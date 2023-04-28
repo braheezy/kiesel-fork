@@ -4,12 +4,17 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const kiesel = b.addModule("kiesel", .{
+        .source_file = .{ .path = "src/kiesel.zig" },
+    });
+
     const exe = b.addExecutable(.{
         .name = "kiesel",
         .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
+    exe.addModule("kiesel", kiesel);
 
     b.installArtifact(exe);
 
