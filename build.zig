@@ -4,8 +4,38 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    // Copied from zig-libgc's build.zig
+    const libgc = b.addStaticLibrary(.{
+        .name = "libgc",
+        .target = target,
+        .optimize = optimize,
+    });
+    {
+        const cflags = [_][]const u8{};
+        const libgc_srcs = [_][]const u8{
+            "alloc.c",    "reclaim.c", "allchblk.c", "misc.c",     "mach_dep.c", "os_dep.c",
+            "mark_rts.c", "headers.c", "mark.c",     "obj_map.c",  "blacklst.c", "finalize.c",
+            "new_hblk.c", "dbg_mlc.c", "malloc.c",   "dyn_load.c", "typd_mlc.c", "ptr_chck.c",
+            "mallocx.c",
+        };
+
+        libgc.linkLibC();
+        libgc.addIncludePath("vendor/zig-libgc/vendor/bdwgc/include");
+        inline for (libgc_srcs) |src| {
+            libgc.addCSourceFile("vendor/zig-libgc/vendor/bdwgc/" ++ src, &cflags);
+        }
+    }
+
+    const gc = b.createModule(.{
+        .source_file = .{ .path = "vendor/zig-libgc/src/gc.zig" },
+    });
+
     const kiesel = b.addModule("kiesel", .{
         .source_file = .{ .path = "src/kiesel.zig" },
+        .dependencies = &.{std.Build.ModuleDependency{
+            .module = gc,
+            .name = "gc",
+        }},
     });
 
     const exe = b.addExecutable(.{
@@ -14,6 +44,9 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    exe.linkLibC();
+    exe.linkLibrary(libgc);
+    exe.addIncludePath("vendor/zig-libgc/vendor/bdwgc/include");
     exe.addModule("kiesel", kiesel);
 
     b.installArtifact(exe);

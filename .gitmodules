@@ -1,0 +1,3 @@
+[submodule "vendor/zig-libgc"]
+	path = vendor/zig-libgc
+	url = https://github.com/mitchellh/zig-libgc
