@@ -6,6 +6,7 @@ const std = @import("std");
 const execution = @import("../../execution.zig");
 
 const Agent = execution.Agent;
+const Value = @import("value.zig").Value;
 
 pub const Data = @import("Object/Data.zig");
 pub const Factory = @import("Object/Factory.zig").Factory;
@@ -49,4 +50,11 @@ pub fn propertyStorage(self: Object) *PropertyStorage {
 pub fn isExtensible(object: Object) !bool {
     // 1. Return ? O.[[IsExtensible]]().
     return object.internalMethods().isExtensible(object);
+}
+
+/// 7.3.2 Get ( O, P )
+/// https://tc39.es/ecma262/#sec-get-o-p
+pub fn get(object: Object, property_key: PropertyKey) !Value {
+    // 1. Return ? O.[[Get]](P, O).
+    return object.internalMethods().get(object, property_key, Value.fromObject(object));
 }
