@@ -44,7 +44,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    exe.linkLibC();
     exe.linkLibrary(libgc);
     exe.addIncludePath("vendor/zig-libgc/vendor/bdwgc/include");
     exe.addModule("kiesel", kiesel);
@@ -62,10 +61,13 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .path = "src/kiesel.zig" },
         .target = target,
         .optimize = optimize,
     });
+    unit_tests.linkLibrary(libgc);
+    unit_tests.addIncludePath("vendor/zig-libgc/vendor/bdwgc/include");
+    unit_tests.addModule("gc", gc);
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
     const test_step = b.step("test", "Run unit tests");
