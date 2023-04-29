@@ -35,13 +35,17 @@ pub fn create(allocator: Allocator) !*Self {
     // 2. Perform CreateIntrinsics(realmRec).
     realm.createIntrinsics();
 
-    // 3. Set realmRec.[[GlobalObject]] to undefined.
-    realm.global_object = undefined;
+    realm.* = .{
+        .intrinsics = realm.intrinsics,
 
-    // 4. Set realmRec.[[GlobalEnv]] to undefined.
-    realm.global_object = undefined;
+        // 3. Set realmRec.[[GlobalObject]] to undefined.
+        .global_object = undefined,
 
-    // TODO: 5. Set realmRec.[[TemplateMap]] to a new empty List.
+        // 4. Set realmRec.[[GlobalEnv]] to undefined.
+        .global_env = undefined,
+
+        // TODO: 5. Set realmRec.[[TemplateMap]] to a new empty List.
+    };
 
     // 6. Return realmRec.
     return realm;

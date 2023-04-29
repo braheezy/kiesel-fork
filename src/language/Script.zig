@@ -29,7 +29,6 @@ pub fn parse(allocator: Allocator, source_text: []const u8, realm: *Realm, host_
 
     // 3. Return Script Record { [[Realm]]: realm, [[ECMAScriptCode]]: script, [[LoadedModules]]: « », [[HostDefined]]: hostDefined }.
     var script = try allocator.create(Self);
-    script.realm = realm;
-    script.host_defined = host_defined;
+    script.* = .{ .realm = realm, .host_defined = host_defined };
     return script;
 }
