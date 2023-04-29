@@ -285,12 +285,91 @@ pub fn ordinarySet(object: Object, property_key: PropertyKey, value: Value, rece
 
 /// 10.1.9.2 OrdinarySetWithOwnDescriptor ( O, P, V, Receiver, ownDesc )
 /// https://tc39.es/ecma262/#sec-ordinarysetwithowndescriptor
-pub fn ordinarySetWithOwnDescriptor(object: Object, property_key: PropertyKey, value: Value, receiver: Value, own_descriptor: ?PropertyDescriptor) !bool {
-    _ = own_descriptor;
-    _ = receiver;
-    _ = value;
-    _ = property_key;
-    _ = object;
+pub fn ordinarySetWithOwnDescriptor(
+    object: Object,
+    property_key: PropertyKey,
+    value: Value,
+    receiver_value: Value,
+    maybe_own_descriptor: ?PropertyDescriptor,
+) !bool {
+    var own_descriptor: PropertyDescriptor = undefined;
+
+    // 1. If ownDesc is undefined, then
+    if (maybe_own_descriptor == null) {
+        // a. Let parent be ? O.[[GetPrototypeOf]]().
+        const parent = try object.internalMethods().getPrototypeOf(object);
+
+        // b. If parent is not null, then
+        if (parent) |parent_object| {
+            // i. Return ? parent.[[Set]](P, V, Receiver).
+            return parent_object.internalMethods().set(parent_object, property_key, value, receiver_value);
+        }
+        // c. Else,
+        else {
+            // i. Set ownDesc to the PropertyDescriptor { [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true }.
+            own_descriptor = PropertyDescriptor{
+                .value = .undefined,
+                .writable = true,
+                .enumerable = true,
+                .configurable = true,
+            };
+        }
+    } else {
+        own_descriptor = maybe_own_descriptor.?;
+    }
+
+    // 2. If IsDataDescriptor(ownDesc) is true, then
+    if (own_descriptor.isDataDescriptor()) {
+        // a. If ownDesc.[[Writable]] is false, return false.
+        if (own_descriptor.writable == false)
+            return false;
+
+        // b. If Receiver is not an Object, return false.
+        if (receiver_value != .object)
+            return false;
+        const receiver = receiver_value.object;
+
+        // c. Let existingDescriptor be ? Receiver.[[GetOwnProperty]](P).
+        const maybe_existing_descriptor = try receiver.internalMethods().getOwnProperty(receiver, property_key);
+
+        // d. If existingDescriptor is not undefined, then
+        if (maybe_existing_descriptor) |existing_descriptor| {
+            // i. If IsAccessorDescriptor(existingDescriptor) is true, return false.
+            if (existing_descriptor.isAccessorDescriptor())
+                return false;
+
+            // ii. If existingDescriptor.[[Writable]] is false, return false.
+            if (existing_descriptor.writable == false)
+                return false;
+
+            // iii. Let valueDesc be the PropertyDescriptor { [[Value]]: V }.
+            const value_descriptor = PropertyDescriptor{ .value = value };
+
+            // iv. Return ? Receiver.[[DefineOwnProperty]](P, valueDesc).
+            return receiver.internalMethods().defineOwnProperty(receiver, property_key, value_descriptor);
+        }
+        // e. Else,
+        else {
+            // i. Assert: Receiver does not currently have a property P.
+            std.debug.assert(!receiver.propertyStorage().has(property_key));
+
+            // ii. Return ? CreateDataProperty(Receiver, P, V).
+            return receiver.createDataProperty(property_key, value);
+        }
+    }
+
+    // 3. Assert: IsAccessorDescriptor(ownDesc) is true.
+    std.debug.assert(own_descriptor.isAccessorDescriptor());
+
+    // 4. Let setter be ownDesc.[[Set]].
+    const setter = own_descriptor.set;
+
+    // 5. If setter is undefined, return false.
+    if (setter == null)
+        return false;
+
+    // TODO: 6. Perform ? Call(setter, Receiver, « V »).
+    // 7. Return true.
     return error.NotImplemented;
 }
 
