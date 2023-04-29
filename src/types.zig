@@ -6,6 +6,7 @@ pub const Completion = spec.Completion;
 pub const Number = language.Number;
 pub const Object = language.Object;
 pub const PropertyDescriptor = spec.PropertyDescriptor;
+pub const PropertyKey = Object.PropertyKey;
 pub const Symbol = language.Symbol;
 pub const Value = language.Value;
 

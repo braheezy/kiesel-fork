@@ -59,9 +59,18 @@ pub fn isGenericDescriptor(self: *const Self) bool {
 }
 
 test "isAccessorDescriptor" {
-    try std.testing.expect((Self{ .get = .{} }).isAccessorDescriptor());
-    try std.testing.expect((Self{ .set = .{} }).isAccessorDescriptor());
-    try std.testing.expect((Self{ .get = .{}, .set = .{} }).isAccessorDescriptor());
+    const builtins = @import("../../builtins.zig");
+    const Agent = @import("../../execution.zig").Agent;
+    var agent = Agent.init();
+    const getter = (try builtins.Object.create(&agent, .{
+        .prototype = null,
+    })).object();
+    const setter = (try builtins.Object.create(&agent, .{
+        .prototype = null,
+    })).object();
+    try std.testing.expect((Self{ .get = getter }).isAccessorDescriptor());
+    try std.testing.expect((Self{ .set = setter }).isAccessorDescriptor());
+    try std.testing.expect((Self{ .get = getter, .set = setter }).isAccessorDescriptor());
     try std.testing.expect(!(Self{ .value = Value.undefined }).isAccessorDescriptor());
 }
 
@@ -72,7 +81,13 @@ test "isDataDescriptor" {
 }
 
 test "isGenericDescriptor" {
+    const builtins = @import("../../builtins.zig");
+    const Agent = @import("../../execution.zig").Agent;
+    var agent = Agent.init();
+    const setter = (try builtins.Object.create(&agent, .{
+        .prototype = null,
+    })).object();
     try std.testing.expect((Self{ .writable = null }).isGenericDescriptor());
-    try std.testing.expect(!(Self{ .set = .{} }).isGenericDescriptor());
+    try std.testing.expect(!(Self{ .set = setter }).isGenericDescriptor());
     try std.testing.expect(!(Self{}).isGenericDescriptor());
 }

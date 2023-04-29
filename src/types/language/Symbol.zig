@@ -3,8 +3,10 @@
 
 const Symbol = @This();
 
+pub const Id = usize;
+
 /// Internal ID used for equality checks
-id: usize,
+id: Id,
 
 /// [[Description]]
 description: ?[]const u8,
