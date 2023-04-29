@@ -114,6 +114,21 @@ pub const Value = union(enum) {
         // 4. Return false.
         return false;
     }
+
+    /// 7.2.3 IsCallable ( argument )
+    /// https://tc39.es/ecma262/#sec-iscallable
+    pub fn isCallable(self: Self) bool {
+        // 1. If argument is not an Object, return false.
+        if (self != .object)
+            return false;
+
+        // 2. If argument has a [[Call]] internal method, return true.
+        if (self.object.internalMethods().call != null)
+            return true;
+
+        // 3. Return false.
+        return false;
+    }
 };
 
 test "Value.nan" {
