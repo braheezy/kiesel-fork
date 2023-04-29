@@ -129,6 +129,21 @@ pub const Value = union(enum) {
         // 3. Return false.
         return false;
     }
+
+    /// 7.2.4 IsConstructor ( argument )
+    /// https://tc39.es/ecma262/#sec-isconstructor
+    pub fn isConstructor(self: Self) bool {
+        // 1. If argument is not an Object, return false.
+        if (!self == .object)
+            return false;
+
+        // 2. If argument has a [[Construct]] internal method, return true.
+        if (self.object.internalMethods().construct != null)
+            return true;
+
+        // 3. Return false.
+        return false;
+    }
 };
 
 test "Value.nan" {
