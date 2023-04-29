@@ -4,8 +4,10 @@
 const std = @import("std");
 
 const execution = @import("../../execution.zig");
+const spec = @import("../spec.zig");
 
 const Agent = execution.Agent;
+const PropertyDescriptor = spec.PropertyDescriptor;
 const Value = @import("value.zig").Value;
 
 pub const Data = @import("Object/Data.zig");
@@ -70,4 +72,14 @@ pub fn set(object: Object, property_key: PropertyKey, value: Value, throw: enum 
         return error.ExceptionThrown;
 
     // 3. Return unused.
+}
+
+/// 7.3.5 CreateDataProperty ( O, P, V )
+/// https://tc39.es/ecma262/#sec-createdataproperty
+pub fn createDataProperty(object: Object, property_key: PropertyKey, value: Value) !bool {
+    // 1. Let newDesc be the PropertyDescriptor { [[Value]]: V, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true }.
+    const new_descriptor = PropertyDescriptor{ .value = value, .writable = true, .enumerable = true, .configurable = true };
+
+    // 2. Return ? O.[[DefineOwnProperty]](P, newDesc).
+    return object.internalMethods().defineOwnProperty(object, property_key, new_descriptor);
 }
