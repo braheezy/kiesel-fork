@@ -58,3 +58,16 @@ pub fn get(object: Object, property_key: PropertyKey) !Value {
     // 1. Return ? O.[[Get]](P, O).
     return object.internalMethods().get(object, property_key, Value.fromObject(object));
 }
+
+/// 7.3.4 Set ( O, P, V, Throw )
+/// https://tc39.es/ecma262/#sec-set-o-p-v-throw
+pub fn set(object: Object, property_key: PropertyKey, value: Value, throw: enum { throw, ignore }) !void {
+    // 1. Let success be ? O.[[Set]](P, V, O).
+    const success = try object.internalMethods().set(object, property_key, value, Value.fromObject(object));
+
+    // 2. If success is false and Throw is true, throw a TypeError exception.
+    if (!success and throw == .throw)
+        return error.ExceptionThrown;
+
+    // 3. Return unused.
+}
