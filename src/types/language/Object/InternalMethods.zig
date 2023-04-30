@@ -82,7 +82,7 @@ call: ?*const fn (
     object: Object,
     this_value: Value,
     arguments: []const Value,
-) anyerror!std.ArrayList(PropertyKey) = null,
+) anyerror!Value = null,
 
 // [[Construct]]
 construct: ?*const fn (

@@ -260,10 +260,9 @@ pub fn ordinaryGet(object: Object, property_key: PropertyKey, receiver: Value) !
     // 5. Let getter be desc.[[Get]].
     // 6. If getter is undefined, return undefined.
     const getter = descriptor.get orelse return Value.undefined;
-    _ = getter;
 
     // 7. Return ? Call(getter, Receiver).
-    return error.NotImplemented;
+    return Value.fromObject(getter).callAssumeCallableNoArgs(receiver);
 }
 
 /// 10.1.9 [[Set]] ( P, V, Receiver )
@@ -362,15 +361,14 @@ pub fn ordinarySetWithOwnDescriptor(
     std.debug.assert(own_descriptor.isAccessorDescriptor());
 
     // 4. Let setter be ownDesc.[[Set]].
-    const setter = own_descriptor.set;
-
     // 5. If setter is undefined, return false.
-    if (setter == null)
-        return false;
+    const setter = own_descriptor.set orelse return false;
 
-    // TODO: 6. Perform ? Call(setter, Receiver, « V »).
+    // 6. Perform ? Call(setter, Receiver, « V »).
+    _ = try Value.fromObject(setter).callAssumeCallable(receiver_value, &[_]Value{value});
+
     // 7. Return true.
-    return error.NotImplemented;
+    return true;
 }
 
 /// 10.1.10 [[Delete]] ( P )

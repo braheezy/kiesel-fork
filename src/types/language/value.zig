@@ -1,5 +1,8 @@
 const std = @import("std");
 
+const execution = @import("../../execution.zig");
+
+const Agent = execution.Agent;
 const BigInt = @import("BigInt.zig");
 const Number = @import("number.zig").Number;
 const Object = @import("Object.zig");
@@ -143,6 +146,34 @@ pub const Value = union(enum) {
 
         // 3. Return false.
         return false;
+    }
+
+    /// 7.3.14 Call ( F, V [ , argumentsList ] )
+    /// https://tc39.es/ecma262/#sec-call
+    pub fn call(self: Self, agent: *Agent, this_value: Value, arguments_list: []const Value) !Value {
+        _ = agent;
+
+        // 1. If argumentsList is not present, set argumentsList to a new empty List.
+        // This is done via the NoArgs variant of the function.
+
+        // 2. If IsCallable(F) is false, throw a TypeError exception.
+        if (!self.isCallable())
+            return error.ExceptionThrown;
+
+        // 3. Return ? F.[[Call]](V, argumentsList).
+        return self.object.internalMethods().call.?(self.object, this_value, arguments_list);
+    }
+
+    pub fn callNoArgs(self: Self, agent: *Agent, this_value: Value) !Value {
+        return self.call(agent, this_value, &[_]Value{});
+    }
+
+    pub fn callAssumeCallable(self: Self, this_value: Value, arguments_list: []const Value) !Value {
+        return self.object.internalMethods().call.?(self.object, this_value, arguments_list);
+    }
+
+    pub fn callAssumeCallableNoArgs(self: Self, this_value: Value) !Value {
+        return self.callAssumeCallable(this_value, &[_]Value{});
     }
 };
 
