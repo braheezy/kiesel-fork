@@ -20,11 +20,11 @@ pub fn init(allocator: Allocator) Self {
     };
 }
 
-pub fn has(self: *const Self, property_key: PropertyKey) bool {
+pub fn has(self: Self, property_key: PropertyKey) bool {
     return self.hash_map.contains(property_key);
 }
 
-pub fn get(self: *const Self, property_key: PropertyKey) ?PropertyDescriptor {
+pub fn get(self: Self, property_key: PropertyKey) ?PropertyDescriptor {
     return self.hash_map.get(property_key);
 }
 
