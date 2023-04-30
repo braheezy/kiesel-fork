@@ -145,6 +145,39 @@ pub const Value = union(enum) {
         return self;
     }
 
+    /// 7.1.2 ToBoolean ( argument )
+    /// https://tc39.es/ecma262/#sec-toboolean
+    pub fn toBoolean(self: Self) bool {
+        // 1. If argument is a Boolean, return argument.
+        if (self == .boolean)
+            return self.boolean;
+
+        // 2. If argument is one of undefined, null, +0𝔽, -0𝔽, NaN, 0ℤ, or the empty String, return false.
+        switch (self) {
+            .undefined, .null => return false,
+            .number => |number| switch (number) {
+                .f64 => |x| if (x == 0 or std.math.isNan(x)) {
+                    return false;
+                },
+                .i32 => |x| if (x == 0) {
+                    return false;
+                },
+            },
+            .big_int => |big_int| if (big_int.value.eqZero()) {
+                return false;
+            },
+            .string => |string| if (string.len == 0) {
+                return false;
+            },
+            else => {},
+        }
+
+        // 3. NOTE: This step is replaced in section B.3.6.1.
+
+        // 4. Return true.
+        return true;
+    }
+
     /// 7.1.17 ToString ( argument )
     /// https://tc39.es/ecma262/#sec-tostring
     pub fn toString(self: Self, agent: *Agent) ![]const u8 {
