@@ -145,6 +145,46 @@ pub const Value = union(enum) {
         return self;
     }
 
+    /// 7.1.17 ToString ( argument )
+    /// https://tc39.es/ecma262/#sec-tostring
+    pub fn toString(self: Self, agent: *Agent) ![]const u8 {
+        return switch (self) {
+            // 1. If argument is a String, return argument.
+            .string => |string| string,
+
+            // 2. If argument is a Symbol, throw a TypeError exception.
+            .symbol => error.ExceptionThrown,
+
+            // 3. If argument is undefined, return "undefined".
+            .undefined => "undefined",
+
+            // 4. If argument is null, return "null".
+            .null => "null",
+
+            // 5. If argument is true, return "true".
+            // 6. If argument is false, return "false".
+            .boolean => |boolean| if (boolean) "true" else "false",
+
+            // 7. If argument is a Number, return Number::toString(argument, 10).
+            .number => |number| number.toString(agent.allocator, 10),
+
+            // 8. If argument is a BigInt, return BigInt::toString(argument, 10).
+            .big_int => |big_int| big_int.toString(agent.allocator, 10),
+
+            // 9. Assert: argument is an Object.
+            .object => {
+                // 10. Let primValue be ? ToPrimitive(argument, string).
+                const primitive_value = try self.toPrimitive(agent, .string);
+
+                // 11. Assert: primValue is not an Object.
+                std.debug.assert(primitive_value != .object);
+
+                // 12. Return ? ToString(primValue).
+                return primitive_value.toString(agent);
+            },
+        };
+    }
+
     /// 7.2.2 IsArray ( argument )
     /// https://tc39.es/ecma262/#sec-isarray
     pub fn isArray(self: Self) !bool {
