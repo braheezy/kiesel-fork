@@ -13,6 +13,8 @@ const Symbol = @import("Symbol.zig");
 pub const Value = union(enum) {
     const Self = @This();
 
+    pub const PreferredType = enum { string, number };
+
     /// 6.1.1 The Undefined Type
     /// https://tc39.es/ecma262/#sec-ecmascript-language-types-undefined-type
     undefined,

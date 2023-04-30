@@ -8,6 +8,7 @@ pub const Agent = execution.Agent;
 pub const Completion = types.Completion;
 pub const Number = types.Number;
 pub const Object = types.Object;
+pub const PreferredType = types.PreferredType;
 pub const PropertyDescriptor = types.PropertyDescriptor;
 pub const PropertyKey = types.PropertyKey;
 pub const Realm = execution.Realm;

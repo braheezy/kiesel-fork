@@ -7,6 +7,7 @@ const execution = @import("../../execution.zig");
 const spec = @import("../spec.zig");
 
 const Agent = execution.Agent;
+const PreferredType = Value.PreferredType;
 const PropertyDescriptor = spec.PropertyDescriptor;
 const Value = @import("value.zig").Value;
 
@@ -45,6 +46,38 @@ pub fn internalMethods(self: Object) *InternalMethods {
 
 pub fn propertyStorage(self: Object) *PropertyStorage {
     return &self.data.property_storage;
+}
+
+/// 7.1.1.1 OrdinaryToPrimitive ( O, hint )
+/// https://tc39.es/ecma262/#sec-ordinarytoprimitive
+pub fn ordinaryToPrimitive(object: Object, hint: PreferredType) !Value {
+    const method_names = switch (hint) {
+        // 1. If hint is string, then
+        //     a. Let methodNames be « "toString", "valueOf" ».
+        .string => [_][]const u8{ "toString", "valueOf" },
+        // 2. Else,
+        //     a. Let methodNames be « "valueOf", "toString" ».
+        else => [_][]const u8{ "valueOf", "toString" },
+    };
+
+    // 3. For each element name of methodNames, do
+    for (method_names) |name| {
+        // a. Let method be ? Get(O, name).
+        const method = try object.get(PropertyKey.fromString(name));
+
+        // b. If IsCallable(method) is true, then
+        if (method.isCallable()) {
+            // i. Let result be ? Call(method, O).
+            const result = try method.callAssumeCallableNoArgs(Value.fromObject(object));
+
+            // ii. If result is not an Object, return result.
+            if (result != .object)
+                return result;
+        }
+    }
+
+    // 4. Throw a TypeError exception.
+    return error.ExceptionThrown;
 }
 
 /// 7.2.5 IsExtensible ( O )
