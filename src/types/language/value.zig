@@ -98,6 +98,53 @@ pub const Value = union(enum) {
         return .{ .object = object };
     }
 
+    /// 7.1.1 ToPrimitive ( input [ , preferredType ] )
+    /// https://tc39.es/ecma262/#sec-toprimitive
+    pub fn toPrimitive(self: Self, agent: *Agent, preferred_type: ?PreferredType) !Value {
+        // 1. If input is an Object, then
+        if (self == .object) {
+            // a. Let exoticToPrim be ? GetMethod(input, @@toPrimitive).
+            const exotic_to_primitive = Value.undefined;
+
+            // b. If exoticToPrim is not undefined, then
+            if (exotic_to_primitive != .undefined) {
+                const hint = blk: {
+                    // i. If preferredType is not present, then
+                    if (preferred_type == null) {
+                        // 1. Let hint be "default".
+                        break :blk "default";
+                    }
+                    break :blk switch (preferred_type.?) {
+                        // ii. Else if preferredType is string, then
+                        //     1. Let hint be "string".
+                        .string => "string",
+                        // iii. Else,
+                        //     1. Assert: preferredType is number.
+                        //     2. Let hint be "number".
+                        .number => "number",
+                    };
+                };
+
+                // iv. Let result be ? Call(exoticToPrim, input, « hint »).
+                const result = exotic_to_primitive.call(agent, self, [_]Value{hint});
+
+                // v. If result is not an Object, return result.
+                if (result != .object)
+                    return result;
+
+                // vi. Throw a TypeError exception.
+                return error.ExceptionThrown;
+            }
+
+            // c. If preferredType is not present, let preferredType be number.
+            // d. Return ? OrdinaryToPrimitive(input, preferredType).
+            return self.object.ordinaryToPrimitive(preferred_type orelse .number);
+        }
+
+        // 2. Return input.
+        return self;
+    }
+
     /// 7.2.2 IsArray ( argument )
     /// https://tc39.es/ecma262/#sec-isarray
     pub fn isArray(self: Self) !bool {
