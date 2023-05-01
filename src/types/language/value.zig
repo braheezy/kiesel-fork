@@ -185,6 +185,48 @@ pub const Value = union(enum) {
         return true;
     }
 
+    /// 7.1.4 ToNumber ( argument )
+    /// https://tc39.es/ecma262/#sec-tonumber
+    pub fn toNumber(self: Self, agent: *Agent) !Number {
+        switch (self) {
+            // 1. If argument is a Number, return argument.
+            .number => |number| return number,
+
+            // 2. If argument is either a Symbol or a BigInt, throw a TypeError exception.
+            .symbol => return agent.throwException(
+                .type_error,
+                "Cannot convert Symbol to number",
+            ),
+            .big_int => return agent.throwException(
+                .type_error,
+                "Cannot convert BigInt to number",
+            ),
+
+            // 3. If argument is undefined, return NaN.
+            .undefined => return Number.from(std.math.nan(f64)),
+
+            // 4. If argument is either null or false, return +0𝔽.
+            // 5. If argument is true, return 1𝔽.
+            .null => return Number.from(0),
+            .boolean => |boolean| return Number.from(@boolToInt(boolean)),
+
+            // 6. If argument is a String, return StringToNumber(argument).
+            .string => |string| return stringToNumber(string),
+
+            // 7. Assert: argument is an Object.
+            .object => {
+                // 8. Let primValue be ? ToPrimitive(argument, number).
+                const primitive_value = try self.toPrimitive(agent, .number);
+
+                // 9. Assert: primValue is not an Object.
+                std.debug.assert(primitive_value != .object);
+
+                // 10. Return ? ToNumber(primValue).
+                return primitive_value.toNumber(agent);
+            },
+        }
+    }
+
     /// 7.1.17 ToString ( argument )
     /// https://tc39.es/ecma262/#sec-tostring
     pub fn toString(self: Self, agent: *Agent) ![]const u8 {
@@ -310,6 +352,20 @@ pub const Value = union(enum) {
         return self.callAssumeCallable(this_value, &[_]Value{});
     }
 };
+
+/// 7.1.4.1.1 StringToNumber ( str )
+/// https://tc39.es/ecma262/#sec-stringtonumber
+pub fn stringToNumber(string: []const u8) Number {
+    // 1. Let text be StringToCodePoints(str).
+
+    // 2. Let literal be ParseText(text, StringNumericLiteral).
+    // 3. If literal is a List of errors, return NaN.
+    // 4. Return StringNumericValue of literal.
+    // TODO: Implement the proper string parsing grammar!
+    return Number.from(std.fmt.parseFloat(f64, string) catch std.math.nan(f64));
+}
+
+}
 
 test "format" {
     const builtins = @import("../../builtins.zig");
