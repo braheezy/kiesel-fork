@@ -378,6 +378,26 @@ pub const Value = union(enum) {
         return @floatToInt(i8, if (int8bit >= pow_2_7) int8bit - pow_2_8 else int8bit);
     }
 
+    /// 7.1.11 ToUint8 ( argument )
+    /// https://tc39.es/ecma262/#sec-touint8
+    pub fn toUint8(self: Self, agent: *Agent) !u8 {
+        // 1. Let number be ? ToNumber(argument).
+        const number = try self.toNumber(agent);
+
+        // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
+        if (!number.isFinite() or number.asFloat() == 0)
+            return 0;
+
+        // 3. Let int be truncate(ℝ(number)).
+        const int = number.truncate().asFloat();
+
+        // 4. Let int8bit be int modulo 2^8.
+        const int8bit = @mod(int, pow_2_8);
+
+        // 5. Return 𝔽(int8bit).
+        return @floatToInt(u8, int8bit);
+    }
+
     /// 7.1.17 ToString ( argument )
     /// https://tc39.es/ecma262/#sec-tostring
     pub fn toString(self: Self, agent: *Agent) ![]const u8 {
