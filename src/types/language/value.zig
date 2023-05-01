@@ -8,6 +8,9 @@ const Number = @import("number.zig").Number;
 const Object = @import("Object.zig");
 const Symbol = @import("Symbol.zig");
 
+const pow_2_31 = std.math.pow(f64, 2, 31);
+const pow_2_32 = std.math.pow(f64, 2, 32);
+
 /// 6.1 ECMAScript Language Types
 /// https://tc39.es/ecma262/#sec-ecmascript-language-types
 pub const Value = union(enum) {
@@ -261,6 +264,30 @@ pub const Value = union(enum) {
 
         // 5. Return truncate(ℝ(number)).
         return number.truncate();
+    }
+
+    /// 7.1.6 ToInt32 ( argument )
+    /// https://tc39.es/ecma262/#sec-toint32
+    pub fn toInt32(self: Self, agent: *Agent) !i32 {
+        // OPTIMIZATION: We may already have an i32 :^)
+        if (self == .number and self.number == .i32)
+            return self.number.i32;
+
+        // 1. Let number be ? ToNumber(argument).
+        const number = try self.toNumber(agent);
+
+        // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
+        if (!number.isFinite() or number.asFloat() == 0)
+            return 0;
+
+        // 3. Let int be truncate(ℝ(number)).
+        const int = number.truncate().asFloat();
+
+        // 4. Let int32bit be int modulo 2^32.
+        const int32bit = @mod(int, pow_2_32);
+
+        // 5. If int32bit ≥ 2^31, return 𝔽(int32bit - 2^32); otherwise return 𝔽(int32bit).
+        return @floatToInt(i32, if (int32bit >= pow_2_31) int32bit - pow_2_32 else int32bit);
     }
 
     /// 7.1.17 ToString ( argument )
