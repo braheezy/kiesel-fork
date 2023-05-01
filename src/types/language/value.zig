@@ -164,13 +164,8 @@ pub const Value = union(enum) {
         // 2. If argument is one of undefined, null, +0𝔽, -0𝔽, NaN, 0ℤ, or the empty String, return false.
         switch (self) {
             .undefined, .null => return false,
-            .number => |number| switch (number) {
-                .f64 => |x| if (x == 0 or std.math.isNan(x)) {
-                    return false;
-                },
-                .i32 => |x| if (x == 0) {
-                    return false;
-                },
+            .number => |number| if (number.asFloat() == 0 or number.isNan()) {
+                return false;
             },
             .big_int => |big_int| if (big_int.value.eqZero()) {
                 return false;

@@ -55,6 +55,55 @@ pub const Number = union(enum) {
         }
     }
 
+    pub fn asFloat(self: Self) f64 {
+        return switch (self) {
+            .f64 => |x| x,
+            .i32 => |x| @intToFloat(f64, x),
+        };
+    }
+
+    pub fn isNan(self: Self) bool {
+        return switch (self) {
+            .f64 => |x| std.math.isNan(x),
+            .i32 => false,
+        };
+    }
+
+    pub fn isPositiveInf(self: Self) bool {
+        return switch (self) {
+            .f64 => |x| std.math.isPositiveInf(x),
+            .i32 => false,
+        };
+    }
+
+    pub fn isNegativeInf(self: Self) bool {
+        return switch (self) {
+            .f64 => |x| std.math.isNegativeInf(x),
+            .i32 => false,
+        };
+    }
+
+    pub fn isFinite(self: Self) bool {
+        return switch (self) {
+            .f64 => |x| std.math.isFinite(x),
+            .i32 => false,
+        };
+    }
+
+    pub fn truncate(self: Self) Self {
+        return switch (self) {
+            .f64 => |x| .{ .f64 = @trunc(x) },
+            .i32 => |x| .{ .i32 = x },
+        };
+    }
+
+    pub fn floor(self: Self) Self {
+        return switch (self) {
+            .f64 => |x| .{ .f64 = @floor(x) },
+            .i32 => |x| .{ .i32 = x },
+        };
+    }
+
     /// 6.1.6.1.20 Number::toString ( x, radix )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-tostring
     pub fn toString(self: Self, allocator: Allocator, radix: u8) ![]const u8 {
