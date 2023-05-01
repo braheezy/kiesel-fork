@@ -481,6 +481,32 @@ pub const Value = union(enum) {
         };
     }
 
+    /// 7.1.15 ToBigInt64 ( argument )
+    /// https://tc39.es/ecma262/#sec-tobigint64
+    pub fn toBigInt64(self: Self, agent: *Agent) !i64 {
+        const pow_2_63 = agent.pre_allocated.pow_2_63;
+        const pow_2_64 = agent.pre_allocated.pow_2_64;
+
+        // 1. Let n be ? ToBigInt(argument).
+        const n = try self.toBigInt(agent);
+
+        // 2. Let int64bit be ℝ(n) modulo 2^64.
+        var quotient = try BigInt.Value.init(agent.allocator);
+        var int64bit = try BigInt.Value.init(agent.allocator);
+        try quotient.divTrunc(&int64bit, &n.value, &pow_2_64);
+
+        // 3. If int64bit ≥ 2^63, return ℤ(int64bit - 2^64); otherwise return ℤ(int64bit).
+        // FIXME: Use `int64bit.order(pow_2_63) != .lt` (https://github.com/ziglang/zig/issues/15535)
+        if (int64bit.to(u128) catch unreachable >= pow_2_63.to(u128) catch unreachable) {
+            var result = try BigInt.Value.init(agent.allocator);
+            try result.sub(&int64bit, &pow_2_64);
+            std.debug.print("result = {}\n", .{result});
+            return result.to(i64) catch unreachable;
+        } else {
+            return int64bit.to(i64) catch unreachable;
+        }
+    }
+
     /// 7.1.17 ToString ( argument )
     /// https://tc39.es/ecma262/#sec-tostring
     pub fn toString(self: Self, agent: *Agent) ![]const u8 {
