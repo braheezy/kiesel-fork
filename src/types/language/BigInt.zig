@@ -9,7 +9,7 @@ const Self = @This();
 
 pub const Value = std.math.big.int.Managed;
 
-value: *Value,
+value: Value,
 
 /// 6.1.6.2.21 BigInt::toString ( x, radix )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-tostring
