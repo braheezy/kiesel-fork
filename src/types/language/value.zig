@@ -8,6 +8,8 @@ const Number = @import("number.zig").Number;
 const Object = @import("Object.zig");
 const Symbol = @import("Symbol.zig");
 
+const pow_2_7 = std.math.pow(f64, 2, 7);
+const pow_2_8 = std.math.pow(f64, 2, 8);
 const pow_2_15 = std.math.pow(f64, 2, 15);
 const pow_2_16 = std.math.pow(f64, 2, 16);
 const pow_2_31 = std.math.pow(f64, 2, 31);
@@ -354,6 +356,26 @@ pub const Value = union(enum) {
 
         // 5. Return 𝔽(int16bit).
         return @floatToInt(u16, int16bit);
+    }
+
+    /// 7.1.10 ToInt8 ( argument )
+    /// https://tc39.es/ecma262/#sec-toint8
+    pub fn toInt8(self: Self, agent: *Agent) !i8 {
+        // 1. Let number be ? ToNumber(argument).
+        const number = try self.toNumber(agent);
+
+        // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
+        if (!number.isFinite() or number.asFloat() == 0)
+            return 0;
+
+        // 3. Let int be truncate(ℝ(number)).
+        const int = number.truncate().asFloat();
+
+        // 4. Let int8bit be int modulo 2^8.
+        const int8bit = @mod(int, pow_2_8);
+
+        // 5. If int8bit ≥ 2^7, return 𝔽(int8bit - 2^8); otherwise return 𝔽(int8bit).
+        return @floatToInt(i8, if (int8bit >= pow_2_7) int8bit - pow_2_8 else int8bit);
     }
 
     /// 7.1.17 ToString ( argument )
