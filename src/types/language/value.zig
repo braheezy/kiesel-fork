@@ -336,6 +336,26 @@ pub const Value = union(enum) {
         return @floatToInt(i16, if (int16bit >= pow_2_15) int16bit - pow_2_16 else int16bit);
     }
 
+    /// 7.1.9 ToUint16 ( argument )
+    /// https://tc39.es/ecma262/#sec-touint16
+    pub fn toUint16(self: Self, agent: *Agent) !u16 {
+        // 1. Let number be ? ToNumber(argument).
+        const number = try self.toNumber(agent);
+
+        // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
+        if (!number.isFinite() or number.asFloat() == 0)
+            return 0;
+
+        // 3. Let int be truncate(ℝ(number)).
+        const int = number.truncate().asFloat();
+
+        // 4. Let int16bit be int modulo 2^16.
+        const int16bit = @mod(int, pow_2_16);
+
+        // 5. Return 𝔽(int16bit).
+        return @floatToInt(u16, int16bit);
+    }
+
     /// 7.1.17 ToString ( argument )
     /// https://tc39.es/ecma262/#sec-tostring
     pub fn toString(self: Self, agent: *Agent) ![]const u8 {
