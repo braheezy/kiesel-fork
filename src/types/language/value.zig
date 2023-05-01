@@ -270,7 +270,7 @@ pub const Value = union(enum) {
             return -std.math.inf(f64);
 
         // 5. Return truncate(ℝ(number)).
-        return number.truncate();
+        return number.truncate().asFloat();
     }
 
     /// 7.1.6 ToInt32 ( argument )
