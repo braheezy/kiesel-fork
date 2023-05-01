@@ -11,7 +11,7 @@ const Script = kiesel.Script;
 const Value = kiesel.Value;
 
 pub fn main() !void {
-    var agent = Agent.init();
+    var agent = try Agent.init();
     const realm = try Realm.create(agent.allocator);
     const script = try Script.parse(agent.allocator, "", realm, null);
     _ = script;

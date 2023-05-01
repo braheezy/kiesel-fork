@@ -39,6 +39,7 @@ const ExceptionType = enum {
 };
 
 allocator: Allocator,
+pre_allocated: struct {},
 exception: ?Value = null,
 symbol_id: usize = 0,
 well_known_symbols: WellKnownSymbols,
@@ -61,11 +62,13 @@ pub const WellKnownSymbols = struct {
     @"@@unscopables": Symbol,
 };
 
-pub fn init() Self {
+pub fn init() !Self {
     var self = Self{
         .allocator = gc.allocator(),
+        .pre_allocated = undefined,
         .well_known_symbols = undefined,
     };
+    self.pre_allocated = .{};
     self.well_known_symbols = WellKnownSymbols{
         .@"@@asyncIterator" = self.createSymbol("Symbol.asyncIterator") catch unreachable,
         .@"@@hasInstance" = self.createSymbol("Symbol.hasInstance") catch unreachable,
@@ -114,7 +117,7 @@ pub fn throwException(
 }
 
 test "well_known_symbols" {
-    const agent = init();
+    const agent = try init();
     const unscopables = agent.well_known_symbols.@"@@unscopables";
     try std.testing.expectEqual(unscopables.id, 12);
     try std.testing.expectEqualStrings(unscopables.description.?, "Symbol.unscopables");

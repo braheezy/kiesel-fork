@@ -641,7 +641,7 @@ pub fn stringToBigInt(allocator: Allocator, string: []const u8) !?BigInt {
 
 test "format" {
     const builtins = @import("../../builtins.zig");
-    var agent = Agent.init();
+    var agent = try Agent.init();
     const object = (try builtins.Object.create(&agent, .{
         .prototype = null,
     })).object();

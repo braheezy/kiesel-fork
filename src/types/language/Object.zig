@@ -137,7 +137,7 @@ pub fn createDataProperty(self: Self, property_key: PropertyKey, value: Value) !
 
 test "format" {
     const builtins = @import("../../builtins.zig");
-    var agent_ = Agent.init();
+    var agent_ = try Agent.init();
     const object = (try builtins.Object.create(&agent_, .{
         .prototype = null,
     })).object();

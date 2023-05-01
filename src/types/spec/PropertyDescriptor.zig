@@ -61,7 +61,7 @@ pub fn isGenericDescriptor(self: Self) bool {
 test "isAccessorDescriptor" {
     const builtins = @import("../../builtins.zig");
     const Agent = @import("../../execution.zig").Agent;
-    var agent = Agent.init();
+    var agent = try Agent.init();
     const getter = (try builtins.Object.create(&agent, .{
         .prototype = null,
     })).object();
@@ -83,7 +83,7 @@ test "isDataDescriptor" {
 test "isGenericDescriptor" {
     const builtins = @import("../../builtins.zig");
     const Agent = @import("../../execution.zig").Agent;
-    var agent = Agent.init();
+    var agent = try Agent.init();
     const setter = (try builtins.Object.create(&agent, .{
         .prototype = null,
     })).object();
