@@ -398,6 +398,49 @@ pub const Value = union(enum) {
         return @floatToInt(u8, int8bit);
     }
 
+    /// 7.1.12 ToUint8Clamp ( argument )
+    /// https://tc39.es/ecma262/#sec-touint8clamp
+    pub fn toUint8Clamp(self: Self, agent: *Agent) !u8 {
+        // 1. Let number be ? ToNumber(argument).
+        const number = try self.toNumber(agent);
+
+        // 2. If number is NaN, return +0𝔽.
+        if (number.isNan())
+            return 0;
+
+        // 3. If ℝ(number) ≤ 0, return +0𝔽.
+        // 4. If ℝ(number) ≥ 255, return 255𝔽.
+        switch (number) {
+            .f64 => |x| {
+                if (x <= 0) return 0;
+                if (x >= 255) return 255;
+            },
+            .i32 => |x| {
+                if (x <= 0) return 0;
+                if (x >= 255) return 255;
+            },
+        }
+
+        // 5. Let f be floor(ℝ(number)).
+        const f = number.floor().asFloat();
+        const f_int = @floatToInt(u8, f);
+
+        // 6. If f + 0.5 < ℝ(number), return 𝔽(f + 1).
+        if (f + 0.5 < number.asFloat())
+            return f_int + 1;
+
+        // 7. If ℝ(number) < f + 0.5, return 𝔽(f).
+        if (number.asFloat() < f + 0.5)
+            return f_int;
+
+        // 8. If f is odd, return 𝔽(f + 1).
+        if (f_int % 2 != 0)
+            return f_int + 1;
+
+        // 9. Return 𝔽(f).
+        return f_int;
+    }
+
     /// 7.1.17 ToString ( argument )
     /// https://tc39.es/ecma262/#sec-tostring
     pub fn toString(self: Self, agent: *Agent) ![]const u8 {
