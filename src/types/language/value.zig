@@ -241,6 +241,28 @@ pub const Value = union(enum) {
         }
     }
 
+    /// 7.1.5 ToIntegerOrInfinity ( argument )
+    /// https://tc39.es/ecma262/#sec-tointegerorinfinity
+    pub fn toIntegerOrInfinity(self: Self, agent: *Agent) !f64 {
+        // 1. Let number be ? ToNumber(argument).
+        const number = try self.toNumber(agent);
+
+        // 2. If number is one of NaN, +0𝔽, or -0𝔽, return 0.
+        if (number.isNan() or number.asFloat() == 0)
+            return 0;
+
+        // 3. If number is +∞𝔽, return +∞.
+        if (number.isPositiveInf())
+            return std.math.inf(f64);
+
+        // 4. If number is -∞𝔽, return -∞.
+        if (number.isNegativeInf())
+            return -std.math.inf(f64);
+
+        // 5. Return truncate(ℝ(number)).
+        return number.truncate();
+    }
+
     /// 7.1.17 ToString ( argument )
     /// https://tc39.es/ecma262/#sec-tostring
     pub fn toString(self: Self, agent: *Agent) ![]const u8 {
