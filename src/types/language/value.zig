@@ -8,6 +8,7 @@ const Agent = execution.Agent;
 const BigInt = @import("BigInt.zig");
 const Number = @import("number.zig").Number;
 const Object = @import("Object.zig");
+const PropertyKey = Object.PropertyKey;
 const Symbol = @import("Symbol.zig");
 
 const pow_2_7 = std.math.pow(f64, 2, 7);
@@ -565,6 +566,26 @@ pub const Value = union(enum) {
                 return primitive_value.toString(agent);
             },
         };
+    }
+
+    /// 7.1.19 ToPropertyKey ( argument )
+    /// https://tc39.es/ecma262/#sec-topropertykey
+    pub fn toPropertyKey(self: Self, agent: *Agent) !PropertyKey {
+        // 1. Let key be ? ToPrimitive(argument, string).
+        const key = try self.toPrimitive(agent, .string);
+
+        // 2. If key is a Symbol, then
+        if (key == .symbol) {
+            // a. Return key.
+            return PropertyKey.fromSymbol(key.symbol);
+        }
+
+        // 3. Return ! ToString(key).
+        const string = key.toString(agent) catch |err| switch (err) {
+            error.ExceptionThrown => unreachable,
+            error.OutOfMemory => return error.OutOfMemory,
+        };
+        return PropertyKey.fromString(string);
     }
 
     /// 7.2.2 IsArray ( argument )
