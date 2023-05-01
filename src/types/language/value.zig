@@ -47,6 +47,30 @@ pub const Value = union(enum) {
     /// https://tc39.es/ecma262/#sec-object-type
     object: Object,
 
+    pub fn format(
+        self: Self,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = options;
+        _ = fmt;
+        switch (self) {
+            .undefined => try writer.writeAll("undefined"),
+            .null => try writer.writeAll("null"),
+            .boolean => |boolean| try writer.writeAll(if (boolean) "true" else "false"),
+            .string => |string| {
+                try writer.writeAll("\"");
+                try writer.writeAll(string);
+                try writer.writeAll("\"");
+            },
+            .symbol => |symbol| try writer.print("{}", .{symbol}),
+            .number => |number| try writer.print("{}", .{number}),
+            .big_int => |big_int| try writer.print("{}", .{big_int}),
+            .object => |object| try writer.print("{}", .{object}),
+        }
+    }
+
     pub fn nan() Value {
         return .{ .number = Number.from(std.math.nan(f64)) };
     }
@@ -283,6 +307,33 @@ pub const Value = union(enum) {
         return self.callAssumeCallable(this_value, &[_]Value{});
     }
 };
+
+test "format" {
+    const builtins = @import("../../builtins.zig");
+    var agent = Agent.init();
+    const object = (try builtins.Object.create(&agent, .{
+        .prototype = null,
+    })).object();
+    const test_cases = [_]struct { Value, []const u8 }{
+        .{ Value.undefined, "undefined" },
+        .{ Value.null, "null" },
+        .{ Value.fromBoolean(true), "true" },
+        .{ Value.fromBoolean(false), "false" },
+        .{ Value.fromString("foo"), "\"foo\"" },
+        .{ Value.fromSymbol(Symbol{ .id = 0, .description = null }), "Symbol()" },
+        .{ Value.fromSymbol(Symbol{ .id = 0, .description = "foo" }), "Symbol(\"foo\")" },
+        .{ Value.fromBigInt(BigInt{ .value = try BigInt.Value.initSet(std.testing.allocator, 123) }), "123n" },
+        .{ Value.fromObject(object), "[object Object]" },
+    };
+    for (test_cases) |test_case| {
+        const value = test_case[0];
+        const expected = test_case[1];
+        const string = try std.fmt.allocPrint(std.testing.allocator, "{}", .{value});
+        defer std.testing.allocator.free(string);
+        defer if (value == .big_int) @constCast(&value.big_int).value.deinit();
+        try std.testing.expectEqualStrings(expected, string);
+    }
+}
 
 test "Value.nan" {
     try std.testing.expect(std.math.isNan(Value.nan().number.f64));
