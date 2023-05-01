@@ -86,7 +86,7 @@ pub const Number = union(enum) {
     pub fn isFinite(self: Self) bool {
         return switch (self) {
             .f64 => |x| std.math.isFinite(x),
-            .i32 => false,
+            .i32 => true,
         };
     }
 
