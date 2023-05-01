@@ -185,6 +185,20 @@ pub const Value = union(enum) {
         return true;
     }
 
+    /// 7.1.3 ToNumeric ( value )
+    /// https://tc39.es/ecma262/#sec-tonumeric
+    pub fn toNumeric(self: Self, agent: *Agent) !Number {
+        // 1. Let primValue be ? ToPrimitive(value, number).
+        const primitive_value = try self.toPrimitive(agent, .number);
+
+        // 2. If primValue is a BigInt, return primValue.
+        if (primitive_value == .big_int)
+            return primitive_value.big_int;
+
+        // 3. Return ? ToNumber(primValue).
+        return primitive_value.toNumber(agent);
+    }
+
     /// 7.1.4 ToNumber ( argument )
     /// https://tc39.es/ecma262/#sec-tonumber
     pub fn toNumber(self: Self, agent: *Agent) !Number {
