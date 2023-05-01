@@ -9,13 +9,38 @@ const Allocator = std.mem.Allocator;
 const types = @import("../types.zig");
 
 const Symbol = types.Symbol;
+const Value = types.Value;
 
 const Self = @This();
 
+const ExceptionType = enum {
+    // NativeError types
+    eval_error,
+    range_error,
+    reference_error,
+    syntax_error,
+    type_error,
+    uri_error,
+
+    // Non-standard internal error
+    internal_error,
+
+    pub fn typeName(self: @This()) []const u8 {
+        return switch (self) {
+            .eval_error => "EvalError",
+            .range_error => "RangeError",
+            .reference_error => "ReferenceError",
+            .syntax_error => "SyntaxError",
+            .type_error => "TypeError",
+            .uri_error => "URIError",
+            .internal_error => "InternalError",
+        };
+    }
+};
+
 allocator: Allocator,
-
+exception: ?Value = null,
 symbol_id: usize = 0,
-
 well_known_symbols: WellKnownSymbols,
 
 /// 6.1.5.1 Well-Known Symbols
@@ -68,6 +93,24 @@ pub fn createSymbol(self: *Self, description: ?[]const u8) !Symbol {
         break :blk self.symbol_id;
     };
     return .{ .id = id, .description = description };
+}
+
+/// 5.2.3.2 Throw an Exception
+/// https://tc39.es/ecma262/#sec-throw-an-exception
+pub fn throwException(
+    self: *Self,
+    exception_type: ExceptionType,
+    message: []const u8,
+) error{ExceptionThrown} {
+    // TODO: Create an actual error object.
+    self.exception = Value.fromString(
+        std.fmt.allocPrint(
+            self.allocator,
+            "{s}: {s}",
+            .{ exception_type.typeName(), message },
+        ) catch "InternalError: Out of memory",
+    );
+    return error.ExceptionThrown;
 }
 
 test "well_known_symbols" {

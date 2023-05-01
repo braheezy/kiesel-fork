@@ -142,7 +142,10 @@ pub const Value = union(enum) {
                     return result;
 
                 // vi. Throw a TypeError exception.
-                return error.ExceptionThrown;
+                return agent.throwException(
+                    .type_error,
+                    "Could not convert object to primitive",
+                );
             }
 
             // c. If preferredType is not present, let preferredType be number.
@@ -190,7 +193,10 @@ pub const Value = union(enum) {
             .string => |string| string,
 
             // 2. If argument is a Symbol, throw a TypeError exception.
-            .symbol => error.ExceptionThrown,
+            .symbol => return agent.throwException(
+                .type_error,
+                "Cannot convert Symbol to string",
+            ),
 
             // 3. If argument is undefined, return "undefined".
             .undefined => "undefined",
@@ -277,14 +283,16 @@ pub const Value = union(enum) {
     /// 7.3.14 Call ( F, V [ , argumentsList ] )
     /// https://tc39.es/ecma262/#sec-call
     pub fn call(self: Self, agent: *Agent, this_value: Value, arguments_list: []const Value) !Value {
-        _ = agent;
-
         // 1. If argumentsList is not present, set argumentsList to a new empty List.
         // This is done via the NoArgs variant of the function.
 
         // 2. If IsCallable(F) is false, throw a TypeError exception.
-        if (!self.isCallable())
-            return error.ExceptionThrown;
+        if (!self.isCallable()) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.allocator, "{} is not callable", .{self}),
+            );
+        }
 
         // 3. Return ? F.[[Call]](V, argumentsList).
         return self.object.internalMethods().call.?(self.object, this_value, arguments_list);

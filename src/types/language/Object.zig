@@ -90,7 +90,12 @@ pub fn ordinaryToPrimitive(self: Self, hint: PreferredType) !Value {
     }
 
     // 4. Throw a TypeError exception.
-    return error.ExceptionThrown;
+    const message = try std.fmt.allocPrint(
+        self.agent().allocator,
+        "Could not convert object to {s}",
+        .{@tagName(hint)},
+    );
+    return self.agent().throwException(.type_error, message);
 }
 
 /// 7.2.5 IsExtensible ( O )
@@ -115,7 +120,7 @@ pub fn set(self: Self, property_key: PropertyKey, value: Value, throw: enum { th
 
     // 2. If success is false and Throw is true, throw a TypeError exception.
     if (!success and throw == .throw)
-        return error.ExceptionThrown;
+        return self.agent().throwException(.type_error, "Could not set property");
 
     // 3. Return unused.
 }
