@@ -588,6 +588,20 @@ pub const Value = union(enum) {
         return PropertyKey.fromString(string);
     }
 
+    /// 7.1.20 ToLength ( argument )
+    /// https://tc39.es/ecma262/#sec-tolength
+    pub fn toLength(self: Self, agent: *Agent) !u53 {
+        // 1. Let len be ? ToIntegerOrInfinity(argument).
+        const length = try self.toIntegerOrInfinity(agent);
+
+        // 2. If len ≤ 0, return +0𝔽.
+        if (length <= 0)
+            return 0;
+
+        // 3. Return 𝔽(min(len, 2^53 - 1)).
+        return @floatToInt(u53, std.math.min(length, std.math.maxInt(u53)));
+    }
+
     /// 7.2.2 IsArray ( argument )
     /// https://tc39.es/ecma262/#sec-isarray
     pub fn isArray(self: Self) !bool {
