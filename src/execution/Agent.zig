@@ -14,6 +14,11 @@ const Value = types.Value;
 
 const Self = @This();
 
+pub const Error = error{
+    ExceptionThrown,
+    OutOfMemory,
+};
+
 const ExceptionType = enum {
     // NativeError types
     eval_error,
