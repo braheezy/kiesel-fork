@@ -22,6 +22,19 @@ const Self = @This();
 ptr: *anyopaque,
 data: *Data,
 
+pub fn format(
+    self: Self,
+    comptime fmt: []const u8,
+    options: std.fmt.FormatOptions,
+    writer: anytype,
+) !void {
+    _ = self;
+    _ = fmt;
+    _ = options;
+    // TODO: Print the actual object type.
+    try writer.writeAll("[object Object]");
+}
+
 pub fn as(self: Self, comptime T: type) *T {
     return @ptrCast(*T, @alignCast(@alignOf(T), self.ptr));
 }
@@ -115,4 +128,15 @@ pub fn createDataProperty(self: Self, property_key: PropertyKey, value: Value) !
 
     // 2. Return ? O.[[DefineOwnProperty]](P, newDesc).
     return self.internalMethods().defineOwnProperty(self, property_key, new_descriptor);
+}
+
+test "format" {
+    const builtins = @import("../../builtins.zig");
+    var agent_ = Agent.init();
+    const object = (try builtins.Object.create(&agent_, .{
+        .prototype = null,
+    })).object();
+    const string = try std.fmt.allocPrint(std.testing.allocator, "{}", .{object});
+    defer std.testing.allocator.free(string);
+    try std.testing.expectEqualStrings(string, "[object Object]");
 }
