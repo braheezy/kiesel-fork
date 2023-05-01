@@ -48,15 +48,15 @@ pub const Value = union(enum) {
     object: Object,
 
     pub fn nan() Value {
-        return .{ .number = .{ .f64 = std.math.nan(f64) } };
+        return .{ .number = Number.from(std.math.nan(f64)) };
     }
 
     pub fn infinity() Value {
-        return .{ .number = .{ .f64 = std.math.inf(f64) } };
+        return .{ .number = Number.from(std.math.inf(f64)) };
     }
 
     pub fn negativeInfinity() Value {
-        return .{ .number = .{ .f64 = -std.math.inf(f64) } };
+        return .{ .number = Number.from(-std.math.inf(f64)) };
     }
 
     pub fn fromBoolean(boolean: bool) Value {
@@ -72,22 +72,7 @@ pub const Value = union(enum) {
     }
 
     pub fn fromNumber(number: anytype) Value {
-        switch (@typeInfo(@TypeOf(number))) {
-            .Int, .ComptimeInt => return .{
-                .number = .{ .i32 = @as(i32, number) },
-            },
-            .Float, .ComptimeFloat => {
-                const truncated = std.math.trunc(number);
-                if (std.math.isFinite(@as(f64, number)) and
-                    truncated == number and
-                    truncated <= std.math.maxInt(i32))
-                {
-                    return .{ .number = .{ .i32 = @floatToInt(i32, truncated) } };
-                }
-                return .{ .number = .{ .f64 = @as(f64, number) } };
-            },
-            else => @compileError("Value.fromNumber() called with incompatible type " ++ @typeName(@TypeOf(number))),
-        }
+        return .{ .number = Number.from(number) };
     }
 
     pub fn fromBigInt(big_int: BigInt) Value {

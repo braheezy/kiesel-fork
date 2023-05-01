@@ -13,6 +13,23 @@ pub const Number = union(enum) {
     // i32 internally.
     i32: i32,
 
+    pub fn from(number: anytype) Self {
+        switch (@typeInfo(@TypeOf(number))) {
+            .Int, .ComptimeInt => return .{ .i32 = @as(i32, number) },
+            .Float, .ComptimeFloat => {
+                const truncated = std.math.trunc(number);
+                if (std.math.isFinite(@as(f64, number)) and
+                    truncated == number and
+                    truncated <= std.math.maxInt(i32))
+                {
+                    return .{ .i32 = @floatToInt(i32, truncated) };
+                }
+                return .{ .f64 = @as(f64, number) };
+            },
+            else => @compileError("Value.fromNumber() called with incompatible type " ++ @typeName(@TypeOf(number))),
+        }
+    }
+
     /// 6.1.6.1.20 Number::toString ( x, radix )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-tostring
     pub fn toString(self: Self, allocator: Allocator, radix: u8) ![]const u8 {
