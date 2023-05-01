@@ -28,7 +28,11 @@ pub fn format(
 pub fn toString(self: Self, allocator: Allocator, radix: u8) ![]const u8 {
     // 1. If x < 0ℤ, return the string-concatenation of "-" and BigInt::toString(-x, radix).
     // 2. Return the String value consisting of the representation of x using radix radix.
-    return self.value.toString(allocator, radix, .lower);
+    return self.value.toString(allocator, radix, .lower) catch |err| switch (err) {
+        // This is an internal API, the base should always be valid.
+        error.InvalidBase => @panic("BigInt.toString() called with invalid base"),
+        error.OutOfMemory => return error.OutOfMemory,
+    };
 }
 
 test "format" {
