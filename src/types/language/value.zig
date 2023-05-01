@@ -686,6 +686,25 @@ pub const Value = union(enum) {
         return false;
     }
 
+    /// 7.2.6 IsIntegralNumber ( argument )
+    /// https://tc39.es/ecma262/#sec-isintegralnumber
+    pub fn isIntegralNumber(self: Self) bool {
+        // 1. If argument is not a Number, return false.
+        if (self != .number)
+            return false;
+
+        // 2. If argument is not finite, return false.
+        if (!self.number.isFinite())
+            return false;
+
+        // 3. If truncate(ℝ(argument)) ≠ ℝ(argument), return false.
+        if (self.number.truncate().asFloat() != self.number.asFloat())
+            return false;
+
+        // 4. Return true.
+        return true;
+    }
+
     /// 7.3.14 Call ( F, V [ , argumentsList ] )
     /// https://tc39.es/ecma262/#sec-call
     pub fn call(self: Self, agent: *Agent, this_value: Value, arguments_list: []const Value) !Value {
