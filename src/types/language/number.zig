@@ -19,6 +19,7 @@ pub const Number = union(enum) {
             .Float, .ComptimeFloat => {
                 const truncated = std.math.trunc(number);
                 if (std.math.isFinite(@as(f64, number)) and
+                    !std.math.signbit(@as(f64, number)) and
                     truncated == number and
                     truncated <= std.math.maxInt(i32))
                 {
