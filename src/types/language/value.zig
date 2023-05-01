@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const execution = @import("../../execution.zig");
 
 const Agent = execution.Agent;
@@ -441,6 +443,44 @@ pub const Value = union(enum) {
         return f_int;
     }
 
+    /// 7.1.13 ToBigInt ( argument )
+    /// https://tc39.es/ecma262/#sec-tobigint
+    pub fn toBigInt(self: Self, agent: *Agent) !BigInt {
+        // 1. Let prim be ? ToPrimitive(argument, number).
+        const primitive = try self.toPrimitive(agent, .number);
+
+        // 2. Return the value that prim corresponds to in Table 12.
+        return switch (primitive) {
+            // Throw a TypeError exception.
+            .undefined => agent.throwException(.type_error, "Cannot convert undefined to BigInt"),
+            .null => agent.throwException(.type_error, "Cannot convert null to BigInt"),
+            .number => agent.throwException(.type_error, "Cannot convert number to BigInt"),
+            .symbol => agent.throwException(.type_error, "Cannot convert symbol to BigInt"),
+
+            // Return 1n if prim is true and 0n if prim is false.
+            .boolean => |boolean| BigInt{
+                .value = try BigInt.Value.initSet(agent.allocator, @boolToInt(boolean)),
+            },
+
+            // Return prim.
+            .big_int => |big_int| big_int,
+
+            .string => |string| {
+                // 1. Let n be StringToBigInt(prim).
+                const n = try stringToBigInt(agent.allocator, string);
+
+                // 2. If n is undefined, throw a SyntaxError exception.
+                // 3. Return n.
+                return n orelse agent.throwException(
+                    .syntax_error,
+                    "Cannot convert string to BigInt",
+                );
+            },
+
+            .object => unreachable,
+        };
+    }
+
     /// 7.1.17 ToString ( argument )
     /// https://tc39.es/ecma262/#sec-tostring
     pub fn toString(self: Self, agent: *Agent) ![]const u8 {
@@ -579,6 +619,24 @@ pub fn stringToNumber(string: []const u8) Number {
     return Number.from(std.fmt.parseFloat(f64, string) catch std.math.nan(f64));
 }
 
+/// 7.1.14 StringToBigInt ( str )
+/// https://tc39.es/ecma262/#sec-stringtobigint
+pub fn stringToBigInt(allocator: Allocator, string: []const u8) !?BigInt {
+
+    // 1. Let text be StringToCodePoints(str).
+
+    // 2. Let literal be ParseText(text, StringIntegerLiteral).
+    // 3. If literal is a List of errors, return undefined.
+    // 4. Let mv be the MV of literal.
+    // 5. Assert: mv is an integer.
+    // 6. Return ℤ(mv).
+    // TODO: Implement the proper string parsing grammar!
+    var value = try BigInt.Value.init(allocator);
+    value.setString(10, string) catch |err| return switch (err) {
+        error.InvalidCharacter => null,
+        else => err,
+    };
+    return BigInt{ .value = value };
 }
 
 test "format" {
