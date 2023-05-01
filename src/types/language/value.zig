@@ -290,6 +290,30 @@ pub const Value = union(enum) {
         return @floatToInt(i32, if (int32bit >= pow_2_31) int32bit - pow_2_32 else int32bit);
     }
 
+    /// 7.1.7 ToUint32 ( argument )
+    /// https://tc39.es/ecma262/#sec-touint32
+    pub fn toUint32(self: Self, agent: *Agent) !u32 {
+        // OPTIMIZATION: We may already have a positive i32 :^)
+        if (self == .number and self.number == .i32 and self.number.i32 >= 0)
+            return @intCast(u32, self.number.i32);
+
+        // 1. Let number be ? ToNumber(argument).
+        const number = try self.toNumber(agent);
+
+        // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
+        if (!number.isFinite() or number.asFloat() == 0)
+            return 0;
+
+        // 3. Let int be truncate(ℝ(number)).
+        const int = number.truncate().asFloat();
+
+        // 4. Let int32bit be int modulo 2^32.
+        const int32bit = @mod(int, pow_2_32);
+
+        // 5. Return 𝔽(int32bit).
+        return @floatToInt(u32, int32bit);
+    }
+
     /// 7.1.17 ToString ( argument )
     /// https://tc39.es/ecma262/#sec-tostring
     pub fn toString(self: Self, agent: *Agent) ![]const u8 {
