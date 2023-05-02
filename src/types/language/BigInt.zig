@@ -23,6 +23,13 @@ pub fn format(
     try writer.writeAll("n");
 }
 
+/// 6.1.6.2.13 BigInt::equal ( x, y )
+/// https://tc39.es/ecma262/#sec-numeric-types-bigint-equal
+pub fn equal(x: Self, y: Self) bool {
+    // 1. If ℝ(x) = ℝ(y), return true; otherwise return false.
+    return x.value.eq(y.value);
+}
+
 /// 6.1.6.2.21 BigInt::toString ( x, radix )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-tostring
 pub fn toString(self: Self, allocator: Allocator, radix: u8) ![]const u8 {

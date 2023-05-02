@@ -768,6 +768,72 @@ pub fn stringToBigInt(allocator: Allocator, string: []const u8) !?BigInt {
     return BigInt{ .value = value };
 }
 
+/// 7.2.10 SameValue ( x, y )
+/// https://tc39.es/ecma262/#sec-samevalue
+pub fn sameValue(x: Value, y: Value) bool {
+    // 1. If Type(x) is not Type(y), return false.
+    if (@enumToInt(x) != @enumToInt(y))
+        return false;
+
+    // 2. If x is a Number, then
+    if (x == .number) {
+        // a. Return Number::sameValue(x, y).
+        return x.number.sameValue(y.number);
+    }
+
+    // 3. Return SameValueNonNumber(x, y).
+    return sameValueNonNumber(x, y);
+}
+
+/// 7.2.11 SameValueZero ( x, y )
+/// https://tc39.es/ecma262/#sec-samevaluezero
+pub fn sameValueZero(x: Value, y: Value) bool {
+    // 1. If Type(x) is not Type(y), return false.
+    if (@enumToInt(x) != @enumToInt(y))
+        return false;
+
+    // 2. If x is a Number, then
+    if (x == .number) {
+        // a. Return Number::sameValueZero(x, y).
+        return x.number.sameValueZero(y.number);
+    }
+
+    // 3. Return SameValueNonNumber(x, y).
+    return sameValueNonNumber(x, y);
+}
+
+/// 7.2.12 SameValueNonNumber ( x, y )
+/// https://tc39.es/ecma262/#sec-samevaluenonnumber
+pub fn sameValueNonNumber(x: Value, y: Value) bool {
+    // 1. Assert: Type(x) is Type(y).
+    std.debug.assert(@enumToInt(x) == @enumToInt(y));
+
+    return switch (x) {
+        // 2. If x is either null or undefined, return true.
+        .null, .undefined => true,
+
+        // 3. If x is a BigInt, then
+        //     a. Return BigInt::equal(x, y).
+        .big_int => x.big_int.equal(y.big_int),
+
+        // 4. If x is a String, then
+        //     a. If x and y have the same length and the same code units in the same positions,
+        //        return true; otherwise, return false.
+        .string => std.mem.eql(u8, x.string, y.string),
+
+        // 5. If x is a Boolean, then
+        //     a. If x and y are both true or both false, return true; otherwise, return false.
+        .boolean => x.boolean == y.boolean,
+
+        // 6. NOTE: All other ECMAScript language values are compared by identity.
+        // 7. If x is y, return true; otherwise, return false.
+        .symbol => x.symbol.id == y.symbol.id,
+        .object => x.object.ptr == y.object.ptr,
+
+        .number => unreachable,
+    };
+}
+
 test "format" {
     const builtins = @import("../../builtins.zig");
     var agent = try Agent.init();

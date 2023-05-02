@@ -10,6 +10,8 @@ pub const PropertyDescriptor = spec.PropertyDescriptor;
 pub const PropertyKey = Object.PropertyKey;
 pub const Symbol = language.Symbol;
 pub const Value = language.Value;
+pub const sameValue = language.sameValue;
+pub const sameValueZero = language.sameValueZero;
 
 test {
     _ = language;

@@ -83,6 +83,20 @@ pub const Number = union(enum) {
         };
     }
 
+    pub fn isPositiveZero(self: Self) bool {
+        return switch (self) {
+            .f64 => |x| x == 0 and !std.math.signbit(x),
+            .i32 => |x| x == 0,
+        };
+    }
+
+    pub fn isNegativeZero(self: Self) bool {
+        return switch (self) {
+            .f64 => |x| x == 0 and std.math.signbit(x),
+            .i32 => false,
+        };
+    }
+
     pub fn isFinite(self: Self) bool {
         return switch (self) {
             .f64 => |x| std.math.isFinite(x),
@@ -102,6 +116,40 @@ pub const Number = union(enum) {
             .f64 => |x| .{ .f64 = @floor(x) },
             .i32 => |x| .{ .i32 = x },
         };
+    }
+
+    /// 6.1.6.1.14 Number::sameValue ( x, y )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-sameValue
+    pub fn sameValue(x: Self, y: Self) bool {
+        // 1. If x is NaN and y is NaN, return true.
+        if (x.isNan() and y.isNan())
+            return true;
+
+        // 2. If x is +0𝔽 and y is -0𝔽, return false.
+        if (x.isPositiveZero() and y.isNegativeZero())
+            return false;
+
+        // 3. If x is -0𝔽 and y is +0𝔽, return false.
+        if (x.isNegativeZero() and y.isPositiveZero())
+            return false;
+
+        // 4. If x is y, return true.
+        // 5. Return false.
+        return x.asFloat() == y.asFloat();
+    }
+
+    /// 6.1.6.1.15 Number::sameValueZero ( x, y )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-sameValueZero
+    pub fn sameValueZero(x: Self, y: Self) bool {
+        // 1. If x is NaN and y is NaN, return true.
+        if (x.isNan() and y.isNan())
+            return true;
+
+        // 2. If x is +0𝔽 and y is -0𝔽, return true.
+        // 3. If x is -0𝔽 and y is +0𝔽, return true.
+        // 4. If x is y, return true.
+        // 5. Return false.
+        return x.asFloat() == y.asFloat();
     }
 
     /// 6.1.6.1.20 Number::toString ( x, radix )
