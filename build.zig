@@ -31,7 +31,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const kiesel = b.addModule("kiesel", .{
-        .source_file = .{ .path = "src/kiesel.zig" },
+        .source_file = .{ .path = "src/main.zig" },
         .dependencies = &.{std.Build.ModuleDependency{
             .module = gc,
             .name = "gc",
@@ -40,7 +40,7 @@ pub fn build(b: *std.Build) void {
 
     const exe = b.addExecutable(.{
         .name = "kiesel",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .path = "src/cli.zig" },
         .target = target,
         .optimize = optimize,
     });
@@ -61,7 +61,7 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/kiesel.zig" },
+        .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
