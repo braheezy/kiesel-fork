@@ -3,12 +3,12 @@ const kiesel = @import("kiesel");
 
 const builtins = kiesel.builtins;
 
-const Agent = kiesel.Agent;
-const PropertyDescriptor = kiesel.PropertyDescriptor;
-const PropertyKey = kiesel.PropertyKey;
-const Realm = kiesel.Realm;
-const Script = kiesel.Script;
-const Value = kiesel.Value;
+const Agent = kiesel.execution.Agent;
+const PropertyDescriptor = kiesel.types.PropertyDescriptor;
+const PropertyKey = kiesel.types.PropertyKey;
+const Realm = kiesel.execution.Realm;
+const Script = kiesel.language.Script;
+const Value = kiesel.types.Value;
 
 pub fn main() !void {
     var agent = try Agent.init();
