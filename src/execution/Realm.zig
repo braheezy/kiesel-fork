@@ -31,12 +31,9 @@ host_defined: ?*anyopaque = null,
 pub fn create(allocator: Allocator) !*Self {
     // 1. Let realmRec be a new Realm Record.
     var realm = try allocator.create(Self);
-
-    // 2. Perform CreateIntrinsics(realmRec).
-    realm.createIntrinsics();
-
     realm.* = .{
-        .intrinsics = realm.intrinsics,
+        // 2. Perform CreateIntrinsics(realmRec).
+        .intrinsics = try realm.createIntrinsics(),
 
         // 3. Set realmRec.[[GlobalObject]] to undefined.
         .global_object = undefined,
@@ -53,9 +50,10 @@ pub fn create(allocator: Allocator) !*Self {
 
 /// 9.3.2 CreateIntrinsics ( realmRec )
 /// https://tc39.es/ecma262/#sec-createintrinsics
-fn createIntrinsics(self: *Self) void {
+fn createIntrinsics(self: *Self) !Intrinsics {
+    _ = self;
     // 1. Set realmRec.[[Intrinsics]] to a new Record.
-    self.intrinsics = Intrinsics{};
+    var intrinsics = Intrinsics{};
 
     // TODO: 2. Set fields of realmRec.[[Intrinsics]] with the values listed in Table 6. The field
     //    names are the names listed in column one of the table. The value of each field is a new
@@ -72,4 +70,5 @@ fn createIntrinsics(self: *Self) void {
     // TODO: 3. Perform AddRestrictedFunctionProperties(realmRec.[[Intrinsics]].[[%Function.prototype%]], realmRec).
 
     // 4. Return unused.
+    return intrinsics;
 }
