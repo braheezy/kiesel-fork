@@ -5,14 +5,16 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const types = @import("../types.zig");
+
 const Agent = @import("Agent.zig");
+const Object = types.Object;
 
 const Self = @This();
 
 // Stubs, for now
 const Environment = struct {};
 const Intrinsics = struct {};
-const Object = struct {};
 
 agent: *Agent,
 
