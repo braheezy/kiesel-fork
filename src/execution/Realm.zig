@@ -10,11 +10,12 @@ const types = @import("../types.zig");
 const Agent = @import("Agent.zig");
 const Object = types.Object;
 
+pub const Intrinsics = @import("Realm/Intrinsics.zig");
+
 const Self = @This();
 
 // Stubs, for now
 const Environment = struct {};
-const Intrinsics = struct {};
 
 agent: *Agent,
 
