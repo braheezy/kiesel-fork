@@ -12,7 +12,7 @@ const Value = kiesel.types.Value;
 
 pub fn main() !void {
     var agent = try Agent.init();
-    const realm = try Realm.create(agent.allocator);
+    const realm = try Realm.create(&agent);
     const script = try Script.parse(agent.allocator, "", realm, null);
     _ = script;
 

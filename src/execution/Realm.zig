@@ -5,12 +5,16 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const Agent = @import("Agent.zig");
+
 const Self = @This();
 
 // Stubs, for now
 const Environment = struct {};
 const Intrinsics = struct {};
 const Object = struct {};
+
+agent: *Agent,
 
 /// [[Intrinsics]]
 intrinsics: Intrinsics,
@@ -28,10 +32,12 @@ host_defined: ?*anyopaque = null,
 
 /// 9.3.1 CreateRealm ( )
 /// https://tc39.es/ecma262/#sec-createrealm
-pub fn create(allocator: Allocator) !*Self {
+pub fn create(agent: *Agent) !*Self {
     // 1. Let realmRec be a new Realm Record.
-    var realm = try allocator.create(Self);
+    var realm = try agent.allocator.create(Self);
     realm.* = .{
+        .agent = agent,
+
         // 2. Perform CreateIntrinsics(realmRec).
         .intrinsics = try realm.createIntrinsics(),
 
