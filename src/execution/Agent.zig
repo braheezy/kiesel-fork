@@ -9,6 +9,7 @@ const Allocator = std.mem.Allocator;
 const types = @import("../types.zig");
 
 const BigInt = types.BigInt;
+const ExecutionContext = @import("ExecutionContext.zig");
 const Symbol = types.Symbol;
 const Value = types.Value;
 
@@ -52,6 +53,7 @@ pre_allocated: struct {
 exception: ?Value = null,
 symbol_id: usize = 0,
 well_known_symbols: WellKnownSymbols,
+execution_context_stack: std.ArrayList(ExecutionContext),
 
 /// 6.1.5.1 Well-Known Symbols
 /// https://tc39.es/ecma262/#sec-well-known-symbols
@@ -76,6 +78,7 @@ pub fn init() !Self {
         .allocator = gc.allocator(),
         .pre_allocated = undefined,
         .well_known_symbols = undefined,
+        .execution_context_stack = undefined,
     };
     self.pre_allocated = .{
         .pow_2_63 = try BigInt.Value.initSet(self.allocator, std.math.pow(u64, 2, 63)),
@@ -96,6 +99,7 @@ pub fn init() !Self {
         .@"@@toStringTag" = self.createSymbol("Symbol.toStringTag") catch unreachable,
         .@"@@unscopables" = self.createSymbol("Symbol.unscopables") catch unreachable,
     };
+    self.execution_context_stack = std.ArrayList(ExecutionContext).init(self.allocator);
     return self;
 }
 
