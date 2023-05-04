@@ -9,6 +9,7 @@ const spec = @import("../spec.zig");
 const Agent = execution.Agent;
 const PreferredType = Value.PreferredType;
 const PropertyDescriptor = spec.PropertyDescriptor;
+const Realm = execution.Realm;
 const Value = @import("value.zig").Value;
 
 pub const Data = @import("Object/Data.zig");
@@ -133,6 +134,19 @@ pub fn createDataProperty(self: Self, property_key: PropertyKey, value: Value) !
 
     // 2. Return ? O.[[DefineOwnProperty]](P, newDesc).
     return self.internalMethods().defineOwnProperty(self, property_key, new_descriptor);
+}
+
+/// 7.3.15 Construct ( F [ , argumentsList [ , newTarget ] ] )
+/// https://tc39.es/ecma262/#sec-construct
+pub fn construct(self: Self, args: struct { arguments_list: []const Value = &[_]Value{}, new_target: ?Self = null }) !Self {
+    // 1. If newTarget is not present, set newTarget to F.
+    const new_target = args.new_target orelse self;
+
+    // 2. If argumentsList is not present, set argumentsList to a new empty List.
+    const arguments_list = args.arguments_list;
+
+    // 3. Return ? F.[[Construct]](argumentsList, newTarget).
+    return self.internalMethods().construct.?(self, arguments_list, new_target);
 }
 
 test "format" {
