@@ -8,6 +8,7 @@ const Allocator = std.mem.Allocator;
 const types = @import("../types.zig");
 
 const Agent = @import("Agent.zig");
+const ExecutionContext = @import("ExecutionContext.zig");
 const Object = types.Object;
 
 pub const Intrinsics = @import("Realm/Intrinsics.zig");
@@ -80,4 +81,44 @@ fn createIntrinsics(self: *Self) !Intrinsics {
 
     // 4. Return unused.
     return intrinsics;
+}
+
+/// 9.6 InitializeHostDefinedRealm ( )
+/// https://tc39.es/ecma262/#sec-initializehostdefinedrealm
+pub fn initializeHostDefinedRealm(agent: *Agent) !void {
+    // 1. Let realm be CreateRealm().
+    const realm = try create(agent);
+
+    // 2. Let newContext be a new execution context.
+    const new_context = ExecutionContext{
+        // 3. Set the Function of newContext to null.
+        .function = null,
+
+        // 4. Set the Realm of newContext to realm.
+        .realm = realm,
+
+        // 5. Set the ScriptOrModule of newContext to null.
+        .script_or_module = null,
+    };
+
+    // 6. Push newContext onto the execution context stack; newContext is now the running execution
+    //    context.
+    try agent.execution_context_stack.append(new_context);
+
+    // 7. If the host requires use of an exotic object to serve as realm's global object, let
+    //    global be such an object created in a host-defined manner. Otherwise, let global be
+    //    undefined, indicating that an ordinary object should be created as the global object.
+
+    // 8. If the host requires that the this binding in realm's global scope return an object other
+    //    than the global object, let thisValue be such an object created in a host-defined manner.
+    //    Otherwise, let thisValue be undefined, indicating that realm's global this binding should
+    //    be the global object.
+    const thisValue = null;
+    _ = thisValue;
+
+    // TODO: 9. Perform SetRealmGlobalObject(realm, global, thisValue).
+    // TODO: 10. Let globalObj be ? SetDefaultGlobalBindings(realm).
+
+    // 11. Create any host-defined global object properties on globalObj.
+    // 12. Return unused.
 }
