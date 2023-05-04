@@ -142,6 +142,13 @@ pub fn runningExecutionContext(self: Self) *ExecutionContext {
     return &self.execution_context_stack.items[self.execution_context_stack.items.len - 1];
 }
 
+/// https://tc39.es/ecma262/#current-realm
+pub fn currentRealm(self: Self) *Realm {
+    // The value of the Realm component of the running execution context is also called the current
+    // Realm Record.
+    return self.runningExecutionContext().realm;
+}
+
 test "well_known_symbols" {
     const agent = try init();
     const unscopables = agent.well_known_symbols.@"@@unscopables";
