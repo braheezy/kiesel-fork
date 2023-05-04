@@ -21,8 +21,10 @@ pub fn Factory(
     const Args = if (has_fields) struct {
         fields: options.Fields,
         prototype: ?Object,
+        extensible: bool = true,
     } else struct {
         prototype: ?Object,
+        extensible: bool = true,
     };
 
     return struct {
@@ -38,6 +40,7 @@ pub fn Factory(
                 .data = .{
                     .agent = agent,
                     .prototype = args.prototype,
+                    .extensible = args.extensible,
                     .internal_methods = options.internal_methods orelse .{},
                     .property_storage = Object.PropertyStorage.init(agent.allocator),
                 },

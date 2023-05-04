@@ -9,8 +9,8 @@ const PropertyStorage = @import("PropertyStorage.zig");
 prototype: ?Object,
 
 /// [[Extensible]]
-extensible: bool = true,
+extensible: bool,
 
 agent: *Agent,
-internal_methods: InternalMethods = .{},
+internal_methods: InternalMethods,
 property_storage: PropertyStorage,
