@@ -10,6 +10,7 @@ const types = @import("../types.zig");
 
 const BigInt = types.BigInt;
 const ExecutionContext = @import("ExecutionContext.zig");
+const Realm = @import("Realm.zig");
 const Symbol = types.Symbol;
 const Value = types.Value;
 
@@ -130,6 +131,15 @@ pub fn throwException(
         ) catch "InternalError: Out of memory",
     );
     return error.ExceptionThrown;
+}
+
+/// https://tc39.es/ecma262/#running-execution-context
+pub fn runningExecutionContext(self: Self) *ExecutionContext {
+    // At any point in time, there is at most one execution context per agent that is actually
+    // executing code. This is known as the agent's running execution context.
+    // The running execution context is always the top element of this stack.
+    std.debug.assert(self.execution_context_stack.items.len > 0);
+    return &self.execution_context_stack.items[self.execution_context_stack.items.len - 1];
 }
 
 test "well_known_symbols" {
