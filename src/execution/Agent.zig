@@ -149,6 +149,29 @@ pub fn currentRealm(self: Self) *Realm {
     return self.runningExecutionContext().realm;
 }
 
+/// 9.4.1 GetActiveScriptOrModule ( )
+/// https://tc39.es/ecma262/#sec-getactivescriptormodule
+pub fn getActiveScriptOrModule(self: Self) ?*ExecutionContext.ScriptOrModule {
+    // 1. If the execution context stack is empty, return null.
+    if (self.execution_context_stack.items.len == 0)
+        return null;
+
+    // 2. Let ec be the topmost execution context on the execution context stack whose
+    //    ScriptOrModule component is not null.
+    var execution_context: ?*ExecutionContext = null;
+    var i = self.execution_context_stack.items.len;
+    while (i > 0) : (i -= 1) {
+        execution_context = self.execution_context_stack.items[i - 1];
+        if (execution_context.script_or_module != null)
+            break;
+    }
+
+    // 3. If no such execution context exists, return null. Otherwise, return ec's ScriptOrModule.
+    if (execution_context == null)
+        return null;
+    return execution_context.script_or_module;
+}
+
 test "well_known_symbols" {
     const agent = try init();
     const unscopables = agent.well_known_symbols.@"@@unscopables";
