@@ -30,7 +30,9 @@ pub fn Factory(
     return struct {
         const Self = @This();
 
-        fields: options.Fields,
+        pub const Fields = options.Fields;
+
+        fields: Fields,
         data: Data,
 
         pub fn create(agent: *Agent, args: Args) !*Self {
