@@ -149,6 +149,19 @@ pub fn definePropertyOrThrow(self: Self, property_key: PropertyKey, property_des
     // 3. Return unused.
 }
 
+/// 7.3.10 DeletePropertyOrThrow ( O, P )
+/// https://tc39.es/ecma262/#sec-deletepropertyorthrow
+pub fn deletePropertyOrThrow(self: Self, property_key: PropertyKey) !void {
+    // 1. Let success be ? O.[[Delete]](P).
+    const success = try self.internalMethods().delete(self, property_key);
+
+    // 2. If success is false, throw a TypeError exception.
+    if (!success)
+        return self.agent().throwException(.type_error, "Could not delete property");
+
+    // 3. Return unused.
+}
+
 /// 7.3.15 Construct ( F [ , argumentsList [ , newTarget ] ] )
 /// https://tc39.es/ecma262/#sec-construct
 pub fn construct(self: Self, args: struct { arguments_list: []const Value = &[_]Value{}, new_target: ?Self = null }) !Self {
