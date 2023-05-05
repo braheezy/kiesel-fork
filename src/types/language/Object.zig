@@ -3,6 +3,7 @@
 
 const std = @import("std");
 
+const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const spec = @import("../spec.zig");
 
@@ -175,8 +176,29 @@ pub fn construct(self: Self, args: struct { arguments_list: []const Value = &[_]
     return self.internalMethods().construct.?(self, arguments_list, new_target);
 }
 
+/// 7.3.25 GetFunctionRealm ( obj )
+/// https://tc39.es/ecma262/#sec-getfunctionrealm
+pub fn getFunctionRealm(self: Self) !*Realm {
+    // 1. If obj has a [[Realm]] internal slot, then
+    if (self.internalMethods().call != null) {
+        // a. Return obj.[[Realm]].
+        return self.as(builtins.BuiltinFunction).fields.realm;
+    }
+
+    // TODO: 2. If obj is a bound function exotic object, then
+    //     a. Let boundTargetFunction be obj.[[BoundTargetFunction]].
+    //     b. Return ? GetFunctionRealm(boundTargetFunction).
+
+    // TODO: 3. If obj is a Proxy exotic object, then
+    //     a. Perform ? ValidateNonRevokedProxy(obj).
+    //     b. Let proxyTarget be obj.[[ProxyTarget]].
+    //     c. Return ? GetFunctionRealm(proxyTarget).
+
+    // 4. Return the current Realm Record.
+    return self.agent().currentRealm();
+}
+
 test "format" {
-    const builtins = @import("../../builtins.zig");
     var agent_ = try Agent.init();
     const object = (try builtins.Object.create(&agent_, .{
         .prototype = null,
