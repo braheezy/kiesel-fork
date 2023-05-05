@@ -1,0 +1,181 @@
+//! 10.3 Built-in Function Objects
+//! https://tc39.es/ecma262/#sec-built-in-function-objects-call-thisargument-argumentslist
+
+const ecmascript_function = @import("ecmascript_function.zig");
+const execution = @import("../execution.zig");
+const types = @import("../types.zig");
+
+const Agent = execution.Agent;
+const ExecutionContext = execution.ExecutionContext;
+const Object = types.Object;
+const PropertyKey = types.PropertyKey;
+const Realm = execution.Realm;
+const Value = types.Value;
+const setFunctionLength = ecmascript_function.setFunctionLength;
+const setFunctionName = ecmascript_function.setFunctionName;
+
+const BehaviourFn = fn (*Agent, Value, []const Value, ?Object) Agent.Error!Value;
+
+pub const BuiltinFunction = Object.Factory(.{
+    .Fields = struct {
+        behaviour: *const BehaviourFn,
+
+        /// [[Realm]]
+        realm: *Realm,
+
+        /// [[InitialName]]
+        initial_name: ?[]const u8,
+    },
+});
+
+/// 10.3.1 [[Call]] ( thisArgument, argumentsList )
+/// https://tc39.es/ecma262/#sec-built-in-function-objects-call-thisargument-argumentslist
+fn call(object: Object, this_argument: Value, arguments_list: []const Value) !Value {
+    const agent = object.agent();
+    const self = object.as(BuiltinFunction);
+
+    // 1. Let callerContext be the running execution context.
+    const caller_context = agent.runningExecutionContext();
+
+    // TODO: 2. If callerContext is not already suspended, suspend callerContext.
+    _ = caller_context;
+
+    // 3. Let calleeContext be a new execution context.
+    const callee_context = ExecutionContext{
+        // 4. Set the Function of calleeContext to F.
+        .function = object,
+
+        // 5. Let calleeRealm be F.[[Realm]].
+        // 6. Set the Realm of calleeContext to calleeRealm.
+        .realm = self.fields.realm,
+
+        // 7. Set the ScriptOrModule of calleeContext to null.
+        .script_or_module = null,
+    };
+
+    // 8. Perform any necessary implementation-defined initialization of calleeContext.
+
+    // 9. Push calleeContext onto the execution context stack; calleeContext is now the running execution context.
+    try agent.execution_context_stack.append(callee_context);
+
+    // 10. Let result be the Completion Record that is the result of evaluating F in a manner that
+    //     conforms to the specification of F. thisArgument is the this value, argumentsList
+    //     provides the named parameters, and the NewTarget value is undefined.
+    const result = try self.fields.behaviour(agent, this_argument, arguments_list, null);
+
+    // 11. Remove calleeContext from the execution context stack and restore callerContext as the
+    //     running execution context.
+    _ = agent.execution_context_stack.pop();
+
+    // 12. Return ? result.
+    return result;
+}
+
+/// 10.3.2 [[Construct]] ( argumentsList, newTarget )
+/// https://tc39.es/ecma262/#sec-built-in-function-objects-construct-argumentslist-newtarget
+fn construct(object: Object, arguments_list: []const Value, new_target: Object) !Object {
+    const agent = object.agent();
+    const self = object.as(BuiltinFunction);
+
+    // 1. Let callerContext be the running execution context.
+    const caller_context = agent.runningExecutionContext();
+
+    // TODO: 2. If callerContext is not already suspended, suspend callerContext.
+    _ = caller_context;
+
+    // 3. Let calleeContext be a new execution context.
+    const callee_context = ExecutionContext{
+        // 4. Set the Function of calleeContext to F.
+        .function = object,
+
+        // 5. Let calleeRealm be F.[[Realm]].
+        // 6. Set the Realm of calleeContext to calleeRealm.
+        .realm = self.fields.realm,
+
+        // 7. Set the ScriptOrModule of calleeContext to null.
+        .script_or_module = null,
+    };
+
+    // 8. Perform any necessary implementation-defined initialization of calleeContext.
+
+    // 9. Push calleeContext onto the execution context stack; calleeContext is now the running execution context.
+    try agent.execution_context_stack.append(callee_context);
+
+    // 10. Let result be the Completion Record that is the result of evaluating F in a manner that
+    //     conforms to the specification of F. The this value is uninitialized, argumentsList
+    //     provides the named parameters, and newTarget provides the NewTarget value.
+    const result = try self.fields.behaviour(agent, undefined, arguments_list, new_target);
+
+    // 11. Remove calleeContext from the execution context stack and restore callerContext as the
+    //     running execution context.
+    _ = agent.execution_context_stack.pop();
+
+    // 12. Return ? result.
+    return result.object;
+}
+
+/// 10.3.3 CreateBuiltinFunction ( behaviour, length, name, additionalInternalSlotsList [ , realm [ , prototype [ , prefix ] ] ] )
+/// https://tc39.es/ecma262/#sec-createbuiltinfunction
+pub fn createBuiltinFunction(
+    agent: *Agent,
+    behaviour: *const BehaviourFn,
+    args: struct {
+        length: u32,
+        name: []const u8,
+        realm: ?*Realm = null,
+        // NOTE: I don't think any builtin functions are created with a null prototype,
+        //       so the null state can serve as 'not present'.
+        prototype: ?Object = null,
+        prefix: ?[]const u8 = null,
+    },
+) !*BuiltinFunction {
+    // 1. If realm is not present, set realm to the current Realm Record.
+    const realm = args.realm orelse agent.currentRealm();
+
+    // 2. If prototype is not present, set prototype to realm.[[Intrinsics]].[[%Function.prototype%]].
+    const prototype = args.prototype orelse realm.intrinsics.@"%Function.prototype%";
+
+    // 3. Let internalSlotsList be a List containing the names of all the internal slots that 10.3
+    //    requires for the built-in function object that is about to be created.
+    // 4. Append to internalSlotsList the elements of additionalInternalSlotsList.
+
+    // 5. Let func be a new built-in function object that, when called, performs the action
+    //    described by behaviour using the provided arguments as the values of the corresponding
+    //    parameters specified by behaviour. The new function object has internal slots whose names
+    //    are the elements of internalSlotsList, and an [[InitialName]] internal slot.
+    const function = try BuiltinFunction.create(agent, .{
+        // 6. Set func.[[Prototype]] to prototype.
+        .prototype = prototype,
+
+        // 7. Set func.[[Extensible]] to true.
+        .extensible = true,
+
+        .fields = .{
+            .behaviour = behaviour,
+
+            // 8. Set func.[[Realm]] to realm.
+            .realm = realm,
+
+            // 9. Set func.[[InitialName]] to null.
+            .initial_name = null,
+        },
+    });
+
+    // FIXME: Needs to be assigned here for now instead of in the factory (https://github.com/ziglang/zig/issues/14353)
+    function.data.internal_methods = .{
+        .call = call,
+        .construct = construct,
+    };
+
+    // 10. Perform SetFunctionLength(func, length).
+    try setFunctionLength(function.object(), @intToFloat(f64, args.length));
+
+    // 11. If prefix is not present, then
+    //     a. Perform SetFunctionName(func, name).
+    // 12. Else,
+    //     a. Perform SetFunctionName(func, name, prefix).
+    try setFunctionName(function.object(), PropertyKey.fromString(args.name), args.prefix);
+
+    // 13. Return func.
+    return function;
+}
