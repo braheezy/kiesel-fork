@@ -3,11 +3,13 @@
 
 const std = @import("std");
 
+const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = Object.PropertyKey;
+const Realm = execution.Realm;
 const Value = types.Value;
 
 /// 10.1.1 [[GetPrototypeOf]] ( )
@@ -444,4 +446,32 @@ pub fn ordinaryOwnPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
 
     // 5. Return keys.
     return keys;
+}
+
+/// 10.1.14 GetPrototypeFromConstructor ( constructor, intrinsicDefaultProto )
+/// https://tc39.es/ecma262/#sec-getprototypefromconstructor
+pub fn getPrototypeFromConstructor(constructor: Object, comptime intrinsic_default_proto: []const u8) !?Object {
+    // 1. Assert: intrinsicDefaultProto is this specification's name of an intrinsic object. The
+    //    corresponding object must be an intrinsic that is intended to be used as the
+    //    [[Prototype]] value of an object.
+    comptime std.debug.assert(@hasField(Realm.Intrinsics, intrinsic_default_proto));
+
+    // 2. Let proto be ? Get(constructor, "prototype").
+    const prototype = try constructor.get(PropertyKey.fromString("prototype"));
+
+    const prototype_object: ?Object = switch (prototype) {
+        .object => prototype.object,
+
+        // 3. If proto is not an Object, then
+        else => blk: {
+            // a. Let realm be ? GetFunctionRealm(constructor).
+            const realm = try constructor.getFunctionRealm();
+
+            // b. Set proto to realm's intrinsic object named intrinsicDefaultProto.
+            break :blk @field(realm.intrinsics, intrinsic_default_proto);
+        },
+    };
+
+    // 4. Return proto.
+    return prototype_object;
 }
