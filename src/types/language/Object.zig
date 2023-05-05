@@ -136,6 +136,19 @@ pub fn createDataProperty(self: Self, property_key: PropertyKey, value: Value) !
     return self.internalMethods().defineOwnProperty(self, property_key, new_descriptor);
 }
 
+/// 7.3.9 DefinePropertyOrThrow ( O, P, desc )
+/// https://tc39.es/ecma262/#sec-definepropertyorthrow
+pub fn definePropertyOrThrow(self: Self, property_key: PropertyKey, property_descriptor: PropertyDescriptor) !void {
+    // 1. Let success be ? O.[[DefineOwnProperty]](P, desc).
+    const success = try self.internalMethods().defineOwnProperty(self, property_key, property_descriptor);
+
+    // 2. If success is false, throw a TypeError exception.
+    if (!success)
+        return self.agent().throwException(.type_error, "Could not define property");
+
+    // 3. Return unused.
+}
+
 /// 7.3.15 Construct ( F [ , argumentsList [ , newTarget ] ] )
 /// https://tc39.es/ecma262/#sec-construct
 pub fn construct(self: Self, args: struct { arguments_list: []const Value = &[_]Value{}, new_target: ?Self = null }) !Self {
