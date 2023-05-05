@@ -6,6 +6,7 @@ const std = @import("std");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
+const Agent = execution.Agent;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = Object.PropertyKey;
@@ -446,6 +447,28 @@ pub fn ordinaryOwnPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
 
     // 5. Return keys.
     return keys;
+}
+
+/// 10.1.13 OrdinaryCreateFromConstructor ( constructor, intrinsicDefaultProto [ , internalSlotsList ] )
+/// https://tc39.es/ecma262/#sec-ordinarycreatefromconstructor
+pub fn ordinaryCreateFromConstructor(comptime T: type, agent: *Agent, constructor: Object, comptime intrinsic_default_proto: []const u8) !*T {
+    // 1. Assert: intrinsicDefaultProto is this specification's name of an intrinsic
+    //    object. The corresponding object must be an intrinsic that is intended to be used
+    //    as the [[Prototype]] value of an object.
+    comptime std.debug.assert(@hasField(Realm.Intrinsics, intrinsic_default_proto));
+
+    // 2. Let proto be ? GetPrototypeFromConstructor(constructor, intrinsicDefaultProto).
+    const prototype = try getPrototypeFromConstructor(constructor, intrinsic_default_proto);
+
+    // 3. If internalSlotsList is present, let slotsList be internalSlotsList.
+    // 4. Else, let slotsList be a new empty List.
+    // 5. Return OrdinaryObjectCreate(proto, slotsList).
+    return T.create(agent, if (T.Fields != void) .{
+        .prototype = prototype,
+        .fields = undefined,
+    } else .{
+        .prototype = prototype,
+    });
 }
 
 /// 10.1.14 GetPrototypeFromConstructor ( constructor, intrinsicDefaultProto )
