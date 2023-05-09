@@ -6,14 +6,13 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const builtins = @import("../builtins.zig");
-const ordinary = builtins.ordinary;
 const types = @import("../types.zig");
 
 const Agent = @import("Agent.zig");
 const ExecutionContext = @import("ExecutionContext.zig");
 const Object = types.Object;
 const Value = types.Value;
-const ordinaryObjectCreate = ordinary.ordinaryObjectCreate;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 pub const Intrinsics = @import("Realm/Intrinsics.zig");
 

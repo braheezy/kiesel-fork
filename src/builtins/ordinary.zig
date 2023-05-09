@@ -14,9 +14,26 @@ const PropertyKey = Object.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 
+const Self = @This();
+
+// Only export these in a namespace so it's clear what they are.
+pub const ordinary_internal_methods = struct {
+    pub const getPrototypeOf = Self.getPrototypeOf;
+    pub const setPrototypeOf = Self.setPrototypeOf;
+    pub const isExtensible = Self.isExtensible;
+    pub const preventExtensions = Self.preventExtensions;
+    pub const getOwnProperty = Self.getOwnProperty;
+    pub const defineOwnProperty = Self.defineOwnProperty;
+    pub const hasProperty = Self.hasProperty;
+    pub const get = Self.get;
+    pub const set = Self.set;
+    pub const delete = Self.delete;
+    pub const ownPropertyKeys = Self.ownPropertyKeys;
+};
+
 /// 10.1.1 [[GetPrototypeOf]] ( )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-getprototypeof
-pub fn internalGetPrototypeOf(object: Object) !?Object {
+fn getPrototypeOf(object: Object) !?Object {
     // 1. Return OrdinaryGetPrototypeOf(O).
     return ordinaryGetPrototypeOf(object);
 }
@@ -30,7 +47,7 @@ pub fn ordinaryGetPrototypeOf(object: Object) ?Object {
 
 /// 10.1.2 [[SetPrototypeOf]] ( V )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-setprototypeof-v
-pub fn internalSetPrototypeOf(object: Object, prototype: ?Object) !bool {
+fn setPrototypeOf(object: Object, prototype: ?Object) !bool {
     // 1. Return OrdinarySetPrototypeOf(O, V).
     return ordinarySetPrototypeOf(object, prototype);
 }
@@ -75,7 +92,7 @@ pub fn ordinarySetPrototypeOf(object: Object, prototype: ?Object) bool {
 
         // c. Else,
         // i. If p.[[GetPrototypeOf]] is not the ordinary object internal method defined in 10.1.1, set done to true.
-        if (parent_prototype_object.internalMethods().getPrototypeOf != internalGetPrototypeOf)
+        if (parent_prototype_object.internalMethods().getPrototypeOf != getPrototypeOf)
             break;
 
         // ii. Else, set p to p.[[Prototype]].
@@ -91,7 +108,7 @@ pub fn ordinarySetPrototypeOf(object: Object, prototype: ?Object) bool {
 
 /// 10.1.3 [[IsExtensible]] ( )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-isextensible
-pub fn internalIsExtensible(object: Object) !bool {
+fn isExtensible(object: Object) !bool {
     // 1. Return OrdinaryIsExtensible(O).
     return ordinaryIsExtensible(object);
 }
@@ -105,7 +122,7 @@ pub fn ordinaryIsExtensible(object: Object) bool {
 
 /// 10.1.4 [[PreventExtensions]] ( )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-preventextensions
-pub fn internalPreventExtensions(object: Object) !bool {
+fn preventExtensions(object: Object) !bool {
     // 1. Return OrdinaryPreventExtensions(O).
     return ordinaryPreventExtensions(object);
 }
@@ -122,7 +139,7 @@ pub fn ordinaryPreventExtensions(object: Object) bool {
 
 /// 10.1.5 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-getownproperty-p
-pub fn internalGetOwnProperty(object: Object, property_key: PropertyKey) !?PropertyDescriptor {
+fn getOwnProperty(object: Object, property_key: PropertyKey) !?PropertyDescriptor {
     // 1. Return OrdinaryGetOwnProperty(O, P).
     return ordinaryGetOwnProperty(object, property_key);
 }
@@ -169,7 +186,7 @@ pub fn ordinaryGetOwnProperty(object: Object, property_key: PropertyKey) ?Proper
 
 /// 10.1.6 [[DefineOwnProperty]] ( P, Desc )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-defineownproperty-p-desc
-pub fn internalDefineOwnProperty(object: Object, property_key: PropertyKey, property_descriptor: PropertyDescriptor) !bool {
+fn defineOwnProperty(object: Object, property_key: PropertyKey, property_descriptor: PropertyDescriptor) !bool {
     // 1. Return ? OrdinaryDefineOwnProperty(O, P, Desc).
     return ordinaryDefineOwnProperty(object, property_key, property_descriptor);
 }
@@ -199,7 +216,7 @@ fn validateAndApplyPropertyDescriptor(object: Object, property_key: PropertyKey,
 
 /// 10.1.7 [[HasProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-hasproperty-p
-pub fn internalHasProperty(object: Object, property_key: PropertyKey) !bool {
+fn hasProperty(object: Object, property_key: PropertyKey) !bool {
     // 1. Return ? OrdinaryHasProperty(O, P).
     return ordinaryHasProperty(object, property_key);
 }
@@ -229,7 +246,7 @@ pub fn ordinaryHasProperty(object: Object, property_key: PropertyKey) !bool {
 
 /// 10.1.8 [[Get]] ( P, Receiver )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-get-p-receiver
-pub fn internalGet(object: Object, property_key: PropertyKey, receiver: Value) !Value {
+fn get(object: Object, property_key: PropertyKey, receiver: Value) !Value {
     // 1. Return ? OrdinaryGet(O, P, Receiver).
     return ordinaryGet(object, property_key, receiver);
 }
@@ -271,7 +288,7 @@ pub fn ordinaryGet(object: Object, property_key: PropertyKey, receiver: Value) !
 
 /// 10.1.9 [[Set]] ( P, V, Receiver )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-set-p-v-receiver
-pub fn internalSet(object: Object, property_key: PropertyKey, value: Value, receiver: Value) !bool {
+fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value) !bool {
     // 1. Return ? OrdinarySet(O, P, V, Receiver).
     return ordinarySet(object, property_key, value, receiver);
 }
@@ -377,7 +394,7 @@ pub fn ordinarySetWithOwnDescriptor(
 
 /// 10.1.10 [[Delete]] ( P )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-delete-p
-pub fn internalDelete(object: Object, property_key: PropertyKey) !bool {
+fn delete(object: Object, property_key: PropertyKey) !bool {
     // 1. Return ? OrdinaryDelete(O, P).
     return ordinaryDelete(object, property_key);
 }
@@ -407,7 +424,7 @@ pub fn ordinaryDelete(object: Object, property_key: PropertyKey) !bool {
 
 /// 10.1.11 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-ownpropertykeys
-pub fn internalOwnPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
+fn ownPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
     // 1. Return OrdinaryOwnPropertyKeys(O).
     return ordinaryOwnPropertyKeys(object);
 }

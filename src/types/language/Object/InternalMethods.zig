@@ -5,6 +5,7 @@ const std = @import("std");
 
 const builtins = @import("../../../builtins.zig");
 const execution = @import("../../../execution.zig");
+const ordinary_internal_methods = builtins.ordinary_internal_methods;
 const spec = @import("../../spec.zig");
 
 const Agent = execution.Agent;
@@ -16,49 +17,49 @@ const Value = @import("../value.zig").Value;
 /// [[GetPrototypeOf]]
 getPrototypeOf: *const fn (
     object: Object,
-) Agent.Error!?Object = builtins.ordinary.internalGetPrototypeOf,
+) Agent.Error!?Object = ordinary_internal_methods.getPrototypeOf,
 
 /// [[SetPrototypeOf]]
 setPrototypeOf: *const fn (
     object: Object,
     prototype: ?Object,
-) Agent.Error!bool = builtins.ordinary.internalSetPrototypeOf,
+) Agent.Error!bool = ordinary_internal_methods.setPrototypeOf,
 
 /// [[IsExtensible]]
 isExtensible: *const fn (
     object: Object,
-) Agent.Error!bool = builtins.ordinary.internalIsExtensible,
+) Agent.Error!bool = ordinary_internal_methods.isExtensible,
 
 /// [[PreventExtensions]]
 preventExtensions: *const fn (
     object: Object,
-) Agent.Error!bool = builtins.ordinary.internalPreventExtensions,
+) Agent.Error!bool = ordinary_internal_methods.preventExtensions,
 
 /// [[GetOwnProperty]]
 getOwnProperty: *const fn (
     object: Object,
     property_key: PropertyKey,
-) Agent.Error!?PropertyDescriptor = builtins.ordinary.internalGetOwnProperty,
+) Agent.Error!?PropertyDescriptor = ordinary_internal_methods.getOwnProperty,
 
 /// [[DefineOwnProperty]]
 defineOwnProperty: *const fn (
     object: Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
-) Agent.Error!bool = builtins.ordinary.internalDefineOwnProperty,
+) Agent.Error!bool = ordinary_internal_methods.defineOwnProperty,
 
 /// [[HasProperty]]
 hasProperty: *const fn (
     object: Object,
     property_key: PropertyKey,
-) Agent.Error!bool = builtins.ordinary.internalHasProperty,
+) Agent.Error!bool = ordinary_internal_methods.hasProperty,
 
 /// [[Get]]
 get: *const fn (
     object: Object,
     property_key: PropertyKey,
     receiver: Value,
-) Agent.Error!Value = builtins.ordinary.internalGet,
+) Agent.Error!Value = ordinary_internal_methods.get,
 
 /// [[Set]]
 set: *const fn (
@@ -66,18 +67,18 @@ set: *const fn (
     property_key: PropertyKey,
     value: Value,
     receiver: Value,
-) Agent.Error!bool = builtins.ordinary.internalSet,
+) Agent.Error!bool = ordinary_internal_methods.set,
 
 /// [[Delete]]
 delete: *const fn (
     object: Object,
     property_key: PropertyKey,
-) Agent.Error!bool = builtins.ordinary.internalDelete,
+) Agent.Error!bool = ordinary_internal_methods.delete,
 
 // [[OwnPropertyKeys]]
 ownPropertyKeys: *const fn (
     object: Object,
-) Agent.Error!std.ArrayList(PropertyKey) = builtins.ordinary.internalOwnPropertyKeys,
+) Agent.Error!std.ArrayList(PropertyKey) = ordinary_internal_methods.ownPropertyKeys,
 
 // [[Call]]
 call: ?*const fn (

@@ -1,11 +1,28 @@
 const builtin_function = @import("builtins/builtin_function.zig");
 const ecmascript_function = @import("builtins/ecmascript_function.zig");
+const ordinary = @import("builtins/ordinary.zig");
 
-pub const ordinary = @import("builtins/ordinary.zig");
+pub const ordinary_internal_methods = ordinary.ordinary_internal_methods;
 
 pub const BuiltinFunction = builtin_function.BuiltinFunction;
 pub const Object = @import("builtins/Object.zig").Object;
 pub const createBuiltinFunction = builtin_function.createBuiltinFunction;
+pub const getPrototypeFromConstructor = ordinary.getPrototypeFromConstructor;
+pub const ordinaryCreateFromConstructor = ordinary.ordinaryCreateFromConstructor;
+pub const ordinaryDefineOwnProperty = ordinary.ordinaryDefineOwnProperty;
+pub const ordinaryDelete = ordinary.ordinaryDelete;
+pub const ordinaryGet = ordinary.ordinaryGet;
+pub const ordinaryGetOwnProperty = ordinary.ordinaryGetOwnProperty;
+pub const ordinaryGetPrototypeOf = ordinary.ordinaryGetPrototypeOf;
+pub const ordinaryHasProperty = ordinary.ordinaryHasProperty;
+pub const ordinaryIsExtensible = ordinary.ordinaryIsExtensible;
+pub const ordinaryObjectCreate = ordinary.ordinaryObjectCreate;
+pub const ordinaryObjectCreateWithType = ordinary.ordinaryObjectCreateWithType;
+pub const ordinaryOwnPropertyKeys = ordinary.ordinaryOwnPropertyKeys;
+pub const ordinaryPreventExtensions = ordinary.ordinaryPreventExtensions;
+pub const ordinarySet = ordinary.ordinarySet;
+pub const ordinarySetPrototypeOf = ordinary.ordinarySetPrototypeOf;
+pub const ordinarySetWithOwnDescriptor = ordinary.ordinarySetWithOwnDescriptor;
 pub const setFunctionLength = ecmascript_function.setFunctionLength;
 pub const setFunctionName = ecmascript_function.setFunctionName;
 
