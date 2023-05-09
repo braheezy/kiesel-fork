@@ -7,6 +7,7 @@ pub const ordinary_internal_methods = ordinary.ordinary_internal_methods;
 
 pub const BuiltinFunction = builtin_function.BuiltinFunction;
 pub const Object = object.Object;
+pub const ObjectPrototype = object.ObjectPrototype;
 pub const createBuiltinFunction = builtin_function.createBuiltinFunction;
 pub const getPrototypeFromConstructor = ordinary.getPrototypeFromConstructor;
 pub const ordinaryCreateFromConstructor = ordinary.ordinaryCreateFromConstructor;

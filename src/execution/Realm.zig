@@ -79,10 +79,7 @@ fn createIntrinsics(self: *Self) !Intrinsics {
     //    ordered to avoid any dependencies upon objects that have not yet been created.
     // NOTE: A few common dependendent objects are created upfront, but the entire Intrinsics
     //       struct is then overwritten to ensure nothing is missed.
-    // FIXME: This is a stub for now.
-    self.intrinsics.@"%Object.prototype%" = try builtins.Object.create(self.agent, .{
-        .prototype = null,
-    });
+    self.intrinsics.@"%Object.prototype%" = try builtins.ObjectPrototype.create(self);
     var intrinsics = Intrinsics{
         .@"%Object.prototype%" = self.intrinsics.@"%Object.prototype%",
     };
