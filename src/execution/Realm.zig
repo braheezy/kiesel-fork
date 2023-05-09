@@ -80,7 +80,9 @@ fn createIntrinsics(self: *Self) !Intrinsics {
     // NOTE: A few common dependendent objects are created upfront, but the entire Intrinsics
     //       struct is then overwritten to ensure nothing is missed.
     self.intrinsics.@"%Object.prototype%" = try builtins.ObjectPrototype.create(self);
+    self.intrinsics.@"%Function.prototype%" = try builtins.FunctionPrototype.create(self);
     var intrinsics = Intrinsics{
+        .@"%Function.prototype%" = self.intrinsics.@"%Function.prototype%",
         .@"%Object.prototype%" = self.intrinsics.@"%Object.prototype%",
     };
 

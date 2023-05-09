@@ -127,6 +127,7 @@ pub fn createBuiltinFunction(
         //       so the null state can serve as 'not present'.
         prototype: ?Object = null,
         prefix: ?[]const u8 = null,
+        is_constructor: bool = true,
     },
 ) !Object {
     // 1. If realm is not present, set realm to the current Realm Record.
@@ -146,7 +147,7 @@ pub fn createBuiltinFunction(
     const function = try BuiltinFunction.create(agent, .{
         .internal_methods = .{
             .call = call,
-            .construct = construct,
+            .construct = if (args.is_constructor) construct else null,
         },
 
         // 6. Set func.[[Prototype]] to prototype.

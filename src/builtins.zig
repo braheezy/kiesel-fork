@@ -1,11 +1,13 @@
 const builtin_function = @import("builtins/builtin_function.zig");
 const ecmascript_function = @import("builtins/ecmascript_function.zig");
+const function = @import("builtins/function.zig");
 const object = @import("builtins/object.zig");
 const ordinary = @import("builtins/ordinary.zig");
 
 pub const ordinary_internal_methods = ordinary.ordinary_internal_methods;
 
 pub const BuiltinFunction = builtin_function.BuiltinFunction;
+pub const FunctionPrototype = function.FunctionPrototype;
 pub const Object = object.Object;
 pub const ObjectPrototype = object.ObjectPrototype;
 pub const createBuiltinFunction = builtin_function.createBuiltinFunction;
@@ -31,6 +33,7 @@ pub const setFunctionName = ecmascript_function.setFunctionName;
 test {
     _ = builtin_function;
     _ = ecmascript_function;
+    _ = function;
     _ = object;
     _ = ordinary;
 }
