@@ -144,6 +144,11 @@ pub fn createBuiltinFunction(
     //    parameters specified by behaviour. The new function object has internal slots whose names
     //    are the elements of internalSlotsList, and an [[InitialName]] internal slot.
     const function = try BuiltinFunction.create(agent, .{
+        .internal_methods = .{
+            .call = call,
+            .construct = construct,
+        },
+
         // 6. Set func.[[Prototype]] to prototype.
         .prototype = prototype,
 
@@ -160,12 +165,6 @@ pub fn createBuiltinFunction(
             .initial_name = null,
         },
     });
-
-    // FIXME: Needs to be assigned here for now instead of in the factory (https://github.com/ziglang/zig/issues/14353)
-    function.data.internal_methods = .{
-        .call = call,
-        .construct = construct,
-    };
 
     // 10. Perform SetFunctionLength(func, length).
     try setFunctionLength(function, @intToFloat(f64, args.length));
