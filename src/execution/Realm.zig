@@ -5,11 +5,15 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const builtins = @import("../builtins.zig");
+const ordinary = builtins.ordinary;
 const types = @import("../types.zig");
 
 const Agent = @import("Agent.zig");
 const ExecutionContext = @import("ExecutionContext.zig");
 const Object = types.Object;
+const Value = types.Value;
+const ordinaryObjectCreate = ordinary.ordinaryObjectCreate;
 
 pub const Intrinsics = @import("Realm/Intrinsics.zig");
 
@@ -61,11 +65,8 @@ pub fn create(agent: *Agent) !*Self {
 /// 9.3.2 CreateIntrinsics ( realmRec )
 /// https://tc39.es/ecma262/#sec-createintrinsics
 fn createIntrinsics(self: *Self) !Intrinsics {
-    _ = self;
     // 1. Set realmRec.[[Intrinsics]] to a new Record.
-    var intrinsics = Intrinsics{};
-
-    // TODO: 2. Set fields of realmRec.[[Intrinsics]] with the values listed in Table 6. The field
+    // 2. Set fields of realmRec.[[Intrinsics]] with the values listed in Table 6. The field
     //    names are the names listed in column one of the table. The value of each field is a new
     //    object value fully and recursively populated with property values as defined by the
     //    specification of each object in clauses 19 through 28. All object property values are
@@ -77,15 +78,56 @@ fn createIntrinsics(self: *Self) !Intrinsics {
     //    specified internal slots, and prototype is the specified value of the function's
     //    [[Prototype]] internal slot. The creation of the intrinsics and their properties must be
     //    ordered to avoid any dependencies upon objects that have not yet been created.
+    // NOTE: A few common dependendent objects are created upfront, but the entire Intrinsics
+    //       struct is then overwritten to ensure nothing is missed.
+    // FIXME: This is a stub for now.
+    self.intrinsics.@"%Object.prototype%" = (try builtins.Object.create(self.agent, .{
+        .prototype = null,
+    })).object();
+    var intrinsics = Intrinsics{
+        .@"%Object.prototype%" = self.intrinsics.@"%Object.prototype%",
+    };
+
     // TODO: 3. Perform AddRestrictedFunctionProperties(realmRec.[[Intrinsics]].[[%Function.prototype%]], realmRec).
 
     // 4. Return unused.
     return intrinsics;
 }
 
+/// 9.3.3 SetRealmGlobalObject ( realmRec, globalObj, thisValue )
+/// https://tc39.es/ecma262/#sec-setrealmglobalobject
+pub fn setRealmGlobalObject(self: *Self, maybe_global_object: ?Object, maybe_this_value: ?Value) !void {
+    // 1. If globalObj is undefined, then
+    //     a. Let intrinsics be realmRec.[[Intrinsics]].
+    //     b. Set globalObj to OrdinaryObjectCreate(intrinsics.[[%Object.prototype%]]).
+    // 2. Assert: globalObj is an Object.
+    const global_object = maybe_global_object orelse (try ordinaryObjectCreate(
+        self.agent,
+        self.intrinsics.@"%Object.prototype%",
+    )).object();
+
+    // 3. If thisValue is undefined, set thisValue to globalObj.
+    const this_value = maybe_this_value orelse Value.fromObject(global_object);
+
+    // 4. Set realmRec.[[GlobalObject]] to globalObj.
+    self.global_object = global_object;
+
+    // TODO: 5. Let newGlobalEnv be NewGlobalEnvironment(globalObj, thisValue).
+    const new_global_env = .{};
+    _ = this_value;
+
+    // 6. Set realmRec.[[GlobalEnv]] to newGlobalEnv.
+    self.global_env = new_global_env;
+
+    // 7. Return unused.
+}
+
 /// 9.6 InitializeHostDefinedRealm ( )
 /// https://tc39.es/ecma262/#sec-initializehostdefinedrealm
-pub fn initializeHostDefinedRealm(agent: *Agent) !void {
+pub fn initializeHostDefinedRealm(
+    agent: *Agent,
+    args: struct { globalObject: ?Object = null },
+) !void {
     // 1. Let realm be CreateRealm().
     const realm = try create(agent);
 
@@ -108,15 +150,17 @@ pub fn initializeHostDefinedRealm(agent: *Agent) !void {
     // 7. If the host requires use of an exotic object to serve as realm's global object, let
     //    global be such an object created in a host-defined manner. Otherwise, let global be
     //    undefined, indicating that an ordinary object should be created as the global object.
+    const global = args.globalObject orelse null;
 
     // 8. If the host requires that the this binding in realm's global scope return an object other
     //    than the global object, let thisValue be such an object created in a host-defined manner.
     //    Otherwise, let thisValue be undefined, indicating that realm's global this binding should
     //    be the global object.
-    const thisValue = null;
-    _ = thisValue;
+    const this_value = null;
 
-    // TODO: 9. Perform SetRealmGlobalObject(realm, global, thisValue).
+    // 9. Perform SetRealmGlobalObject(realm, global, thisValue).
+    try realm.setRealmGlobalObject(global, this_value);
+
     // TODO: 10. Let globalObj be ? SetDefaultGlobalBindings(realm).
 
     // 11. Create any host-defined global object properties on globalObj.
