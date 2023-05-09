@@ -35,7 +35,7 @@ pub fn Factory(
         fields: Fields,
         data: Data,
 
-        pub fn create(agent: *Agent, args: Args) !*Self {
+        pub fn create(agent: *Agent, args: Args) !Object {
             const self = try agent.allocator.create(Self);
             self.* = .{
                 .fields = if (has_fields) args.fields,
@@ -47,7 +47,7 @@ pub fn Factory(
                     .property_storage = Object.PropertyStorage.init(agent.allocator),
                 },
             };
-            return self;
+            return self.object();
         }
 
         pub fn object(self: *Self) Object {

@@ -200,9 +200,9 @@ pub fn getFunctionRealm(self: Self) !*Realm {
 
 test "format" {
     var agent_ = try Agent.init();
-    const object = (try builtins.Object.create(&agent_, .{
+    const object = try builtins.Object.create(&agent_, .{
         .prototype = null,
-    })).object();
+    });
     const string = try std.fmt.allocPrint(std.testing.allocator, "{}", .{object});
     defer std.testing.allocator.free(string);
     try std.testing.expectEqualStrings(string, "[object Object]");

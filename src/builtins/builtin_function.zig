@@ -128,7 +128,7 @@ pub fn createBuiltinFunction(
         prototype: ?Object = null,
         prefix: ?[]const u8 = null,
     },
-) !*BuiltinFunction {
+) !Object {
     // 1. If realm is not present, set realm to the current Realm Record.
     const realm = args.realm orelse agent.currentRealm();
 
@@ -168,13 +168,13 @@ pub fn createBuiltinFunction(
     };
 
     // 10. Perform SetFunctionLength(func, length).
-    try setFunctionLength(function.object(), @intToFloat(f64, args.length));
+    try setFunctionLength(function, @intToFloat(f64, args.length));
 
     // 11. If prefix is not present, then
     //     a. Perform SetFunctionName(func, name).
     // 12. Else,
     //     a. Perform SetFunctionName(func, name, prefix).
-    try setFunctionName(function.object(), PropertyKey.fromString(args.name), args.prefix);
+    try setFunctionName(function, PropertyKey.fromString(args.name), args.prefix);
 
     // 13. Return func.
     return function;

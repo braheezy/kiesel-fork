@@ -80,9 +80,9 @@ fn createIntrinsics(self: *Self) !Intrinsics {
     // NOTE: A few common dependendent objects are created upfront, but the entire Intrinsics
     //       struct is then overwritten to ensure nothing is missed.
     // FIXME: This is a stub for now.
-    self.intrinsics.@"%Object.prototype%" = (try builtins.Object.create(self.agent, .{
+    self.intrinsics.@"%Object.prototype%" = try builtins.Object.create(self.agent, .{
         .prototype = null,
-    })).object();
+    });
     var intrinsics = Intrinsics{
         .@"%Object.prototype%" = self.intrinsics.@"%Object.prototype%",
     };
@@ -100,10 +100,10 @@ pub fn setRealmGlobalObject(self: *Self, maybe_global_object: ?Object, maybe_thi
     //     a. Let intrinsics be realmRec.[[Intrinsics]].
     //     b. Set globalObj to OrdinaryObjectCreate(intrinsics.[[%Object.prototype%]]).
     // 2. Assert: globalObj is an Object.
-    const global_object = maybe_global_object orelse (try ordinaryObjectCreate(
+    const global_object = maybe_global_object orelse try ordinaryObjectCreate(
         self.agent,
         self.intrinsics.@"%Object.prototype%",
-    )).object();
+    );
 
     // 3. If thisValue is undefined, set thisValue to globalObj.
     const this_value = maybe_this_value orelse Value.fromObject(global_object);

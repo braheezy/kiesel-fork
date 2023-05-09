@@ -467,13 +467,13 @@ pub fn ordinaryOwnPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
     return keys;
 }
 
-pub fn ordinaryObjectCreate(agent: *Agent, prototype: ?Object) !*builtins.Object {
+pub fn ordinaryObjectCreate(agent: *Agent, prototype: ?Object) !Object {
     return ordinaryObjectCreateWithType(builtins.Object, agent, prototype);
 }
 
 /// 10.1.12 OrdinaryObjectCreate ( proto [ , additionalInternalSlotsList ] )
 /// https://tc39.es/ecma262/#sec-ordinaryobjectcreate
-pub fn ordinaryObjectCreateWithType(comptime T: type, agent: *Agent, prototype: ?Object) !*T {
+pub fn ordinaryObjectCreateWithType(comptime T: type, agent: *Agent, prototype: ?Object) !Object {
     // 1. Let internalSlotsList be « [[Prototype]], [[Extensible]] ».
     // 2. If additionalInternalSlotsList is present, set internalSlotsList to the list-concatenation
     //    of internalSlotsList and additionalInternalSlotsList.
@@ -481,7 +481,7 @@ pub fn ordinaryObjectCreateWithType(comptime T: type, agent: *Agent, prototype: 
     // 3. Let O be MakeBasicObject(internalSlotsList).
     // 4. Set O.[[Prototype]] to proto.
     // 5. Return O.
-    return T.create(agent, if (T.Fields != void) .{
+    return try T.create(agent, if (T.Fields != void) .{
         .prototype = prototype,
         .fields = undefined,
     } else .{
@@ -491,7 +491,7 @@ pub fn ordinaryObjectCreateWithType(comptime T: type, agent: *Agent, prototype: 
 
 /// 10.1.13 OrdinaryCreateFromConstructor ( constructor, intrinsicDefaultProto [ , internalSlotsList ] )
 /// https://tc39.es/ecma262/#sec-ordinarycreatefromconstructor
-pub fn ordinaryCreateFromConstructor(comptime T: type, agent: *Agent, constructor: Object, comptime intrinsic_default_proto: []const u8) !*T {
+pub fn ordinaryCreateFromConstructor(comptime T: type, agent: *Agent, constructor: Object, comptime intrinsic_default_proto: []const u8) !Object {
     // 1. Assert: intrinsicDefaultProto is this specification's name of an intrinsic
     //    object. The corresponding object must be an intrinsic that is intended to be used
     //    as the [[Prototype]] value of an object.

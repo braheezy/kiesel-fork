@@ -837,9 +837,9 @@ pub fn sameValueNonNumber(x: Value, y: Value) bool {
 test "format" {
     const builtins = @import("../../builtins.zig");
     var agent = try Agent.init();
-    const object = (try builtins.Object.create(&agent, .{
+    const object = try builtins.Object.create(&agent, .{
         .prototype = null,
-    })).object();
+    });
     const test_cases = [_]struct { Value, []const u8 }{
         .{ Value.undefined, "undefined" },
         .{ Value.null, "null" },

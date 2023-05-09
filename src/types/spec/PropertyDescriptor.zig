@@ -62,12 +62,12 @@ test "isAccessorDescriptor" {
     const builtins = @import("../../builtins.zig");
     const Agent = @import("../../execution.zig").Agent;
     var agent = try Agent.init();
-    const getter = (try builtins.Object.create(&agent, .{
+    const getter = try builtins.Object.create(&agent, .{
         .prototype = null,
-    })).object();
-    const setter = (try builtins.Object.create(&agent, .{
+    });
+    const setter = try builtins.Object.create(&agent, .{
         .prototype = null,
-    })).object();
+    });
     try std.testing.expect((Self{ .get = getter }).isAccessorDescriptor());
     try std.testing.expect((Self{ .set = setter }).isAccessorDescriptor());
     try std.testing.expect((Self{ .get = getter, .set = setter }).isAccessorDescriptor());
@@ -84,9 +84,9 @@ test "isGenericDescriptor" {
     const builtins = @import("../../builtins.zig");
     const Agent = @import("../../execution.zig").Agent;
     var agent = try Agent.init();
-    const setter = (try builtins.Object.create(&agent, .{
+    const setter = try builtins.Object.create(&agent, .{
         .prototype = null,
-    })).object();
+    });
     try std.testing.expect((Self{ .writable = null }).isGenericDescriptor());
     try std.testing.expect(!(Self{ .set = setter }).isGenericDescriptor());
     try std.testing.expect(!(Self{}).isGenericDescriptor());
