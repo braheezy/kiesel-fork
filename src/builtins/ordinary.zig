@@ -3,6 +3,7 @@
 
 const std = @import("std");
 
+const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
@@ -449,6 +450,28 @@ pub fn ordinaryOwnPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
     return keys;
 }
 
+pub fn ordinaryObjectCreate(agent: *Agent, prototype: ?Object) !*builtins.Object {
+    return ordinaryObjectCreateWithType(builtins.Object, agent, prototype);
+}
+
+/// 10.1.12 OrdinaryObjectCreate ( proto [ , additionalInternalSlotsList ] )
+/// https://tc39.es/ecma262/#sec-ordinaryobjectcreate
+pub fn ordinaryObjectCreateWithType(comptime T: type, agent: *Agent, prototype: ?Object) !*T {
+    // 1. Let internalSlotsList be « [[Prototype]], [[Extensible]] ».
+    // 2. If additionalInternalSlotsList is present, set internalSlotsList to the list-concatenation
+    //    of internalSlotsList and additionalInternalSlotsList.
+
+    // 3. Let O be MakeBasicObject(internalSlotsList).
+    // 4. Set O.[[Prototype]] to proto.
+    // 5. Return O.
+    return T.create(agent, if (T.Fields != void) .{
+        .prototype = prototype,
+        .fields = undefined,
+    } else .{
+        .prototype = prototype,
+    });
+}
+
 /// 10.1.13 OrdinaryCreateFromConstructor ( constructor, intrinsicDefaultProto [ , internalSlotsList ] )
 /// https://tc39.es/ecma262/#sec-ordinarycreatefromconstructor
 pub fn ordinaryCreateFromConstructor(comptime T: type, agent: *Agent, constructor: Object, comptime intrinsic_default_proto: []const u8) !*T {
@@ -463,12 +486,7 @@ pub fn ordinaryCreateFromConstructor(comptime T: type, agent: *Agent, constructo
     // 3. If internalSlotsList is present, let slotsList be internalSlotsList.
     // 4. Else, let slotsList be a new empty List.
     // 5. Return OrdinaryObjectCreate(proto, slotsList).
-    return T.create(agent, if (T.Fields != void) .{
-        .prototype = prototype,
-        .fields = undefined,
-    } else .{
-        .prototype = prototype,
-    });
+    return ordinaryObjectCreateWithType(T, agent, prototype);
 }
 
 /// 10.1.14 GetPrototypeFromConstructor ( constructor, intrinsicDefaultProto )
