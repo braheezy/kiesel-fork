@@ -726,6 +726,16 @@ pub const Value = union(enum) {
         return true;
     }
 
+    /// 7.3.3 GetV ( V, P )
+    /// https://tc39.es/ecma262/#sec-getv
+    pub fn get(self: Self, agent: *Agent, property_key: PropertyKey) !Value {
+        // 1. Let O be ? ToObject(V).
+        const object = try self.toObject(agent);
+
+        // 2. Return ? O.[[Get]](P, V).
+        return object.internalMethods().get(object, property_key, self);
+    }
+
     /// 7.3.14 Call ( F, V [ , argumentsList ] )
     /// https://tc39.es/ecma262/#sec-call
     pub fn call(self: Self, agent: *Agent, this_value: Value, arguments_list: []const Value) !Value {
