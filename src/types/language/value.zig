@@ -4,6 +4,7 @@ const Allocator = std.mem.Allocator;
 
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
+const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const BigInt = @import("BigInt.zig");
@@ -11,6 +12,7 @@ const Number = @import("number.zig").Number;
 const Object = @import("Object.zig");
 const PropertyKey = Object.PropertyKey;
 const Symbol = @import("Symbol.zig");
+const noexcept = utils.noexcept;
 
 const pow_2_7 = std.math.pow(f64, 2, 7);
 const pow_2_8 = std.math.pow(f64, 2, 8);
@@ -608,10 +610,7 @@ pub const Value = union(enum) {
         }
 
         // 3. Return ! ToString(key).
-        const string = key.toString(agent) catch |err| switch (err) {
-            error.ExceptionThrown => unreachable,
-            error.OutOfMemory => return error.OutOfMemory,
-        };
+        const string = key.toString(agent) catch |err| try noexcept(err);
         return PropertyKey.fromString(string);
     }
 

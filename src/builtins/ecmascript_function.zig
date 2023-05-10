@@ -5,12 +5,14 @@ const std = @import("std");
 
 const builtin_function = @import("builtin_function.zig");
 const types = @import("../types.zig");
+const utils = @import("../utils.zig");
 
 const BuiltinFunction = builtin_function.BuiltinFunction;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Value = types.Value;
+const noexcept = utils.noexcept;
 
 /// 10.2.9 SetFunctionName ( F, name [ , prefix ] )
 /// https://tc39.es/ecma262/#sec-setfunctionname
@@ -63,10 +65,7 @@ pub fn setFunctionName(function: Object, name_property_key: PropertyKey, prefix:
         .writable = false,
         .enumerable = false,
         .configurable = true,
-    }) catch |err| switch (err) {
-        error.ExceptionThrown => unreachable,
-        error.OutOfMemory => return error.OutOfMemory,
-    };
+    }) catch |err| try noexcept(err);
 
     // 7. Return unused.
 }
@@ -90,10 +89,7 @@ pub fn setFunctionLength(function: Object, length: f64) !void {
         .writable = false,
         .enumerable = false,
         .configurable = true,
-    }) catch |err| switch (err) {
-        error.ExceptionThrown => unreachable,
-        error.OutOfMemory => return error.OutOfMemory,
-    };
+    }) catch |err| try noexcept(err);
 
     // 3. Return unused.
 }

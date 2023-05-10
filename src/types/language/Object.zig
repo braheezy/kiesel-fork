@@ -6,12 +6,14 @@ const std = @import("std");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const spec = @import("../spec.zig");
+const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const PreferredType = Value.PreferredType;
 const PropertyDescriptor = spec.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = @import("value.zig").Value;
+const noexcept = utils.noexcept;
 
 pub const Data = @import("Object/Data.zig");
 pub const Factory = @import("Object/Factory.zig").Factory;
@@ -165,10 +167,7 @@ pub fn createMethodProperty(self: Self, property_key: PropertyKey, value: Value)
     };
 
     // 3. Perform ! DefinePropertyOrThrow(O, P, newDesc).
-    self.definePropertyOrThrow(property_key, new_descriptor) catch |err| switch (err) {
-        error.ExceptionThrown => unreachable,
-        error.OutOfMemory => return error.OutOfMemory,
-    };
+    self.definePropertyOrThrow(property_key, new_descriptor) catch |err| try noexcept(err);
 
     // 4. Return unused.
 }
@@ -209,10 +208,7 @@ pub fn createNonEnumerableDataPropertyOrThrow(self: Self, property_key: Property
     };
 
     // 3. Perform ! DefinePropertyOrThrow(O, P, newDesc).
-    self.definePropertyOrThrow(property_key, new_descriptor) catch |err| switch (err) {
-        error.ExceptionThrown => unreachable,
-        error.OutOfMemory => return error.OutOfMemory,
-    };
+    self.definePropertyOrThrow(property_key, new_descriptor) catch |err| try noexcept(err);
 
     // 4. Return unused.
 }
