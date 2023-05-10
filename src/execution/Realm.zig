@@ -11,6 +11,8 @@ const types = @import("../types.zig");
 const Agent = @import("Agent.zig");
 const ExecutionContext = @import("ExecutionContext.zig");
 const Object = types.Object;
+const PropertyDescriptor = types.PropertyDescriptor;
+const PropertyKey = types.PropertyKey;
 const Value = types.Value;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -120,6 +122,32 @@ pub fn setRealmGlobalObject(self: *Self, maybe_global_object: ?Object, maybe_thi
     // 7. Return unused.
 }
 
+/// 9.3.4 SetDefaultGlobalBindings ( realmRec )
+/// https://tc39.es/ecma262/#sec-setdefaultglobalbindings
+pub fn setDefaultGlobalBindings(self: *Self) !Object {
+    // 1. Let global be realmRec.[[GlobalObject]].
+    const global = self.global_object;
+
+    // 2. For each property of the Global Object specified in clause 19, do
+    for ([_]struct { []const u8, Value }{}) |property| {
+        // a. Let name be the String value of the property name.
+        const name = PropertyKey.fromString(property[0]);
+        const value = property[1];
+
+        // b. Let desc be the fully populated data Property Descriptor for the property, containing
+        //    the specified attributes for the property. For properties listed in 19.2, 19.3, or
+        //    19.4 the value of the [[Value]] attribute is the corresponding intrinsic object from
+        //    realmRec.
+        const descriptor = PropertyDescriptor{ .value = value, .writable = true, .enumerable = false, .configurable = true };
+
+        // c. Perform ? DefinePropertyOrThrow(global, name, desc).
+        try global.definePropertyOrThrow(name, descriptor);
+    }
+
+    // 3. Return global.
+    return global;
+}
+
 /// 9.6 InitializeHostDefinedRealm ( )
 /// https://tc39.es/ecma262/#sec-initializehostdefinedrealm
 pub fn initializeHostDefinedRealm(
@@ -159,7 +187,8 @@ pub fn initializeHostDefinedRealm(
     // 9. Perform SetRealmGlobalObject(realm, global, thisValue).
     try realm.setRealmGlobalObject(global, this_value);
 
-    // TODO: 10. Let globalObj be ? SetDefaultGlobalBindings(realm).
+    // 10. Let globalObj be ? SetDefaultGlobalBindings(realm).
+    _ = try realm.setDefaultGlobalBindings();
 
     // 11. Create any host-defined global object properties on globalObj.
     // 12. Return unused.
