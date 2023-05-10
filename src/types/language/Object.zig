@@ -250,6 +250,17 @@ pub fn hasProperty(self: Self, property_key: PropertyKey) !bool {
     return self.internalMethods().hasProperty(self, property_key);
 }
 
+/// 7.3.13 HasOwnProperty ( O, P )
+/// https://tc39.es/ecma262/#sec-hasownproperty
+pub fn hasOwnProperty(self: Self, property_key: PropertyKey) !bool {
+    // 1. Let desc be ? O.[[GetOwnProperty]](P).
+    const descriptor = try self.internalMethods().getOwnProperty(self, property_key);
+
+    // 2. If desc is undefined, return false.
+    // 3. Return true.
+    return descriptor != null;
+}
+
 /// 7.3.15 Construct ( F [ , argumentsList [ , newTarget ] ] )
 /// https://tc39.es/ecma262/#sec-construct
 pub fn construct(self: Self, args: struct { arguments_list: []const Value = &[_]Value{}, new_target: ?Self = null }) !Self {
