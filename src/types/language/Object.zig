@@ -137,6 +137,37 @@ pub fn createDataProperty(self: Self, property_key: PropertyKey, value: Value) !
     return self.internalMethods().defineOwnProperty(self, property_key, new_descriptor);
 }
 
+/// 7.3.6 CreateMethodProperty ( O, P, V )
+/// https://tc39.es/ecma262/#sec-createmethodproperty
+pub fn createMethodProperty(self: Self, property_key: PropertyKey, value: Value) !void {
+    // 1. Assert: O is an ordinary, extensible object with no non-configurable properties.
+    std.debug.assert(self.extensible().* and blk: {
+        for (self.propertyStorage().hash_map.values()) |descriptor| {
+            if (descriptor.configurable.? == false)
+                break :blk false;
+        }
+        break :blk true;
+    });
+
+    // 2. Let newDesc be the PropertyDescriptor {
+    //      [[Value]]: V, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
+    //    }.
+    const new_descriptor = PropertyDescriptor{
+        .value = value,
+        .writable = true,
+        .enumerable = false,
+        .configurable = true,
+    };
+
+    // 3. Perform ! DefinePropertyOrThrow(O, P, newDesc).
+    self.definePropertyOrThrow(property_key, new_descriptor) catch |err| switch (err) {
+        error.ExceptionThrown => unreachable,
+        error.OutOfMemory => return error.OutOfMemory,
+    };
+
+    // 4. Return unused.
+}
+
 /// 7.3.9 DefinePropertyOrThrow ( O, P, desc )
 /// https://tc39.es/ecma262/#sec-definepropertyorthrow
 pub fn definePropertyOrThrow(self: Self, property_key: PropertyKey, property_descriptor: PropertyDescriptor) !void {
