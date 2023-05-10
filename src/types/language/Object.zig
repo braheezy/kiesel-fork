@@ -168,6 +168,19 @@ pub fn createMethodProperty(self: Self, property_key: PropertyKey, value: Value)
     // 4. Return unused.
 }
 
+/// 7.3.7 CreateDataPropertyOrThrow ( O, P, V )
+/// https://tc39.es/ecma262/#sec-createdatapropertyorthrow
+pub fn createDataPropertyOrThrow(self: Self, property_key: PropertyKey, value: Value) !void {
+    // 1. Let success be ? CreateDataProperty(O, P, V).
+    const success = try self.createDataProperty(property_key, value);
+
+    // 2. If success is false, throw a TypeError exception.
+    if (!success)
+        return self.agent().throwException(.type_error, "Could not create data property");
+
+    // 3. Return unused.
+}
+
 /// 7.3.9 DefinePropertyOrThrow ( O, P, desc )
 /// https://tc39.es/ecma262/#sec-definepropertyorthrow
 pub fn definePropertyOrThrow(self: Self, property_key: PropertyKey, property_descriptor: PropertyDescriptor) !void {
