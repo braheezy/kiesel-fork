@@ -124,10 +124,13 @@ pub const Value = union(enum) {
         // 1. If input is an Object, then
         if (self == .object) {
             // a. Let exoticToPrim be ? GetMethod(input, @@toPrimitive).
-            const exotic_to_primitive = Value.undefined;
+            const maybe_exotic_to_primitive = try self.getMethod(
+                agent,
+                PropertyKey.fromSymbol(agent.well_known_symbols.@"@@toPrimitive"),
+            );
 
             // b. If exoticToPrim is not undefined, then
-            if (exotic_to_primitive != .undefined) {
+            if (maybe_exotic_to_primitive) |exotic_to_primitive| {
                 const hint = blk: {
                     // i. If preferredType is not present, then
                     if (preferred_type == null) {
@@ -146,7 +149,10 @@ pub const Value = union(enum) {
                 };
 
                 // iv. Let result be ? Call(exoticToPrim, input, « hint »).
-                const result = exotic_to_primitive.call(agent, self, [_]Value{hint});
+                const result = try Value.fromObject(exotic_to_primitive).callAssumeCallable(
+                    self,
+                    &[_]Value{Value.fromString(hint)},
+                );
 
                 // v. If result is not an Object, return result.
                 if (result != .object)
@@ -734,6 +740,28 @@ pub const Value = union(enum) {
 
         // 2. Return ? O.[[Get]](P, V).
         return object.internalMethods().get(object, property_key, self);
+    }
+
+    /// 7.3.11 GetMethod ( V, P )
+    /// https://tc39.es/ecma262/#sec-getmethod
+    pub fn getMethod(self: Self, agent: *Agent, property_key: PropertyKey) !?Object {
+        // 1. Let func be ? GetV(V, P).
+        const function = try self.get(agent, property_key);
+
+        // 2. If func is either undefined or null, return undefined.
+        if (function == .undefined or function == .null)
+            return null;
+
+        // 3. If IsCallable(func) is false, throw a TypeError exception.
+        if (!function.isCallable()) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.allocator, "{} is not callable", .{self}),
+            );
+        }
+
+        // 4. Return func.
+        return function.object;
     }
 
     /// 7.3.14 Call ( F, V [ , argumentsList ] )
