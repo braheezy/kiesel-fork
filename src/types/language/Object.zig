@@ -21,7 +21,9 @@ pub const PropertyStorage = @import("Object/PropertyStorage.zig");
 
 const Self = @This();
 
-pub const Tag = enum(u32) {};
+pub const Tag = enum(u32) {
+    boolean,
+};
 
 ptr: *anyopaque,
 data: *Data,

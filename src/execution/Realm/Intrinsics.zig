@@ -5,5 +5,7 @@ const types = @import("../../types.zig");
 
 const Object = types.Object;
 
+@"%Boolean%": Object,
+@"%Boolean.prototype%": Object,
 @"%Function.prototype%": Object,
 @"%Object.prototype%": Object,

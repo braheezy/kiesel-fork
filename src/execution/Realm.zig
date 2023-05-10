@@ -83,7 +83,11 @@ fn createIntrinsics(self: *Self) !Intrinsics {
     //       struct is then overwritten to ensure nothing is missed.
     self.intrinsics.@"%Object.prototype%" = try builtins.ObjectPrototype.create(self);
     self.intrinsics.@"%Function.prototype%" = try builtins.FunctionPrototype.create(self);
+    self.intrinsics.@"%Boolean.prototype%" = try builtins.BooleanPrototype.create(self);
+    self.intrinsics.@"%Boolean%" = try builtins.BooleanConstructor.create(self);
     var intrinsics = Intrinsics{
+        .@"%Boolean%" = self.intrinsics.@"%Boolean%",
+        .@"%Boolean.prototype%" = self.intrinsics.@"%Boolean.prototype%",
         .@"%Function.prototype%" = self.intrinsics.@"%Function.prototype%",
         .@"%Object.prototype%" = self.intrinsics.@"%Object.prototype%",
     };
@@ -129,7 +133,9 @@ pub fn setDefaultGlobalBindings(self: *Self) !Object {
     const global = self.global_object;
 
     // 2. For each property of the Global Object specified in clause 19, do
-    for ([_]struct { []const u8, Value }{}) |property| {
+    for ([_]struct { []const u8, Value }{
+        .{ "Boolean", Value.fromObject(self.intrinsics.@"%Boolean%") },
+    }) |property| {
         // a. Let name be the String value of the property name.
         const name = PropertyKey.fromString(property[0]);
         const value = property[1];
