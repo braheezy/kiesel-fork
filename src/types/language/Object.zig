@@ -243,6 +243,13 @@ pub fn deletePropertyOrThrow(self: Self, property_key: PropertyKey) !void {
     // 3. Return unused.
 }
 
+/// 7.3.12 HasProperty ( O, P )
+/// https://tc39.es/ecma262/#sec-hasproperty
+pub fn hasProperty(self: Self, property_key: PropertyKey) !bool {
+    // 1. Return ? O.[[HasProperty]](P).
+    return self.internalMethods().hasProperty(self, property_key);
+}
+
 /// 7.3.15 Construct ( F [ , argumentsList [ , newTarget ] ] )
 /// https://tc39.es/ecma262/#sec-construct
 pub fn construct(self: Self, args: struct { arguments_list: []const Value = &[_]Value{}, new_target: ?Self = null }) !Self {
