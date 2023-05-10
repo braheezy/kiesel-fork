@@ -6,6 +6,7 @@ const ordinary = @import("builtins/ordinary.zig");
 
 pub const ordinary_internal_methods = ordinary.ordinary_internal_methods;
 
+pub const BehaviourFn = builtin_function.BehaviourFn;
 pub const BuiltinFunction = builtin_function.BuiltinFunction;
 pub const FunctionPrototype = function.FunctionPrototype;
 pub const Object = object.Object;

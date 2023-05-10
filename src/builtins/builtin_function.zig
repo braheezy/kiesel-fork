@@ -14,7 +14,7 @@ const Value = types.Value;
 const setFunctionLength = ecmascript_function.setFunctionLength;
 const setFunctionName = ecmascript_function.setFunctionName;
 
-const BehaviourFn = fn (*Agent, Value, []const Value, ?Object) Agent.Error!Value;
+pub const BehaviourFn = fn (*Agent, Value, []const Value, ?Object) Agent.Error!Value;
 
 pub const BuiltinFunction = Object.Factory(.{
     .Fields = struct {
