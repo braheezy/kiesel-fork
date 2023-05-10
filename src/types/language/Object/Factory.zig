@@ -12,6 +12,7 @@ const Object = @import("../Object.zig");
 pub fn Factory(
     comptime options: struct {
         Fields: type = void,
+        tag: ?Object.Tag = null,
     },
 ) type {
     const has_fields = options.Fields != void;
@@ -56,6 +57,7 @@ pub fn Factory(
             return .{
                 .ptr = self,
                 .data = &self.data,
+                .tag = options.tag,
             };
         }
     };
