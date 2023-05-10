@@ -71,11 +71,11 @@ test "isAccessorDescriptor" {
     try std.testing.expect((Self{ .get = getter }).isAccessorDescriptor());
     try std.testing.expect((Self{ .set = setter }).isAccessorDescriptor());
     try std.testing.expect((Self{ .get = getter, .set = setter }).isAccessorDescriptor());
-    try std.testing.expect(!(Self{ .value = Value.undefined }).isAccessorDescriptor());
+    try std.testing.expect(!(Self{ .value = .undefined }).isAccessorDescriptor());
 }
 
 test "isDataDescriptor" {
-    try std.testing.expect((Self{ .value = Value.undefined }).isDataDescriptor());
+    try std.testing.expect((Self{ .value = .undefined }).isDataDescriptor());
     try std.testing.expect((Self{ .writable = true }).isDataDescriptor());
     try std.testing.expect(!(Self{ .writable = null }).isDataDescriptor());
 }

@@ -263,7 +263,7 @@ pub fn ordinaryGet(object: Object, property_key: PropertyKey, receiver: Value) !
         const parent = try object.internalMethods().getPrototypeOf(object)
 
         // b. If parent is null, return undefined.
-        orelse return Value.undefined;
+        orelse return .undefined;
 
         // c. Return ? parent.[[Get]](P, Receiver).
         return parent.internalMethods().get(parent, property_key, receiver);
@@ -280,7 +280,7 @@ pub fn ordinaryGet(object: Object, property_key: PropertyKey, receiver: Value) !
 
     // 5. Let getter be desc.[[Get]].
     // 6. If getter is undefined, return undefined.
-    const getter = descriptor.get orelse return Value.undefined;
+    const getter = descriptor.get orelse return .undefined;
 
     // 7. Return ? Call(getter, Receiver).
     return Value.fromObject(getter).callAssumeCallableNoArgs(receiver);

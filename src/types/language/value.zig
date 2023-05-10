@@ -898,8 +898,8 @@ test "format" {
         .prototype = null,
     });
     const test_cases = [_]struct { Value, []const u8 }{
-        .{ Value.undefined, "undefined" },
-        .{ Value.null, "null" },
+        .{ .undefined, "undefined" },
+        .{ .null, "null" },
         .{ Value.fromBoolean(true), "true" },
         .{ Value.fromBoolean(false), "false" },
         .{ Value.fromString("foo"), "\"foo\"" },

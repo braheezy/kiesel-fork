@@ -47,7 +47,7 @@ pub const BooleanConstructor = struct {
     /// 20.3.1.1 Boolean ( value )
     /// https://tc39.es/ecma262/#sec-boolean-constructor-boolean-value
     fn behaviour(agent: *Agent, _: Value, arguments: []const Value, new_target: ?Object) !Value {
-        const value = if (arguments.len > 0) arguments[0] else Value.undefined;
+        const value = if (arguments.len > 0) arguments[0] else .undefined;
 
         // 1. Let b be ToBoolean(value).
         const b = value.toBoolean();

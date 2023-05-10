@@ -32,6 +32,6 @@ pub const FunctionPrototype = struct {
         _ = this_value;
         _ = arguments;
         _ = new_target;
-        return Value.undefined;
+        return .undefined;
     }
 };
