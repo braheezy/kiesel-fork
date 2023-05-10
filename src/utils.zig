@@ -7,6 +7,7 @@ const types = @import("types.zig");
 const BehaviourFn = builtins.BehaviourFn;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
+const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -32,6 +33,17 @@ pub fn defineBuiltinFunction(
     );
 }
 
-pub fn defineBuiltinProperty(object: Object, name: []const u8, value: Value) !void {
-    try object.createNonEnumerableDataPropertyOrThrow(PropertyKey.fromString(name), value);
+pub fn defineBuiltinProperty(object: Object, name: []const u8, value: anytype) !void {
+    const property_key = PropertyKey.fromString(name);
+    const ValueT = @TypeOf(value);
+    if (ValueT == Value) {
+        try object.createNonEnumerableDataPropertyOrThrow(property_key, value);
+    } else if (ValueT == PropertyDescriptor) {
+        object.definePropertyOrThrow(property_key, value) catch |err| switch (err) {
+            error.ExceptionThrown => unreachable,
+            error.OutOfMemory => return error.OutOfMemory,
+        };
+    } else {
+        @compileError("Unsupported value type in defineBuiltinProperty(): " ++ @typeName(ValueT));
+    }
 }
