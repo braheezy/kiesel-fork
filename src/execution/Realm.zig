@@ -152,7 +152,7 @@ pub fn setDefaultGlobalBindings(self: *Self) !Object {
 /// https://tc39.es/ecma262/#sec-initializehostdefinedrealm
 pub fn initializeHostDefinedRealm(
     agent: *Agent,
-    args: struct { globalObject: ?Object = null },
+    args: struct { global_object: ?Object = null },
 ) !void {
     // 1. Let realm be CreateRealm().
     const realm = try create(agent);
@@ -176,7 +176,7 @@ pub fn initializeHostDefinedRealm(
     // 7. If the host requires use of an exotic object to serve as realm's global object, let
     //    global be such an object created in a host-defined manner. Otherwise, let global be
     //    undefined, indicating that an ordinary object should be created as the global object.
-    const global = args.globalObject orelse null;
+    const global = args.global_object orelse null;
 
     // 8. If the host requires that the this binding in realm's global scope return an object other
     //    than the global object, let thisValue be such an object created in a host-defined manner.
