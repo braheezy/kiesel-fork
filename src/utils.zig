@@ -24,7 +24,7 @@ pub fn defineBuiltinFunction(
     const function = try createBuiltinFunction(
         realm.agent,
         behaviour,
-        .{ .length = length, .name = name, .realm = realm, .is_constructor = false },
+        .{ .length = length, .name = name, .realm = realm },
     );
     try object.createMethodProperty(
         PropertyKey.fromString(name),
