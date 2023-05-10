@@ -2,6 +2,7 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 
 const Agent = execution.Agent;
@@ -568,6 +569,26 @@ pub const Value = union(enum) {
         };
     }
 
+    /// 7.1.18 ToObject ( argument )
+    /// https://tc39.es/ecma262/#sec-toobject
+    pub fn toObject(self: Self, agent: *Agent) !Object {
+        const realm = agent.currentRealm();
+        return switch (self) {
+            .undefined => agent.throwException(.type_error, "Cannot convert undefined to Object"),
+            .null => agent.throwException(.type_error, "Cannot convert null to Object"),
+            .boolean => try builtins.Boolean.create(agent, .{
+                .fields = .{ .boolean_data = false },
+                .prototype = realm.intrinsics.@"%Boolean.prototype%",
+            }),
+            // TODO: Implement these objects
+            .number => agent.throwException(.type_error, "toObject() not implemented for Number"),
+            .string => agent.throwException(.type_error, "toObject() not implemented for String"),
+            .symbol => agent.throwException(.type_error, "toObject() not implemented for Symbol"),
+            .big_int => agent.throwException(.type_error, "toObject() not implemented for BigInt"),
+            .object => |object| object,
+        };
+    }
+
     /// 7.1.19 ToPropertyKey ( argument )
     /// https://tc39.es/ecma262/#sec-topropertykey
     pub fn toPropertyKey(self: Self, agent: *Agent) !PropertyKey {
@@ -835,7 +856,6 @@ pub fn sameValueNonNumber(x: Value, y: Value) bool {
 }
 
 test "format" {
-    const builtins = @import("../../builtins.zig");
     var agent = try Agent.init();
     const object = try builtins.Object.create(&agent, .{
         .prototype = null,
