@@ -111,7 +111,7 @@ pub fn setRealmGlobalObject(self: *Self, maybe_global_object: ?Object, maybe_thi
     );
 
     // 3. If thisValue is undefined, set thisValue to globalObj.
-    const this_value = maybe_this_value orelse Value.fromObject(global_object);
+    const this_value = maybe_this_value orelse Value.from(global_object);
 
     // 4. Set realmRec.[[GlobalObject]] to globalObj.
     self.global_object = global_object;
@@ -134,10 +134,10 @@ pub fn setDefaultGlobalBindings(self: *Self) !Object {
 
     // 2. For each property of the Global Object specified in clause 19, do
     for ([_]struct { []const u8, Value }{
-        .{ "Boolean", Value.fromObject(self.intrinsics.@"%Boolean%") },
+        .{ "Boolean", Value.from(self.intrinsics.@"%Boolean%") },
     }) |property| {
         // a. Let name be the String value of the property name.
-        const name = PropertyKey.fromString(property[0]);
+        const name = PropertyKey.from(property[0]);
         const value = property[1];
 
         // b. Let desc be the fully populated data Property Descriptor for the property, containing

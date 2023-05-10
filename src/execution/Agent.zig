@@ -123,7 +123,7 @@ pub fn throwException(
     message: []const u8,
 ) error{ExceptionThrown} {
     // TODO: Create an actual error object.
-    self.exception = Value.fromString(
+    self.exception = Value.from(
         std.fmt.allocPrint(
             self.allocator,
             "{s}: {s}",

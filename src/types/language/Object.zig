@@ -85,12 +85,12 @@ pub fn ordinaryToPrimitive(self: Self, hint: PreferredType) !Value {
     // 3. For each element name of methodNames, do
     for (method_names) |name| {
         // a. Let method be ? Get(O, name).
-        const method = try self.get(PropertyKey.fromString(name));
+        const method = try self.get(PropertyKey.from(name));
 
         // b. If IsCallable(method) is true, then
         if (method.isCallable()) {
             // i. Let result be ? Call(method, O).
-            const result = try method.callAssumeCallableNoArgs(Value.fromObject(self));
+            const result = try method.callAssumeCallableNoArgs(Value.from(self));
 
             // ii. If result is not an Object, return result.
             if (result != .object)
@@ -118,14 +118,14 @@ pub fn isExtensible(self: Self) !bool {
 /// https://tc39.es/ecma262/#sec-get-o-p
 pub fn get(self: Self, property_key: PropertyKey) !Value {
     // 1. Return ? O.[[Get]](P, O).
-    return self.internalMethods().get(self, property_key, Value.fromObject(self));
+    return self.internalMethods().get(self, property_key, Value.from(self));
 }
 
 /// 7.3.4 Set ( O, P, V, Throw )
 /// https://tc39.es/ecma262/#sec-set-o-p-v-throw
 pub fn set(self: Self, property_key: PropertyKey, value: Value, throw: enum { throw, ignore }) !void {
     // 1. Let success be ? O.[[Set]](P, V, O).
-    const success = try self.internalMethods().set(self, property_key, value, Value.fromObject(self));
+    const success = try self.internalMethods().set(self, property_key, value, Value.from(self));
 
     // 2. If success is false and Throw is true, throw a TypeError exception.
     if (!success and throw == .throw)

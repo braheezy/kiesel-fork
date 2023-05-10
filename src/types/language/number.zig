@@ -38,7 +38,8 @@ pub const Number = union(enum) {
     }
 
     pub fn from(number: anytype) Self {
-        switch (@typeInfo(@TypeOf(number))) {
+        const T = @TypeOf(number);
+        switch (@typeInfo(T)) {
             .Int, .ComptimeInt => return .{ .i32 = @as(i32, number) },
             .Float, .ComptimeFloat => {
                 const truncated = std.math.trunc(number);
@@ -51,7 +52,7 @@ pub const Number = union(enum) {
                 }
                 return .{ .f64 = @as(f64, number) };
             },
-            else => @compileError("Value.fromNumber() called with incompatible type " ++ @typeName(@TypeOf(number))),
+            else => @compileError("Number.from() called with incompatible type " ++ @typeName(T)),
         }
     }
 

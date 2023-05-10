@@ -14,21 +14,24 @@ pub const PropertyKey = union(enum) {
     // OPTIMIZATION: If the string is known to be an integer index, store it as a number.
     integer_index: IntegerIndex,
 
-    pub fn fromString(string: []const u8) Self {
-        // FIXME: This should use CanonicalNumericIndexString to reject numeric strings that are not canonical.
-        if (std.fmt.parseUnsigned(IntegerIndex, string, 10)) |integer_index| {
-            return .{ .integer_index = integer_index };
-        } else |_| {
-            return .{ .string = string };
+    pub fn from(value: anytype) Self {
+        const T = @TypeOf(value);
+        if (@typeInfo(T) == .Pointer) {
+            // FIXME: This is not great, but for now we can let the compiler do the rest as strings
+            //        are the only pointers we support here.
+            // FIXME: This should use CanonicalNumericIndexString to reject numeric strings that are not canonical.
+            if (std.fmt.parseUnsigned(IntegerIndex, value, 10)) |integer_index| {
+                return .{ .integer_index = integer_index };
+            } else |_| {
+                return .{ .string = value };
+            }
+        } else if (T == Symbol) {
+            return .{ .symbol = value };
+        } else if (T == IntegerIndex) {
+            return .{ .integer_index = value };
+        } else {
+            @compileError("PropertyKey.from() called with incompatible type " ++ @typeName(T));
         }
-    }
-
-    pub fn fromSymbol(symbol: Symbol) Self {
-        return .{ .symbol = symbol };
-    }
-
-    pub fn fromIntegerIndex(integer_index: IntegerIndex) Self {
-        return .{ .integer_index = integer_index };
     }
 
     /// An integer index is a String-valued property key that is a canonical numeric string and whose

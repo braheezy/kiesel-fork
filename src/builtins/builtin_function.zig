@@ -174,7 +174,7 @@ pub fn createBuiltinFunction(
     //     a. Perform SetFunctionName(func, name).
     // 12. Else,
     //     a. Perform SetFunctionName(func, name, prefix).
-    try setFunctionName(function, PropertyKey.fromString(args.name), args.prefix);
+    try setFunctionName(function, PropertyKey.from(args.name), args.prefix);
 
     // 13. Return func.
     return function;

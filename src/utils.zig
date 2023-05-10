@@ -37,19 +37,19 @@ pub fn defineBuiltinFunction(
         .{ .length = length, .name = name, .realm = realm },
     );
     try object.createMethodProperty(
-        PropertyKey.fromString(name),
-        Value.fromObject(function),
+        PropertyKey.from(name),
+        Value.from(function),
     );
 }
 
 pub fn defineBuiltinProperty(object: Object, name: []const u8, value: anytype) !void {
-    const property_key = PropertyKey.fromString(name);
-    const ValueT = @TypeOf(value);
-    if (ValueT == Value) {
+    const property_key = PropertyKey.from(name);
+    const T = @TypeOf(value);
+    if (T == Value) {
         try object.createNonEnumerableDataPropertyOrThrow(property_key, value);
-    } else if (ValueT == PropertyDescriptor) {
+    } else if (T == PropertyDescriptor) {
         object.definePropertyOrThrow(property_key, value) catch |err| try noexcept(err);
     } else {
-        @compileError("Unsupported value type in defineBuiltinProperty(): " ++ @typeName(ValueT));
+        @compileError("defineBuiltinProperty() called with incompatible type " ++ @typeName(T));
     }
 }

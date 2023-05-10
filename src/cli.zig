@@ -14,11 +14,11 @@ pub fn main() !void {
     const script = try Script.parse(agent.allocator, "", realm, null);
     _ = script;
 
-    const boolean_constructor = try realm.global_object.get(PropertyKey.fromString("Boolean"));
+    const boolean_constructor = try realm.global_object.get(PropertyKey.from("Boolean"));
     const boolean_object = try boolean_constructor.object.construct(.{
-        .arguments_list = &[_]Value{Value.fromBoolean(true)},
+        .arguments_list = &[_]Value{Value.from(true)},
     });
-    const value_of = try boolean_object.get(PropertyKey.fromString("valueOf"));
-    const value = try value_of.callAssumeCallableNoArgs(Value.fromObject(boolean_object));
+    const value_of = try boolean_object.get(PropertyKey.from("valueOf"));
+    const value = try value_of.callAssumeCallableNoArgs(Value.from(boolean_object));
     std.debug.print("new Boolean(true).valueOf() = {}\n", .{value});
 }

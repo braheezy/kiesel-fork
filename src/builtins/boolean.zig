@@ -35,7 +35,7 @@ pub const BooleanConstructor = struct {
         // 20.3.2.1 Boolean.prototype
         // https://tc39.es/ecma262/#sec-boolean.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
-            .value = Value.fromObject(realm.intrinsics.@"%Boolean.prototype%"),
+            .value = Value.from(realm.intrinsics.@"%Boolean.prototype%"),
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -54,7 +54,7 @@ pub const BooleanConstructor = struct {
 
         // 2. If NewTarget is undefined, return b.
         if (new_target == null)
-            return Value.fromBoolean(b);
+            return Value.from(b);
 
         // 3. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%Boolean.prototype%", « [[BooleanData]] »).
         const object = try ordinaryCreateFromConstructor(Boolean, agent, new_target.?, "%Boolean.prototype%");
@@ -63,7 +63,7 @@ pub const BooleanConstructor = struct {
         object.as(Boolean).fields = .{ .boolean_data = b };
 
         // 5. Return O.
-        return Value.fromObject(object);
+        return Value.from(object);
     }
 };
 
@@ -80,7 +80,7 @@ pub const BooleanPrototype = struct {
 
         // 20.3.3.1 Boolean.prototype.constructor
         // https://tc39.es/ecma262/#sec-boolean.prototype.constructor
-        try defineBuiltinProperty(object, "constructor", Value.fromObject(realm.intrinsics.@"%Boolean%"));
+        try defineBuiltinProperty(object, "constructor", Value.from(realm.intrinsics.@"%Boolean%"));
 
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
@@ -121,14 +121,14 @@ pub const BooleanPrototype = struct {
         const b = try thisBooleanValue(agent, this_value);
 
         // 2. If b is true, return "true"; else return "false".
-        return Value.fromString(if (b) "true" else "false");
+        return Value.from(if (b) "true" else "false");
     }
 
     /// 20.3.3.3 Boolean.prototype.valueOf ( )
     /// https://tc39.es/ecma262/#sec-boolean.prototype.valueof
     fn valueOf(agent: *Agent, this_value: Value, _: []const Value, _: ?Object) !Value {
         // 1. Return ? thisBooleanValue(this value).
-        return Value.fromBoolean(try thisBooleanValue(agent, this_value));
+        return Value.from(try thisBooleanValue(agent, this_value));
     }
 };
 

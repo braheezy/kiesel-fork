@@ -20,7 +20,7 @@ pub fn setFunctionName(function: Object, name_property_key: PropertyKey, prefix:
     const agent = function.agent();
 
     // 1. Assert: F is an extensible object that does not have a "name" own property.
-    std.debug.assert(function.extensible().* and !function.propertyStorage().has(PropertyKey.fromString("name")));
+    std.debug.assert(function.extensible().* and !function.propertyStorage().has(PropertyKey.from("name")));
 
     var name = switch (name_property_key) {
         .string => |string| string,
@@ -60,8 +60,8 @@ pub fn setFunctionName(function: Object, name_property_key: PropertyKey, prefix:
     // 6. Perform ! DefinePropertyOrThrow(F, "name", PropertyDescriptor {
     //      [[Value]]: name, [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    function.definePropertyOrThrow(PropertyKey.fromString("name"), PropertyDescriptor{
-        .value = Value.fromString(name),
+    function.definePropertyOrThrow(PropertyKey.from("name"), PropertyDescriptor{
+        .value = Value.from(name),
         .writable = false,
         .enumerable = false,
         .configurable = true,
@@ -79,13 +79,13 @@ pub fn setFunctionLength(function: Object, length: f64) !void {
     );
 
     // 1. Assert: F is an extensible object that does not have a "length" own property.
-    std.debug.assert(function.extensible().* and !function.propertyStorage().has(PropertyKey.fromString("length")));
+    std.debug.assert(function.extensible().* and !function.propertyStorage().has(PropertyKey.from("length")));
 
     // 2. Perform ! DefinePropertyOrThrow(F, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    function.definePropertyOrThrow(PropertyKey.fromString("length"), PropertyDescriptor{
-        .value = Value.fromNumber(length),
+    function.definePropertyOrThrow(PropertyKey.from("length"), PropertyDescriptor{
+        .value = Value.from(length),
         .writable = false,
         .enumerable = false,
         .configurable = true,

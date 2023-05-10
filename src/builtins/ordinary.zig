@@ -283,7 +283,7 @@ pub fn ordinaryGet(object: Object, property_key: PropertyKey, receiver: Value) !
     const getter = descriptor.get orelse return .undefined;
 
     // 7. Return ? Call(getter, Receiver).
-    return Value.fromObject(getter).callAssumeCallableNoArgs(receiver);
+    return Value.from(getter).callAssumeCallableNoArgs(receiver);
 }
 
 /// 10.1.9 [[Set]] ( P, V, Receiver )
@@ -386,7 +386,7 @@ pub fn ordinarySetWithOwnDescriptor(
     const setter = own_descriptor.set orelse return false;
 
     // 6. Perform ? Call(setter, Receiver, « V »).
-    _ = try Value.fromObject(setter).callAssumeCallable(receiver_value, &[_]Value{value});
+    _ = try Value.from(setter).callAssumeCallable(receiver_value, &[_]Value{value});
 
     // 7. Return true.
     return true;
@@ -515,7 +515,7 @@ pub fn getPrototypeFromConstructor(constructor: Object, comptime intrinsic_defau
     comptime std.debug.assert(@hasField(Realm.Intrinsics, intrinsic_default_proto));
 
     // 2. Let proto be ? Get(constructor, "prototype").
-    const prototype = try constructor.get(PropertyKey.fromString("prototype"));
+    const prototype = try constructor.get(PropertyKey.from("prototype"));
 
     const prototype_object: ?Object = switch (prototype) {
         .object => prototype.object,

@@ -96,28 +96,25 @@ pub const Value = union(enum) {
         return .{ .number = Number.from(-std.math.inf(f64)) };
     }
 
-    pub fn fromBoolean(boolean: bool) Value {
-        return .{ .boolean = boolean };
-    }
-
-    pub fn fromString(string: []const u8) Value {
-        return .{ .string = string };
-    }
-
-    pub fn fromSymbol(symbol: Symbol) Value {
-        return .{ .symbol = symbol };
-    }
-
-    pub fn fromNumber(number: anytype) Value {
-        return .{ .number = Number.from(number) };
-    }
-
-    pub fn fromBigInt(big_int: BigInt) Value {
-        return .{ .big_int = big_int };
-    }
-
-    pub fn fromObject(object: Object) Value {
-        return .{ .object = object };
+    pub fn from(value: anytype) Value {
+        const T = @TypeOf(value);
+        if (T == bool) {
+            return .{ .boolean = value };
+        } else if (@typeInfo(T) == .Pointer) {
+            // FIXME: This is not great, but for now we can let the compiler do the rest as strings
+            //        are the only pointers we support here.
+            return .{ .string = value };
+        } else if (T == Symbol) {
+            return .{ .symbol = value };
+        } else if (@typeInfo(T) == .Int or @typeInfo(T) == .ComptimeInt or @typeInfo(T) == .Float or @typeInfo(T) == .ComptimeFloat) {
+            return .{ .number = Number.from(value) };
+        } else if (T == BigInt) {
+            return .{ .big_int = value };
+        } else if (T == Object) {
+            return .{ .object = value };
+        } else {
+            @compileError("Value.from() called with incompatible type " ++ @typeName(T));
+        }
     }
 
     /// 7.1.1 ToPrimitive ( input [ , preferredType ] )
@@ -128,7 +125,7 @@ pub const Value = union(enum) {
             // a. Let exoticToPrim be ? GetMethod(input, @@toPrimitive).
             const maybe_exotic_to_primitive = try self.getMethod(
                 agent,
-                PropertyKey.fromSymbol(agent.well_known_symbols.@"@@toPrimitive"),
+                PropertyKey.from(agent.well_known_symbols.@"@@toPrimitive"),
             );
 
             // b. If exoticToPrim is not undefined, then
@@ -606,12 +603,12 @@ pub const Value = union(enum) {
         // 2. If key is a Symbol, then
         if (key == .symbol) {
             // a. Return key.
-            return PropertyKey.fromSymbol(key.symbol);
+            return PropertyKey.from(key.symbol);
         }
 
         // 3. Return ! ToString(key).
         const string = key.toString(agent) catch |err| try noexcept(err);
-        return PropertyKey.fromString(string);
+        return PropertyKey.from(string);
     }
 
     /// 7.1.20 ToLength ( argument )
@@ -900,13 +897,13 @@ test "format" {
     const test_cases = [_]struct { Value, []const u8 }{
         .{ .undefined, "undefined" },
         .{ .null, "null" },
-        .{ Value.fromBoolean(true), "true" },
-        .{ Value.fromBoolean(false), "false" },
-        .{ Value.fromString("foo"), "\"foo\"" },
-        .{ Value.fromSymbol(Symbol{ .id = 0, .description = null }), "Symbol()" },
-        .{ Value.fromSymbol(Symbol{ .id = 0, .description = "foo" }), "Symbol(\"foo\")" },
-        .{ Value.fromBigInt(BigInt{ .value = try BigInt.Value.initSet(std.testing.allocator, 123) }), "123n" },
-        .{ Value.fromObject(object), "[object Object]" },
+        .{ Value.from(true), "true" },
+        .{ Value.from(false), "false" },
+        .{ Value.from("foo"), "\"foo\"" },
+        .{ Value.from(Symbol{ .id = 0, .description = null }), "Symbol()" },
+        .{ Value.from(Symbol{ .id = 0, .description = "foo" }), "Symbol(\"foo\")" },
+        .{ Value.from(BigInt{ .value = try BigInt.Value.initSet(std.testing.allocator, 123) }), "123n" },
+        .{ Value.from(object), "[object Object]" },
     };
     for (test_cases) |test_case| {
         const value = test_case[0];
@@ -932,24 +929,18 @@ test "Value.negativeInfinity" {
     try std.testing.expectEqual(Value.negativeInfinity().number.f64, -inf);
 }
 
-test "Value.fromBoolean" {
-    try std.testing.expectEqual(Value.fromBoolean(true).boolean, true);
-    try std.testing.expectEqual(Value.fromBoolean(false).boolean, false);
-}
-
-test "Value.fromString" {
-    try std.testing.expectEqual(Value.fromString("").string, "");
-    try std.testing.expectEqual(Value.fromString("foo").string, "foo");
-    try std.testing.expectEqual(Value.fromString("123").string, "123");
-}
-
-test "Value.fromNumber" {
+test "Value.from" {
     const inf = std.math.inf(f64);
-    try std.testing.expectEqual(Value.fromNumber(0).number.i32, 0);
-    try std.testing.expectEqual(Value.fromNumber(0.0).number.i32, 0);
-    try std.testing.expectEqual(Value.fromNumber(123).number.i32, 123);
-    try std.testing.expectEqual(Value.fromNumber(123.0).number.i32, 123);
-    try std.testing.expectEqual(Value.fromNumber(123.456).number.f64, 123.456);
-    try std.testing.expectEqual(Value.fromNumber(std.math.inf(f64)).number.f64, inf);
-    try std.testing.expect(std.math.isNan(Value.fromNumber(std.math.nan(f64)).number.f64));
+    try std.testing.expectEqual(Value.from(true).boolean, true);
+    try std.testing.expectEqual(Value.from(false).boolean, false);
+    try std.testing.expectEqual(Value.from("").string, "");
+    try std.testing.expectEqual(Value.from("foo").string, "foo");
+    try std.testing.expectEqual(Value.from("123").string, "123");
+    try std.testing.expectEqual(Value.from(0).number.i32, 0);
+    try std.testing.expectEqual(Value.from(0.0).number.i32, 0);
+    try std.testing.expectEqual(Value.from(123).number.i32, 123);
+    try std.testing.expectEqual(Value.from(123.0).number.i32, 123);
+    try std.testing.expectEqual(Value.from(123.456).number.f64, 123.456);
+    try std.testing.expectEqual(Value.from(std.math.inf(f64)).number.f64, inf);
+    try std.testing.expect(std.math.isNan(Value.from(std.math.nan(f64)).number.f64));
 }
