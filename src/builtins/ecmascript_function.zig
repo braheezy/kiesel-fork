@@ -4,6 +4,7 @@
 const std = @import("std");
 
 const builtin_function = @import("builtin_function.zig");
+const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
@@ -11,8 +12,42 @@ const BuiltinFunction = builtin_function.BuiltinFunction;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
+const Realm = execution.Realm;
 const Value = types.Value;
 const noexcept = utils.noexcept;
+
+/// 10.2.4 AddRestrictedFunctionProperties ( F, realm )
+/// https://tc39.es/ecma262/#sec-addrestrictedfunctionproperties
+pub fn addRestrictedFunctionProperties(function: Object, realm: *Realm) !void {
+    // 1. Assert: realm.[[Intrinsics]].[[%ThrowTypeError%]] exists and has been initialized.
+    // 2. Let thrower be realm.[[Intrinsics]].[[%ThrowTypeError%]].
+    const thrower = try realm.intrinsics.@"%ThrowTypeError%"();
+
+    const property_descriptor = PropertyDescriptor{
+        .get = thrower,
+        .set = thrower,
+        .enumerable = false,
+        .configurable = true,
+    };
+
+    // 3. Perform ! DefinePropertyOrThrow(F, "caller", PropertyDescriptor {
+    //      [[Get]]: thrower, [[Set]]: thrower, [[Enumerable]]: false, [[Configurable]]: true
+    //    }).
+    function.definePropertyOrThrow(
+        PropertyKey.from("caller"),
+        property_descriptor,
+    ) catch |err| try noexcept(err);
+
+    // 4. Perform ! DefinePropertyOrThrow(F, "arguments", PropertyDescriptor {
+    //      [[Get]]: thrower, [[Set]]: thrower, [[Enumerable]]: false, [[Configurable]]: true
+    //    }).
+    function.definePropertyOrThrow(
+        PropertyKey.from("arguments"),
+        property_descriptor,
+    ) catch |err| try noexcept(err);
+
+    // 5. Return unused.
+}
 
 /// 10.2.9 SetFunctionName ( F, name [ , prefix ] )
 /// https://tc39.es/ecma262/#sec-setfunctionname

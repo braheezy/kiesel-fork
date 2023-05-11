@@ -17,6 +17,7 @@ pub const FunctionPrototype = function.FunctionPrototype;
 pub const Object = object.Object;
 pub const ObjectPrototype = object.ObjectPrototype;
 pub const ThrowTypeError = throw_type_error.ThrowTypeError;
+pub const addRestrictedFunctionProperties = ecmascript_function.addRestrictedFunctionProperties;
 pub const createBuiltinFunction = builtin_function.createBuiltinFunction;
 pub const getPrototypeFromConstructor = ordinary.getPrototypeFromConstructor;
 pub const ordinaryCreateFromConstructor = ordinary.ordinaryCreateFromConstructor;
