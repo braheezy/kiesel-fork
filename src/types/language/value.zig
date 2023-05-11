@@ -84,19 +84,19 @@ pub const Value = union(enum) {
         }
     }
 
-    pub fn nan() Value {
+    pub inline fn nan() Value {
         return .{ .number = Number.from(std.math.nan(f64)) };
     }
 
-    pub fn infinity() Value {
+    pub inline fn infinity() Value {
         return .{ .number = Number.from(std.math.inf(f64)) };
     }
 
-    pub fn negativeInfinity() Value {
+    pub inline fn negativeInfinity() Value {
         return .{ .number = Number.from(-std.math.inf(f64)) };
     }
 
-    pub fn from(value: anytype) Value {
+    pub inline fn from(value: anytype) Value {
         const T = @TypeOf(value);
         if (T == bool) {
             return .{ .boolean = value };
@@ -778,15 +778,15 @@ pub const Value = union(enum) {
         return self.object.internalMethods().call.?(self.object, this_value, arguments_list);
     }
 
-    pub fn callNoArgs(self: Self, agent: *Agent, this_value: Value) !Value {
+    pub inline fn callNoArgs(self: Self, agent: *Agent, this_value: Value) !Value {
         return self.call(agent, this_value, &[_]Value{});
     }
 
-    pub fn callAssumeCallable(self: Self, this_value: Value, arguments_list: []const Value) !Value {
+    pub inline fn callAssumeCallable(self: Self, this_value: Value, arguments_list: []const Value) !Value {
         return self.object.internalMethods().call.?(self.object, this_value, arguments_list);
     }
 
-    pub fn callAssumeCallableNoArgs(self: Self, this_value: Value) !Value {
+    pub inline fn callAssumeCallableNoArgs(self: Self, this_value: Value) !Value {
         return self.callAssumeCallable(this_value, &[_]Value{});
     }
 };

@@ -37,7 +37,7 @@ pub const Number = union(enum) {
         }
     }
 
-    pub fn from(number: anytype) Self {
+    pub inline fn from(number: anytype) Self {
         const T = @TypeOf(number);
         switch (@typeInfo(T)) {
             .Int, .ComptimeInt => return .{ .i32 = @as(i32, number) },
@@ -56,63 +56,63 @@ pub const Number = union(enum) {
         }
     }
 
-    pub fn asFloat(self: Self) f64 {
+    pub inline fn asFloat(self: Self) f64 {
         return switch (self) {
             .f64 => |x| x,
             .i32 => |x| @intToFloat(f64, x),
         };
     }
 
-    pub fn isNan(self: Self) bool {
+    pub inline fn isNan(self: Self) bool {
         return switch (self) {
             .f64 => |x| std.math.isNan(x),
             .i32 => false,
         };
     }
 
-    pub fn isPositiveInf(self: Self) bool {
+    pub inline fn isPositiveInf(self: Self) bool {
         return switch (self) {
             .f64 => |x| std.math.isPositiveInf(x),
             .i32 => false,
         };
     }
 
-    pub fn isNegativeInf(self: Self) bool {
+    pub inline fn isNegativeInf(self: Self) bool {
         return switch (self) {
             .f64 => |x| std.math.isNegativeInf(x),
             .i32 => false,
         };
     }
 
-    pub fn isPositiveZero(self: Self) bool {
+    pub inline fn isPositiveZero(self: Self) bool {
         return switch (self) {
             .f64 => |x| x == 0 and !std.math.signbit(x),
             .i32 => |x| x == 0,
         };
     }
 
-    pub fn isNegativeZero(self: Self) bool {
+    pub inline fn isNegativeZero(self: Self) bool {
         return switch (self) {
             .f64 => |x| x == 0 and std.math.signbit(x),
             .i32 => false,
         };
     }
 
-    pub fn isFinite(self: Self) bool {
+    pub inline fn isFinite(self: Self) bool {
         return switch (self) {
             .f64 => |x| std.math.isFinite(x),
             .i32 => true,
         };
     }
 
-    pub fn truncate(self: Self) Self {
+    pub inline fn truncate(self: Self) Self {
         return switch (self) {
             .f64 => |x| .{ .f64 = @trunc(x) },
             .i32 => |x| .{ .i32 = x },
         };
     }
 
-    pub fn floor(self: Self) Self {
+    pub inline fn floor(self: Self) Self {
         return switch (self) {
             .f64 => |x| .{ .f64 = @floor(x) },
             .i32 => |x| .{ .i32 = x },

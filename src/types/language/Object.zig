@@ -44,29 +44,29 @@ pub fn format(
     try writer.writeAll("[object Object]");
 }
 
-pub fn as(self: Self, comptime T: type) *T {
+pub inline fn as(self: Self, comptime T: type) *T {
     return @ptrCast(*T, @alignCast(@alignOf(T), self.ptr));
 }
 
 // Helper functions so we don't have to say 'data' all the time
 
-pub fn prototype(self: Self) *?Self {
+pub inline fn prototype(self: Self) *?Self {
     return &self.data.prototype;
 }
 
-pub fn extensible(self: Self) *bool {
+pub inline fn extensible(self: Self) *bool {
     return &self.data.extensible;
 }
 
-pub fn agent(self: Self) *Agent {
+pub inline fn agent(self: Self) *Agent {
     return self.data.agent;
 }
 
-pub fn internalMethods(self: Self) *InternalMethods {
+pub inline fn internalMethods(self: Self) *InternalMethods {
     return &self.data.internal_methods;
 }
 
-pub fn propertyStorage(self: Self) *PropertyStorage {
+pub inline fn propertyStorage(self: Self) *PropertyStorage {
     return &self.data.property_storage;
 }
 
