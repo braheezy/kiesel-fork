@@ -27,6 +27,11 @@ pub const Tag = enum(u32) {
     boolean,
 };
 
+pub const IntegrityLevel = enum {
+    sealed,
+    frozen,
+};
+
 ptr: *anyopaque,
 data: *Data,
 tag: ?Tag,
@@ -305,6 +310,75 @@ pub fn construct(
 
     // 3. Return ? F.[[Construct]](argumentsList, newTarget).
     return self.internalMethods().construct.?(self, arguments_list, new_target);
+}
+
+/// 7.3.16 SetIntegrityLevel ( O, level )
+/// https://tc39.es/ecma262/#sec-setintegritylevel
+pub fn setIntegrityLevel(self: Self, level: IntegrityLevel) !bool {
+    // 1. Let status be ? O.[[PreventExtensions]]().
+    const status = try self.internalMethods().preventExtensions(self);
+
+    // 2. If status is false, return false.
+    if (!status)
+        return false;
+
+    // 3. Let keys be ? O.[[OwnPropertyKeys]]().
+    const keys = try self.internalMethods().ownPropertyKeys(self);
+
+    switch (level) {
+        // 4. If level is sealed,
+        .sealed => {
+            // a. For each element k of keys, do
+            for (keys.items) |property_key| {
+                // i. Perform ? DefinePropertyOrThrow(O, k, PropertyDescriptor { [[Configurable]]: false }).
+                try self.definePropertyOrThrow(
+                    property_key,
+                    PropertyDescriptor{ .configurable = false },
+                );
+            }
+        },
+
+        // 5. Else,
+        .frozen => {
+            // a. Assert: level is frozen.
+
+            // b. For each element k of keys, do
+            for (keys.items) |property_key| {
+                // i. Let currentDesc be ? O.[[GetOwnProperty]](k).
+                const maybe_current_descriptor = try self.internalMethods().getOwnProperty(
+                    self,
+                    property_key,
+                );
+
+                // ii. If currentDesc is not undefined, then
+                if (maybe_current_descriptor) |current_descriptor| {
+                    var descriptor: PropertyDescriptor = undefined;
+
+                    // 1. If IsAccessorDescriptor(currentDesc) is true, then
+                    if (current_descriptor.isAccessorDescriptor()) {
+                        // a. Let desc be the PropertyDescriptor { [[Configurable]]: false }.
+                        descriptor = PropertyDescriptor{ .configurable = false };
+                    }
+                    // 2. Else,
+                    else {
+                        // a. Let desc be the PropertyDescriptor {
+                        //      [[Configurable]]: false, [[Writable]]: false
+                        //    }.
+                        descriptor = PropertyDescriptor{
+                            .configurable = false,
+                            .writable = false,
+                        };
+                    }
+
+                    // 3. Perform ? DefinePropertyOrThrow(O, k, desc).
+                    try self.definePropertyOrThrow(property_key, descriptor);
+                }
+            }
+        },
+    }
+
+    // 6. Return true.
+    return true;
 }
 
 /// 7.3.25 GetFunctionRealm ( obj )
