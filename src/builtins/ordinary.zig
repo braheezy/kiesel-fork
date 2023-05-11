@@ -205,6 +205,23 @@ pub fn ordinaryDefineOwnProperty(object: Object, property_key: PropertyKey, prop
     return validateAndApplyPropertyDescriptor(object, property_key, extensible, property_descriptor, current);
 }
 
+/// 10.1.6.2 IsCompatiblePropertyDescriptor ( Extensible, Desc, Current )
+/// https://tc39.es/ecma262/#sec-iscompatiblepropertydescriptor
+pub fn isCompatiblePropertyDescriptor(
+    extensible: bool,
+    descriptor: PropertyDescriptor,
+    current: PropertyDescriptor,
+) bool {
+    // 1. Return ValidateAndApplyPropertyDescriptor(undefined, "", Extensible, Desc, Current).
+    return validateAndApplyPropertyDescriptor(
+        null,
+        PropertyKey.from(""),
+        extensible,
+        descriptor,
+        current,
+    ) catch unreachable;
+}
+
 /// 10.1.6.3 ValidateAndApplyPropertyDescriptor ( O, P, extensible, Desc, current )
 /// https://tc39.es/ecma262/#sec-validateandapplypropertydescriptor
 fn validateAndApplyPropertyDescriptor(
