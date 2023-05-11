@@ -95,7 +95,7 @@ pub const BooleanPrototype = struct {
             .boolean => |boolean| return boolean,
 
             // 2. If value is an Object and value has a [[BooleanData]] internal slot, then
-            .object => |object| if (object.tag) |tag| if (tag == .boolean) {
+            .object => |object| if (object.is(Boolean)) {
                 // a. Let b be value.[[BooleanData]].
                 // b. Assert: b is a Boolean.
                 const b = object.as(Boolean).fields.boolean_data;

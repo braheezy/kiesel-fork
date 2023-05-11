@@ -44,6 +44,16 @@ pub fn format(
     try writer.writeAll("[object Object]");
 }
 
+pub inline fn is(self: Self, comptime T: type) bool {
+    inline for ([_]struct { type, Tag }{
+        .{ builtins.Boolean, .boolean },
+    }) |entry| {
+        if (T == entry[0])
+            return if (self.tag) |tag| tag == entry[1] else false;
+    }
+    @compileError("Object.is() called with unsupported type " ++ @typeName(T));
+}
+
 pub inline fn as(self: Self, comptime T: type) *T {
     return @ptrCast(*T, @alignCast(@alignOf(T), self.ptr));
 }
