@@ -13,6 +13,7 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = Object.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
+const sameValue = types.sameValue;
 
 const Self = @This();
 
@@ -206,11 +207,170 @@ pub fn ordinaryDefineOwnProperty(object: Object, property_key: PropertyKey, prop
 
 /// 10.1.6.3 ValidateAndApplyPropertyDescriptor ( O, P, extensible, Desc, current )
 /// https://tc39.es/ecma262/#sec-validateandapplypropertydescriptor
-fn validateAndApplyPropertyDescriptor(object: Object, property_key: PropertyKey, extensible: bool, property_descriptor: PropertyDescriptor, current: ?PropertyDescriptor) !bool {
-    _ = current;
-    _ = extensible;
-    // TODO: Implement me :^)
-    try object.propertyStorage().set(property_key, property_descriptor);
+fn validateAndApplyPropertyDescriptor(
+    maybe_object: ?Object,
+    property_key: PropertyKey,
+    extensible: bool,
+    descriptor: PropertyDescriptor,
+    maybe_current: ?PropertyDescriptor,
+) !bool {
+    // 1. Assert: IsPropertyKey(P) is true.
+
+    // 2. If current is undefined, then
+    if (maybe_current == null) {
+        // a. If extensible is false, return false.
+        if (!extensible)
+            return false;
+
+        // b. If O is undefined, return true.
+        if (maybe_object == null)
+            return true;
+
+        const object = maybe_object.?;
+
+        // c. If IsAccessorDescriptor(Desc) is true, then
+        if (descriptor.isAccessorDescriptor()) {
+            // i. Create an own accessor property named P of object O whose [[Get]], [[Set]],
+            //    [[Enumerable]], and [[Configurable]] attributes are set to the value of the
+            //    corresponding field in Desc if Desc has that field, or to the attribute's default
+            //    value otherwise.
+            try object.propertyStorage().set(property_key, PropertyDescriptor{
+                .get = descriptor.get,
+                .set = descriptor.set,
+                .enumerable = descriptor.enumerable orelse false,
+                .configurable = descriptor.configurable orelse false,
+            });
+        }
+        // d. Else,
+        else {
+            // i. Create an own data property named P of object O whose [[Value]], [[Writable]],
+            //    [[Enumerable]], and [[Configurable]] attributes are set to the value of the
+            //    corresponding field in Desc if Desc has that field, or to the attribute's default
+            //    value otherwise.
+            try object.propertyStorage().set(property_key, PropertyDescriptor{
+                .value = descriptor.value orelse .undefined,
+                .writable = descriptor.writable orelse false,
+                .enumerable = descriptor.enumerable orelse false,
+                .configurable = descriptor.configurable orelse false,
+            });
+        }
+
+        // e. Return true.
+        return true;
+    }
+
+    const current = maybe_current.?;
+
+    // 3. Assert: current is a fully populated Property Descriptor.
+    std.debug.assert(current.isFullyPopulated());
+
+    // 4. If Desc does not have any fields, return true.
+    if (!descriptor.hasFields())
+        return true;
+
+    // 5. If current.[[Configurable]] is false, then
+    if (!current.configurable.?) {
+        // a. If Desc has a [[Configurable]] field and Desc.[[Configurable]] is true, return false.
+        if (descriptor.configurable) |configurable| if (configurable)
+            return false;
+
+        // b. If Desc has an [[Enumerable]] field and SameValue(Desc.[[Enumerable]], current.[[Enumerable]])
+        //    is false, return false.
+        if (descriptor.enumerable) |enumerable| if (enumerable != current.enumerable.?)
+            return false;
+
+        // c. If IsGenericDescriptor(Desc) is false and SameValue(IsAccessorDescriptor(Desc), IsAccessorDescriptor(current))
+        //    is false, return false.
+        if (!descriptor.isGenericDescriptor() and descriptor.isAccessorDescriptor() != current.isAccessorDescriptor())
+            return false;
+
+        // d. If IsAccessorDescriptor(current) is true, then
+        if (current.isAccessorDescriptor()) {
+            // i. If Desc has a [[Get]] field and SameValue(Desc.[[Get]], current.[[Get]]) is false,
+            //    return false.
+            if (descriptor.get != null and current.get != null and descriptor.get.?.ptr != current.get.?.ptr)
+                return false;
+
+            // ii. If Desc has a [[Set]] field and SameValue(Desc.[[Set]], current.[[Set]]) is
+            //     false, return false.
+            if (descriptor.set != null and current.set != null and descriptor.set.?.ptr != current.set.?.ptr)
+                return false;
+        }
+        // e. Else if current.[[Writable]] is false, then
+        else if (!current.writable.?) {
+            // i. If Desc has a [[Writable]] field and Desc.[[Writable]] is true, return false.
+            if (descriptor.writable) |writable| if (writable)
+                return false;
+
+            // ii. If Desc has a [[Value]] field and SameValue(Desc.[[Value]], current.[[Value]])
+            //     is false, return false.
+            if (descriptor.value) |value| if (!sameValue(value, current.value.?))
+                return false;
+        }
+    }
+
+    // 6. If O is not undefined, then
+    if (maybe_object) |object| {
+        // a. If IsDataDescriptor(current) is true and IsAccessorDescriptor(Desc) is true, then
+        if (current.isDataDescriptor() and descriptor.isAccessorDescriptor()) {
+            // i. If Desc has a [[Configurable]] field, let configurable be Desc.[[Configurable]];
+            //    else let configurable be current.[[Configurable]].
+            const configurable = descriptor.configurable orelse current.configurable.?;
+
+            // ii. If Desc has a [[Enumerable]] field, let enumerable be Desc.[[Enumerable]]; else
+            //     let enumerable be current.[[Enumerable]].
+            const enumerable = descriptor.configurable orelse current.enumerable.?;
+
+            // iii. Replace the property named P of object O with an accessor property whose
+            //      [[Configurable]] and [[Enumerable]] attributes are set to configurable and
+            //      enumerable, respectively, and whose [[Get]] and [[Set]] attributes are set to
+            //      the value of the corresponding field in Desc if Desc has that field, or to the
+            //      attribute's default value otherwise.
+            try object.propertyStorage().set(property_key, PropertyDescriptor{
+                .get = descriptor.get,
+                .set = descriptor.set,
+                .enumerable = enumerable,
+                .configurable = configurable,
+            });
+        }
+        // b. Else if IsAccessorDescriptor(current) is true and IsDataDescriptor(Desc) is true, then
+        else if (current.isAccessorDescriptor() and descriptor.isDataDescriptor()) {
+            // i. If Desc has a [[Configurable]] field, let configurable be Desc.[[Configurable]];
+            //    else let configurable be current.[[Configurable]].
+            const configurable = descriptor.configurable orelse current.configurable.?;
+
+            // ii. If Desc has a [[Enumerable]] field, let enumerable be Desc.[[Enumerable]]; else
+            //     let enumerable be current.[[Enumerable]].
+            const enumerable = descriptor.enumerable orelse current.enumerable.?;
+
+            // iii. Replace the property named P of object O with a data property whose
+            //      [[Configurable]] and [[Enumerable]] attributes are set to configurable and
+            //      enumerable, respectively, and whose [[Value]] and [[Writable]] attributes are
+            //      set to the value of the corresponding field in Desc if Desc has that field, or
+            //      to the attribute's default value otherwise.
+            try object.propertyStorage().set(property_key, PropertyDescriptor{
+                .value = descriptor.value orelse .undefined,
+                .writable = descriptor.writable orelse false,
+                .enumerable = enumerable,
+                .configurable = configurable,
+            });
+        }
+        // c. Else,
+        else {
+            // i. For each field of Desc, set the corresponding attribute of the property named P
+            //    of object O to the value of the field.
+            try object.propertyStorage().set(property_key, PropertyDescriptor{
+                .value = descriptor.value orelse current.value,
+                .writable = descriptor.writable orelse current.writable,
+                .get = descriptor.get orelse current.get,
+                .set = descriptor.set orelse current.set,
+                .enumerable = descriptor.enumerable orelse current.enumerable,
+                .configurable = descriptor.configurable orelse current.configurable,
+            });
+        }
+    }
+
+    // 7. Return true.
     return true;
 }
 
