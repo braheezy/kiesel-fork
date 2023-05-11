@@ -134,7 +134,7 @@ pub fn createBuiltinFunction(
     const realm = args.realm orelse agent.currentRealm();
 
     // 2. If prototype is not present, set prototype to realm.[[Intrinsics]].[[%Function.prototype%]].
-    const prototype = args.prototype orelse realm.intrinsics.@"%Function.prototype%";
+    const prototype = args.prototype orelse try realm.intrinsics.@"%Function.prototype%"();
 
     // 3. Let internalSlotsList be a List containing the names of all the internal slots that 10.3
     //    requires for the built-in function object that is about to be created.

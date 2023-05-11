@@ -583,7 +583,7 @@ pub const Value = union(enum) {
             .null => agent.throwException(.type_error, "Cannot convert null to Object"),
             .boolean => try builtins.Boolean.create(agent, .{
                 .fields = .{ .boolean_data = false },
-                .prototype = realm.intrinsics.@"%Boolean.prototype%",
+                .prototype = try realm.intrinsics.@"%Boolean.prototype%"(),
             }),
             // TODO: Implement these objects
             .number => agent.throwException(.type_error, "toObject() not implemented for Number"),

@@ -495,7 +495,7 @@ pub fn ordinaryCreateFromConstructor(comptime T: type, agent: *Agent, constructo
     // 1. Assert: intrinsicDefaultProto is this specification's name of an intrinsic
     //    object. The corresponding object must be an intrinsic that is intended to be used
     //    as the [[Prototype]] value of an object.
-    comptime std.debug.assert(@hasField(Realm.Intrinsics, intrinsic_default_proto));
+    comptime std.debug.assert(@hasDecl(Realm.Intrinsics, intrinsic_default_proto));
 
     // 2. Let proto be ? GetPrototypeFromConstructor(constructor, intrinsicDefaultProto).
     const prototype = try getPrototypeFromConstructor(constructor, intrinsic_default_proto);
@@ -512,7 +512,7 @@ pub fn getPrototypeFromConstructor(constructor: Object, comptime intrinsic_defau
     // 1. Assert: intrinsicDefaultProto is this specification's name of an intrinsic object. The
     //    corresponding object must be an intrinsic that is intended to be used as the
     //    [[Prototype]] value of an object.
-    comptime std.debug.assert(@hasField(Realm.Intrinsics, intrinsic_default_proto));
+    comptime std.debug.assert(@hasDecl(Realm.Intrinsics, intrinsic_default_proto));
 
     // 2. Let proto be ? Get(constructor, "prototype").
     const prototype = try constructor.get(PropertyKey.from("prototype"));
@@ -526,7 +526,7 @@ pub fn getPrototypeFromConstructor(constructor: Object, comptime intrinsic_defau
             const realm = try constructor.getFunctionRealm();
 
             // b. Set proto to realm's intrinsic object named intrinsicDefaultProto.
-            break :blk @field(realm.intrinsics, intrinsic_default_proto);
+            break :blk try @field(realm.intrinsics, intrinsic_default_proto)();
         },
     };
 

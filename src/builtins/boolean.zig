@@ -27,7 +27,7 @@ pub const BooleanConstructor = struct {
                 .length = 1,
                 .name = "Boolean",
                 .realm = realm,
-                .prototype = realm.intrinsics.@"%Function.prototype%",
+                .prototype = try realm.intrinsics.@"%Function.prototype%"(),
                 .is_constructor = true,
             },
         );
@@ -35,11 +35,19 @@ pub const BooleanConstructor = struct {
         // 20.3.2.1 Boolean.prototype
         // https://tc39.es/ecma262/#sec-boolean.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
-            .value = Value.from(realm.intrinsics.@"%Boolean.prototype%"),
+            .value = Value.from(try realm.intrinsics.@"%Boolean.prototype%"()),
             .writable = false,
             .enumerable = false,
             .configurable = false,
         });
+
+        // 20.3.3.1 Boolean.prototype.constructor
+        // https://tc39.es/ecma262/#sec-boolean.prototype.constructor
+        try defineBuiltinProperty(
+            realm.intrinsics.@"%Boolean.prototype%"() catch unreachable,
+            "constructor",
+            Value.from(object),
+        );
 
         return object;
     }
@@ -75,12 +83,8 @@ pub const BooleanPrototype = struct {
             .fields = .{
                 .boolean_data = false,
             },
-            .prototype = realm.intrinsics.@"%Object.prototype%",
+            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
-
-        // 20.3.3.1 Boolean.prototype.constructor
-        // https://tc39.es/ecma262/#sec-boolean.prototype.constructor
-        try defineBuiltinProperty(object, "constructor", Value.from(realm.intrinsics.@"%Boolean%"));
 
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);

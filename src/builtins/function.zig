@@ -22,7 +22,7 @@ pub const FunctionPrototype = struct {
                 .length = 0,
                 .name = "",
                 .realm = realm,
-                .prototype = realm.intrinsics.@"%Object.prototype%",
+                .prototype = try realm.intrinsics.@"%Object.prototype%"(),
             },
         );
     }

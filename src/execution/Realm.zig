@@ -44,11 +44,13 @@ host_defined: ?*anyopaque = null,
 pub fn create(agent: *Agent) !*Self {
     // 1. Let realmRec be a new Realm Record.
     var realm = try agent.allocator.create(Self);
+
+    // 2. Perform CreateIntrinsics(realmRec).
+    try realm.createIntrinsics();
+
     realm.* = .{
         .agent = agent,
-
-        // 2. Perform CreateIntrinsics(realmRec).
-        .intrinsics = try realm.createIntrinsics(),
+        .intrinsics = realm.intrinsics,
 
         // 3. Set realmRec.[[GlobalObject]] to undefined.
         .global_object = undefined,
@@ -65,8 +67,10 @@ pub fn create(agent: *Agent) !*Self {
 
 /// 9.3.2 CreateIntrinsics ( realmRec )
 /// https://tc39.es/ecma262/#sec-createintrinsics
-fn createIntrinsics(self: *Self) !Intrinsics {
+fn createIntrinsics(self: *Self) !void {
     // 1. Set realmRec.[[Intrinsics]] to a new Record.
+    self.intrinsics = Intrinsics{ .realm = self };
+
     // 2. Set fields of realmRec.[[Intrinsics]] with the values listed in Table 6. The field
     //    names are the names listed in column one of the table. The value of each field is a new
     //    object value fully and recursively populated with property values as defined by the
@@ -79,23 +83,11 @@ fn createIntrinsics(self: *Self) !Intrinsics {
     //    specified internal slots, and prototype is the specified value of the function's
     //    [[Prototype]] internal slot. The creation of the intrinsics and their properties must be
     //    ordered to avoid any dependencies upon objects that have not yet been created.
-    // NOTE: A few common dependendent objects are created upfront, but the entire Intrinsics
-    //       struct is then overwritten to ensure nothing is missed.
-    self.intrinsics.@"%Object.prototype%" = try builtins.ObjectPrototype.create(self);
-    self.intrinsics.@"%Function.prototype%" = try builtins.FunctionPrototype.create(self);
-    self.intrinsics.@"%Boolean.prototype%" = try builtins.BooleanPrototype.create(self);
-    self.intrinsics.@"%Boolean%" = try builtins.BooleanConstructor.create(self);
-    var intrinsics = Intrinsics{
-        .@"%Boolean%" = self.intrinsics.@"%Boolean%",
-        .@"%Boolean.prototype%" = self.intrinsics.@"%Boolean.prototype%",
-        .@"%Function.prototype%" = self.intrinsics.@"%Function.prototype%",
-        .@"%Object.prototype%" = self.intrinsics.@"%Object.prototype%",
-    };
+    // NOTE: Intrinsics are lazily allocated, see the struct itself for details.
 
     // TODO: 3. Perform AddRestrictedFunctionProperties(realmRec.[[Intrinsics]].[[%Function.prototype%]], realmRec).
 
     // 4. Return unused.
-    return intrinsics;
 }
 
 /// 9.3.3 SetRealmGlobalObject ( realmRec, globalObj, thisValue )
@@ -107,7 +99,7 @@ pub fn setRealmGlobalObject(self: *Self, maybe_global_object: ?Object, maybe_thi
     // 2. Assert: globalObj is an Object.
     const global_object = maybe_global_object orelse try ordinaryObjectCreate(
         self.agent,
-        self.intrinsics.@"%Object.prototype%",
+        try self.intrinsics.@"%Object.prototype%"(),
     );
 
     // 3. If thisValue is undefined, set thisValue to globalObj.
@@ -134,7 +126,7 @@ pub fn setDefaultGlobalBindings(self: *Self) !Object {
 
     // 2. For each property of the Global Object specified in clause 19, do
     for ([_]struct { []const u8, Value }{
-        .{ "Boolean", Value.from(self.intrinsics.@"%Boolean%") },
+        .{ "Boolean", Value.from(try self.intrinsics.@"%Boolean%"()) },
     }) |property| {
         // a. Let name be the String value of the property name.
         const name = PropertyKey.from(property[0]);
