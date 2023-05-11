@@ -97,7 +97,11 @@ fn createIntrinsics(self: *Self) !void {
 
 /// 9.3.3 SetRealmGlobalObject ( realmRec, globalObj, thisValue )
 /// https://tc39.es/ecma262/#sec-setrealmglobalobject
-pub fn setRealmGlobalObject(self: *Self, maybe_global_object: ?Object, maybe_this_value: ?Value) !void {
+pub fn setRealmGlobalObject(
+    self: *Self,
+    maybe_global_object: ?Object,
+    maybe_this_value: ?Value,
+) !void {
     // 1. If globalObj is undefined, then
     //     a. Let intrinsics be realmRec.[[Intrinsics]].
     //     b. Set globalObj to OrdinaryObjectCreate(intrinsics.[[%Object.prototype%]]).
@@ -141,7 +145,12 @@ pub fn setDefaultGlobalBindings(self: *Self) !Object {
         //    the specified attributes for the property. For properties listed in 19.2, 19.3, or
         //    19.4 the value of the [[Value]] attribute is the corresponding intrinsic object from
         //    realmRec.
-        const descriptor = PropertyDescriptor{ .value = value, .writable = true, .enumerable = false, .configurable = true };
+        const descriptor = PropertyDescriptor{
+            .value = value,
+            .writable = true,
+            .enumerable = false,
+            .configurable = true,
+        };
 
         // c. Perform ? DefinePropertyOrThrow(global, name, desc).
         try global.definePropertyOrThrow(name, descriptor);

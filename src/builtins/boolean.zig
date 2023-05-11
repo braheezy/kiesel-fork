@@ -65,7 +65,12 @@ pub const BooleanConstructor = struct {
             return Value.from(b);
 
         // 3. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%Boolean.prototype%", « [[BooleanData]] »).
-        const object = try ordinaryCreateFromConstructor(Boolean, agent, new_target.?, "%Boolean.prototype%");
+        const object = try ordinaryCreateFromConstructor(
+            Boolean,
+            agent,
+            new_target.?,
+            "%Boolean.prototype%",
+        );
 
         // 4. Set O.[[BooleanData]] to b.
         object.as(Boolean).fields = .{ .boolean_data = b };

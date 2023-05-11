@@ -133,7 +133,12 @@ pub fn get(self: Self, property_key: PropertyKey) !Value {
 
 /// 7.3.4 Set ( O, P, V, Throw )
 /// https://tc39.es/ecma262/#sec-set-o-p-v-throw
-pub fn set(self: Self, property_key: PropertyKey, value: Value, throw: enum { throw, ignore }) !void {
+pub fn set(
+    self: Self,
+    property_key: PropertyKey,
+    value: Value,
+    throw: enum { throw, ignore },
+) !void {
     // 1. Let success be ? O.[[Set]](P, V, O).
     const success = try self.internalMethods().set(self, property_key, value, Value.from(self));
 
@@ -147,8 +152,15 @@ pub fn set(self: Self, property_key: PropertyKey, value: Value, throw: enum { th
 /// 7.3.5 CreateDataProperty ( O, P, V )
 /// https://tc39.es/ecma262/#sec-createdataproperty
 pub fn createDataProperty(self: Self, property_key: PropertyKey, value: Value) !bool {
-    // 1. Let newDesc be the PropertyDescriptor { [[Value]]: V, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true }.
-    const new_descriptor = PropertyDescriptor{ .value = value, .writable = true, .enumerable = true, .configurable = true };
+    // 1. Let newDesc be the PropertyDescriptor {
+    //      [[Value]]: V, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true
+    //    }.
+    const new_descriptor = PropertyDescriptor{
+        .value = value,
+        .writable = true,
+        .enumerable = true,
+        .configurable = true,
+    };
 
     // 2. Return ? O.[[DefineOwnProperty]](P, newDesc).
     return self.internalMethods().defineOwnProperty(self, property_key, new_descriptor);
@@ -197,7 +209,11 @@ pub fn createDataPropertyOrThrow(self: Self, property_key: PropertyKey, value: V
 
 /// 7.3.8 CreateNonEnumerableDataPropertyOrThrow ( O, P, V )
 /// https://tc39.es/ecma262/#sec-createnonenumerabledatapropertyorthrow
-pub fn createNonEnumerableDataPropertyOrThrow(self: Self, property_key: PropertyKey, value: Value) !void {
+pub fn createNonEnumerableDataPropertyOrThrow(
+    self: Self,
+    property_key: PropertyKey,
+    value: Value,
+) !void {
     // 1. Assert: O is an ordinary, extensible object with no non-configurable properties.
     std.debug.assert(self.extensible().* and blk: {
         for (self.propertyStorage().hash_map.values()) |descriptor| {
@@ -225,9 +241,17 @@ pub fn createNonEnumerableDataPropertyOrThrow(self: Self, property_key: Property
 
 /// 7.3.9 DefinePropertyOrThrow ( O, P, desc )
 /// https://tc39.es/ecma262/#sec-definepropertyorthrow
-pub fn definePropertyOrThrow(self: Self, property_key: PropertyKey, property_descriptor: PropertyDescriptor) !void {
+pub fn definePropertyOrThrow(
+    self: Self,
+    property_key: PropertyKey,
+    property_descriptor: PropertyDescriptor,
+) !void {
     // 1. Let success be ? O.[[DefineOwnProperty]](P, desc).
-    const success = try self.internalMethods().defineOwnProperty(self, property_key, property_descriptor);
+    const success = try self.internalMethods().defineOwnProperty(
+        self,
+        property_key,
+        property_descriptor,
+    );
 
     // 2. If success is false, throw a TypeError exception.
     if (!success)
@@ -269,7 +293,10 @@ pub fn hasOwnProperty(self: Self, property_key: PropertyKey) !bool {
 
 /// 7.3.15 Construct ( F [ , argumentsList [ , newTarget ] ] )
 /// https://tc39.es/ecma262/#sec-construct
-pub fn construct(self: Self, args: struct { arguments_list: []const Value = &[_]Value{}, new_target: ?Self = null }) !Self {
+pub fn construct(
+    self: Self,
+    args: struct { arguments_list: []const Value = &[_]Value{}, new_target: ?Self = null },
+) !Self {
     // 1. If newTarget is not present, set newTarget to F.
     const new_target = args.new_target orelse self;
 

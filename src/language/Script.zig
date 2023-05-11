@@ -21,13 +21,20 @@ host_defined: ?*anyopaque = null,
 
 /// 16.1.5 ParseScript ( sourceText, realm, hostDefined )
 /// https://tc39.es/ecma262/#sec-parse-script
-pub fn parse(allocator: Allocator, source_text: []const u8, realm: *Realm, host_defined: ?*anyopaque) !*Self {
+pub fn parse(
+    allocator: Allocator,
+    source_text: []const u8,
+    realm: *Realm,
+    host_defined: ?*anyopaque,
+) !*Self {
     _ = source_text;
 
     // TODO: 1. Let script be ParseText(sourceText, Script).
     // TODO: 2. If script is a List of errors, return script.
 
-    // 3. Return Script Record { [[Realm]]: realm, [[ECMAScriptCode]]: script, [[LoadedModules]]: « », [[HostDefined]]: hostDefined }.
+    // 3. Return Script Record {
+    //      [[Realm]]: realm, [[ECMAScriptCode]]: script, [[LoadedModules]]: « », [[HostDefined]]: hostDefined
+    //    }.
     var script = try allocator.create(Self);
     script.* = .{ .realm = realm, .host_defined = host_defined };
     return script;

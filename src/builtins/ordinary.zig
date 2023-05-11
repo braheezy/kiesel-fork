@@ -92,7 +92,8 @@ pub fn ordinarySetPrototypeOf(object: Object, prototype: ?Object) bool {
         }
 
         // c. Else,
-        // i. If p.[[GetPrototypeOf]] is not the ordinary object internal method defined in 10.1.1, set done to true.
+        // i. If p.[[GetPrototypeOf]] is not the ordinary object internal method defined in 10.1.1,
+        //    set done to true.
         if (parent_prototype_object.internalMethods().getPrototypeOf != getPrototypeOf)
             break;
 
@@ -187,14 +188,22 @@ pub fn ordinaryGetOwnProperty(object: Object, property_key: PropertyKey) ?Proper
 
 /// 10.1.6 [[DefineOwnProperty]] ( P, Desc )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-defineownproperty-p-desc
-fn defineOwnProperty(object: Object, property_key: PropertyKey, property_descriptor: PropertyDescriptor) !bool {
+fn defineOwnProperty(
+    object: Object,
+    property_key: PropertyKey,
+    property_descriptor: PropertyDescriptor,
+) !bool {
     // 1. Return ? OrdinaryDefineOwnProperty(O, P, Desc).
     return ordinaryDefineOwnProperty(object, property_key, property_descriptor);
 }
 
 /// 10.1.6.1 OrdinaryDefineOwnProperty ( O, P, Desc )
 /// https://tc39.es/ecma262/#sec-ordinarydefineownproperty
-pub fn ordinaryDefineOwnProperty(object: Object, property_key: PropertyKey, property_descriptor: PropertyDescriptor) !bool {
+pub fn ordinaryDefineOwnProperty(
+    object: Object,
+    property_key: PropertyKey,
+    property_descriptor: PropertyDescriptor,
+) !bool {
     // 1. Let current be ? O.[[GetOwnProperty]](P).
     const current = try object.internalMethods().getOwnProperty(object, property_key);
 
@@ -202,7 +211,13 @@ pub fn ordinaryDefineOwnProperty(object: Object, property_key: PropertyKey, prop
     const extensible = try object.isExtensible();
 
     // 3. Return ValidateAndApplyPropertyDescriptor(O, P, extensible, Desc, current).
-    return validateAndApplyPropertyDescriptor(object, property_key, extensible, property_descriptor, current);
+    return validateAndApplyPropertyDescriptor(
+        object,
+        property_key,
+        extensible,
+        property_descriptor,
+        current,
+    );
 }
 
 /// 10.1.6.2 IsCompatiblePropertyDescriptor ( Extensible, Desc, Current )
@@ -472,7 +487,12 @@ fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value)
 
 /// 10.1.9.1 OrdinarySet ( O, P, V, Receiver )
 /// https://tc39.es/ecma262/#sec-ordinaryset
-pub fn ordinarySet(object: Object, property_key: PropertyKey, value: Value, receiver: Value) !bool {
+pub fn ordinarySet(
+    object: Object,
+    property_key: PropertyKey,
+    value: Value,
+    receiver: Value,
+) !bool {
     // 1. Let ownDesc be ? O.[[GetOwnProperty]](P).
     const own_descriptor = try object.internalMethods().getOwnProperty(object, property_key);
 
@@ -499,11 +519,18 @@ pub fn ordinarySetWithOwnDescriptor(
         // b. If parent is not null, then
         if (parent) |parent_object| {
             // i. Return ? parent.[[Set]](P, V, Receiver).
-            return parent_object.internalMethods().set(parent_object, property_key, value, receiver_value);
+            return parent_object.internalMethods().set(
+                parent_object,
+                property_key,
+                value,
+                receiver_value,
+            );
         }
         // c. Else,
         else {
-            // i. Set ownDesc to the PropertyDescriptor { [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true }.
+            // i. Set ownDesc to the PropertyDescriptor {
+            //      [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true
+            //    }.
             own_descriptor = PropertyDescriptor{
                 .value = .undefined,
                 .writable = true,
@@ -527,7 +554,10 @@ pub fn ordinarySetWithOwnDescriptor(
         const receiver = receiver_value.object;
 
         // c. Let existingDescriptor be ? Receiver.[[GetOwnProperty]](P).
-        const maybe_existing_descriptor = try receiver.internalMethods().getOwnProperty(receiver, property_key);
+        const maybe_existing_descriptor = try receiver.internalMethods().getOwnProperty(
+            receiver,
+            property_key,
+        );
 
         // d. If existingDescriptor is not undefined, then
         if (maybe_existing_descriptor) |existing_descriptor| {
@@ -543,7 +573,11 @@ pub fn ordinarySetWithOwnDescriptor(
             const value_descriptor = PropertyDescriptor{ .value = value };
 
             // iv. Return ? Receiver.[[DefineOwnProperty]](P, valueDesc).
-            return receiver.internalMethods().defineOwnProperty(receiver, property_key, value_descriptor);
+            return receiver.internalMethods().defineOwnProperty(
+                receiver,
+                property_key,
+                value_descriptor,
+            );
         }
         // e. Else,
         else {
@@ -616,7 +650,8 @@ pub fn ordinaryOwnPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
     var keys = std.ArrayList(PropertyKey).init(agent.allocator);
     try keys.ensureTotalCapacity(property_storage_hash_map.count());
 
-    // 2. For each own property key P of O such that P is an array index, in ascending numeric index order, do
+    // 2. For each own property key P of O such that P is an array index, in ascending numeric
+    //    index order, do
     for (object.propertyStorage().hash_map.keys()) |property_key| {
         if (property_key.isArrayIndex()) {
             // a. Append P to keys.
@@ -624,7 +659,8 @@ pub fn ordinaryOwnPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
         }
     }
 
-    // 3. For each own property key P of O such that P is a String and P is not an array index, in ascending chronological order of property creation, do
+    // 3. For each own property key P of O such that P is a String and P is not an array index, in
+    //    ascending chronological order of property creation, do
     for (object.propertyStorage().hash_map.keys()) |property_key| {
         if (property_key == .string or (property_key == .integer_index and !property_key.isArrayIndex())) {
             // a. Append P to keys.
@@ -632,7 +668,8 @@ pub fn ordinaryOwnPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
         }
     }
 
-    // 4. For each own property key P of O such that P is a Symbol, in ascending chronological order of property creation, do
+    // 4. For each own property key P of O such that P is a Symbol, in ascending chronological
+    //    order of property creation, do
     for (object.propertyStorage().hash_map.keys()) |property_key| {
         if (property_key == .symbol) {
             // a. Append P to keys.
@@ -668,7 +705,12 @@ pub fn ordinaryObjectCreateWithType(comptime T: type, agent: *Agent, prototype: 
 
 /// 10.1.13 OrdinaryCreateFromConstructor ( constructor, intrinsicDefaultProto [ , internalSlotsList ] )
 /// https://tc39.es/ecma262/#sec-ordinarycreatefromconstructor
-pub fn ordinaryCreateFromConstructor(comptime T: type, agent: *Agent, constructor: Object, comptime intrinsic_default_proto: []const u8) !Object {
+pub fn ordinaryCreateFromConstructor(
+    comptime T: type,
+    agent: *Agent,
+    constructor: Object,
+    comptime intrinsic_default_proto: []const u8,
+) !Object {
     // 1. Assert: intrinsicDefaultProto is this specification's name of an intrinsic
     //    object. The corresponding object must be an intrinsic that is intended to be used
     //    as the [[Prototype]] value of an object.
@@ -685,7 +727,10 @@ pub fn ordinaryCreateFromConstructor(comptime T: type, agent: *Agent, constructo
 
 /// 10.1.14 GetPrototypeFromConstructor ( constructor, intrinsicDefaultProto )
 /// https://tc39.es/ecma262/#sec-getprototypefromconstructor
-pub fn getPrototypeFromConstructor(constructor: Object, comptime intrinsic_default_proto: []const u8) !?Object {
+pub fn getPrototypeFromConstructor(
+    constructor: Object,
+    comptime intrinsic_default_proto: []const u8,
+) !?Object {
     // 1. Assert: intrinsicDefaultProto is this specification's name of an intrinsic object. The
     //    corresponding object must be an intrinsic that is intended to be used as the
     //    [[Prototype]] value of an object.

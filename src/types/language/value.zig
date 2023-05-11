@@ -106,7 +106,11 @@ pub const Value = union(enum) {
             return .{ .string = value };
         } else if (T == Symbol) {
             return .{ .symbol = value };
-        } else if (@typeInfo(T) == .Int or @typeInfo(T) == .ComptimeInt or @typeInfo(T) == .Float or @typeInfo(T) == .ComptimeFloat) {
+        } else if (@typeInfo(T) == .Int or
+            @typeInfo(T) == .ComptimeInt or
+            @typeInfo(T) == .Float or
+            @typeInfo(T) == .ComptimeFloat)
+        {
             return .{ .number = Number.from(value) };
         } else if (T == BigInt) {
             return .{ .big_int = value };
@@ -180,7 +184,8 @@ pub const Value = union(enum) {
         if (self == .boolean)
             return self.boolean;
 
-        // 2. If argument is one of undefined, null, +0𝔽, -0𝔽, NaN, 0ℤ, or the empty String, return false.
+        // 2. If argument is one of undefined, null, +0𝔽, -0𝔽, NaN, 0ℤ, or the empty String, return
+        //    false.
         switch (self) {
             .undefined, .null => return false,
             .number => |number| if (number.asFloat() == 0 or number.isNan()) {
@@ -762,7 +767,12 @@ pub const Value = union(enum) {
 
     /// 7.3.14 Call ( F, V [ , argumentsList ] )
     /// https://tc39.es/ecma262/#sec-call
-    pub fn call(self: Self, agent: *Agent, this_value: Value, arguments_list: []const Value) !Value {
+    pub fn call(
+        self: Self,
+        agent: *Agent,
+        this_value: Value,
+        arguments_list: []const Value,
+    ) !Value {
         // 1. If argumentsList is not present, set argumentsList to a new empty List.
         // This is done via the NoArgs variant of the function.
 
@@ -782,7 +792,11 @@ pub const Value = union(enum) {
         return self.call(agent, this_value, &[_]Value{});
     }
 
-    pub inline fn callAssumeCallable(self: Self, this_value: Value, arguments_list: []const Value) !Value {
+    pub inline fn callAssumeCallable(
+        self: Self,
+        this_value: Value,
+        arguments_list: []const Value,
+    ) !Value {
         return self.object.internalMethods().call.?(self.object, this_value, arguments_list);
     }
 

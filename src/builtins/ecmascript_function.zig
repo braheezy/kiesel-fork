@@ -51,15 +51,25 @@ pub fn addRestrictedFunctionProperties(function: Object, realm: *Realm) !void {
 
 /// 10.2.9 SetFunctionName ( F, name [ , prefix ] )
 /// https://tc39.es/ecma262/#sec-setfunctionname
-pub fn setFunctionName(function: Object, name_property_key: PropertyKey, prefix: ?[]const u8) !void {
+pub fn setFunctionName(
+    function: Object,
+    name_property_key: PropertyKey,
+    prefix: ?[]const u8,
+) !void {
     const agent = function.agent();
 
     // 1. Assert: F is an extensible object that does not have a "name" own property.
-    std.debug.assert(function.extensible().* and !function.propertyStorage().has(PropertyKey.from("name")));
+    std.debug.assert(
+        function.extensible().* and !function.propertyStorage().has(PropertyKey.from("name")),
+    );
 
     var name = switch (name_property_key) {
         .string => |string| string,
-        .integer_index => |integer_index| try std.fmt.allocPrint(agent.allocator, "{d}", .{integer_index}),
+        .integer_index => |integer_index| try std.fmt.allocPrint(
+            agent.allocator,
+            "{d}",
+            .{integer_index},
+        ),
 
         // 2. If name is a Symbol, then
         .symbol => |symbol| blk: {
@@ -84,7 +94,8 @@ pub fn setFunctionName(function: Object, name_property_key: PropertyKey, prefix:
 
     // 5. If prefix is present, then
     if (prefix != null) {
-        // a. Set name to the string-concatenation of prefix, the code unit 0x0020 (SPACE), and name.
+        // a. Set name to the string-concatenation of prefix, the code unit 0x0020 (SPACE), and
+        //    name.
         name = try std.fmt.allocPrint(agent.allocator, "{s} {s}", .{ prefix.?, name });
 
         // b. If F has an [[InitialName]] internal slot, then
@@ -114,7 +125,9 @@ pub fn setFunctionLength(function: Object, length: f64) !void {
     );
 
     // 1. Assert: F is an extensible object that does not have a "length" own property.
-    std.debug.assert(function.extensible().* and !function.propertyStorage().has(PropertyKey.from("length")));
+    std.debug.assert(
+        function.extensible().* and !function.propertyStorage().has(PropertyKey.from("length")),
+    );
 
     // 2. Perform ! DefinePropertyOrThrow(F, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true

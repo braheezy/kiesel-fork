@@ -27,11 +27,7 @@ pub const FunctionPrototype = struct {
         );
     }
 
-    fn behaviour(agent: *Agent, this_value: Value, arguments: []const Value, new_target: ?Object) !Value {
-        _ = agent;
-        _ = this_value;
-        _ = arguments;
-        _ = new_target;
+    fn behaviour(_: *Agent, _: Value, _: []const Value, _: ?Object) !Value {
         return .undefined;
     }
 };

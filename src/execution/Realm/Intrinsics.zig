@@ -19,7 +19,11 @@ const lazy_intrinsics = struct {
     var @"%ThrowTypeError%": ?Object = null;
 };
 
-inline fn lazyIntrinsic(self: *Self, comptime name: []const u8, comptime T: type) error{OutOfMemory}!Object {
+inline fn lazyIntrinsic(
+    self: *Self,
+    comptime name: []const u8,
+    comptime T: type,
+) error{OutOfMemory}!Object {
     const intrinsic = &@field(lazy_intrinsics, name);
     if (intrinsic.* == null)
         intrinsic.* = try T.create(self.realm);

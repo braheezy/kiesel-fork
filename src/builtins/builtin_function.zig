@@ -55,7 +55,8 @@ fn call(object: Object, this_argument: Value, arguments_list: []const Value) !Va
 
     // 8. Perform any necessary implementation-defined initialization of calleeContext.
 
-    // 9. Push calleeContext onto the execution context stack; calleeContext is now the running execution context.
+    // 9. Push calleeContext onto the execution context stack; calleeContext is now the running
+    //    execution context.
     try agent.execution_context_stack.append(callee_context);
 
     // 10. Let result be the Completion Record that is the result of evaluating F in a manner that
@@ -98,7 +99,8 @@ fn construct(object: Object, arguments_list: []const Value, new_target: Object) 
 
     // 8. Perform any necessary implementation-defined initialization of calleeContext.
 
-    // 9. Push calleeContext onto the execution context stack; calleeContext is now the running execution context.
+    // 9. Push calleeContext onto the execution context stack; calleeContext is now the running
+    //    execution context.
     try agent.execution_context_stack.append(callee_context);
 
     // 10. Let result be the Completion Record that is the result of evaluating F in a manner that

@@ -17,7 +17,8 @@ pub fn Factory(
 ) type {
     const has_fields = options.Fields != void;
 
-    // FIXME: `internal_methods: InternalMethods = .{}` would be nicer but causes a 'depends on itself' error
+    // FIXME: `internal_methods: InternalMethods = .{}` would be nicer but causes a 'depends on
+    //        itself' error
     // FIXME: Can we dedupe this?
     const Args = if (has_fields) struct {
         fields: options.Fields,
