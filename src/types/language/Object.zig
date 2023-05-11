@@ -381,6 +381,47 @@ pub fn setIntegrityLevel(self: Self, level: IntegrityLevel) !bool {
     return true;
 }
 
+/// 7.3.17 TestIntegrityLevel ( O, level )
+/// https://tc39.es/ecma262/#sec-testintegritylevel
+pub fn testIntegrityLevel(self: Self, level: IntegrityLevel) !bool {
+    // 1. Let extensible be ? IsExtensible(O).
+    const extensible_ = try self.isExtensible();
+
+    // 2. If extensible is true, return false.
+    // 3. NOTE: If the object is extensible, none of its properties are examined.
+    if (extensible_)
+        return false;
+
+    // 4. Let keys be ? O.[[OwnPropertyKeys]]().
+    const keys = try self.internalMethods().ownPropertyKeys(self);
+
+    // 5. For each element k of keys, do
+    for (keys.items) |property_key| {
+        // a. Let currentDesc be ? O.[[GetOwnProperty]](k).
+        const maybe_current_descriptor = try self.internalMethods().getOwnProperty(
+            self,
+            property_key,
+        );
+
+        // b. If currentDesc is not undefined, then
+        if (maybe_current_descriptor) |current_descriptor| {
+            // i. If currentDesc.[[Configurable]] is true, return false.
+            if (current_descriptor.configurable.?)
+                return false;
+
+            // ii. If level is frozen and IsDataDescriptor(currentDesc) is true, then
+            if (level == .frozen and current_descriptor.isDataDescriptor()) {
+                // 1. If currentDesc.[[Writable]] is true, return false.
+                if (current_descriptor.writable.?)
+                    return false;
+            }
+        }
+    }
+
+    // 6. Return true.
+    return true;
+}
+
 /// 7.3.25 GetFunctionRealm ( obj )
 /// https://tc39.es/ecma262/#sec-getfunctionrealm
 pub fn getFunctionRealm(self: Self) !*Realm {
