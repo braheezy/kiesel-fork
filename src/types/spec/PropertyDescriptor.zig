@@ -58,6 +58,22 @@ pub inline fn isGenericDescriptor(self: Self) bool {
     return !(self.isAccessorDescriptor() or self.isDataDescriptor());
 }
 
+pub inline fn isFullyPopulated(self: Self) bool {
+    return ((self.value != null and self.writable != null) or
+        (self.get != null or self.set != null)) and
+        self.enumerable != null and
+        self.configurable != null;
+}
+
+pub inline fn hasFields(self: Self) bool {
+    return self.value != null or
+        self.writable != null or
+        self.get != null or
+        self.set != null or
+        self.enumerable != null or
+        self.configurable != null;
+}
+
 test "isAccessorDescriptor" {
     const builtins = @import("../../builtins.zig");
     const Agent = @import("../../execution.zig").Agent;
