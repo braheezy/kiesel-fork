@@ -4,6 +4,7 @@ const ecmascript_function = @import("builtins/ecmascript_function.zig");
 const function = @import("builtins/function.zig");
 const object = @import("builtins/object.zig");
 const ordinary = @import("builtins/ordinary.zig");
+const throw_type_error = @import("builtins/throw_type_error.zig");
 
 pub const ordinary_internal_methods = ordinary.ordinary_internal_methods;
 
@@ -15,6 +16,7 @@ pub const BuiltinFunction = builtin_function.BuiltinFunction;
 pub const FunctionPrototype = function.FunctionPrototype;
 pub const Object = object.Object;
 pub const ObjectPrototype = object.ObjectPrototype;
+pub const ThrowTypeError = throw_type_error.ThrowTypeError;
 pub const createBuiltinFunction = builtin_function.createBuiltinFunction;
 pub const getPrototypeFromConstructor = ordinary.getPrototypeFromConstructor;
 pub const ordinaryCreateFromConstructor = ordinary.ordinaryCreateFromConstructor;

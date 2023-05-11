@@ -16,6 +16,7 @@ const lazy_intrinsics = struct {
     var @"%Boolean.prototype%": ?Object = null;
     var @"%Function.prototype%": ?Object = null;
     var @"%Object.prototype%": ?Object = null;
+    var @"%ThrowTypeError%": ?Object = null;
 };
 
 inline fn lazyIntrinsic(self: *Self, comptime name: []const u8, comptime T: type) error{OutOfMemory}!Object {
@@ -36,4 +37,7 @@ pub fn @"%Function.prototype%"(self: *Self) error{OutOfMemory}!Object {
 }
 pub fn @"%Object.prototype%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Object.prototype%", builtins.ObjectPrototype);
+}
+pub fn @"%ThrowTypeError%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%ThrowTypeError%", builtins.ThrowTypeError);
 }
