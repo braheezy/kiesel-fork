@@ -14,6 +14,7 @@ const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Value = types.Value;
+const addRestrictedFunctionProperties = builtins.addRestrictedFunctionProperties;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 pub const Intrinsics = @import("Realm/Intrinsics.zig");
@@ -45,11 +46,14 @@ pub fn create(agent: *Agent) !*Self {
     // 1. Let realmRec be a new Realm Record.
     var realm = try agent.allocator.create(Self);
 
+    // Set this early, it'll be accessed before the realm struct is fully initialized.
+    realm.agent = agent;
+
     // 2. Perform CreateIntrinsics(realmRec).
     try realm.createIntrinsics();
 
     realm.* = .{
-        .agent = agent,
+        .agent = realm.agent,
         .intrinsics = realm.intrinsics,
 
         // 3. Set realmRec.[[GlobalObject]] to undefined.
@@ -85,7 +89,8 @@ fn createIntrinsics(self: *Self) !void {
     //    ordered to avoid any dependencies upon objects that have not yet been created.
     // NOTE: Intrinsics are lazily allocated, see the struct itself for details.
 
-    // TODO: 3. Perform AddRestrictedFunctionProperties(realmRec.[[Intrinsics]].[[%Function.prototype%]], realmRec).
+    // 3. Perform AddRestrictedFunctionProperties(realmRec.[[Intrinsics]].[[%Function.prototype%]], realmRec).
+    try addRestrictedFunctionProperties(try self.intrinsics.@"%Function.prototype%"(), self);
 
     // 4. Return unused.
 }
