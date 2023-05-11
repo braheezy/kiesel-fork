@@ -14,7 +14,7 @@ const Self = @This();
 value: ?Value = null,
 
 /// [[Writable]]
-writable: ?bool = false,
+writable: ?bool = null,
 
 /// [[Get]]
 get: ?Object = null,
@@ -23,10 +23,10 @@ get: ?Object = null,
 set: ?Object = null,
 
 /// [[Enumerable]]
-enumerable: ?bool = false,
+enumerable: ?bool = null,
 
 /// [[Configurable]]
-configurable: ?bool = false,
+configurable: ?bool = null,
 
 /// 6.2.6.1 IsAccessorDescriptor ( Desc )
 /// https://tc39.es/ecma262/#sec-isaccessordescriptor
@@ -72,12 +72,14 @@ test "isAccessorDescriptor" {
     try std.testing.expect((Self{ .set = setter }).isAccessorDescriptor());
     try std.testing.expect((Self{ .get = getter, .set = setter }).isAccessorDescriptor());
     try std.testing.expect(!(Self{ .value = .undefined }).isAccessorDescriptor());
+    try std.testing.expect(!(Self{}).isAccessorDescriptor());
 }
 
 test "isDataDescriptor" {
     try std.testing.expect((Self{ .value = .undefined }).isDataDescriptor());
     try std.testing.expect((Self{ .writable = true }).isDataDescriptor());
     try std.testing.expect(!(Self{ .writable = null }).isDataDescriptor());
+    try std.testing.expect(!(Self{}).isDataDescriptor());
 }
 
 test "isGenericDescriptor" {
@@ -89,5 +91,5 @@ test "isGenericDescriptor" {
     });
     try std.testing.expect((Self{ .writable = null }).isGenericDescriptor());
     try std.testing.expect(!(Self{ .set = setter }).isGenericDescriptor());
-    try std.testing.expect(!(Self{}).isGenericDescriptor());
+    try std.testing.expect((Self{}).isGenericDescriptor());
 }
