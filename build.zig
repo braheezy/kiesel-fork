@@ -30,12 +30,22 @@ pub fn build(b: *std.Build) void {
         .source_file = .{ .path = "vendor/zig-libgc/src/gc.zig" },
     });
 
+    const ptk = b.createModule(.{
+        .source_file = .{ .path = "vendor/parser-toolkit/src/main.zig" },
+    });
+
     const kiesel = b.addModule("kiesel", .{
         .source_file = .{ .path = "src/main.zig" },
-        .dependencies = &.{std.Build.ModuleDependency{
-            .module = gc,
-            .name = "gc",
-        }},
+        .dependencies = &.{
+            std.Build.ModuleDependency{
+                .module = gc,
+                .name = "gc",
+            },
+            std.Build.ModuleDependency{
+                .module = ptk,
+                .name = "ptk",
+            },
+        },
     });
 
     const exe = b.addExecutable(.{
