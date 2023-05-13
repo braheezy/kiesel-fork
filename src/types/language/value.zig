@@ -508,8 +508,7 @@ pub const Value = union(enum) {
         try quotient.divTrunc(&int64bit, &n.value, &pow_2_64);
 
         // 3. If int64bit ≥ 2^63, return ℤ(int64bit - 2^64); otherwise return ℤ(int64bit).
-        // FIXME: Use `int64bit.order(pow_2_63) != .lt` (https://github.com/ziglang/zig/issues/15535)
-        if (int64bit.to(u128) catch unreachable >= pow_2_63.to(u128) catch unreachable) {
+        if (int64bit.order(pow_2_63) != .lt) {
             var result = try BigInt.Value.init(agent.allocator);
             try result.sub(&int64bit, &pow_2_64);
             std.debug.print("result = {}\n", .{result});
