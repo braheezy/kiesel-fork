@@ -166,15 +166,13 @@ pub const ExpressionStatement = struct {
 pub const Script = struct {
     const Self = @This();
 
-    statement_list: ?StatementList,
+    statement_list: StatementList,
 
     pub fn print(self: Self, writer: anytype) !void {
         const indentation: usize = 0;
         try printString("Script", writer, indentation);
-        if (self.statement_list) |statement_list| {
-            for (statement_list) |statement_list_item| {
-                try statement_list_item.print(writer, indentation + 1);
-            }
+        for (self.statement_list) |statement_list_item| {
+            try statement_list_item.print(writer, indentation + 1);
         }
     }
 };

@@ -65,9 +65,7 @@ pub fn parse(
         );
         return error.ParseError;
     }
-    return ast.Script{
-        .statement_list = if (statement_list.len == 0) null else statement_list,
-    };
+    return ast.Script{ .statement_list = statement_list };
 }
 
 /// 12.10 Automatic Semicolon Insertion
