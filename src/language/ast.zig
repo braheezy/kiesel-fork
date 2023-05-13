@@ -73,6 +73,7 @@ pub const Statement = union(enum) {
     block_statement: BlockStatement,
     empty_statement,
     expression_statement: ExpressionStatement,
+    debugger_statement,
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("Statement", writer, indentation);
@@ -86,6 +87,7 @@ pub const Statement = union(enum) {
                 writer,
                 indentation + 1,
             ),
+            .debugger_statement => try printString("debugger", writer, indentation + 1),
         }
     }
 };

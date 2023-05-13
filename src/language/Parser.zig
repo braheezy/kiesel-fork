@@ -156,6 +156,8 @@ fn acceptStatement(self: *Self) !*ast.Statement {
         statement.* = .empty_statement
     else |_| if (self.acceptExpressionStatement()) |expression_statement|
         statement.* = .{ .expression_statement = expression_statement }
+    else |_| if (self.core.accept(RuleSet.is(.debugger))) |_|
+        statement.* = .debugger_statement
     else |_|
         return error.UnexpectedToken;
     return statement;

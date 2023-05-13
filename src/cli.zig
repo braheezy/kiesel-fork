@@ -16,7 +16,7 @@ pub fn main() !void {
     try Realm.initializeHostDefinedRealm(&agent, .{});
     const realm = agent.currentRealm();
 
-    const source_text = "\t{true; false\u{2028} ;;;}\r\nnull\u{FEFF}";
+    const source_text = "\t{true; false\u{2028} ;;;}\r\nnull;debugger\u{FEFF}";
     var diagnostics = Diagnostics.init(agent.allocator);
     const script = Script.parse(source_text, realm, null, .{
         .diagnostics = &diagnostics,
