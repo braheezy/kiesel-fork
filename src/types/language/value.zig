@@ -511,7 +511,6 @@ pub const Value = union(enum) {
         if (int64bit.order(pow_2_63) != .lt) {
             var result = try BigInt.Value.init(agent.allocator);
             try result.sub(&int64bit, &pow_2_64);
-            std.debug.print("result = {}\n", .{result});
             return result.to(i64) catch unreachable;
         } else {
             return int64bit.to(i64) catch unreachable;
