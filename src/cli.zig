@@ -4,15 +4,28 @@ const kiesel = @import("kiesel");
 const Agent = kiesel.execution.Agent;
 const PropertyKey = kiesel.types.PropertyKey;
 const Realm = kiesel.execution.Realm;
+const Diagnostics = kiesel.language.Diagnostics;
 const Script = kiesel.language.Script;
 const Value = kiesel.types.Value;
 
 pub fn main() !void {
+    const stdout = std.io.getStdOut().writer();
+    const stderr = std.io.getStdErr().writer();
+
     var agent = try Agent.init();
     try Realm.initializeHostDefinedRealm(&agent, .{});
     const realm = agent.currentRealm();
-    const script = try Script.parse(agent.allocator, "", realm, null);
-    _ = script;
+
+    const source_text = "\t{true; false\u{2028} ;;;}\r\nnull\u{FEFF}";
+    var diagnostics = Diagnostics.init(agent.allocator);
+    const script = Script.parse(source_text, realm, null, .{
+        .diagnostics = &diagnostics,
+        .file_name = "file.js",
+    }) catch {
+        try diagnostics.print(stderr);
+        return;
+    };
+    try script.ecmascript_code.print(stdout);
 
     const boolean_constructor = try realm.global_object.get(PropertyKey.from("Boolean"));
     const boolean_object = try boolean_constructor.object.construct(.{

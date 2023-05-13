@@ -5,8 +5,10 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const ast = @import("ast.zig");
 const execution = @import("../execution.zig");
 
+const Parser = @import("Parser.zig");
 const Realm = execution.Realm;
 
 const Self = @This();
@@ -14,28 +16,36 @@ const Self = @This();
 /// [[Realm]]
 realm: *Realm,
 
+/// [[ECMAScriptCode]]
+ecmascript_code: ast.Script,
+
+// TODO: [[LoadedModules]]
+
 /// [[HostDefined]]
 host_defined: ?*anyopaque = null,
-
-// TODO: [[ECMAScriptCode]], [[LoadedModules]]
 
 /// 16.1.5 ParseScript ( sourceText, realm, hostDefined )
 /// https://tc39.es/ecma262/#sec-parse-script
 pub fn parse(
-    allocator: Allocator,
     source_text: []const u8,
     realm: *Realm,
     host_defined: ?*anyopaque,
+    ctx: Parser.Context,
 ) !*Self {
-    _ = source_text;
+    const agent = realm.agent;
 
-    // TODO: 1. Let script be ParseText(sourceText, Script).
-    // TODO: 2. If script is a List of errors, return script.
+    // 1. Let script be ParseText(sourceText, Script).
+    // 2. If script is a List of errors, return script.
+    const script = try Parser.parse(ast.Script, agent.allocator, source_text, ctx);
 
     // 3. Return Script Record {
     //      [[Realm]]: realm, [[ECMAScriptCode]]: script, [[LoadedModules]]: « », [[HostDefined]]: hostDefined
     //    }.
-    var script = try allocator.create(Self);
-    script.* = .{ .realm = realm, .host_defined = host_defined };
-    return script;
+    var self = try agent.allocator.create(Self);
+    self.* = .{
+        .realm = realm,
+        .ecmascript_code = script,
+        .host_defined = host_defined,
+    };
+    return self;
 }
