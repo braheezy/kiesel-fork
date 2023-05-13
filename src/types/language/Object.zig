@@ -25,6 +25,7 @@ const Self = @This();
 
 pub const Tag = enum(u32) {
     boolean,
+    _,
 };
 
 pub const IntegrityLevel = enum {
