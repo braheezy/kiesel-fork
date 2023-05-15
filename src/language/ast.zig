@@ -1,5 +1,11 @@
 const std = @import("std");
 
+const bytecode = @import("bytecode.zig");
+const types = @import("../types.zig");
+
+const Executable = bytecode.Executable;
+const Value = types.Value;
+
 fn printIndentation(writer: anytype, indentation: usize) !void {
     var i: usize = 0;
     while (i < indentation) : (i += 1)
@@ -17,6 +23,12 @@ pub const PrimaryExpression = union(enum) {
 
     literal: Literal,
 
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        switch (self) {
+            .literal => |literal| try literal.generateBytecode(executable),
+        }
+    }
+
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         // Omit printing 'PrimaryExpression' here, it's implied and only adds nesting.
         switch (self) {
@@ -33,6 +45,21 @@ pub const Literal = union(enum) {
     boolean: bool,
     numeric,
     string,
+
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        switch (self) {
+            .null => try executable.addInstructionWithConstant(
+                .store_constant,
+                .null,
+            ),
+            .boolean => |boolean| try executable.addInstructionWithConstant(
+                .store_constant,
+                Value.from(boolean),
+            ),
+            .numeric => unreachable,
+            .string => unreachable,
+        }
+    }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("Literal", writer, indentation);
@@ -55,6 +82,14 @@ pub const Expression = union(enum) {
 
     primary_expression: PrimaryExpression,
 
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        switch (self) {
+            .primary_expression => |primary_expression| try primary_expression.generateBytecode(
+                executable,
+            ),
+        }
+    }
+
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("Expression", writer, indentation);
         switch (self) {
@@ -74,6 +109,19 @@ pub const Statement = union(enum) {
     empty_statement,
     expression_statement: ExpressionStatement,
     debugger_statement,
+
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        switch (self) {
+            .block_statement => |block_statement| {
+                try block_statement.generateBytecode(executable);
+            },
+            .empty_statement => {},
+            .expression_statement => |expression_statement| {
+                try expression_statement.generateBytecode(executable);
+            },
+            .debugger_statement => {},
+        }
+    }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("Statement", writer, indentation);
@@ -98,6 +146,11 @@ pub const Declaration = union(enum) {
 
     dummy,
 
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        _ = executable;
+        _ = self;
+    }
+
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         _ = writer;
         _ = indentation;
@@ -111,6 +164,10 @@ pub const BlockStatement = struct {
 
     block: Block,
 
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        try self.block.generateBytecode(executable);
+    }
+
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         // Omit printing 'BlockStatement' here, it's implied and only adds nesting.
         try self.block.print(writer, indentation);
@@ -122,6 +179,12 @@ pub const Block = struct {
     const Self = @This();
 
     statement_list: StatementList,
+
+    pub fn generateBytecode(self: Self, executable: *Executable) error{ OutOfMemory, BytecodeGenerationFailed }!void {
+        for (self.statement_list) |statement_list_item| {
+            try statement_list_item.generateBytecode(executable);
+        }
+    }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
         try printString("Block", writer, indentation);
@@ -141,6 +204,13 @@ pub const StatementListItem = union(enum) {
     statement: *Statement,
     declaration: *Declaration,
 
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        switch (self) {
+            .statement => |statement| try statement.generateBytecode(executable),
+            .declaration => |declaration| try declaration.generateBytecode(executable),
+        }
+    }
+
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         // Omit printing 'StatementListItem' here, it's implied and only adds nesting.
         switch (self) {
@@ -156,6 +226,10 @@ pub const ExpressionStatement = struct {
 
     expression: Expression,
 
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        try self.expression.generateBytecode(executable);
+    }
+
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         // Omit printing 'ExpressionStatement' here, it's implied and only adds nesting.
         try self.expression.print(writer, indentation);
@@ -167,6 +241,12 @@ pub const Script = struct {
     const Self = @This();
 
     statement_list: StatementList,
+
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        for (self.statement_list) |statement_list_item| {
+            try statement_list_item.generateBytecode(executable);
+        }
+    }
 
     pub fn print(self: Self, writer: anytype) !void {
         const indentation: usize = 0;
