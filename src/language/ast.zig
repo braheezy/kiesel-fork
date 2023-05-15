@@ -21,10 +21,17 @@ fn printString(string: []const u8, writer: anytype, indentation: usize) !void {
 pub const PrimaryExpression = union(enum) {
     const Self = @This();
 
+    this,
     literal: Literal,
 
     pub fn generateBytecode(self: Self, executable: *Executable) !void {
         switch (self) {
+            // PrimaryExpression : this
+            .this => {
+                // 1. Return ? ResolveThisBinding().
+                try executable.addInstruction(.resolve_this_binding);
+            },
+
             .literal => |literal| try literal.generateBytecode(executable),
         }
     }
@@ -32,6 +39,7 @@ pub const PrimaryExpression = union(enum) {
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         // Omit printing 'PrimaryExpression' here, it's implied and only adds nesting.
         switch (self) {
+            .this => try printString("this", writer, indentation),
             .literal => |literal| try literal.print(writer, indentation),
         }
     }

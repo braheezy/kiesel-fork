@@ -42,11 +42,10 @@ fn run(
             try stderr.print("Bytecode generation failed\n", .{});
             return null;
         },
-        // TODO: Enable this once there's bytecode instructions that can throw.
-        // error.ExceptionThrown => {
-        //     try stderr.print("Uncaught exception: {}\n", .{agent.exception.?});
-        //     return null;
-        // },
+        error.ExceptionThrown => {
+            try stderr.print("Uncaught exception: {}\n", .{agent.exception.?});
+            return null;
+        },
         else => return err,
     };
 }

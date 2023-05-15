@@ -9,6 +9,7 @@ const TokenType = enum {
     false,
     null,
     semicolon,
+    this,
     true,
     whitespace,
 };
@@ -23,6 +24,7 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
     Pattern.create(.false, ptk.matchers.literal("false")),
     Pattern.create(.null, ptk.matchers.literal("null")),
     Pattern.create(.semicolon, ptk.matchers.literal(";")),
+    Pattern.create(.this, ptk.matchers.literal("this")),
     Pattern.create(.true, ptk.matchers.literal("true")),
     Pattern.create(.whitespace, whitespaceMatcher),
 });

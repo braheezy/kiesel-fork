@@ -17,6 +17,8 @@ pub const Instruction = enum(u8) {
     load,
     /// Load a constant and add it to the stack.
     load_constant,
+    /// Store ResolveThisBinding() as the result value.
+    resolve_this_binding,
     /// Store the last value from the stack as the result value.
     store,
     /// Store a constant as the result value.

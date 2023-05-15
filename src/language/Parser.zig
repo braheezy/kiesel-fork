@@ -109,7 +109,9 @@ fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    if (self.acceptLiteral()) |literal|
+    if (self.core.accept(RuleSet.is(.this))) |_|
+        return .this
+    else |_| if (self.acceptLiteral()) |literal|
         return .{ .literal = literal }
     else |_|
         return error.UnexpectedToken;
