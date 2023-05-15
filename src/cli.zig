@@ -26,6 +26,8 @@ pub fn main() !void {
         return;
     };
     try script.ecmascript_code.print(stdout);
+    const result = try script.evaluate();
+    std.debug.print("result = {}\n", .{result});
 
     const boolean_constructor = try realm.global_object.get(PropertyKey.from("Boolean"));
     const boolean_object = try boolean_constructor.object.construct(.{

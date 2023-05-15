@@ -6,10 +6,15 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const ast = @import("ast.zig");
+const bytecode = @import("bytecode.zig");
 const execution = @import("../execution.zig");
+const types = @import("../types.zig");
 
+const Executable = bytecode.Executable;
 const Parser = @import("Parser.zig");
 const Realm = execution.Realm;
+const Value = types.Value;
+const Vm = bytecode.Vm;
 
 const Self = @This();
 
@@ -48,4 +53,23 @@ pub fn parse(
         .host_defined = host_defined,
     };
     return self;
+}
+
+/// 16.1.6 ScriptEvaluation ( scriptRecord )
+/// https://tc39.es/ecma262/#sec-runtime-semantics-scriptevaluation
+pub fn evaluate(self: Self) !Value {
+    const agent = self.realm.agent;
+
+    var executable = Executable.init(agent.allocator);
+    defer executable.deinit();
+
+    var vm = try Vm.init(agent);
+    defer vm.deinit();
+
+    try self.ecmascript_code.generateBytecode(&executable);
+
+    const stdout = std.io.getStdOut().writer();
+    try executable.print(stdout);
+
+    return vm.run(executable);
 }
