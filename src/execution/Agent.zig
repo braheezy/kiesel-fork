@@ -181,6 +181,14 @@ pub fn getActiveScriptOrModule(self: Self) ?*ExecutionContext.ScriptOrModule {
     return execution_context.script_or_module;
 }
 
+/// 9.4.4 ResolveThisBinding ( )
+/// https://tc39.es/ecma262/#sec-resolvethisbinding
+pub fn resolveThisBinding(self: *Self) Error!Value {
+    // TODO: 1. Let envRec be GetThisEnvironment().
+    // TODO: 2. Return ? envRec.GetThisBinding().
+    return Value.from(self.currentRealm().global_object);
+}
+
 test "well_known_symbols" {
     const agent = try init(.{});
     const unscopables = agent.well_known_symbols.@"@@unscopables";
