@@ -447,6 +447,7 @@ pub fn getFunctionRealm(self: Self) !*Realm {
 
 test "format" {
     var agent_ = try Agent.init(.{});
+    defer agent_.deinit();
     const object = try builtins.Object.create(&agent_, .{
         .prototype = null,
     });

@@ -78,6 +78,7 @@ test "isAccessorDescriptor" {
     const builtins = @import("../../builtins.zig");
     const Agent = @import("../../execution.zig").Agent;
     var agent = try Agent.init(.{});
+    defer agent.deinit();
     const getter = try builtins.Object.create(&agent, .{
         .prototype = null,
     });
@@ -102,6 +103,7 @@ test "isGenericDescriptor" {
     const builtins = @import("../../builtins.zig");
     const Agent = @import("../../execution.zig").Agent;
     var agent = try Agent.init(.{});
+    defer agent.deinit();
     const setter = try builtins.Object.create(&agent, .{
         .prototype = null,
     });

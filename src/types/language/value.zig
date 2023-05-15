@@ -903,6 +903,7 @@ pub fn sameValueNonNumber(x: Value, y: Value) bool {
 
 test "format" {
     var agent = try Agent.init(.{});
+    defer agent.deinit();
     const object = try builtins.Object.create(&agent, .{
         .prototype = null,
     });

@@ -64,6 +64,7 @@ pub fn main() !void {
             .print_bytecode = true,
         },
     });
+    defer agent.deinit();
     try Realm.initializeHostDefinedRealm(&agent, .{});
     const realm = agent.currentRealm();
 

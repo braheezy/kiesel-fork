@@ -88,6 +88,12 @@ pub fn init(options: Options) !Self {
     return self;
 }
 
+pub fn deinit(self: *Self) void {
+    self.pre_allocated.pow_2_63.deinit();
+    self.pre_allocated.pow_2_64.deinit();
+    self.execution_context_stack.deinit();
+}
+
 pub fn createSymbol(self: *Self, description: ?[]const u8) !Symbol {
     const id = blk: {
         const ov = @addWithOverflow(self.symbol_id, 1);
@@ -190,7 +196,8 @@ pub fn resolveThisBinding(self: *Self) Error!Value {
 }
 
 test "well_known_symbols" {
-    const agent = try init(.{});
+    var agent = try init(.{});
+    defer agent.deinit();
     const unscopables = agent.well_known_symbols.@"@@unscopables";
     try std.testing.expectEqual(unscopables.id, 12);
     try std.testing.expectEqualStrings(unscopables.description.?, "Symbol.unscopables");
