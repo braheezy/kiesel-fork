@@ -16,36 +16,6 @@ const Value = types.Value;
 
 const Self = @This();
 
-pub const Error = error{
-    ExceptionThrown,
-    OutOfMemory,
-};
-
-const ExceptionType = enum {
-    // NativeError types
-    eval_error,
-    range_error,
-    reference_error,
-    syntax_error,
-    type_error,
-    uri_error,
-
-    // Non-standard internal error
-    internal_error,
-
-    pub fn typeName(self: @This()) []const u8 {
-        return switch (self) {
-            .eval_error => "EvalError",
-            .range_error => "RangeError",
-            .reference_error => "ReferenceError",
-            .syntax_error => "SyntaxError",
-            .type_error => "TypeError",
-            .uri_error => "URIError",
-            .internal_error => "InternalError",
-        };
-    }
-};
-
 allocator: Allocator,
 options: Options,
 pre_allocated: struct {
@@ -62,6 +32,11 @@ pub const Options = struct {
         print_ast: bool = false,
         print_bytecode: bool = false,
     } = .{},
+};
+
+pub const Error = error{
+    ExceptionThrown,
+    OutOfMemory,
 };
 
 /// 6.1.5.1 Well-Known Symbols
@@ -123,6 +98,31 @@ pub fn createSymbol(self: *Self, description: ?[]const u8) !Symbol {
     };
     return .{ .id = id, .description = description };
 }
+
+const ExceptionType = enum {
+    // NativeError types
+    eval_error,
+    range_error,
+    reference_error,
+    syntax_error,
+    type_error,
+    uri_error,
+
+    // Non-standard internal error
+    internal_error,
+
+    pub fn typeName(self: @This()) []const u8 {
+        return switch (self) {
+            .eval_error => "EvalError",
+            .range_error => "RangeError",
+            .reference_error => "ReferenceError",
+            .syntax_error => "SyntaxError",
+            .type_error => "TypeError",
+            .uri_error => "URIError",
+            .internal_error => "InternalError",
+        };
+    }
+};
 
 /// 5.2.3.2 Throw an Exception
 /// https://tc39.es/ecma262/#sec-throw-an-exception
