@@ -47,6 +47,7 @@ const ExceptionType = enum {
 };
 
 allocator: Allocator,
+options: Options,
 pre_allocated: struct {
     pow_2_63: BigInt.Value,
     pow_2_64: BigInt.Value,
@@ -55,6 +56,13 @@ exception: ?Value = null,
 symbol_id: usize = 0,
 well_known_symbols: WellKnownSymbols,
 execution_context_stack: std.ArrayList(ExecutionContext),
+
+pub const Options = struct {
+    debug: struct {
+        print_ast: bool = false,
+        print_bytecode: bool = false,
+    } = .{},
+};
 
 /// 6.1.5.1 Well-Known Symbols
 /// https://tc39.es/ecma262/#sec-well-known-symbols
@@ -74,9 +82,10 @@ pub const WellKnownSymbols = struct {
     @"@@unscopables": Symbol,
 };
 
-pub fn init() !Self {
+pub fn init(options: Options) !Self {
     var self = Self{
         .allocator = gc.allocator(),
+        .options = options,
         .pre_allocated = undefined,
         .well_known_symbols = undefined,
         .execution_context_stack = undefined,
@@ -173,7 +182,7 @@ pub fn getActiveScriptOrModule(self: Self) ?*ExecutionContext.ScriptOrModule {
 }
 
 test "well_known_symbols" {
-    const agent = try init();
+    const agent = try init(.{});
     const unscopables = agent.well_known_symbols.@"@@unscopables";
     try std.testing.expectEqual(unscopables.id, 12);
     try std.testing.expectEqualStrings(unscopables.description.?, "Symbol.unscopables");

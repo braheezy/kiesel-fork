@@ -77,7 +77,7 @@ pub inline fn hasFields(self: Self) bool {
 test "isAccessorDescriptor" {
     const builtins = @import("../../builtins.zig");
     const Agent = @import("../../execution.zig").Agent;
-    var agent = try Agent.init();
+    var agent = try Agent.init(.{});
     const getter = try builtins.Object.create(&agent, .{
         .prototype = null,
     });
@@ -101,7 +101,7 @@ test "isDataDescriptor" {
 test "isGenericDescriptor" {
     const builtins = @import("../../builtins.zig");
     const Agent = @import("../../execution.zig").Agent;
-    var agent = try Agent.init();
+    var agent = try Agent.init(.{});
     const setter = try builtins.Object.create(&agent, .{
         .prototype = null,
     });

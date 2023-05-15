@@ -68,8 +68,10 @@ pub fn evaluate(self: Self) !Value {
 
     try self.ecmascript_code.generateBytecode(&executable);
 
-    const stdout = std.io.getStdOut().writer();
-    try executable.print(stdout);
+    if (agent.options.debug.print_bytecode) {
+        const stdout = std.io.getStdOut().writer();
+        try executable.print(stdout);
+    }
 
     return vm.run(executable);
 }

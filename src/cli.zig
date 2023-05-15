@@ -12,7 +12,12 @@ pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
     const stderr = std.io.getStdErr().writer();
 
-    var agent = try Agent.init();
+    var agent = try Agent.init(.{
+        .debug = .{
+            .print_ast = true,
+            .print_bytecode = true,
+        },
+    });
     try Realm.initializeHostDefinedRealm(&agent, .{});
     const realm = agent.currentRealm();
 
@@ -25,7 +30,8 @@ pub fn main() !void {
         try diagnostics.print(stderr);
         return;
     };
-    try script.ecmascript_code.print(stdout);
+    if (agent.options.debug.print_ast)
+        try script.ecmascript_code.print(stdout);
     const result = try script.evaluate();
     std.debug.print("result = {}\n", .{result});
 
