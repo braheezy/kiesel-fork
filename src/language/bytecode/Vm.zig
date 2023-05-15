@@ -14,7 +14,7 @@ stack: std.ArrayList(Value),
 result: ?Value,
 
 pub fn init(agent: *Agent) !Self {
-    var stack = std.ArrayList(Value).init(agent.allocator);
+    var stack = std.ArrayList(Value).init(agent.gc_allocator);
     try stack.ensureTotalCapacity(32);
     return .{
         .agent = agent,

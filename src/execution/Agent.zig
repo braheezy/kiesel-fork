@@ -16,7 +16,7 @@ const Value = types.Value;
 
 const Self = @This();
 
-allocator: Allocator,
+gc_allocator: Allocator,
 options: Options,
 pre_allocated: struct {
     pow_2_63: BigInt.Value,
@@ -59,15 +59,15 @@ pub const WellKnownSymbols = struct {
 
 pub fn init(options: Options) !Self {
     var self = Self{
-        .allocator = gc.allocator(),
+        .gc_allocator = gc.allocator(),
         .options = options,
         .pre_allocated = undefined,
         .well_known_symbols = undefined,
         .execution_context_stack = undefined,
     };
     self.pre_allocated = .{
-        .pow_2_63 = try BigInt.Value.initSet(self.allocator, std.math.pow(u64, 2, 63)),
-        .pow_2_64 = try BigInt.Value.initSet(self.allocator, std.math.pow(u128, 2, 64)),
+        .pow_2_63 = try BigInt.Value.initSet(self.gc_allocator, std.math.pow(u64, 2, 63)),
+        .pow_2_64 = try BigInt.Value.initSet(self.gc_allocator, std.math.pow(u128, 2, 64)),
     };
     self.well_known_symbols = WellKnownSymbols{
         .@"@@asyncIterator" = self.createSymbol("Symbol.asyncIterator") catch unreachable,
@@ -84,7 +84,7 @@ pub fn init(options: Options) !Self {
         .@"@@toStringTag" = self.createSymbol("Symbol.toStringTag") catch unreachable,
         .@"@@unscopables" = self.createSymbol("Symbol.unscopables") catch unreachable,
     };
-    self.execution_context_stack = std.ArrayList(ExecutionContext).init(self.allocator);
+    self.execution_context_stack = std.ArrayList(ExecutionContext).init(self.gc_allocator);
     return self;
 }
 
@@ -134,7 +134,7 @@ pub fn throwException(
     // TODO: Create an actual error object.
     self.exception = Value.from(
         std.fmt.allocPrint(
-            self.allocator,
+            self.gc_allocator,
             "{s}: {s}",
             .{ exception_type.typeName(), message },
         ) catch "InternalError: Out of memory",

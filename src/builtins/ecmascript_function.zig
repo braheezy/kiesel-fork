@@ -66,7 +66,7 @@ pub fn setFunctionName(
     var name = switch (name_property_key) {
         .string => |string| string,
         .integer_index => |integer_index| try std.fmt.allocPrint(
-            agent.allocator,
+            agent.gc_allocator,
             "{d}",
             .{integer_index},
         ),
@@ -81,7 +81,7 @@ pub fn setFunctionName(
                 break :blk "";
 
             // c. Else, set name to the string-concatenation of "[", description, and "]".
-            break :blk try std.fmt.allocPrint(agent.allocator, "[{s}]", .{description.?});
+            break :blk try std.fmt.allocPrint(agent.gc_allocator, "[{s}]", .{description.?});
         },
 
         // TODO: 3. Else if name is a Private Name, then
@@ -96,7 +96,7 @@ pub fn setFunctionName(
     if (prefix != null) {
         // a. Set name to the string-concatenation of prefix, the code unit 0x0020 (SPACE), and
         //    name.
-        name = try std.fmt.allocPrint(agent.allocator, "{s} {s}", .{ prefix.?, name });
+        name = try std.fmt.allocPrint(agent.gc_allocator, "{s} {s}", .{ prefix.?, name });
 
         // b. If F has an [[InitialName]] internal slot, then
         //     i. Optionally, set F.[[InitialName]] to name.

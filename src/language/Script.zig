@@ -41,12 +41,12 @@ pub fn parse(
 
     // 1. Let script be ParseText(sourceText, Script).
     // 2. If script is a List of errors, return script.
-    const script = try Parser.parse(ast.Script, agent.allocator, source_text, ctx);
+    const script = try Parser.parse(ast.Script, agent.gc_allocator, source_text, ctx);
 
     // 3. Return Script Record {
     //      [[Realm]]: realm, [[ECMAScriptCode]]: script, [[LoadedModules]]: « », [[HostDefined]]: hostDefined
     //    }.
-    var self = try agent.allocator.create(Self);
+    var self = try agent.gc_allocator.create(Self);
     self.* = .{
         .realm = realm,
         .ecmascript_code = script,
@@ -60,7 +60,7 @@ pub fn parse(
 pub fn evaluate(self: Self) !Value {
     const agent = self.realm.agent;
 
-    var executable = Executable.init(agent.allocator);
+    var executable = Executable.init(agent.gc_allocator);
     defer executable.deinit();
 
     var vm = try Vm.init(agent);

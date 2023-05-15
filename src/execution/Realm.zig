@@ -44,7 +44,7 @@ host_defined: ?*anyopaque = null,
 /// https://tc39.es/ecma262/#sec-createrealm
 pub fn create(agent: *Agent) !*Self {
     // 1. Let realmRec be a new Realm Record.
-    var realm = try agent.allocator.create(Self);
+    var realm = try agent.gc_allocator.create(Self);
 
     // Set this early, it'll be accessed before the realm struct is fully initialized.
     realm.agent = agent;

@@ -40,7 +40,7 @@ pub fn Factory(
         data: Data,
 
         pub fn create(agent: *Agent, args: Args) !Object {
-            const self = try agent.allocator.create(Self);
+            const self = try agent.gc_allocator.create(Self);
             self.* = .{
                 .fields = if (has_fields) args.fields,
                 .data = .{
@@ -48,7 +48,7 @@ pub fn Factory(
                     .prototype = args.prototype,
                     .extensible = args.extensible,
                     .internal_methods = args.internal_methods orelse .{},
-                    .property_storage = Object.PropertyStorage.init(agent.allocator),
+                    .property_storage = Object.PropertyStorage.init(agent.gc_allocator),
                 },
             };
             return self.object();

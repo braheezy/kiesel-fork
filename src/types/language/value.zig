@@ -471,7 +471,7 @@ pub const Value = union(enum) {
 
             // Return 1n if prim is true and 0n if prim is false.
             .boolean => |boolean| BigInt{
-                .value = try BigInt.Value.initSet(agent.allocator, @boolToInt(boolean)),
+                .value = try BigInt.Value.initSet(agent.gc_allocator, @boolToInt(boolean)),
             },
 
             // Return prim.
@@ -479,7 +479,7 @@ pub const Value = union(enum) {
 
             .string => |string| {
                 // 1. Let n be StringToBigInt(prim).
-                const n = try stringToBigInt(agent.allocator, string);
+                const n = try stringToBigInt(agent.gc_allocator, string);
 
                 // 2. If n is undefined, throw a SyntaxError exception.
                 // 3. Return n.
@@ -503,13 +503,13 @@ pub const Value = union(enum) {
         const n = try self.toBigInt(agent);
 
         // 2. Let int64bit be ℝ(n) modulo 2^64.
-        var quotient = try BigInt.Value.init(agent.allocator);
-        var int64bit = try BigInt.Value.init(agent.allocator);
+        var quotient = try BigInt.Value.init(agent.gc_allocator);
+        var int64bit = try BigInt.Value.init(agent.gc_allocator);
         try quotient.divTrunc(&int64bit, &n.value, &pow_2_64);
 
         // 3. If int64bit ≥ 2^63, return ℤ(int64bit - 2^64); otherwise return ℤ(int64bit).
         if (int64bit.order(pow_2_63) != .lt) {
-            var result = try BigInt.Value.init(agent.allocator);
+            var result = try BigInt.Value.init(agent.gc_allocator);
             try result.sub(&int64bit, &pow_2_64);
             return result.to(i64) catch unreachable;
         } else {
@@ -526,8 +526,8 @@ pub const Value = union(enum) {
         const n = try self.toBigInt(agent);
 
         // 2. Let int64bit be ℝ(n) modulo 2^64.
-        var quotient = try BigInt.Value.init(agent.allocator);
-        var int64bit = try BigInt.Value.init(agent.allocator);
+        var quotient = try BigInt.Value.init(agent.gc_allocator);
+        var int64bit = try BigInt.Value.init(agent.gc_allocator);
         try quotient.divTrunc(&int64bit, &n.value, &pow_2_64);
 
         // 3. Return ℤ(int64bit).
@@ -558,10 +558,10 @@ pub const Value = union(enum) {
             .boolean => |boolean| if (boolean) "true" else "false",
 
             // 7. If argument is a Number, return Number::toString(argument, 10).
-            .number => |number| number.toString(agent.allocator, 10),
+            .number => |number| number.toString(agent.gc_allocator, 10),
 
             // 8. If argument is a BigInt, return BigInt::toString(argument, 10).
-            .big_int => |big_int| big_int.toString(agent.allocator, 10),
+            .big_int => |big_int| big_int.toString(agent.gc_allocator, 10),
 
             // 9. Assert: argument is an Object.
             .object => {
@@ -755,7 +755,7 @@ pub const Value = union(enum) {
         if (!function.isCallable()) {
             return agent.throwException(
                 .type_error,
-                try std.fmt.allocPrint(agent.allocator, "{} is not callable", .{self}),
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{self}),
             );
         }
 
@@ -778,7 +778,7 @@ pub const Value = union(enum) {
         if (!self.isCallable()) {
             return agent.throwException(
                 .type_error,
-                try std.fmt.allocPrint(agent.allocator, "{} is not callable", .{self}),
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{self}),
             );
         }
 
