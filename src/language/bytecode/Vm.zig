@@ -41,7 +41,7 @@ fn fetchConstant(executable: Executable, ip: *usize) Value {
     return constants[index];
 }
 
-pub fn run(self: *Self, executable: Executable) !Value {
+pub fn run(self: *Self, executable: Executable) !?Value {
     var ip: usize = 0;
     while (fetchInstruction(executable, &ip)) |instruction| switch (instruction) {
         .load => try self.stack.append(self.result.?),
@@ -57,5 +57,5 @@ pub fn run(self: *Self, executable: Executable) !Value {
         },
         _ => unreachable,
     };
-    return self.result orelse .undefined;
+    return self.result;
 }

@@ -73,5 +73,5 @@ pub fn evaluate(self: Self) !Value {
         try executable.print(stdout);
     }
 
-    return vm.run(executable);
+    return try vm.run(executable) orelse .undefined;
 }
