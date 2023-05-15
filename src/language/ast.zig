@@ -54,18 +54,34 @@ pub const Literal = union(enum) {
     numeric,
     string,
 
+    /// 13.2.3.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-literals-runtime-semantics-evaluation
     pub fn generateBytecode(self: Self, executable: *Executable) !void {
         switch (self) {
-            .null => try executable.addInstructionWithConstant(
-                .store_constant,
-                .null,
-            ),
-            .boolean => |boolean| try executable.addInstructionWithConstant(
-                .store_constant,
-                Value.from(boolean),
-            ),
-            .numeric => unreachable,
-            .string => unreachable,
+            // Literal : NullLiteral
+            .null => {
+                // 1. Return null.
+                try executable.addInstructionWithConstant(.store_constant, .null);
+            },
+
+            // Literal : BooleanLiteral
+            .boolean => |boolean| {
+                // 1. If BooleanLiteral is the token false, return false.
+                // 2. If BooleanLiteral is the token true, return true.
+                try executable.addInstructionWithConstant(.store_constant, Value.from(boolean));
+            },
+
+            // Literal : NumericLiteral
+            .numeric => {
+                // 1. Return the NumericValue of NumericLiteral as defined in 12.9.3.
+                unreachable;
+            },
+
+            // Literal : StringLiteral
+            .string => {
+                // 1. Return the SV of StringLiteral as defined in 12.9.4.2.
+                unreachable;
+            },
         }
     }
 
@@ -123,11 +139,24 @@ pub const Statement = union(enum) {
             .block_statement => |block_statement| {
                 try block_statement.generateBytecode(executable);
             },
-            .empty_statement => {},
+
+            // EmptyStatement : ;
+            .empty_statement => {
+                // 1. Return empty.
+            },
+
             .expression_statement => |expression_statement| {
                 try expression_statement.generateBytecode(executable);
             },
-            .debugger_statement => {},
+
+            // DebuggerStatement : debugger ;
+            .debugger_statement => {
+                // 1.If an implementation-defined debugging facility is available and enabled, then
+                //     a. Perform an implementation-defined debugging action.
+                //     b. Return a new implementation-defined Completion Record.
+                // 2. Else,
+                //     a. Return empty.
+            },
         }
     }
 
@@ -188,7 +217,13 @@ pub const Block = struct {
 
     statement_list: StatementList,
 
+    /// 14.2.2 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-block-runtime-semantics-evaluation
     pub fn generateBytecode(self: Self, executable: *Executable) error{ OutOfMemory, BytecodeGenerationFailed }!void {
+        // StatementList : StatementList StatementListItem
+        // 1. Let sl be ? Evaluation of StatementList.
+        // 2. Let s be Completion(Evaluation of StatementListItem).
+        // 3. Return ? UpdateEmpty(s, sl).
         for (self.statement_list) |statement_list_item| {
             try statement_list_item.generateBytecode(executable);
         }
@@ -234,7 +269,12 @@ pub const ExpressionStatement = struct {
 
     expression: Expression,
 
+    /// 14.5.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-expression-statement-runtime-semantics-evaluation
     pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        // ExpressionStatement : Expression ;
+        // 1. Let exprRef be ? Evaluation of Expression.
+        // 2. Return ? GetValue(exprRef).
         try self.expression.generateBytecode(executable);
     }
 
