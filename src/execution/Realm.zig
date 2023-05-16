@@ -6,23 +6,23 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const builtins = @import("../builtins.zig");
+const environments = @import("environments.zig");
 const types = @import("../types.zig");
 
 const Agent = @import("Agent.zig");
 const ExecutionContext = @import("ExecutionContext.zig");
+const GlobalEnvironment = environments.GlobalEnvironment;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Value = types.Value;
 const addRestrictedFunctionProperties = builtins.addRestrictedFunctionProperties;
+const newGlobalEnvironment = environments.newGlobalEnvironment;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 pub const Intrinsics = @import("Realm/Intrinsics.zig");
 
 const Self = @This();
-
-// Stubs, for now
-const Environment = struct {};
 
 agent: *Agent,
 
@@ -33,7 +33,7 @@ intrinsics: Intrinsics,
 global_object: Object,
 
 /// [[GlobalEnv]]
-global_env: Environment,
+global_env: *GlobalEnvironment,
 
 /// [[HostDefined]]
 host_defined: ?*anyopaque = null,
@@ -117,9 +117,12 @@ pub fn setRealmGlobalObject(
     // 4. Set realmRec.[[GlobalObject]] to globalObj.
     self.global_object = global_object;
 
-    // TODO: 5. Let newGlobalEnv be NewGlobalEnvironment(globalObj, thisValue).
-    const new_global_env = .{};
-    _ = this_value;
+    // 5. Let newGlobalEnv be NewGlobalEnvironment(globalObj, thisValue).
+    const new_global_env = try newGlobalEnvironment(
+        self.agent.gc_allocator,
+        global_object,
+        this_value,
+    );
 
     // 6. Set realmRec.[[GlobalEnv]] to newGlobalEnv.
     self.global_env = new_global_env;
