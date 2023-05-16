@@ -75,7 +75,7 @@ pub fn print(self: Self, writer: anytype) !void {
             const constant_index = @enumToInt(instructions[index]);
             index += 1;
             const value = constants[constant_index];
-            try writer.print("{s} {}\n", .{ @tagName(instruction), value });
+            try writer.print("{s} {} [{}]\n", .{ @tagName(instruction), constant_index, value });
             continue;
         }
         try writer.print("{s}\n", .{@tagName(instruction)});
