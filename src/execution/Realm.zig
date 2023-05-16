@@ -100,7 +100,7 @@ fn createIntrinsics(self: *Self) !void {
 pub fn setRealmGlobalObject(
     self: *Self,
     maybe_global_object: ?Object,
-    maybe_this_value: ?Value,
+    maybe_this_value: ?Object,
 ) !void {
     // 1. If globalObj is undefined, then
     //     a. Let intrinsics be realmRec.[[Intrinsics]].
@@ -112,7 +112,7 @@ pub fn setRealmGlobalObject(
     );
 
     // 3. If thisValue is undefined, set thisValue to globalObj.
-    const this_value = maybe_this_value orelse Value.from(global_object);
+    const this_value = maybe_this_value orelse global_object;
 
     // 4. Set realmRec.[[GlobalObject]] to globalObj.
     self.global_object = global_object;
