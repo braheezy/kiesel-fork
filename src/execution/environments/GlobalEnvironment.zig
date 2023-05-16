@@ -11,6 +11,8 @@ const Environment = environments.Environment;
 const Object = types.Object;
 const ObjectEnvironment = environments.ObjectEnvironment;
 
+const Self = @This();
+
 /// [[ObjectRecord]]
 object_record: *ObjectEnvironment,
 
@@ -25,3 +27,10 @@ var_names: std.ArrayList([]const u8),
 
 /// [[OuterEnv]]
 outer_env: ?Environment,
+
+/// 9.1.1.4.8 HasThisBinding ( )
+/// https://tc39.es/ecma262/#sec-global-environment-records-hasthisbinding
+pub fn hasThisBinding(_: Self) bool {
+    // 1. Return true.
+    return true;
+}

@@ -81,8 +81,11 @@ pub const Environment = union(enum) {
     }
 
     pub fn hasThisBinding(self: Self) bool {
-        _ = self;
-        @compileError("Not implemented");
+        return switch (self) {
+            .declarative_environment => |env| env.hasThisBinding(),
+            .object_environment => |env| env.hasThisBinding(),
+            .global_environment => |env| env.hasThisBinding(),
+        };
     }
 
     pub fn hasSuperBinding(self: Self) bool {
