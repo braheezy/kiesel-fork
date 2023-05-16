@@ -97,6 +97,14 @@ pub const Environment = union(enum) {
         _ = self;
         @compileError("Not implemented");
     }
+
+    pub fn getThisBinding(self: Self) !Value {
+        return switch (self) {
+            .declarative_environment => unreachable,
+            .object_environment => unreachable,
+            .global_environment => |env| Value.from(env.getThisBinding()),
+        };
+    }
 };
 
 /// 9.1.2.2 NewDeclarativeEnvironment ( E )
