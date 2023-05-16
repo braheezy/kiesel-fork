@@ -222,9 +222,11 @@ pub fn getThisEnvironment(self: *Self) Environment {
 /// 9.4.4 ResolveThisBinding ( )
 /// https://tc39.es/ecma262/#sec-resolvethisbinding
 pub fn resolveThisBinding(self: *Self) Error!Value {
-    // TODO: 1. Let envRec be GetThisEnvironment().
-    // TODO: 2. Return ? envRec.GetThisBinding().
-    return Value.from(self.currentRealm().global_object);
+    // 1. Let envRec be GetThisEnvironment().
+    const env = self.getThisEnvironment();
+
+    // 2. Return ? envRec.GetThisBinding().
+    return env.getThisBinding();
 }
 
 test "well_known_symbols" {
