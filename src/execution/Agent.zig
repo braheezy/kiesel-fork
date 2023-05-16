@@ -6,8 +6,10 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const environments = @import("environments.zig");
 const types = @import("../types.zig");
 
+const Environment = environments.Environment;
 const BigInt = types.BigInt;
 const ExecutionContext = @import("ExecutionContext.zig");
 const Realm = @import("Realm.zig");
@@ -185,6 +187,36 @@ pub fn getActiveScriptOrModule(self: Self) ?*ExecutionContext.ScriptOrModule {
     if (execution_context == null)
         return null;
     return execution_context.script_or_module;
+}
+
+/// 9.4.3 GetThisEnvironment ( )
+/// https://tc39.es/ecma262/#sec-getthisenvironment
+pub fn getThisEnvironment(self: *Self) Environment {
+    // 1. Let env be the running execution context's LexicalEnvironment.
+    var env = self.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+    // 2. Repeat,
+    while (true) {
+        // a. Let exists be env.HasThisBinding().
+        const exists = env.hasThisBinding();
+
+        // b. If exists is true, return env.
+        if (exists)
+            return env;
+
+        // c. Let outer be env.[[OuterEnv]].
+        const outer = env.outerEnv();
+
+        // d. Assert: outer is not null.
+        std.debug.assert(outer != null);
+
+        // e. Set env to outer.
+        env = outer.?;
+    }
+
+    // NOTE: The loop in step 2 will always terminate because the list of environments always ends
+    //       with the global environment which has a this binding.
+    unreachable;
 }
 
 /// 9.4.4 ResolveThisBinding ( )
