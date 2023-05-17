@@ -1,10 +1,12 @@
 const std = @import("std");
 
 const execution = @import("../../execution.zig");
+const instructions_ = @import("instructions.zig");
 const types = @import("../../types.zig");
 
 const Agent = execution.Agent;
 const Executable = @import("Executable.zig");
+const Instruction = instructions_.Instruction;
 const Value = types.Value;
 
 const Self = @This();
@@ -29,7 +31,7 @@ pub fn deinit(self: Self) void {
     self.stack.deinit();
 }
 
-fn fetchInstruction(self: *Self, executable: Executable) ?Executable.Instruction {
+fn fetchInstruction(self: *Self, executable: Executable) ?Instruction {
     const instructions = executable.instructions.items;
     if (self.ip >= instructions.len)
         return null;
