@@ -58,7 +58,7 @@ pub const IdentifierReference = struct {
 };
 
 /// https://tc39.es/ecma262/#prod-Identifier
-const Identifier = []const u8;
+pub const Identifier = []const u8;
 
 /// https://tc39.es/ecma262/#prod-PrimaryExpression
 pub const PrimaryExpression = union(enum) {
