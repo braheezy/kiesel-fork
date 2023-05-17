@@ -4,6 +4,7 @@ const Allocator = std.mem.Allocator;
 
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
+const pretty_printing = @import("../../pretty_printing.zig");
 const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
@@ -13,6 +14,7 @@ const Object = @import("Object.zig");
 const PropertyKey = Object.PropertyKey;
 const Symbol = @import("Symbol.zig");
 const noexcept = utils.noexcept;
+const prettyPrintValue = pretty_printing.prettyPrintValue;
 
 const pow_2_7 = std.math.pow(f64, 2, 7);
 const pow_2_8 = std.math.pow(f64, 2, 8);
@@ -67,7 +69,8 @@ pub const Value = union(enum) {
         writer: anytype,
     ) !void {
         _ = options;
-        _ = fmt;
+        if (std.mem.eql(u8, fmt, "pretty"))
+            return prettyPrintValue(self, writer);
         switch (self) {
             .undefined => try writer.writeAll("undefined"),
             .null => try writer.writeAll("null"),

@@ -43,7 +43,7 @@ fn run(
             return null;
         },
         error.ExceptionThrown => {
-            try stderr.print("Uncaught exception: {}\n", .{agent.exception.?});
+            try stderr.print("Uncaught exception: {pretty}\n", .{agent.exception.?});
             return null;
         },
         else => return err,
@@ -95,7 +95,7 @@ pub fn main() !void {
                     continue;
 
                 if (try run(allocator, realm, "repl", source_text)) |result| {
-                    try stdout.print("{}\n", .{result});
+                    try stdout.print("{pretty}\n", .{result});
                 }
                 // Handled exception & printed something, carry on
                 else continue;
