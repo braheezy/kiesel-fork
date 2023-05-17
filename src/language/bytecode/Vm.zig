@@ -10,6 +10,7 @@ const Value = types.Value;
 const Self = @This();
 
 agent: *Agent,
+ip: usize,
 stack: std.ArrayList(Value),
 result: ?Value,
 
@@ -18,6 +19,7 @@ pub fn init(agent: *Agent) !Self {
     try stack.ensureTotalCapacity(32);
     return .{
         .agent = agent,
+        .ip = 0,
         .stack = stack,
         .result = null,
     };
@@ -27,37 +29,36 @@ pub fn deinit(self: Self) void {
     self.stack.deinit();
 }
 
-fn fetchInstruction(executable: Executable, ip: *usize) ?Executable.Instruction {
+fn fetchInstruction(self: *Self, executable: Executable) ?Executable.Instruction {
     const instructions = executable.instructions.items;
-    if (ip.* >= instructions.len)
+    if (self.ip >= instructions.len)
         return null;
-    defer ip.* += 1;
-    return instructions[ip.*];
+    defer self.ip += 1;
+    return instructions[self.ip];
 }
 
-fn fetchConstant(executable: Executable, ip: *usize) Value {
+fn fetchConstant(self: *Self, executable: Executable) Value {
     const constants = executable.constants.items;
-    const index = @enumToInt(fetchInstruction(executable, ip).?);
+    const index = @enumToInt(self.fetchInstruction(executable).?);
     return constants[index];
 }
 
 pub fn run(self: *Self, executable: Executable) !?Value {
-    var ip: usize = 0;
-    while (fetchInstruction(executable, &ip)) |instruction| switch (instruction) {
+    while (self.fetchInstruction(executable)) |instruction| switch (instruction) {
         .load => try self.stack.append(self.result.?),
         .load_constant => {
-            const value = fetchConstant(executable, &ip);
+            const value = self.fetchConstant(executable);
             try self.stack.append(value);
         },
         .resolve_binding => {
-            const name = fetchConstant(executable, &ip).string;
+            const name = self.fetchConstant(executable).string;
             const reference = try self.agent.resolveBinding(name, null);
             self.result = try reference.getValue(self.agent);
         },
         .resolve_this_binding => self.result = try self.agent.resolveThisBinding(),
         .store => self.result = self.stack.pop(),
         .store_constant => {
-            const value = fetchConstant(executable, &ip);
+            const value = self.fetchConstant(executable);
             self.result = value;
         },
         _ => unreachable,
