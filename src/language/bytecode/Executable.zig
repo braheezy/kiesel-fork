@@ -36,6 +36,26 @@ pub const Instruction = enum(u8) {
     }
 };
 
+pub const InstructionIterator = struct {
+    instructions: []const Instruction,
+    index: usize = 0,
+    constant_index: ?usize = null,
+
+    pub fn next(self: *InstructionIterator) ?Instruction {
+        if (self.index >= self.instructions.len)
+            return null;
+        const instruction = self.instructions[self.index];
+        self.index += 1;
+        if (instruction.hasConstantIndex()) {
+            self.constant_index = @enumToInt(self.instructions[self.index]);
+            self.index += 1;
+        } else {
+            self.constant_index = null;
+        }
+        return instruction;
+    }
+};
+
 pub fn init(allocator: Allocator) Self {
     return .{
         .instructions = std.ArrayList(Instruction).init(allocator),
@@ -70,19 +90,13 @@ pub fn addInstructionWithConstant(
 }
 
 pub fn print(self: Self, writer: anytype) !void {
-    const instructions = self.instructions.items;
-    const constants = self.constants.items;
-    var index: usize = 0;
-    while (index < instructions.len) {
-        const instruction = instructions[index];
-        index += 1;
-        if (instruction.hasConstantIndex()) {
-            const constant_index = @enumToInt(instructions[index]);
-            index += 1;
-            const value = constants[constant_index];
-            try writer.print("{s} {} [{}]\n", .{ @tagName(instruction), constant_index, value });
-            continue;
+    var iterator = InstructionIterator{ .instructions = self.instructions.items };
+    while (iterator.next()) |instruction| {
+        if (iterator.constant_index) |constant_index| {
+            const value = self.constants.items[constant_index];
+            try writer.print("{s} {} [{pretty}]\n", .{ @tagName(instruction), constant_index, value });
+        } else {
+            try writer.print("{s}\n", .{@tagName(instruction)});
         }
-        try writer.print("{s}\n", .{@tagName(instruction)});
     }
 }
