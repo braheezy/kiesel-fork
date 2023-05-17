@@ -1,12 +1,15 @@
 //! 9.1.1.2 Object Environment Records
 //! https://tc39.es/ecma262/#sec-object-environment-records
 
+const std = @import("std");
+
 const environments = @import("../environments.zig");
 const types = @import("../../types.zig");
 
 const Environment = environments.Environment;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
+const Value = types.Value;
 
 const Self = @This();
 
@@ -53,6 +56,30 @@ pub fn hasBinding(self: Self, name: []const u8) !bool {
 
     // 7. Return true.
     return true;
+}
+
+/// 9.1.1.2.6 GetBindingValue ( N, S )
+/// https://tc39.es/ecma262/#sec-object-environment-records-getbindingvalue-n-s
+pub fn getBindingValue(self: Self, name: []const u8, strict: bool) !Value {
+    const agent = self.binding_object.agent();
+
+    // 1. Let bindingObject be envRec.[[BindingObject]].
+    // 2. Let value be ? HasProperty(bindingObject, N).
+    const value = try self.binding_object.hasProperty(PropertyKey.from(name));
+
+    // 3. If value is false, then
+    if (!value) {
+        // a. If S is false, return undefined; otherwise throw a ReferenceError exception.
+        if (!strict)
+            return .undefined;
+        return agent.throwException(
+            .reference_error,
+            try std.fmt.allocPrint(agent.gc_allocator, "'{s}' is not defined", .{name}),
+        );
+    }
+
+    // 4. Return ? Get(bindingObject, N).
+    return self.binding_object.get(PropertyKey.from(name));
 }
 
 /// 9.1.1.2.8 HasThisBinding ( )

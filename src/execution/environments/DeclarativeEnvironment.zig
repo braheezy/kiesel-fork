@@ -2,8 +2,10 @@
 //! https://tc39.es/ecma262/#sec-declarative-environment-records
 
 const environments = @import("../environments.zig");
+const types = @import("../../types.zig");
 
 const Environment = environments.Environment;
+const Value = types.Value;
 
 const Self = @This();
 
@@ -19,6 +21,15 @@ pub fn hasBinding(self: Self, name: []const u8) bool {
 
     // 2. Return false.
     return false;
+}
+
+/// 9.1.1.1.6 GetBindingValue ( N, S )
+/// https://tc39.es/ecma262/#sec-declarative-environment-records-getbindingvalue-n-s
+pub fn getBindingValue(self: Self, name: []const u8, strict: bool) Value {
+    _ = self;
+    _ = name;
+    _ = strict;
+    @panic("Not implemented");
 }
 
 /// 9.1.1.1.8 HasThisBinding ( )

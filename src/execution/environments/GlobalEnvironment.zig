@@ -10,6 +10,7 @@ const DeclarativeEnvironment = environments.DeclarativeEnvironment;
 const Environment = environments.Environment;
 const Object = types.Object;
 const ObjectEnvironment = environments.ObjectEnvironment;
+const Value = types.Value;
 
 const Self = @This();
 
@@ -39,6 +40,21 @@ pub fn hasBinding(self: Self, name: []const u8) !bool {
     // 3. Let ObjRec be envRec.[[ObjectRecord]].
     // 4. Return ? ObjRec.HasBinding(N).
     return self.object_record.hasBinding(name);
+}
+
+/// 9.1.1.4.6 GetBindingValue ( N, S )
+/// https://tc39.es/ecma262/#sec-global-environment-records-getbindingvalue-n-s
+pub fn getBindingValue(self: Self, name: []const u8, strict: bool) !Value {
+    // 1. Let DclRec be envRec.[[DeclarativeRecord]].
+    // 2. If ! DclRec.HasBinding(N) is true, then
+    if (self.declarative_record.hasBinding(name)) {
+        // a. Return ? DclRec.GetBindingValue(N, S).
+        return self.declarative_record.getBindingValue(name, strict);
+    }
+
+    // 3. Let ObjRec be envRec.[[ObjectRecord]].
+    // 4. Return ? ObjRec.GetBindingValue(N, S).
+    return self.object_record.getBindingValue(name, strict);
 }
 
 /// 9.1.1.4.8 HasThisBinding ( )

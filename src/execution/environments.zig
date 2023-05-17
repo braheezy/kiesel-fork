@@ -69,11 +69,12 @@ pub const Environment = union(enum) {
         @compileError("Not implemented");
     }
 
-    pub fn getBindingValue(self: Self, name: []const u8, strict: bool) bool {
-        _ = self;
-        _ = name;
-        _ = strict;
-        @compileError("Not implemented");
+    pub fn getBindingValue(self: Self, name: []const u8, strict: bool) !Value {
+        return switch (self) {
+            .declarative_environment => |env| env.getBindingValue(name, strict),
+            .object_environment => |env| env.getBindingValue(name, strict),
+            .global_environment => |env| env.getBindingValue(name, strict),
+        };
     }
 
     pub fn deleteBinding(self: Self, name: []const u8) bool {
