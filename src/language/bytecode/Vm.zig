@@ -49,6 +49,11 @@ pub fn run(self: *Self, executable: Executable) !?Value {
             const value = fetchConstant(executable, &ip);
             try self.stack.append(value);
         },
+        .resolve_binding => {
+            const name = fetchConstant(executable, &ip).string;
+            const reference = try self.agent.resolveBinding(name, null);
+            self.result = try reference.getValue(self.agent);
+        },
         .resolve_this_binding => self.result = try self.agent.resolveThisBinding(),
         .store => self.result = self.stack.pop(),
         .store_constant => {

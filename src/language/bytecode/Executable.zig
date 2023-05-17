@@ -17,6 +17,8 @@ pub const Instruction = enum(u8) {
     load,
     /// Load a constant and add it to the stack.
     load_constant,
+    /// Store ResolveBinding() as the result value.
+    resolve_binding,
     /// Store ResolveThisBinding() as the result value.
     resolve_this_binding,
     /// Store the last value from the stack as the result value.
@@ -27,7 +29,10 @@ pub const Instruction = enum(u8) {
     _,
 
     pub fn hasConstantIndex(self: @This()) bool {
-        return self == .load_constant or self == .store_constant;
+        return switch (self) {
+            .load_constant, .resolve_binding, .store_constant => true,
+            else => false,
+        };
     }
 };
 

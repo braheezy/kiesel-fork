@@ -7,6 +7,7 @@ const TokenType = enum {
     comment,
     debugger,
     false,
+    identifier,
     null,
     semicolon,
     this,
@@ -27,6 +28,8 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
     Pattern.create(.this, ptk.matchers.literal("this")),
     Pattern.create(.true, ptk.matchers.literal("true")),
     Pattern.create(.whitespace, whitespaceMatcher),
+    // NOTE: Needs to come last to not swallow any of the above tokens
+    Pattern.create(.identifier, identifierMatcher),
 });
 
 /// 12.2 White Space
@@ -84,4 +87,18 @@ fn commentMatcher(str: []const u8) ?usize {
     // TODO: Implement me :^)
     _ = str;
     return null;
+}
+
+/// 12.7 Names and Keywords
+/// https://tc39.es/ecma262/#sec-names-and-keywords
+fn identifierMatcher(str: []const u8) ?usize {
+    // TODO: Handle UnicodeIDStart, UnicodeIDContinue, UnicodeEscapeSequence
+    const start_chars = "$_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const part_chars = start_chars ++ "0123456789";
+    for (str, 0..) |c, i| {
+        if (std.mem.indexOfScalar(u8, if (i > 0) part_chars else start_chars, c) == null) {
+            return i;
+        }
+    }
+    return str.len;
 }

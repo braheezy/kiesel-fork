@@ -17,11 +17,37 @@ fn printString(string: []const u8, writer: anytype, indentation: usize) !void {
     try writer.print("{s}\n", .{string});
 }
 
+/// https://tc39.es/ecma262/#prod-IdentifierReference
+pub const IdentifierReference = struct {
+    const Self = @This();
+
+    identifier: Identifier,
+
+    /// 13.1.3 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-identifiers-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        // IdentifierReference : Identifier
+        // IdentifierReference : yield
+        // IdentifierReference : await
+        // 1. Return ? ResolveBinding(StringValue of Identifier).
+        try executable.addInstructionWithConstant(.resolve_binding, Value.from(self.identifier));
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("IdentifierReference", writer, indentation);
+        try printString(self.identifier, writer, indentation + 1);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-Identifier
+const Identifier = []const u8;
+
 /// https://tc39.es/ecma262/#prod-PrimaryExpression
 pub const PrimaryExpression = union(enum) {
     const Self = @This();
 
     this,
+    identifier_reference: IdentifierReference,
     literal: Literal,
 
     pub fn generateBytecode(self: Self, executable: *Executable) !void {
@@ -32,6 +58,9 @@ pub const PrimaryExpression = union(enum) {
                 try executable.addInstruction(.resolve_this_binding);
             },
 
+            .identifier_reference => |identifier_reference| try identifier_reference.generateBytecode(
+                executable,
+            ),
             .literal => |literal| try literal.generateBytecode(executable),
         }
     }
@@ -40,6 +69,10 @@ pub const PrimaryExpression = union(enum) {
         // Omit printing 'PrimaryExpression' here, it's implied and only adds nesting.
         switch (self) {
             .this => try printString("this", writer, indentation),
+            .identifier_reference => |identifier_reference| try identifier_reference.print(
+                writer,
+                indentation,
+            ),
             .literal => |literal| try literal.print(writer, indentation),
         }
     }

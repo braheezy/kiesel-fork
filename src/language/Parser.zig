@@ -105,12 +105,22 @@ fn acceptOrInsertSemicolon(self: *Self) !void {
     return error.UnexpectedToken;
 }
 
+fn acceptIdentifierReference(self: *Self) !ast.IdentifierReference {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.is(.identifier));
+    return .{ .identifier = token.text };
+}
+
 fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
     if (self.core.accept(RuleSet.is(.this))) |_|
         return .this
+    else |_| if (self.acceptIdentifierReference()) |identifier_reference|
+        return .{ .identifier_reference = identifier_reference }
     else |_| if (self.acceptLiteral()) |literal|
         return .{ .literal = literal }
     else |_|
