@@ -28,6 +28,19 @@ var_names: std.ArrayList([]const u8),
 /// [[OuterEnv]]
 outer_env: ?Environment,
 
+/// 9.1.1.4.1 HasBinding ( N )
+/// https://tc39.es/ecma262/#sec-global-environment-records-hasbinding-n
+pub fn hasBinding(self: Self, name: []const u8) !bool {
+    // 1. Let DclRec be envRec.[[DeclarativeRecord]].
+    // 2. If ! DclRec.HasBinding(N) is true, return true.
+    if (self.declarative_record.hasBinding(name))
+        return true;
+
+    // 3. Let ObjRec be envRec.[[ObjectRecord]].
+    // 4. Return ? ObjRec.HasBinding(N).
+    return self.object_record.hasBinding(name);
+}
+
 /// 9.1.1.4.8 HasThisBinding ( )
 /// https://tc39.es/ecma262/#sec-global-environment-records-hasthisbinding
 pub fn hasThisBinding(_: Self) bool {

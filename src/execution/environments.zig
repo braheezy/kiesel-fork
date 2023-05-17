@@ -32,10 +32,12 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn hasBinding(self: Self, name: []const u8) bool {
-        _ = self;
-        _ = name;
-        @compileError("Not implemented");
+    pub fn hasBinding(self: Self, name: []const u8) !bool {
+        return switch (self) {
+            .declarative_environment => |env| env.hasBinding(name),
+            .object_environment => |env| env.hasBinding(name),
+            .global_environment => |env| env.hasBinding(name),
+        };
     }
 
     pub fn createMutableBinding(self: Self, name: []const u8, deletable: bool) bool {
