@@ -1,6 +1,11 @@
 pub const Instruction = enum(u8) {
     const Self = @This();
 
+    /// Jump to another instruction by setting the instruction pointer.
+    jump,
+    /// Jump to one of two other instructions depending on whether the last value on the stack is
+    /// truthy or not.
+    jump_conditional,
     /// Load the result value and add it to the stack.
     load,
     /// Load a constant and add it to the stack.
@@ -16,6 +21,14 @@ pub const Instruction = enum(u8) {
     /// Non-exhaustive enum to allow arbitrary values as constant indices.
     _,
 
+    pub fn argumentCount(self: Self) u2 {
+        return switch (self) {
+            .jump_conditional => 2,
+            .jump, .load_constant, .resolve_binding, .store_constant => 1,
+            else => 0,
+        };
+    }
+
     pub fn hasConstantIndex(self: Self) bool {
         return switch (self) {
             .load_constant, .resolve_binding, .store_constant => true,
@@ -29,18 +42,19 @@ pub const InstructionIterator = struct {
 
     instructions: []const Instruction,
     index: usize = 0,
-    constant_index: ?usize = null,
+    instruction_index: usize = 0,
+    instruction_args: [2]?usize = [_]?usize{ null, null },
 
     pub fn next(self: *Self) ?Instruction {
         if (self.index >= self.instructions.len)
             return null;
         const instruction = self.instructions[self.index];
+        self.instruction_index = self.index;
         self.index += 1;
-        if (instruction.hasConstantIndex()) {
-            self.constant_index = @enumToInt(self.instructions[self.index]);
+        self.instruction_args = [_]?usize{ null, null };
+        for (0..instruction.argumentCount()) |i| {
+            self.instruction_args[i] = @intCast(usize, @enumToInt(self.instructions[self.index]));
             self.index += 1;
-        } else {
-            self.constant_index = null;
         }
         return instruction;
     }

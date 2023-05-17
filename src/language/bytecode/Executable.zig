@@ -3,11 +3,11 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const ast = @import("../ast.zig");
-const instructions = @import("instructions.zig");
+const instructions_ = @import("instructions.zig");
 const types = @import("../../types.zig");
 
-const Instruction = instructions.Instruction;
-const InstructionIterator = instructions.InstructionIterator;
+const Instruction = instructions_.Instruction;
+const InstructionIterator = instructions_.InstructionIterator;
 const Value = types.Value;
 const sameValue = types.sameValue;
 
@@ -51,16 +51,51 @@ pub fn addInstructionWithConstant(
     ));
 }
 
+const JumpIndex = struct {
+    executable: *Self,
+    index: usize,
+
+    pub fn setTargetHere(self: JumpIndex) void {
+        const instructions = self.executable.instructions.items;
+        instructions[self.index] = @intToEnum(Instruction, instructions.len);
+    }
+};
+
+pub fn addJumpIndex(self: *Self) !JumpIndex {
+    try self.instructions.append(@intToEnum(Instruction, 0));
+    const index = self.instructions.items.len - 1;
+    return .{ .executable = self, .index = index };
+}
+
 pub fn print(self: Self, writer: anytype) !void {
     var iterator = InstructionIterator{ .instructions = self.instructions.items };
     while (iterator.next()) |instruction| {
-        if (iterator.constant_index) |constant_index| {
-            const value = self.constants.items[constant_index];
-            try writer.print("{s} {} [{pretty}]\n", .{ @tagName(instruction), constant_index, value });
-        } else {
-            try writer.print("{s}\n", .{@tagName(instruction)});
+        try writer.print("{}: ", .{iterator.instruction_index});
+        switch (instruction) {
+            .jump => try writer.print("{s} {}\n", .{
+                @tagName(instruction),
+                iterator.instruction_args[0].?,
+            }),
+            .jump_conditional => try writer.print(
+                "{s} {} {}\n",
+                .{
+                    @tagName(instruction),
+                    iterator.instruction_args[0].?,
+                    iterator.instruction_args[1].?,
+                },
+            ),
+            .load_constant, .resolve_binding, .store_constant => {
+                const constant_index = iterator.instruction_args[0].?;
+                const value = self.constants.items[constant_index];
+                try writer.print(
+                    "{s} {} [{pretty}]\n",
+                    .{ @tagName(instruction), constant_index, value },
+                );
+            },
+            else => try writer.print("{s}\n", .{@tagName(instruction)}),
         }
     }
+    try writer.print("{}: <end>\n", .{self.instructions.items.len});
 }
 
 pub fn optimize(self: *Self) !void {
@@ -70,8 +105,8 @@ pub fn optimize(self: *Self) !void {
 fn deduplicateConstants(self: *Self) !void {
     var deduplicated_constants = std.ArrayList(Value).init(self.allocator);
     var iterator = InstructionIterator{ .instructions = self.instructions.items };
-    while (iterator.next()) |_| if (iterator.constant_index) |constant_index| {
-        const value = self.constants.items[constant_index];
+    while (iterator.next()) |instruction| if (instruction.hasConstantIndex()) {
+        const value = self.constants.items[iterator.instruction_args[0].?];
         const deduplicated_index = for (deduplicated_constants.items, 0..) |other_value, index| {
             if (sameValue(value, other_value))
                 break index;

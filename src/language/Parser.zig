@@ -167,7 +167,7 @@ fn acceptExpression(self: *Self) ParserCore.AcceptError!ast.Expression {
         return error.UnexpectedToken;
 }
 
-fn acceptStatement(self: *Self) !*ast.Statement {
+fn acceptStatement(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!*ast.Statement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -179,6 +179,8 @@ fn acceptStatement(self: *Self) !*ast.Statement {
         statement.* = .empty_statement
     else |_| if (self.acceptExpressionStatement()) |expression_statement|
         statement.* = .{ .expression_statement = expression_statement }
+    else |_| if (self.acceptIfStatement()) |if_statement|
+        statement.* = .{ .if_statement = if_statement }
     else |_| if (self.core.accept(RuleSet.is(.debugger))) |_|
         statement.* = .debugger_statement
     else |_|
@@ -244,4 +246,24 @@ fn acceptExpressionStatement(self: *Self) !ast.ExpressionStatement {
     errdefer self.core.restoreState(state);
 
     return .{ .expression = try self.acceptExpression() };
+}
+
+fn acceptIfStatement(self: *Self) !ast.IfStatement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"if"));
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    const test_expression = try self.acceptExpression();
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    const consequent_statement = try self.acceptStatement();
+    const alternate_statement = if (self.core.accept(RuleSet.is(.@"else"))) |_|
+        try self.acceptStatement()
+    else |_|
+        null;
+    return .{
+        .test_expression = test_expression,
+        .consequent_statement = consequent_statement,
+        .alternate_statement = alternate_statement,
+    };
 }

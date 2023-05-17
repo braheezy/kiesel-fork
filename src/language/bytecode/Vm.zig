@@ -41,12 +41,23 @@ fn fetchInstruction(self: *Self, executable: Executable) ?Instruction {
 
 fn fetchConstant(self: *Self, executable: Executable) Value {
     const constants = executable.constants.items;
-    const index = @enumToInt(self.fetchInstruction(executable).?);
+    const index = self.fetchIndex(executable);
     return constants[index];
+}
+
+fn fetchIndex(self: *Self, executable: Executable) u8 {
+    return @enumToInt(self.fetchInstruction(executable).?);
 }
 
 pub fn run(self: *Self, executable: Executable) !?Value {
     while (self.fetchInstruction(executable)) |instruction| switch (instruction) {
+        .jump => self.ip = self.fetchIndex(executable),
+        .jump_conditional => {
+            const ip_consequent = self.fetchIndex(executable);
+            const ip_alternate = self.fetchIndex(executable);
+            const value = self.stack.pop();
+            self.ip = if (value.toBoolean()) ip_consequent else ip_alternate;
+        },
         .load => try self.stack.append(self.result.?),
         .load_constant => {
             const value = self.fetchConstant(executable);
