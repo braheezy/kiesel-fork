@@ -17,6 +17,7 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Value = types.Value;
 const addRestrictedFunctionProperties = builtins.addRestrictedFunctionProperties;
+const globalObjectProperties = builtins.globalObjectProperties;
 const newGlobalEnvironment = environments.newGlobalEnvironment;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -137,23 +138,15 @@ pub fn setDefaultGlobalBindings(self: *Self) !Object {
     const global = self.global_object;
 
     // 2. For each property of the Global Object specified in clause 19, do
-    for ([_]struct { []const u8, Value }{
-        .{ "Boolean", Value.from(try self.intrinsics.@"%Boolean%"()) },
-    }) |property| {
+    for (try globalObjectProperties(self)) |property| {
         // a. Let name be the String value of the property name.
         const name = PropertyKey.from(property[0]);
-        const value = property[1];
 
         // b. Let desc be the fully populated data Property Descriptor for the property, containing
         //    the specified attributes for the property. For properties listed in 19.2, 19.3, or
         //    19.4 the value of the [[Value]] attribute is the corresponding intrinsic object from
         //    realmRec.
-        const descriptor = PropertyDescriptor{
-            .value = value,
-            .writable = true,
-            .enumerable = false,
-            .configurable = true,
-        };
+        const descriptor = property[1];
 
         // c. Perform ? DefinePropertyOrThrow(global, name, desc).
         try global.definePropertyOrThrow(name, descriptor);
