@@ -13,8 +13,10 @@ const Environment = environments.Environment;
 const BigInt = types.BigInt;
 const ExecutionContext = @import("ExecutionContext.zig");
 const Realm = @import("Realm.zig");
+const Reference = types.Reference;
 const Symbol = types.Symbol;
 const Value = types.Value;
+const getIdentifierReference = environments.getIdentifierReference;
 
 const Self = @This();
 
@@ -187,6 +189,22 @@ pub fn getActiveScriptOrModule(self: Self) ?*ExecutionContext.ScriptOrModule {
     if (execution_context == null)
         return null;
     return execution_context.script_or_module;
+}
+
+/// 9.4.2 ResolveBinding ( name [ , env ] )
+/// https://tc39.es/ecma262/#sec-resolvebinding
+pub fn resolveBinding(self: *Self, name: []const u8, maybe_env: ?Environment) !Reference {
+    // 1. If env is not present or env is undefined, then
+    //     a. Set env to the running execution context's LexicalEnvironment.
+    // 2. Assert: env is an Environment Record.
+    const env = maybe_env orelse self.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+    // TODO: 3. If the source text matched by the syntactic production that is being evaluated is
+    //    contained in strict mode code, let strict be true; else let strict be false.
+    const strict = false;
+
+    // 4. Return ? GetIdentifierReference(env, name, strict).
+    return getIdentifierReference(env, name, strict);
 }
 
 /// 9.4.3 GetThisEnvironment ( )
