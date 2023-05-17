@@ -8,6 +8,7 @@ pub const GlobalEnvironment = environments.GlobalEnvironment;
 pub const ObjectEnvironment = environments.ObjectEnvironment;
 pub const PrivateEnvironment = environments.PrivateEnvironment;
 pub const Realm = @import("execution/Realm.zig");
+pub const getIdentifierReference = environments.getIdentifierReference;
 pub const newDeclarativeEnvironment = environments.newDeclarativeEnvironment;
 pub const newGlobalEnvironment = environments.newGlobalEnvironment;
 pub const newObjectEnvironment = environments.newObjectEnvironment;

@@ -8,6 +8,7 @@ const Allocator = std.mem.Allocator;
 const types = @import("../types.zig");
 
 const Object = types.Object;
+const Reference = types.Reference;
 const Value = types.Value;
 
 pub const DeclarativeEnvironment = @import("environments/DeclarativeEnvironment.zig");
@@ -109,6 +110,49 @@ pub const Environment = union(enum) {
         };
     }
 };
+
+/// 9.1.2.1 GetIdentifierReference ( env, name, strict )
+/// https://tc39.es/ecma262/#sec-getidentifierreference
+pub fn getIdentifierReference(maybe_env: ?Environment, name: []const u8, strict: bool) !Reference {
+    // 1. If env is null, then
+    if (maybe_env == null) {
+        // a. Return the Reference Record {
+        //      [[Base]]: unresolvable, [[ReferencedName]]: name, [[Strict]]: strict, [[ThisValue]]: empty
+        //    }.
+        return .{
+            .base = .unresolvable,
+            .referenced_name = .{ .string = name },
+            .strict = strict,
+            .this_value = null,
+        };
+    }
+
+    const env = maybe_env.?;
+
+    // 2. Let exists be ? env.HasBinding(name).
+    const exists = try env.hasBinding(name);
+
+    // 3. If exists is true, then
+    if (exists) {
+        // a. Return the Reference Record {
+        //      [[Base]]: env, [[ReferencedName]]: name, [[Strict]]: strict, [[ThisValue]]: empty
+        //    }.
+        return .{
+            .base = .{ .environment = env },
+            .referenced_name = .{ .string = name },
+            .strict = strict,
+            .this_value = null,
+        };
+    }
+    // 4. Else,
+    else {
+        // a. Let outer be env.[[OuterEnv]].
+        const outer = env.outerEnv();
+
+        // b. Return ? GetIdentifierReference(outer, name, strict).
+        return getIdentifierReference(outer, name, strict);
+    }
+}
 
 /// 9.1.2.2 NewDeclarativeEnvironment ( E )
 /// https://tc39.es/ecma262/#sec-newdeclarativeenvironment
