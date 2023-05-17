@@ -8,6 +8,7 @@ pub const Object = language.Object;
 pub const PreferredType = Value.PreferredType;
 pub const PropertyDescriptor = spec.PropertyDescriptor;
 pub const PropertyKey = Object.PropertyKey;
+pub const Reference = spec.Reference;
 pub const Symbol = language.Symbol;
 pub const Value = language.Value;
 pub const sameValue = language.sameValue;
