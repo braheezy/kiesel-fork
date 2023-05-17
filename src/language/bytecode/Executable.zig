@@ -75,14 +75,15 @@ fn deduplicateConstants(self: *Self) !void {
         const deduplicated_index = for (deduplicated_constants.items, 0..) |other_value, index| {
             if (sameValue(value, other_value))
                 break index;
-            if (value == .number and other_value == .number and
-                value.number.isNan() and other_value.number.isNan())
-                break index;
         } else null;
         if (deduplicated_index) |index| {
             self.instructions.items[iterator.index - 1] = @intToEnum(Instruction, index);
         } else {
             try deduplicated_constants.append(value);
+            self.instructions.items[iterator.index - 1] = @intToEnum(
+                Instruction,
+                deduplicated_constants.items.len - 1,
+            );
         }
     };
     self.constants.deinit();
