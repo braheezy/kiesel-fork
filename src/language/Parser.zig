@@ -105,6 +105,17 @@ fn acceptOrInsertSemicolon(self: *Self) !void {
     return error.UnexpectedToken;
 }
 
+fn acceptParenthesizedExpression(self: *Self) !ast.ParenthesizedExpression {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    const expression = try self.allocator.create(ast.Expression);
+    expression.* = try self.acceptExpression();
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    return .{ .expression = expression };
+}
+
 fn acceptIdentifierReference(self: *Self) !ast.IdentifierReference {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
@@ -123,6 +134,8 @@ fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
         return .{ .identifier_reference = identifier_reference }
     else |_| if (self.acceptLiteral()) |literal|
         return .{ .literal = literal }
+    else |_| if (self.acceptParenthesizedExpression()) |parenthesized_expression|
+        return .{ .parenthesized_expression = parenthesized_expression }
     else |_|
         return error.UnexpectedToken;
 }
@@ -144,7 +157,7 @@ fn acceptLiteral(self: *Self) !ast.Literal {
     }
 }
 
-fn acceptExpression(self: *Self) !ast.Expression {
+fn acceptExpression(self: *Self) ParserCore.AcceptError!ast.Expression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 

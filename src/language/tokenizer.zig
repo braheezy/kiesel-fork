@@ -2,6 +2,8 @@ const ptk = @import("ptk");
 const std = @import("std");
 
 const TokenType = enum {
+    @"(",
+    @")",
     @"{",
     @"}",
     comment,
@@ -18,6 +20,8 @@ const TokenType = enum {
 const Pattern = ptk.Pattern(TokenType);
 
 pub const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
+    Pattern.create(.@"(", ptk.matchers.literal("(")),
+    Pattern.create(.@")", ptk.matchers.literal(")")),
     Pattern.create(.@"{", ptk.matchers.literal("{")),
     Pattern.create(.@"}", ptk.matchers.literal("}")),
     Pattern.create(.comment, commentMatcher),

@@ -6,6 +6,8 @@ const types = @import("../types.zig");
 const Executable = bytecode.Executable;
 const Value = types.Value;
 
+const BytecodeError = error{ OutOfMemory, BytecodeGenerationFailed };
+
 fn printIndentation(writer: anytype, indentation: usize) !void {
     var i: usize = 0;
     while (i < indentation) : (i += 1)
@@ -16,6 +18,22 @@ fn printString(string: []const u8, writer: anytype, indentation: usize) !void {
     try printIndentation(writer, indentation);
     try writer.print("{s}\n", .{string});
 }
+
+/// https://tc39.es/ecma262/#prod-ParenthesizedExpression
+pub const ParenthesizedExpression = struct {
+    const Self = @This();
+
+    expression: *Expression,
+
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        try self.expression.generateBytecode(executable);
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("ParenthesizedExpression", writer, indentation);
+        try self.expression.print(writer, indentation + 1);
+    }
+};
 
 /// https://tc39.es/ecma262/#prod-IdentifierReference
 pub const IdentifierReference = struct {
@@ -49,8 +67,9 @@ pub const PrimaryExpression = union(enum) {
     this,
     identifier_reference: IdentifierReference,
     literal: Literal,
+    parenthesized_expression: ParenthesizedExpression,
 
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+    pub fn generateBytecode(self: Self, executable: *Executable) BytecodeError!void {
         switch (self) {
             // PrimaryExpression : this
             .this => {
@@ -62,10 +81,13 @@ pub const PrimaryExpression = union(enum) {
                 executable,
             ),
             .literal => |literal| try literal.generateBytecode(executable),
+            .parenthesized_expression => |parenthesized_expression| try parenthesized_expression.generateBytecode(
+                executable,
+            ),
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
         // Omit printing 'PrimaryExpression' here, it's implied and only adds nesting.
         switch (self) {
             .this => try printString("this", writer, indentation),
@@ -74,6 +96,10 @@ pub const PrimaryExpression = union(enum) {
                 indentation,
             ),
             .literal => |literal| try literal.print(writer, indentation),
+            .parenthesized_expression => |parenthesized_expression| try parenthesized_expression.print(
+                writer,
+                indentation,
+            ),
         }
     }
 };
@@ -252,7 +278,7 @@ pub const Block = struct {
 
     /// 14.2.2 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-block-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable) error{ OutOfMemory, BytecodeGenerationFailed }!void {
+    pub fn generateBytecode(self: Self, executable: *Executable) BytecodeError!void {
         // StatementList : StatementList StatementListItem
         // 1. Let sl be ? Evaluation of StatementList.
         // 2. Let s be Completion(Evaluation of StatementListItem).
