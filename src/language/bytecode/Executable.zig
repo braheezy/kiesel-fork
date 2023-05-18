@@ -33,9 +33,11 @@ pub fn deinit(self: Self) void {
 }
 
 pub fn addInstruction(self: *Self, instruction: Instruction) !void {
-    if (self.instructions.items.len >= std.math.maxInt(IndexType))
-        return error.BytecodeGenerationFailed;
     try self.instructions.append(instruction);
+}
+
+pub fn addConstant(self: *Self, constant: Value) !void {
+    try self.constants.append(constant);
 }
 
 pub fn addInstructionWithConstant(
@@ -45,10 +47,8 @@ pub fn addInstructionWithConstant(
 ) !void {
     std.debug.assert(instruction.hasConstantIndex());
     try self.addInstruction(instruction);
-    if (self.constants.items.len >= std.math.maxInt(IndexType))
-        return error.BytecodeGenerationFailed;
-    try self.constants.append(constant);
-    try self.addIndex(@intCast(IndexType, self.constants.items.len - 1));
+    try self.addConstant(constant);
+    try self.addIndex(self.constants.items.len - 1);
 }
 
 const JumpIndex = struct {
@@ -73,8 +73,10 @@ pub fn addJumpIndex(self: *Self) !JumpIndex {
     };
 }
 
-pub fn addIndex(self: *Self, index: IndexType) !void {
-    const bytes = std.mem.toBytes(index);
+pub fn addIndex(self: *Self, index: usize) !void {
+    if (index >= std.math.maxInt(IndexType))
+        return error.BytecodeGenerationFailed;
+    const bytes = std.mem.toBytes(@intCast(IndexType, index));
     try self.instructions.append(@intToEnum(Instruction, bytes[0]));
     try self.instructions.append(@intToEnum(Instruction, bytes[1]));
 }
