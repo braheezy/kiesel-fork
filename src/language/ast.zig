@@ -500,7 +500,8 @@ pub const WhileStatement = struct {
         // TODO: e. If LoopContinues(stmtResult, labelSet) is false, return ? UpdateEmpty(stmtResult, V).
 
         try executable.addInstruction(.jump);
-        try executable.addIndex(start_index);
+        const start_jump = try executable.addJumpIndex();
+        try start_jump.setTarget(start_index);
 
         // f. If stmtResult.[[Value]] is not empty, set V to stmtResult.[[Value]].
         // NOTE: This is done by the store/load sequence around each consequent execution.

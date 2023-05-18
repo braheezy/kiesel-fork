@@ -55,13 +55,18 @@ const JumpIndex = struct {
     executable: *Self,
     index: usize,
 
-    pub fn setTargetHere(self: JumpIndex) !void {
+    pub fn setTarget(self: JumpIndex, index: usize) !void {
         const instructions = self.executable.instructions.items;
-        if (instructions.len >= std.math.maxInt(IndexType))
+        if (index >= std.math.maxInt(IndexType))
             return error.BytecodeGenerationFailed;
-        const bytes = std.mem.toBytes(@intCast(IndexType, instructions.len));
+        const bytes = std.mem.toBytes(@intCast(IndexType, index));
         instructions[self.index] = @intToEnum(Instruction, bytes[0]);
         instructions[self.index + 1] = @intToEnum(Instruction, bytes[1]);
+    }
+
+    pub fn setTargetHere(self: JumpIndex) !void {
+        const instructions = self.executable.instructions.items;
+        try self.setTarget(instructions.len);
     }
 };
 
