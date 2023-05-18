@@ -16,6 +16,7 @@ const TokenType = enum {
     semicolon,
     this,
     true,
+    @"while",
     whitespace,
 };
 
@@ -37,6 +38,7 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
     Pattern.create(.semicolon, ptk.matchers.literal(";")),
     Pattern.create(.this, ptk.matchers.literal("this")),
     Pattern.create(.true, ptk.matchers.literal("true")),
+    Pattern.create(.@"while", ptk.matchers.literal("while")),
     Pattern.create(.whitespace, whitespaceMatcher),
 });
 

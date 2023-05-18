@@ -192,6 +192,7 @@ pub const Statement = union(enum) {
     empty_statement,
     expression_statement: ExpressionStatement,
     if_statement: IfStatement,
+    breakable_statement: BreakableStatement,
     debugger_statement,
 
     pub fn generateBytecode(self: Self, executable: *Executable) BytecodeError!void {
@@ -209,6 +210,9 @@ pub const Statement = union(enum) {
                 try expression_statement.generateBytecode(executable);
             },
             .if_statement => |if_statement| try if_statement.generateBytecode(executable),
+            .breakable_statement => |breakable_statement| {
+                try breakable_statement.generateBytecode(executable);
+            },
 
             // DebuggerStatement : debugger ;
             .debugger_statement => {
@@ -234,6 +238,10 @@ pub const Statement = union(enum) {
                 indentation + 1,
             ),
             .if_statement => |if_statement| try if_statement.print(writer, indentation + 1),
+            .breakable_statement => |breakable_statement| try breakable_statement.print(
+                writer,
+                indentation + 1,
+            ),
             .debugger_statement => try printString("debugger", writer, indentation + 1),
         }
     }
@@ -254,6 +262,31 @@ pub const Declaration = union(enum) {
         _ = writer;
         _ = indentation;
         _ = self;
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-BreakableStatement
+pub const BreakableStatement = union(enum) {
+    const Self = @This();
+
+    iteration_statement: IterationStatement,
+
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        switch (self) {
+            .iteration_statement => |iteration_statement| try iteration_statement.generateBytecode(
+                executable,
+            ),
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'BreakableStatement' here, it's implied and only adds nesting.
+        switch (self) {
+            .iteration_statement => |iteration_statement| try iteration_statement.print(
+                writer,
+                indentation,
+            ),
+        }
     }
 };
 
@@ -401,6 +434,86 @@ pub const IfStatement = struct {
             try printString("alternate:", writer, indentation + 1);
             try alternate_statement.print(writer, indentation + 2);
         }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-IterationStatement
+pub const IterationStatement = union(enum) {
+    const Self = @This();
+
+    while_statement: WhileStatement,
+
+    /// 14.7.1.2 Runtime Semantics: LoopEvaluation
+    /// https://tc39.es/ecma262/#sec-runtime-semantics-loopevaluation
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        switch (self) {
+            // IterationStatement : WhileStatement
+            .while_statement => |while_statement| {
+                // 1. Return ? WhileLoopEvaluation of WhileStatement with argument labelSet.
+                try while_statement.generateBytecode(executable);
+            },
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'IterationStatement' here, it's implied and only adds nesting.
+        switch (self) {
+            .while_statement => |while_statement| try while_statement.print(writer, indentation),
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-WhileStatement
+pub const WhileStatement = struct {
+    const Self = @This();
+
+    test_expression: Expression,
+    consequent_statement: *Statement,
+
+    /// 14.7.3.2 Runtime Semantics: WhileLoopEvaluation
+    /// https://tc39.es/ecma262/#sec-runtime-semantics-whileloopevaluation
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        // WhileStatement : while ( Expression ) Statement
+        // 1. Let V be undefined.
+        try executable.addInstructionWithConstant(.load_constant, .undefined);
+
+        // 2. Repeat,
+        const start_index = executable.instructions.items.len;
+
+        // a. Let exprRef be ? Evaluation of Expression.
+        // b. Let exprValue be ? GetValue(exprRef).
+        try self.test_expression.generateBytecode(executable);
+
+        // c. If ToBoolean(exprValue) is false, return V.
+        try executable.addInstruction(.load);
+        try executable.addInstruction(.jump_conditional);
+        const consequent_jump = try executable.addJumpIndex();
+        const end_jump = try executable.addJumpIndex();
+
+        // d. Let stmtResult be Completion(Evaluation of Statement).
+        try consequent_jump.setTargetHere();
+        try executable.addInstruction(.store);
+        try self.consequent_statement.generateBytecode(executable);
+        try executable.addInstruction(.load);
+
+        // TODO: e. If LoopContinues(stmtResult, labelSet) is false, return ? UpdateEmpty(stmtResult, V).
+
+        try executable.addInstruction(.jump);
+        try executable.addIndex(start_index);
+
+        // f. If stmtResult.[[Value]] is not empty, set V to stmtResult.[[Value]].
+        // NOTE: This is done by the store/load sequence around each consequent execution.
+
+        try end_jump.setTargetHere();
+        try executable.addInstruction(.store);
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("WhileStatement", writer, indentation);
+        try printString("test:", writer, indentation + 1);
+        try self.test_expression.print(writer, indentation + 2);
+        try printString("consequent:", writer, indentation + 1);
+        try self.consequent_statement.print(writer, indentation + 2);
     }
 };
 

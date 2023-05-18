@@ -181,6 +181,8 @@ fn acceptStatement(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!*
         statement.* = .{ .expression_statement = expression_statement }
     else |_| if (self.acceptIfStatement()) |if_statement|
         statement.* = .{ .if_statement = if_statement }
+    else |_| if (self.acceptBreakableStatement()) |breakable_statement|
+        statement.* = .{ .breakable_statement = breakable_statement }
     else |_| if (self.core.accept(RuleSet.is(.debugger))) |_|
         statement.* = .debugger_statement
     else |_|
@@ -196,6 +198,16 @@ fn acceptDeclaration(self: *Self) !*ast.Declaration {
     _ = declaration;
 
     return error.UnexpectedToken;
+}
+
+fn acceptBreakableStatement(self: *Self) !ast.BreakableStatement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    if (self.acceptIterationStatement()) |iteration_statement|
+        return .{ .iteration_statement = iteration_statement }
+    else |_|
+        return error.UnexpectedToken;
 }
 
 fn acceptBlockStatement(self: *Self) !ast.BlockStatement {
@@ -265,5 +277,30 @@ fn acceptIfStatement(self: *Self) !ast.IfStatement {
         .test_expression = test_expression,
         .consequent_statement = consequent_statement,
         .alternate_statement = alternate_statement,
+    };
+}
+
+fn acceptIterationStatement(self: *Self) !ast.IterationStatement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    if (self.acceptWhileStatement()) |while_statement|
+        return .{ .while_statement = while_statement }
+    else |_|
+        return error.UnexpectedToken;
+}
+
+fn acceptWhileStatement(self: *Self) !ast.WhileStatement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"while"));
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    const test_expression = try self.acceptExpression();
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    const consequent_statement = try self.acceptStatement();
+    return .{
+        .test_expression = test_expression,
+        .consequent_statement = consequent_statement,
     };
 }
