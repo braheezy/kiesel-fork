@@ -26,23 +26,27 @@ pub fn build(b: *std.Build) void {
         }
     }
 
-    const gc = b.createModule(.{
+    const args_module = b.createModule(.{
+        .source_file = .{ .path = "vendor/zig-args/args.zig" },
+    });
+
+    const gc_module = b.createModule(.{
         .source_file = .{ .path = "vendor/zig-libgc/src/gc.zig" },
     });
 
-    const ptk = b.createModule(.{
+    const ptk_module = b.createModule(.{
         .source_file = .{ .path = "vendor/parser-toolkit/src/main.zig" },
     });
 
-    const kiesel = b.addModule("kiesel", .{
+    const kiesel_module = b.addModule("kiesel", .{
         .source_file = .{ .path = "src/main.zig" },
         .dependencies = &.{
             std.Build.ModuleDependency{
-                .module = gc,
+                .module = gc_module,
                 .name = "gc",
             },
             std.Build.ModuleDependency{
-                .module = ptk,
+                .module = ptk_module,
                 .name = "ptk",
             },
         },
@@ -56,7 +60,8 @@ pub fn build(b: *std.Build) void {
     });
     exe.linkLibrary(libgc);
     exe.addIncludePath("vendor/zig-libgc/vendor/bdwgc/include");
-    exe.addModule("kiesel", kiesel);
+    exe.addModule("kiesel", kiesel_module);
+    exe.addModule("args", args_module);
 
     b.installArtifact(exe);
 
@@ -77,7 +82,7 @@ pub fn build(b: *std.Build) void {
     });
     unit_tests.linkLibrary(libgc);
     unit_tests.addIncludePath("vendor/zig-libgc/vendor/bdwgc/include");
-    unit_tests.addModule("gc", gc);
+    unit_tests.addModule("gc", gc_module);
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
     const test_step = b.step("test", "Run unit tests");
