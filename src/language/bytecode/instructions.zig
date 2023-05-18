@@ -1,3 +1,8 @@
+const std = @import("std");
+
+const Executable = @import("Executable.zig");
+const IndexType = Executable.IndexType;
+
 pub const Instruction = enum(u8) {
     const Self = @This();
 
@@ -43,7 +48,7 @@ pub const InstructionIterator = struct {
     instructions: []const Instruction,
     index: usize = 0,
     instruction_index: usize = 0,
-    instruction_args: [2]?usize = [_]?usize{ null, null },
+    instruction_args: [2]?IndexType = [_]?IndexType{ null, null },
 
     pub fn next(self: *Self) ?Instruction {
         if (self.index >= self.instructions.len)
@@ -51,10 +56,13 @@ pub const InstructionIterator = struct {
         const instruction = self.instructions[self.index];
         self.instruction_index = self.index;
         self.index += 1;
-        self.instruction_args = [_]?usize{ null, null };
+        self.instruction_args = [_]?IndexType{ null, null };
         for (0..instruction.argumentCount()) |i| {
-            self.instruction_args[i] = @intCast(usize, @enumToInt(self.instructions[self.index]));
+            const b1 = @enumToInt(self.instructions[self.index]);
             self.index += 1;
+            const b2 = @enumToInt(self.instructions[self.index]);
+            self.index += 1;
+            self.instruction_args[i] = std.mem.bytesToValue(IndexType, &[_]u8{ b1, b2 });
         }
         return instruction;
     }

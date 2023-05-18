@@ -17,6 +17,8 @@ allocator: Allocator,
 instructions: std.ArrayList(Instruction),
 constants: std.ArrayList(Value),
 
+pub const IndexType = u16;
+
 pub fn init(allocator: Allocator) Self {
     return .{
         .allocator = allocator,
@@ -31,6 +33,8 @@ pub fn deinit(self: Self) void {
 }
 
 pub fn addInstruction(self: *Self, instruction: Instruction) !void {
+    if (self.instructions.items.len >= std.math.maxInt(IndexType))
+        return error.BytecodeGenerationFailed;
     try self.instructions.append(instruction);
 }
 
@@ -40,15 +44,11 @@ pub fn addInstructionWithConstant(
     constant: Value,
 ) !void {
     std.debug.assert(instruction.hasConstantIndex());
-    try self.instructions.append(instruction);
-    // TODO: Support more than 256 constants
-    if (self.constants.items.len >= std.math.maxInt(@typeInfo(Instruction).Enum.tag_type))
+    try self.addInstruction(instruction);
+    if (self.constants.items.len >= std.math.maxInt(IndexType))
         return error.BytecodeGenerationFailed;
     try self.constants.append(constant);
-    try self.instructions.append(@intToEnum(
-        Instruction,
-        self.constants.items.len - 1,
-    ));
+    try self.addIndex(@intCast(IndexType, self.constants.items.len - 1));
 }
 
 const JumpIndex = struct {
@@ -57,14 +57,24 @@ const JumpIndex = struct {
 
     pub fn setTargetHere(self: JumpIndex) void {
         const instructions = self.executable.instructions.items;
-        instructions[self.index] = @intToEnum(Instruction, instructions.len);
+        const bytes = std.mem.toBytes(@intCast(IndexType, instructions.len));
+        instructions[self.index] = @intToEnum(Instruction, bytes[0]);
+        instructions[self.index + 1] = @intToEnum(Instruction, bytes[1]);
     }
 };
 
 pub fn addJumpIndex(self: *Self) !JumpIndex {
-    try self.instructions.append(@intToEnum(Instruction, 0));
-    const index = self.instructions.items.len - 1;
-    return .{ .executable = self, .index = index };
+    try self.addIndex(0);
+    return .{
+        .executable = self,
+        .index = self.instructions.items.len - @sizeOf(IndexType),
+    };
+}
+
+pub fn addIndex(self: *Self, index: IndexType) !void {
+    const bytes = std.mem.toBytes(index);
+    try self.instructions.append(@intToEnum(Instruction, bytes[0]));
+    try self.instructions.append(@intToEnum(Instruction, bytes[1]));
 }
 
 pub fn print(self: Self, writer: anytype) !void {
@@ -107,19 +117,16 @@ fn deduplicateConstants(self: *Self) !void {
     var iterator = InstructionIterator{ .instructions = self.instructions.items };
     while (iterator.next()) |instruction| if (instruction.hasConstantIndex()) {
         const value = self.constants.items[iterator.instruction_args[0].?];
-        const deduplicated_index = for (deduplicated_constants.items, 0..) |other_value, index| {
+        const constant_index = for (deduplicated_constants.items, 0..) |other_value, index| {
             if (sameValue(value, other_value))
                 break index;
-        } else null;
-        if (deduplicated_index) |index| {
-            self.instructions.items[iterator.index - 1] = @intToEnum(Instruction, index);
-        } else {
+        } else blk: {
             try deduplicated_constants.append(value);
-            self.instructions.items[iterator.index - 1] = @intToEnum(
-                Instruction,
-                deduplicated_constants.items.len - 1,
-            );
-        }
+            break :blk deduplicated_constants.items.len - 1;
+        };
+        const bytes = std.mem.toBytes(@intCast(IndexType, constant_index));
+        self.instructions.items[iterator.instruction_index + 1] = @intToEnum(Instruction, bytes[0]);
+        self.instructions.items[iterator.instruction_index + 2] = @intToEnum(Instruction, bytes[1]);
     };
     self.constants.deinit();
     self.constants = deduplicated_constants;

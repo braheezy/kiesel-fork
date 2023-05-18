@@ -45,8 +45,10 @@ fn fetchConstant(self: *Self, executable: Executable) Value {
     return constants[index];
 }
 
-fn fetchIndex(self: *Self, executable: Executable) u8 {
-    return @enumToInt(self.fetchInstruction(executable).?);
+fn fetchIndex(self: *Self, executable: Executable) Executable.IndexType {
+    const b1 = @enumToInt(self.fetchInstruction(executable).?);
+    const b2 = @enumToInt(self.fetchInstruction(executable).?);
+    return std.mem.bytesToValue(Executable.IndexType, &[_]u8{ b1, b2 });
 }
 
 pub fn run(self: *Self, executable: Executable) !?Value {
