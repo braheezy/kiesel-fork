@@ -368,7 +368,7 @@ pub const IfStatement = struct {
         const alternate_jump = try executable.addJumpIndex();
 
         // a. Let stmtCompletion be Completion(Evaluation of the first Statement).
-        consequent_jump.setTargetHere();
+        try consequent_jump.setTargetHere();
         try executable.addInstructionWithConstant(.store_constant, .undefined);
         try self.consequent_statement.generateBytecode(executable);
 
@@ -378,13 +378,13 @@ pub const IfStatement = struct {
 
             // 4. Else,
             // a. Let stmtCompletion be Completion(Evaluation of the second Statement).
-            alternate_jump.setTargetHere();
+            try alternate_jump.setTargetHere();
             try executable.addInstructionWithConstant(.store_constant, .undefined);
             try alternate_statement.generateBytecode(executable);
 
-            end_jump.setTargetHere();
+            try end_jump.setTargetHere();
         } else {
-            alternate_jump.setTargetHere();
+            try alternate_jump.setTargetHere();
         }
 
         // 5. Return ? UpdateEmpty(stmtCompletion, undefined).
