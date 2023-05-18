@@ -22,6 +22,8 @@ const TokenType = enum {
 const Pattern = ptk.Pattern(TokenType);
 
 pub const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
+    // NOTE: Needs to come first or strings such as 'ifelse' turn into two tokens
+    Pattern.create(.identifier, identifierMatcher),
     Pattern.create(.@"(", ptk.matchers.literal("(")),
     Pattern.create(.@")", ptk.matchers.literal(")")),
     Pattern.create(.@"{", ptk.matchers.literal("{")),
@@ -36,8 +38,6 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
     Pattern.create(.this, ptk.matchers.literal("this")),
     Pattern.create(.true, ptk.matchers.literal("true")),
     Pattern.create(.whitespace, whitespaceMatcher),
-    // NOTE: Needs to come last to not swallow any of the above tokens
-    Pattern.create(.identifier, identifierMatcher),
 });
 
 /// 12.2 White Space
@@ -100,6 +100,17 @@ fn commentMatcher(str: []const u8) ?usize {
 /// 12.7 Names and Keywords
 /// https://tc39.es/ecma262/#sec-names-and-keywords
 fn identifierMatcher(str: []const u8) ?usize {
+    // Identifier : IdentifierName but not ReservedWord
+    const len = identifierNameMatcher(str) orelse return null;
+    const identifier_name = str[0..len];
+    for (reserved_words) |reserved_word| {
+        if (std.mem.eql(u8, identifier_name, reserved_word))
+            return null;
+    }
+    return len;
+}
+
+fn identifierNameMatcher(str: []const u8) ?usize {
     // TODO: Handle UnicodeIDStart, UnicodeIDContinue, UnicodeEscapeSequence
     const start_chars = "$_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
     const part_chars = start_chars ++ "0123456789";
@@ -110,3 +121,13 @@ fn identifierMatcher(str: []const u8) ?usize {
     }
     return str.len;
 }
+
+/// 12.7.2 Keywords and Reserved Words
+/// https://tc39.es/ecma262/#sec-keywords-and-reserved-words
+pub const reserved_words = [_][]const u8{
+    "await",   "break",  "case",     "catch",  "class",  "const",  "continue",   "debugger",
+    "default", "delete", "do",       "else",   "enum",   "export", "extends",    "false",
+    "finally", "for",    "function", "if",     "import", "in",     "instanceof", "new",
+    "null",    "return", "super",    "switch", "this",   "throw",  "true",       "try",
+    "typeof",  "var",    "void",     "while",  "with",   "yield",
+};
