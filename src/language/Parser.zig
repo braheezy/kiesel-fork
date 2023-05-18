@@ -284,10 +284,28 @@ fn acceptIterationStatement(self: *Self) !ast.IterationStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    if (self.acceptWhileStatement()) |while_statement|
+    if (self.acceptDoWhileStatement()) |do_while_statement|
+        return .{ .do_while_statement = do_while_statement }
+    else |_| if (self.acceptWhileStatement()) |while_statement|
         return .{ .while_statement = while_statement }
     else |_|
         return error.UnexpectedToken;
+}
+
+fn acceptDoWhileStatement(self: *Self) !ast.DoWhileStatement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.do));
+    const consequent_statement = try self.acceptStatement();
+    _ = try self.core.accept(RuleSet.is(.@"while"));
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    const test_expression = try self.acceptExpression();
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    return .{
+        .test_expression = test_expression,
+        .consequent_statement = consequent_statement,
+    };
 }
 
 fn acceptWhileStatement(self: *Self) !ast.WhileStatement {

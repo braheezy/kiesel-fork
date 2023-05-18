@@ -442,12 +442,18 @@ pub const IfStatement = struct {
 pub const IterationStatement = union(enum) {
     const Self = @This();
 
+    do_while_statement: DoWhileStatement,
     while_statement: WhileStatement,
 
     /// 14.7.1.2 Runtime Semantics: LoopEvaluation
     /// https://tc39.es/ecma262/#sec-runtime-semantics-loopevaluation
     pub fn generateBytecode(self: Self, executable: *Executable) !void {
         switch (self) {
+            // IterationStatement : DoWhileStatement
+            .do_while_statement => |do_while_statement| {
+                // 1. Return ? DoWhileLoopEvaluation of DoWhileStatement with argument labelSet.
+                try do_while_statement.generateBytecode(executable);
+            },
             // IterationStatement : WhileStatement
             .while_statement => |while_statement| {
                 // 1. Return ? WhileLoopEvaluation of WhileStatement with argument labelSet.
@@ -459,8 +465,61 @@ pub const IterationStatement = union(enum) {
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         // Omit printing 'IterationStatement' here, it's implied and only adds nesting.
         switch (self) {
+            .do_while_statement => |do_while_statement| try do_while_statement.print(writer, indentation),
             .while_statement => |while_statement| try while_statement.print(writer, indentation),
         }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-DoWhileStatement
+pub const DoWhileStatement = struct {
+    const Self = @This();
+
+    test_expression: Expression,
+    consequent_statement: *Statement,
+
+    /// 14.7.2.2 Runtime Semantics: DoWhileLoopEvaluation
+    /// https://tc39.es/ecma262/#sec-runtime-semantics-dowhileloopevaluation
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        // DoWhileStatement : do Statement while ( Expression ) ;
+        // 1. Let V be undefined.
+        try executable.addInstructionWithConstant(.load_constant, .undefined);
+
+        // 2. Repeat,
+        const start_index = executable.instructions.items.len;
+
+        // a. Let stmtResult be Completion(Evaluation of Statement).
+        try executable.addInstruction(.store);
+        try self.consequent_statement.generateBytecode(executable);
+        try executable.addInstruction(.load);
+
+        // TODO: b. If LoopContinues(stmtResult, labelSet) is false, return ? UpdateEmpty(stmtResult, V).
+
+        // c. If stmtResult.[[Value]] is not empty, set V to stmtResult.[[Value]].
+        // NOTE: This is done by the store/load sequence around each consequent execution.
+
+        // d. Let exprRef be ? Evaluation of Expression.
+        // e. Let exprValue be ? GetValue(exprRef).
+        try self.test_expression.generateBytecode(executable);
+
+        // f. If ToBoolean(exprValue) is false, return V.
+        try executable.addInstruction(.load);
+        try executable.addInstruction(.jump_conditional);
+        const consequent_jump = try executable.addJumpIndex();
+        const end_jump = try executable.addJumpIndex();
+
+        try consequent_jump.setTarget(start_index);
+
+        try end_jump.setTargetHere();
+        try executable.addInstruction(.store);
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("DoWhileStatement", writer, indentation);
+        try printString("consequent:", writer, indentation + 1);
+        try self.consequent_statement.print(writer, indentation + 2);
+        try printString("test:", writer, indentation + 1);
+        try self.test_expression.print(writer, indentation + 2);
     }
 };
 
