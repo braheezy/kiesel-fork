@@ -418,6 +418,7 @@ pub const IfStatement = struct {
             try end_jump.setTargetHere();
         } else {
             try alternate_jump.setTargetHere();
+            try executable.addInstructionWithConstant(.store_constant, .undefined);
         }
 
         // 5. Return ? UpdateEmpty(stmtCompletion, undefined).
