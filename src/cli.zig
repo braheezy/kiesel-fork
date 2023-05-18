@@ -1,3 +1,4 @@
+const args = @import("args");
 const std = @import("std");
 const kiesel = @import("kiesel");
 
@@ -50,36 +51,40 @@ fn run(
     };
 }
 
-pub fn main() !void {
+pub fn main() !u8 {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var args = try std.process.argsWithAllocator(allocator);
-    defer args.deinit();
+    const stdin = std.io.getStdIn().reader();
+    const stdout = std.io.getStdOut().writer();
+
+    const parsed_args = args.parseForCurrentProcess(struct {
+        @"print-ast": bool = false,
+        @"print-bytecode": bool = false,
+    }, allocator, .print) catch return 1;
+    defer parsed_args.deinit();
 
     var agent = try Agent.init(.{
         .debug = .{
-            .print_ast = true,
-            .print_bytecode = true,
+            .print_ast = parsed_args.options.@"print-ast",
+            .print_bytecode = parsed_args.options.@"print-bytecode",
         },
     });
     defer agent.deinit();
     try Realm.initializeHostDefinedRealm(&agent, .{});
     const realm = agent.currentRealm();
 
-    _ = args.skip();
-    if (args.next()) |path| {
+    if (parsed_args.positionals.len > 0) {
+        const path = parsed_args.positionals[0];
         const file = try std.fs.cwd().openFile(path, .{});
         const file_name = std.fs.path.basename(path);
         const file_size = (try file.stat()).size;
         var source_text = try allocator.alloc(u8, file_size);
         defer allocator.free(source_text);
         _ = try file.readAll(source_text);
-        _ = try run(allocator, realm, file_name, source_text);
+        _ = try run(allocator, realm, file_name, source_text) orelse return 1;
     } else {
-        const stdin = std.io.getStdIn().reader();
-        const stdout = std.io.getStdOut().writer();
         while (true) {
             try stdout.print("> ", .{});
             if (try stdin.readUntilDelimiterOrEofAlloc(
@@ -104,4 +109,5 @@ pub fn main() !void {
             else break;
         }
     }
+    return 0;
 }
