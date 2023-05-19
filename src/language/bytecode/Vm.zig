@@ -76,6 +76,12 @@ pub fn run(self: *Self, executable: Executable) !?Value {
             const value = self.fetchConstant(executable);
             self.result = value;
         },
+        .throw => {
+            const value = self.stack.pop();
+            self.agent.exception = value;
+            // TODO: This will need to change when try/catch are implemented.
+            return error.ExceptionThrown;
+        },
         _ => unreachable,
     };
     return self.result;

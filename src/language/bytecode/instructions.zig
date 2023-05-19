@@ -23,6 +23,8 @@ pub const Instruction = enum(u8) {
     store,
     /// Store a constant as the result value.
     store_constant,
+    /// Throw the last value from the stack as an exception.
+    throw,
     /// Non-exhaustive enum to allow arbitrary values as constant indices.
     _,
 

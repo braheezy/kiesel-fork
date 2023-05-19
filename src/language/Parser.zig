@@ -46,7 +46,9 @@ pub fn parse(
     };
 
     const statement_list = try parser.acceptStatementList();
-    if (parser.core.peek()) |maybe_next_token| {
+    if (parser.diagnostics.hasErrors()) {
+        return error.ParseError;
+    } else if (parser.core.peek()) |maybe_next_token| {
         if (maybe_next_token) |next_token| {
             try parser.diagnostics.emit(
                 tokenizer.current_location,
@@ -66,6 +68,27 @@ pub fn parse(
         return error.ParseError;
     }
     return ast.Script{ .statement_list = statement_list };
+}
+
+/// 5.1.5.8 [no LineTerminator here]
+/// https://tc39.es/ecma262/#sec-no-lineterminator-here
+fn noLineTerminatorHere(self: *Self) !void {
+    // Same as peek() but without immediately restoring the state; we need to look at what's
+    // between the current and next token.
+    const state = self.core.saveState();
+    defer self.core.restoreState(state);
+    if (try self.core.nextToken()) |next_token| {
+        const start_offset = state.offset;
+        const end_offset = self.core.tokenizer.offset - next_token.text.len;
+        const whitespace_and_comments = self.core.tokenizer.source[start_offset..end_offset];
+
+        for (line_terminators) |line_terminator| {
+            if (std.mem.indexOf(u8, whitespace_and_comments, line_terminator)) |_| {
+                try self.diagnostics.emit(state.location, .@"error", "Unexpected newline", .{});
+                return error.UnexpectedToken;
+            }
+        }
+    }
 }
 
 /// 12.10 Automatic Semicolon Insertion
@@ -97,8 +120,8 @@ fn acceptOrInsertSemicolon(self: *Self) !void {
     const whitespace_and_comments = self.core.tokenizer.source[start_offset..end_offset];
 
     // Next token is separated by a newline, insert semicolon
-    for (line_terminators) |needle| {
-        if (std.mem.indexOf(u8, whitespace_and_comments, needle)) |_|
+    for (line_terminators) |line_terminator| {
+        if (std.mem.indexOf(u8, whitespace_and_comments, line_terminator)) |_|
             return;
     }
 
@@ -183,6 +206,8 @@ fn acceptStatement(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!*
         statement.* = .{ .if_statement = if_statement }
     else |_| if (self.acceptBreakableStatement()) |breakable_statement|
         statement.* = .{ .breakable_statement = breakable_statement }
+    else |_| if (self.acceptThrowStatement()) |throw_statement|
+        statement.* = .{ .throw_statement = throw_statement }
     else |_| if (self.core.accept(RuleSet.is(.debugger))) |_|
         statement.* = .debugger_statement
     else |_|
@@ -321,4 +346,14 @@ fn acceptWhileStatement(self: *Self) !ast.WhileStatement {
         .test_expression = test_expression,
         .consequent_statement = consequent_statement,
     };
+}
+
+fn acceptThrowStatement(self: *Self) !ast.ThrowStatement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.throw));
+    try self.noLineTerminatorHere();
+    const expression = try self.acceptExpression();
+    return .{ .expression = expression };
 }

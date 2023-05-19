@@ -193,6 +193,7 @@ pub const Statement = union(enum) {
     expression_statement: ExpressionStatement,
     if_statement: IfStatement,
     breakable_statement: BreakableStatement,
+    throw_statement: ThrowStatement,
     debugger_statement,
 
     pub fn generateBytecode(self: Self, executable: *Executable) BytecodeError!void {
@@ -212,6 +213,9 @@ pub const Statement = union(enum) {
             .if_statement => |if_statement| try if_statement.generateBytecode(executable),
             .breakable_statement => |breakable_statement| {
                 try breakable_statement.generateBytecode(executable);
+            },
+            .throw_statement => |throw_statement| {
+                try throw_statement.generateBytecode(executable);
             },
 
             // DebuggerStatement : debugger ;
@@ -239,6 +243,10 @@ pub const Statement = union(enum) {
             ),
             .if_statement => |if_statement| try if_statement.print(writer, indentation + 1),
             .breakable_statement => |breakable_statement| try breakable_statement.print(
+                writer,
+                indentation + 1,
+            ),
+            .throw_statement => |throw_statement| try throw_statement.print(
                 writer,
                 indentation + 1,
             ),
@@ -575,6 +583,31 @@ pub const WhileStatement = struct {
         try self.test_expression.print(writer, indentation + 2);
         try printString("consequent:", writer, indentation + 1);
         try self.consequent_statement.print(writer, indentation + 2);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ThrowStatement
+pub const ThrowStatement = struct {
+    const Self = @This();
+
+    expression: Expression,
+
+    /// 14.14.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-throw-statement-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        // ThrowStatement : throw Expression ;
+        // 1. Let exprRef be ? Evaluation of Expression.
+        // 2. Let exprValue be ? GetValue(exprRef).
+        try self.expression.generateBytecode(executable);
+
+        // 3. Return ThrowCompletion(exprValue).
+        try executable.addInstruction(.load);
+        try executable.addInstruction(.throw);
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("ThrowStatement", writer, indentation);
+        try self.expression.print(writer, indentation + 1);
     }
 };
 
