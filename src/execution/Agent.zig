@@ -33,6 +33,7 @@ execution_context_stack: std.ArrayList(ExecutionContext),
 
 pub const Options = struct {
     debug: struct {
+        disable_gc: bool = false,
         print_ast: bool = false,
         print_bytecode: bool = false,
     } = .{},
@@ -69,6 +70,8 @@ pub fn init(options: Options) !Self {
         .well_known_symbols = undefined,
         .execution_context_stack = undefined,
     };
+    if (options.debug.disable_gc)
+        gc.disable();
     self.pre_allocated = .{
         .pow_2_63 = try BigInt.Value.initSet(self.gc_allocator, std.math.pow(u64, 2, 63)),
         .pow_2_64 = try BigInt.Value.initSet(self.gc_allocator, std.math.pow(u128, 2, 64)),
