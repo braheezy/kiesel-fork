@@ -1,6 +1,8 @@
 const std = @import("std");
 
 const ast = @import("ast.zig");
+const tokenizer = @import("tokenizer.zig");
+const startsWithLineTerminator = tokenizer.startsWithLineTerminator;
 
 /// 12.9.3 Numeric Literals
 /// https://tc39.es/ecma262/#sec-literals-numeric-literals
@@ -159,6 +161,95 @@ pub fn parseNumericLiteral(
     };
 }
 
+/// 12.9.4 String Literals
+/// https://tc39.es/ecma262/#sec-literals-string-literals
+pub fn parseStringLiteral(
+    str: []const u8,
+    consume: enum { partial, complete },
+) !ast.StringLiteral {
+    var state: enum {
+        start,
+        opening_quote,
+        closing_quote,
+        character,
+        backslash,
+        line_continuation_start,
+        line_continuation_middle,
+        line_continuation_end,
+    } = .start;
+    var opening_quote: ?u8 = null;
+    for (str, 0..) |c, i| switch (c) {
+        // TODO: Implement remaining escape sequence types
+        '"', '\'' => switch (state) {
+            .start => {
+                state = .opening_quote;
+                opening_quote = c;
+            },
+            .opening_quote, .character, .line_continuation_end => {
+                state = if (c == opening_quote) .closing_quote else .character;
+            },
+            .backslash => state = .character,
+            else => return error.InvalidStringLiteral,
+        },
+        '\\' => switch (state) {
+            .opening_quote, .character, .line_continuation_end => state = .backslash,
+            .backslash => state = .character,
+            else => return error.InvalidStringLiteral,
+        },
+        else => switch (state) {
+            .opening_quote, .character, .line_continuation_end => {
+                if (startsWithLineTerminator(str[i..]))
+                    return error.InvalidStringLiteral;
+                state = .character;
+            },
+            .backslash => {
+                if (startsWithLineTerminator(str[i..])) {
+                    state = if (i < str.len - 1 and (c == '\n' or (c == '\r' and str[i + 1] != '\n')))
+                        .line_continuation_end
+                    else
+                        .line_continuation_start;
+                } else {
+                    state = .character;
+                }
+            },
+            .line_continuation_start => {
+                switch (str[i - 1]) {
+                    '\xe2' => {
+                        if (c != '\x80')
+                            return error.InvalidStringLiteral;
+                        state = .line_continuation_middle;
+                    },
+                    '\r' => {
+                        state = if (c == '\n')
+                            .line_continuation_end
+                        else
+                            .character;
+                    },
+                    else => state = .character,
+                }
+            },
+            .line_continuation_middle => {
+                std.debug.assert(str[i - 1] == '\x80');
+                switch (c) {
+                    '\xa8', '\xa9' => state = .line_continuation_end,
+                    else => return error.InvalidStringLiteral,
+                }
+            },
+            .closing_quote => switch (consume) {
+                .partial => return .{ .text = str[0..i] },
+                .complete => return error.InvalidStringLiteral,
+            },
+            else => return error.InvalidStringLiteral,
+        },
+    };
+
+    return switch (state) {
+        // Valid end states after exhausting the input string
+        .closing_quote => .{ .text = str },
+        else => error.InvalidStringLiteral,
+    };
+}
+
 test "parseNumericLiteral" {
     for ([_]ast.NumericLiteral{
         .{ .text = "0", .system = .decimal, .production = .regular, .type = .number },
@@ -251,5 +342,41 @@ test "parseNumericLiteral" {
     ) |input| {
         const parse_error = parseNumericLiteral(input, .complete);
         try std.testing.expectError(error.InvalidNumericLiteral, parse_error);
+    }
+}
+
+test "parseStringLiteral" {
+    for ([_]ast.StringLiteral{
+        .{ .text = "''" },
+        .{ .text = "\"\"" },
+        .{ .text = "' '" },
+        .{ .text = "\" \"" },
+        .{ .text = "'foo'" },
+        .{ .text = "\"foo\"" },
+        .{ .text = "\" foo \"" },
+        .{ .text = "\"Here's a \\\"string\\\"\"" },
+        .{ .text = "'\\' \\\" \\\\ \\b \\f \\n \\r \\t \\v \\0'" },
+        .{ .text = "'\\\n'" },
+        .{ .text = "'\\\n \\\r \\\r\n \\\u{2028} \\\u{2029}'" },
+        .{ .text = "'\\a \\z \\1 \\123'" },
+    }) |input| {
+        const parsed = parseStringLiteral(input.text, .complete) catch unreachable;
+        try std.testing.expectEqualStrings(input.text, parsed.text);
+    }
+
+    for ([_][]const u8
+    // zig fmt: off
+    {
+        // Garbage input
+        "", "foo", "123",
+        // Invalid quotes
+        "'", "\"",  "'\"", "\"'", "''\"", "\"\"'", "“”",
+        // Invalid escapes
+        "'\\'", "'\\\\\\'",
+    }
+    // zig fmt: on
+    ) |input| {
+        const parse_error = parseStringLiteral(input, .complete);
+        try std.testing.expectError(error.InvalidStringLiteral, parse_error);
     }
 }

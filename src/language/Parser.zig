@@ -9,7 +9,9 @@ const tokenizer_ = @import("tokenizer.zig");
 
 const Tokenizer = tokenizer_.Tokenizer;
 const line_terminators = tokenizer_.line_terminators;
+const containsLineTerminator = tokenizer_.containsLineTerminator;
 const parseNumericLiteral = literals.parseNumericLiteral;
+const parseStringLiteral = literals.parseStringLiteral;
 
 const Self = @This();
 
@@ -84,11 +86,9 @@ fn noLineTerminatorHere(self: *Self) !void {
         const end_offset = self.core.tokenizer.offset - next_token.text.len;
         const whitespace_and_comments = self.core.tokenizer.source[start_offset..end_offset];
 
-        for (line_terminators) |line_terminator| {
-            if (std.mem.indexOf(u8, whitespace_and_comments, line_terminator)) |_| {
-                try self.diagnostics.emit(state.location, .@"error", "Unexpected newline", .{});
-                return error.UnexpectedToken;
-            }
+        if (containsLineTerminator(whitespace_and_comments)) {
+            try self.diagnostics.emit(state.location, .@"error", "Unexpected newline", .{});
+            return error.UnexpectedToken;
         }
     }
 }
@@ -122,10 +122,8 @@ fn acceptOrInsertSemicolon(self: *Self) !void {
     const whitespace_and_comments = self.core.tokenizer.source[start_offset..end_offset];
 
     // Next token is separated by a newline, insert semicolon
-    for (line_terminators) |line_terminator| {
-        if (std.mem.indexOf(u8, whitespace_and_comments, line_terminator)) |_|
-            return;
-    }
+    if (containsLineTerminator(whitespace_and_comments))
+        return;
 
     return error.UnexpectedToken;
 }
@@ -174,12 +172,14 @@ fn acceptLiteral(self: *Self) !ast.Literal {
         .true,
         .false,
         .numeric,
+        .string,
     }));
     switch (token.type) {
         .null => return .null,
         .true => return .{ .boolean = true },
         .false => return .{ .boolean = false },
         .numeric => return .{ .numeric = parseNumericLiteral(token.text, .complete) catch unreachable },
+        .string => return .{ .string = parseStringLiteral(token.text, .complete) catch unreachable },
         else => unreachable,
     }
 }

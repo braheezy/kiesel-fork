@@ -3,7 +3,9 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const bytecode = @import("bytecode.zig");
+const tokenizer = @import("tokenizer.zig");
 const types = @import("../types.zig");
+const line_terminators = tokenizer.line_terminators;
 
 const BigInt = types.BigInt;
 const Executable = bytecode.Executable;
@@ -114,7 +116,7 @@ pub const Literal = union(enum) {
     null,
     boolean: bool,
     numeric: NumericLiteral,
-    string,
+    string: StringLiteral,
 
     /// 13.2.3.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-literals-runtime-semantics-evaluation
@@ -141,9 +143,10 @@ pub const Literal = union(enum) {
             },
 
             // Literal : StringLiteral
-            .string => {
+            .string => |string_literal| {
                 // 1. Return the SV of StringLiteral as defined in 12.9.4.2.
-                unreachable;
+                const value = try string_literal.stringValue(executable.allocator);
+                try executable.addInstructionWithConstant(.store_constant, value);
             },
         }
     }
@@ -233,6 +236,48 @@ pub const NumericLiteral = struct {
                 return Value.from(big_int);
             },
         }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-StringLiteral
+pub const StringLiteral = struct {
+    const Self = @This();
+
+    text: []const u8,
+
+    /// 12.9.4.2 Static Semantics: SV
+    /// https://tc39.es/ecma262/#sec-static-semantics-sv
+    pub fn stringValue(self: Self, allocator: Allocator) !Value {
+        // TODO: Implement remaining escape sequence types
+        std.debug.assert(self.text.len >= 2);
+        var str = std.ArrayList(u8).init(allocator);
+        try str.ensureTotalCapacity(self.text.len - 2);
+        var i: usize = 1;
+        while (i <= self.text.len - 2) : (i += 1) {
+            const c = self.text[i];
+            if (c == '\\') {
+                for (line_terminators) |line_terminator| {
+                    if (std.mem.startsWith(u8, self.text[i + 1 ..], line_terminator)) {
+                        i += line_terminator.len;
+                        break;
+                    }
+                } else {
+                    const next_c = self.text[i + 1];
+                    i += 1;
+                    switch (next_c) {
+                        '0' => str.appendAssumeCapacity(0),
+                        'b' => str.appendAssumeCapacity(0x08),
+                        'f' => str.appendAssumeCapacity(0x0c),
+                        'n' => str.appendAssumeCapacity('\n'),
+                        'r' => str.appendAssumeCapacity('\r'),
+                        't' => str.appendAssumeCapacity('\t'),
+                        'v' => str.appendAssumeCapacity(0x0b),
+                        else => str.appendAssumeCapacity(next_c),
+                    }
+                }
+            } else str.appendAssumeCapacity(c);
+        }
+        return Value.from(str.items);
     }
 };
 

@@ -3,6 +3,7 @@ const std = @import("std");
 
 const literals = @import("literals.zig");
 const parseNumericLiteral = literals.parseNumericLiteral;
+const parseStringLiteral = literals.parseStringLiteral;
 
 const TokenType = enum {
     @"(",
@@ -19,6 +20,7 @@ const TokenType = enum {
     null,
     numeric,
     semicolon,
+    string,
     this,
     throw,
     true,
@@ -44,6 +46,7 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
     Pattern.create(.null, ptk.matchers.literal("null")),
     Pattern.create(.numeric, numericMatcher),
     Pattern.create(.semicolon, ptk.matchers.literal(";")),
+    Pattern.create(.string, stringMatcher),
     Pattern.create(.this, ptk.matchers.literal("this")),
     Pattern.create(.throw, ptk.matchers.literal("throw")),
     Pattern.create(.true, ptk.matchers.literal("true")),
@@ -85,6 +88,22 @@ pub const line_terminators = [_][]const u8{
     "\u{2028}", // <LS>
     "\u{2029}", // <PS>
 };
+
+pub fn startsWithLineTerminator(str: []const u8) bool {
+    for (line_terminators) |line_terminator| {
+        if (std.mem.startsWith(u8, str, line_terminator))
+            return true;
+    }
+    return false;
+}
+
+pub fn containsLineTerminator(str: []const u8) bool {
+    for (line_terminators) |line_terminator| {
+        if (std.mem.indexOf(u8, str, line_terminator)) |_|
+            return true;
+    }
+    return false;
+}
 
 fn whitespaceMatcher(str: []const u8) ?usize {
     var rest = str;
@@ -148,5 +167,13 @@ fn numericMatcher(str: []const u8) ?usize {
         return numeric_literal.text.len
     else |err| switch (err) {
         error.InvalidNumericLiteral => return null,
+    }
+}
+
+fn stringMatcher(str: []const u8) ?usize {
+    if (parseStringLiteral(str, .partial)) |string_literal|
+        return string_literal.text.len
+    else |err| switch (err) {
+        error.InvalidStringLiteral => return null,
     }
 }
