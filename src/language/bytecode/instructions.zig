@@ -38,7 +38,14 @@ pub const Instruction = enum(u8) {
 
     pub fn hasConstantIndex(self: Self) bool {
         return switch (self) {
-            .load_constant, .resolve_binding, .store_constant => true,
+            .load_constant, .store_constant => true,
+            else => false,
+        };
+    }
+
+    pub fn hasIdentifierIndex(self: Self) bool {
+        return switch (self) {
+            .resolve_binding => true,
             else => false,
         };
     }

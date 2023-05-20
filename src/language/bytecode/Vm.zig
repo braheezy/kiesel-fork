@@ -45,6 +45,12 @@ fn fetchConstant(self: *Self, executable: Executable) Value {
     return constants[index];
 }
 
+fn fetchIdentifier(self: *Self, executable: Executable) []const u8 {
+    const identifiers = executable.identifiers.items;
+    const index = self.fetchIndex(executable);
+    return identifiers[index];
+}
+
 fn fetchIndex(self: *Self, executable: Executable) Executable.IndexType {
     const b1 = @enumToInt(self.fetchInstruction(executable).?);
     const b2 = @enumToInt(self.fetchInstruction(executable).?);
@@ -66,7 +72,7 @@ pub fn run(self: *Self, executable: Executable) !?Value {
             try self.stack.append(value);
         },
         .resolve_binding => {
-            const name = self.fetchConstant(executable).string;
+            const name = self.fetchIdentifier(executable);
             const reference = try self.agent.resolveBinding(name, null);
             self.result = try reference.getValue(self.agent);
         },

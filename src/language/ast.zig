@@ -53,7 +53,7 @@ pub const IdentifierReference = struct {
         // IdentifierReference : yield
         // IdentifierReference : await
         // 1. Return ? ResolveBinding(StringValue of Identifier).
-        try executable.addInstructionWithConstant(.resolve_binding, Value.from(self.identifier));
+        try executable.addInstructionWithIdentifier(.resolve_binding, self.identifier);
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
