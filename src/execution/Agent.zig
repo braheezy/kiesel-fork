@@ -103,10 +103,8 @@ pub fn deinit(self: *Self) void {
 
 pub fn createSymbol(self: *Self, description: ?[]const u8) !Symbol {
     const id = blk: {
-        const ov = @addWithOverflow(self.symbol_id, 1);
-        if (ov[1] != 0)
-            return error.Overflow;
-        defer self.symbol_id = ov[0];
+        const next_symbol_id = try std.math.add(usize, self.symbol_id, 1);
+        defer self.symbol_id = next_symbol_id;
         break :blk self.symbol_id;
     };
     return .{ .id = id, .description = description };
