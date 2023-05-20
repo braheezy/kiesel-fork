@@ -178,18 +178,13 @@ pub fn getActiveScriptOrModule(self: Self) ?ExecutionContext.ScriptOrModule {
 
     // 2. Let ec be the topmost execution context on the execution context stack whose
     //    ScriptOrModule component is not null.
-    var execution_context: ?*ExecutionContext = null;
-    var i = self.execution_context_stack.items.len;
-    while (i > 0) : (i -= 1) {
-        execution_context = &self.execution_context_stack.items[i - 1];
-        if (execution_context.?.script_or_module != null)
-            break;
-    }
-
     // 3. If no such execution context exists, return null. Otherwise, return ec's ScriptOrModule.
-    if (execution_context == null)
-        return null;
-    return execution_context.?.script_or_module;
+    var it = std.mem.reverseIterator(self.execution_context_stack.items);
+    while (it.nextPtr()) |execution_context| {
+        if (execution_context.script_or_module) |script_or_module|
+            return script_or_module;
+    }
+    return null;
 }
 
 /// 9.4.2 ResolveBinding ( name [ , env ] )
