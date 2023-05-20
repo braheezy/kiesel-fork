@@ -1,8 +1,11 @@
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const bytecode = @import("bytecode.zig");
 const types = @import("../types.zig");
 
+const BigInt = types.BigInt;
 const Executable = bytecode.Executable;
 const Value = types.Value;
 
@@ -110,7 +113,7 @@ pub const Literal = union(enum) {
 
     null,
     boolean: bool,
-    numeric,
+    numeric: NumericLiteral,
     string,
 
     /// 13.2.3.1 Runtime Semantics: Evaluation
@@ -131,9 +134,10 @@ pub const Literal = union(enum) {
             },
 
             // Literal : NumericLiteral
-            .numeric => {
+            .numeric => |numeric_literal| {
                 // 1. Return the NumericValue of NumericLiteral as defined in 12.9.3.
-                unreachable;
+                const value = try numeric_literal.numericValue(executable.allocator);
+                try executable.addInstructionWithConstant(.store_constant, value);
             },
 
             // Literal : StringLiteral
@@ -155,6 +159,79 @@ pub const Literal = union(enum) {
             ),
             .numeric => unreachable,
             .string => unreachable,
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-NumericLiteral
+pub const NumericLiteral = struct {
+    const Self = @This();
+
+    pub const System = enum {
+        binary,
+        octal,
+        decimal,
+        hexadecimal,
+    };
+
+    pub const Production = enum {
+        /// Anything else
+        regular,
+        /// https://tc39.es/ecma262/#prod-LegacyOctalIntegerLiteral
+        legacy_octal_integer_literal,
+        /// https://tc39.es/ecma262/#prod-NonOctalDecimalIntegerLiteral
+        non_octal_decimal_integer_literal,
+    };
+
+    pub const Type = enum {
+        number,
+        big_int,
+    };
+
+    text: []const u8,
+    system: System,
+    production: Production,
+    type: Type,
+
+    /// 12.9.3.3 Static Semantics: NumericValue
+    /// https://tc39.es/ecma262/#sec-numericvalue
+    pub fn numericValue(self: Self, allocator: Allocator) !Value {
+        const base: u8 = switch (self.system) {
+            .binary => 2,
+            .octal => 8,
+            .decimal => 10,
+            .hexadecimal => 16,
+        };
+        const start: usize = if (self.production == .legacy_octal_integer_literal)
+            1 // Strip leading zero
+        else if (self.system != .decimal)
+            2 // Strip 0b/0o/0x prefix
+        else
+            0;
+        const end: usize = if (self.type == .big_int)
+            self.text.len - 1 // Strip trailing 'n'
+        else
+            self.text.len;
+        const str = self.text[start..end];
+        switch (self.type) {
+            .number => {
+                const number = switch (self.system) {
+                    .decimal => std.fmt.parseFloat(f64, str) catch unreachable,
+                    else => @intToFloat(
+                        f64,
+                        std.fmt.parseInt(i128, str, base) catch unreachable,
+                    ),
+                };
+                return Value.from(number);
+            },
+            .big_int => {
+                var big_int = BigInt{ .value = try BigInt.Value.init(allocator) };
+                big_int.value.setString(base, str) catch |err| switch (err) {
+                    error.InvalidBase, error.InvalidCharacter => unreachable,
+                    error.OutOfMemory => return error.OutOfMemory,
+                };
+                return Value.from(big_int);
+            },
         }
     }
 };

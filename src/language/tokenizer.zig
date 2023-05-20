@@ -1,6 +1,9 @@
 const ptk = @import("ptk");
 const std = @import("std");
 
+const literals = @import("literals.zig");
+const parseNumericLiteral = literals.parseNumericLiteral;
+
 const TokenType = enum {
     @"(",
     @")",
@@ -14,6 +17,7 @@ const TokenType = enum {
     identifier,
     @"if",
     null,
+    numeric,
     semicolon,
     this,
     throw,
@@ -38,6 +42,7 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
     Pattern.create(.false, ptk.matchers.literal("false")),
     Pattern.create(.@"if", ptk.matchers.literal("if")),
     Pattern.create(.null, ptk.matchers.literal("null")),
+    Pattern.create(.numeric, numericMatcher),
     Pattern.create(.semicolon, ptk.matchers.literal(";")),
     Pattern.create(.this, ptk.matchers.literal("this")),
     Pattern.create(.throw, ptk.matchers.literal("throw")),
@@ -137,3 +142,11 @@ pub const reserved_words = [_][]const u8{
     "null",    "return", "super",    "switch", "this",   "throw",  "true",       "try",
     "typeof",  "var",    "void",     "while",  "with",   "yield",
 };
+
+fn numericMatcher(str: []const u8) ?usize {
+    if (parseNumericLiteral(str, .partial)) |numeric_literal|
+        return numeric_literal.text.len
+    else |err| switch (err) {
+        error.InvalidNumericLiteral => return null,
+    }
+}

@@ -4,10 +4,12 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const ast = @import("ast.zig");
+const literals = @import("literals.zig");
 const tokenizer_ = @import("tokenizer.zig");
 
 const Tokenizer = tokenizer_.Tokenizer;
 const line_terminators = tokenizer_.line_terminators;
+const parseNumericLiteral = literals.parseNumericLiteral;
 
 const Self = @This();
 
@@ -168,14 +170,16 @@ fn acceptLiteral(self: *Self) !ast.Literal {
     errdefer self.core.restoreState(state);
 
     const token = try self.core.accept(RuleSet.oneOf(.{
+        .null,
         .true,
         .false,
-        .null,
+        .numeric,
     }));
     switch (token.type) {
+        .null => return .null,
         .true => return .{ .boolean = true },
         .false => return .{ .boolean = false },
-        .null => return .null,
+        .numeric => return .{ .numeric = parseNumericLiteral(token.text, .complete) catch unreachable },
         else => unreachable,
     }
 }
