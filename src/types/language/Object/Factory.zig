@@ -17,18 +17,16 @@ pub fn Factory(
 ) type {
     const has_fields = options.Fields != void;
 
-    // FIXME: `internal_methods: InternalMethods = .{}` would be nicer but causes a 'depends on
-    //        itself' error
     // FIXME: Can we dedupe this?
     const Args = if (has_fields) struct {
         fields: options.Fields,
         prototype: ?Object,
         extensible: bool = true,
-        internal_methods: ?InternalMethods = null,
+        internal_methods: InternalMethods = .{},
     } else struct {
         prototype: ?Object,
         extensible: bool = true,
-        internal_methods: ?InternalMethods = null,
+        internal_methods: InternalMethods = .{},
     };
 
     return struct {
@@ -47,7 +45,7 @@ pub fn Factory(
                     .agent = agent,
                     .prototype = args.prototype,
                     .extensible = args.extensible,
-                    .internal_methods = args.internal_methods orelse .{},
+                    .internal_methods = args.internal_methods,
                     .property_storage = Object.PropertyStorage.init(agent.gc_allocator),
                 },
             };
