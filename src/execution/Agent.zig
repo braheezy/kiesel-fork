@@ -171,7 +171,7 @@ pub fn currentRealm(self: Self) *Realm {
 
 /// 9.4.1 GetActiveScriptOrModule ( )
 /// https://tc39.es/ecma262/#sec-getactivescriptormodule
-pub fn getActiveScriptOrModule(self: Self) ?*ExecutionContext.ScriptOrModule {
+pub fn getActiveScriptOrModule(self: Self) ?ExecutionContext.ScriptOrModule {
     // 1. If the execution context stack is empty, return null.
     if (self.execution_context_stack.items.len == 0)
         return null;
@@ -181,15 +181,15 @@ pub fn getActiveScriptOrModule(self: Self) ?*ExecutionContext.ScriptOrModule {
     var execution_context: ?*ExecutionContext = null;
     var i = self.execution_context_stack.items.len;
     while (i > 0) : (i -= 1) {
-        execution_context = self.execution_context_stack.items[i - 1];
-        if (execution_context.script_or_module != null)
+        execution_context = &self.execution_context_stack.items[i - 1];
+        if (execution_context.?.script_or_module != null)
             break;
     }
 
     // 3. If no such execution context exists, return null. Otherwise, return ec's ScriptOrModule.
     if (execution_context == null)
         return null;
-    return execution_context.script_or_module;
+    return execution_context.?.script_or_module;
 }
 
 /// 9.4.2 ResolveBinding ( name [ , env ] )
