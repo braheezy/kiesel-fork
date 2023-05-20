@@ -76,7 +76,7 @@ const JumpIndex = struct {
     pub fn setTarget(self: JumpIndex, index: usize) !void {
         const instructions = self.executable.instructions.items;
         if (index >= std.math.maxInt(IndexType))
-            return error.BytecodeGenerationFailed;
+            return error.IndexOutOfRange;
         const bytes = std.mem.toBytes(@intCast(IndexType, index));
         instructions[self.index] = @intToEnum(Instruction, bytes[0]);
         instructions[self.index + 1] = @intToEnum(Instruction, bytes[1]);
@@ -98,7 +98,7 @@ pub fn addJumpIndex(self: *Self) !JumpIndex {
 
 pub fn addIndex(self: *Self, index: usize) !void {
     if (index >= std.math.maxInt(IndexType))
-        return error.BytecodeGenerationFailed;
+        return error.IndexOutOfRange;
     const bytes = std.mem.toBytes(@intCast(IndexType, index));
     try self.instructions.append(@intToEnum(Instruction, bytes[0]));
     try self.instructions.append(@intToEnum(Instruction, bytes[1]));

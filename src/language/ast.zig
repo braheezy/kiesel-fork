@@ -11,7 +11,7 @@ const BigInt = types.BigInt;
 const Executable = bytecode.Executable;
 const Value = types.Value;
 
-const BytecodeError = error{ OutOfMemory, BytecodeGenerationFailed };
+const BytecodeError = error{ OutOfMemory, IndexOutOfRange };
 
 fn printIndentation(writer: anytype, indentation: usize) !void {
     var i: usize = 0;

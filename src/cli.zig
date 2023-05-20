@@ -56,7 +56,7 @@ fn run(
         try script.ecmascript_code.print(stdout);
 
     return script.evaluate() catch |err| switch (err) {
-        error.BytecodeGenerationFailed => {
+        error.IndexOutOfRange => {
             try stderr.print("Bytecode generation failed\n", .{});
             return null;
         },
