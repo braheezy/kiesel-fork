@@ -50,15 +50,16 @@ const help =
     \\
 ;
 
+const stdin = std.io.getStdIn().reader();
+const stdout = std.io.getStdOut().writer();
+const stderr = std.io.getStdErr().writer();
+
 fn run(
     allocator: Allocator,
     realm: *Realm,
     file_name: []const u8,
     source_text: []const u8,
 ) !?Value {
-    const stdout = std.io.getStdOut().writer();
-    const stderr = std.io.getStdErr().writer();
-
     const agent = realm.agent;
 
     var diagnostics = Diagnostics.init(allocator);
@@ -95,9 +96,6 @@ pub fn main() !u8 {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
-
-    const stdin = std.io.getStdIn().reader();
-    const stdout = std.io.getStdOut().writer();
 
     const parsed_args = args.parseForCurrentProcess(struct {
         command: ?[]const u8 = null,
