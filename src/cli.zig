@@ -158,14 +158,13 @@ pub fn main() !u8 {
     try Realm.initializeHostDefinedRealm(&agent, .{});
     const realm = agent.currentRealm();
 
-    if (parsed_args.positionals.len > 0) {
-        const path = parsed_args.positionals[0];
-        const file = try std.fs.cwd().openFile(path, .{});
-        const file_name = std.fs.path.basename(path);
-        const file_size = (try file.stat()).size;
-        var source_text = try allocator.alloc(u8, file_size);
+    const path = if (parsed_args.positionals.len > 0) parsed_args.positionals[0] else null;
+    if (path != null) {
+        const file = try std.fs.cwd().openFile(path.?, .{});
+        defer file.close();
+        const file_name = std.fs.path.basename(path.?);
+        const source_text = try file.reader().readAllAlloc(allocator, std.math.maxInt(usize));
         defer allocator.free(source_text);
-        _ = try file.readAll(source_text);
         _ = try run(allocator, realm, file_name, source_text) orelse return 1;
     } else if (parsed_args.options.command) |source_text| {
         _ = try run(allocator, realm, "command", source_text) orelse return 1;
