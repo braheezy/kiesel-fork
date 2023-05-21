@@ -15,12 +15,22 @@ const Realm = kiesel.execution.Realm;
 const Script = kiesel.language.Script;
 const Value = kiesel.types.Value;
 
-const version =
+const bdwgc_version_string = std.fmt.comptimePrint("{}.{}.{}", .{
+    gc.GC_VERSION_MAJOR,
+    gc.GC_VERSION_MINOR,
+    gc.GC_VERSION_MICRO,
+});
+
+const version = std.fmt.comptimePrint(
     \\kiesel {[kiesel]s}
     \\bdwgc {[bdwgc]s}
     \\zig {[zig]s}
     \\
-;
+, .{
+    .kiesel = kiesel.version_string,
+    .bdwgc = bdwgc_version_string,
+    .zig = builtin.zig_version_string,
+});
 
 const help =
     \\Usage: kiesel [options] [args]
@@ -106,17 +116,7 @@ pub fn main() !u8 {
     defer parsed_args.deinit();
 
     if (parsed_args.options.version) {
-        const bdwgc_version_string = try std.fmt.allocPrint(allocator, "{}.{}.{}", .{
-            gc.GC_VERSION_MAJOR,
-            gc.GC_VERSION_MINOR,
-            gc.GC_VERSION_MICRO,
-        });
-        defer allocator.free(bdwgc_version_string);
-        try stdout.print(version, .{
-            .kiesel = kiesel.version_string,
-            .bdwgc = bdwgc_version_string,
-            .zig = builtin.zig_version_string,
-        });
+        try stdout.writeAll(version);
         return 0;
     } else if (parsed_args.options.help) {
         try stdout.writeAll(help);
