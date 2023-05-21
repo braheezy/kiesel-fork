@@ -250,8 +250,7 @@ pub const StringLiteral = struct {
     pub fn stringValue(self: Self, allocator: Allocator) !Value {
         // TODO: Implement remaining escape sequence types
         std.debug.assert(self.text.len >= 2);
-        var str = std.ArrayList(u8).init(allocator);
-        try str.ensureTotalCapacity(self.text.len - 2);
+        var str = try std.ArrayList(u8).initCapacity(allocator, self.text.len - 2);
         var i: usize = 1;
         while (i <= self.text.len - 2) : (i += 1) {
             const c = self.text[i];

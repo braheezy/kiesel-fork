@@ -647,8 +647,10 @@ pub fn ordinaryOwnPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
     const property_storage_hash_map = object.propertyStorage().hash_map;
 
     // 1. Let keys be a new empty List.
-    var keys = std.ArrayList(PropertyKey).init(agent.gc_allocator);
-    try keys.ensureTotalCapacity(property_storage_hash_map.count());
+    var keys = try std.ArrayList(PropertyKey).initCapacity(
+        agent.gc_allocator,
+        property_storage_hash_map.count(),
+    );
 
     // 2. For each own property key P of O such that P is an array index, in ascending numeric
     //    index order, do
