@@ -92,6 +92,32 @@ fn run(
     };
 }
 
+fn repl(allocator: Allocator, realm: *Realm) !void {
+    while (true) {
+        try stdout.print("> ", .{});
+        if (try stdin.readUntilDelimiterOrEofAlloc(
+            allocator,
+            '\n',
+            std.math.maxInt(usize),
+        )) |source_text| {
+            defer allocator.free(source_text);
+
+            // Directly show another prompt when spamming enter, whitespace is evaluated
+            // however (and will print 'undefined').
+            if (source_text.len == 0)
+                continue;
+
+            if (try run(allocator, realm, "repl", source_text)) |result| {
+                try stdout.print("{pretty}\n", .{result});
+            }
+            // Handled exception & printed something, carry on
+            else continue;
+        }
+        // ^C pressed, exit REPL
+        else break;
+    }
+}
+
 pub fn main() !u8 {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -144,29 +170,7 @@ pub fn main() !u8 {
     } else if (parsed_args.options.command) |source_text| {
         _ = try run(allocator, realm, "command", source_text) orelse return 1;
     } else {
-        while (true) {
-            try stdout.print("> ", .{});
-            if (try stdin.readUntilDelimiterOrEofAlloc(
-                allocator,
-                '\n',
-                std.math.maxInt(usize),
-            )) |source_text| {
-                defer allocator.free(source_text);
-
-                // Directly show another prompt when spamming enter, whitespace is evaluated
-                // however (and will print 'undefined').
-                if (source_text.len == 0)
-                    continue;
-
-                if (try run(allocator, realm, "repl", source_text)) |result| {
-                    try stdout.print("{pretty}\n", .{result});
-                }
-                // Handled exception & printed something, carry on
-                else continue;
-            }
-            // ^C pressed, exit REPL
-            else break;
-        }
+        try repl(allocator, realm);
     }
     return 0;
 }
