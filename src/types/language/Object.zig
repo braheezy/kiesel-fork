@@ -53,10 +53,9 @@ pub fn format(
 pub inline fn is(self: Self, comptime T: type) bool {
     inline for ([_]struct { type, Tag }{
         .{ builtins.Boolean, .boolean },
-    }) |entry| {
-        if (T == entry[0])
-            return if (self.tag) |tag| tag == entry[1] else false;
-    }
+    }) |entry| if (T == entry[0]) {
+        return if (self.tag) |tag| tag == entry[1] else false;
+    };
     @compileError("Object.is() called with unsupported type " ++ @typeName(T));
 }
 
@@ -109,8 +108,7 @@ pub fn ordinaryToPrimitive(self: Self, hint: PreferredType) !Value {
             const result = try method.callAssumeCallableNoArgs(Value.from(self));
 
             // ii. If result is not an Object, return result.
-            if (result != .object)
-                return result;
+            if (result != .object) return result;
         }
     }
 
@@ -178,8 +176,7 @@ pub fn createMethodProperty(self: Self, property_key: PropertyKey, value: Value)
     // 1. Assert: O is an ordinary, extensible object with no non-configurable properties.
     std.debug.assert(self.extensible().* and blk: {
         for (self.propertyStorage().hash_map.values()) |descriptor| {
-            if (descriptor.configurable.? == false)
-                break :blk false;
+            if (descriptor.configurable.? == false) break :blk false;
         }
         break :blk true;
     });
@@ -223,8 +220,7 @@ pub fn createNonEnumerableDataPropertyOrThrow(
     // 1. Assert: O is an ordinary, extensible object with no non-configurable properties.
     std.debug.assert(self.extensible().* and blk: {
         for (self.propertyStorage().hash_map.values()) |descriptor| {
-            if (descriptor.configurable.? == false)
-                break :blk false;
+            if (descriptor.configurable.? == false) break :blk false;
         }
         break :blk true;
     });
@@ -320,8 +316,7 @@ pub fn setIntegrityLevel(self: Self, level: IntegrityLevel) !bool {
     const status = try self.internalMethods().preventExtensions(self);
 
     // 2. If status is false, return false.
-    if (!status)
-        return false;
+    if (!status) false;
 
     // 3. Let keys be ? O.[[OwnPropertyKeys]]().
     const keys = try self.internalMethods().ownPropertyKeys(self);
@@ -390,8 +385,7 @@ pub fn testIntegrityLevel(self: Self, level: IntegrityLevel) !bool {
 
     // 2. If extensible is true, return false.
     // 3. NOTE: If the object is extensible, none of its properties are examined.
-    if (extensible_)
-        return false;
+    if (extensible_) return false;
 
     // 4. Let keys be ? O.[[OwnPropertyKeys]]().
     const keys = try self.internalMethods().ownPropertyKeys(self);
@@ -407,14 +401,12 @@ pub fn testIntegrityLevel(self: Self, level: IntegrityLevel) !bool {
         // b. If currentDesc is not undefined, then
         if (maybe_current_descriptor) |current_descriptor| {
             // i. If currentDesc.[[Configurable]] is true, return false.
-            if (current_descriptor.configurable.?)
-                return false;
+            if (current_descriptor.configurable.?) return false;
 
             // ii. If level is frozen and IsDataDescriptor(currentDesc) is true, then
             if (level == .frozen and current_descriptor.isDataDescriptor()) {
                 // 1. If currentDesc.[[Writable]] is true, return false.
-                if (current_descriptor.writable.?)
-                    return false;
+                if (current_descriptor.writable.?) return false;
             }
         }
     }

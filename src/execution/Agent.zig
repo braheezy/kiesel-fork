@@ -70,8 +70,7 @@ pub fn init(options: Options) !Self {
         .well_known_symbols = undefined,
         .execution_context_stack = undefined,
     };
-    if (options.debug.disable_gc)
-        gc.disable();
+    if (options.debug.disable_gc) gc.disable();
     self.pre_allocated = .{
         .pow_2_63 = try BigInt.Value.initSet(self.gc_allocator, std.math.pow(u64, 2, 63)),
         .pow_2_64 = try BigInt.Value.initSet(self.gc_allocator, std.math.pow(u128, 2, 64)),
@@ -173,8 +172,7 @@ pub fn currentRealm(self: Self) *Realm {
 /// https://tc39.es/ecma262/#sec-getactivescriptormodule
 pub fn getActiveScriptOrModule(self: Self) ?ExecutionContext.ScriptOrModule {
     // 1. If the execution context stack is empty, return null.
-    if (self.execution_context_stack.items.len == 0)
-        return null;
+    if (self.execution_context_stack.items.len == 0) return null;
 
     // 2. Let ec be the topmost execution context on the execution context stack whose
     //    ScriptOrModule component is not null.
@@ -215,8 +213,7 @@ pub fn getThisEnvironment(self: *Self) Environment {
         const exists = env.hasThisBinding();
 
         // b. If exists is true, return env.
-        if (exists)
-            return env;
+        if (exists) return env;
 
         // c. Let outer be env.[[OuterEnv]].
         const outer = env.outerEnv();

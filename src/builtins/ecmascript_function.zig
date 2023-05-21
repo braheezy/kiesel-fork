@@ -77,8 +77,7 @@ pub fn setFunctionName(
             const description = symbol.description;
 
             // b. If description is undefined, set name to the empty String.
-            if (description == null)
-                break :blk "";
+            if (description == null) break :blk "";
 
             // c. Else, set name to the string-concatenation of "[", description, and "]".
             break :blk try std.fmt.allocPrint(agent.gc_allocator, "[{s}]", .{description.?});

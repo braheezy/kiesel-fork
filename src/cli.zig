@@ -76,8 +76,7 @@ fn run(
         error.OutOfMemory => return error.OutOfMemory,
     };
 
-    if (agent.options.debug.print_ast)
-        try script.ecmascript_code.print(stdout);
+    if (agent.options.debug.print_ast) try script.ecmascript_code.print(stdout);
 
     return script.evaluate() catch |err| switch (err) {
         error.IndexOutOfRange => {
@@ -104,8 +103,7 @@ fn repl(allocator: Allocator, realm: *Realm) !void {
 
             // Directly show another prompt when spamming enter, whitespace is evaluated
             // however (and will print 'undefined').
-            if (source_text.len == 0)
-                continue;
+            if (source_text.len == 0) continue;
 
             if (try run(allocator, realm, "repl", source_text)) |result| {
                 try stdout.print("{pretty}\n", .{result});

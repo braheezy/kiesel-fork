@@ -123,16 +123,13 @@ pub const Number = union(enum) {
     /// https://tc39.es/ecma262/#sec-numeric-types-number-sameValue
     pub fn sameValue(x: Self, y: Self) bool {
         // 1. If x is NaN and y is NaN, return true.
-        if (x.isNan() and y.isNan())
-            return true;
+        if (x.isNan() and y.isNan()) return true;
 
         // 2. If x is +0𝔽 and y is -0𝔽, return false.
-        if (x.isPositiveZero() and y.isNegativeZero())
-            return false;
+        if (x.isPositiveZero() and y.isNegativeZero()) return false;
 
         // 3. If x is -0𝔽 and y is +0𝔽, return false.
-        if (x.isNegativeZero() and y.isPositiveZero())
-            return false;
+        if (x.isNegativeZero() and y.isPositiveZero()) return false;
 
         // 4. If x is y, return true.
         // 5. Return false.
@@ -143,8 +140,7 @@ pub const Number = union(enum) {
     /// https://tc39.es/ecma262/#sec-numeric-types-number-sameValueZero
     pub fn sameValueZero(x: Self, y: Self) bool {
         // 1. If x is NaN and y is NaN, return true.
-        if (x.isNan() and y.isNan())
-            return true;
+        if (x.isNan() and y.isNan()) return true;
 
         // 2. If x is +0𝔽 and y is -0𝔽, return true.
         // 3. If x is -0𝔽 and y is +0𝔽, return true.

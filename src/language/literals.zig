@@ -40,8 +40,7 @@ pub fn parseNumericLiteral(
             }
         },
         '2'...'7' => {
-            if (system == .binary)
-                return error.InvalidNumericLiteral;
+            if (system == .binary) return error.InvalidNumericLiteral;
             if (system == .decimal and production == .regular and state == .integer_digit and i > 0 and str[0] == '0') {
                 system = .octal;
                 production = .legacy_octal_integer_literal;
@@ -54,8 +53,7 @@ pub fn parseNumericLiteral(
             }
         },
         '8', '9' => {
-            if (system == .binary)
-                return error.InvalidNumericLiteral;
+            if (system == .binary) return error.InvalidNumericLiteral;
             if (system == .octal and
                 std.mem.startsWith(u8, str, "0o") or std.mem.startsWith(u8, str, "0O"))
                 return error.InvalidNumericLiteral;
@@ -127,8 +125,7 @@ pub fn parseNumericLiteral(
         },
         'n' => switch (state) {
             .integer_digit => {
-                if (production != .regular)
-                    return error.InvalidNumericLiteral;
+                if (production != .regular) return error.InvalidNumericLiteral;
                 state = .big_int_suffix;
                 @"type" = .big_int;
             },
@@ -146,8 +143,7 @@ pub fn parseNumericLiteral(
     };
 
     // Special case: fraction_period is allowed as an end state, but not on its own
-    if (state == .fraction_period and str.len == 1)
-        return error.InvalidNumericLiteral;
+    if (state == .fraction_period and str.len == 1) return error.InvalidNumericLiteral;
 
     return switch (state) {
         // Valid end states after exhausting the input string
@@ -198,8 +194,7 @@ pub fn parseStringLiteral(
         },
         else => switch (state) {
             .opening_quote, .character, .line_continuation_end => {
-                if (startsWithLineTerminator(str[i..]))
-                    return error.InvalidStringLiteral;
+                if (startsWithLineTerminator(str[i..])) return error.InvalidStringLiteral;
                 state = .character;
             },
             .backslash => {
@@ -215,8 +210,7 @@ pub fn parseStringLiteral(
             .line_continuation_start => {
                 switch (str[i - 1]) {
                     '\xe2' => {
-                        if (c != '\x80')
-                            return error.InvalidStringLiteral;
+                        if (c != '\x80') return error.InvalidStringLiteral;
                         state = .line_continuation_middle;
                     },
                     '\r' => {

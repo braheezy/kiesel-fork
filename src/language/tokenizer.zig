@@ -91,8 +91,7 @@ pub const line_terminators = [_][]const u8{
 
 pub fn startsWithLineTerminator(str: []const u8) bool {
     for (line_terminators) |line_terminator| {
-        if (std.mem.startsWith(u8, str, line_terminator))
-            return true;
+        if (std.mem.startsWith(u8, str, line_terminator)) return true;
     }
     return false;
 }
@@ -134,8 +133,7 @@ fn identifierMatcher(str: []const u8) ?usize {
     const len = identifierNameMatcher(str) orelse return null;
     const identifier_name = str[0..len];
     for (reserved_words) |reserved_word| {
-        if (std.mem.eql(u8, identifier_name, reserved_word))
-            return null;
+        if (std.mem.eql(u8, identifier_name, reserved_word)) return null;
     }
     return len;
 }

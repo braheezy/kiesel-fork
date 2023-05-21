@@ -32,12 +32,10 @@ pub fn hasBinding(self: Self, name: []const u8) !bool {
     const found_binding = try self.binding_object.hasProperty(PropertyKey.from(name));
 
     // 3. If foundBinding is false, return false.
-    if (!found_binding)
-        return false;
+    if (!found_binding) return false;
 
     // 4. If envRec.[[IsWithEnvironment]] is false, return true.
-    if (!self.is_with_environment)
-        return true;
+    if (!self.is_with_environment) return true;
 
     // 5. Let unscopables be ? Get(bindingObject, @@unscopables).
     const unscopables = try self.binding_object.get(
@@ -50,8 +48,7 @@ pub fn hasBinding(self: Self, name: []const u8) !bool {
         const blocked = (try unscopables.object.get(PropertyKey.from(name))).toBoolean();
 
         // b. If blocked is true, return false.
-        if (blocked)
-            return false;
+        if (blocked) return false;
     }
 
     // 7. Return true.
@@ -70,8 +67,7 @@ pub fn getBindingValue(self: Self, name: []const u8, strict: bool) !Value {
     // 3. If value is false, then
     if (!value) {
         // a. If S is false, return undefined; otherwise throw a ReferenceError exception.
-        if (!strict)
-            return .undefined;
+        if (!strict) return .undefined;
         return agent.throwException(
             .reference_error,
             try std.fmt.allocPrint(agent.gc_allocator, "'{s}' is not defined", .{name}),

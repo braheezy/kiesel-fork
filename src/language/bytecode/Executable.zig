@@ -75,8 +75,7 @@ const JumpIndex = struct {
 
     pub fn setTarget(self: JumpIndex, index: usize) !void {
         const instructions = self.executable.instructions.items;
-        if (index >= std.math.maxInt(IndexType))
-            return error.IndexOutOfRange;
+        if (index >= std.math.maxInt(IndexType)) return error.IndexOutOfRange;
         const bytes = std.mem.toBytes(@intCast(IndexType, index));
         instructions[self.index] = @intToEnum(Instruction, bytes[0]);
         instructions[self.index + 1] = @intToEnum(Instruction, bytes[1]);
@@ -97,8 +96,7 @@ pub fn addJumpIndex(self: *Self) !JumpIndex {
 }
 
 pub fn addIndex(self: *Self, index: usize) !void {
-    if (index >= std.math.maxInt(IndexType))
-        return error.IndexOutOfRange;
+    if (index >= std.math.maxInt(IndexType)) return error.IndexOutOfRange;
     const bytes = std.mem.toBytes(@intCast(IndexType, index));
     try self.instructions.append(@intToEnum(Instruction, bytes[0]));
     try self.instructions.append(@intToEnum(Instruction, bytes[1]));
@@ -160,8 +158,7 @@ fn deduplicate(
     while (iterator.next()) |instruction| if (@field(instruction, has_index_getter)()) {
         const item = items[iterator.instruction_args[0].?];
         const index = for (deduplicated_list.items, 0..) |other_item, index| {
-            if (eql(item, other_item))
-                break index;
+            if (eql(item, other_item)) break index;
         } else blk: {
             try deduplicated_list.append(item);
             break :blk deduplicated_list.items.len - 1;

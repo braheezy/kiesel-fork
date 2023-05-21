@@ -69,8 +69,7 @@ pub const Value = union(enum) {
         writer: anytype,
     ) !void {
         _ = options;
-        if (std.mem.eql(u8, fmt, "pretty"))
-            return prettyPrintValue(self, writer);
+        if (std.mem.eql(u8, fmt, "pretty")) return prettyPrintValue(self, writer);
         switch (self) {
             .undefined => try writer.writeAll("undefined"),
             .null => try writer.writeAll("null"),
@@ -161,8 +160,7 @@ pub const Value = union(enum) {
                 );
 
                 // v. If result is not an Object, return result.
-                if (result != .object)
-                    return result;
+                if (result != .object) return result;
 
                 // vi. Throw a TypeError exception.
                 return agent.throwException(
@@ -184,8 +182,7 @@ pub const Value = union(enum) {
     /// https://tc39.es/ecma262/#sec-toboolean
     pub fn toBoolean(self: Self) bool {
         // 1. If argument is a Boolean, return argument.
-        if (self == .boolean)
-            return self.boolean;
+        if (self == .boolean) return self.boolean;
 
         // 2. If argument is one of undefined, null, +0𝔽, -0𝔽, NaN, 0ℤ, or the empty String, return
         //    false.
@@ -216,8 +213,7 @@ pub const Value = union(enum) {
         const primitive_value = try self.toPrimitive(agent, .number);
 
         // 2. If primValue is a BigInt, return primValue.
-        if (primitive_value == .big_int)
-            return primitive_value.big_int;
+        if (primitive_value == .big_int) return primitive_value.big_int;
 
         // 3. Return ? ToNumber(primValue).
         return primitive_value.toNumber(agent);
@@ -272,16 +268,13 @@ pub const Value = union(enum) {
         const number = try self.toNumber(agent);
 
         // 2. If number is one of NaN, +0𝔽, or -0𝔽, return 0.
-        if (number.isNan() or number.asFloat() == 0)
-            return 0;
+        if (number.isNan() or number.asFloat() == 0) return 0;
 
         // 3. If number is +∞𝔽, return +∞.
-        if (number.isPositiveInf())
-            return std.math.inf(f64);
+        if (number.isPositiveInf()) return std.math.inf(f64);
 
         // 4. If number is -∞𝔽, return -∞.
-        if (number.isNegativeInf())
-            return -std.math.inf(f64);
+        if (number.isNegativeInf()) return -std.math.inf(f64);
 
         // 5. Return truncate(ℝ(number)).
         return number.truncate().asFloat();
@@ -291,15 +284,13 @@ pub const Value = union(enum) {
     /// https://tc39.es/ecma262/#sec-toint32
     pub fn toInt32(self: Self, agent: *Agent) !i32 {
         // OPTIMIZATION: We may already have an i32 :^)
-        if (self == .number and self.number == .i32)
-            return self.number.i32;
+        if (self == .number and self.number == .i32) return self.number.i32;
 
         // 1. Let number be ? ToNumber(argument).
         const number = try self.toNumber(agent);
 
         // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
-        if (!number.isFinite() or number.asFloat() == 0)
-            return 0;
+        if (!number.isFinite() or number.asFloat() == 0) return 0;
 
         // 3. Let int be truncate(ℝ(number)).
         const int = number.truncate().asFloat();
@@ -322,8 +313,7 @@ pub const Value = union(enum) {
         const number = try self.toNumber(agent);
 
         // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
-        if (!number.isFinite() or number.asFloat() == 0)
-            return 0;
+        if (!number.isFinite() or number.asFloat() == 0) return 0;
 
         // 3. Let int be truncate(ℝ(number)).
         const int = number.truncate().asFloat();
@@ -342,8 +332,7 @@ pub const Value = union(enum) {
         const number = try self.toNumber(agent);
 
         // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
-        if (!number.isFinite() or number.asFloat() == 0)
-            return 0;
+        if (!number.isFinite() or number.asFloat() == 0) return 0;
 
         // 3. Let int be truncate(ℝ(number)).
         const int = number.truncate().asFloat();
@@ -362,8 +351,7 @@ pub const Value = union(enum) {
         const number = try self.toNumber(agent);
 
         // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
-        if (!number.isFinite() or number.asFloat() == 0)
-            return 0;
+        if (!number.isFinite() or number.asFloat() == 0) return 0;
 
         // 3. Let int be truncate(ℝ(number)).
         const int = number.truncate().asFloat();
@@ -382,8 +370,7 @@ pub const Value = union(enum) {
         const number = try self.toNumber(agent);
 
         // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
-        if (!number.isFinite() or number.asFloat() == 0)
-            return 0;
+        if (!number.isFinite() or number.asFloat() == 0) return 0;
 
         // 3. Let int be truncate(ℝ(number)).
         const int = number.truncate().asFloat();
@@ -402,8 +389,7 @@ pub const Value = union(enum) {
         const number = try self.toNumber(agent);
 
         // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
-        if (!number.isFinite() or number.asFloat() == 0)
-            return 0;
+        if (!number.isFinite() or number.asFloat() == 0) return 0;
 
         // 3. Let int be truncate(ℝ(number)).
         const int = number.truncate().asFloat();
@@ -422,8 +408,7 @@ pub const Value = union(enum) {
         const number = try self.toNumber(agent);
 
         // 2. If number is NaN, return +0𝔽.
-        if (number.isNan())
-            return 0;
+        if (number.isNan()) return 0;
 
         // 3. If ℝ(number) ≤ 0, return +0𝔽.
         // 4. If ℝ(number) ≥ 255, return 255𝔽.
@@ -443,16 +428,13 @@ pub const Value = union(enum) {
         const f_int = @floatToInt(u8, f);
 
         // 6. If f + 0.5 < ℝ(number), return 𝔽(f + 1).
-        if (f + 0.5 < number.asFloat())
-            return f_int + 1;
+        if (f + 0.5 < number.asFloat()) return f_int + 1;
 
         // 7. If ℝ(number) < f + 0.5, return 𝔽(f).
-        if (number.asFloat() < f + 0.5)
-            return f_int;
+        if (number.asFloat() < f + 0.5) return f_int;
 
         // 8. If f is odd, return 𝔽(f + 1).
-        if (f_int % 2 != 0)
-            return f_int + 1;
+        if (f_int % 2 != 0) return f_int + 1;
 
         // 9. Return 𝔽(f).
         return f_int;
@@ -624,8 +606,7 @@ pub const Value = union(enum) {
         const length = try self.toIntegerOrInfinity(agent);
 
         // 2. If len ≤ 0, return +0𝔽.
-        if (length <= 0)
-            return 0;
+        if (length <= 0) return 0;
 
         // 3. Return 𝔽(min(len, 2^53 - 1)).
         return @floatToInt(u53, std.math.min(length, std.math.maxInt(u53)));
@@ -667,12 +648,10 @@ pub const Value = union(enum) {
     /// https://tc39.es/ecma262/#sec-isarray
     pub fn isArray(self: Self) !bool {
         // 1. If argument is not an Object, return false.
-        if (!self == .object)
-            return false;
+        if (!self == .object) return false;
 
         // TODO: 2. If argument is an Array exotic object, return true.
-        if (false)
-            return true;
+        if (false) return true;
 
         // TODO: 3. If argument is a Proxy exotic object, then
         if (false) {
@@ -689,12 +668,10 @@ pub const Value = union(enum) {
     /// https://tc39.es/ecma262/#sec-iscallable
     pub fn isCallable(self: Self) bool {
         // 1. If argument is not an Object, return false.
-        if (self != .object)
-            return false;
+        if (self != .object) return false;
 
         // 2. If argument has a [[Call]] internal method, return true.
-        if (self.object.internalMethods().call != null)
-            return true;
+        if (self.object.internalMethods().call != null) return true;
 
         // 3. Return false.
         return false;
@@ -704,12 +681,10 @@ pub const Value = union(enum) {
     /// https://tc39.es/ecma262/#sec-isconstructor
     pub fn isConstructor(self: Self) bool {
         // 1. If argument is not an Object, return false.
-        if (!self == .object)
-            return false;
+        if (!self == .object) return false;
 
         // 2. If argument has a [[Construct]] internal method, return true.
-        if (self.object.internalMethods().construct != null)
-            return true;
+        if (self.object.internalMethods().construct != null) return true;
 
         // 3. Return false.
         return false;
@@ -719,16 +694,13 @@ pub const Value = union(enum) {
     /// https://tc39.es/ecma262/#sec-isintegralnumber
     pub fn isIntegralNumber(self: Self) bool {
         // 1. If argument is not a Number, return false.
-        if (self != .number)
-            return false;
+        if (self != .number) return false;
 
         // 2. If argument is not finite, return false.
-        if (!self.number.isFinite())
-            return false;
+        if (!self.number.isFinite()) return false;
 
         // 3. If truncate(ℝ(argument)) ≠ ℝ(argument), return false.
-        if (self.number.truncate().asFloat() != self.number.asFloat())
-            return false;
+        if (self.number.truncate().asFloat() != self.number.asFloat()) return false;
 
         // 4. Return true.
         return true;
@@ -751,8 +723,7 @@ pub const Value = union(enum) {
         const function = try self.get(agent, property_key);
 
         // 2. If func is either undefined or null, return undefined.
-        if (function == .undefined or function == .null)
-            return null;
+        if (function == .undefined or function == .null) return null;
 
         // 3. If IsCallable(func) is false, throw a TypeError exception.
         if (!function.isCallable()) {
@@ -842,8 +813,7 @@ pub fn stringToBigInt(allocator: Allocator, string: []const u8) !?BigInt {
 /// https://tc39.es/ecma262/#sec-samevalue
 pub fn sameValue(x: Value, y: Value) bool {
     // 1. If Type(x) is not Type(y), return false.
-    if (@enumToInt(x) != @enumToInt(y))
-        return false;
+    if (@enumToInt(x) != @enumToInt(y)) return false;
 
     // 2. If x is a Number, then
     if (x == .number) {
@@ -859,8 +829,7 @@ pub fn sameValue(x: Value, y: Value) bool {
 /// https://tc39.es/ecma262/#sec-samevaluezero
 pub fn sameValueZero(x: Value, y: Value) bool {
     // 1. If Type(x) is not Type(y), return false.
-    if (@enumToInt(x) != @enumToInt(y))
-        return false;
+    if (@enumToInt(x) != @enumToInt(y)) return false;
 
     // 2. If x is a Number, then
     if (x == .number) {

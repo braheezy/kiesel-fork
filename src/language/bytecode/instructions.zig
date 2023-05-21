@@ -60,8 +60,7 @@ pub const InstructionIterator = struct {
     instruction_args: [2]?IndexType = [_]?IndexType{ null, null },
 
     pub fn next(self: *Self) ?Instruction {
-        if (self.index >= self.instructions.len)
-            return null;
+        if (self.index >= self.instructions.len) return null;
         const instruction = self.instructions[self.index];
         self.instruction_index = self.index;
         self.index += 1;

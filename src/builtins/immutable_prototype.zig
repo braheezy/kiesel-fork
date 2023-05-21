@@ -21,8 +21,7 @@ pub fn setImmutablePrototype(object: Object, prototype: ?Object) !bool {
     // 2. If SameValue(V, current) is true, return true.
     if (prototype) |prototype_object| {
         if (current) |current_object| {
-            if (current_object.ptr == prototype_object.ptr)
-                return true;
+            if (current_object.ptr == prototype_object.ptr) return true;
         }
     } else if (current == null) {
         return true;

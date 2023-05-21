@@ -32,8 +32,7 @@ pub fn deinit(self: Self) void {
 
 fn fetchInstruction(self: *Self, executable: Executable) ?Instruction {
     const instructions = executable.instructions.items;
-    if (self.ip >= instructions.len)
-        return null;
+    if (self.ip >= instructions.len) return null;
     defer self.ip += 1;
     return instructions[self.ip];
 }

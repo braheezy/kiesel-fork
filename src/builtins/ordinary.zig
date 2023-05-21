@@ -62,8 +62,7 @@ pub fn ordinarySetPrototypeOf(object: Object, prototype: ?Object) bool {
     // 2. If SameValue(V, current) is true, return true.
     if (prototype) |prototype_object| {
         if (current) |current_object| {
-            if (current_object.ptr == prototype_object.ptr)
-                return true;
+            if (current_object.ptr == prototype_object.ptr) return true;
         }
     } else if (current == null) {
         return true;
@@ -73,8 +72,7 @@ pub fn ordinarySetPrototypeOf(object: Object, prototype: ?Object) bool {
     const extensible = object.extensible().*;
 
     // 4. If extensible is false, return false.
-    if (!extensible)
-        return false;
+    if (!extensible) return false;
 
     // 5. Let p be V.
     var parent_prototype = prototype;
@@ -94,8 +92,7 @@ pub fn ordinarySetPrototypeOf(object: Object, prototype: ?Object) bool {
         // c. Else,
         // i. If p.[[GetPrototypeOf]] is not the ordinary object internal method defined in 10.1.1,
         //    set done to true.
-        if (parent_prototype_object.internalMethods().getPrototypeOf != getPrototypeOf)
-            break;
+        if (parent_prototype_object.internalMethods().getPrototypeOf != getPrototypeOf) break;
 
         // ii. Else, set p to p.[[Prototype]].
         parent_prototype = parent_prototype_object.prototype().*;
@@ -251,12 +248,10 @@ fn validateAndApplyPropertyDescriptor(
     // 2. If current is undefined, then
     if (maybe_current == null) {
         // a. If extensible is false, return false.
-        if (!extensible)
-            return false;
+        if (!extensible) return false;
 
         // b. If O is undefined, return true.
-        if (maybe_object == null)
-            return true;
+        if (maybe_object == null) return true;
 
         const object = maybe_object.?;
 
@@ -297,47 +292,44 @@ fn validateAndApplyPropertyDescriptor(
     std.debug.assert(current.isFullyPopulated());
 
     // 4. If Desc does not have any fields, return true.
-    if (!descriptor.hasFields())
-        return true;
+    if (!descriptor.hasFields()) return true;
 
     // 5. If current.[[Configurable]] is false, then
     if (!current.configurable.?) {
         // a. If Desc has a [[Configurable]] field and Desc.[[Configurable]] is true, return false.
-        if (descriptor.configurable) |configurable| if (configurable)
-            return false;
+        if (descriptor.configurable) |configurable| if (configurable) return false;
 
         // b. If Desc has an [[Enumerable]] field and SameValue(Desc.[[Enumerable]], current.[[Enumerable]])
         //    is false, return false.
-        if (descriptor.enumerable) |enumerable| if (enumerable != current.enumerable.?)
-            return false;
+        if (descriptor.enumerable) |enumerable| if (enumerable != current.enumerable.?) return false;
 
         // c. If IsGenericDescriptor(Desc) is false and SameValue(IsAccessorDescriptor(Desc), IsAccessorDescriptor(current))
         //    is false, return false.
-        if (!descriptor.isGenericDescriptor() and descriptor.isAccessorDescriptor() != current.isAccessorDescriptor())
-            return false;
+        if (!descriptor.isGenericDescriptor() and
+            descriptor.isAccessorDescriptor() != current.isAccessorDescriptor()) return false;
 
         // d. If IsAccessorDescriptor(current) is true, then
         if (current.isAccessorDescriptor()) {
             // i. If Desc has a [[Get]] field and SameValue(Desc.[[Get]], current.[[Get]]) is false,
             //    return false.
-            if (descriptor.get != null and current.get != null and descriptor.get.?.ptr != current.get.?.ptr)
-                return false;
+            if (descriptor.get != null and
+                current.get != null and
+                descriptor.get.?.ptr != current.get.?.ptr) return false;
 
             // ii. If Desc has a [[Set]] field and SameValue(Desc.[[Set]], current.[[Set]]) is
             //     false, return false.
-            if (descriptor.set != null and current.set != null and descriptor.set.?.ptr != current.set.?.ptr)
-                return false;
+            if (descriptor.set != null and
+                current.set != null and
+                descriptor.set.?.ptr != current.set.?.ptr) return false;
         }
         // e. Else if current.[[Writable]] is false, then
         else if (!current.writable.?) {
             // i. If Desc has a [[Writable]] field and Desc.[[Writable]] is true, return false.
-            if (descriptor.writable) |writable| if (writable)
-                return false;
+            if (descriptor.writable) |writable| if (writable) return false;
 
             // ii. If Desc has a [[Value]] field and SameValue(Desc.[[Value]], current.[[Value]])
             //     is false, return false.
-            if (descriptor.value) |value| if (!sameValue(value, current.value.?))
-                return false;
+            if (descriptor.value) |value| if (!sameValue(value, current.value.?)) return false;
         }
     }
 
@@ -420,8 +412,7 @@ pub fn ordinaryHasProperty(object: Object, property_key: PropertyKey) !bool {
     const has_own = try object.internalMethods().getOwnProperty(object, property_key);
 
     // 2. If hasOwn is not undefined, return true.
-    if (has_own != null)
-        return true;
+    if (has_own != null) return true;
 
     // 3. Let parent be ? O.[[GetPrototypeOf]]().
     const parent = try object.internalMethods().getPrototypeOf(object);
@@ -545,12 +536,10 @@ pub fn ordinarySetWithOwnDescriptor(
     // 2. If IsDataDescriptor(ownDesc) is true, then
     if (own_descriptor.isDataDescriptor()) {
         // a. If ownDesc.[[Writable]] is false, return false.
-        if (own_descriptor.writable == false)
-            return false;
+        if (own_descriptor.writable == false) return false;
 
         // b. If Receiver is not an Object, return false.
-        if (receiver_value != .object)
-            return false;
+        if (receiver_value != .object) return false;
         const receiver = receiver_value.object;
 
         // c. Let existingDescriptor be ? Receiver.[[GetOwnProperty]](P).
@@ -562,12 +551,10 @@ pub fn ordinarySetWithOwnDescriptor(
         // d. If existingDescriptor is not undefined, then
         if (maybe_existing_descriptor) |existing_descriptor| {
             // i. If IsAccessorDescriptor(existingDescriptor) is true, return false.
-            if (existing_descriptor.isAccessorDescriptor())
-                return false;
+            if (existing_descriptor.isAccessorDescriptor()) return false;
 
             // ii. If existingDescriptor.[[Writable]] is false, return false.
-            if (existing_descriptor.writable == false)
-                return false;
+            if (existing_descriptor.writable == false) return false;
 
             // iii. Let valueDesc be the PropertyDescriptor { [[Value]]: V }.
             const value_descriptor = PropertyDescriptor{ .value = value };
@@ -617,8 +604,7 @@ pub fn ordinaryDelete(object: Object, property_key: PropertyKey) !bool {
     const descriptor = try object.internalMethods().getOwnProperty(object, property_key);
 
     // 2. If desc is undefined, return true.
-    if (descriptor == null)
-        return true;
+    if (descriptor == null) return true;
 
     // 3. If desc.[[Configurable]] is true, then
     if (descriptor.?.configurable == true) {

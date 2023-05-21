@@ -34,8 +34,7 @@ outer_env: ?Environment,
 pub fn hasBinding(self: Self, name: []const u8) !bool {
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, return true.
-    if (self.declarative_record.hasBinding(name))
-        return true;
+    if (self.declarative_record.hasBinding(name)) return true;
 
     // 3. Let ObjRec be envRec.[[ObjectRecord]].
     // 4. Return ? ObjRec.HasBinding(N).

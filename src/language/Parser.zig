@@ -108,22 +108,19 @@ fn acceptOrInsertSemicolon(self: *Self) !void {
     const maybe_next_token = try self.core.nextToken();
 
     // Next token is EOF, insert semicolon
-    if (maybe_next_token == null)
-        return;
+    if (maybe_next_token == null) return;
 
     const next_token = maybe_next_token.?;
 
     // Next token is '}', insert semicolon
-    if (next_token.type == .@"}")
-        return;
+    if (next_token.type == .@"}") return;
 
     const start_offset = state.offset;
     const end_offset = self.core.tokenizer.offset - next_token.text.len;
     const whitespace_and_comments = self.core.tokenizer.source[start_offset..end_offset];
 
     // Next token is separated by a newline, insert semicolon
-    if (containsLineTerminator(whitespace_and_comments))
-        return;
+    if (containsLineTerminator(whitespace_and_comments)) return;
 
     return error.UnexpectedToken;
 }
