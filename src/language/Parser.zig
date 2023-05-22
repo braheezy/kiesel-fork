@@ -97,7 +97,7 @@ fn noLineTerminatorHere(self: *Self) !void {
 /// https://tc39.es/ecma262/#sec-automatic-semicolon-insertion
 fn acceptOrInsertSemicolon(self: *Self) !void {
     // Next token is ';', consume semicolon
-    if (self.core.accept(RuleSet.is(.semicolon))) |_|
+    if (self.core.accept(RuleSet.is(.@";"))) |_|
         return
     else |_| {}
 
@@ -233,7 +233,7 @@ fn acceptStatement(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!*
 
     if (self.acceptBlockStatement()) |block_statement|
         statement.* = .{ .block_statement = block_statement }
-    else |_| if (self.core.accept(RuleSet.is(.semicolon))) |_|
+    else |_| if (self.core.accept(RuleSet.is(.@";"))) |_|
         statement.* = .empty_statement
     else |_| if (self.acceptExpressionStatement()) |expression_statement|
         statement.* = .{ .expression_statement = expression_statement }

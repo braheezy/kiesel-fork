@@ -7,6 +7,7 @@ const parseStringLiteral = literals.parseStringLiteral;
 
 const TokenType = enum {
     @",",
+    @";",
     @"(",
     @")",
     @"{",
@@ -20,7 +21,6 @@ const TokenType = enum {
     @"if",
     null,
     numeric,
-    semicolon,
     string,
     this,
     throw,
@@ -35,6 +35,7 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
     // NOTE: Needs to come first or strings such as 'ifelse' turn into two tokens
     Pattern.create(.identifier, identifierMatcher),
     Pattern.create(.@",", ptk.matchers.literal(",")),
+    Pattern.create(.@";", ptk.matchers.literal(";")),
     Pattern.create(.@"(", ptk.matchers.literal("(")),
     Pattern.create(.@")", ptk.matchers.literal(")")),
     Pattern.create(.@"{", ptk.matchers.literal("{")),
@@ -47,7 +48,6 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
     Pattern.create(.@"if", ptk.matchers.literal("if")),
     Pattern.create(.null, ptk.matchers.literal("null")),
     Pattern.create(.numeric, numericMatcher),
-    Pattern.create(.semicolon, ptk.matchers.literal(";")),
     Pattern.create(.string, stringMatcher),
     Pattern.create(.this, ptk.matchers.literal("this")),
     Pattern.create(.throw, ptk.matchers.literal("throw")),
