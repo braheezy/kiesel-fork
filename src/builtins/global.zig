@@ -13,6 +13,8 @@ const Value = types.Value;
 const createBuiltinFunction = builtin_function.createBuiltinFunction;
 const performEval = @import("eval.zig").performEval;
 
+const Self = @This();
+
 const NameAndPropertyDescriptor = struct {
     []const u8,
     PropertyDescriptor,
@@ -55,36 +57,22 @@ pub fn globalObjectProperties(realm: *Realm) ![8]NameAndPropertyDescriptor {
     };
 }
 
+fn GlobalFunction(comptime options: struct { name: []const u8, length: u32 }) type {
+    return struct {
+        pub fn create(realm: *Realm) !Object {
+            return createBuiltinFunction(realm.agent, @field(Self, options.name), .{
+                .length = options.length,
+                .name = options.name,
+                .realm = realm,
+            });
+        }
+    };
+}
+
 pub const global_functions = struct {
-    pub const Eval = struct {
-        pub fn create(realm: *Realm) !Object {
-            return createBuiltinFunction(realm.agent, eval, .{
-                .length = 1,
-                .name = "eval",
-                .realm = realm,
-            });
-        }
-    };
-
-    pub const IsFinite = struct {
-        pub fn create(realm: *Realm) !Object {
-            return createBuiltinFunction(realm.agent, isFinite, .{
-                .length = 1,
-                .name = "isFinite",
-                .realm = realm,
-            });
-        }
-    };
-
-    pub const IsNaN = struct {
-        pub fn create(realm: *Realm) !Object {
-            return createBuiltinFunction(realm.agent, isNaN, .{
-                .length = 1,
-                .name = "isNaN",
-                .realm = realm,
-            });
-        }
-    };
+    pub const Eval = GlobalFunction(.{ .name = "eval", .length = 1 });
+    pub const IsFinite = GlobalFunction(.{ .name = "isFinite", .length = 1 });
+    pub const IsNaN = GlobalFunction(.{ .name = "isNaN", .length = 1 });
 };
 
 /// 19.2.1 eval ( x )
