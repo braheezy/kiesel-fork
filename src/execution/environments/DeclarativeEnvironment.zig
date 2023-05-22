@@ -5,6 +5,7 @@ const environments = @import("../environments.zig");
 const types = @import("../../types.zig");
 
 const Environment = environments.Environment;
+const Object = types.Object;
 const Value = types.Value;
 
 const Self = @This();
@@ -37,4 +38,11 @@ pub fn getBindingValue(self: Self, name: []const u8, strict: bool) Value {
 pub fn hasThisBinding(_: Self) bool {
     // 1. Return false.
     return false;
+}
+
+/// 9.1.1.1.10 WithBaseObject ( )
+/// https://tc39.es/ecma262/#sec-declarative-environment-records-withbaseobject
+pub fn withBaseObject(_: Self) ?Object {
+    // 1. Return undefined.
+    return null;
 }

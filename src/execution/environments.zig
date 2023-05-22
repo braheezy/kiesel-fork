@@ -98,8 +98,11 @@ pub const Environment = union(enum) {
     }
 
     pub fn withBaseObject(self: Self) ?Object {
-        _ = self;
-        @compileError("Not implemented");
+        return switch (self) {
+            .declarative_environment => |env| env.withBaseObject(),
+            .object_environment => |env| env.withBaseObject(),
+            .global_environment => |env| env.withBaseObject(),
+        };
     }
 
     pub fn getThisBinding(self: Self) !Value {

@@ -84,3 +84,13 @@ pub fn hasThisBinding(_: Self) bool {
     // 1. Return false.
     return false;
 }
+
+/// 9.1.1.2.10 WithBaseObject ( )
+/// https://tc39.es/ecma262/#sec-object-environment-records-withbaseobject
+pub fn withBaseObject(self: Self) ?Object {
+    // 1. If envRec.[[IsWithEnvironment]] is true, return envRec.[[BindingObject]].
+    if (self.is_with_environment) return self.binding_object;
+
+    // 2. Otherwise, return undefined.
+    return null;
+}

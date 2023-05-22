@@ -63,6 +63,13 @@ pub fn hasThisBinding(_: Self) bool {
     return true;
 }
 
+/// 9.1.1.4.10 WithBaseObject ( )
+/// https://tc39.es/ecma262/#sec-global-environment-records-withbaseobject
+pub fn withBaseObject(_: Self) ?Object {
+    // 1. Return undefined.
+    return null;
+}
+
 /// 9.1.1.4.11 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-global-environment-records-getthisbinding
 pub fn getThisBinding(self: Self) Object {
