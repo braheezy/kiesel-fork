@@ -523,35 +523,33 @@ pub const IfStatement = struct {
         try self.test_expression.generateBytecode(executable);
 
         // 2. Let exprValue be ToBoolean(? GetValue(exprRef)).
-        // 3. If exprValue is true, then
         try executable.addInstruction(.load);
         try executable.addInstruction(.jump_conditional);
         const consequent_jump = try executable.addJumpIndex();
         const alternate_jump = try executable.addJumpIndex();
 
-        // a. Let stmtCompletion be Completion(Evaluation of the first Statement).
+        // 3. If exprValue is true, then
         try consequent_jump.setTargetHere();
         try executable.addInstructionWithConstant(.store_constant, .undefined);
+
+        // a. Let stmtCompletion be Completion(Evaluation of the first Statement).
         try self.consequent_statement.generateBytecode(executable);
+        try executable.addInstruction(.jump);
+        const end_jump = try executable.addJumpIndex();
+
+        // 4. Else,
+        try alternate_jump.setTargetHere();
+        try executable.addInstructionWithConstant(.store_constant, .undefined);
 
         if (self.alternate_statement) |alternate_statement| {
-            try executable.addInstruction(.jump);
-            const end_jump = try executable.addJumpIndex();
-
-            // 4. Else,
             // a. Let stmtCompletion be Completion(Evaluation of the second Statement).
-            try alternate_jump.setTargetHere();
-            try executable.addInstructionWithConstant(.store_constant, .undefined);
             try alternate_statement.generateBytecode(executable);
-
-            try end_jump.setTargetHere();
-        } else {
-            try alternate_jump.setTargetHere();
-            try executable.addInstructionWithConstant(.store_constant, .undefined);
         }
 
         // 5. Return ? UpdateEmpty(stmtCompletion, undefined).
         // NOTE: This is handled by the store_constant before the consequent/alternate statements.
+
+        try end_jump.setTargetHere();
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
