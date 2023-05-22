@@ -15,16 +15,12 @@ const createBuiltinFunction = builtin_function.createBuiltinFunction;
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-prototype-object
 pub const FunctionPrototype = struct {
     pub fn create(realm: *Realm) !Object {
-        return createBuiltinFunction(
-            realm.agent,
-            behaviour,
-            .{
-                .length = 0,
-                .name = "",
-                .realm = realm,
-                .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-            },
-        );
+        return createBuiltinFunction(realm.agent, behaviour, .{
+            .length = 0,
+            .name = "",
+            .realm = realm,
+            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
+        });
     }
 
     fn behaviour(_: *Agent, _: Value, _: []const Value, _: ?Object) !Value {

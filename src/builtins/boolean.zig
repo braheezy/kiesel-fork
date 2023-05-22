@@ -20,17 +20,13 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// https://tc39.es/ecma262/#sec-properties-of-the-boolean-constructor
 pub const BooleanConstructor = struct {
     pub fn create(realm: *Realm) !Object {
-        const object = try createBuiltinFunction(
-            realm.agent,
-            behaviour,
-            .{
-                .length = 1,
-                .name = "Boolean",
-                .realm = realm,
-                .prototype = try realm.intrinsics.@"%Function.prototype%"(),
-                .is_constructor = true,
-            },
-        );
+        const object = try createBuiltinFunction(realm.agent, behaviour, .{
+            .length = 1,
+            .name = "Boolean",
+            .realm = realm,
+            .prototype = try realm.intrinsics.@"%Function.prototype%"(),
+            .is_constructor = true,
+        });
 
         // 20.3.2.1 Boolean.prototype
         // https://tc39.es/ecma262/#sec-boolean.prototype

@@ -31,11 +31,11 @@ pub fn defineBuiltinFunction(
     length: u32,
     realm: *Realm,
 ) !void {
-    const function = try createBuiltinFunction(
-        realm.agent,
-        behaviour,
-        .{ .length = length, .name = name, .realm = realm },
-    );
+    const function = try createBuiltinFunction(realm.agent, behaviour, .{
+        .length = length,
+        .name = name,
+        .realm = realm,
+    });
     try object.createMethodProperty(
         PropertyKey.from(name),
         Value.from(function),

@@ -16,11 +16,11 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 pub const ThrowTypeError = struct {
     pub fn create(realm: *Realm) !Object {
-        const object = try createBuiltinFunction(
-            realm.agent,
-            behaviour,
-            .{ .length = 0, .name = "", .realm = realm },
-        );
+        const object = try createBuiltinFunction(realm.agent, behaviour, .{
+            .length = 0,
+            .name = "",
+            .realm = realm,
+        });
 
         // The value of the [[Extensible]] internal slot of this function is false.
         object.data.extensible = false;
