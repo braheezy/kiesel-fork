@@ -160,6 +160,38 @@ fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
         return error.UnexpectedToken;
 }
 
+fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression) !ast.Expression {
+    if (self.acceptCallExpression(primary_expression)) |call_expression|
+        return .{ .call_expression = call_expression }
+    else |_|
+        return error.UnexpectedToken;
+}
+
+fn acceptCallExpression(self: *Self, primary_expression: ast.Expression) !ast.CallExpression {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const arguments = try self.acceptArguments();
+    // Defer heap allocation of expression until we know this is a CallExpression
+    const expression = try self.allocator.create(ast.Expression);
+    expression.* = primary_expression;
+    return .{ .expression = expression, .arguments = arguments };
+}
+
+fn acceptArguments(self: *Self) !ast.Arguments {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    var arguments = std.ArrayList(ast.Expression).init(self.allocator);
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    while (self.acceptExpression()) |argument| {
+        try arguments.append(argument);
+        _ = self.core.accept(RuleSet.is(.@",")) catch break;
+    } else |_| {}
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    return arguments.toOwnedSlice();
+}
+
 fn acceptLiteral(self: *Self) !ast.Literal {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
@@ -185,10 +217,12 @@ fn acceptExpression(self: *Self) ParserCore.AcceptError!ast.Expression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    if (self.acceptPrimaryExpression()) |primary_expression|
-        return .{ .primary_expression = primary_expression }
-    else |_|
-        return error.UnexpectedToken;
+    const primary_expression = try self.acceptPrimaryExpression();
+    var expression = ast.Expression{ .primary_expression = primary_expression };
+    while (self.acceptSecondaryExpression(expression)) |secondary_expression|
+        expression = secondary_expression
+    else |_| {}
+    return expression;
 }
 
 fn acceptStatement(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!*ast.Statement {

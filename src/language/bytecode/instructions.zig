@@ -6,6 +6,11 @@ const IndexType = Executable.IndexType;
 pub const Instruction = enum(u8) {
     const Self = @This();
 
+    /// Store EvaluateCall() as the result value.
+    /// This instruction has the number of argument values that need to be popped from the stack
+    /// (last to first) as an argument, the values on the stack afterwards are the this value and
+    /// lastly the function to call.
+    evaluate_call,
     /// Jump to another instruction by setting the instruction pointer.
     jump,
     /// Jump to one of two other instructions depending on whether the last value on the stack is
@@ -15,6 +20,8 @@ pub const Instruction = enum(u8) {
     load,
     /// Load a constant and add it to the stack.
     load_constant,
+    /// Determine the this value for an upcoming evaluate_call instruction and add it to the stack.
+    prepare_call,
     /// Store ResolveBinding() as the result value.
     resolve_binding,
     /// Store ResolveThisBinding() as the result value.
@@ -31,7 +38,13 @@ pub const Instruction = enum(u8) {
     pub fn argumentCount(self: Self) u2 {
         return switch (self) {
             .jump_conditional => 2,
-            .jump, .load_constant, .resolve_binding, .store_constant => 1,
+            .evaluate_call,
+            .jump,
+            .load_constant,
+            .prepare_call,
+            .resolve_binding,
+            .store_constant,
+            => 1,
             else => 0,
         };
     }

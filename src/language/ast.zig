@@ -24,11 +24,21 @@ fn printString(string: []const u8, writer: anytype, indentation: usize) !void {
     try writer.print("{s}\n", .{string});
 }
 
+const AnalyzeQuery = enum {
+    is_reference,
+};
+
 /// https://tc39.es/ecma262/#prod-ParenthesizedExpression
 pub const ParenthesizedExpression = struct {
     const Self = @This();
 
     expression: *Expression,
+
+    pub fn analyze(self: Self, query: AnalyzeQuery) bool {
+        switch (query) {
+            .is_reference => return self.expression.analyze(query),
+        }
+    }
 
     pub fn generateBytecode(self: Self, executable: *Executable) !void {
         try self.expression.generateBytecode(executable);
@@ -74,6 +84,18 @@ pub const PrimaryExpression = union(enum) {
     literal: Literal,
     parenthesized_expression: ParenthesizedExpression,
 
+    pub fn analyze(self: Self, query: AnalyzeQuery) bool {
+        switch (query) {
+            .is_reference => switch (self) {
+                .identifier_reference => return true,
+                .parenthesized_expression => |parenthesized_expression| {
+                    return parenthesized_expression.analyze(query);
+                },
+                .this, .literal => return false,
+            },
+        }
+    }
+
     pub fn generateBytecode(self: Self, executable: *Executable) BytecodeError!void {
         switch (self) {
             // PrimaryExpression : this
@@ -108,6 +130,53 @@ pub const PrimaryExpression = union(enum) {
         }
     }
 };
+
+/// https://tc39.es/ecma262/#prod-CallExpression
+pub const CallExpression = struct {
+    const Self = @This();
+
+    expression: *Expression,
+    arguments: Arguments,
+
+    /// 13.3.6.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-function-calls-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        // CallExpression : CallExpression Arguments
+        // 1. Let ref be ? Evaluation of CallExpression.
+        // 2. Let func be ? GetValue(ref).
+        try self.expression.generateBytecode(executable);
+        try executable.addInstruction(.load);
+
+        // TODO: 3. Let thisCall be this CallExpression.
+        // TODO: 4. Let tailCall be IsInTailPosition(thisCall).
+
+        const expression_is_reference = self.expression.analyze(.is_reference);
+        try executable.addInstruction(.prepare_call);
+        try executable.addIndex(@boolToInt(expression_is_reference));
+
+        for (self.arguments) |argument| {
+            try argument.generateBytecode(executable);
+            try executable.addInstruction(.load);
+        }
+
+        // 5. Return ? EvaluateCall(func, ref, Arguments, tailCall).
+        try executable.addInstruction(.evaluate_call);
+        try executable.addIndex(self.arguments.len);
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("CallExpression", writer, indentation);
+        try printString("expression", writer, indentation + 1);
+        try self.expression.print(writer, indentation + 2);
+        try printString("arguments", writer, indentation + 1);
+        for (self.arguments) |argument| {
+            try argument.print(writer, indentation + 2);
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-Arguments
+pub const Arguments = []const Expression;
 
 /// https://tc39.es/ecma262/#prod-Literal
 pub const Literal = union(enum) {
@@ -293,19 +362,36 @@ pub const Expression = union(enum) {
     const Self = @This();
 
     primary_expression: PrimaryExpression,
+    call_expression: CallExpression,
 
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+    pub fn analyze(self: Self, query: AnalyzeQuery) bool {
+        switch (query) {
+            .is_reference => switch (self) {
+                .primary_expression => |primary_expression| {
+                    return primary_expression.analyze(query);
+                },
+                .call_expression => return false,
+            },
+        }
+    }
+
+    pub fn generateBytecode(self: Self, executable: *Executable) BytecodeError!void {
         switch (self) {
             .primary_expression => |primary_expression| try primary_expression.generateBytecode(
                 executable,
             ),
+            .call_expression => |call_expression| try call_expression.generateBytecode(executable),
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
         try printString("Expression", writer, indentation);
         switch (self) {
             .primary_expression => |primary_expression| try primary_expression.print(
+                writer,
+                indentation + 1,
+            ),
+            .call_expression => |call_expression| try call_expression.print(
                 writer,
                 indentation + 1,
             ),

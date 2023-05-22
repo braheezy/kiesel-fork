@@ -107,7 +107,7 @@ pub fn print(self: Self, writer: anytype) !void {
     while (iterator.next()) |instruction| {
         try writer.print("{}: ", .{iterator.instruction_index});
         switch (instruction) {
-            .jump => try writer.print("{s} {}\n", .{
+            .evaluate_call, .jump, .prepare_call => try writer.print("{s} {}\n", .{
                 @tagName(instruction),
                 iterator.instruction_args[0].?,
             }),
