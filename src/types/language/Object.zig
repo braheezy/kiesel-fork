@@ -114,7 +114,7 @@ pub fn ordinaryToPrimitive(self: Self, hint: PreferredType) !Value {
 
     // 4. Throw a TypeError exception.
     const message = try std.fmt.allocPrint(
-        self.agent().allocator,
+        self.agent().gc_allocator,
         "Could not convert object to {s}",
         .{@tagName(hint)},
     );

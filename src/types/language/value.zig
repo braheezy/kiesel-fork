@@ -154,9 +154,9 @@ pub const Value = union(enum) {
                 };
 
                 // iv. Let result be ? Call(exoticToPrim, input, « hint »).
-                const result = try Value.fromObject(exotic_to_primitive).callAssumeCallable(
+                const result = try Value.from(exotic_to_primitive).callAssumeCallable(
                     self,
-                    &[_]Value{Value.fromString(hint)},
+                    &[_]Value{Value.from(hint)},
                 );
 
                 // v. If result is not an Object, return result.
