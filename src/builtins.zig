@@ -7,6 +7,7 @@ const object = @import("builtins/object.zig");
 const ordinary = @import("builtins/ordinary.zig");
 const throw_type_error = @import("builtins/throw_type_error.zig");
 
+pub const global_functions = global.global_functions;
 pub const ordinary_internal_methods = ordinary.ordinary_internal_methods;
 
 pub const BehaviourFn = builtin_function.BehaviourFn;

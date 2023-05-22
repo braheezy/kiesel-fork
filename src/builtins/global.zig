@@ -1,19 +1,23 @@
 //! 19 The Global Object
 //! https://tc39.es/ecma262/#sec-global-object
 
+const builtin_function = @import("builtin_function.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
+const Agent = execution.Agent;
+const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
+const createBuiltinFunction = builtin_function.createBuiltinFunction;
 
 const NameAndPropertyDescriptor = struct {
     []const u8,
     PropertyDescriptor,
 };
 
-pub fn globalObjectProperties(realm: *Realm) ![5]NameAndPropertyDescriptor {
+pub fn globalObjectProperties(realm: *Realm) ![6]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
     return [_]NameAndPropertyDescriptor{
         // 19.1.1 globalThis
@@ -32,8 +36,37 @@ pub fn globalObjectProperties(realm: *Realm) ![5]NameAndPropertyDescriptor {
         // https://tc39.es/ecma262/#sec-undefined
         .{ "undefined", .{ .value = .undefined, .writable = false, .enumerable = false, .configurable = false } },
 
+        // 19.2.2 isFinite ( number )
+        // https://tc39.es/ecma262/#sec-isfinite-number
+        .{ "isFinite", .{ .value = Value.from(try realm.intrinsics.@"%isFinite%"()), .writable = true, .enumerable = false, .configurable = true } },
+
         // 19.3.7 Boolean ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-boolean
         .{ "Boolean", .{ .value = Value.from(try realm.intrinsics.@"%Boolean%"()), .writable = true, .enumerable = false, .configurable = true } },
     };
+}
+
+pub const global_functions = struct {
+    pub const IsFinite = struct {
+        pub fn create(realm: *Realm) !Object {
+            return createBuiltinFunction(realm.agent, isFinite, .{
+                .length = 1,
+                .name = "isFinite",
+                .realm = realm,
+            });
+        }
+    };
+};
+
+/// 19.2.2 isFinite ( number )
+/// https://tc39.es/ecma262/#sec-isfinite-number
+fn isFinite(agent: *Agent, _: Value, arguments: []const Value, _: ?Object) !Value {
+    const number = if (arguments.len > 0) arguments[0] else .undefined;
+
+    // 1. Let num be ? ToNumber(number).
+    const num = try number.toNumber(agent);
+
+    // 2. If num is not finite, return false.
+    // 3. Otherwise, return true.
+    return Value.from(num.isFinite());
 }
