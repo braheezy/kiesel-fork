@@ -160,8 +160,16 @@ pub const Literal = union(enum) {
                 writer,
                 indentation + 1,
             ),
-            .numeric => unreachable,
-            .string => unreachable,
+            .numeric => |numeric_literal| try printString(
+                numeric_literal.text,
+                writer,
+                indentation + 1,
+            ),
+            .string => |string_literal| try printString(
+                string_literal.text,
+                writer,
+                indentation + 1,
+            ),
         }
     }
 };
