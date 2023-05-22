@@ -79,15 +79,14 @@ fn run(
     if (agent.options.debug.print_ast) try script.ecmascript_code.print(stdout);
 
     return script.evaluate() catch |err| switch (err) {
-        error.IndexOutOfRange => {
-            try stderr.print("Bytecode generation failed\n", .{});
+        error.OutOfMemory => {
+            try stderr.writeAll("Out of memory\n");
             return null;
         },
         error.ExceptionThrown => {
             try stderr.print("Uncaught exception: {pretty}\n", .{agent.exception.?});
             return null;
         },
-        else => return err,
     };
 }
 
