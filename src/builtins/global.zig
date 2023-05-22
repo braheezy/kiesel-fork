@@ -11,13 +11,14 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtin_function.createBuiltinFunction;
+const performEval = @import("eval.zig").performEval;
 
 const NameAndPropertyDescriptor = struct {
     []const u8,
     PropertyDescriptor,
 };
 
-pub fn globalObjectProperties(realm: *Realm) ![7]NameAndPropertyDescriptor {
+pub fn globalObjectProperties(realm: *Realm) ![8]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
     return [_]NameAndPropertyDescriptor{
         // 19.1.1 globalThis
@@ -36,6 +37,10 @@ pub fn globalObjectProperties(realm: *Realm) ![7]NameAndPropertyDescriptor {
         // https://tc39.es/ecma262/#sec-undefined
         .{ "undefined", .{ .value = .undefined, .writable = false, .enumerable = false, .configurable = false } },
 
+        // 19.2.1 eval ( x )
+        // https://tc39.es/ecma262/#sec-eval-x
+        .{ "eval", .{ .value = Value.from(try realm.intrinsics.@"%eval%"()), .writable = true, .enumerable = false, .configurable = true } },
+
         // 19.2.2 isFinite ( number )
         // https://tc39.es/ecma262/#sec-isfinite-number
         .{ "isFinite", .{ .value = Value.from(try realm.intrinsics.@"%isFinite%"()), .writable = true, .enumerable = false, .configurable = true } },
@@ -51,6 +56,16 @@ pub fn globalObjectProperties(realm: *Realm) ![7]NameAndPropertyDescriptor {
 }
 
 pub const global_functions = struct {
+    pub const Eval = struct {
+        pub fn create(realm: *Realm) !Object {
+            return createBuiltinFunction(realm.agent, eval, .{
+                .length = 1,
+                .name = "eval",
+                .realm = realm,
+            });
+        }
+    };
+
     pub const IsFinite = struct {
         pub fn create(realm: *Realm) !Object {
             return createBuiltinFunction(realm.agent, isFinite, .{
@@ -71,6 +86,15 @@ pub const global_functions = struct {
         }
     };
 };
+
+/// 19.2.1 eval ( x )
+/// https://tc39.es/ecma262/#sec-eval-x
+fn eval(agent: *Agent, _: Value, arguments: []const Value, _: ?Object) !Value {
+    const x = if (arguments.len > 0) arguments[0] else .undefined;
+
+    // 1. Return ? PerformEval(x, false, false).
+    return performEval(agent, x, false, false);
+}
 
 /// 19.2.2 isFinite ( number )
 /// https://tc39.es/ecma262/#sec-isfinite-number

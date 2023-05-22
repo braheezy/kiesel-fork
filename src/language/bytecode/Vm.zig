@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const instructions_ = @import("instructions.zig");
 const types = @import("../../types.zig");
@@ -9,6 +10,7 @@ const Executable = @import("Executable.zig");
 const Instruction = instructions_.Instruction;
 const Reference = types.Reference;
 const Value = types.Value;
+const performEval = builtins.performEval;
 
 const Self = @This();
 
@@ -16,9 +18,12 @@ agent: *Agent,
 ip: usize,
 stack: std.ArrayList(Value),
 result: ?Value,
-evaluate_call_context: struct {
+last_reference: ?Reference = null,
+evaluate_call_context: EvaluateCallContext,
+
+const EvaluateCallContext = struct {
     reference: ?Reference = null,
-},
+};
 
 pub fn init(agent: *Agent) !Self {
     var stack = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 32);
@@ -27,6 +32,7 @@ pub fn init(agent: *Agent) !Self {
         .ip = 0,
         .stack = stack,
         .result = null,
+        .last_reference = null,
         .evaluate_call_context = .{},
     };
 }
@@ -62,9 +68,9 @@ fn fetchIndex(self: *Self, executable: Executable) Executable.IndexType {
 
 /// 13.3.6.2 EvaluateCall ( func, ref, arguments, tailPosition )
 /// https://tc39.es/ecma262/#sec-evaluatecall
-fn evaluateCallGetThisValue(maybe_reference: ?Reference) Value {
+fn evaluateCallGetThisValue(ctx: EvaluateCallContext) Value {
     // 1. If ref is a Reference Record, then
-    if (maybe_reference) |reference| {
+    if (ctx.reference) |reference| {
         // a. If IsPropertyReference(ref) is true, then
         if (reference.isPropertyReference()) {
             // i. Let thisValue be GetThisValue(ref).
@@ -126,9 +132,28 @@ fn evaluateCall(
     return function.callAssumeCallable(this_value, arguments_list);
 }
 
+/// CallExpression : CoverCallExpressionAndAsyncArrowHead
+/// Step 6.a.
+fn directEval(agent: *Agent, arguments_list: []const Value) !Value {
+    // i. Let argList be ? ArgumentListEvaluation of arguments.
+    // ii. If argList has no elements, return undefined.
+    if (arguments_list.len == 0) return .undefined;
+
+    // iii. Let evalArg be the first element of argList.
+    const eval_arg = arguments_list[0];
+
+    // TODO: iv. If the source text matched by this CallExpression is strict mode code, let
+    //     strictCaller be true. Otherwise let strictCaller be false.
+    const strict_caller = false;
+
+    // v. Return ? PerformEval(evalArg, strictCaller, true).
+    return performEval(agent, eval_arg, strict_caller, true);
+}
+
 pub fn run(self: *Self, executable: Executable) !?Value {
     while (self.fetchInstruction(executable)) |instruction| switch (instruction) {
         .evaluate_call => {
+            defer self.evaluate_call_context = .{};
             const argument_count = self.fetchIndex(executable);
             var arguments = try std.ArrayList(Value).initCapacity(
                 self.agent.gc_allocator,
@@ -141,6 +166,25 @@ pub fn run(self: *Self, executable: Executable) !?Value {
             std.mem.reverse(Value, arguments.items);
             const this_value = self.stack.pop();
             const function = self.stack.pop();
+
+            const realm = self.agent.currentRealm();
+            const eval = try realm.intrinsics.@"%eval%"();
+
+            // 6. If ref is a Reference Record, IsPropertyReference(ref) is false, and
+            //    ref.[[ReferencedName]] is "eval", then
+            if (self.evaluate_call_context.reference) |reference| {
+                if (!reference.isPropertyReference() and
+                    reference.referenced_name == .string and
+                    std.mem.eql(u8, reference.referenced_name.string, "eval") and
+
+                    // a. If SameValue(func, %eval%) is true, then
+                    function.object.ptr == eval.ptr)
+                {
+                    self.result = try directEval(self.agent, arguments.items);
+                    continue;
+                }
+            }
+
             self.result = try evaluateCall(
                 self.agent,
                 function,
@@ -162,18 +206,18 @@ pub fn run(self: *Self, executable: Executable) !?Value {
         },
         .prepare_call => {
             const expression_is_reference = self.fetchIndex(executable) == 1;
-            const reference = if (expression_is_reference)
-                self.evaluate_call_context.reference.?
+            self.evaluate_call_context.reference = if (expression_is_reference)
+                self.last_reference.?
             else
                 null;
-            const this_value = evaluateCallGetThisValue(reference);
+            const this_value = evaluateCallGetThisValue(self.evaluate_call_context);
             try self.stack.append(this_value);
         },
         .resolve_binding => {
             const name = self.fetchIdentifier(executable);
             const reference = try self.agent.resolveBinding(name, null);
             self.result = try reference.getValue(self.agent);
-            self.evaluate_call_context.reference = reference;
+            self.last_reference = reference;
         },
         .resolve_this_binding => self.result = try self.agent.resolveThisBinding(),
         .store => self.result = self.stack.pop(),

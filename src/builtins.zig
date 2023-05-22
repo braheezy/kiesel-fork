@@ -1,6 +1,7 @@
 const boolean = @import("builtins/boolean.zig");
 const builtin_function = @import("builtins/builtin_function.zig");
 const ecmascript_function = @import("builtins/ecmascript_function.zig");
+const eval = @import("builtins/eval.zig");
 const function = @import("builtins/function.zig");
 const global = @import("builtins/global.zig");
 const object = @import("builtins/object.zig");
@@ -38,6 +39,7 @@ pub const ordinaryPreventExtensions = ordinary.ordinaryPreventExtensions;
 pub const ordinarySet = ordinary.ordinarySet;
 pub const ordinarySetPrototypeOf = ordinary.ordinarySetPrototypeOf;
 pub const ordinarySetWithOwnDescriptor = ordinary.ordinarySetWithOwnDescriptor;
+pub const performEval = eval.performEval;
 pub const setFunctionLength = ecmascript_function.setFunctionLength;
 pub const setFunctionName = ecmascript_function.setFunctionName;
 
