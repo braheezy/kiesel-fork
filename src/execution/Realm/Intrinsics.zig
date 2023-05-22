@@ -16,6 +16,7 @@ const lazy_intrinsics = struct {
     var @"%Boolean.prototype%": ?Object = null;
     var @"%Function.prototype%": ?Object = null;
     var @"%isFinite%": ?Object = null;
+    var @"%isNaN%": ?Object = null;
     var @"%Object.prototype%": ?Object = null;
     var @"%ThrowTypeError%": ?Object = null;
 };
@@ -42,6 +43,9 @@ pub fn @"%Function.prototype%"(self: *Self) error{OutOfMemory}!Object {
 }
 pub fn @"%isFinite%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%isFinite%", builtins.global_functions.IsFinite);
+}
+pub fn @"%isNaN%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%isNaN%", builtins.global_functions.IsNaN);
 }
 pub fn @"%Object.prototype%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Object.prototype%", builtins.ObjectPrototype);

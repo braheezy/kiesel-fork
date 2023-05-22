@@ -17,7 +17,7 @@ const NameAndPropertyDescriptor = struct {
     PropertyDescriptor,
 };
 
-pub fn globalObjectProperties(realm: *Realm) ![6]NameAndPropertyDescriptor {
+pub fn globalObjectProperties(realm: *Realm) ![7]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
     return [_]NameAndPropertyDescriptor{
         // 19.1.1 globalThis
@@ -40,6 +40,10 @@ pub fn globalObjectProperties(realm: *Realm) ![6]NameAndPropertyDescriptor {
         // https://tc39.es/ecma262/#sec-isfinite-number
         .{ "isFinite", .{ .value = Value.from(try realm.intrinsics.@"%isFinite%"()), .writable = true, .enumerable = false, .configurable = true } },
 
+        // 19.2.3 isNaN ( number )
+        // https://tc39.es/ecma262/#sec-isnan-number
+        .{ "isNaN", .{ .value = Value.from(try realm.intrinsics.@"%isNaN%"()), .writable = true, .enumerable = false, .configurable = true } },
+
         // 19.3.7 Boolean ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-boolean
         .{ "Boolean", .{ .value = Value.from(try realm.intrinsics.@"%Boolean%"()), .writable = true, .enumerable = false, .configurable = true } },
@@ -52,6 +56,16 @@ pub const global_functions = struct {
             return createBuiltinFunction(realm.agent, isFinite, .{
                 .length = 1,
                 .name = "isFinite",
+                .realm = realm,
+            });
+        }
+    };
+
+    pub const IsNaN = struct {
+        pub fn create(realm: *Realm) !Object {
+            return createBuiltinFunction(realm.agent, isNaN, .{
+                .length = 1,
+                .name = "isNaN",
                 .realm = realm,
             });
         }
@@ -69,4 +83,17 @@ fn isFinite(agent: *Agent, _: Value, arguments: []const Value, _: ?Object) !Valu
     // 2. If num is not finite, return false.
     // 3. Otherwise, return true.
     return Value.from(num.isFinite());
+}
+
+/// 19.2.3 isNaN ( number )
+/// https://tc39.es/ecma262/#sec-isnan-number
+fn isNaN(agent: *Agent, _: Value, arguments: []const Value, _: ?Object) !Value {
+    const number = if (arguments.len > 0) arguments[0] else .undefined;
+
+    // 1. Let num be ? ToNumber(number).
+    const num = try number.toNumber(agent);
+
+    // 2. If num is NaN, return true.
+    // 3. Otherwise, return false.
+    return Value.from(num.isNan());
 }
