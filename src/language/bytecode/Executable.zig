@@ -105,51 +105,55 @@ pub fn addIndex(self: *Self, index: usize) !void {
 pub fn print(self: Self, writer: anytype) !void {
     var iterator = InstructionIterator{ .instructions = self.instructions.items };
     while (iterator.next()) |instruction| {
-        try writer.print("{}: ", .{iterator.instruction_index});
+        try writer.print("{}: \x1b[1m{s}\x1b[0m", .{
+            iterator.instruction_index,
+            @tagName(instruction),
+        });
+        if (instruction.argumentCount() != 0) try writer.writeAll(" ");
         switch (instruction) {
-            .evaluate_call,
-            .evaluate_property_access_with_expression_key,
-            .jump,
-            .prepare_call,
-            => try writer.print("{s} {}\n", .{
-                @tagName(instruction),
-                iterator.instruction_args[0].?,
-            }),
-            .jump_conditional => try writer.print(
-                "{s} {} {}\n",
-                .{
-                    @tagName(instruction),
-                    iterator.instruction_args[0].?,
-                    iterator.instruction_args[1].?,
-                },
-            ),
-            .load_constant, .store_constant => {
-                const constant_index = iterator.instruction_args[0].?;
-                const value = self.constants.items[constant_index];
-                try writer.print(
-                    "{s} {} [{pretty}]\n",
-                    .{ @tagName(instruction), constant_index, value },
-                );
+            .evaluate_call => {
+                const argument_count = iterator.instruction_args[0].?;
+                try writer.print("(argument_count: {})", .{argument_count});
             },
-            .resolve_binding => {
-                const identifier_index = iterator.instruction_args[0].?;
-                const identifier = self.identifiers.items[identifier_index];
-                try writer.print(
-                    "{s} {} [{s}]\n",
-                    .{ @tagName(instruction), identifier_index, identifier },
-                );
+            .evaluate_property_access_with_expression_key => {
+                const strict = iterator.instruction_args[0].?;
+                try writer.print("(strict: {})", .{strict == 1});
             },
             .evaluate_property_access_with_identifier_key => {
                 const identifier_index = iterator.instruction_args[0].?;
                 const strict = iterator.instruction_args[1].?;
                 const identifier = self.identifiers.items[identifier_index];
                 try writer.print(
-                    "{s} {} {} [{s}]\n",
-                    .{ @tagName(instruction), identifier_index, strict, identifier },
+                    "{s} [{}] (strict: {})",
+                    .{ identifier, identifier_index, strict == 1 },
                 );
             },
-            else => try writer.print("{s}\n", .{@tagName(instruction)}),
+            .jump => {
+                const index = iterator.instruction_args[0].?;
+                try writer.print("{}", .{index});
+            },
+            .jump_conditional => {
+                const consequent_index = iterator.instruction_args[0].?;
+                const alternate_index = iterator.instruction_args[1].?;
+                try writer.print("{} {}", .{ consequent_index, alternate_index });
+            },
+            .load_constant, .store_constant => {
+                const constant_index = iterator.instruction_args[0].?;
+                const constant = self.constants.items[constant_index];
+                try writer.print("{pretty} [{}]", .{ constant, constant_index });
+            },
+            .prepare_call => {
+                const expression_is_reference = iterator.instruction_args[0].?;
+                try writer.print("(expression_is_reference: {})", .{expression_is_reference == 1});
+            },
+            .resolve_binding => {
+                const identifier_index = iterator.instruction_args[0].?;
+                const identifier = self.identifiers.items[identifier_index];
+                try writer.print("{s} [{}]", .{ identifier, identifier_index });
+            },
+            else => {},
         }
+        try writer.writeAll("\n");
     }
     try writer.print("{}: <end>\n", .{self.instructions.items.len});
 }
