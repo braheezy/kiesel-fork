@@ -161,10 +161,36 @@ fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
 }
 
 fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression) !ast.Expression {
-    if (self.acceptCallExpression(primary_expression)) |call_expression|
+    if (self.acceptMemberExpression(primary_expression)) |member_expression|
+        return .{ .member_expression = member_expression }
+    else |_| if (self.acceptCallExpression(primary_expression)) |call_expression|
         return .{ .call_expression = call_expression }
     else |_|
         return error.UnexpectedToken;
+}
+
+fn acceptMemberExpression(self: *Self, primary_expression: ast.Expression) !ast.MemberExpression {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.oneOf(.{ .@"[", .@"." }));
+    const property: ast.MemberExpression.Property = switch (token.type) {
+        .@"[" => blk: {
+            const property_expression = try self.allocator.create(ast.Expression);
+            property_expression.* = try self.acceptExpression();
+            _ = try self.core.accept(RuleSet.is(.@"]"));
+            break :blk .{ .expression = property_expression };
+        },
+        .@"." => blk: {
+            const identifier_token = try self.core.accept(RuleSet.is(.identifier));
+            break :blk .{ .identifier = identifier_token.text };
+        },
+        else => unreachable,
+    };
+    // Defer heap allocation of expression until we know this is a MemberExpression
+    const expression = try self.allocator.create(ast.Expression);
+    expression.* = primary_expression;
+    return .{ .expression = expression, .property = property };
 }
 
 fn acceptCallExpression(self: *Self, primary_expression: ast.Expression) !ast.CallExpression {

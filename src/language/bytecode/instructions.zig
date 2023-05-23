@@ -11,6 +11,10 @@ pub const Instruction = enum(u8) {
     /// (last to first) as an argument, the values on the stack afterwards are the this value and
     /// lastly the function to call.
     evaluate_call,
+    /// Store EvaluatePropertyAccessWithExpressionKey() as the result value.
+    evaluate_property_access_with_expression_key,
+    /// Store EvaluatePropertyAccessWithIdentifierKey() as the result value.
+    evaluate_property_access_with_identifier_key,
     /// Jump to another instruction by setting the instruction pointer.
     jump,
     /// Jump to one of two other instructions depending on whether the last value on the stack is
@@ -37,8 +41,11 @@ pub const Instruction = enum(u8) {
 
     pub fn argumentCount(self: Self) u2 {
         return switch (self) {
-            .jump_conditional => 2,
+            .evaluate_property_access_with_identifier_key,
+            .jump_conditional,
+            => 2,
             .evaluate_call,
+            .evaluate_property_access_with_expression_key,
             .jump,
             .load_constant,
             .prepare_call,
@@ -58,7 +65,7 @@ pub const Instruction = enum(u8) {
 
     pub fn hasIdentifierIndex(self: Self) bool {
         return switch (self) {
-            .resolve_binding => true,
+            .evaluate_property_access_with_identifier_key, .resolve_binding => true,
             else => false,
         };
     }

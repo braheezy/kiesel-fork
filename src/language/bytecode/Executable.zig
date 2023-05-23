@@ -107,7 +107,11 @@ pub fn print(self: Self, writer: anytype) !void {
     while (iterator.next()) |instruction| {
         try writer.print("{}: ", .{iterator.instruction_index});
         switch (instruction) {
-            .evaluate_call, .jump, .prepare_call => try writer.print("{s} {}\n", .{
+            .evaluate_call,
+            .evaluate_property_access_with_expression_key,
+            .jump,
+            .prepare_call,
+            => try writer.print("{s} {}\n", .{
                 @tagName(instruction),
                 iterator.instruction_args[0].?,
             }),
@@ -133,6 +137,15 @@ pub fn print(self: Self, writer: anytype) !void {
                 try writer.print(
                     "{s} {} [{s}]\n",
                     .{ @tagName(instruction), identifier_index, identifier },
+                );
+            },
+            .evaluate_property_access_with_identifier_key => {
+                const identifier_index = iterator.instruction_args[0].?;
+                const strict = iterator.instruction_args[1].?;
+                const identifier = self.identifiers.items[identifier_index];
+                try writer.print(
+                    "{s} {} {} [{s}]\n",
+                    .{ @tagName(instruction), identifier_index, strict, identifier },
                 );
             },
             else => try writer.print("{s}\n", .{@tagName(instruction)}),

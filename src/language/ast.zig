@@ -131,6 +131,64 @@ pub const PrimaryExpression = union(enum) {
     }
 };
 
+/// https://tc39.es/ecma262/#prod-MemberExpression
+pub const MemberExpression = struct {
+    const Self = @This();
+
+    pub const Property = union(enum) {
+        expression: *Expression,
+        identifier: Identifier,
+    };
+
+    expression: *Expression,
+    property: Property,
+
+    /// 13.3.2.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-property-accessors-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        // 1. Let baseReference be ? Evaluation of MemberExpression.
+        // 2. Let baseValue be ? GetValue(baseReference).
+        try self.expression.generateBytecode(executable);
+        try executable.addInstruction(.load);
+
+        // TODO: 3. If the source text matched by this MemberExpression is strict mode code, let
+        //    strict be true; else let strict be false.
+        const strict = false;
+
+        switch (self.property) {
+            // MemberExpression : MemberExpression [ Expression ]
+            .expression => |expression| {
+                // 4. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
+                try expression.generateBytecode(executable);
+                try executable.addInstruction(.load);
+                try executable.addInstruction(.evaluate_property_access_with_expression_key);
+                try executable.addIndex(@boolToInt(strict));
+            },
+
+            // MemberExpression : MemberExpression . IdentifierName
+            .identifier => |identifier| {
+                // 4. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
+                try executable.addInstructionWithIdentifier(
+                    .evaluate_property_access_with_identifier_key,
+                    identifier,
+                );
+                try executable.addIndex(@boolToInt(strict));
+            },
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("MemberExpression", writer, indentation);
+        try printString("expression", writer, indentation + 1);
+        try self.expression.print(writer, indentation + 2);
+        try printString("property", writer, indentation + 1);
+        switch (self.property) {
+            .expression => |expression| try expression.print(writer, indentation + 2),
+            .identifier => |identifier| try printString(identifier, writer, indentation + 2),
+        }
+    }
+};
+
 /// https://tc39.es/ecma262/#prod-CallExpression
 pub const CallExpression = struct {
     const Self = @This();
@@ -362,6 +420,7 @@ pub const Expression = union(enum) {
     const Self = @This();
 
     primary_expression: PrimaryExpression,
+    member_expression: MemberExpression,
     call_expression: CallExpression,
 
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
@@ -370,6 +429,7 @@ pub const Expression = union(enum) {
                 .primary_expression => |primary_expression| {
                     return primary_expression.analyze(query);
                 },
+                .member_expression => return true,
                 .call_expression => return false,
             },
         }
@@ -380,6 +440,7 @@ pub const Expression = union(enum) {
             .primary_expression => |primary_expression| try primary_expression.generateBytecode(
                 executable,
             ),
+            .member_expression => |member_expression| try member_expression.generateBytecode(executable),
             .call_expression => |call_expression| try call_expression.generateBytecode(executable),
         }
     }
@@ -388,6 +449,10 @@ pub const Expression = union(enum) {
         try printString("Expression", writer, indentation);
         switch (self) {
             .primary_expression => |primary_expression| try primary_expression.print(
+                writer,
+                indentation + 1,
+            ),
+            .member_expression => |member_expression| try member_expression.print(
                 writer,
                 indentation + 1,
             ),

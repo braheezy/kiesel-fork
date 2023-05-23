@@ -192,6 +192,68 @@ pub fn run(self: *Self, executable: Executable) !?Value {
                 arguments.items,
             );
         },
+        // 13.3.3 EvaluatePropertyAccessWithExpressionKey ( baseValue, expression, strict )
+        // https://tc39.es/ecma262/#sec-evaluate-property-access-with-expression-key
+        .evaluate_property_access_with_expression_key => {
+            // 1. Let propertyNameReference be ? Evaluation of expression.
+            // 2. Let propertyNameValue be ? GetValue(propertyNameReference).
+            const property_name_value = self.stack.pop();
+
+            const strict = self.fetchIndex(executable) == 1;
+            const base_value = self.stack.pop();
+
+            // 3. Let propertyKey be ? ToPropertyKey(propertyNameValue).
+            const property_key = try property_name_value.toPropertyKey(self.agent);
+
+            // 4. Return the Reference Record {
+            //      [[Base]]: baseValue,
+            //      [[ReferencedName]]: propertyKey,
+            //      [[Strict]]: strict,
+            //      [[ThisValue]]: empty
+            //    }.
+            const reference = Reference{
+                .base = .{ .value = base_value },
+                .referenced_name = switch (property_key) {
+                    .string => |string| .{ .string = string },
+                    .symbol => |symbol| .{ .symbol = symbol },
+                    .integer_index => |integer_index| .{
+                        .string = try std.fmt.allocPrint(
+                            self.agent.gc_allocator,
+                            "{}",
+                            .{integer_index},
+                        ),
+                    },
+                },
+                .strict = strict,
+                .this_value = null,
+            };
+            self.result = try reference.getValue(self.agent);
+            self.last_reference = reference;
+        },
+        // 13.3.4 EvaluatePropertyAccessWithIdentifierKey ( baseValue, identifierName, strict )
+        // https://tc39.es/ecma262/#sec-evaluate-property-access-with-identifier-key
+        .evaluate_property_access_with_identifier_key => {
+            // 1. Let propertyNameString be StringValue of identifierName.
+            const property_name_string = self.fetchIdentifier(executable);
+
+            const strict = self.fetchIndex(executable) == 1;
+            const base_value = self.stack.pop();
+
+            // 2. Return the Reference Record {
+            //      [[Base]]: baseValue,
+            //      [[ReferencedName]]: propertyNameString,
+            //      [[Strict]]: strict,
+            //      [[ThisValue]]: empty
+            //    }.
+            const reference = Reference{
+                .base = .{ .value = base_value },
+                .referenced_name = .{ .string = property_name_string },
+                .strict = strict,
+                .this_value = null,
+            };
+            self.result = try reference.getValue(self.agent);
+            self.last_reference = reference;
+        },
         .jump => self.ip = self.fetchIndex(executable),
         .jump_conditional => {
             const ip_consequent = self.fetchIndex(executable);
