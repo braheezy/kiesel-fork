@@ -11,9 +11,11 @@ const Allocator = std.mem.Allocator;
 
 const Agent = kiesel.execution.Agent;
 const Diagnostics = kiesel.language.Diagnostics;
+const Object = kiesel.types.Object;
 const Realm = kiesel.execution.Realm;
 const Script = kiesel.language.Script;
 const Value = kiesel.types.Value;
+const ordinaryObjectCreate = kiesel.builtins.ordinaryObjectCreate;
 
 const bdwgc_version_string = std.fmt.comptimePrint("{}.{}.{}", .{
     gc.GC_VERSION_MAJOR,
@@ -54,6 +56,13 @@ const help =
 const stdin = std.io.getStdIn().reader();
 const stdout = std.io.getStdOut().writer();
 const stderr = std.io.getStdErr().writer();
+
+pub const Kiesel = struct {
+    pub fn create(realm: *Realm) !Object {
+        const kiesel_object = try ordinaryObjectCreate(realm.agent, try realm.intrinsics.@"%Object.prototype%"());
+        return kiesel_object;
+    }
+};
 
 fn run(
     allocator: Allocator,
@@ -157,6 +166,7 @@ pub fn main() !u8 {
     defer agent.deinit();
     try Realm.initializeHostDefinedRealm(&agent, .{});
     const realm = agent.currentRealm();
+    try defineBuiltinProperty(realm.global_object, "Kiesel", Value.from(try Kiesel.create(realm)));
 
     const path = if (parsed_args.positionals.len > 0) parsed_args.positionals[0] else null;
     if (path != null) {
