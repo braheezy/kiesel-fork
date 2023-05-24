@@ -736,7 +736,7 @@ pub fn getPrototypeFromConstructor(
             const realm = try constructor.getFunctionRealm();
 
             // b. Set proto to realm's intrinsic object named intrinsicDefaultProto.
-            break :blk try @field(realm.intrinsics, intrinsic_default_proto)();
+            break :blk try @field(Realm.Intrinsics, intrinsic_default_proto)(&realm.intrinsics);
         },
     };
 

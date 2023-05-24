@@ -173,7 +173,7 @@ fn deduplicate(
 ) !std.ArrayList(T) {
     var deduplicated_list = std.ArrayList(T).init(self.allocator);
     var iterator = InstructionIterator{ .instructions = self.instructions.items };
-    while (iterator.next()) |instruction| if (@field(instruction, has_index_getter)()) {
+    while (iterator.next()) |instruction| if (@field(Instruction, has_index_getter)(instruction)) {
         const item = items[iterator.instruction_args[0].?];
         const index = for (deduplicated_list.items, 0..) |other_item, index| {
             if (eql(item, other_item)) break index;
