@@ -103,13 +103,20 @@ pub fn addIndex(self: *Self, index: usize) !void {
 }
 
 pub fn print(self: Self, writer: anytype) !void {
+    const file = if (@TypeOf(writer.context) == std.fs.File)
+        writer.context
+    else
+        std.io.getStdOut();
+    const tty_config = std.io.tty.detectConfig(file);
     var iterator = InstructionIterator{ .instructions = self.instructions.items };
     while (iterator.next()) |instruction| {
-        try writer.print("{:>[2]}: \x1b[1m{s}\x1b[0m", .{
+        try writer.print("{:>[1]}: ", .{
             iterator.instruction_index,
-            @tagName(instruction),
             std.fmt.count("{d}", .{self.instructions.items.len}),
         });
+        try tty_config.setColor(writer, .bold);
+        try writer.writeAll(@tagName(instruction));
+        try tty_config.setColor(writer, .reset);
         if (instruction.argumentCount() != 0) try writer.writeAll(" ");
         switch (instruction) {
             .evaluate_call => {
