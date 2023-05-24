@@ -36,20 +36,22 @@ pub fn defineBuiltinFunction(
         .name = name,
         .realm = realm,
     });
-    try object.createMethodProperty(
-        PropertyKey.from(name),
-        Value.from(function),
-    );
+    try defineBuiltinProperty(object, name, Value.from(function));
 }
 
 pub fn defineBuiltinProperty(object: Object, name: []const u8, value: anytype) !void {
-    const property_key = PropertyKey.from(name);
     const T = @TypeOf(value);
-    if (T == Value) {
-        try object.createNonEnumerableDataPropertyOrThrow(property_key, value);
-    } else if (T == PropertyDescriptor) {
-        object.definePropertyOrThrow(property_key, value) catch |err| try noexcept(err);
-    } else {
+    const property_key = PropertyKey.from(name);
+    const property_descriptor = if (T == Value)
+        PropertyDescriptor{
+            .value = value,
+            .writable = true,
+            .enumerable = false,
+            .configurable = true,
+        }
+    else if (T == PropertyDescriptor)
+        value
+    else
         @compileError("defineBuiltinProperty() called with incompatible type " ++ @typeName(T));
-    }
+    object.definePropertyOrThrow(property_key, property_descriptor) catch |err| try noexcept(err);
 }
