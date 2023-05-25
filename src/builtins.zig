@@ -18,6 +18,7 @@ pub const BooleanPrototype = boolean.BooleanPrototype;
 pub const BuiltinFunction = builtin_function.BuiltinFunction;
 pub const FunctionPrototype = function.FunctionPrototype;
 pub const Object = object.Object;
+pub const ObjectConstructor = object.ObjectConstructor;
 pub const ObjectPrototype = object.ObjectPrototype;
 pub const ThrowTypeError = throw_type_error.ThrowTypeError;
 pub const addRestrictedFunctionProperties = ecmascript_function.addRestrictedFunctionProperties;
