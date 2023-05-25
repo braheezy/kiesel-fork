@@ -33,6 +33,7 @@ pub const ObjectConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "freeze", freeze, 1, realm);
         try defineBuiltinFunction(object, "is", is, 2, realm);
 
         // 20.1.2.20 Object.prototype
@@ -81,6 +82,24 @@ pub const ObjectConstructor = struct {
         // 3. Return ! ToObject(value).
         // TODO: Use `catch |err| try noexcept(err)` once Value.toObject() is fully implemented
         return Value.from(try value.toObject(agent));
+    }
+
+    /// 20.1.2.6 Object.freeze ( O )
+    /// https://tc39.es/ecma262/#sec-object.freeze
+    fn freeze(agent: *Agent, _: Value, arguments: []const Value) !Value {
+        const object = if (arguments.len > 0) arguments[0] else .undefined;
+
+        // 1. If O is not an Object, return O.
+        if (object != .object) return object;
+
+        // 2. Let status be ? SetIntegrityLevel(O, frozen).
+        const status = try object.object.setIntegrityLevel(.frozen);
+
+        // 3. If status is false, throw a TypeError exception.
+        if (!status) return agent.throwException(.type_error, "Could not freeze object");
+
+        // 4. Return O.
+        return object;
     }
 
     /// 20.1.2.14 Object.is ( value1, value2 )

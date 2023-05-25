@@ -316,7 +316,7 @@ pub fn setIntegrityLevel(self: Self, level: IntegrityLevel) !bool {
     const status = try self.internalMethods().preventExtensions(self);
 
     // 2. If status is false, return false.
-    if (!status) false;
+    if (!status) return false;
 
     // 3. Let keys be ? O.[[OwnPropertyKeys]]().
     const keys = try self.internalMethods().ownPropertyKeys(self);
