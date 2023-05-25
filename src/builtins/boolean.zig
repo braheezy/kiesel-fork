@@ -20,12 +20,11 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// https://tc39.es/ecma262/#sec-properties-of-the-boolean-constructor
 pub const BooleanConstructor = struct {
     pub fn create(realm: *Realm) !Object {
-        const object = try createBuiltinFunction(realm.agent, behaviour, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
             .length = 1,
             .name = "Boolean",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
-            .is_constructor = true,
         });
 
         // 20.3.2.1 Boolean.prototype
@@ -120,7 +119,7 @@ pub const BooleanPrototype = struct {
 
     /// 20.3.3.2 Boolean.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-boolean.prototype.tostring
-    fn toString(agent: *Agent, this_value: Value, _: []const Value, _: ?Object) !Value {
+    fn toString(agent: *Agent, this_value: Value, _: []const Value) !Value {
         // 1. Let b be ? thisBooleanValue(this value).
         const b = try thisBooleanValue(agent, this_value);
 
@@ -130,7 +129,7 @@ pub const BooleanPrototype = struct {
 
     /// 20.3.3.3 Boolean.prototype.valueOf ( )
     /// https://tc39.es/ecma262/#sec-boolean.prototype.valueof
-    fn valueOf(agent: *Agent, this_value: Value, _: []const Value, _: ?Object) !Value {
+    fn valueOf(agent: *Agent, this_value: Value, _: []const Value) !Value {
         // 1. Return ? thisBooleanValue(this value).
         return Value.from(try thisBooleanValue(agent, this_value));
     }

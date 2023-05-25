@@ -26,12 +26,11 @@ pub const ObjectConstructor = struct {
     pub fn create(realm: *Realm) !Object_ {
         // 20.1.2 Properties of the Object Constructor
         // https://tc39.es/ecma262/#sec-properties-of-the-object-constructor
-        const object = try createBuiltinFunction(realm.agent, behaviour, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
             .length = 1,
             .name = "Object",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
-            .is_constructor = true,
         });
 
         try defineBuiltinFunction(object, "is", is, 2, realm);
@@ -86,7 +85,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.14 Object.is ( value1, value2 )
     /// https://tc39.es/ecma262/#sec-object.is
-    fn is(_: *Agent, _: Value, arguments: []const Value, _: ?Object_) !Value {
+    fn is(_: *Agent, _: Value, arguments: []const Value) !Value {
         const value1 = if (arguments.len > 0) arguments[0] else .undefined;
         const value2 = if (arguments.len > 1) arguments[1] else .undefined;
 

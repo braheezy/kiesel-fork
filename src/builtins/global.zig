@@ -64,7 +64,7 @@ pub fn globalObjectProperties(realm: *Realm) ![9]NameAndPropertyDescriptor {
 fn GlobalFunction(comptime options: struct { name: []const u8, length: u32 }) type {
     return struct {
         pub fn create(realm: *Realm) !Object {
-            return createBuiltinFunction(realm.agent, @field(Self, options.name), .{
+            return createBuiltinFunction(realm.agent, .{ .regular = @field(Self, options.name) }, .{
                 .length = options.length,
                 .name = options.name,
                 .realm = realm,
@@ -81,7 +81,7 @@ pub const global_functions = struct {
 
 /// 19.2.1 eval ( x )
 /// https://tc39.es/ecma262/#sec-eval-x
-fn eval(agent: *Agent, _: Value, arguments: []const Value, _: ?Object) !Value {
+fn eval(agent: *Agent, _: Value, arguments: []const Value) !Value {
     const x = if (arguments.len > 0) arguments[0] else .undefined;
 
     // 1. Return ? PerformEval(x, false, false).
@@ -90,7 +90,7 @@ fn eval(agent: *Agent, _: Value, arguments: []const Value, _: ?Object) !Value {
 
 /// 19.2.2 isFinite ( number )
 /// https://tc39.es/ecma262/#sec-isfinite-number
-fn isFinite(agent: *Agent, _: Value, arguments: []const Value, _: ?Object) !Value {
+fn isFinite(agent: *Agent, _: Value, arguments: []const Value) !Value {
     const number = if (arguments.len > 0) arguments[0] else .undefined;
 
     // 1. Let num be ? ToNumber(number).
@@ -103,7 +103,7 @@ fn isFinite(agent: *Agent, _: Value, arguments: []const Value, _: ?Object) !Valu
 
 /// 19.2.3 isNaN ( number )
 /// https://tc39.es/ecma262/#sec-isnan-number
-fn isNaN(agent: *Agent, _: Value, arguments: []const Value, _: ?Object) !Value {
+fn isNaN(agent: *Agent, _: Value, arguments: []const Value) !Value {
     const number = if (arguments.len > 0) arguments[0] else .undefined;
 
     // 1. Let num be ? ToNumber(number).

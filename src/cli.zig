@@ -68,7 +68,7 @@ pub const Kiesel = struct {
         return kiesel_object;
     }
 
-    fn collect(_: *Agent, _: Value, _: []const Value, _: ?Object) !Value {
+    fn collect(_: *Agent, _: Value, _: []const Value) !Value {
         kiesel.gc.collect();
         return .undefined;
     }

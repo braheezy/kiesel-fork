@@ -14,11 +14,17 @@ const Value = types.Value;
 const setFunctionLength = ecmascript_function.setFunctionLength;
 const setFunctionName = ecmascript_function.setFunctionName;
 
-pub const BehaviourFn = fn (*Agent, Value, []const Value, ?Object) Agent.Error!Value;
+pub const Behaviour = union(enum) {
+    pub const RegularFn = fn (*Agent, Value, []const Value) Agent.Error!Value;
+    pub const ConstructorFn = fn (*Agent, Value, []const Value, ?Object) Agent.Error!Value;
+
+    regular: *const RegularFn,
+    constructor: *const ConstructorFn,
+};
 
 pub const BuiltinFunction = Object.Factory(.{
     .Fields = struct {
-        behaviour: *const BehaviourFn,
+        behaviour: Behaviour,
 
         /// [[Realm]]
         realm: *Realm,
@@ -62,7 +68,10 @@ fn call(object: Object, this_argument: Value, arguments_list: []const Value) !Va
     // 10. Let result be the Completion Record that is the result of evaluating F in a manner that
     //     conforms to the specification of F. thisArgument is the this value, argumentsList
     //     provides the named parameters, and the NewTarget value is undefined.
-    const result = try self.fields.behaviour(agent, this_argument, arguments_list, null);
+    const result = switch (self.fields.behaviour) {
+        .regular => |regularFn| try regularFn(agent, this_argument, arguments_list),
+        .constructor => |constructorFn| try constructorFn(agent, this_argument, arguments_list, null),
+    };
 
     // 11. Remove calleeContext from the execution context stack and restore callerContext as the
     //     running execution context.
@@ -106,7 +115,10 @@ fn construct(object: Object, arguments_list: []const Value, new_target: Object) 
     // 10. Let result be the Completion Record that is the result of evaluating F in a manner that
     //     conforms to the specification of F. The this value is uninitialized, argumentsList
     //     provides the named parameters, and newTarget provides the NewTarget value.
-    const result = try self.fields.behaviour(agent, undefined, arguments_list, new_target);
+    const result = switch (self.fields.behaviour) {
+        .regular => unreachable,
+        .constructor => |constructorFn| try constructorFn(agent, undefined, arguments_list, new_target),
+    };
 
     // 11. Remove calleeContext from the execution context stack and restore callerContext as the
     //     running execution context.
@@ -120,7 +132,7 @@ fn construct(object: Object, arguments_list: []const Value, new_target: Object) 
 /// https://tc39.es/ecma262/#sec-createbuiltinfunction
 pub fn createBuiltinFunction(
     agent: *Agent,
-    behaviour: *const BehaviourFn,
+    behaviour: Behaviour,
     args: struct {
         length: u32,
         name: []const u8,
@@ -129,7 +141,6 @@ pub fn createBuiltinFunction(
         //       so the null state can serve as 'not present'.
         prototype: ?Object = null,
         prefix: ?[]const u8 = null,
-        is_constructor: bool = false,
     },
 ) !Object {
     // 1. If realm is not present, set realm to the current Realm Record.
@@ -149,7 +160,7 @@ pub fn createBuiltinFunction(
     const function = try BuiltinFunction.create(agent, .{
         .internal_methods = .{
             .call = call,
-            .construct = if (args.is_constructor) construct else null,
+            .construct = if (behaviour == .constructor) construct else null,
         },
 
         // 6. Set func.[[Prototype]] to prototype.

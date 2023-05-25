@@ -4,7 +4,7 @@ const builtins = @import("builtins.zig");
 const execution = @import("execution.zig");
 const types = @import("types.zig");
 
-const BehaviourFn = builtins.BehaviourFn;
+const Behaviour = builtins.Behaviour;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -27,11 +27,11 @@ pub fn noexcept(err: error{ ExceptionThrown, OutOfMemory }) !noreturn {
 pub fn defineBuiltinFunction(
     object: Object,
     name: []const u8,
-    behaviour: *const BehaviourFn,
+    behaviour: *const Behaviour.RegularFn,
     length: u32,
     realm: *Realm,
 ) !void {
-    const function = try createBuiltinFunction(realm.agent, behaviour, .{
+    const function = try createBuiltinFunction(realm.agent, .{ .regular = behaviour }, .{
         .length = length,
         .name = name,
         .realm = realm,

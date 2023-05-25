@@ -16,7 +16,7 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 pub const ThrowTypeError = struct {
     pub fn create(realm: *Realm) !Object {
-        const object = try createBuiltinFunction(realm.agent, behaviour, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .regular = behaviour }, .{
             .length = 0,
             .name = "",
             .realm = realm,
@@ -48,7 +48,7 @@ pub const ThrowTypeError = struct {
         return object;
     }
 
-    fn behaviour(agent: *Agent, _: Value, _: []const Value, _: ?Object) !Value {
+    fn behaviour(agent: *Agent, _: Value, _: []const Value) !Value {
         // 1. Throw a TypeError exception.
         return agent.throwException(.type_error, "Forbidden property access");
     }
