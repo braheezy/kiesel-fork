@@ -35,6 +35,7 @@ pub const ObjectConstructor = struct {
 
         try defineBuiltinFunction(object, "freeze", freeze, 1, realm);
         try defineBuiltinFunction(object, "is", is, 2, realm);
+        try defineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm);
         try defineBuiltinFunction(object, "isFrozen", isFrozen, 1, realm);
         try defineBuiltinFunction(object, "isSealed", isSealed, 1, realm);
         try defineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm);
@@ -114,6 +115,18 @@ pub const ObjectConstructor = struct {
 
         // 1. Return SameValue(value1, value2).
         return Value.from(sameValue(value1, value2));
+    }
+
+    /// 20.1.2.15 Object.isExtensible ( O )
+    /// https://tc39.es/ecma262/#sec-object.isextensible
+    fn isExtensible(_: *Agent, _: Value, arguments: []const Value) !Value {
+        const object = if (arguments.len > 0) arguments[0] else .undefined;
+
+        // 1. If O is not an Object, return true.
+        if (object != .object) return Value.from(true);
+
+        // 2. Return ? IsExtensible(O).
+        return Value.from(try object.object.isExtensible());
     }
 
     /// 20.1.2.16 Object.isFrozen ( O )
