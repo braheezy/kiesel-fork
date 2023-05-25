@@ -13,10 +13,12 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+const sameValue = types.sameValue;
 
 /// 20.1.1 The Object Constructor
 /// https://tc39.es/ecma262/#sec-object-constructor
@@ -31,6 +33,8 @@ pub const ObjectConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
             .is_constructor = true,
         });
+
+        try defineBuiltinFunction(object, "is", is, 2, realm);
 
         // 20.1.2.20 Object.prototype
         // https://tc39.es/ecma262/#sec-object.prototype
@@ -78,6 +82,16 @@ pub const ObjectConstructor = struct {
         // 3. Return ! ToObject(value).
         // TODO: Use `catch |err| try noexcept(err)` once Value.toObject() is fully implemented
         return Value.from(try value.toObject(agent));
+    }
+
+    /// 20.1.2.14 Object.is ( value1, value2 )
+    /// https://tc39.es/ecma262/#sec-object.is
+    fn is(_: *Agent, _: Value, arguments: []const Value, _: ?Object_) !Value {
+        const value1 = if (arguments.len > 0) arguments[0] else .undefined;
+        const value2 = if (arguments.len > 1) arguments[1] else .undefined;
+
+        // 1. Return SameValue(value1, value2).
+        return Value.from(sameValue(value1, value2));
     }
 };
 
