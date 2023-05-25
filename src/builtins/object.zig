@@ -36,6 +36,7 @@ pub const ObjectConstructor = struct {
         try defineBuiltinFunction(object, "freeze", freeze, 1, realm);
         try defineBuiltinFunction(object, "is", is, 2, realm);
         try defineBuiltinFunction(object, "isFrozen", isFrozen, 1, realm);
+        try defineBuiltinFunction(object, "isSealed", isSealed, 1, realm);
         try defineBuiltinFunction(object, "seal", seal, 1, realm);
 
         // 20.1.2.20 Object.prototype
@@ -124,6 +125,18 @@ pub const ObjectConstructor = struct {
 
         // 2. Return ? TestIntegrityLevel(O, frozen).
         return Value.from(try object.object.testIntegrityLevel(.frozen));
+    }
+
+    /// 20.1.2.17 Object.isSealed ( O )
+    /// https://tc39.es/ecma262/#sec-object.issealed
+    fn isSealed(_: *Agent, _: Value, arguments: []const Value) !Value {
+        const object = if (arguments.len > 0) arguments[0] else .undefined;
+
+        // 1. If O is not an Object, return true.
+        if (object != .object) return Value.from(true);
+
+        // 2. Return ? TestIntegrityLevel(O, sealed).
+        return Value.from(try object.object.testIntegrityLevel(.sealed));
     }
 
     /// 20.1.2.21 Object.seal ( O )
