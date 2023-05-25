@@ -12,6 +12,7 @@ const types = @import("../types.zig");
 const Environment = environments.Environment;
 const BigInt = types.BigInt;
 const ExecutionContext = @import("ExecutionContext.zig");
+const Object = types.Object;
 const Realm = @import("Realm.zig");
 const Reference = types.Reference;
 const Symbol = types.Symbol;
@@ -166,6 +167,13 @@ pub fn currentRealm(self: Self) *Realm {
     // The value of the Realm component of the running execution context is also called the current
     // Realm Record.
     return self.runningExecutionContext().realm;
+}
+
+/// https://tc39.es/ecma262/#active-function-object
+pub fn activeFunctionObject(self: Self) Object {
+    // The value of the Function component of the running execution context is also called the
+    // active function object.
+    return self.runningExecutionContext().function.?;
 }
 
 /// 9.4.1 GetActiveScriptOrModule ( )
