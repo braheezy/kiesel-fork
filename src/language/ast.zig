@@ -415,6 +415,42 @@ pub const StringLiteral = struct {
     }
 };
 
+/// https://tc39.es/ecma262/#prod-UnaryExpression
+pub const UnaryExpression = struct {
+    const Self = @This();
+
+    pub const Operator = enum {
+        void,
+    };
+
+    operator: Operator,
+    expression: *Expression,
+
+    pub fn generateBytecode(self: Self, executable: *Executable) BytecodeError!void {
+        switch (self.operator) {
+            // 13.5.2.1 Runtime Semantics: Evaluation
+            // https://tc39.es/ecma262/#sec-void-operator-runtime-semantics-evaluation
+            // UnaryExpression : void UnaryExpression
+            .void => {
+                // 1. Let expr be ? Evaluation of UnaryExpression.
+                // 2. Perform ? GetValue(expr).
+                try self.expression.generateBytecode(executable);
+
+                // 3. Return undefined.
+               try executable.addInstructionWithConstant(.store_constant, .undefined);
+            },
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
+        try printString("UnaryExpression", writer, indentation);
+        try printString("operator", writer, indentation + 1);
+        try printString(@tagName(self.operator), writer, indentation + 2);
+        try printString("expression", writer, indentation + 1);
+        try self.expression.print(writer, indentation + 2);
+    }
+};
+
 /// https://tc39.es/ecma262/#prod-Expression
 pub const Expression = union(enum) {
     const Self = @This();
@@ -422,6 +458,7 @@ pub const Expression = union(enum) {
     primary_expression: PrimaryExpression,
     member_expression: MemberExpression,
     call_expression: CallExpression,
+    unary_expression: UnaryExpression,
 
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
         switch (query) {
@@ -431,6 +468,7 @@ pub const Expression = union(enum) {
                 },
                 .member_expression => return true,
                 .call_expression => return false,
+                .unary_expression => return false,
             },
         }
     }
@@ -442,6 +480,7 @@ pub const Expression = union(enum) {
             ),
             .member_expression => |member_expression| try member_expression.generateBytecode(executable),
             .call_expression => |call_expression| try call_expression.generateBytecode(executable),
+            .unary_expression => |unary_expression| try unary_expression.generateBytecode(executable),
         }
     }
 
@@ -457,6 +496,10 @@ pub const Expression = union(enum) {
                 indentation + 1,
             ),
             .call_expression => |call_expression| try call_expression.print(
+                writer,
+                indentation + 1,
+            ),
+            .unary_expression => |unary_expression| try unary_expression.print(
                 writer,
                 indentation + 1,
             ),

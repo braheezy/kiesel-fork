@@ -239,9 +239,27 @@ fn acceptLiteral(self: *Self) !ast.Literal {
     }
 }
 
-fn acceptExpression(self: *Self) ParserCore.AcceptError!ast.Expression {
+fn acceptUnaryExpression(self: *Self, operator_token: Tokenizer.Token) !ast.UnaryExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
+
+    const operator: ast.UnaryExpression.Operator = switch (operator_token.type) {
+        .void => .void,
+        else => unreachable,
+    };
+    const expression = try self.allocator.create(ast.Expression);
+    expression.* = try self.acceptExpression();
+    return .{ .operator = operator, .expression = expression };
+}
+
+fn acceptExpression(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!ast.Expression {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    if (self.core.accept(RuleSet.oneOf(.{.void}))) |operator_token| {
+        const unary_expression = try self.acceptUnaryExpression(operator_token);
+        return .{ .unary_expression = unary_expression };
+    } else |_| {}
 
     const primary_expression = try self.acceptPrimaryExpression();
     var expression = ast.Expression{ .primary_expression = primary_expression };
