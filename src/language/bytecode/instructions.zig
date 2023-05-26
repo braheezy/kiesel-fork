@@ -28,6 +28,8 @@ pub const Instruction = enum(u8) {
     load_constant,
     /// Determine the this value for an upcoming evaluate_call instruction and add it to the stack.
     load_this_value,
+    /// Apply logical NOT to the last value on the stack and store it as the result value.
+    logical_not,
     /// Store ResolveBinding() as the result value.
     resolve_binding,
     /// Store ResolveThisBinding() as the result value.

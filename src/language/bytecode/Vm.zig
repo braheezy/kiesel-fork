@@ -274,6 +274,10 @@ pub fn run(self: *Self, executable: Executable) !?Value {
             const this_value = evaluateCallGetThisValue(evaluation_context);
             try self.stack.append(this_value);
         },
+        .logical_not => {
+            const value = self.stack.pop();
+            self.result = Value.from(!value.toBoolean());
+        },
         .resolve_binding => {
             const name = self.fetchIdentifier(executable);
             self.reference = try self.agent.resolveBinding(name, null);
