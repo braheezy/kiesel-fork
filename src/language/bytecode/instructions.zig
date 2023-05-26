@@ -42,8 +42,12 @@ pub const Instruction = enum(u8) {
     throw,
     /// Store ToNumber() as the result value.
     to_number,
+    /// Store ToNumeric() as the result value.
+    to_numeric,
     /// Apply the typeof operation to the evaluated expression and set it as the result value.
     typeof,
+    /// Store Number::unaryMinus() / BigInt::unaryMinus() as the result value.
+    unary_minus,
     /// Non-exhaustive enum to allow arbitrary values as constant indices.
     _,
 

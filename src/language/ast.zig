@@ -428,6 +428,7 @@ pub const UnaryExpression = struct {
         void,
         typeof,
         @"+",
+        @"-",
     };
 
     operator: Operator,
@@ -469,6 +470,27 @@ pub const UnaryExpression = struct {
                 if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
                 try executable.addInstruction(.load);
                 try executable.addInstruction(.to_number);
+            },
+
+            // 13.5.5.1 Runtime Semantics: Evaluation
+            // https://tc39.es/ecma262/#sec-unary-minus-operator-runtime-semantics-evaluation
+            // UnaryExpression : - UnaryExpression
+            .@"-" => {
+                // 1. Let expr be ? Evaluation of UnaryExpression.
+                try self.expression.generateBytecode(executable);
+
+                // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
+                if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                try executable.addInstruction(.load);
+                try executable.addInstruction(.to_numeric);
+
+                // 3. If oldValue is a Number, then
+                //     a. Return Number::unaryMinus(oldValue).
+                // 4. Else,
+                //     a. Assert: oldValue is a BigInt.
+                //     b. Return BigInt::unaryMinus(oldValue).
+                try executable.addInstruction(.load);
+                try executable.addInstruction(.unary_minus);
             },
         }
     }
