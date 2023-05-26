@@ -5,6 +5,9 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const pow_2_31 = std.math.pow(f64, 2, 31);
+const pow_2_32 = std.math.pow(f64, 2, 32);
+
 pub const Number = union(enum) {
     const Self = @This();
 
@@ -131,6 +134,29 @@ pub const Number = union(enum) {
             .f64 => |x| .{ .f64 = -x },
             .i32 => |x| .{ .i32 = -x },
         };
+    }
+
+    /// 6.1.6.1.2 Number::bitwiseNOT ( x )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-bitwiseNOT
+    pub fn bitwiseNOT(self: Self) Self {
+        // 1. Let oldValue be ! ToInt32(x).
+        const old_value = switch (self) {
+            .f64 => |x| blk: {
+                // Excerpt from Value.toInt32()
+                if (!std.math.isFinite(x) or x == 0) break :blk 0;
+                const int = @trunc(x);
+                const int32bit = @mod(int, pow_2_32);
+                break :blk @floatToInt(
+                    i32,
+                    if (int32bit >= pow_2_31) int32bit - pow_2_32 else int32bit,
+                );
+            },
+            .i32 => |x| x,
+        };
+
+        // 2. Return the result of applying bitwise complement to oldValue. The mathematical value
+        //    of the result is exactly representable as a 32-bit two's complement bit string.
+        return .{ .i32 = ~old_value };
     }
 
     /// 6.1.6.1.14 Number::sameValue ( x, y )

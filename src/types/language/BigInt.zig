@@ -35,6 +35,16 @@ pub fn unaryMinus(self: Self) !Self {
     return .{ .value = cloned_value };
 }
 
+/// 6.1.6.2.2 BigInt::bitwiseNOT ( x )
+/// https://tc39.es/ecma262/#sec-numeric-types-bigint-bitwiseNOT
+pub fn bitwiseNOT(self: Self) !Self {
+    // 1. Return -x - 1ℤ.
+    var cloned_value = try self.value.clone();
+    cloned_value.negate();
+    try cloned_value.sub(&cloned_value, &try Value.initSet(self.value.allocator, 1));
+    return .{ .value = cloned_value };
+}
+
 /// 6.1.6.2.13 BigInt::equal ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-equal
 pub fn equal(x: Self, y: Self) bool {
