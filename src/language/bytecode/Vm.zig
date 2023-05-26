@@ -17,9 +17,9 @@ const Self = @This();
 agent: *Agent,
 ip: usize,
 stack: std.ArrayList(Value),
+evaluation_context_stack: std.ArrayList(EvaluationContext),
 result: ?Value,
 reference: ?Reference = null,
-evaluation_context: EvaluationContext,
 
 const EvaluationContext = struct {
     reference: ?Reference = null,
@@ -27,13 +27,14 @@ const EvaluationContext = struct {
 
 pub fn init(agent: *Agent) !Self {
     var stack = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 32);
+    var evaluation_context_stack = std.ArrayList(EvaluationContext).init(agent.gc_allocator);
     return .{
         .agent = agent,
         .ip = 0,
         .stack = stack,
+        .evaluation_context_stack = evaluation_context_stack,
         .result = null,
         .reference = null,
-        .evaluation_context = .{},
     };
 }
 
@@ -155,7 +156,7 @@ fn directEval(agent: *Agent, arguments: []const Value) !Value {
 pub fn run(self: *Self, executable: Executable) !?Value {
     while (self.fetchInstruction(executable)) |instruction| switch (instruction) {
         .evaluate_call => {
-            defer self.evaluation_context = .{};
+            const evaluation_context = self.evaluation_context_stack.pop();
             const argument_count = self.fetchIndex(executable);
             var arguments = try std.ArrayList(Value).initCapacity(
                 self.agent.gc_allocator,
@@ -174,7 +175,7 @@ pub fn run(self: *Self, executable: Executable) !?Value {
 
             // 6. If ref is a Reference Record, IsPropertyReference(ref) is false, and
             //    ref.[[ReferencedName]] is "eval", then
-            if (self.evaluation_context.reference) |reference| {
+            if (evaluation_context.reference) |reference| {
                 if (!reference.isPropertyReference() and
                     reference.referenced_name == .string and
                     std.mem.eql(u8, reference.referenced_name.string, "eval") and
@@ -269,7 +270,8 @@ pub fn run(self: *Self, executable: Executable) !?Value {
             try self.stack.append(value);
         },
         .load_this_value => {
-            const this_value = evaluateCallGetThisValue(self.evaluation_context);
+            const evaluation_context = self.evaluation_context_stack.getLast();
+            const this_value = evaluateCallGetThisValue(evaluation_context);
             try self.stack.append(this_value);
         },
         .resolve_binding => {
@@ -277,7 +279,9 @@ pub fn run(self: *Self, executable: Executable) !?Value {
             self.reference = try self.agent.resolveBinding(name, null);
         },
         .resolve_this_binding => self.result = try self.agent.resolveThisBinding(),
-        .set_evaluation_context_reference => self.evaluation_context.reference = self.reference,
+        .set_evaluation_context_reference => {
+            try self.evaluation_context_stack.append(.{ .reference = self.reference });
+        },
         .store => self.result = self.stack.pop(),
         .store_constant => {
             const value = self.fetchConstant(executable);
