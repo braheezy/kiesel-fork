@@ -1,16 +1,17 @@
 //! 19 The Global Object
 //! https://tc39.es/ecma262/#sec-global-object
 
-const builtin_function = @import("builtin_function.zig");
+const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
+const ArgumentsList = builtins.ArgumentsList;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
-const createBuiltinFunction = builtin_function.createBuiltinFunction;
+const createBuiltinFunction = builtins.createBuiltinFunction;
 const performEval = @import("eval.zig").performEval;
 
 const Self = @This();
@@ -81,8 +82,8 @@ pub const global_functions = struct {
 
 /// 19.2.1 eval ( x )
 /// https://tc39.es/ecma262/#sec-eval-x
-fn eval(agent: *Agent, _: Value, arguments: []const Value) !Value {
-    const x = if (arguments.len > 0) arguments[0] else .undefined;
+fn eval(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    const x = arguments.get(0);
 
     // 1. Return ? PerformEval(x, false, false).
     return performEval(agent, x, false, false);
@@ -90,8 +91,8 @@ fn eval(agent: *Agent, _: Value, arguments: []const Value) !Value {
 
 /// 19.2.2 isFinite ( number )
 /// https://tc39.es/ecma262/#sec-isfinite-number
-fn isFinite(agent: *Agent, _: Value, arguments: []const Value) !Value {
-    const number = if (arguments.len > 0) arguments[0] else .undefined;
+fn isFinite(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    const number = arguments.get(0);
 
     // 1. Let num be ? ToNumber(number).
     const num = try number.toNumber(agent);
@@ -103,8 +104,8 @@ fn isFinite(agent: *Agent, _: Value, arguments: []const Value) !Value {
 
 /// 19.2.3 isNaN ( number )
 /// https://tc39.es/ecma262/#sec-isnan-number
-fn isNaN(agent: *Agent, _: Value, arguments: []const Value) !Value {
-    const number = if (arguments.len > 0) arguments[0] else .undefined;
+fn isNaN(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    const number = arguments.get(0);
 
     // 1. Let num be ? ToNumber(number).
     const num = try number.toNumber(agent);

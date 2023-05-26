@@ -8,6 +8,7 @@ const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
+const ArgumentsList = builtins.ArgumentsList;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = Object.PropertyKey;
@@ -584,7 +585,7 @@ pub fn ordinarySetWithOwnDescriptor(
     const setter = own_descriptor.set orelse return false;
 
     // 6. Perform ? Call(setter, Receiver, « V »).
-    _ = try Value.from(setter).callAssumeCallable(receiver_value, &[_]Value{value});
+    _ = try Value.from(setter).callAssumeCallable(receiver_value, .{value});
 
     // 7. Return true.
     return true;

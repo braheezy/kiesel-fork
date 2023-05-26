@@ -7,6 +7,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
+const ArgumentsList = builtins.ArgumentsList;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
@@ -49,8 +50,8 @@ pub const BooleanConstructor = struct {
 
     /// 20.3.1.1 Boolean ( value )
     /// https://tc39.es/ecma262/#sec-boolean-constructor-boolean-value
-    fn behaviour(agent: *Agent, _: Value, arguments: []const Value, new_target: ?Object) !Value {
-        const value = if (arguments.len > 0) arguments[0] else .undefined;
+    fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, new_target: ?Object) !Value {
+        const value = arguments.get(0);
 
         // 1. Let b be ToBoolean(value).
         const b = value.toBoolean();
@@ -119,7 +120,7 @@ pub const BooleanPrototype = struct {
 
     /// 20.3.3.2 Boolean.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-boolean.prototype.tostring
-    fn toString(agent: *Agent, this_value: Value, _: []const Value) !Value {
+    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
         // 1. Let b be ? thisBooleanValue(this value).
         const b = try thisBooleanValue(agent, this_value);
 
@@ -129,7 +130,7 @@ pub const BooleanPrototype = struct {
 
     /// 20.3.3.3 Boolean.prototype.valueOf ( )
     /// https://tc39.es/ecma262/#sec-boolean.prototype.valueof
-    fn valueOf(agent: *Agent, this_value: Value, _: []const Value) !Value {
+    fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
         // 1. Return ? thisBooleanValue(this value).
         return Value.from(try thisBooleanValue(agent, this_value));
     }

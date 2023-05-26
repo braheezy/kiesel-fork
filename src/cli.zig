@@ -10,6 +10,7 @@ const gc = @cImport({
 const Allocator = std.mem.Allocator;
 
 const Agent = kiesel.execution.Agent;
+const ArgumentsList = kiesel.builtins.ArgumentsList;
 const Diagnostics = kiesel.language.Diagnostics;
 const Object = kiesel.types.Object;
 const Realm = kiesel.execution.Realm;
@@ -68,7 +69,7 @@ pub const Kiesel = struct {
         return kiesel_object;
     }
 
-    fn collect(_: *Agent, _: Value, _: []const Value) !Value {
+    fn collect(_: *Agent, _: Value, _: ArgumentsList) !Value {
         kiesel.gc.collect();
         return .undefined;
     }

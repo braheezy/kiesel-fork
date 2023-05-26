@@ -1,15 +1,16 @@
 //! 20.2 Function Objects
 //! https://tc39.es/ecma262/#sec-function-objects
 
-const builtin_function = @import("builtin_function.zig");
+const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
+const ArgumentsList = builtins.ArgumentsList;
 const Object = types.Object;
 const Realm = execution.Realm;
 const Value = types.Value;
-const createBuiltinFunction = builtin_function.createBuiltinFunction;
+const createBuiltinFunction = builtins.createBuiltinFunction;
 
 /// 20.2.3 Properties of the Function Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-prototype-object
@@ -23,7 +24,7 @@ pub const FunctionPrototype = struct {
         });
     }
 
-    fn behaviour(_: *Agent, _: Value, _: []const Value) !Value {
+    fn behaviour(_: *Agent, _: Value, _: ArgumentsList) !Value {
         return .undefined;
     }
 };

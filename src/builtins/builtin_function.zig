@@ -14,9 +14,38 @@ const Value = types.Value;
 const setFunctionLength = ecmascript_function.setFunctionLength;
 const setFunctionName = ecmascript_function.setFunctionName;
 
+pub const ArgumentsList = struct {
+    const Self = @This();
+
+    values: []const Value,
+
+    pub inline fn from(values: anytype) Self {
+        const T = @TypeOf(values);
+        if (@typeInfo(T) == .Struct and @typeInfo(T).Struct.is_tuple) {
+            return .{ .values = &values };
+        } else if (@typeInfo(T) == .Pointer) {
+            return .{ .values = values };
+        } else {
+            @compileError("ArgumentsList.from() called with incompatible type " ++ @typeName(T));
+        }
+    }
+
+    pub inline fn count(self: Self) usize {
+        return self.values.len;
+    }
+
+    pub inline fn get(self: Self, index: usize) Value {
+        return self.getOrNull(index) orelse .undefined;
+    }
+
+    pub inline fn getOrNull(self: Self, index: usize) ?Value {
+        return if (self.count() > index) self.values[index] else null;
+    }
+};
+
 pub const Behaviour = union(enum) {
-    pub const RegularFn = fn (*Agent, Value, []const Value) Agent.Error!Value;
-    pub const ConstructorFn = fn (*Agent, Value, []const Value, ?Object) Agent.Error!Value;
+    pub const RegularFn = fn (*Agent, Value, ArgumentsList) Agent.Error!Value;
+    pub const ConstructorFn = fn (*Agent, Value, ArgumentsList, ?Object) Agent.Error!Value;
 
     regular: *const RegularFn,
     constructor: *const ConstructorFn,
@@ -36,7 +65,7 @@ pub const BuiltinFunction = Object.Factory(.{
 
 /// 10.3.1 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-built-in-function-objects-call-thisargument-argumentslist
-fn call(object: Object, this_argument: Value, arguments_list: []const Value) !Value {
+fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) !Value {
     const agent = object.agent();
     const self = object.as(BuiltinFunction);
 
@@ -83,7 +112,7 @@ fn call(object: Object, this_argument: Value, arguments_list: []const Value) !Va
 
 /// 10.3.2 [[Construct]] ( argumentsList, newTarget )
 /// https://tc39.es/ecma262/#sec-built-in-function-objects-construct-argumentslist-newtarget
-fn construct(object: Object, arguments_list: []const Value, new_target: Object) !Object {
+fn construct(object: Object, arguments_list: ArgumentsList, new_target: Object) !Object {
     const agent = object.agent();
     const self = object.as(BuiltinFunction);
 

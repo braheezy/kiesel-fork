@@ -8,6 +8,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
+const ArgumentsList = builtins.ArgumentsList;
 const Object_ = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
@@ -63,9 +64,9 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.1.1 Object ( [ value ] )
     /// https://tc39.es/ecma262/#sec-object-value
-    fn behaviour(agent: *Agent, _: Value, arguments: []const Value, new_target: ?Object_) !Value {
+    fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, new_target: ?Object_) !Value {
         const realm = agent.currentRealm();
-        const value = if (arguments.len > 0) arguments[0] else .undefined;
+        const value = arguments.get(0);
 
         // 1. If NewTarget is neither undefined nor the active function object, then
         if (new_target != null and new_target.?.ptr != agent.activeFunctionObject().ptr) {
@@ -91,8 +92,8 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.6 Object.freeze ( O )
     /// https://tc39.es/ecma262/#sec-object.freeze
-    fn freeze(agent: *Agent, _: Value, arguments: []const Value) !Value {
-        const object = if (arguments.len > 0) arguments[0] else .undefined;
+    fn freeze(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
 
         // 1. If O is not an Object, return O.
         if (object != .object) return object;
@@ -109,9 +110,9 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.14 Object.is ( value1, value2 )
     /// https://tc39.es/ecma262/#sec-object.is
-    fn is(_: *Agent, _: Value, arguments: []const Value) !Value {
-        const value1 = if (arguments.len > 0) arguments[0] else .undefined;
-        const value2 = if (arguments.len > 1) arguments[1] else .undefined;
+    fn is(_: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const value1 = arguments.get(0);
+        const value2 = arguments.get(1);
 
         // 1. Return SameValue(value1, value2).
         return Value.from(sameValue(value1, value2));
@@ -119,8 +120,8 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.15 Object.isExtensible ( O )
     /// https://tc39.es/ecma262/#sec-object.isextensible
-    fn isExtensible(_: *Agent, _: Value, arguments: []const Value) !Value {
-        const object = if (arguments.len > 0) arguments[0] else .undefined;
+    fn isExtensible(_: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
 
         // 1. If O is not an Object, return true.
         if (object != .object) return Value.from(true);
@@ -131,8 +132,8 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.16 Object.isFrozen ( O )
     /// https://tc39.es/ecma262/#sec-object.isfrozen
-    fn isFrozen(_: *Agent, _: Value, arguments: []const Value) !Value {
-        const object = if (arguments.len > 0) arguments[0] else .undefined;
+    fn isFrozen(_: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
 
         // 1. If O is not an Object, return true.
         if (object != .object) return Value.from(true);
@@ -143,8 +144,8 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.17 Object.isSealed ( O )
     /// https://tc39.es/ecma262/#sec-object.issealed
-    fn isSealed(_: *Agent, _: Value, arguments: []const Value) !Value {
-        const object = if (arguments.len > 0) arguments[0] else .undefined;
+    fn isSealed(_: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
 
         // 1. If O is not an Object, return true.
         if (object != .object) return Value.from(true);
@@ -155,8 +156,8 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.21 Object.seal ( O )
     /// https://tc39.es/ecma262/#sec-object.seal
-    fn seal(agent: *Agent, _: Value, arguments: []const Value) !Value {
-        const object = if (arguments.len > 0) arguments[0] else .undefined;
+    fn seal(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
 
         // 1. If O is not an Object, return O.
         if (object != .object) return Value.from(true);
@@ -173,8 +174,8 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.19 Object.preventExtensions ( O )
     /// https://tc39.es/ecma262/#sec-object.preventextensions
-    fn preventExtensions(agent: *Agent, _: Value, arguments: []const Value) !Value {
-        const object = if (arguments.len > 0) arguments[0] else .undefined;
+    fn preventExtensions(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
 
         // 1. If O is not an Object, return O.
         if (object != .object) return object;

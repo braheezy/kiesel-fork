@@ -8,6 +8,7 @@ const pretty_printing = @import("../../pretty_printing.zig");
 const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
+const ArgumentsList = builtins.ArgumentsList;
 const BigInt = @import("BigInt.zig");
 const Number = @import("number.zig").Number;
 const Object = @import("Object.zig");
@@ -156,7 +157,7 @@ pub const Value = union(enum) {
                 // iv. Let result be ? Call(exoticToPrim, input, « hint »).
                 const result = try Value.from(exotic_to_primitive).callAssumeCallable(
                     self,
-                    &[_]Value{Value.from(hint)},
+                    .{Value.from(hint)},
                 );
 
                 // v. If result is not an Object, return result.
@@ -743,10 +744,11 @@ pub const Value = union(enum) {
         self: Self,
         agent: *Agent,
         this_value: Value,
-        arguments_list: []const Value,
+        arguments: anytype,
     ) !Value {
         // 1. If argumentsList is not present, set argumentsList to a new empty List.
-        // This is done via the NoArgs variant of the function.
+        // NOTE: This is done via the NoArgs variant of the function.
+        const arguments_list = ArgumentsList.from(arguments);
 
         // 2. If IsCallable(F) is false, throw a TypeError exception.
         if (!self.isCallable()) {
@@ -761,19 +763,15 @@ pub const Value = union(enum) {
     }
 
     pub inline fn callNoArgs(self: Self, agent: *Agent, this_value: Value) !Value {
-        return self.call(agent, this_value, &[_]Value{});
+        return self.call(agent, this_value, .{});
     }
 
-    pub inline fn callAssumeCallable(
-        self: Self,
-        this_value: Value,
-        arguments_list: []const Value,
-    ) !Value {
-        return self.object.internalMethods().call.?(self.object, this_value, arguments_list);
+    pub inline fn callAssumeCallable(self: Self, this_value: Value, arguments: anytype) !Value {
+        return self.object.internalMethods().call.?(self.object, this_value, ArgumentsList.from(arguments));
     }
 
     pub inline fn callAssumeCallableNoArgs(self: Self, this_value: Value) !Value {
-        return self.callAssumeCallable(this_value, &[_]Value{});
+        return self.callAssumeCallable(this_value, .{});
     }
 };
 

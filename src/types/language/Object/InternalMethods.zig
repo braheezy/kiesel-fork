@@ -9,6 +9,7 @@ const ordinary_internal_methods = builtins.ordinary_internal_methods;
 const spec = @import("../../spec.zig");
 
 const Agent = execution.Agent;
+const ArgumentsList = builtins.ArgumentsList;
 const Object = @import("../Object.zig");
 const PropertyDescriptor = spec.PropertyDescriptor;
 const PropertyKey = Object.PropertyKey;
@@ -84,12 +85,12 @@ ownPropertyKeys: *const fn (
 call: ?*const fn (
     object: Object,
     this_value: Value,
-    arguments: []const Value,
+    arguments_list: ArgumentsList,
 ) Agent.Error!Value = null,
 
 // [[Construct]]
 construct: ?*const fn (
     object: Object,
-    arguments: []const Value,
+    arguments_list: ArgumentsList,
     new_target: Object,
 ) Agent.Error!Object = null,
