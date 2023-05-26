@@ -18,7 +18,7 @@ agent: *Agent,
 ip: usize,
 stack: std.ArrayList(Value),
 result: ?Value,
-last_reference: ?Reference = null,
+reference: ?Reference = null,
 evaluation_context: EvaluationContext,
 
 const EvaluationContext = struct {
@@ -32,7 +32,7 @@ pub fn init(agent: *Agent) !Self {
         .ip = 0,
         .stack = stack,
         .result = null,
-        .last_reference = null,
+        .reference = null,
         .evaluation_context = .{},
     };
 }
@@ -213,7 +213,7 @@ pub fn run(self: *Self, executable: Executable) !?Value {
             //      [[Strict]]: strict,
             //      [[ThisValue]]: empty
             //    }.
-            const reference = Reference{
+            self.reference = Reference{
                 .base = .{ .value = base_value },
                 .referenced_name = switch (property_key) {
                     .string => |string| .{ .string = string },
@@ -229,8 +229,6 @@ pub fn run(self: *Self, executable: Executable) !?Value {
                 .strict = strict,
                 .this_value = null,
             };
-            self.result = try reference.getValue(self.agent);
-            self.last_reference = reference;
         },
         // 13.3.4 EvaluatePropertyAccessWithIdentifierKey ( baseValue, identifierName, strict )
         // https://tc39.es/ecma262/#sec-evaluate-property-access-with-identifier-key
@@ -247,14 +245,16 @@ pub fn run(self: *Self, executable: Executable) !?Value {
             //      [[Strict]]: strict,
             //      [[ThisValue]]: empty
             //    }.
-            const reference = Reference{
+            self.reference = Reference{
                 .base = .{ .value = base_value },
                 .referenced_name = .{ .string = property_name_string },
                 .strict = strict,
                 .this_value = null,
             };
-            self.result = try reference.getValue(self.agent);
-            self.last_reference = reference;
+        },
+        .get_value => {
+            if (self.reference) |reference| self.result = try reference.getValue(self.agent);
+            self.reference = null;
         },
         .jump => self.ip = self.fetchIndex(executable),
         .jump_conditional => {
@@ -274,18 +274,10 @@ pub fn run(self: *Self, executable: Executable) !?Value {
         },
         .resolve_binding => {
             const name = self.fetchIdentifier(executable);
-            const reference = try self.agent.resolveBinding(name, null);
-            self.result = try reference.getValue(self.agent);
-            self.last_reference = reference;
+            self.reference = try self.agent.resolveBinding(name, null);
         },
         .resolve_this_binding => self.result = try self.agent.resolveThisBinding(),
-        .set_reference => {
-            const expression_is_reference = self.fetchIndex(executable) == 1;
-            self.evaluation_context.reference = if (expression_is_reference)
-                self.last_reference.?
-            else
-                null;
-        },
+        .set_evaluation_context_reference => self.evaluation_context.reference = self.reference,
         .store => self.result = self.stack.pop(),
         .store_constant => {
             const value = self.fetchConstant(executable);

@@ -155,10 +155,6 @@ pub fn print(self: Self, writer: anytype) !void {
                 const identifier = self.identifiers.items[identifier_index];
                 try writer.print("{s} [{}]", .{ identifier, identifier_index });
             },
-            .set_reference => {
-                const expression_is_reference = iterator.instruction_args[0].?;
-                try writer.print("(expression_is_reference: {})", .{expression_is_reference == 1});
-            },
             else => {},
         }
         try writer.writeAll("\n");

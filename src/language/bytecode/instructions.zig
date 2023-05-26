@@ -15,6 +15,8 @@ pub const Instruction = enum(u8) {
     evaluate_property_access_with_expression_key,
     /// Store EvaluatePropertyAccessWithIdentifierKey() as the result value.
     evaluate_property_access_with_identifier_key,
+    /// Store GetValue() as the result value.
+    get_value,
     /// Jump to another instruction by setting the instruction pointer.
     jump,
     /// Jump to one of two other instructions depending on whether the last value on the stack is
@@ -30,9 +32,8 @@ pub const Instruction = enum(u8) {
     resolve_binding,
     /// Store ResolveThisBinding() as the result value.
     resolve_this_binding,
-    /// Set the evaluation context reference to the last evaluated one or null, depending on the
-    /// argument.
-    set_reference,
+    /// Set the evaluation context reference to the last evaluated one, if any.
+    set_evaluation_context_reference,
     /// Store the last value from the stack as the result value.
     store,
     /// Store a constant as the result value.
@@ -52,7 +53,6 @@ pub const Instruction = enum(u8) {
             .jump,
             .load_constant,
             .resolve_binding,
-            .set_reference,
             .store_constant,
             => 1,
             else => 0,

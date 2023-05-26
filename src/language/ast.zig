@@ -147,8 +147,10 @@ pub const MemberExpression = struct {
     /// https://tc39.es/ecma262/#sec-property-accessors-runtime-semantics-evaluation
     pub fn generateBytecode(self: Self, executable: *Executable) !void {
         // 1. Let baseReference be ? Evaluation of MemberExpression.
-        // 2. Let baseValue be ? GetValue(baseReference).
         try self.expression.generateBytecode(executable);
+
+        // 2. Let baseValue be ? GetValue(baseReference).
+        if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
         try executable.addInstruction(.load);
 
         // TODO: 3. If the source text matched by this MemberExpression is strict mode code, let
@@ -201,21 +203,22 @@ pub const CallExpression = struct {
     pub fn generateBytecode(self: Self, executable: *Executable) !void {
         // CallExpression : CallExpression Arguments
         // 1. Let ref be ? Evaluation of CallExpression.
-        // 2. Let func be ? GetValue(ref).
         try self.expression.generateBytecode(executable);
+
+        try executable.addInstruction(.set_evaluation_context_reference);
+
+        // 2. Let func be ? GetValue(ref).
+        if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
         try executable.addInstruction(.load);
 
         // TODO: 3. Let thisCall be this CallExpression.
         // TODO: 4. Let tailCall be IsInTailPosition(thisCall).
 
-        const expression_is_reference = self.expression.analyze(.is_reference);
-        try executable.addInstruction(.set_reference);
-        try executable.addIndex(@boolToInt(expression_is_reference));
-
         try executable.addInstruction(.load_this_value);
 
         for (self.arguments) |argument| {
             try argument.generateBytecode(executable);
+            if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
             try executable.addInstruction(.load);
         }
 
@@ -435,11 +438,13 @@ pub const UnaryExpression = struct {
             // UnaryExpression : void UnaryExpression
             .void => {
                 // 1. Let expr be ? Evaluation of UnaryExpression.
-                // 2. Perform ? GetValue(expr).
                 try self.expression.generateBytecode(executable);
 
+                // 2. Perform ? GetValue(expr).
+                if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
                 // 3. Return undefined.
-               try executable.addInstructionWithConstant(.store_constant, .undefined);
+                try executable.addInstructionWithConstant(.store_constant, .undefined);
             },
         }
     }
@@ -702,8 +707,10 @@ pub const ExpressionStatement = struct {
     pub fn generateBytecode(self: Self, executable: *Executable) !void {
         // ExpressionStatement : Expression ;
         // 1. Let exprRef be ? Evaluation of Expression.
-        // 2. Return ? GetValue(exprRef).
         try self.expression.generateBytecode(executable);
+
+        // 2. Return ? GetValue(exprRef).
+        if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
@@ -727,6 +734,7 @@ pub const IfStatement = struct {
         try self.test_expression.generateBytecode(executable);
 
         // 2. Let exprValue be ToBoolean(? GetValue(exprRef)).
+        if (self.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
         try executable.addInstruction(.load);
         try executable.addInstruction(.jump_conditional);
         const consequent_jump = try executable.addJumpIndex();
@@ -830,8 +838,10 @@ pub const DoWhileStatement = struct {
         // NOTE: This is done by the store/load sequence around each consequent execution.
 
         // d. Let exprRef be ? Evaluation of Expression.
-        // e. Let exprValue be ? GetValue(exprRef).
         try self.test_expression.generateBytecode(executable);
+
+        // e. Let exprValue be ? GetValue(exprRef).
+        if (self.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
         // f. If ToBoolean(exprValue) is false, return V.
         try executable.addInstruction(.load);
@@ -872,8 +882,10 @@ pub const WhileStatement = struct {
         const start_index = executable.instructions.items.len;
 
         // a. Let exprRef be ? Evaluation of Expression.
-        // b. Let exprValue be ? GetValue(exprRef).
         try self.test_expression.generateBytecode(executable);
+
+        // b. Let exprValue be ? GetValue(exprRef).
+        if (self.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
         // c. If ToBoolean(exprValue) is false, return V.
         try executable.addInstruction(.load);
@@ -920,8 +932,10 @@ pub const ThrowStatement = struct {
     pub fn generateBytecode(self: Self, executable: *Executable) !void {
         // ThrowStatement : throw Expression ;
         // 1. Let exprRef be ? Evaluation of Expression.
-        // 2. Let exprValue be ? GetValue(exprRef).
         try self.expression.generateBytecode(executable);
+
+        // 2. Let exprValue be ? GetValue(exprRef).
+        if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
         // 3. Return ThrowCompletion(exprValue).
         try executable.addInstruction(.load);
