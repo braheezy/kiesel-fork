@@ -426,6 +426,7 @@ pub const UnaryExpression = struct {
 
     pub const Operator = enum {
         void,
+        typeof,
     };
 
     operator: Operator,
@@ -445,6 +446,15 @@ pub const UnaryExpression = struct {
 
                 // 3. Return undefined.
                 try executable.addInstructionWithConstant(.store_constant, .undefined);
+            },
+
+            // 13.5.3.1 Runtime Semantics: Evaluation
+            // https://tc39.es/ecma262/#sec-typeof-operator-runtime-semantics-evaluation
+            // UnaryExpression : typeof UnaryExpression
+            .typeof => {
+                // NOTE: get_value is intentionally omitted here, typeof needs to do it conditionally.
+                try self.expression.generateBytecode(executable);
+                try executable.addInstruction(.typeof);
             },
         }
     }
