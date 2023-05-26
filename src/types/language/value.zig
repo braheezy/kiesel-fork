@@ -115,6 +115,8 @@ pub const Value = union(enum) {
             @typeInfo(T) == .ComptimeFloat)
         {
             return .{ .number = Number.from(value) };
+        } else if (T == Number) {
+            return .{ .number = value };
         } else if (T == BigInt) {
             return .{ .big_int = value };
         } else if (T == Object) {

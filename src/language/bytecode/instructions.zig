@@ -40,6 +40,8 @@ pub const Instruction = enum(u8) {
     store_constant,
     /// Throw the last value from the stack as an exception.
     throw,
+    /// Store ToNumber() as the result value.
+    to_number,
     /// Apply the typeof operation to the evaluated expression and set it as the result value.
     typeof,
     /// Non-exhaustive enum to allow arbitrary values as constant indices.

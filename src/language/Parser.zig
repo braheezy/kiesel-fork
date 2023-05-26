@@ -246,6 +246,7 @@ fn acceptUnaryExpression(self: *Self, operator_token: Tokenizer.Token) !ast.Unar
     const operator: ast.UnaryExpression.Operator = switch (operator_token.type) {
         .void => .void,
         .typeof => .typeof,
+        .@"+" => .@"+",
         else => unreachable,
     };
     const expression = try self.allocator.create(ast.Expression);
@@ -257,7 +258,7 @@ fn acceptExpression(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    if (self.core.accept(RuleSet.oneOf(.{ .void, .typeof }))) |operator_token| {
+    if (self.core.accept(RuleSet.oneOf(.{ .void, .typeof, .@"+" }))) |operator_token| {
         const unary_expression = try self.acceptUnaryExpression(operator_token);
         return .{ .unary_expression = unary_expression };
     } else |_| {}
