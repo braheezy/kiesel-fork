@@ -155,6 +155,14 @@ fn directEval(agent: *Agent, arguments: []const Value) !Value {
 
 pub fn run(self: *Self, executable: Executable) !?Value {
     while (self.fetchInstruction(executable)) |instruction| switch (instruction) {
+        .bitwise_not => {
+            const value = self.stack.pop();
+            self.result = switch (value) {
+                .number => |number| Value.from(number.bitwiseNOT()),
+                .big_int => |big_int| Value.from(try big_int.bitwiseNOT()),
+                else => unreachable,
+            };
+        },
         .evaluate_call => {
             const evaluation_context = self.evaluation_context_stack.pop();
             const argument_count = self.fetchIndex(executable);

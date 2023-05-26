@@ -6,6 +6,8 @@ const IndexType = Executable.IndexType;
 pub const Instruction = enum(u8) {
     const Self = @This();
 
+    /// Apply bitwise NOT to the last value on the stack and store it as the result value.
+    bitwise_not,
     /// Store EvaluateCall() as the result value.
     /// This instruction has the number of argument values that need to be popped from the stack
     /// (last to first) as an argument, the values on the stack afterwards are the this value and
