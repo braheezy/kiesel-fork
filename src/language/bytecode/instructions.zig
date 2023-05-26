@@ -25,11 +25,14 @@ pub const Instruction = enum(u8) {
     /// Load a constant and add it to the stack.
     load_constant,
     /// Determine the this value for an upcoming evaluate_call instruction and add it to the stack.
-    prepare_call,
+    load_this_value,
     /// Store ResolveBinding() as the result value.
     resolve_binding,
     /// Store ResolveThisBinding() as the result value.
     resolve_this_binding,
+    /// Set the evaluation context reference to the last evaluated one or null, depending on the
+    /// argument.
+    set_reference,
     /// Store the last value from the stack as the result value.
     store,
     /// Store a constant as the result value.
@@ -48,8 +51,8 @@ pub const Instruction = enum(u8) {
             .evaluate_property_access_with_expression_key,
             .jump,
             .load_constant,
-            .prepare_call,
             .resolve_binding,
+            .set_reference,
             .store_constant,
             => 1,
             else => 0,

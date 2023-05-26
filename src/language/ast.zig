@@ -209,8 +209,10 @@ pub const CallExpression = struct {
         // TODO: 4. Let tailCall be IsInTailPosition(thisCall).
 
         const expression_is_reference = self.expression.analyze(.is_reference);
-        try executable.addInstruction(.prepare_call);
+        try executable.addInstruction(.set_reference);
         try executable.addIndex(@boolToInt(expression_is_reference));
+
+        try executable.addInstruction(.load_this_value);
 
         for (self.arguments) |argument| {
             try argument.generateBytecode(executable);

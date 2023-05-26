@@ -150,14 +150,14 @@ pub fn print(self: Self, writer: anytype) !void {
                 const constant = self.constants.items[constant_index];
                 try writer.print("{pretty} [{}]", .{ constant, constant_index });
             },
-            .prepare_call => {
-                const expression_is_reference = iterator.instruction_args[0].?;
-                try writer.print("(expression_is_reference: {})", .{expression_is_reference == 1});
-            },
             .resolve_binding => {
                 const identifier_index = iterator.instruction_args[0].?;
                 const identifier = self.identifiers.items[identifier_index];
                 try writer.print("{s} [{}]", .{ identifier, identifier_index });
+            },
+            .set_reference => {
+                const expression_is_reference = iterator.instruction_args[0].?;
+                try writer.print("(expression_is_reference: {})", .{expression_is_reference == 1});
             },
             else => {},
         }

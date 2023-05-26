@@ -19,9 +19,9 @@ ip: usize,
 stack: std.ArrayList(Value),
 result: ?Value,
 last_reference: ?Reference = null,
-evaluate_call_context: EvaluateCallContext,
+evaluation_context: EvaluationContext,
 
-const EvaluateCallContext = struct {
+const EvaluationContext = struct {
     reference: ?Reference = null,
 };
 
@@ -33,7 +33,7 @@ pub fn init(agent: *Agent) !Self {
         .stack = stack,
         .result = null,
         .last_reference = null,
-        .evaluate_call_context = .{},
+        .evaluation_context = .{},
     };
 }
 
@@ -68,7 +68,7 @@ fn fetchIndex(self: *Self, executable: Executable) Executable.IndexType {
 
 /// 13.3.6.2 EvaluateCall ( func, ref, arguments, tailPosition )
 /// https://tc39.es/ecma262/#sec-evaluatecall
-fn evaluateCallGetThisValue(ctx: EvaluateCallContext) Value {
+fn evaluateCallGetThisValue(ctx: EvaluationContext) Value {
     // 1. If ref is a Reference Record, then
     if (ctx.reference) |reference| {
         // a. If IsPropertyReference(ref) is true, then
@@ -155,7 +155,7 @@ fn directEval(agent: *Agent, arguments: []const Value) !Value {
 pub fn run(self: *Self, executable: Executable) !?Value {
     while (self.fetchInstruction(executable)) |instruction| switch (instruction) {
         .evaluate_call => {
-            defer self.evaluate_call_context = .{};
+            defer self.evaluation_context = .{};
             const argument_count = self.fetchIndex(executable);
             var arguments = try std.ArrayList(Value).initCapacity(
                 self.agent.gc_allocator,
@@ -174,7 +174,7 @@ pub fn run(self: *Self, executable: Executable) !?Value {
 
             // 6. If ref is a Reference Record, IsPropertyReference(ref) is false, and
             //    ref.[[ReferencedName]] is "eval", then
-            if (self.evaluate_call_context.reference) |reference| {
+            if (self.evaluation_context.reference) |reference| {
                 if (!reference.isPropertyReference() and
                     reference.referenced_name == .string and
                     std.mem.eql(u8, reference.referenced_name.string, "eval") and
@@ -268,13 +268,8 @@ pub fn run(self: *Self, executable: Executable) !?Value {
             const value = self.fetchConstant(executable);
             try self.stack.append(value);
         },
-        .prepare_call => {
-            const expression_is_reference = self.fetchIndex(executable) == 1;
-            self.evaluate_call_context.reference = if (expression_is_reference)
-                self.last_reference.?
-            else
-                null;
-            const this_value = evaluateCallGetThisValue(self.evaluate_call_context);
+        .load_this_value => {
+            const this_value = evaluateCallGetThisValue(self.evaluation_context);
             try self.stack.append(this_value);
         },
         .resolve_binding => {
@@ -284,6 +279,13 @@ pub fn run(self: *Self, executable: Executable) !?Value {
             self.last_reference = reference;
         },
         .resolve_this_binding => self.result = try self.agent.resolveThisBinding(),
+        .set_reference => {
+            const expression_is_reference = self.fetchIndex(executable) == 1;
+            self.evaluation_context.reference = if (expression_is_reference)
+                self.last_reference.?
+            else
+                null;
+        },
         .store => self.result = self.stack.pop(),
         .store_constant => {
             const value = self.fetchConstant(executable);
