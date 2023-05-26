@@ -31,6 +31,11 @@ pub const Value = union(enum) {
 
     pub const PreferredType = enum { string, number };
 
+    pub const Numeric = union(enum) {
+        number: Number,
+        big_int: BigInt,
+    };
+
     /// 6.1.1 The Undefined Type
     /// https://tc39.es/ecma262/#sec-ecmascript-language-types-undefined-type
     undefined,
@@ -211,15 +216,15 @@ pub const Value = union(enum) {
 
     /// 7.1.3 ToNumeric ( value )
     /// https://tc39.es/ecma262/#sec-tonumeric
-    pub fn toNumeric(self: Self, agent: *Agent) !Number {
+    pub fn toNumeric(self: Self, agent: *Agent) !Numeric {
         // 1. Let primValue be ? ToPrimitive(value, number).
         const primitive_value = try self.toPrimitive(agent, .number);
 
         // 2. If primValue is a BigInt, return primValue.
-        if (primitive_value == .big_int) return primitive_value.big_int;
+        if (primitive_value == .big_int) return .{ .big_int = primitive_value.big_int };
 
         // 3. Return ? ToNumber(primValue).
-        return primitive_value.toNumber(agent);
+        return .{ .number = try primitive_value.toNumber(agent) };
     }
 
     /// 7.1.4 ToNumber ( argument )
