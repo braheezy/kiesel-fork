@@ -23,6 +23,18 @@ pub fn format(
     try writer.writeAll("n");
 }
 
+/// 6.1.6.2.1 BigInt::unaryMinus ( x )
+/// https://tc39.es/ecma262/#sec-numeric-types-bigint-unaryMinus
+pub fn unaryMinus(self: Self) !Self {
+    // 1.If x is 0ℤ, return 0ℤ.
+    if (self.value.eqZero()) return self;
+
+    // 2. Return the BigInt value that represents the negation of ℝ(x).
+    var cloned_value = try self.value.clone();
+    cloned_value.negate();
+    return .{ .value = cloned_value };
+}
+
 /// 6.1.6.2.13 BigInt::equal ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-equal
 pub fn equal(x: Self, y: Self) bool {

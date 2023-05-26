@@ -119,6 +119,20 @@ pub const Number = union(enum) {
         };
     }
 
+    /// 6.1.6.1.1 Number::unaryMinus ( x )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-unaryMinus
+    pub fn unaryMinus(self: Self) Self {
+        // 1. If x is NaN, return NaN.
+        if (self.isNan()) return self;
+
+        // 2. Return the result of negating x; that is, compute a Number with the same magnitude
+        //    but opposite sign.
+        return switch (self) {
+            .f64 => |x| .{ .f64 = -x },
+            .i32 => |x| .{ .i32 = -x },
+        };
+    }
+
     /// 6.1.6.1.14 Number::sameValue ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-sameValue
     pub fn sameValue(x: Self, y: Self) bool {
