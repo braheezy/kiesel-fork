@@ -470,7 +470,6 @@ pub const UnaryExpression = struct {
 
                 // 2. Return ? ToNumber(? GetValue(expr)).
                 if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.load);
                 try executable.addInstruction(.to_number);
             },
 
@@ -483,7 +482,6 @@ pub const UnaryExpression = struct {
 
                 // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
                 if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.load);
                 try executable.addInstruction(.to_numeric);
 
                 // 3. If oldValue is a Number, then
@@ -491,7 +489,6 @@ pub const UnaryExpression = struct {
                 // 4. Else,
                 //     a. Assert: oldValue is a BigInt.
                 //     b. Return BigInt::unaryMinus(oldValue).
-                try executable.addInstruction(.load);
                 try executable.addInstruction(.unary_minus);
             },
 
@@ -504,7 +501,6 @@ pub const UnaryExpression = struct {
 
                 // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
                 if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.load);
                 try executable.addInstruction(.to_numeric);
 
                 // 3. If oldValue is a Number, then
@@ -512,7 +508,6 @@ pub const UnaryExpression = struct {
                 // 4. Else,
                 //     a. Assert: oldValue is a BigInt.
                 //     b. Return BigInt::bitwiseNOT(oldValue).
-                try executable.addInstruction(.load);
                 try executable.addInstruction(.bitwise_not);
             },
 
@@ -525,7 +520,6 @@ pub const UnaryExpression = struct {
 
                 // 2. Let oldValue be ToBoolean(? GetValue(expr)).
                 if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.load);
 
                 // 3. If oldValue is true, return false.
                 // 4. Return true.
@@ -820,7 +814,6 @@ pub const IfStatement = struct {
 
         // 2. Let exprValue be ToBoolean(? GetValue(exprRef)).
         if (self.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
         try executable.addInstruction(.jump_conditional);
         const consequent_jump = try executable.addJumpIndex();
         const alternate_jump = try executable.addJumpIndex();
@@ -973,7 +966,6 @@ pub const WhileStatement = struct {
         if (self.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
         // c. If ToBoolean(exprValue) is false, return V.
-        try executable.addInstruction(.load);
         try executable.addInstruction(.jump_conditional);
         const consequent_jump = try executable.addJumpIndex();
         const end_jump = try executable.addJumpIndex();
@@ -1023,7 +1015,6 @@ pub const ThrowStatement = struct {
         if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
         // 3. Return ThrowCompletion(exprValue).
-        try executable.addInstruction(.load);
         try executable.addInstruction(.throw);
     }
 

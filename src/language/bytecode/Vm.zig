@@ -156,7 +156,7 @@ fn directEval(agent: *Agent, arguments: []const Value) !Value {
 pub fn run(self: *Self, executable: Executable) !?Value {
     while (self.fetchInstruction(executable)) |instruction| switch (instruction) {
         .bitwise_not => {
-            const value = self.stack.pop();
+            const value = self.result.?;
             self.result = switch (value) {
                 .number => |number| Value.from(number.bitwiseNOT()),
                 .big_int => |big_int| Value.from(try big_int.bitwiseNOT()),
@@ -269,10 +269,13 @@ pub fn run(self: *Self, executable: Executable) !?Value {
         .jump_conditional => {
             const ip_consequent = self.fetchIndex(executable);
             const ip_alternate = self.fetchIndex(executable);
-            const value = self.stack.pop();
+            const value = self.result.?;
             self.ip = if (value.toBoolean()) ip_consequent else ip_alternate;
         },
-        .load => try self.stack.append(self.result.?),
+        .load => {
+            const value = self.result.?;
+            try self.stack.append(value);
+        },
         .load_constant => {
             const value = self.fetchConstant(executable);
             try self.stack.append(value);
@@ -283,7 +286,7 @@ pub fn run(self: *Self, executable: Executable) !?Value {
             try self.stack.append(this_value);
         },
         .logical_not => {
-            const value = self.stack.pop();
+            const value = self.result.?;
             self.result = Value.from(!value.toBoolean());
         },
         .resolve_binding => {
@@ -300,17 +303,17 @@ pub fn run(self: *Self, executable: Executable) !?Value {
             self.result = value;
         },
         .throw => {
-            const value = self.stack.pop();
+            const value = self.result.?;
             self.agent.exception = value;
             // TODO: This will need to change when try/catch are implemented.
             return error.ExceptionThrown;
         },
         .to_number => {
-            const value = self.stack.pop();
+            const value = self.result.?;
             self.result = Value.from(try value.toNumber(self.agent));
         },
         .to_numeric => {
-            const value = self.stack.pop();
+            const value = self.result.?;
             const numeric = try value.toNumeric(self.agent);
             self.result = switch (numeric) {
                 .number => |number| Value.from(number),
@@ -371,7 +374,7 @@ pub fn run(self: *Self, executable: Executable) !?Value {
             };
         },
         .unary_minus => {
-            const value = self.stack.pop();
+            const value = self.result.?;
             self.result = switch (value) {
                 .number => |number| Value.from(number.unaryMinus()),
                 .big_int => |big_int| Value.from(try big_int.unaryMinus()),
