@@ -181,9 +181,9 @@ pub const MemberExpression = struct {
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("MemberExpression", writer, indentation);
-        try printString("expression", writer, indentation + 1);
+        try printString("expression:", writer, indentation + 1);
         try self.expression.print(writer, indentation + 2);
-        try printString("property", writer, indentation + 1);
+        try printString("property:", writer, indentation + 1);
         switch (self.property) {
             .expression => |expression| try expression.print(writer, indentation + 2),
             .identifier => |identifier| try printString(identifier, writer, indentation + 2),
@@ -229,9 +229,9 @@ pub const CallExpression = struct {
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("CallExpression", writer, indentation);
-        try printString("expression", writer, indentation + 1);
+        try printString("expression:", writer, indentation + 1);
         try self.expression.print(writer, indentation + 2);
-        try printString("arguments", writer, indentation + 1);
+        try printString("arguments:", writer, indentation + 1);
         for (self.arguments) |argument| {
             try argument.print(writer, indentation + 2);
         }
@@ -530,9 +530,9 @@ pub const UnaryExpression = struct {
 
     pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
         try printString("UnaryExpression", writer, indentation);
-        try printString("operator", writer, indentation + 1);
+        try printString("operator:", writer, indentation + 1);
         try printString(@tagName(self.operator), writer, indentation + 2);
-        try printString("expression", writer, indentation + 1);
+        try printString("expression:", writer, indentation + 1);
         try self.expression.print(writer, indentation + 2);
     }
 };
