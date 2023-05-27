@@ -140,7 +140,7 @@ fn acceptIdentifierReference(self: *Self) !ast.IdentifierReference {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const token = try self.core.accept(RuleSet.is(.identifier));
+    const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .@"await" }));
     return .{ .identifier = token.text };
 }
 

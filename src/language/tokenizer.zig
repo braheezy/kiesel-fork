@@ -19,6 +19,7 @@ const TokenType = enum {
     @"}",
     @"+",
     @"~",
+    @"await",
     comment,
     debugger,
     do,
@@ -36,6 +37,7 @@ const TokenType = enum {
     void,
     @"while",
     whitespace,
+    yield,
 };
 
 const Pattern = ptk.Pattern(TokenType);
@@ -56,6 +58,7 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
     Pattern.create(.@"}", ptk.matchers.literal("}")),
     Pattern.create(.@"+", ptk.matchers.literal("+")),
     Pattern.create(.@"~", ptk.matchers.literal("~")),
+    Pattern.create(.@"await", ptk.matchers.literal("await")),
     Pattern.create(.comment, commentMatcher),
     Pattern.create(.debugger, ptk.matchers.literal("debugger")),
     Pattern.create(.do, ptk.matchers.literal("do")),
@@ -72,6 +75,7 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
     Pattern.create(.void, ptk.matchers.literal("void")),
     Pattern.create(.@"while", ptk.matchers.literal("while")),
     Pattern.create(.whitespace, whitespaceMatcher),
+    Pattern.create(.yield, ptk.matchers.literal("yield")),
 });
 
 /// 12.2 White Space
