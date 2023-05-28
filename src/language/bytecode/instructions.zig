@@ -57,14 +57,14 @@ pub const Instruction = enum(u8) {
 
     pub fn argumentCount(self: Self) u2 {
         return switch (self) {
+            .evaluate_call,
             .evaluate_property_access_with_identifier_key,
             .jump_conditional,
+            .resolve_binding,
             => 2,
-            .evaluate_call,
             .evaluate_property_access_with_expression_key,
             .jump,
             .load_constant,
-            .resolve_binding,
             .store_constant,
             => 1,
             else => 0,

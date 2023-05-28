@@ -13,6 +13,10 @@ const Value = types.Value;
 
 const BytecodeError = error{ OutOfMemory, IndexOutOfRange };
 
+const BytecodeContext = struct {
+    contained_in_strict_mode_code: bool = false,
+};
+
 fn printIndentation(writer: anytype, indentation: usize) !void {
     var i: usize = 0;
     while (i < indentation) : (i += 1)
@@ -26,6 +30,7 @@ fn printString(string: []const u8, writer: anytype, indentation: usize) !void {
 
 const AnalyzeQuery = enum {
     is_reference,
+    is_string_literal,
 };
 
 /// https://tc39.es/ecma262/#prod-ParenthesizedExpression
@@ -35,13 +40,14 @@ pub const ParenthesizedExpression = struct {
     expression: *Expression,
 
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
-        switch (query) {
-            .is_reference => return self.expression.analyze(query),
-        }
+        return switch (query) {
+            .is_reference => self.expression.analyze(query),
+            .is_string_literal => false,
+        };
     }
 
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
-        try self.expression.generateBytecode(executable);
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        try self.expression.generateBytecode(executable, ctx);
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
@@ -58,12 +64,14 @@ pub const IdentifierReference = struct {
 
     /// 13.1.3 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-identifiers-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         // IdentifierReference : Identifier
         // IdentifierReference : yield
         // IdentifierReference : await
         // 1. Return ? ResolveBinding(StringValue of Identifier).
         try executable.addInstructionWithIdentifier(.resolve_binding, self.identifier);
+        const strict = ctx.contained_in_strict_mode_code;
+        try executable.addIndex(@boolToInt(strict));
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
@@ -85,18 +93,20 @@ pub const PrimaryExpression = union(enum) {
     parenthesized_expression: ParenthesizedExpression,
 
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
-        switch (query) {
+        return switch (query) {
             .is_reference => switch (self) {
-                .identifier_reference => return true,
-                .parenthesized_expression => |parenthesized_expression| {
-                    return parenthesized_expression.analyze(query);
-                },
-                .this, .literal => return false,
+                .identifier_reference => true,
+                .parenthesized_expression => |parenthesized_expression| parenthesized_expression.analyze(query),
+                .this, .literal => false,
             },
-        }
+            .is_string_literal => switch (self) {
+                .literal => |literal| literal.analyze(query),
+                else => false,
+            },
+        };
     }
 
-    pub fn generateBytecode(self: Self, executable: *Executable) BytecodeError!void {
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
         switch (self) {
             // PrimaryExpression : this
             .this => {
@@ -104,13 +114,9 @@ pub const PrimaryExpression = union(enum) {
                 try executable.addInstruction(.resolve_this_binding);
             },
 
-            .identifier_reference => |identifier_reference| try identifier_reference.generateBytecode(
-                executable,
-            ),
-            .literal => |literal| try literal.generateBytecode(executable),
-            .parenthesized_expression => |parenthesized_expression| try parenthesized_expression.generateBytecode(
-                executable,
-            ),
+            .identifier_reference => |identifier_reference| try identifier_reference.generateBytecode(executable, ctx),
+            .literal => |literal| try literal.generateBytecode(executable, ctx),
+            .parenthesized_expression => |parenthesized_expression| try parenthesized_expression.generateBytecode(executable, ctx),
         }
     }
 
@@ -145,23 +151,23 @@ pub const MemberExpression = struct {
 
     /// 13.3.2.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-property-accessors-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         // 1. Let baseReference be ? Evaluation of MemberExpression.
-        try self.expression.generateBytecode(executable);
+        try self.expression.generateBytecode(executable, ctx);
 
         // 2. Let baseValue be ? GetValue(baseReference).
         if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
         try executable.addInstruction(.load);
 
-        // TODO: 3. If the source text matched by this MemberExpression is strict mode code, let
-        //    strict be true; else let strict be false.
-        const strict = false;
+        // 3. If the source text matched by this MemberExpression is strict mode code, let strict
+        //    be true; else let strict be false.
+        const strict = ctx.contained_in_strict_mode_code;
 
         switch (self.property) {
             // MemberExpression : MemberExpression [ Expression ]
             .expression => |expression| {
                 // 4. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
-                try expression.generateBytecode(executable);
+                try expression.generateBytecode(executable, ctx);
                 try executable.addInstruction(.load);
                 try executable.addInstruction(.evaluate_property_access_with_expression_key);
                 try executable.addIndex(@boolToInt(strict));
@@ -200,10 +206,10 @@ pub const CallExpression = struct {
 
     /// 13.3.6.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-function-calls-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         // CallExpression : CallExpression Arguments
         // 1. Let ref be ? Evaluation of CallExpression.
-        try self.expression.generateBytecode(executable);
+        try self.expression.generateBytecode(executable, ctx);
 
         try executable.addInstruction(.set_evaluation_context_reference);
 
@@ -217,14 +223,17 @@ pub const CallExpression = struct {
         try executable.addInstruction(.load_this_value);
 
         for (self.arguments) |argument| {
-            try argument.generateBytecode(executable);
+            try argument.generateBytecode(executable, ctx);
             if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
             try executable.addInstruction(.load);
         }
 
+        const strict = ctx.contained_in_strict_mode_code;
+
         // 5. Return ? EvaluateCall(func, ref, Arguments, tailCall).
         try executable.addInstruction(.evaluate_call);
         try executable.addIndex(self.arguments.len);
+        try executable.addIndex(@boolToInt(strict));
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
@@ -250,9 +259,16 @@ pub const Literal = union(enum) {
     numeric: NumericLiteral,
     string: StringLiteral,
 
+    pub fn analyze(self: Self, query: AnalyzeQuery) bool {
+        return switch (query) {
+            .is_reference => false,
+            .is_string_literal => self == .string,
+        };
+    }
+
     /// 13.2.3.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-literals-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+    pub fn generateBytecode(self: Self, executable: *Executable, _: *BytecodeContext) !void {
         switch (self) {
             // Literal : NullLiteral
             .null => {
@@ -436,14 +452,14 @@ pub const UnaryExpression = struct {
     operator: Operator,
     expression: *Expression,
 
-    pub fn generateBytecode(self: Self, executable: *Executable) BytecodeError!void {
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
         switch (self.operator) {
             // 13.5.2.1 Runtime Semantics: Evaluation
             // https://tc39.es/ecma262/#sec-void-operator-runtime-semantics-evaluation
             // UnaryExpression : void UnaryExpression
             .void => {
                 // 1. Let expr be ? Evaluation of UnaryExpression.
-                try self.expression.generateBytecode(executable);
+                try self.expression.generateBytecode(executable, ctx);
 
                 // 2. Perform ? GetValue(expr).
                 if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
@@ -457,7 +473,7 @@ pub const UnaryExpression = struct {
             // UnaryExpression : typeof UnaryExpression
             .typeof => {
                 // NOTE: get_value is intentionally omitted here, typeof needs to do it conditionally.
-                try self.expression.generateBytecode(executable);
+                try self.expression.generateBytecode(executable, ctx);
                 try executable.addInstruction(.typeof);
             },
 
@@ -466,7 +482,7 @@ pub const UnaryExpression = struct {
             // UnaryExpression : + UnaryExpression
             .@"+" => {
                 // 1. Let expr be ? Evaluation of UnaryExpression.
-                try self.expression.generateBytecode(executable);
+                try self.expression.generateBytecode(executable, ctx);
 
                 // 2. Return ? ToNumber(? GetValue(expr)).
                 if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
@@ -478,7 +494,7 @@ pub const UnaryExpression = struct {
             // UnaryExpression : - UnaryExpression
             .@"-" => {
                 // 1. Let expr be ? Evaluation of UnaryExpression.
-                try self.expression.generateBytecode(executable);
+                try self.expression.generateBytecode(executable, ctx);
 
                 // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
                 if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
@@ -497,7 +513,7 @@ pub const UnaryExpression = struct {
             // UnaryExpression : ~ UnaryExpression
             .@"~" => {
                 // 1. Let expr be ? Evaluation of UnaryExpression.
-                try self.expression.generateBytecode(executable);
+                try self.expression.generateBytecode(executable, ctx);
 
                 // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
                 if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
@@ -516,7 +532,7 @@ pub const UnaryExpression = struct {
             // UnaryExpression : ! UnaryExpression
             .@"!" => {
                 // 1. Let expr be ? Evaluation of UnaryExpression.
-                try self.expression.generateBytecode(executable);
+                try self.expression.generateBytecode(executable, ctx);
 
                 // 2. Let oldValue be ToBoolean(? GetValue(expr)).
                 if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
@@ -547,26 +563,26 @@ pub const Expression = union(enum) {
     unary_expression: UnaryExpression,
 
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
-        switch (query) {
+        return switch (query) {
             .is_reference => switch (self) {
-                .primary_expression => |primary_expression| {
-                    return primary_expression.analyze(query);
-                },
-                .member_expression => return true,
-                .call_expression => return false,
-                .unary_expression => return false,
+                .primary_expression => |primary_expression| primary_expression.analyze(query),
+                .member_expression => true,
+                .call_expression => false,
+                .unary_expression => false,
             },
-        }
+            .is_string_literal => switch (self) {
+                .primary_expression => |primary_expression| primary_expression.analyze(query),
+                else => false,
+            },
+        };
     }
 
-    pub fn generateBytecode(self: Self, executable: *Executable) BytecodeError!void {
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
         switch (self) {
-            .primary_expression => |primary_expression| try primary_expression.generateBytecode(
-                executable,
-            ),
-            .member_expression => |member_expression| try member_expression.generateBytecode(executable),
-            .call_expression => |call_expression| try call_expression.generateBytecode(executable),
-            .unary_expression => |unary_expression| try unary_expression.generateBytecode(executable),
+            .primary_expression => |primary_expression| try primary_expression.generateBytecode(executable, ctx),
+            .member_expression => |member_expression| try member_expression.generateBytecode(executable, ctx),
+            .call_expression => |call_expression| try call_expression.generateBytecode(executable, ctx),
+            .unary_expression => |unary_expression| try unary_expression.generateBytecode(executable, ctx),
         }
     }
 
@@ -605,10 +621,23 @@ pub const Statement = union(enum) {
     throw_statement: ThrowStatement,
     debugger_statement,
 
-    pub fn generateBytecode(self: Self, executable: *Executable) BytecodeError!void {
+    pub fn analyze(self: Self, query: AnalyzeQuery) bool {
+        return switch (query) {
+            .is_reference => switch (self) {
+                .expression_statement => |expression_statement| expression_statement.analyze(query),
+                else => false,
+            },
+            .is_string_literal => switch (self) {
+                .expression_statement => |expression_statement| expression_statement.analyze(query),
+                else => false,
+            },
+        };
+    }
+
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
         switch (self) {
             .block_statement => |block_statement| {
-                try block_statement.generateBytecode(executable);
+                try block_statement.generateBytecode(executable, ctx);
             },
 
             // EmptyStatement : ;
@@ -617,14 +646,14 @@ pub const Statement = union(enum) {
             },
 
             .expression_statement => |expression_statement| {
-                try expression_statement.generateBytecode(executable);
+                try expression_statement.generateBytecode(executable, ctx);
             },
-            .if_statement => |if_statement| try if_statement.generateBytecode(executable),
+            .if_statement => |if_statement| try if_statement.generateBytecode(executable, ctx),
             .breakable_statement => |breakable_statement| {
-                try breakable_statement.generateBytecode(executable);
+                try breakable_statement.generateBytecode(executable, ctx);
             },
             .throw_statement => |throw_statement| {
-                try throw_statement.generateBytecode(executable);
+                try throw_statement.generateBytecode(executable, ctx);
             },
 
             // DebuggerStatement : debugger ;
@@ -670,7 +699,15 @@ pub const Declaration = union(enum) {
 
     dummy,
 
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+    pub fn analyze(_: Self, query: AnalyzeQuery) bool {
+        return switch (query) {
+            .is_reference => false,
+            .is_string_literal => false,
+        };
+    }
+
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        _ = ctx;
         _ = executable;
         _ = self;
     }
@@ -688,11 +725,9 @@ pub const BreakableStatement = union(enum) {
 
     iteration_statement: IterationStatement,
 
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         switch (self) {
-            .iteration_statement => |iteration_statement| try iteration_statement.generateBytecode(
-                executable,
-            ),
+            .iteration_statement => |iteration_statement| try iteration_statement.generateBytecode(executable, ctx),
         }
     }
 
@@ -713,8 +748,8 @@ pub const BlockStatement = struct {
 
     block: Block,
 
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
-        try self.block.generateBytecode(executable);
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        try self.block.generateBytecode(executable, ctx);
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
@@ -731,7 +766,7 @@ pub const Block = struct {
 
     /// 14.2.2 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-block-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable) BytecodeError!void {
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
         // Block : { }
         if (self.statement_list.items.len == 0) {
             // 1. Return empty.
@@ -742,7 +777,7 @@ pub const Block = struct {
         // TODO: 1-4, 6
         // 5. Let blockValue be Completion(Evaluation of StatementList).
         // 7. Return ? blockValue.
-        try self.statement_list.generateBytecode(executable);
+        try self.statement_list.generateBytecode(executable, ctx);
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
@@ -757,13 +792,25 @@ pub const StatementList = struct {
 
     items: []const StatementListItem,
 
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+    /// 11.2.1 Directive Prologues and the Use Strict Directive
+    /// https://tc39.es/ecma262/#sec-directive-prologues-and-the-use-strict-directive
+    pub fn containsDirective(self: Self, directive: []const u8) bool {
+        for (self.items) |item| {
+            if (!item.analyze(.is_string_literal)) break;
+            const string_literal = item.statement.expression_statement.expression.primary_expression.literal.string;
+            const raw_string_value = string_literal.text[1 .. string_literal.text.len - 1];
+            if (std.mem.eql(u8, raw_string_value, directive)) return true;
+        }
+        return false;
+    }
+
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         // StatementList : StatementList StatementListItem
         // 1. Let sl be ? Evaluation of StatementList.
         // 2. Let s be Completion(Evaluation of StatementListItem).
         // 3. Return ? UpdateEmpty(s, sl).
         for (self.items) |item| {
-            try item.generateBytecode(executable);
+            try item.generateBytecode(executable, ctx);
         }
     }
 
@@ -782,10 +829,17 @@ pub const StatementListItem = union(enum) {
     statement: *Statement,
     declaration: *Declaration,
 
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+    pub fn analyze(self: Self, query: AnalyzeQuery) bool {
+        return switch (self) {
+            .statement => |statement| statement.analyze(query),
+            .declaration => |declaration| declaration.analyze(query),
+        };
+    }
+
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         switch (self) {
-            .statement => |statement| try statement.generateBytecode(executable),
-            .declaration => |declaration| try declaration.generateBytecode(executable),
+            .statement => |statement| try statement.generateBytecode(executable, ctx),
+            .declaration => |declaration| try declaration.generateBytecode(executable, ctx),
         }
     }
 
@@ -804,12 +858,16 @@ pub const ExpressionStatement = struct {
 
     expression: Expression,
 
+    pub fn analyze(self: Self, query: AnalyzeQuery) bool {
+        return self.expression.analyze(query);
+    }
+
     /// 14.5.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-expression-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         // ExpressionStatement : Expression ;
         // 1. Let exprRef be ? Evaluation of Expression.
-        try self.expression.generateBytecode(executable);
+        try self.expression.generateBytecode(executable, ctx);
 
         // 2. Return ? GetValue(exprRef).
         if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
@@ -831,9 +889,9 @@ pub const IfStatement = struct {
 
     /// 14.6.2 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-if-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         // 1. Let exprRef be ? Evaluation of Expression.
-        try self.test_expression.generateBytecode(executable);
+        try self.test_expression.generateBytecode(executable, ctx);
 
         // 2. Let exprValue be ToBoolean(? GetValue(exprRef)).
         if (self.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
@@ -846,7 +904,7 @@ pub const IfStatement = struct {
         try executable.addInstructionWithConstant(.store_constant, .undefined);
 
         // a. Let stmtCompletion be Completion(Evaluation of the first Statement).
-        try self.consequent_statement.generateBytecode(executable);
+        try self.consequent_statement.generateBytecode(executable, ctx);
         try executable.addInstruction(.jump);
         const end_jump = try executable.addJumpIndex();
 
@@ -856,7 +914,7 @@ pub const IfStatement = struct {
 
         if (self.alternate_statement) |alternate_statement| {
             // a. Let stmtCompletion be Completion(Evaluation of the second Statement).
-            try alternate_statement.generateBytecode(executable);
+            try alternate_statement.generateBytecode(executable, ctx);
         }
 
         // 5. Return ? UpdateEmpty(stmtCompletion, undefined).
@@ -887,17 +945,17 @@ pub const IterationStatement = union(enum) {
 
     /// 14.7.1.2 Runtime Semantics: LoopEvaluation
     /// https://tc39.es/ecma262/#sec-runtime-semantics-loopevaluation
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         switch (self) {
             // IterationStatement : DoWhileStatement
             .do_while_statement => |do_while_statement| {
                 // 1. Return ? DoWhileLoopEvaluation of DoWhileStatement with argument labelSet.
-                try do_while_statement.generateBytecode(executable);
+                try do_while_statement.generateBytecode(executable, ctx);
             },
             // IterationStatement : WhileStatement
             .while_statement => |while_statement| {
                 // 1. Return ? WhileLoopEvaluation of WhileStatement with argument labelSet.
-                try while_statement.generateBytecode(executable);
+                try while_statement.generateBytecode(executable, ctx);
             },
         }
     }
@@ -920,7 +978,7 @@ pub const DoWhileStatement = struct {
 
     /// 14.7.2.2 Runtime Semantics: DoWhileLoopEvaluation
     /// https://tc39.es/ecma262/#sec-runtime-semantics-dowhileloopevaluation
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         // DoWhileStatement : do Statement while ( Expression ) ;
         // 1. Let V be undefined.
         try executable.addInstructionWithConstant(.load_constant, .undefined);
@@ -930,7 +988,7 @@ pub const DoWhileStatement = struct {
 
         // a. Let stmtResult be Completion(Evaluation of Statement).
         try executable.addInstruction(.store);
-        try self.consequent_statement.generateBytecode(executable);
+        try self.consequent_statement.generateBytecode(executable, ctx);
         try executable.addInstruction(.load);
 
         // TODO: b. If LoopContinues(stmtResult, labelSet) is false, return ? UpdateEmpty(stmtResult, V).
@@ -939,7 +997,7 @@ pub const DoWhileStatement = struct {
         // NOTE: This is done by the store/load sequence around each consequent execution.
 
         // d. Let exprRef be ? Evaluation of Expression.
-        try self.test_expression.generateBytecode(executable);
+        try self.test_expression.generateBytecode(executable, ctx);
 
         // e. Let exprValue be ? GetValue(exprRef).
         if (self.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
@@ -974,7 +1032,7 @@ pub const WhileStatement = struct {
 
     /// 14.7.3.2 Runtime Semantics: WhileLoopEvaluation
     /// https://tc39.es/ecma262/#sec-runtime-semantics-whileloopevaluation
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         // WhileStatement : while ( Expression ) Statement
         // 1. Let V be undefined.
         try executable.addInstructionWithConstant(.load_constant, .undefined);
@@ -983,7 +1041,7 @@ pub const WhileStatement = struct {
         const start_index = executable.instructions.items.len;
 
         // a. Let exprRef be ? Evaluation of Expression.
-        try self.test_expression.generateBytecode(executable);
+        try self.test_expression.generateBytecode(executable, ctx);
 
         // b. Let exprValue be ? GetValue(exprRef).
         if (self.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
@@ -996,7 +1054,7 @@ pub const WhileStatement = struct {
         // d. Let stmtResult be Completion(Evaluation of Statement).
         try consequent_jump.setTargetHere();
         try executable.addInstruction(.store);
-        try self.consequent_statement.generateBytecode(executable);
+        try self.consequent_statement.generateBytecode(executable, ctx);
         try executable.addInstruction(.load);
 
         // TODO: e. If LoopContinues(stmtResult, labelSet) is false, return ? UpdateEmpty(stmtResult, V).
@@ -1029,10 +1087,10 @@ pub const ThrowStatement = struct {
 
     /// 14.14.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-throw-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         // ThrowStatement : throw Expression ;
         // 1. Let exprRef be ? Evaluation of Expression.
-        try self.expression.generateBytecode(executable);
+        try self.expression.generateBytecode(executable, ctx);
 
         // 2. Let exprValue be ? GetValue(exprRef).
         if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
@@ -1053,13 +1111,26 @@ pub const Script = struct {
 
     statement_list: StatementList,
 
+    /// 16.1.2 Static Semantics: IsStrict
+    /// https://tc39.es/ecma262/#sec-static-semantics-isstrict
+    pub fn isStrict(self: Self) bool {
+        // 1. If ScriptBody is present and the Directive Prologue of ScriptBody contains a Use
+        //    Strict Directive, return true; otherwise, return false.
+        return self.statement_list.containsDirective("use strict");
+    }
+
     pub fn generateBytecode(self: Self, executable: *Executable) !void {
-        try self.statement_list.generateBytecode(executable);
+        var ctx = BytecodeContext{
+            .contained_in_strict_mode_code = self.isStrict(),
+        };
+        try self.statement_list.generateBytecode(executable, &ctx);
     }
 
     pub fn print(self: Self, writer: anytype) !void {
         const indentation: usize = 0;
         try printString("Script", writer, indentation);
+        try printString("strict:", writer, indentation + 1);
+        try printString(if (self.isStrict()) "true" else "false", writer, indentation + 2);
         try self.statement_list.print(writer, indentation + 1);
     }
 };

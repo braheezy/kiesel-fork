@@ -121,19 +121,20 @@ pub fn print(self: Self, writer: anytype) !void {
         switch (instruction) {
             .evaluate_call => {
                 const argument_count = iterator.instruction_args[0].?;
-                try writer.print("(argument_count: {})", .{argument_count});
+                const strict = iterator.instruction_args[1].? == 1;
+                try writer.print("(argument_count: {}, strict: {})", .{ argument_count, strict });
             },
             .evaluate_property_access_with_expression_key => {
-                const strict = iterator.instruction_args[0].?;
-                try writer.print("(strict: {})", .{strict == 1});
+                const strict = iterator.instruction_args[0].? == 1;
+                try writer.print("(strict: {})", .{strict});
             },
             .evaluate_property_access_with_identifier_key => {
                 const identifier_index = iterator.instruction_args[0].?;
-                const strict = iterator.instruction_args[1].?;
+                const strict = iterator.instruction_args[1].? == 1;
                 const identifier = self.identifiers.items[identifier_index];
                 try writer.print(
                     "{s} [{}] (strict: {})",
-                    .{ identifier, identifier_index, strict == 1 },
+                    .{ identifier, identifier_index, strict },
                 );
             },
             .jump => {
@@ -152,8 +153,9 @@ pub fn print(self: Self, writer: anytype) !void {
             },
             .resolve_binding => {
                 const identifier_index = iterator.instruction_args[0].?;
+                const strict = iterator.instruction_args[1].? == 1;
                 const identifier = self.identifiers.items[identifier_index];
-                try writer.print("{s} [{}]", .{ identifier, identifier_index });
+                try writer.print("{s} [{}] (strict: {})", .{ identifier, identifier_index, strict });
             },
             else => {},
         }

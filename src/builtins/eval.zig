@@ -61,8 +61,8 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) !
     // TODO: e-h.
 
     // 12. If strictCaller is true, let strictEval be true.
-    // TODO: 13. Else, let strictEval be IsStrict of script.
-    const strict_eval = if (strict_caller) true else false;
+    // 13. Else, let strictEval be IsStrict of script.
+    const strict_eval = strict_caller or script.isStrict();
 
     // 14. Let runningContext be the running execution context.
     // 15. NOTE: If direct is true, runningContext will be the execution context that performed the
