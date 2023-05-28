@@ -53,7 +53,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) !
     };
 
     // c. If script Contains ScriptBody is false, return undefined.
-    if (script.statement_list.len == 0) return .undefined;
+    if (script.statement_list.items.len == 0) return .undefined;
 
     // d. Let body be the ScriptBody of script.
     // NOTE: No-op, we evaluate the script directly.

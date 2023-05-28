@@ -732,25 +732,48 @@ pub const Block = struct {
     /// 14.2.2 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-block-runtime-semantics-evaluation
     pub fn generateBytecode(self: Self, executable: *Executable) BytecodeError!void {
-        // StatementList : StatementList StatementListItem
-        // 1. Let sl be ? Evaluation of StatementList.
-        // 2. Let s be Completion(Evaluation of StatementListItem).
-        // 3. Return ? UpdateEmpty(s, sl).
-        for (self.statement_list) |statement_list_item| {
-            try statement_list_item.generateBytecode(executable);
+        // Block : { }
+        if (self.statement_list.items.len == 0) {
+            // 1. Return empty.
+            return;
         }
+
+        // Block : { StatementList }
+        // TODO: 1-4, 6
+        // 5. Let blockValue be Completion(Evaluation of StatementList).
+        // 7. Return ? blockValue.
+        try self.statement_list.generateBytecode(executable);
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
         try printString("Block", writer, indentation);
-        for (self.statement_list) |statement_list_item| {
-            try statement_list_item.print(writer, indentation + 1);
-        }
+        try self.statement_list.print(writer, indentation + 1);
     }
 };
 
 /// https://tc39.es/ecma262/#prod-StatementList
-pub const StatementList = []const StatementListItem;
+pub const StatementList = struct {
+    const Self = @This();
+
+    items: []const StatementListItem,
+
+    pub fn generateBytecode(self: Self, executable: *Executable) !void {
+        // StatementList : StatementList StatementListItem
+        // 1. Let sl be ? Evaluation of StatementList.
+        // 2. Let s be Completion(Evaluation of StatementListItem).
+        // 3. Return ? UpdateEmpty(s, sl).
+        for (self.items) |item| {
+            try item.generateBytecode(executable);
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'StatementList' here, it's implied and only adds nesting.
+        for (self.items) |item| {
+            try item.print(writer, indentation);
+        }
+    }
+};
 
 /// https://tc39.es/ecma262/#prod-StatementListItem
 pub const StatementListItem = union(enum) {
@@ -1031,16 +1054,12 @@ pub const Script = struct {
     statement_list: StatementList,
 
     pub fn generateBytecode(self: Self, executable: *Executable) !void {
-        for (self.statement_list) |statement_list_item| {
-            try statement_list_item.generateBytecode(executable);
-        }
+        try self.statement_list.generateBytecode(executable);
     }
 
     pub fn print(self: Self, writer: anytype) !void {
         const indentation: usize = 0;
         try printString("Script", writer, indentation);
-        for (self.statement_list) |statement_list_item| {
-            try statement_list_item.print(writer, indentation + 1);
-        }
+        try self.statement_list.print(writer, indentation + 1);
     }
 };

@@ -337,11 +337,11 @@ fn acceptBlock(self: *Self) !ast.Block {
 }
 
 fn acceptStatementList(self: *Self) error{OutOfMemory}!ast.StatementList {
-    var statement_list = std.ArrayList(ast.StatementListItem).init(self.allocator);
+    var statement_list_items = std.ArrayList(ast.StatementListItem).init(self.allocator);
     while (self.acceptStatementListItem()) |statement_list_item|
-        try statement_list.append(statement_list_item)
+        try statement_list_items.append(statement_list_item)
     else |_| {}
-    return statement_list.toOwnedSlice();
+    return .{ .items = try statement_list_items.toOwnedSlice() };
 }
 
 fn acceptStatementListItem(self: *Self) !ast.StatementListItem {
