@@ -29,7 +29,12 @@ pub fn get(self: Self, property_key: PropertyKey) ?PropertyDescriptor {
 }
 
 pub fn set(self: *Self, property_key: PropertyKey, property_descriptor: PropertyDescriptor) !void {
-    try self.hash_map.put(property_key, property_descriptor);
+    const property_key_copy = switch (property_key) {
+        // Copy the string since it might outlive the source text - identifiers are just slices of that.
+        .string => |string| PropertyKey.from(try self.hash_map.allocator.dupe(u8, string)),
+        else => property_key,
+    };
+    try self.hash_map.put(property_key_copy, property_descriptor);
 }
 
 pub fn remove(self: *Self, property_key: PropertyKey) void {
