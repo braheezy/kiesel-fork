@@ -297,6 +297,7 @@ pub fn run(self: *Self, executable: Executable) !Completion {
             self.reference = try self.agent.resolveBinding(name, null, strict);
         },
         .resolve_this_binding => self.result = try self.agent.resolveThisBinding(),
+        .@"return" => return .{ .type = .@"return", .value = self.result, .target = null },
         .set_evaluation_context_reference => {
             try self.evaluation_context_stack.append(.{ .reference = self.reference });
         },

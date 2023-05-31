@@ -36,6 +36,8 @@ pub const Instruction = enum(u8) {
     resolve_binding,
     /// Store ResolveThisBinding() as the result value.
     resolve_this_binding,
+    /// Stop bytecode execution, indicating a return from the current function.
+    @"return",
     /// Set the evaluation context reference to the last evaluated one, if any.
     set_evaluation_context_reference,
     /// Store the last value from the stack as the result value.

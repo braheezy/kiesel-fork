@@ -630,6 +630,7 @@ pub const Statement = union(enum) {
     expression_statement: ExpressionStatement,
     if_statement: IfStatement,
     breakable_statement: BreakableStatement,
+    return_statement: ReturnStatement,
     throw_statement: ThrowStatement,
     debugger_statement,
 
@@ -664,6 +665,9 @@ pub const Statement = union(enum) {
             .breakable_statement => |breakable_statement| {
                 try breakable_statement.generateBytecode(executable, ctx);
             },
+            .return_statement => |return_statement| {
+                try return_statement.generateBytecode(executable, ctx);
+            },
             .throw_statement => |throw_statement| {
                 try throw_statement.generateBytecode(executable, ctx);
             },
@@ -693,6 +697,10 @@ pub const Statement = union(enum) {
             ),
             .if_statement => |if_statement| try if_statement.print(writer, indentation + 1),
             .breakable_statement => |breakable_statement| try breakable_statement.print(
+                writer,
+                indentation + 1,
+            ),
+            .return_statement => |return_statement| try return_statement.print(
                 writer,
                 indentation + 1,
             ),
@@ -1128,6 +1136,42 @@ pub const WhileStatement = struct {
         try self.test_expression.print(writer, indentation + 2);
         try printString("consequent:", writer, indentation + 1);
         try self.consequent_statement.print(writer, indentation + 2);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ReturnStatement
+pub const ReturnStatement = struct {
+    const Self = @This();
+
+    expression: ?Expression,
+
+    /// 14.10.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-return-statement-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // ReturnStatement : return Expression ;
+        if (self.expression) |expression| {
+            // 1. Let exprRef be ? Evaluation of Expression.
+            try expression.generateBytecode(executable, ctx);
+
+            // 2. Let exprValue be ? GetValue(exprRef).
+            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+            // TODO: 3. If GetGeneratorKind() is async, set exprValue to ? Await(exprValue).
+
+            // 4. Return Completion Record { [[Type]]: return, [[Value]]: exprValue, [[Target]]: empty }.
+            try executable.addInstruction(.@"return");
+        }
+        // ReturnStatement : return ;
+        else {
+            // 1. Return Completion Record { [[Type]]: return, [[Value]]: undefined, [[Target]]: empty }.
+            try executable.addInstructionWithConstant(.store_constant, .undefined);
+            try executable.addInstruction(.@"return");
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("ReturnStatement", writer, indentation);
+        if (self.expression) |expression| try expression.print(writer, indentation + 1);
     }
 };
 

@@ -28,6 +28,7 @@ pub const Context = struct {
 allocator: Allocator,
 core: ParserCore,
 diagnostics: *ptk.Diagnostics,
+in_function: bool = false,
 
 const RuleSet = ptk.RuleSet(Tokenizer.TokenType);
 const ParserCore = ptk.ParserCore(Tokenizer, .{ .whitespace, .comment });
@@ -306,6 +307,8 @@ fn acceptStatement(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!*
         statement.* = .{ .if_statement = if_statement }
     else |_| if (self.acceptBreakableStatement()) |breakable_statement|
         statement.* = .{ .breakable_statement = breakable_statement }
+    else |_| if (self.acceptReturnStatement()) |return_statement|
+        statement.* = .{ .return_statement = return_statement }
     else |_| if (self.acceptThrowStatement()) |throw_statement|
         statement.* = .{ .throw_statement = throw_statement }
     else |_| if (self.core.accept(RuleSet.is(.debugger))) |_|
@@ -461,6 +464,33 @@ fn acceptWhileStatement(self: *Self) !ast.WhileStatement {
     };
 }
 
+fn acceptReturnStatement(self: *Self) !ast.ReturnStatement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"return"));
+
+    if (!self.in_function) {
+        try self.diagnostics.emit(
+            state.location,
+            .@"error",
+            "Return statement is only allowed in functions",
+            .{},
+        );
+        return error.UnexpectedToken;
+    }
+
+    if (self.noLineTerminatorHere()) |_| {
+        if (self.acceptExpression()) |expression| {
+            return .{ .expression = expression };
+        } else |_| {}
+    } else |_| {
+        // Drop emitted 'unexpected newline' error
+        _ = self.diagnostics.errors.pop();
+    }
+    return .{ .expression = null };
+}
+
 fn acceptThrowStatement(self: *Self) !ast.ThrowStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
@@ -489,6 +519,10 @@ fn acceptFormalParameters(self: *Self) !ast.FormalParameters {
 fn acceptFunctionDeclaration(self: *Self) !ast.FunctionDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
+
+    const in_function_before = self.in_function;
+    self.in_function = true;
+    defer self.in_function = in_function_before;
 
     _ = try self.core.accept(RuleSet.is(.function));
     const identifier = try self.acceptBindingIdentifier();
