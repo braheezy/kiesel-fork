@@ -22,14 +22,17 @@ test {
     _ = Vm;
 }
 
-pub fn generateAndRunBytecode(agent: *Agent, script: ast.Script) Agent.Error!Completion {
+pub fn generateAndRunBytecode(agent: *Agent, ast_node: anytype) Agent.Error!Completion {
     var vm = try Vm.init(agent);
     defer vm.deinit();
 
     var executable = Executable.init(agent.gc_allocator);
     defer executable.deinit();
 
-    script.generateBytecode(&executable) catch |err| switch (err) {
+    var ctx = ast.BytecodeContext{
+        .contained_in_strict_mode_code = false,
+    };
+    ast_node.generateBytecode(&executable, &ctx) catch |err| switch (err) {
         error.IndexOutOfRange => return agent.throwException(
             .internal_error,
             "Bytecode generation failed",

@@ -13,7 +13,7 @@ const Value = types.Value;
 
 const BytecodeError = error{ OutOfMemory, IndexOutOfRange };
 
-const BytecodeContext = struct {
+pub const BytecodeContext = struct {
     contained_in_strict_mode_code: bool = false,
 };
 
@@ -1119,11 +1119,9 @@ pub const Script = struct {
         return self.statement_list.containsDirective("use strict");
     }
 
-    pub fn generateBytecode(self: Self, executable: *Executable) !void {
-        var ctx = BytecodeContext{
-            .contained_in_strict_mode_code = self.isStrict(),
-        };
-        try self.statement_list.generateBytecode(executable, &ctx);
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        ctx.contained_in_strict_mode_code = self.isStrict();
+        try self.statement_list.generateBytecode(executable, ctx);
     }
 
     pub fn print(self: Self, writer: anytype) !void {
