@@ -6,6 +6,7 @@ const instructions_ = @import("instructions.zig");
 const types = @import("../../types.zig");
 
 const Agent = execution.Agent;
+const Completion = types.Completion;
 const Executable = @import("Executable.zig");
 const Instruction = instructions_.Instruction;
 const Reference = types.Reference;
@@ -153,7 +154,7 @@ fn directEval(agent: *Agent, arguments: []const Value, strict: bool) !Value {
     return performEval(agent, eval_arg, strict_caller, true);
 }
 
-pub fn run(self: *Self, executable: Executable) !?Value {
+pub fn run(self: *Self, executable: Executable) !Completion {
     while (self.fetchInstruction(executable)) |instruction| switch (instruction) {
         .bitwise_not => {
             const value = self.result.?;
@@ -385,5 +386,5 @@ pub fn run(self: *Self, executable: Executable) !?Value {
         },
         _ => unreachable,
     };
-    return self.result;
+    return Completion.normal(self.result);
 }

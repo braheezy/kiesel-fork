@@ -146,9 +146,9 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) !
     const result = if (result_no_value) |_| blk: {
         // a. Set result to Completion(Evaluation of body).
         // 30. If result.[[Type]] is normal and result.[[Value]] is empty, then
-        if (generateAndRunBytecode(agent, script)) |value|
+        if (generateAndRunBytecode(agent, script)) |completion|
             // a. Set result to NormalCompletion(undefined).
-            break :blk value orelse .undefined
+            break :blk completion.value orelse .undefined
         else |err|
             break :blk err;
     } else |err| err;

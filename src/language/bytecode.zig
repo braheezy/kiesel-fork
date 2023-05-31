@@ -5,6 +5,7 @@ const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
+const Completion = types.Completion;
 const Value = types.Value;
 
 const instructions = @import("bytecode/instructions.zig");
@@ -21,7 +22,7 @@ test {
     _ = Vm;
 }
 
-pub fn generateAndRunBytecode(agent: *Agent, script: ast.Script) Agent.Error!?Value {
+pub fn generateAndRunBytecode(agent: *Agent, script: ast.Script) Agent.Error!Completion {
     var vm = try Vm.init(agent);
     defer vm.deinit();
 

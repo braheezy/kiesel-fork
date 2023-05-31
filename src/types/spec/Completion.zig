@@ -19,14 +19,14 @@ pub const Type = enum {
 type: Type,
 
 /// [[Value]]
-value: Value,
+value: ?Value,
 
 /// [[Target]]
 target: ?[]const u8 = null,
 
 /// 6.2.4.1 NormalCompletion ( value )
 /// https://tc39.es/ecma262/#sec-normalcompletion
-pub fn normal(value: Value) Completion {
+pub fn normal(value: ?Value) Completion {
     // 1. Return Completion Record { [[Type]]: normal, [[Value]]: value, [[Target]]: empty }.
     return Completion{ .type = .normal, .value = value, .target = null };
 }
