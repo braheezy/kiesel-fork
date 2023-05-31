@@ -2,18 +2,30 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const builtins = @import("../builtins.zig");
 const bytecode = @import("bytecode.zig");
+const execution = @import("../execution.zig");
 const tokenizer = @import("tokenizer.zig");
 const types = @import("../types.zig");
+const utils = @import("../utils.zig");
 const line_terminators = tokenizer.line_terminators;
 
+const Agent = execution.Agent;
 const BigInt = types.BigInt;
+const Environment = execution.Environment;
 const Executable = bytecode.Executable;
+const Object = types.Object;
+const PrivateEnvironment = execution.PrivateEnvironment;
+const PropertyKey = types.PropertyKey;
 const Value = types.Value;
+const noexcept = utils.noexcept;
+const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
+const setFunctionName = builtins.setFunctionName;
 
 const BytecodeError = error{ OutOfMemory, IndexOutOfRange };
 
 pub const BytecodeContext = struct {
+    agent: *Agent,
     contained_in_strict_mode_code: bool = false,
 };
 
@@ -697,7 +709,7 @@ pub const Statement = union(enum) {
 pub const Declaration = union(enum) {
     const Self = @This();
 
-    dummy,
+    hoistable_declaration: HoistableDeclaration,
 
     pub fn analyze(_: Self, query: AnalyzeQuery) bool {
         return switch (query) {
@@ -707,15 +719,42 @@ pub const Declaration = union(enum) {
     }
 
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
-        _ = ctx;
-        _ = executable;
-        _ = self;
+        switch (self) {
+            .hoistable_declaration => |hoistable_declaration| try hoistable_declaration.generateBytecode(executable, ctx),
+        }
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
-        _ = writer;
-        _ = indentation;
-        _ = self;
+        try printString("Declaration", writer, indentation);
+        switch (self) {
+            .hoistable_declaration => |hoistable_declaration| try hoistable_declaration.print(
+                writer,
+                indentation + 1,
+            ),
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-HoistableDeclaration
+pub const HoistableDeclaration = union(enum) {
+    const Self = @This();
+
+    function_declaration: FunctionDeclaration,
+
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        switch (self) {
+            .function_declaration => |function_declaration| try function_declaration.generateBytecode(executable, ctx),
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
+        // Omit printing 'HoistableDeclaration' here, it's implied and only adds nesting.
+        switch (self) {
+            .function_declaration => |function_declaration| try function_declaration.print(
+                writer,
+                indentation,
+            ),
+        }
     }
 };
 
@@ -849,6 +888,19 @@ pub const StatementListItem = union(enum) {
             .statement => |statement| try statement.print(writer, indentation),
             .declaration => |declaration| try declaration.print(writer, indentation),
         }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-BindingElement
+pub const BindingElement = struct {
+    const Self = @This();
+
+    identifier: Identifier,
+    // TODO: Binding patterns, initializers
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("BindingElement", writer, indentation);
+        try printString(self.identifier, writer, indentation + 1);
     }
 };
 
@@ -1102,6 +1154,143 @@ pub const ThrowStatement = struct {
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("ThrowStatement", writer, indentation);
         try self.expression.print(writer, indentation + 1);
+    }
+};
+
+pub const FormalParametersItem = union(enum) {
+    formal_parameter: FormalParameter,
+    // TODO: FunctionRestParameter
+};
+
+/// https://tc39.es/ecma262/#prod-FormalParameters
+pub const FormalParameters = struct {
+    const Self = @This();
+
+    items: []const FormalParametersItem,
+
+    /// 15.1.5 Static Semantics: ExpectedArgumentCount
+    /// https://tc39.es/ecma262/#sec-static-semantics-expectedargumentcount
+    pub fn expectedArgumentCount(self: Self) usize {
+        return self.items.len;
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'FormalParameters' here, it's implied and only adds nesting.
+        for (self.items) |item| {
+            switch (item) {
+                .formal_parameter => |formal_parameter| try formal_parameter.print(writer, indentation),
+            }
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-FormalParameter
+pub const FormalParameter = struct {
+    const Self = @This();
+
+    binding_element: BindingElement,
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("FormalParameter", writer, indentation);
+        try self.binding_element.print(writer, indentation + 1);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-FunctionDeclaration
+pub const FunctionDeclaration = struct {
+    const Self = @This();
+
+    identifier: Identifier,
+    formal_parameters: FormalParameters,
+    function_body: FunctionBody,
+
+    /// 15.2.2 Static Semantics: FunctionBodyContainsUseStrict
+    /// https://tc39.es/ecma262/#sec-static-semantics-functionbodycontainsusestrict
+    pub fn functionBodyContainsUseStrict(self: Self) bool {
+        // 1. If the Directive Prologue of FunctionBody contains a Use Strict Directive, return
+        //    true; otherwise, return false.
+        return self.function_body.statement_list.containsDirective("use strict");
+    }
+
+    // 15.2.4 Runtime Semantics: InstantiateOrdinaryFunctionObject
+    // https://tc39.es/ecma262/#sec-runtime-semantics-instantiateordinaryfunctionobject
+    fn instantiateOrdinaryFunctionObject(
+        self: Self,
+        agent: *Agent,
+        env: Environment,
+        private_env: ?*PrivateEnvironment,
+    ) !Object {
+        const realm = agent.currentRealm();
+
+        // 1. Let name be StringValue of BindingIdentifier.
+        const name = self.identifier;
+
+        // TODO: 2. Let sourceText be the source text matched by FunctionDeclaration.
+        const source_text = "";
+
+        // 3. Let F be OrdinaryFunctionCreate(%Function.prototype%, sourceText, FormalParameters, FunctionBody, non-lexical-this, env, privateEnv).
+        const function = try ordinaryFunctionCreate(
+            agent,
+            try realm.intrinsics.@"%Function.prototype%"(),
+            source_text,
+            self.formal_parameters,
+            self.function_body,
+            .non_lexical_this,
+            env,
+            private_env,
+            self.functionBodyContainsUseStrict(),
+        );
+
+        // 4. Perform SetFunctionName(F, name).
+        try setFunctionName(function, PropertyKey.from(name), null);
+
+        // TODO: 5. Perform MakeConstructor(F).
+
+        // 6. Return F.
+        return function;
+    }
+
+    /// 15.2.6 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, _: *Executable, ctx: *BytecodeContext) !void {
+        // FIXME: This should be called in the various FooDeclarationInstantiation AOs instead.
+        //        It's enough to get ECMAScript Functions Objects up and running however :^)
+        const realm = ctx.agent.currentRealm();
+        const env = Environment{ .global_environment = realm.global_env };
+        const function = try self.instantiateOrdinaryFunctionObject(ctx.agent, env, null);
+        realm.global_env.object_record.binding_object.set(
+            PropertyKey.from(self.identifier),
+            Value.from(function),
+            .ignore,
+        ) catch |err| try noexcept(err);
+
+        // 1. Return empty.
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("FunctionDeclaration", writer, indentation);
+        try printString("identifier:", writer, indentation + 1);
+        try printString(self.identifier, writer, indentation + 2);
+        try printString("formal_parameters:", writer, indentation + 1);
+        try self.formal_parameters.print(writer, indentation + 2);
+        try printString("function_body:", writer, indentation + 1);
+        try self.function_body.print(writer, indentation + 2);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-FunctionBody
+pub const FunctionBody = struct {
+    const Self = @This();
+
+    statement_list: StatementList,
+
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        try self.statement_list.generateBytecode(executable, ctx);
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'FunctionBody' here, it's implied and only adds nesting.
+        try self.statement_list.print(writer, indentation);
     }
 };
 

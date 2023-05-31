@@ -144,6 +144,14 @@ fn acceptIdentifierReference(self: *Self) !ast.IdentifierReference {
     return .{ .identifier = try self.allocator.dupe(u8, token.text) };
 }
 
+fn acceptBindingIdentifier(self: *Self) !ast.Identifier {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .@"await" }));
+    return self.allocator.dupe(u8, token.text);
+}
+
 fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
@@ -312,9 +320,22 @@ fn acceptDeclaration(self: *Self) !*ast.Declaration {
     errdefer self.core.restoreState(state);
 
     const declaration = try self.allocator.create(ast.Declaration);
-    _ = declaration;
 
-    return error.UnexpectedToken;
+    if (self.acceptHoistableDeclaration()) |hoistable_declaration|
+        declaration.* = .{ .hoistable_declaration = hoistable_declaration }
+    else |_|
+        return error.UnexpectedToken;
+    return declaration;
+}
+
+fn acceptHoistableDeclaration(self: *Self) !ast.HoistableDeclaration {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    if (self.acceptFunctionDeclaration()) |function_declaration|
+        return .{ .function_declaration = function_declaration }
+    else |_|
+        return error.UnexpectedToken;
 }
 
 fn acceptBreakableStatement(self: *Self) !ast.BreakableStatement {
@@ -448,4 +469,38 @@ fn acceptThrowStatement(self: *Self) !ast.ThrowStatement {
     try self.noLineTerminatorHere();
     const expression = try self.acceptExpression();
     return .{ .expression = expression };
+}
+
+fn acceptFormalParameters(self: *Self) !ast.FormalParameters {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    var formal_parameters_items = std.ArrayList(ast.FormalParametersItem).init(self.allocator);
+    while (self.acceptBindingIdentifier()) |identifier| {
+        const formal_parameter = ast.FormalParameter{
+            .binding_element = .{ .identifier = identifier },
+        };
+        try formal_parameters_items.append(.{ .formal_parameter = formal_parameter });
+        _ = self.core.accept(RuleSet.is(.@",")) catch break;
+    } else |_| {}
+    return .{ .items = try formal_parameters_items.toOwnedSlice() };
+}
+
+fn acceptFunctionDeclaration(self: *Self) !ast.FunctionDeclaration {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.function));
+    const identifier = try self.acceptBindingIdentifier();
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    const formal_parameters = try self.acceptFormalParameters();
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    _ = try self.core.accept(RuleSet.is(.@"{"));
+    const statement_list = try self.acceptStatementList();
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+    return .{
+        .identifier = identifier,
+        .formal_parameters = formal_parameters,
+        .function_body = .{ .statement_list = statement_list },
+    };
 }

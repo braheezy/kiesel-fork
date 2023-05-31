@@ -30,6 +30,7 @@ pub fn generateAndRunBytecode(agent: *Agent, ast_node: anytype) Agent.Error!Comp
     defer executable.deinit();
 
     var ctx = ast.BytecodeContext{
+        .agent = agent,
         .contained_in_strict_mode_code = false,
     };
     ast_node.generateBytecode(&executable, &ctx) catch |err| switch (err) {

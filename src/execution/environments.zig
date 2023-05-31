@@ -5,13 +5,16 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const builtins = @import("../builtins.zig");
 const types = @import("../types.zig");
 
+const ECMAScriptFunction = builtins.ECMAScriptFunction;
 const Object = types.Object;
 const Reference = types.Reference;
 const Value = types.Value;
 
 pub const DeclarativeEnvironment = @import("environments/DeclarativeEnvironment.zig");
+pub const FunctionEnvironment = @import("environments/FunctionEnvironment.zig");
 pub const GlobalEnvironment = @import("environments/GlobalEnvironment.zig");
 pub const ObjectEnvironment = @import("environments/ObjectEnvironment.zig");
 pub const PrivateEnvironment = @import("environments/PrivateEnvironment.zig");
@@ -23,12 +26,14 @@ pub const Environment = union(enum) {
 
     declarative_environment: *DeclarativeEnvironment,
     object_environment: *ObjectEnvironment,
+    function_environment: *FunctionEnvironment,
     global_environment: *GlobalEnvironment,
 
     pub fn outerEnv(self: Self) ?Self {
         return switch (self) {
             .declarative_environment => |env| env.outer_env,
             .object_environment => |env| env.outer_env,
+            .function_environment => |env| env.outer_env,
             .global_environment => |env| env.outer_env,
         };
     }
@@ -37,6 +42,7 @@ pub const Environment = union(enum) {
         return switch (self) {
             .declarative_environment => |env| env.hasBinding(name),
             .object_environment => |env| env.hasBinding(name),
+            .function_environment => |env| env.declarative_environment.hasBinding(name),
             .global_environment => |env| env.hasBinding(name),
         };
     }
@@ -74,6 +80,7 @@ pub const Environment = union(enum) {
         return switch (self) {
             .declarative_environment => |env| env.getBindingValue(name, strict),
             .object_environment => |env| env.getBindingValue(name, strict),
+            .function_environment => |env| env.declarative_environment.getBindingValue(name, strict),
             .global_environment => |env| env.getBindingValue(name, strict),
         };
     }
@@ -88,6 +95,7 @@ pub const Environment = union(enum) {
         return switch (self) {
             .declarative_environment => |env| env.hasThisBinding(),
             .object_environment => |env| env.hasThisBinding(),
+            .function_environment => |env| env.hasThisBinding(),
             .global_environment => |env| env.hasThisBinding(),
         };
     }
@@ -101,6 +109,7 @@ pub const Environment = union(enum) {
         return switch (self) {
             .declarative_environment => |env| env.withBaseObject(),
             .object_environment => |env| env.withBaseObject(),
+            .function_environment => |env| env.declarative_environment.withBaseObject(),
             .global_environment => |env| env.withBaseObject(),
         };
     }
@@ -109,7 +118,15 @@ pub const Environment = union(enum) {
         return switch (self) {
             .declarative_environment => unreachable,
             .object_environment => unreachable,
+            .function_environment => |env| env.getThisBinding(),
             .global_environment => |env| Value.from(env.getThisBinding()),
+        };
+    }
+
+    pub fn bindThisValue(self: Self, value: Value) !Value {
+        return switch (self) {
+            .function_environment => |env| env.bindThisValue(value),
+            else => unreachable,
         };
     }
 };
@@ -198,6 +215,41 @@ pub fn newObjectEnvironment(
     };
 
     // 5. Return env.
+    return env;
+}
+
+/// 9.1.2.4 NewFunctionEnvironment ( F, newTarget )
+/// https://tc39.es/ecma262/#sec-newfunctionenvironment
+pub fn newFunctionEnvironment(
+    allocator: Allocator,
+    function: *ECMAScriptFunction,
+    new_target: ?Object,
+) !*FunctionEnvironment {
+    // 1. Let env be a new Function Environment Record containing no bindings.
+    const env = try allocator.create(FunctionEnvironment);
+
+    env.* = .{
+        // 2. Set env.[[FunctionObject]] to F.
+        .function_object = function,
+
+        // 3. If F.[[ThisMode]] is lexical, set env.[[ThisBindingStatus]] to lexical.
+        // 4. Else, set env.[[ThisBindingStatus]] to uninitialized.
+        .this_binding_status = if (function.fields.this_mode == .lexical)
+            .lexical
+        else
+            .uninitialized,
+
+        // 5. Set env.[[NewTarget]] to newTarget.
+        .new_target = new_target,
+
+        // 6. Set env.[[OuterEnv]] to F.[[Environment]].
+        .outer_env = function.fields.environment,
+
+        .this_value = .undefined,
+        .declarative_environment = try newDeclarativeEnvironment(allocator, null),
+    };
+
+    // 7. Return env.
     return env;
 }
 
