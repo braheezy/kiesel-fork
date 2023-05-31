@@ -141,7 +141,7 @@ fn acceptIdentifierReference(self: *Self) !ast.IdentifierReference {
     errdefer self.core.restoreState(state);
 
     const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .@"await" }));
-    return .{ .identifier = token.text };
+    return .{ .identifier = try self.allocator.dupe(u8, token.text) };
 }
 
 fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
@@ -183,7 +183,7 @@ fn acceptMemberExpression(self: *Self, primary_expression: ast.Expression) !ast.
         },
         .@"." => blk: {
             const identifier_token = try self.core.accept(RuleSet.is(.identifier));
-            break :blk .{ .identifier = identifier_token.text };
+            break :blk .{ .identifier = try self.allocator.dupe(u8, identifier_token.text) };
         },
         else => unreachable,
     };
@@ -229,14 +229,22 @@ fn acceptLiteral(self: *Self) !ast.Literal {
         .numeric,
         .string,
     }));
-    switch (token.type) {
-        .null => return .null,
-        .true => return .{ .boolean = true },
-        .false => return .{ .boolean = false },
-        .numeric => return .{ .numeric = parseNumericLiteral(token.text, .complete) catch unreachable },
-        .string => return .{ .string = parseStringLiteral(token.text, .complete) catch unreachable },
+    return switch (token.type) {
+        .null => .null,
+        .true => .{ .boolean = true },
+        .false => .{ .boolean = false },
+        .numeric => blk: {
+            var numeric_literal = parseNumericLiteral(token.text, .complete) catch unreachable;
+            numeric_literal.text = try self.allocator.dupe(u8, numeric_literal.text);
+            break :blk .{ .numeric = numeric_literal };
+        },
+        .string => blk: {
+            var string_literal = parseStringLiteral(token.text, .complete) catch unreachable;
+            string_literal.text = try self.allocator.dupe(u8, string_literal.text);
+            break :blk .{ .string = string_literal };
+        },
         else => unreachable,
-    }
+    };
 }
 
 fn acceptUnaryExpression(self: *Self, operator_token: Tokenizer.Token) !ast.UnaryExpression {
