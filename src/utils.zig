@@ -1,5 +1,7 @@
 //! Non-standard util functions
 
+const std = @import("std");
+
 const builtins = @import("builtins.zig");
 const execution = @import("execution.zig");
 const types = @import("types.zig");
@@ -19,6 +21,37 @@ pub fn noexcept(err: error{ ExceptionThrown, OutOfMemory }) !noreturn {
         error.ExceptionThrown => @panic("Throw completion was returned from '!' function call"),
         error.OutOfMemory => return error.OutOfMemory,
     }
+}
+
+fn TemporaryChange(comptime Lhs: type, comptime field_name: []const u8) type {
+    const fields = switch (@typeInfo(Lhs)) {
+        .Struct => |s| s.fields,
+        .Pointer => |p| switch (@typeInfo(p.child)) {
+            .Struct => |s| s.fields,
+            else => @compileError("temporaryChange() called with incompatible type " ++ @typeName(Lhs)),
+        },
+        else => @compileError("temporaryChange() called with incompatible type " ++ @typeName(Lhs)),
+    };
+    const field = for (fields) |field| if (std.mem.eql(u8, field.name, field_name)) break field;
+    return struct {
+        const Self = @This();
+
+        lhs: Lhs,
+        previous_value: field.type,
+
+        pub fn restore(self: Self) void {
+            @field(self.lhs, field_name) = self.previous_value;
+        }
+    };
+}
+
+pub fn temporaryChange(
+    lhs: anytype,
+    comptime field_name: []const u8,
+    new_value: anytype,
+) TemporaryChange(@TypeOf(lhs), field_name) {
+    defer @field(lhs, field_name) = new_value;
+    return .{ .lhs = lhs, .previous_value = @field(lhs, field_name) };
 }
 
 // NOTE: A lot of this behaviour is implied for all builtins and described at the end of
