@@ -1251,6 +1251,7 @@ pub const FunctionDeclaration = struct {
     identifier: Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
+    source_text: []const u8,
 
     /// 15.2.4 Runtime Semantics: InstantiateOrdinaryFunctionObject
     /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateordinaryfunctionobject
@@ -1265,8 +1266,8 @@ pub const FunctionDeclaration = struct {
         // 1. Let name be StringValue of BindingIdentifier.
         const name = self.identifier;
 
-        // TODO: 2. Let sourceText be the source text matched by FunctionDeclaration.
-        const source_text = "";
+        // 2. Let sourceText be the source text matched by FunctionDeclaration.
+        const source_text = self.source_text;
 
         // 3. Let F be OrdinaryFunctionCreate(%Function.prototype%, sourceText, FormalParameters, FunctionBody, non-lexical-this, env, privateEnv).
         const function = try ordinaryFunctionCreate(
@@ -1324,6 +1325,7 @@ pub const FunctionExpression = struct {
     identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
+    source_text: []const u8,
 
     /// 15.2.6 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-evaluation

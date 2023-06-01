@@ -529,6 +529,8 @@ fn acceptFunctionDeclaration(self: *Self) !ast.FunctionDeclaration {
     defer tmp.restore();
 
     _ = try self.core.accept(RuleSet.is(.function));
+    // We need to do this after consuming the 'function' token to skip preceeding whitespace.
+    const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     const identifier = self.acceptBindingIdentifier() catch |err| {
         try self.diagnostics.emit(
             self.core.tokenizer.current_location,
@@ -544,10 +546,16 @@ fn acceptFunctionDeclaration(self: *Self) !ast.FunctionDeclaration {
     _ = try self.core.accept(RuleSet.is(.@"{"));
     const statement_list = try self.acceptStatementList();
     _ = try self.core.accept(RuleSet.is(.@"}"));
+    const end_offset = self.core.tokenizer.offset;
+    const source_text = try self.allocator.dupe(
+        u8,
+        self.core.tokenizer.source[start_offset..end_offset],
+    );
     return .{
         .identifier = identifier,
         .formal_parameters = formal_parameters,
         .function_body = .{ .statement_list = statement_list },
+        .source_text = source_text,
     };
 }
 
@@ -559,6 +567,8 @@ fn acceptFunctionExpression(self: *Self) !ast.FunctionExpression {
     defer tmp.restore();
 
     _ = try self.core.accept(RuleSet.is(.function));
+    // We need to do this after consuming the 'function' token to skip preceeding whitespace.
+    const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     const identifier = self.acceptBindingIdentifier() catch null;
     _ = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
@@ -566,9 +576,15 @@ fn acceptFunctionExpression(self: *Self) !ast.FunctionExpression {
     _ = try self.core.accept(RuleSet.is(.@"{"));
     const statement_list = try self.acceptStatementList();
     _ = try self.core.accept(RuleSet.is(.@"}"));
+    const end_offset = self.core.tokenizer.offset;
+    const source_text = try self.allocator.dupe(
+        u8,
+        self.core.tokenizer.source[start_offset..end_offset],
+    );
     return .{
         .identifier = identifier,
         .formal_parameters = formal_parameters,
         .function_body = .{ .statement_list = statement_list },
+        .source_text = source_text,
     };
 }

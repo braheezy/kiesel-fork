@@ -194,8 +194,8 @@ fn instantiateOrdinaryFunctionExpression(
         // 6. Let privateEnv be the running execution context's PrivateEnvironment.
         const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
 
-        // TODO: 7. Let sourceText be the source text matched by FunctionExpression.
-        const source_text = "";
+        // 7. Let sourceText be the source text matched by FunctionExpression.
+        const source_text = function_expression.source_text;
 
         // 8. Let closure be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
         //    FormalParameters, FunctionBody, non-lexical-this, funcEnv, privateEnv).
@@ -230,8 +230,8 @@ fn instantiateOrdinaryFunctionExpression(
         // 3. Let privateEnv be the running execution context's PrivateEnvironment.
         const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
 
-        // TODO: 4. Let sourceText be the source text matched by FunctionExpression.
-        const source_text = "";
+        // 4. Let sourceText be the source text matched by FunctionExpression.
+        const source_text = function_expression.source_text;
 
         // 5. Let closure be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
         //    FormalParameters, FunctionBody, non-lexical-this, env, privateEnv).
