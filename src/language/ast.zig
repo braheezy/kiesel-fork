@@ -1248,14 +1248,6 @@ pub const FunctionDeclaration = struct {
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
 
-    /// 15.2.2 Static Semantics: FunctionBodyContainsUseStrict
-    /// https://tc39.es/ecma262/#sec-static-semantics-functionbodycontainsusestrict
-    pub fn functionBodyContainsUseStrict(self: Self) bool {
-        // 1. If the Directive Prologue of FunctionBody contains a Use Strict Directive, return
-        //    true; otherwise, return false.
-        return self.function_body.statement_list.containsDirective("use strict");
-    }
-
     // 15.2.4 Runtime Semantics: InstantiateOrdinaryFunctionObject
     // https://tc39.es/ecma262/#sec-runtime-semantics-instantiateordinaryfunctionobject
     fn instantiateOrdinaryFunctionObject(
@@ -1282,7 +1274,6 @@ pub const FunctionDeclaration = struct {
             .non_lexical_this,
             env,
             private_env,
-            self.functionBodyContainsUseStrict(),
         );
 
         // 4. Perform SetFunctionName(F, name).
@@ -1327,6 +1318,14 @@ pub const FunctionBody = struct {
     const Self = @This();
 
     statement_list: StatementList,
+
+    /// 15.2.2 Static Semantics: FunctionBodyContainsUseStrict
+    /// https://tc39.es/ecma262/#sec-static-semantics-functionbodycontainsusestrict
+    pub fn functionBodyContainsUseStrict(self: Self) bool {
+        // 1. If the Directive Prologue of FunctionBody contains a Use Strict Directive, return
+        //    true; otherwise, return false.
+        return self.statement_list.containsDirective("use strict");
+    }
 
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         try self.statement_list.generateBytecode(executable, ctx);

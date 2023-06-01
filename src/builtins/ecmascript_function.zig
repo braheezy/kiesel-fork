@@ -257,8 +257,11 @@ pub fn ordinaryFunctionCreate(
     this_mode: enum { lexical_this, non_lexical_this },
     env: Environment,
     private_env: ?*PrivateEnvironment,
-    strict: bool,
 ) !Object {
+    // 7. If the source text matched by Body is strict mode code, let Strict be true; else let
+    //    Strict be false.
+    const strict = body.functionBodyContainsUseStrict();
+
     // 1. Let internalSlotsList be the internal slots listed in Table 30.
     // 2. Let F be OrdinaryObjectCreate(functionPrototype, internalSlotsList).
     const function = try ECMAScriptFunction.create(agent, .{
@@ -277,8 +280,6 @@ pub fn ordinaryFunctionCreate(
             // 6. Set F.[[ECMAScriptCode]] to Body.
             .ecmascript_code = body,
 
-            // 7. If the source text matched by Body is strict mode code, let Strict be true; else
-            //    let Strict be false.
             // 8. Set F.[[Strict]] to Strict.
             .strict = strict,
 
