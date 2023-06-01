@@ -21,6 +21,7 @@ const Value = types.Value;
 const noexcept = utils.noexcept;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
 const setFunctionName = builtins.setFunctionName;
+const temporaryChange = utils.temporaryChange;
 
 const BytecodeError = error{ OutOfMemory, IndexOutOfRange };
 
@@ -1328,6 +1329,12 @@ pub const FunctionBody = struct {
     }
 
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        const tmp = temporaryChange(
+            ctx,
+            "contained_in_strict_mode_code",
+            ctx.contained_in_strict_mode_code or self.functionBodyContainsUseStrict(),
+        );
+        defer tmp.restore();
         try self.statement_list.generateBytecode(executable, ctx);
     }
 
