@@ -19,6 +19,8 @@ pub const Instruction = enum(u8) {
     evaluate_property_access_with_identifier_key,
     /// Store GetValue() as the result value.
     get_value,
+    /// Store InstantiateOrdinaryFunctionExpression() as the result value.
+    instantiate_ordinary_function_expression,
     /// Jump to another instruction by setting the instruction pointer.
     jump,
     /// Jump to one of two other instructions depending on whether the last value on the stack is
@@ -65,6 +67,7 @@ pub const Instruction = enum(u8) {
             .resolve_binding,
             => 2,
             .evaluate_property_access_with_expression_key,
+            .instantiate_ordinary_function_expression,
             .jump,
             .load_constant,
             .store_constant,
@@ -83,6 +86,13 @@ pub const Instruction = enum(u8) {
     pub fn hasIdentifierIndex(self: Self) bool {
         return switch (self) {
             .evaluate_property_access_with_identifier_key, .resolve_binding => true,
+            else => false,
+        };
+    }
+
+    pub fn hasFunctionExpressionIndex(self: Self) bool {
+        return switch (self) {
+            .instantiate_ordinary_function_expression => true,
             else => false,
         };
     }

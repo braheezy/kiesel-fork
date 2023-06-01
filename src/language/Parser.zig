@@ -165,6 +165,8 @@ fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
         return .{ .identifier_reference = identifier_reference }
     else |_| if (self.acceptLiteral()) |literal|
         return .{ .literal = literal }
+    else |_| if (self.acceptFunctionExpression()) |function_expression|
+        return .{ .function_expression = function_expression }
     else |_| if (self.acceptParenthesizedExpression()) |parenthesized_expression|
         return .{ .parenthesized_expression = parenthesized_expression }
     else |_|
@@ -383,10 +385,11 @@ fn acceptStatementListItem(self: *Self) !ast.StatementListItem {
     errdefer self.core.restoreState(state);
 
     const statement_list_item: ast.StatementListItem = blk: {
-        if (self.acceptStatement()) |statement|
-            break :blk .{ .statement = statement }
-        else |_| if (self.acceptDeclaration()) |declaration|
+        // NOTE: Declarations need to be tried first since function declarations could also be expressions
+        if (self.acceptDeclaration()) |declaration|
             break :blk .{ .declaration = declaration }
+        else |_| if (self.acceptStatement()) |statement|
+            break :blk .{ .statement = statement }
         else |_|
             return error.UnexpectedToken;
     };
@@ -526,7 +529,37 @@ fn acceptFunctionDeclaration(self: *Self) !ast.FunctionDeclaration {
     defer tmp.restore();
 
     _ = try self.core.accept(RuleSet.is(.function));
-    const identifier = try self.acceptBindingIdentifier();
+    const identifier = self.acceptBindingIdentifier() catch |err| {
+        try self.diagnostics.emit(
+            self.core.tokenizer.current_location,
+            .@"error",
+            "Function declaration must have a binding identifier",
+            .{},
+        );
+        return err;
+    };
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    const formal_parameters = try self.acceptFormalParameters();
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    _ = try self.core.accept(RuleSet.is(.@"{"));
+    const statement_list = try self.acceptStatementList();
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+    return .{
+        .identifier = identifier,
+        .formal_parameters = formal_parameters,
+        .function_body = .{ .statement_list = statement_list },
+    };
+}
+
+fn acceptFunctionExpression(self: *Self) !ast.FunctionExpression {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const tmp = temporaryChange(self, "in_function", true);
+    defer tmp.restore();
+
+    _ = try self.core.accept(RuleSet.is(.function));
+    const identifier = self.acceptBindingIdentifier() catch null;
     _ = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));

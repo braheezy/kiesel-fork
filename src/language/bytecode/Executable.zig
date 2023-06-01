@@ -17,6 +17,7 @@ allocator: Allocator,
 instructions: std.ArrayList(Instruction),
 constants: std.ArrayList(Value),
 identifiers: std.ArrayList(ast.Identifier),
+function_expressions: std.ArrayList(ast.FunctionExpression),
 
 pub const IndexType = u16;
 
@@ -26,6 +27,7 @@ pub fn init(allocator: Allocator) Self {
         .instructions = std.ArrayList(Instruction).init(allocator),
         .constants = std.ArrayList(Value).init(allocator),
         .identifiers = std.ArrayList(ast.Identifier).init(allocator),
+        .function_expressions = std.ArrayList(ast.FunctionExpression).init(allocator),
     };
 }
 
@@ -33,6 +35,7 @@ pub fn deinit(self: Self) void {
     self.instructions.deinit();
     self.constants.deinit();
     self.identifiers.deinit();
+    self.function_expressions.deinit();
 }
 
 pub fn addInstruction(self: *Self, instruction: Instruction) !void {
@@ -45,6 +48,10 @@ pub fn addConstant(self: *Self, constant: Value) !void {
 
 pub fn addIdentifier(self: *Self, identifier: ast.Identifier) !void {
     try self.identifiers.append(identifier);
+}
+
+pub fn addFunctionExpression(self: *Self, function_expression: ast.FunctionExpression) !void {
+    try self.function_expressions.append(function_expression);
 }
 
 pub fn addInstructionWithConstant(
@@ -67,6 +74,17 @@ pub fn addInstructionWithIdentifier(
     try self.addInstruction(instruction);
     try self.addIdentifier(identifier);
     try self.addIndex(self.identifiers.items.len - 1);
+}
+
+pub fn addInstructionWithFunctionExpression(
+    self: *Self,
+    instruction: Instruction,
+    function_expression: ast.FunctionExpression,
+) !void {
+    std.debug.assert(instruction.hasFunctionExpressionIndex());
+    try self.addInstruction(instruction);
+    try self.addFunctionExpression(function_expression);
+    try self.addIndex(self.function_expressions.items.len - 1);
 }
 
 const JumpIndex = struct {
@@ -137,7 +155,9 @@ pub fn print(self: Self, writer: anytype) !void {
                     .{ identifier, identifier_index, strict },
                 );
             },
-            .jump => {
+            .instantiate_ordinary_function_expression,
+            .jump,
+            => {
                 const index = iterator.instruction_args[0].?;
                 try writer.print("{}", .{index});
             },

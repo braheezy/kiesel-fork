@@ -103,6 +103,7 @@ pub const PrimaryExpression = union(enum) {
     this,
     identifier_reference: IdentifierReference,
     literal: Literal,
+    function_expression: FunctionExpression,
     parenthesized_expression: ParenthesizedExpression,
 
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
@@ -110,7 +111,7 @@ pub const PrimaryExpression = union(enum) {
             .is_reference => switch (self) {
                 .identifier_reference => true,
                 .parenthesized_expression => |parenthesized_expression| parenthesized_expression.analyze(query),
-                .this, .literal => false,
+                .function_expression, .this, .literal => false,
             },
             .is_string_literal => switch (self) {
                 .literal => |literal| literal.analyze(query),
@@ -129,6 +130,7 @@ pub const PrimaryExpression = union(enum) {
 
             .identifier_reference => |identifier_reference| try identifier_reference.generateBytecode(executable, ctx),
             .literal => |literal| try literal.generateBytecode(executable, ctx),
+            .function_expression => |function_expression| try function_expression.generateBytecode(executable, ctx),
             .parenthesized_expression => |parenthesized_expression| try parenthesized_expression.generateBytecode(executable, ctx),
         }
     }
@@ -142,6 +144,7 @@ pub const PrimaryExpression = union(enum) {
                 indentation,
             ),
             .literal => |literal| try literal.print(writer, indentation),
+            .function_expression => |function_expression| try function_expression.print(writer, indentation),
             .parenthesized_expression => |parenthesized_expression| try parenthesized_expression.print(
                 writer,
                 indentation,
@@ -1249,8 +1252,8 @@ pub const FunctionDeclaration = struct {
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
 
-    // 15.2.4 Runtime Semantics: InstantiateOrdinaryFunctionObject
-    // https://tc39.es/ecma262/#sec-runtime-semantics-instantiateordinaryfunctionobject
+    /// 15.2.4 Runtime Semantics: InstantiateOrdinaryFunctionObject
+    /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateordinaryfunctionobject
     fn instantiateOrdinaryFunctionObject(
         self: Self,
         agent: *Agent,
@@ -1307,6 +1310,35 @@ pub const FunctionDeclaration = struct {
         try printString("FunctionDeclaration", writer, indentation);
         try printString("identifier:", writer, indentation + 1);
         try printString(self.identifier, writer, indentation + 2);
+        try printString("formal_parameters:", writer, indentation + 1);
+        try self.formal_parameters.print(writer, indentation + 2);
+        try printString("function_body:", writer, indentation + 1);
+        try self.function_body.print(writer, indentation + 2);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-FunctionExpression
+pub const FunctionExpression = struct {
+    const Self = @This();
+
+    identifier: ?Identifier,
+    formal_parameters: FormalParameters,
+    function_body: FunctionBody,
+
+    /// 15.2.6 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, _: *BytecodeContext) !void {
+        // 1. Return InstantiateOrdinaryFunctionExpression of FunctionExpression.
+        try executable.addInstructionWithFunctionExpression(
+            .instantiate_ordinary_function_expression,
+            self,
+        );
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("FunctionExpression", writer, indentation);
+        try printString("identifier:", writer, indentation + 1);
+        if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
         try printString("formal_parameters:", writer, indentation + 1);
         try self.formal_parameters.print(writer, indentation + 2);
         try printString("function_body:", writer, indentation + 1);
