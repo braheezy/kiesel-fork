@@ -6,12 +6,14 @@ const Allocator = std.mem.Allocator;
 const ast = @import("ast.zig");
 const literals = @import("literals.zig");
 const tokenizer_ = @import("tokenizer.zig");
+const utils = @import("../utils.zig");
 
 const Tokenizer = tokenizer_.Tokenizer;
 const line_terminators = tokenizer_.line_terminators;
 const containsLineTerminator = tokenizer_.containsLineTerminator;
 const parseNumericLiteral = literals.parseNumericLiteral;
 const parseStringLiteral = literals.parseStringLiteral;
+const temporaryChange = utils.temporaryChange;
 
 const Self = @This();
 
@@ -520,9 +522,8 @@ fn acceptFunctionDeclaration(self: *Self) !ast.FunctionDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const in_function_before = self.in_function;
-    self.in_function = true;
-    defer self.in_function = in_function_before;
+    const tmp = temporaryChange(self, "in_function", true);
+    defer tmp.restore();
 
     _ = try self.core.accept(RuleSet.is(.function));
     const identifier = try self.acceptBindingIdentifier();
