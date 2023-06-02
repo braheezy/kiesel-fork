@@ -78,6 +78,7 @@ pub const ECMAScriptFunction = Object.Factory(.{
         /// [[IsClassConstructor]]
         is_class_constructor: bool,
     },
+    .tag = .ecmascript_function,
 });
 
 /// 10.2.1 [[Call]] ( thisArgument, argumentsList )

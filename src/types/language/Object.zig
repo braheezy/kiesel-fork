@@ -26,6 +26,8 @@ const Self = @This();
 
 pub const Tag = enum(u32) {
     boolean,
+    builtin_function,
+    ecmascript_function,
     _,
 };
 
@@ -54,6 +56,8 @@ pub fn format(
 pub inline fn is(self: Self, comptime T: type) bool {
     inline for ([_]struct { type, Tag }{
         .{ builtins.Boolean, .boolean },
+        .{ builtins.BuiltinFunction, .builtin_function },
+        .{ builtins.ECMAScriptFunction, .ecmascript_function },
     }) |entry| if (T == entry[0]) {
         return if (self.tag) |tag| tag == entry[1] else false;
     };

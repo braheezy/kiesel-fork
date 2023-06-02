@@ -61,6 +61,7 @@ pub const BuiltinFunction = Object.Factory(.{
         /// [[InitialName]]
         initial_name: ?[]const u8,
     },
+    .tag = .builtin_function,
 });
 
 /// 10.3.1 [[Call]] ( thisArgument, argumentsList )
