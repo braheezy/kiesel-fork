@@ -29,8 +29,17 @@ inline fn lazyIntrinsic(
     comptime T: type,
 ) error{OutOfMemory}!Object {
     const intrinsic = &@field(lazy_intrinsics, name);
-    if (intrinsic.* == null)
-        intrinsic.* = try T.create(self.realm);
+    if (intrinsic.* == null) {
+        // Intrinsics that have a dependency on themselves need to use two-stage initialization
+        // when first created, otherwise create() goes into infinite recursion.
+        // Once the intrinsic is no longer null, regular create() can be used.
+        if (@hasDecl(T, "createNoinit")) {
+            intrinsic.* = try T.createNoinit(self.realm);
+            try T.init(self.realm, intrinsic.*.?);
+        } else {
+            intrinsic.* = try T.create(self.realm);
+        }
+    }
     return intrinsic.*.?;
 }
 
