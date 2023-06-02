@@ -45,7 +45,7 @@ pub const ObjectConstructor = struct {
         // 20.1.2.20 Object.prototype
         // https://tc39.es/ecma262/#sec-object.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%Boolean.prototype%"()),
+            .value = Value.from(try realm.intrinsics.@"%Object.prototype%"()),
             .writable = false,
             .enumerable = false,
             .configurable = false,
