@@ -18,6 +18,7 @@ pub const BooleanConstructor = boolean.BooleanConstructor;
 pub const BooleanPrototype = boolean.BooleanPrototype;
 pub const BuiltinFunction = builtin_function.BuiltinFunction;
 pub const ECMAScriptFunction = ecmascript_function.ECMAScriptFunction;
+pub const FunctionConstructor = function.FunctionConstructor;
 pub const FunctionPrototype = function.FunctionPrototype;
 pub const Object = object.Object;
 pub const ObjectConstructor = object.ObjectConstructor;
