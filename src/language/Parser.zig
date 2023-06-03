@@ -533,7 +533,7 @@ fn acceptFormalParameters(self: *Self) !ast.FormalParameters {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var formal_parameters_items = std.ArrayList(ast.FormalParametersItem).init(self.allocator);
+    var formal_parameters_items = std.ArrayList(ast.FormalParameters.Item).init(self.allocator);
     while (self.acceptBindingIdentifier()) |identifier| {
         const formal_parameter = ast.FormalParameter{
             .binding_element = .{ .identifier = identifier },

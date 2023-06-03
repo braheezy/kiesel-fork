@@ -1205,16 +1205,16 @@ pub const ThrowStatement = struct {
     }
 };
 
-pub const FormalParametersItem = union(enum) {
-    formal_parameter: FormalParameter,
-    // TODO: FunctionRestParameter
-};
-
 /// https://tc39.es/ecma262/#prod-FormalParameters
 pub const FormalParameters = struct {
     const Self = @This();
 
-    items: []const FormalParametersItem,
+    pub const Item = union(enum) {
+        formal_parameter: FormalParameter,
+        // TODO: FunctionRestParameter
+    };
+
+    items: []const Item,
 
     /// 15.1.5 Static Semantics: ExpectedArgumentCount
     /// https://tc39.es/ecma262/#sec-static-semantics-expectedargumentcount
