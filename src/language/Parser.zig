@@ -30,7 +30,7 @@ pub const Context = struct {
 allocator: Allocator,
 core: ParserCore,
 diagnostics: *ptk.Diagnostics,
-in_function: bool = false,
+in_function_body: bool = false,
 
 const RuleSet = ptk.RuleSet(Tokenizer.TokenType);
 const ParserCore = ptk.ParserCore(Tokenizer, .{ .whitespace, .comment });
@@ -475,7 +475,7 @@ fn acceptReturnStatement(self: *Self) !ast.ReturnStatement {
 
     _ = try self.core.accept(RuleSet.is(.@"return"));
 
-    if (!self.in_function) {
+    if (!self.in_function_body) {
         try self.diagnostics.emit(
             state.location,
             .@"error",
@@ -525,9 +525,6 @@ fn acceptFunctionDeclaration(self: *Self) !ast.FunctionDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const tmp = temporaryChange(self, "in_function", true);
-    defer tmp.restore();
-
     _ = try self.core.accept(RuleSet.is(.function));
     // We need to do this after consuming the 'function' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
@@ -544,7 +541,7 @@ fn acceptFunctionDeclaration(self: *Self) !ast.FunctionDeclaration {
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
-    const statement_list = try self.acceptStatementList();
+    const function_body = try self.acceptFunctionBody();
     _ = try self.core.accept(RuleSet.is(.@"}"));
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
@@ -554,7 +551,7 @@ fn acceptFunctionDeclaration(self: *Self) !ast.FunctionDeclaration {
     return .{
         .identifier = identifier,
         .formal_parameters = formal_parameters,
-        .function_body = .{ .statement_list = statement_list },
+        .function_body = function_body,
         .source_text = source_text,
     };
 }
@@ -562,9 +559,6 @@ fn acceptFunctionDeclaration(self: *Self) !ast.FunctionDeclaration {
 fn acceptFunctionExpression(self: *Self) !ast.FunctionExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
-
-    const tmp = temporaryChange(self, "in_function", true);
-    defer tmp.restore();
 
     _ = try self.core.accept(RuleSet.is(.function));
     // We need to do this after consuming the 'function' token to skip preceeding whitespace.
@@ -574,7 +568,7 @@ fn acceptFunctionExpression(self: *Self) !ast.FunctionExpression {
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
-    const statement_list = try self.acceptStatementList();
+    const function_body = try self.acceptFunctionBody();
     _ = try self.core.accept(RuleSet.is(.@"}"));
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
@@ -584,7 +578,18 @@ fn acceptFunctionExpression(self: *Self) !ast.FunctionExpression {
     return .{
         .identifier = identifier,
         .formal_parameters = formal_parameters,
-        .function_body = .{ .statement_list = statement_list },
+        .function_body = function_body,
         .source_text = source_text,
     };
+}
+
+fn acceptFunctionBody(self: *Self) !ast.FunctionBody {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const tmp = temporaryChange(self, "in_function_body", true);
+    defer tmp.restore();
+
+    const statement_list = try self.acceptStatementList();
+    return .{ .statement_list = statement_list };
 }
