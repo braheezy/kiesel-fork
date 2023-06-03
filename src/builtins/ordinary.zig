@@ -719,7 +719,7 @@ pub fn ordinaryCreateFromConstructor(
 pub fn getPrototypeFromConstructor(
     constructor: Object,
     comptime intrinsic_default_proto: []const u8,
-) !?Object {
+) !Object {
     // 1. Assert: intrinsicDefaultProto is this specification's name of an intrinsic object. The
     //    corresponding object must be an intrinsic that is intended to be used as the
     //    [[Prototype]] value of an object.
@@ -728,7 +728,7 @@ pub fn getPrototypeFromConstructor(
     // 2. Let proto be ? Get(constructor, "prototype").
     const prototype = try constructor.get(PropertyKey.from("prototype"));
 
-    const prototype_object: ?Object = switch (prototype) {
+    const prototype_object = switch (prototype) {
         .object => prototype.object,
 
         // 3. If proto is not an Object, then
