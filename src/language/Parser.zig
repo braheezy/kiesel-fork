@@ -44,6 +44,24 @@ pub fn parse(
     if (T != ast.Script)
         @compileError("Parser.parse() is only implemented for ast.Script");
 
+    return ast.Script{
+        .statement_list = try parseNode(
+            ast.StatementList,
+            "acceptStatementList",
+            allocator,
+            source_text,
+            ctx,
+        ),
+    };
+}
+
+pub fn parseNode(
+    comptime T: type,
+    comptime accept_function_name: []const u8,
+    allocator: Allocator,
+    source_text: []const u8,
+    ctx: Context,
+) Error!T {
     var tokenizer = Tokenizer.init(source_text, ctx.file_name);
     var core = ParserCore.init(&tokenizer);
     var parser = Self{
@@ -51,8 +69,10 @@ pub fn parse(
         .core = core,
         .diagnostics = ctx.diagnostics,
     };
-
-    const statement_list = try parser.acceptStatementList();
+    const ast_node = @field(Self, accept_function_name)(&parser) catch |err| blk: {
+        if (err == error.OutOfMemory) return error.OutOfMemory;
+        break :blk null;
+    };
     if (parser.diagnostics.hasErrors()) {
         return error.ParseError;
     } else if (parser.core.peek()) |maybe_next_token| {
@@ -60,21 +80,24 @@ pub fn parse(
             try parser.diagnostics.emit(
                 tokenizer.current_location,
                 .@"error",
-                "Expected statement or declaration, got '{s}'",
+                "Unexpected token '{s}'",
                 .{@tagName(next_token.type)},
             );
             return error.ParseError;
         }
     } else |_| {
+        const source = parser.core.tokenizer.source;
+        const offset = parser.core.tokenizer.offset;
+        std.debug.assert(offset < source.len);
         try parser.diagnostics.emit(
             tokenizer.current_location,
             .@"error",
-            "Expected statement or declaration, got unexpected character",
-            .{},
+            "Invalid character '{s}'",
+            .{source[offset .. offset + 1]},
         );
         return error.ParseError;
     }
-    return ast.Script{ .statement_list = statement_list };
+    return ast_node.?;
 }
 
 /// 5.1.5.8 [no LineTerminator here]
