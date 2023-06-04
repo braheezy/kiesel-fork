@@ -259,29 +259,38 @@ fn acceptLiteral(self: *Self) !ast.Literal {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const token = try self.core.accept(RuleSet.oneOf(.{
-        .null,
-        .true,
-        .false,
-        .numeric,
-        .string,
-    }));
-    return switch (token.type) {
-        .null => .null,
-        .true => .{ .boolean = true },
-        .false => .{ .boolean = false },
-        .numeric => blk: {
-            var numeric_literal = parseNumericLiteral(token.text, .complete) catch unreachable;
-            numeric_literal.text = try self.allocator.dupe(u8, numeric_literal.text);
-            break :blk .{ .numeric = numeric_literal };
-        },
-        .string => blk: {
-            var string_literal = parseStringLiteral(token.text, .complete) catch unreachable;
-            string_literal.text = try self.allocator.dupe(u8, string_literal.text);
-            break :blk .{ .string = string_literal };
-        },
-        else => unreachable,
-    };
+    if (self.acceptNumericLiteral()) |numeric_literal|
+        return .{ .numeric = numeric_literal }
+    else |_| if (self.acceptStringLiteral()) |string_literal|
+        return .{ .string = string_literal }
+    else |_| if (self.core.accept(RuleSet.is(.null))) |_|
+        return .null
+    else |_| if (self.core.accept(RuleSet.is(.true))) |_|
+        return .{ .boolean = true }
+    else |_| if (self.core.accept(RuleSet.is(.false))) |_|
+        return .{ .boolean = false }
+    else |_|
+        return error.UnexpectedToken;
+}
+
+fn acceptNumericLiteral(self: *Self) !ast.NumericLiteral {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.is(.numeric));
+    var numeric_literal = parseNumericLiteral(token.text, .complete) catch unreachable;
+    numeric_literal.text = try self.allocator.dupe(u8, numeric_literal.text);
+    return numeric_literal;
+}
+
+fn acceptStringLiteral(self: *Self) !ast.StringLiteral {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.is(.string));
+    var string_literal = parseStringLiteral(token.text, .complete) catch unreachable;
+    string_literal.text = try self.allocator.dupe(u8, string_literal.text);
+    return string_literal;
 }
 
 fn acceptArrayLiteral(self: *Self) !ast.ArrayLiteral {
