@@ -18,6 +18,7 @@ const Object = types.Object;
 const PrivateEnvironment = execution.PrivateEnvironment;
 const PropertyKey = types.PropertyKey;
 const Value = types.Value;
+const arrayCreate = builtins.arrayCreate;
 const noexcept = utils.noexcept;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
 const setFunctionName = builtins.setFunctionName;
@@ -103,6 +104,7 @@ pub const PrimaryExpression = union(enum) {
     this,
     identifier_reference: IdentifierReference,
     literal: Literal,
+    array_literal: ArrayLiteral,
     function_expression: FunctionExpression,
     parenthesized_expression: ParenthesizedExpression,
 
@@ -111,7 +113,7 @@ pub const PrimaryExpression = union(enum) {
             .is_reference => switch (self) {
                 .identifier_reference => true,
                 .parenthesized_expression => |parenthesized_expression| parenthesized_expression.analyze(query),
-                .function_expression, .this, .literal => false,
+                else => false,
             },
             .is_string_literal => switch (self) {
                 .literal => |literal| literal.analyze(query),
@@ -130,6 +132,7 @@ pub const PrimaryExpression = union(enum) {
 
             .identifier_reference => |identifier_reference| try identifier_reference.generateBytecode(executable, ctx),
             .literal => |literal| try literal.generateBytecode(executable, ctx),
+            .array_literal => |array_literal| try array_literal.generateBytecode(executable, ctx),
             .function_expression => |function_expression| try function_expression.generateBytecode(executable, ctx),
             .parenthesized_expression => |parenthesized_expression| try parenthesized_expression.generateBytecode(executable, ctx),
         }
@@ -144,6 +147,7 @@ pub const PrimaryExpression = union(enum) {
                 indentation,
             ),
             .literal => |literal| try literal.print(writer, indentation),
+            .array_literal => |array_literal| try array_literal.print(writer, indentation),
             .function_expression => |function_expression| try function_expression.print(writer, indentation),
             .parenthesized_expression => |parenthesized_expression| try parenthesized_expression.print(
                 writer,
@@ -449,6 +453,67 @@ pub const StringLiteral = struct {
             } else str.appendAssumeCapacity(c);
         }
         return Value.from(str.items);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ArrayLiteral
+pub const ArrayLiteral = struct {
+    const Self = @This();
+
+    pub const Element = union(enum) {
+        elision,
+        expression: Expression,
+        // TODO: SpreadElement
+    };
+
+    element_list: []const Element,
+
+    /// 13.2.4.2 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-array-initializer-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        try executable.addInstruction(.array_create);
+        try executable.addInstruction(.load);
+        for (self.element_list, 0..) |element, i| {
+            switch (element) {
+                // Elision : ,
+                .elision => {
+                    try executable.addInstruction(.store);
+                    try executable.addInstruction(.array_set_length);
+                    try executable.addIndex(i + 1);
+                    try executable.addInstruction(.load);
+                },
+
+                // ElementList : Elisionopt AssignmentExpression
+                .expression => |expression| {
+                    // 1. If Elision is present, then
+                    // NOTE: This is handled above.
+
+                    // 2. Let initResult be ? Evaluation of AssignmentExpression.
+                    try expression.generateBytecode(executable, ctx);
+
+                    // 3. Let initValue be ? GetValue(initResult).
+                    if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+                    // 4. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), initValue).
+                    try executable.addInstruction(.load);
+                    try executable.addInstruction(.array_set_value);
+                    try executable.addIndex(i);
+                    try executable.addInstruction(.load);
+
+                    // 5. Return nextIndex + 1.
+                },
+            }
+        }
+        try executable.addInstruction(.store);
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("ArrayLiteral", writer, indentation);
+        try printString("element_list:", writer, indentation + 1);
+        for (self.element_list) |element| switch (element) {
+            .elision => try printString("<elision>", writer, indentation + 2),
+            .expression => |expression| try expression.print(writer, indentation + 2),
+        };
     }
 };
 

@@ -6,6 +6,12 @@ const IndexType = Executable.IndexType;
 pub const Instruction = enum(u8) {
     const Self = @This();
 
+    /// Store ArrayCreate(0) as the result value.
+    array_create,
+    /// Set an array's value at the given index.
+    array_set_value,
+    /// Set the length property of an array to the given index.
+    array_set_length,
     /// Apply bitwise NOT to the last value on the stack and store it as the result value.
     bitwise_not,
     /// Store EvaluateCall() as the result value.
@@ -66,6 +72,8 @@ pub const Instruction = enum(u8) {
             .jump_conditional,
             .resolve_binding,
             => 2,
+            .array_set_length,
+            .array_set_value,
             .evaluate_property_access_with_expression_key,
             .instantiate_ordinary_function_expression,
             .jump,

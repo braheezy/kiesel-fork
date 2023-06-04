@@ -155,6 +155,8 @@ pub fn print(self: Self, writer: anytype) !void {
                     .{ identifier, identifier_index, strict },
                 );
             },
+            .array_set_length,
+            .array_set_value,
             .instantiate_ordinary_function_expression,
             .jump,
             => {

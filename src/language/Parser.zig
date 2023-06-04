@@ -188,6 +188,8 @@ fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
         return .{ .identifier_reference = identifier_reference }
     else |_| if (self.acceptLiteral()) |literal|
         return .{ .literal = literal }
+    else |_| if (self.acceptArrayLiteral()) |array_literal|
+        return .{ .array_literal = array_literal }
     else |_| if (self.acceptFunctionExpression()) |function_expression|
         return .{ .function_expression = function_expression }
     else |_| if (self.acceptParenthesizedExpression()) |parenthesized_expression|
@@ -281,6 +283,24 @@ fn acceptLiteral(self: *Self) !ast.Literal {
         },
         else => unreachable,
     };
+}
+
+fn acceptArrayLiteral(self: *Self) !ast.ArrayLiteral {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"["));
+    var elements = std.ArrayList(ast.ArrayLiteral.Element).init(self.allocator);
+    while (true) {
+        if (self.acceptExpression()) |expression| {
+            try elements.append(.{ .expression = expression });
+            _ = self.core.accept(RuleSet.is(.@",")) catch break;
+        } else |_| if (self.core.accept(RuleSet.is(.@","))) |_| {
+            try elements.append(.elision);
+        } else |_| break;
+    }
+    _ = try self.core.accept(RuleSet.is(.@"]"));
+    return .{ .element_list = try elements.toOwnedSlice() };
 }
 
 fn acceptUnaryExpression(self: *Self, operator_token: Tokenizer.Token) !ast.UnaryExpression {

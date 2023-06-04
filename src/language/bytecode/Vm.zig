@@ -5,6 +5,7 @@ const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const instructions_ = @import("instructions.zig");
 const types = @import("../../types.zig");
+const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Completion = types.Completion;
@@ -14,7 +15,9 @@ const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Reference = types.Reference;
 const Value = types.Value;
+const arrayCreate = builtins.arrayCreate;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
+const noexcept = utils.noexcept;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
 const performEval = builtins.performEval;
 const setFunctionName = builtins.setFunctionName;
@@ -258,6 +261,26 @@ fn instantiateOrdinaryFunctionExpression(
 
 pub fn run(self: *Self, executable: Executable) !Completion {
     while (self.fetchInstruction(executable)) |instruction| switch (instruction) {
+        .array_create => self.result = Value.from(try arrayCreate(self.agent, 0, null)),
+        .array_set_length => {
+            const length = self.fetchIndex(executable);
+            const array = self.result.?.object;
+            // From ArrayAccumulation:
+            // 2. Perform ? Set(array, "length", 𝔽(len), true).
+            try array.set(PropertyKey.from("length"), Value.from(length), .throw);
+        },
+        .array_set_value => {
+            const index = self.fetchIndex(executable);
+            const init_value = self.stack.pop();
+            const array = self.stack.pop().object;
+            // From ArrayAccumulation:
+            // 4. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), initValue).
+            array.createDataPropertyOrThrow(
+                PropertyKey.from(@as(PropertyKey.IntegerIndex, index)),
+                init_value,
+            ) catch |err| try noexcept(err);
+            self.result = Value.from(array);
+        },
         .bitwise_not => {
             const value = self.result.?;
             self.result = switch (value) {
