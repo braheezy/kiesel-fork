@@ -12,6 +12,8 @@ const Self = @This();
 realm: *Realm,
 
 const lazy_intrinsics = struct {
+    var @"%Array%": ?Object = null;
+    var @"%Array.prototype%": ?Object = null;
     var @"%Boolean%": ?Object = null;
     var @"%Boolean.prototype%": ?Object = null;
     var @"%eval%": ?Object = null;
@@ -44,6 +46,12 @@ inline fn lazyIntrinsic(
     return intrinsic.*.?;
 }
 
+pub fn @"%Array%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%Array%", builtins.ArrayConstructor);
+}
+pub fn @"%Array.prototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%Array.prototype%", builtins.ArrayPrototype);
+}
 pub fn @"%Boolean%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Boolean%", builtins.BooleanConstructor);
 }

@@ -1,3 +1,4 @@
+const array = @import("builtins/array.zig");
 const boolean = @import("builtins/boolean.zig");
 const builtin_function = @import("builtins/builtin_function.zig");
 const ecmascript_function = @import("builtins/ecmascript_function.zig");
@@ -12,6 +13,9 @@ pub const global_functions = global.global_functions;
 pub const ordinary_internal_methods = ordinary.ordinary_internal_methods;
 
 pub const ArgumentsList = builtin_function.ArgumentsList;
+pub const Array = array.Array;
+pub const ArrayConstructor = array.ArrayConstructor;
+pub const ArrayPrototype = array.ArrayPrototype;
 pub const Behaviour = builtin_function.Behaviour;
 pub const Boolean = boolean.Boolean;
 pub const BooleanConstructor = boolean.BooleanConstructor;
@@ -25,6 +29,8 @@ pub const ObjectConstructor = object.ObjectConstructor;
 pub const ObjectPrototype = object.ObjectPrototype;
 pub const ThrowTypeError = throw_type_error.ThrowTypeError;
 pub const addRestrictedFunctionProperties = ecmascript_function.addRestrictedFunctionProperties;
+pub const arrayCreate = array.arrayCreate;
+pub const arraySetLength = array.arraySetLength;
 pub const createBuiltinFunction = builtin_function.createBuiltinFunction;
 pub const getPrototypeFromConstructor = ordinary.getPrototypeFromConstructor;
 pub const globalObjectProperties = global.globalObjectProperties;
