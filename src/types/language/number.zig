@@ -43,13 +43,18 @@ pub const Number = union(enum) {
     pub inline fn from(number: anytype) Self {
         const T = @TypeOf(number);
         switch (@typeInfo(T)) {
-            .Int, .ComptimeInt => return .{ .i32 = @as(i32, number) },
+            .Int, .ComptimeInt => {
+                if (@intToFloat(f64, number) <= @intToFloat(f64, std.math.maxInt(i32))) {
+                    return .{ .i32 = @intCast(i32, number) };
+                }
+                return .{ .f64 = @intToFloat(f64, number) };
+            },
             .Float, .ComptimeFloat => {
                 const truncated = std.math.trunc(number);
                 if (std.math.isFinite(@as(f64, number)) and
                     !std.math.signbit(@as(f64, number)) and
                     truncated == number and
-                    truncated <= std.math.maxInt(i32))
+                    truncated <= @intToFloat(f64, std.math.maxInt(i32)))
                 {
                     return .{ .i32 = @floatToInt(i32, truncated) };
                 }
