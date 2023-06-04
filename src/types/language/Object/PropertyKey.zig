@@ -28,8 +28,8 @@ pub const PropertyKey = union(enum) {
             }
         } else if (T == Symbol) {
             return .{ .symbol = value };
-        } else if (T == IntegerIndex) {
-            return .{ .integer_index = value };
+        } else if (T == IntegerIndex or @typeInfo(T) == .ComptimeInt) {
+            return .{ .integer_index = @as(IntegerIndex, value) };
         } else {
             @compileError("PropertyKey.from() called with incompatible type " ++ @typeName(T));
         }
