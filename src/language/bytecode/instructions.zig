@@ -40,6 +40,10 @@ pub const Instruction = enum(u8) {
     load_this_value,
     /// Apply logical NOT to the last value on the stack and store it as the result value.
     logical_not,
+    /// Store OrdinaryObjectCreate(%Object.prototype%) as the result value.
+    object_create,
+    /// Set an object's property to the key/value pair from the last two values on the stack.
+    object_set_property,
     /// Store ResolveBinding() as the result value.
     resolve_binding,
     /// Store ResolveThisBinding() as the result value.

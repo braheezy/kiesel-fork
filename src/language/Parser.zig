@@ -189,6 +189,8 @@ fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
         return .{ .literal = literal }
     else |_| if (self.acceptArrayLiteral()) |array_literal|
         return .{ .array_literal = array_literal }
+    else |_| if (self.acceptObjectLiteral()) |object_literal|
+        return .{ .object_literal = object_literal }
     else |_| if (self.acceptFunctionExpression()) |function_expression|
         return .{ .function_expression = function_expression }
     else |_| if (self.acceptParenthesizedExpression()) |parenthesized_expression|
@@ -309,6 +311,69 @@ fn acceptArrayLiteral(self: *Self) !ast.ArrayLiteral {
     }
     _ = try self.core.accept(RuleSet.is(.@"]"));
     return .{ .element_list = try elements.toOwnedSlice() };
+}
+
+fn acceptObjectLiteral(self: *Self) !ast.ObjectLiteral {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"{"));
+    const property_definition_list = try self.acceptPropertyDefinitionList();
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+    return .{ .property_definition_list = property_definition_list };
+}
+
+fn acceptPropertyDefinitionList(self: *Self) !ast.PropertyDefinitionList {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    var property_definitions = std.ArrayList(ast.PropertyDefinition).init(self.allocator);
+    while (true) {
+        if (self.acceptPropertyDefinition()) |property_definition| {
+            try property_definitions.append(property_definition);
+            _ = self.core.accept(RuleSet.is(.@",")) catch break;
+        } else |_| break;
+    }
+    return .{ .items = try property_definitions.toOwnedSlice() };
+}
+
+fn acceptPropertyDefinition(self: *Self) !ast.PropertyDefinition {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    var property_name: ast.PropertyName = undefined;
+    if (self.acceptIdentifierReference()) |identifier_reference| {
+        const token = self.core.peek() catch null;
+        // IdentifierReference
+        if (token == null or token.?.type != .@":")
+            return .{ .identifier_reference = identifier_reference };
+        // LiteralPropertyName : IdentifierName
+        property_name = .{
+            .literal_property_name = .{ .identifier = identifier_reference.identifier },
+        };
+    } else |_| if (self.acceptStringLiteral()) |string_literal|
+        // LiteralPropertyName : StringLiteral
+        property_name = .{ .literal_property_name = .{ .string_literal = string_literal } }
+    else |_| if (self.acceptNumericLiteral()) |numeric_literal|
+        // LiteralPropertyName : NumericLiteral
+        property_name = .{ .literal_property_name = .{ .numeric_literal = numeric_literal } }
+    else |_| if (self.core.accept(RuleSet.is(.@"["))) |_| {
+        // ComputedPropertyName
+        const computed_property_name = try self.acceptExpression();
+        property_name = ast.PropertyName{
+            .computed_property_name = computed_property_name,
+        };
+        _ = try self.core.accept(RuleSet.is(.@"]"));
+    } else |_| return error.UnexpectedToken;
+
+    _ = try self.core.accept(RuleSet.is(.@":"));
+    const expression = try self.acceptExpression();
+    return .{
+        .property_name_and_expression = .{
+            .property_name = property_name,
+            .expression = expression,
+        },
+    };
 }
 
 fn acceptUnaryExpression(self: *Self, operator_token: Tokenizer.Token) !ast.UnaryExpression {

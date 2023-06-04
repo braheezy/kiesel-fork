@@ -104,6 +104,7 @@ pub const PrimaryExpression = union(enum) {
     identifier_reference: IdentifierReference,
     literal: Literal,
     array_literal: ArrayLiteral,
+    object_literal: ObjectLiteral,
     function_expression: FunctionExpression,
     parenthesized_expression: ParenthesizedExpression,
 
@@ -132,6 +133,7 @@ pub const PrimaryExpression = union(enum) {
             .identifier_reference => |identifier_reference| try identifier_reference.generateBytecode(executable, ctx),
             .literal => |literal| try literal.generateBytecode(executable, ctx),
             .array_literal => |array_literal| try array_literal.generateBytecode(executable, ctx),
+            .object_literal => |object_literal| try object_literal.generateBytecode(executable, ctx),
             .function_expression => |function_expression| try function_expression.generateBytecode(executable, ctx),
             .parenthesized_expression => |parenthesized_expression| try parenthesized_expression.generateBytecode(executable, ctx),
         }
@@ -147,6 +149,7 @@ pub const PrimaryExpression = union(enum) {
             ),
             .literal => |literal| try literal.print(writer, indentation),
             .array_literal => |array_literal| try array_literal.print(writer, indentation),
+            .object_literal => |object_literal| try object_literal.print(writer, indentation),
             .function_expression => |function_expression| try function_expression.print(writer, indentation),
             .parenthesized_expression => |parenthesized_expression| try parenthesized_expression.print(
                 writer,
@@ -492,9 +495,9 @@ pub const ArrayLiteral = struct {
 
                     // 3. Let initValue be ? GetValue(initResult).
                     if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                    try executable.addInstruction(.load);
 
                     // 4. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), initValue).
-                    try executable.addInstruction(.load);
                     try executable.addInstruction(.array_set_value);
                     try executable.addIndex(i);
                     try executable.addInstruction(.load);
@@ -512,6 +515,200 @@ pub const ArrayLiteral = struct {
             .elision => try printString("<elision>", writer, indentation + 1),
             .expression => |expression| try expression.print(writer, indentation + 1),
         };
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ObjectLiteral
+pub const ObjectLiteral = struct {
+    const Self = @This();
+
+    property_definition_list: PropertyDefinitionList,
+
+    /// 13.2.5.4 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-object-initializer-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // ObjectLiteral : { }
+        if (self.property_definition_list.items.len == 0) {
+            // 1. Return OrdinaryObjectCreate(%Object.prototype%).
+            try executable.addInstruction(.object_create);
+            return;
+        }
+
+        // ObjectLiteral :
+        //     { PropertyDefinitionList }
+        //     { PropertyDefinitionList , }
+        // 1. Let obj be OrdinaryObjectCreate(%Object.prototype%).
+        try executable.addInstruction(.object_create);
+        try executable.addInstruction(.load);
+
+        // 2. Perform ? PropertyDefinitionEvaluation of PropertyDefinitionList with argument obj.
+        try self.property_definition_list.generateBytecode(executable, ctx);
+
+        // 3. Return obj.
+        try executable.addInstruction(.store);
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("ObjectLiteral", writer, indentation);
+        try self.property_definition_list.print(writer, indentation + 1);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-PropertyDefinitionList
+pub const PropertyDefinitionList = struct {
+    const Self = @This();
+
+    items: []const PropertyDefinition,
+
+    /// 13.2.5.5 Runtime Semantics: PropertyDefinitionEvaluation
+    /// https://tc39.es/ecma262/#sec-runtime-semantics-propertydefinitionevaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // PropertyDefinitionList : PropertyDefinitionList , PropertyDefinition
+        // 1. Perform ? PropertyDefinitionEvaluation of PropertyDefinitionList with argument object.
+        // 2. Perform ? PropertyDefinitionEvaluation of PropertyDefinition with argument object.
+        for (self.items) |property_definition| {
+            try property_definition.generateBytecode(executable, ctx);
+        }
+
+        // 3. Return unused.
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'PropertyDefinitionList' here, it's implied and only adds nesting.
+        for (self.items) |property_definition| {
+            try property_definition.print(writer, indentation);
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-PropertyDefinition
+pub const PropertyDefinition = union(enum) {
+    const Self = @This();
+
+    identifier_reference: IdentifierReference,
+    property_name_and_expression: struct {
+        property_name: PropertyName,
+        expression: Expression,
+    },
+    // TODO: MethodDefinition, ...Expression
+
+    /// 13.2.5.5 Runtime Semantics: PropertyDefinitionEvaluation
+    /// https://tc39.es/ecma262/#sec-runtime-semantics-propertydefinitionevaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        switch (self) {
+            // PropertyDefinition : IdentifierReference
+            .identifier_reference => |identifier_reference| {
+                // 1. Let propName be StringValue of IdentifierReference.
+                const prop_name = identifier_reference.identifier;
+                try executable.addInstructionWithConstant(.load_constant, Value.from(prop_name));
+
+                // 2. Let exprValue be ? Evaluation of IdentifierReference.
+                try identifier_reference.generateBytecode(executable, ctx);
+
+                // 3. Let propValue be ? GetValue(exprValue).
+                try executable.addInstruction(.get_value);
+                try executable.addInstruction(.load);
+
+                // 4. Assert: object is an ordinary, extensible object with no non-configurable properties.
+                // 5. Perform ! CreateDataPropertyOrThrow(object, propName, propValue).
+                try executable.addInstruction(.object_set_property);
+                try executable.addInstruction(.load);
+
+                // 6. Return unused.
+            },
+
+            // PropertyDefinition : PropertyName : AssignmentExpression
+            .property_name_and_expression => |property_name_and_expression| {
+                // 1. Let propKey be ? Evaluation of PropertyName.
+                switch (property_name_and_expression.property_name) {
+                    .literal_property_name => |literal| switch (literal) {
+                        .identifier => |identifier| try executable.addInstructionWithConstant(
+                            .load_constant,
+                            Value.from(identifier),
+                        ),
+                        .string_literal => |string_literal| try executable.addInstructionWithConstant(
+                            .load_constant,
+                            try string_literal.stringValue(executable.allocator),
+                        ),
+                        .numeric_literal => |numeric_literal| try executable.addInstructionWithConstant(
+                            .load_constant,
+                            try numeric_literal.numericValue(executable.allocator),
+                        ),
+                    },
+                    .computed_property_name => |expression| {
+                        try expression.generateBytecode(executable, ctx);
+                        if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                        try executable.addInstruction(.load);
+                    },
+                }
+
+                // TODO: 2-4.
+
+                // TODO: 5. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and isProtoSetter is false, then
+                // 6. Else,
+
+                // a. Let exprValueRef be ? Evaluation of AssignmentExpression.
+                try property_name_and_expression.expression.generateBytecode(executable, ctx);
+
+                // b. Let propValue be ? GetValue(exprValueRef).
+                if (property_name_and_expression.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                try executable.addInstruction(.load);
+
+                // TODO: 7. If isProtoSetter is true, then
+
+                // 8. Assert: object is an ordinary, extensible object with no non-configurable properties.
+                // 9. Perform ! CreateDataPropertyOrThrow(object, propKey, propValue).
+                try executable.addInstruction(.object_set_property);
+                try executable.addInstruction(.load);
+
+                // 10. Return unused.
+            },
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'PropertyDefinition' here, it's implied and only adds nesting.
+        switch (self) {
+            .identifier_reference => |identifier_reference| {
+                try printString("[identifier_reference]", writer, indentation);
+                try identifier_reference.print(writer, indentation + 1);
+            },
+            .property_name_and_expression => |property_name_and_expression| {
+                try printString("[property_name_and_expression]", writer, indentation);
+                try property_name_and_expression.property_name.print(writer, indentation + 1);
+                try property_name_and_expression.expression.print(writer, indentation + 1);
+            },
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-PropertyName
+pub const PropertyName = union(enum) {
+    const Self = @This();
+
+    literal_property_name: union(enum) {
+        identifier: Identifier,
+        string_literal: StringLiteral,
+        numeric_literal: NumericLiteral,
+    },
+    computed_property_name: Expression,
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'PropertyName' here, it's implied and only adds nesting.
+        switch (self) {
+            .literal_property_name => |literal| {
+                try printString("[literal_property_name]", writer, indentation);
+                switch (literal) {
+                    .identifier => |identifier| try printString(identifier, writer, indentation + 1),
+                    .string_literal => |string_literal| try printString(string_literal.text, writer, indentation + 1),
+                    .numeric_literal => |numeric_literal| try printString(numeric_literal.text, writer, indentation + 1),
+                }
+            },
+            .computed_property_name => |expression| {
+                try printString("[computed_property_name]", writer, indentation);
+                try expression.print(writer, indentation + 1);
+            },
+        }
     }
 };
 

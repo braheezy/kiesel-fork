@@ -19,6 +19,7 @@ const arrayCreate = builtins.arrayCreate;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const noexcept = utils.noexcept;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const performEval = builtins.performEval;
 const setFunctionName = builtins.setFunctionName;
 
@@ -424,6 +425,22 @@ pub fn run(self: *Self, executable: Executable) !Completion {
         .logical_not => {
             const value = self.result.?;
             self.result = Value.from(!value.toBoolean());
+        },
+        .object_create => {
+            const object = try ordinaryObjectCreate(
+                self.agent,
+                try self.agent.currentRealm().intrinsics.@"%Object.prototype%"(),
+            );
+            self.result = Value.from(object);
+        },
+        .object_set_property => {
+            const property_value = self.stack.pop();
+            const property_name = try self.stack.pop().toPropertyKey(self.agent);
+            const object = self.stack.pop().object;
+            // From PropertyDefinitionEvaluation:
+            // 5. Perform ! CreateDataPropertyOrThrow(object, propName, propValue).
+            object.createDataPropertyOrThrow(property_name, property_value) catch |err| try noexcept(err);
+            self.result = Value.from(object);
         },
         .resolve_binding => {
             const name = self.fetchIdentifier(executable);
