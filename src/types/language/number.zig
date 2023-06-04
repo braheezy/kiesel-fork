@@ -197,8 +197,21 @@ pub const Number = union(enum) {
     /// 6.1.6.1.20 Number::toString ( x, radix )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-tostring
     pub fn toString(self: Self, allocator: Allocator, radix: u8) ![]const u8 {
-        _ = radix;
-        // TODO: Implement according to spec!
+        // 1. If x is NaN, return "NaN".
+        if (self.isNan()) return "NaN";
+
+        // 2. If x is either +0𝔽 or -0𝔽, return "0".
+        if (self.isPositiveZero() or self.isNegativeZero()) return "0";
+
+        // 3. If x < -0𝔽, return the string-concatenation of "-" and Number::toString(-x, radix).
+        if (self.asFloat() < 0) return std.fmt.allocPrint(allocator, "-{s}", .{
+            try self.unaryMinus().toString(allocator, radix),
+        });
+
+        // 4. If x is +∞𝔽, return "Infinity".
+        if (self.isPositiveInf()) return "Infinity";
+
+        // TODO: Implement steps 5-12 according to spec!
         return switch (self) {
             .f64 => |x| std.fmt.allocPrint(allocator, "{}", .{x}),
             .i32 => |x| std.fmt.allocPrint(allocator, "{}", .{x}),
