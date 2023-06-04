@@ -18,7 +18,6 @@ const Object = types.Object;
 const PrivateEnvironment = execution.PrivateEnvironment;
 const PropertyKey = types.PropertyKey;
 const Value = types.Value;
-const arrayCreate = builtins.arrayCreate;
 const noexcept = utils.noexcept;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
 const setFunctionName = builtins.setFunctionName;

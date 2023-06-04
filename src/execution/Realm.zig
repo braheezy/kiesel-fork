@@ -1,10 +1,6 @@
 //! 9.3 Realms
 //! https://tc39.es/ecma262/#sec-code-realms
 
-const std = @import("std");
-
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const environments = @import("environments.zig");
 const types = @import("../types.zig");
@@ -13,9 +9,7 @@ const Agent = @import("Agent.zig");
 const ExecutionContext = @import("ExecutionContext.zig");
 const GlobalEnvironment = environments.GlobalEnvironment;
 const Object = types.Object;
-const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
-const Value = types.Value;
 const addRestrictedFunctionProperties = builtins.addRestrictedFunctionProperties;
 const globalObjectProperties = builtins.globalObjectProperties;
 const newGlobalEnvironment = environments.newGlobalEnvironment;

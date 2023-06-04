@@ -6,7 +6,6 @@ const types = @import("../types.zig");
 
 const Agent = execution.Agent;
 const Completion = types.Completion;
-const Value = types.Value;
 
 const instructions = @import("bytecode/instructions.zig");
 

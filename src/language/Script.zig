@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const ast = @import("ast.zig");
 const bytecode = @import("bytecode.zig");
 const execution = @import("../execution.zig");

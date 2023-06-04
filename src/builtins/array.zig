@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const ordinary = @import("ordinary.zig");

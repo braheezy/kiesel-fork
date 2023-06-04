@@ -1,7 +1,3 @@
-const std = @import("std");
-
-const Allocator = std.mem.Allocator;
-
 const execution = @import("../../../execution.zig");
 
 const Agent = execution.Agent;

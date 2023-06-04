@@ -9,7 +9,6 @@ const tokenizer_ = @import("tokenizer.zig");
 const utils = @import("../utils.zig");
 
 const Tokenizer = tokenizer_.Tokenizer;
-const line_terminators = tokenizer_.line_terminators;
 const containsLineTerminator = tokenizer_.containsLineTerminator;
 const parseNumericLiteral = literals.parseNumericLiteral;
 const parseStringLiteral = literals.parseStringLiteral;
