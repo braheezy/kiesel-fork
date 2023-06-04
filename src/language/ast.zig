@@ -508,10 +508,9 @@ pub const ArrayLiteral = struct {
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("ArrayLiteral", writer, indentation);
-        try printString("element_list:", writer, indentation + 1);
         for (self.element_list) |element| switch (element) {
-            .elision => try printString("<elision>", writer, indentation + 2),
-            .expression => |expression| try expression.print(writer, indentation + 2),
+            .elision => try printString("<elision>", writer, indentation + 1),
+            .expression => |expression| try expression.print(writer, indentation + 1),
         };
     }
 };
