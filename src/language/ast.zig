@@ -1073,6 +1073,63 @@ pub const LogicalExpression = struct {
     }
 };
 
+/// https://tc39.es/ecma262/#prod-ConditionalExpression
+pub const ConditionalExpression = struct {
+    const Self = @This();
+
+    test_expression: *Expression,
+    consequent_expression: *Expression,
+    alternate_expression: *Expression,
+
+    /// 13.14.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-conditional-operator-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // ConditionalExpression : ShortCircuitExpression ? AssignmentExpression : AssignmentExpression
+        // 1. Let lref be ? Evaluation of ShortCircuitExpression.
+        try self.test_expression.generateBytecode(executable, ctx);
+
+        // 2. Let lval be ToBoolean(? GetValue(lref)).
+        if (self.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+        try executable.addInstruction(.jump_conditional);
+        const consequent_jump = try executable.addJumpIndex();
+        const alternate_jump = try executable.addJumpIndex();
+
+        // 3. If lval is true, then
+        try consequent_jump.setTargetHere();
+
+        // a. Let trueRef be ? Evaluation of the first AssignmentExpression.
+        try self.consequent_expression.generateBytecode(executable, ctx);
+
+        // b. Return ? GetValue(trueRef).
+        if (self.consequent_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+        try executable.addInstruction(.jump);
+        const end_jump = try executable.addJumpIndex();
+
+        // 4. Else,
+        try alternate_jump.setTargetHere();
+
+        // a. Let falseRef be ? Evaluation of the second AssignmentExpression.
+        try self.alternate_expression.generateBytecode(executable, ctx);
+
+        // b. Return ? GetValue(falseRef).
+        if (self.alternate_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+        try end_jump.setTargetHere();
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("ConditionalExpression", writer, indentation);
+        try printString("test:", writer, indentation + 1);
+        try self.test_expression.print(writer, indentation + 2);
+        try printString("consequent:", writer, indentation + 1);
+        try self.consequent_expression.print(writer, indentation + 2);
+        try printString("alternate:", writer, indentation + 1);
+        try self.alternate_expression.print(writer, indentation + 2);
+    }
+};
+
 /// https://tc39.es/ecma262/#prod-Expression
 pub const Expression = union(enum) {
     const Self = @This();
@@ -1084,6 +1141,7 @@ pub const Expression = union(enum) {
     relational_expression: RelationalExpression,
     equality_expression: EqualityExpression,
     logical_expression: LogicalExpression,
+    conditional_expression: ConditionalExpression,
 
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
         return switch (query) {
@@ -1108,6 +1166,7 @@ pub const Expression = union(enum) {
             .relational_expression => |relational_expression| try relational_expression.generateBytecode(executable, ctx),
             .equality_expression => |equality_expression| try equality_expression.generateBytecode(executable, ctx),
             .logical_expression => |logical_expression| try logical_expression.generateBytecode(executable, ctx),
+            .conditional_expression => |conditional_expression| try conditional_expression.generateBytecode(executable, ctx),
         }
     }
 
@@ -1139,6 +1198,10 @@ pub const Expression = union(enum) {
                 indentation + 1,
             ),
             .logical_expression => |logical_expression| try logical_expression.print(
+                writer,
+                indentation + 1,
+            ),
+            .conditional_expression => |conditional_expression| try conditional_expression.print(
                 writer,
                 indentation + 1,
             ),
