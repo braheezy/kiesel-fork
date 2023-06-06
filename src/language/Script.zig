@@ -33,7 +33,7 @@ pub fn parse(
     source_text: []const u8,
     realm: *Realm,
     host_defined: ?*anyopaque,
-    ctx: Parser.Context,
+    ctx: Parser.ParseContext,
 ) !*Self {
     const agent = realm.agent;
 

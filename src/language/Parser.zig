@@ -16,16 +16,6 @@ const temporaryChange = utils.temporaryChange;
 
 const Self = @This();
 
-pub const Error = error{
-    ParseError,
-    OutOfMemory,
-};
-
-pub const Context = struct {
-    diagnostics: *ptk.Diagnostics,
-    file_name: ?[]const u8 = null,
-};
-
 allocator: Allocator,
 core: ParserCore,
 diagnostics: *ptk.Diagnostics,
@@ -34,11 +24,140 @@ in_function_body: bool = false,
 const RuleSet = ptk.RuleSet(Tokenizer.TokenType);
 const ParserCore = ptk.ParserCore(Tokenizer, .{ .whitespace, .comment });
 
+pub const Error = error{
+    ParseError,
+    OutOfMemory,
+};
+
+pub const ParseContext = struct {
+    diagnostics: *ptk.Diagnostics,
+    file_name: ?[]const u8 = null,
+};
+
+const AcceptContext = struct {
+    precedence: Precedence = 0,
+    associativity: ?Associativity = null,
+};
+
+const Precedence = u5;
+const Associativity = enum {
+    left_to_right,
+    right_to_left,
+};
+
+const PrecedenceAndAssociativityAltFlag = enum {
+    new_args,
+    function_args,
+    postfix_increment,
+    postfix_decrement,
+    unary_plus,
+    unary_minus,
+};
+
+fn getPrecedenceAndAssociativity(token_type: Tokenizer.TokenType) struct { Precedence, ?Associativity } {
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_Precedence#table
+    return switch (token_type) {
+        .@"(" => .{ 18, null },
+        .@".",
+        .@"?.",
+        => .{ 17, .left_to_right },
+        .@"[" => .{ 17, null },
+        .new => .{ 16, null },
+        .@"!",
+        .@"~",
+        .typeof,
+        .void,
+        .delete,
+        .@"await",
+        => .{ 14, null },
+        .@"**" => .{ 13, .right_to_left },
+        .@"*",
+        .@"/",
+        .@"%",
+        => .{ 12, .left_to_right },
+        .@"+",
+        .@"-",
+        => .{ 11, .left_to_right },
+        .@"<<",
+        .@">>",
+        .@">>>",
+        => .{ 10, .left_to_right },
+        .@"<",
+        .@"<=",
+        .@">",
+        .@">=",
+        .in,
+        .instanceof,
+        => .{ 9, .left_to_right },
+        .@"==",
+        .@"!=",
+        .@"===",
+        .@"!==",
+        => .{ 8, .left_to_right },
+        .@"&" => .{ 7, .left_to_right },
+        .@"^" => .{ 6, .left_to_right },
+        .@"|" => .{ 5, .left_to_right },
+        .@"&&" => .{ 4, .left_to_right },
+        .@"||",
+        .@"??",
+        => .{ 3, .left_to_right },
+        .@"=",
+        .@"+=",
+        .@"-=",
+        .@"**=",
+        .@"*=",
+        .@"/=",
+        .@"%=",
+        .@"<<=",
+        .@">>=",
+        .@">>>=",
+        .@"&=",
+        .@"^=",
+        .@"|=",
+        .@"&&=",
+        .@"||=",
+        .@"??=",
+        => .{ 2, .right_to_left },
+        .@"?" => .{ 2, .right_to_left },
+        .@"=>" => .{ 2, .right_to_left },
+        .yield,
+        .@"yield*",
+        .@"...",
+        => .{ 2, null },
+        .@"," => .{ 1, .left_to_right },
+        else => .{ 0, null },
+    };
+}
+
+fn getPrecedenceAndAssociativityAlt(flag: PrecedenceAndAssociativityAltFlag) struct { Precedence, ?Associativity } {
+    return switch (flag) {
+        .new_args, .function_args => .{ 17, null },
+        .postfix_increment, .postfix_decrement => .{ 15, null },
+        .unary_plus, .unary_minus => .{ 14, null },
+    };
+}
+
+fn getPrecedence(token_type: Tokenizer.TokenType) Precedence {
+    return getPrecedenceAndAssociativity(token_type)[0];
+}
+
+fn getPrecedenceAlt(flag: PrecedenceAndAssociativityAltFlag) Precedence {
+    return getPrecedenceAndAssociativityAlt(flag)[0];
+}
+
+fn getAssociativity(token_type: Tokenizer.TokenType) ?Associativity {
+    return getPrecedenceAndAssociativity(token_type)[1];
+}
+
+fn getAssociativityAlt(flag: PrecedenceAndAssociativityAltFlag) ?Associativity {
+    return getPrecedenceAndAssociativityAlt(flag)[1];
+}
+
 pub fn parse(
     comptime T: type,
     allocator: Allocator,
     source_text: []const u8,
-    ctx: Context,
+    ctx: ParseContext,
 ) Error!T {
     if (T != ast.Script)
         @compileError("Parser.parse() is only implemented for ast.Script");
@@ -59,7 +178,7 @@ pub fn parseNode(
     comptime accept_function_name: []const u8,
     allocator: Allocator,
     source_text: []const u8,
-    ctx: Context,
+    ctx: ParseContext,
 ) Error!T {
     var tokenizer = Tokenizer.init(source_text, ctx.file_name);
     var core = ParserCore.init(&tokenizer);
@@ -156,7 +275,7 @@ fn acceptParenthesizedExpression(self: *Self) !ast.ParenthesizedExpression {
 
     _ = try self.core.accept(RuleSet.is(.@"("));
     const expression = try self.allocator.create(ast.Expression);
-    expression.* = try self.acceptExpression();
+    expression.* = try self.acceptExpression(.{});
     _ = try self.core.accept(RuleSet.is(.@")"));
     return .{ .expression = expression };
 }
@@ -199,7 +318,7 @@ fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
         return error.UnexpectedToken;
 }
 
-fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression) !ast.Expression {
+fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression, _: AcceptContext) !ast.Expression {
     if (self.acceptMemberExpression(primary_expression)) |member_expression|
         return .{ .member_expression = member_expression }
     else |_| if (self.acceptCallExpression(primary_expression)) |call_expression|
@@ -215,8 +334,9 @@ fn acceptMemberExpression(self: *Self, primary_expression: ast.Expression) !ast.
     const token = try self.core.accept(RuleSet.oneOf(.{ .@"[", .@"." }));
     const property: ast.MemberExpression.Property = switch (token.type) {
         .@"[" => blk: {
+            const ctx = AcceptContext{ .precedence = getPrecedence(.@"[") };
             const property_expression = try self.allocator.create(ast.Expression);
-            property_expression.* = try self.acceptExpression();
+            property_expression.* = try self.acceptExpression(ctx);
             _ = try self.core.accept(RuleSet.is(.@"]"));
             break :blk .{ .expression = property_expression };
         },
@@ -249,7 +369,8 @@ fn acceptArguments(self: *Self) !ast.Arguments {
 
     var arguments = std.ArrayList(ast.Expression).init(self.allocator);
     _ = try self.core.accept(RuleSet.is(.@"("));
-    while (self.acceptExpression()) |argument| {
+    const ctx = AcceptContext{ .precedence = getPrecedenceAlt(.function_args) };
+    while (self.acceptExpression(ctx)) |argument| {
         try arguments.append(argument);
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
     } else |_| {}
@@ -301,8 +422,9 @@ fn acceptArrayLiteral(self: *Self) !ast.ArrayLiteral {
 
     _ = try self.core.accept(RuleSet.is(.@"["));
     var elements = std.ArrayList(ast.ArrayLiteral.Element).init(self.allocator);
+    const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
     while (true) {
-        if (self.acceptExpression()) |expression| {
+        if (self.acceptExpression(ctx)) |expression| {
             try elements.append(.{ .expression = expression });
             _ = self.core.accept(RuleSet.is(.@",")) catch break;
         } else |_| if (self.core.accept(RuleSet.is(.@","))) |_| {
@@ -359,7 +481,8 @@ fn acceptPropertyDefinition(self: *Self) !ast.PropertyDefinition {
         property_name = .{ .literal_property_name = .{ .numeric_literal = numeric_literal } }
     else |_| if (self.core.accept(RuleSet.is(.@"["))) |_| {
         // ComputedPropertyName
-        const computed_property_name = try self.acceptExpression();
+        const ctx = AcceptContext{ .precedence = getPrecedence(.@"[") };
+        const computed_property_name = try self.acceptExpression(ctx);
         property_name = ast.PropertyName{
             .computed_property_name = computed_property_name,
         };
@@ -367,7 +490,8 @@ fn acceptPropertyDefinition(self: *Self) !ast.PropertyDefinition {
     } else |_| return error.UnexpectedToken;
 
     _ = try self.core.accept(RuleSet.is(.@":"));
-    const expression = try self.acceptExpression();
+    const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
+    const expression = try self.acceptExpression(ctx);
     return .{
         .property_name_and_expression = .{
             .property_name = property_name,
@@ -389,12 +513,17 @@ fn acceptUnaryExpression(self: *Self, operator_token: Tokenizer.Token) !ast.Unar
         .@"!" => .@"!",
         else => unreachable,
     };
+    const ctx: AcceptContext = switch (operator_token.type) {
+        .@"+" => .{ .precedence = getPrecedenceAlt(.unary_plus), .associativity = getAssociativityAlt(.unary_plus) },
+        .@"-" => .{ .precedence = getPrecedenceAlt(.unary_minus), .associativity = getAssociativityAlt(.unary_minus) },
+        else => .{ .precedence = getPrecedence(operator_token.type), .associativity = getAssociativity(operator_token.type) },
+    };
     const expression = try self.allocator.create(ast.Expression);
-    expression.* = try self.acceptExpression();
+    expression.* = try self.acceptExpression(ctx);
     return .{ .operator = operator, .expression = expression };
 }
 
-fn acceptExpression(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!ast.Expression {
+fn acceptExpression(self: *Self, ctx: AcceptContext) (ParserCore.AcceptError || error{OutOfMemory})!ast.Expression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -405,9 +534,18 @@ fn acceptExpression(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!
 
     const primary_expression = try self.acceptPrimaryExpression();
     var expression = ast.Expression{ .primary_expression = primary_expression };
-    while (self.acceptSecondaryExpression(expression)) |secondary_expression|
-        expression = secondary_expression
-    else |_| {}
+    while (true) {
+        const next_token = try self.core.peek() orelse break;
+        const new_ctx = AcceptContext{
+            .precedence = getPrecedence(next_token.type),
+            .associativity = getAssociativity(next_token.type),
+        };
+        if (new_ctx.precedence < ctx.precedence) break;
+        if (new_ctx.precedence == ctx.precedence and
+            ctx.associativity != null and
+            ctx.associativity.? == .left_to_right) break;
+        expression = self.acceptSecondaryExpression(expression, new_ctx) catch break;
+    }
     return expression;
 }
 
@@ -519,7 +657,7 @@ fn acceptExpressionStatement(self: *Self) !ast.ExpressionStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    return .{ .expression = try self.acceptExpression() };
+    return .{ .expression = try self.acceptExpression(.{}) };
 }
 
 fn acceptIfStatement(self: *Self) !ast.IfStatement {
@@ -528,7 +666,7 @@ fn acceptIfStatement(self: *Self) !ast.IfStatement {
 
     _ = try self.core.accept(RuleSet.is(.@"if"));
     _ = try self.core.accept(RuleSet.is(.@"("));
-    const test_expression = try self.acceptExpression();
+    const test_expression = try self.acceptExpression(.{});
     _ = try self.core.accept(RuleSet.is(.@")"));
     const consequent_statement = try self.acceptStatement();
     const alternate_statement = if (self.core.accept(RuleSet.is(.@"else"))) |_|
@@ -562,7 +700,7 @@ fn acceptDoWhileStatement(self: *Self) !ast.DoWhileStatement {
     const consequent_statement = try self.acceptStatement();
     _ = try self.core.accept(RuleSet.is(.@"while"));
     _ = try self.core.accept(RuleSet.is(.@"("));
-    const test_expression = try self.acceptExpression();
+    const test_expression = try self.acceptExpression(.{});
     _ = try self.core.accept(RuleSet.is(.@")"));
     return .{
         .test_expression = test_expression,
@@ -576,7 +714,7 @@ fn acceptWhileStatement(self: *Self) !ast.WhileStatement {
 
     _ = try self.core.accept(RuleSet.is(.@"while"));
     _ = try self.core.accept(RuleSet.is(.@"("));
-    const test_expression = try self.acceptExpression();
+    const test_expression = try self.acceptExpression(.{});
     _ = try self.core.accept(RuleSet.is(.@")"));
     const consequent_statement = try self.acceptStatement();
     return .{
@@ -602,7 +740,7 @@ fn acceptReturnStatement(self: *Self) !ast.ReturnStatement {
     }
 
     if (self.noLineTerminatorHere()) |_| {
-        if (self.acceptExpression()) |expression| {
+        if (self.acceptExpression(.{})) |expression| {
             return .{ .expression = expression };
         } else |_| {}
     } else |_| {
@@ -618,7 +756,7 @@ fn acceptThrowStatement(self: *Self) !ast.ThrowStatement {
 
     _ = try self.core.accept(RuleSet.is(.throw));
     try self.noLineTerminatorHere();
-    const expression = try self.acceptExpression();
+    const expression = try self.acceptExpression(.{});
     return .{ .expression = expression };
 }
 
