@@ -780,6 +780,44 @@ pub const Value = union(enum) {
     pub inline fn callAssumeCallableNoArgs(self: Self, this_value: Value) !Value {
         return self.callAssumeCallable(this_value, .{});
     }
+
+    /// 7.3.22 OrdinaryHasInstance ( C, O )
+    /// https://tc39.es/ecma262/#sec-ordinaryhasinstance
+    pub fn ordinaryHasInstance(self: Self, object_value: Value) !bool {
+        // 1. If IsCallable(C) is false, return false.
+        if (!self.isCallable()) return false;
+
+        const agent = self.object.agent();
+
+        // TODO: 2. If C has a [[BoundTargetFunction]] internal slot, then
+        //     a. Let BC be C.[[BoundTargetFunction]].
+        //     b. Return ? InstanceofOperator(O, BC).
+
+        // 3. If O is not an Object, return false.
+        if (object_value != .object) return false;
+
+        // 4. Let P be ? Get(C, "prototype").
+        const prototype = try self.object.get(PropertyKey.from("prototype"));
+
+        // 5. If P is not an Object, throw a TypeError exception.
+        if (prototype != .object) {
+            return agent.throwException(.type_error, "'prototype' property must be an object");
+        }
+
+        var object: ?Object = object_value.object;
+
+        // 6. Repeat,
+        while (true) {
+            // a. Set O to ? O.[[GetPrototypeOf]]().
+            object = try object.?.internalMethods().getPrototypeOf(object.?);
+
+            // b. If O is null, return false.
+            if (object == null) return false;
+
+            // c. If SameValue(P, O) is true, return true.
+            if (prototype.object.ptr == object.?.ptr) return true;
+        }
+    }
 };
 
 /// 7.1.4.1.1 StringToNumber ( str )
