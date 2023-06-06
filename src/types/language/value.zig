@@ -846,8 +846,9 @@ pub fn stringToBigInt(allocator: Allocator, string: []const u8) !?BigInt {
     // TODO: Implement the proper string parsing grammar!
     var value = try BigInt.Value.init(allocator);
     value.setString(10, string) catch |err| return switch (err) {
+        error.OutOfMemory => error.OutOfMemory,
         error.InvalidCharacter => null,
-        else => err,
+        error.InvalidBase => unreachable,
     };
     return BigInt{ .value = value };
 }
@@ -1044,6 +1045,97 @@ pub fn isLessThan(
             .big_int => @intToFloat(f64, nx.big_int.value.to(i1024) catch return false) < ny.number.asFloat(),
         };
     }
+}
+
+/// 7.2.14 IsLooselyEqual ( x, y )
+/// https://tc39.es/ecma262/#sec-islooselyequal
+pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) !bool {
+    // 1. If Type(x) is Type(y), then
+    if (@enumToInt(x) == @enumToInt(y)) {
+        // a. Return IsStrictlyEqual(x, y).
+        return isStrictlyEqual(x, y);
+    }
+
+    // 2. If x is null and y is undefined, return true.
+    if (x == .null and y == .undefined) return true;
+
+    // 3. If x is undefined and y is null, return true.
+    if (x == .undefined and y == .null) return true;
+
+    // 4. NOTE: This step is replaced in section B.3.6.2.
+
+    // 5. If x is a Number and y is a String, return ! IsLooselyEqual(x, ! ToNumber(y)).
+    if (x == .number and y == .string) {
+        return isLooselyEqual(
+            agent,
+            x,
+            Value.from(y.toNumber(agent) catch unreachable),
+        ) catch unreachable;
+    }
+
+    // 6. If x is a String and y is a Number, return ! IsLooselyEqual(! ToNumber(x), y).
+    if (x == .string and y == .number) {
+        return isLooselyEqual(
+            agent,
+            Value.from(x.toNumber(agent) catch unreachable),
+            y,
+        ) catch unreachable;
+    }
+
+    // 7. If x is a BigInt and y is a String, then
+    if (x == .big_int and y == .string) {
+        // a. Let n be StringToBigInt(y).
+        const n = try stringToBigInt(agent.gc_allocator, y.string);
+
+        // b. If n is undefined, return false.
+        if (n == null) return false;
+
+        // c. Return ! IsLooselyEqual(x, n).
+        return isLooselyEqual(agent, x, Value.from(n.?));
+    }
+
+    // 8. If x is a String and y is a BigInt, return ! IsLooselyEqual(y, x).
+    if (x == .string and y == .big_int) return isLooselyEqual(agent, y, x) catch unreachable;
+
+    // 9. If x is a Boolean, return ! IsLooselyEqual(! ToNumber(x), y).
+    if (x == .boolean) {
+        return isLooselyEqual(
+            agent,
+            Value.from(x.toNumber(agent) catch unreachable),
+            y,
+        ) catch unreachable;
+    }
+
+    // 10. If y is a Boolean, return ! IsLooselyEqual(x, ! ToNumber(y)).
+    if (y == .boolean) {
+        return isLooselyEqual(
+            agent,
+            x,
+            Value.from(y.toNumber(agent) catch unreachable),
+        ) catch unreachable;
+    }
+
+    // 11. If x is either a String, a Number, a BigInt, or a Symbol and y is an Object, return
+    //     ! IsLooselyEqual(x, ? ToPrimitive(y)).
+    if ((x == .string or x == .number or x == .big_int or x == .symbol) and y == .object) {
+        return isLooselyEqual(agent, x, try y.toPrimitive(agent, null)) catch unreachable;
+    }
+
+    // 12. If x is an Object and y is either a String, a Number, a BigInt, or a Symbol, return
+    //     ! IsLooselyEqual(? ToPrimitive(x), y).
+    if (x == .object and (y == .string or y == .number or y == .big_int or y == .symbol)) {
+        return isLooselyEqual(agent, try x.toPrimitive(agent, null), y) catch unreachable;
+    }
+
+    // 13. If x is a BigInt and y is a Number, or if x is a Number and y is a BigInt, then
+    if ((x == .big_int and y == .number) or (x == .number and y == .big_int)) {
+        // a. If x is not finite or y is not finite, return false.
+        // b. If ℝ(x) = ℝ(y), return true; otherwise return false.
+        // TODO
+    }
+
+    // 14. Return false.
+    return false;
 }
 
 test "format" {
