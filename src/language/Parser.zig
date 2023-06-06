@@ -327,6 +327,8 @@ fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression, ct
         return .{ .relational_expression = relational_expression }
     else |_| if (self.acceptEqualityExpression(primary_expression, ctx)) |equality_expression|
         return .{ .equality_expression = equality_expression }
+    else |_| if (self.acceptLogicalExpression(primary_expression, ctx)) |logical_expression|
+        return .{ .logical_expression = logical_expression }
     else |_|
         return error.UnexpectedToken;
 }
@@ -566,6 +568,29 @@ fn acceptEqualityExpression(self: *Self, primary_expression: ast.Expression, ctx
         else => unreachable,
     };
     // Defer heap allocation of expression until we know this is an EqualityExpression
+    const lhs_expression = try self.allocator.create(ast.Expression);
+    lhs_expression.* = primary_expression;
+    const rhs_expression = try self.allocator.create(ast.Expression);
+    rhs_expression.* = try self.acceptExpression(ctx);
+    return .{
+        .operator = operator,
+        .lhs_expression = lhs_expression,
+        .rhs_expression = rhs_expression,
+    };
+}
+
+fn acceptLogicalExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.LogicalExpression {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.oneOf(.{ .@"&&", .@"||", .@"??" }));
+    const operator: ast.LogicalExpression.Operator = switch (token.type) {
+        .@"&&" => .@"&&",
+        .@"||" => .@"||",
+        .@"??" => .@"??",
+        else => unreachable,
+    };
+    // Defer heap allocation of expression until we know this is a LogicalExpression
     const lhs_expression = try self.allocator.create(ast.Expression);
     lhs_expression.* = primary_expression;
     const rhs_expression = try self.allocator.create(ast.Expression);

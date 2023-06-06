@@ -957,6 +957,122 @@ pub const EqualityExpression = struct {
     }
 };
 
+/// https://tc39.es/ecma262/#prod-LogicalExpression
+pub const LogicalExpression = struct {
+    const Self = @This();
+
+    pub const Operator = enum {
+        @"&&",
+        @"||",
+        @"??",
+    };
+
+    operator: Operator,
+    lhs_expression: *Expression,
+    rhs_expression: *Expression,
+
+    /// 13.13.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-binary-logical-operators-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        switch (self.operator) {
+            // LogicalANDExpression : LogicalANDExpression && BitwiseORExpression
+            .@"&&" => {
+                // 1. Let lref be ? Evaluation of LogicalANDExpression.
+                try self.lhs_expression.generateBytecode(executable, ctx);
+
+                // 2. Let lval be ? GetValue(lref).
+                if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+                // 3. Let lbool be ToBoolean(lval).
+                // 4. If lbool is false, return lval.
+                try executable.addInstruction(.jump_conditional);
+                const consequent_jump = try executable.addJumpIndex();
+                const alternate_jump = try executable.addJumpIndex();
+                try consequent_jump.setTargetHere();
+
+                // 5. Let rref be ? Evaluation of BitwiseORExpression.
+                try self.rhs_expression.generateBytecode(executable, ctx);
+
+                // 6. Return ? GetValue(rref).
+                if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+                try alternate_jump.setTargetHere();
+            },
+
+            // LogicalORExpression : LogicalORExpression || LogicalANDExpression
+            .@"||" => {
+                // 1. Let lref be ? Evaluation of LogicalORExpression.
+                try self.lhs_expression.generateBytecode(executable, ctx);
+
+                // 2. Let lval be ? GetValue(lref).
+                if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+                // 3. Let lbool be ToBoolean(lval).
+                // 4. If lbool is true, return lval.
+                try executable.addInstruction(.jump_conditional);
+                const consequent_jump = try executable.addJumpIndex();
+                const alternate_jump = try executable.addJumpIndex();
+                try alternate_jump.setTargetHere();
+
+                // 5. Let rref be ? Evaluation of LogicalANDExpression.
+                try self.rhs_expression.generateBytecode(executable, ctx);
+
+                // 6. Return ? GetValue(rref).
+                if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+                try consequent_jump.setTargetHere();
+            },
+
+            // CoalesceExpression : CoalesceExpressionHead ?? BitwiseORExpression
+            .@"??" => {
+                // 1. Let lref be ? Evaluation of CoalesceExpressionHead.
+                try self.lhs_expression.generateBytecode(executable, ctx);
+
+                // 2. Let lval be ? GetValue(lref).
+                if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+                try executable.addInstruction(.load);
+
+                try executable.addInstruction(.load);
+                try executable.addInstructionWithConstant(.load_constant, .undefined);
+                try executable.addInstruction(.is_loosely_equal);
+
+                try executable.addInstruction(.jump_conditional);
+                const consequent_jump = try executable.addJumpIndex();
+                const alternate_jump = try executable.addJumpIndex();
+
+                // 3. If lval is either undefined or null, then
+                try consequent_jump.setTargetHere();
+                try executable.addInstruction(.store); // Drop lval from the stack
+
+                // a. Let rref be ? Evaluation of BitwiseORExpression.
+                try self.rhs_expression.generateBytecode(executable, ctx);
+
+                // b. Return ? GetValue(rref).
+                if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+                try executable.addInstruction(.jump);
+                const end_jump = try executable.addJumpIndex();
+
+                // 4. Else,
+                try alternate_jump.setTargetHere();
+
+                // a. Return lval.
+                try executable.addInstruction(.store);
+
+                try end_jump.setTargetHere();
+            },
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("LogicalExpression", writer, indentation);
+        try self.lhs_expression.print(writer, indentation + 1);
+        try printString(@tagName(self.operator), writer, indentation + 1);
+        try self.rhs_expression.print(writer, indentation + 1);
+    }
+};
+
 /// https://tc39.es/ecma262/#prod-Expression
 pub const Expression = union(enum) {
     const Self = @This();
@@ -967,6 +1083,7 @@ pub const Expression = union(enum) {
     unary_expression: UnaryExpression,
     relational_expression: RelationalExpression,
     equality_expression: EqualityExpression,
+    logical_expression: LogicalExpression,
 
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
         return switch (query) {
@@ -990,6 +1107,7 @@ pub const Expression = union(enum) {
             .unary_expression => |unary_expression| try unary_expression.generateBytecode(executable, ctx),
             .relational_expression => |relational_expression| try relational_expression.generateBytecode(executable, ctx),
             .equality_expression => |equality_expression| try equality_expression.generateBytecode(executable, ctx),
+            .logical_expression => |logical_expression| try logical_expression.generateBytecode(executable, ctx),
         }
     }
 
@@ -1017,6 +1135,10 @@ pub const Expression = union(enum) {
                 indentation + 1,
             ),
             .equality_expression => |equality_expression| try equality_expression.print(
+                writer,
+                indentation + 1,
+            ),
+            .logical_expression => |logical_expression| try logical_expression.print(
                 writer,
                 indentation + 1,
             ),
