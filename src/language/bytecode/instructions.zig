@@ -35,6 +35,10 @@ pub const Instruction = enum(u8) {
     instanceof_operator,
     /// Store InstantiateOrdinaryFunctionExpression() as the result value.
     instantiate_ordinary_function_expression,
+    /// Store IsLooselyEqual() as the result value.
+    is_loosely_equal,
+    /// Store IsStrictlyEqual() as the result value.
+    is_strictly_equal,
     /// Jump to another instruction by setting the instruction pointer.
     jump,
     /// Jump to one of two other instructions depending on whether the last value on the stack is

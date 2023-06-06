@@ -17,6 +17,8 @@ const Reference = types.Reference;
 const Value = types.Value;
 const arrayCreate = builtins.arrayCreate;
 const isLessThan = types.isLessThan;
+const isLooselyEqual = types.isLooselyEqual;
+const isStrictlyEqual = types.isStrictlyEqual;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const noexcept = utils.noexcept;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
@@ -479,6 +481,20 @@ pub fn run(self: *Self, executable: Executable) !Completion {
                 null,
             );
             self.result = Value.from(closure);
+        },
+        .is_loosely_equal => {
+            const rval = self.stack.pop();
+            const lval = self.stack.pop();
+
+            // 5. Return IsLooselyEqual(rval, lval).
+            self.result = Value.from(try isLooselyEqual(self.agent, rval, lval));
+        },
+        .is_strictly_equal => {
+            const rval = self.stack.pop();
+            const lval = self.stack.pop();
+
+            // 5. Return IsStrictlyEqual(rval, lval).
+            self.result = Value.from(isStrictlyEqual(rval, lval));
         },
         .jump => self.ip = self.fetchIndex(executable),
         .jump_conditional => {

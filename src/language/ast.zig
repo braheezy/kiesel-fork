@@ -887,6 +887,76 @@ pub const RelationalExpression = struct {
     }
 };
 
+/// https://tc39.es/ecma262/#prod-EqualityExpression
+pub const EqualityExpression = struct {
+    const Self = @This();
+
+    pub const Operator = enum {
+        @"==",
+        @"!=",
+        @"===",
+        @"!==",
+    };
+
+    operator: Operator,
+    lhs_expression: *Expression,
+    rhs_expression: *Expression,
+
+    /// 13.11.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-equality-operators-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // EqualityExpression : EqualityExpression == RelationalExpression
+        // EqualityExpression : EqualityExpression != RelationalExpression
+        // EqualityExpression : EqualityExpression === RelationalExpression
+        // EqualityExpression : EqualityExpression !== RelationalExpression
+        // 1. Let lref be ? Evaluation of EqualityExpression.
+        try self.lhs_expression.generateBytecode(executable, ctx);
+
+        // 2. Let lval be ? GetValue(lref).
+        if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.load);
+
+        // 3. Let rref be ? Evaluation of RelationalExpression.
+        try self.rhs_expression.generateBytecode(executable, ctx);
+
+        // 4. Let rval be ? GetValue(rref).
+        if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.load);
+
+        switch (self.operator) {
+            .@"==" => {
+                // 5. Return ? IsLooselyEqual(rval, lval).
+                try executable.addInstruction(.is_loosely_equal);
+            },
+            .@"!=" => {
+                // 5. Let r be ? IsLooselyEqual(rval, lval).
+                try executable.addInstruction(.is_loosely_equal);
+
+                // 6. If r is true, return false. Otherwise, return true.
+                try executable.addInstruction(.logical_not);
+            },
+            .@"===" => {
+                // 5. Return IsStrictlyEqual(rval, lval).
+                try executable.addInstruction(.is_strictly_equal);
+            },
+            .@"!==" => {
+                // 5. Let r be IsStrictlyEqual(rval, lval).
+                try executable.addInstruction(.is_strictly_equal);
+
+                // 6. If r is true, return false. Otherwise, return true.
+                try executable.addInstruction(.logical_not);
+            },
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("EqualityExpression", writer, indentation);
+        try self.lhs_expression.print(writer, indentation + 1);
+        try printString(@tagName(self.operator), writer, indentation + 1);
+        try self.rhs_expression.print(writer, indentation + 1);
+    }
+};
+
 /// https://tc39.es/ecma262/#prod-Expression
 pub const Expression = union(enum) {
     const Self = @This();
@@ -896,6 +966,7 @@ pub const Expression = union(enum) {
     call_expression: CallExpression,
     unary_expression: UnaryExpression,
     relational_expression: RelationalExpression,
+    equality_expression: EqualityExpression,
 
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
         return switch (query) {
@@ -918,6 +989,7 @@ pub const Expression = union(enum) {
             .call_expression => |call_expression| try call_expression.generateBytecode(executable, ctx),
             .unary_expression => |unary_expression| try unary_expression.generateBytecode(executable, ctx),
             .relational_expression => |relational_expression| try relational_expression.generateBytecode(executable, ctx),
+            .equality_expression => |equality_expression| try equality_expression.generateBytecode(executable, ctx),
         }
     }
 
@@ -941,6 +1013,10 @@ pub const Expression = union(enum) {
                 indentation + 1,
             ),
             .relational_expression => |relational_expression| try relational_expression.print(
+                writer,
+                indentation + 1,
+            ),
+            .equality_expression => |equality_expression| try equality_expression.print(
                 writer,
                 indentation + 1,
             ),
