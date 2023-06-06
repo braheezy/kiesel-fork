@@ -1138,6 +1138,22 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) !bool {
     return false;
 }
 
+/// 7.2.15 IsStrictlyEqual ( x, y )
+/// https://tc39.es/ecma262/#sec-isstrictlyequal
+pub fn isStrictlyEqual(x: Value, y: Value) bool {
+    // 1. If Type(x) is not Type(y), return false.
+    if (@enumToInt(x) != @enumToInt(y)) return false;
+
+    // 2. If x is a Number, then
+    if (x == .number) {
+        // a. Return Number::equal(x, y).
+        return x.number.equal(y.number);
+    }
+
+    // 3. Return SameValueNonNumber(x, y).
+    return sameValueNonNumber(x, y);
+}
+
 test "format" {
     var agent = try Agent.init(.{});
     defer agent.deinit();

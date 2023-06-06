@@ -202,6 +202,22 @@ pub const Number = union(enum) {
         return x.asFloat() < y.asFloat();
     }
 
+    /// 6.1.6.1.13 Number::equal ( x, y )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-equal
+    pub fn equal(x: Self, y: Self) bool {
+        // 1. If x is NaN, return false.
+        if (x.isNan()) return false;
+
+        // 2. If y is NaN, return false.
+        if (y.isNan()) return false;
+
+        // 3. If x is y, return true.
+        // 4. If x is +0𝔽 and y is -0𝔽, return true.
+        // 5. If x is -0𝔽 and y is +0𝔽, return true.
+        // 6. Return false.
+        return x.asFloat() == y.asFloat();
+    }
+
     /// 6.1.6.1.14 Number::sameValue ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-sameValue
     pub fn sameValue(x: Self, y: Self) bool {

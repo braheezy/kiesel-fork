@@ -13,6 +13,7 @@ pub const Symbol = language.Symbol;
 pub const Value = language.Value;
 pub const isLessThan = language.isLessThan;
 pub const isLooselyEqual = language.isLooselyEqual;
+pub const isStrictlyEqual = language.isStrictlyEqual;
 pub const sameValue = language.sameValue;
 pub const sameValueZero = language.sameValueZero;
 
