@@ -5,6 +5,7 @@ pub const Number = @import("language/number.zig").Number;
 pub const Object = @import("language/Object.zig");
 pub const Symbol = @import("language/Symbol.zig");
 pub const Value = value.Value;
+pub const isLessThan = value.isLessThan;
 pub const sameValue = value.sameValue;
 pub const sameValueZero = value.sameValueZero;
 

@@ -164,6 +164,44 @@ pub const Number = union(enum) {
         return .{ .i32 = ~old_value };
     }
 
+    /// 6.1.6.1.12 Number::lessThan ( x, y )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-lessThan
+    pub fn lessThan(x: Self, y: Self) ?bool {
+        // 1. If x is NaN, return undefined.
+        if (x.isNan()) return null;
+
+        // 2. If y is NaN, return undefined.
+        if (y.isNan()) return null;
+
+        // 3. If x is y, return false.
+        if (x.sameValue(y)) return false;
+
+        // 4. If x is +0𝔽 and y is -0𝔽, return false.
+        if (x.isPositiveZero() and y.isNegativeZero()) return false;
+
+        // 5. If x is -0𝔽 and y is +0𝔽, return false.
+        if (x.isNegativeZero() and y.isPositiveZero()) return false;
+
+        // 6. If x is +∞𝔽, return false.
+        if (x.isPositiveInf()) return false;
+
+        // 7. If y is +∞𝔽, return true.
+        if (y.isPositiveInf()) return true;
+
+        // 8. If y is -∞𝔽, return false.
+        if (x.isNegativeInf()) return false;
+
+        // 9. If x is -∞𝔽, return true.
+        if (y.isNegativeInf()) return true;
+
+        // 10. Assert: x and y are finite and non-zero.
+        std.debug.assert(std.math.isFinite(x.asFloat()) and x.asFloat() != 0);
+        std.debug.assert(std.math.isFinite(y.asFloat()) and y.asFloat() != 0);
+
+        // 11. If ℝ(x) < ℝ(y), return true. Otherwise, return false.
+        return x.asFloat() < y.asFloat();
+    }
+
     /// 6.1.6.1.14 Number::sameValue ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-sameValue
     pub fn sameValue(x: Self, y: Self) bool {

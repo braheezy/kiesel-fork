@@ -878,6 +878,136 @@ pub fn sameValueNonNumber(x: Value, y: Value) bool {
     };
 }
 
+/// 7.2.13 IsLessThan ( x, y, LeftFirst )
+/// https://tc39.es/ecma262/#sec-islessthan
+pub fn isLessThan(
+    agent: *Agent,
+    x: Value,
+    y: Value,
+    order: enum { left_first, right_first },
+) !?bool {
+    var px: Value = undefined;
+    var py: Value = undefined;
+
+    // 1. If LeftFirst is true, then
+    if (order == .left_first) {
+        // a. Let px be ? ToPrimitive(x, number).
+        px = try x.toPrimitive(agent, .number);
+
+        // b. Let py be ? ToPrimitive(y, number).
+        py = try y.toPrimitive(agent, .number);
+    }
+    // 2. Else,
+    else {
+        // a. NOTE: The order of evaluation needs to be reversed to preserve left to right
+        //          evaluation.
+
+        // b. Let py be ? ToPrimitive(y, number).
+        py = try y.toPrimitive(agent, .number);
+
+        // c. Let px be ? ToPrimitive(x, number).
+        px = try x.toPrimitive(agent, .number);
+    }
+
+    // 3. If px is a String and py is a String, then
+    if (px == .string and py == .string) {
+        const px_code_units = std.unicode.utf8ToUtf16LeWithNull(agent.gc_allocator, px.string) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.InvalidUtf8 => unreachable,
+        };
+        const py_code_units = std.unicode.utf8ToUtf16LeWithNull(agent.gc_allocator, py.string) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.InvalidUtf8 => unreachable,
+        };
+
+        // a. Let lx be the length of px.
+        const lx = px_code_units.len;
+
+        // b. Let ly be the length of py.
+        const ly = py_code_units.len;
+
+        // c. For each integer i such that 0 ≤ i < min(lx, ly), in ascending order, do
+        for (0..std.math.min(lx, ly)) |i| {
+            // i. Let cx be the numeric value of the code unit at index i within px.
+            const cx = px_code_units[i];
+
+            // ii. Let cy be the numeric value of the code unit at index i within py.
+            const cy = py_code_units[i];
+
+            // iii. If cx < cy, return true.
+            if (cx < cy) return true;
+
+            // iv. If cx > cy, return false.
+            if (cx > cy) return false;
+        }
+
+        // d. If lx < ly, return true. Otherwise, return false.
+        return lx < ly;
+    }
+    // 4. Else,
+    else {
+        // a. If px is a BigInt and py is a String, then
+        if (px == .big_int and py == .string) {
+            //     i. Let ny be StringToBigInt(py).
+            //     ii. If ny is undefined, return undefined.
+            //     iii. Return BigInt::lessThan(px, ny).
+        }
+
+        // b. If px is a String and py is a BigInt, then
+        if (px == .string and py == .big_int) {
+            //     i. Let nx be StringToBigInt(px).
+            //     ii. If nx is undefined, return undefined.
+            //     iii. Return BigInt::lessThan(nx, py).
+        }
+
+        // c. NOTE: Because px and py are primitive values, evaluation order is not important.
+
+        // d. Let nx be ? ToNumeric(px).
+        const nx = try px.toNumeric(agent);
+
+        // e. Let ny be ? ToNumeric(py).
+        const ny = try py.toNumeric(agent);
+
+        // f. If Type(nx) is Type(ny), then
+        if (@enumToInt(nx) == @enumToInt(ny)) {
+            // i. If nx is a Number, then
+            if (nx == .number) {
+                // 1. Return Number::lessThan(nx, ny).
+                return nx.number.lessThan(ny.number);
+            }
+            // ii. Else,
+            else {
+                // 1. Assert: nx is a BigInt.
+                std.debug.assert(nx == .big_int);
+
+                // 2. Return BigInt::lessThan(nx, ny).
+                return nx.big_int.lessThan(ny.big_int);
+            }
+        }
+
+        // g. Assert: nx is a BigInt and ny is a Number, or nx is a Number and ny is a BigInt.
+        std.debug.assert((nx == .big_int and ny == .number) or (nx == .number and ny == .big_int));
+
+        // h. If nx or ny is NaN, return undefined.
+        if ((nx == .number and nx.number.isNan()) or
+            (ny == .number and ny.number.isNan())) return null;
+
+        // i. If nx is -∞𝔽 or ny is +∞𝔽, return true.
+        if ((nx == .number and nx.number.isNegativeInf()) or
+            (ny == .number and ny.number.isPositiveInf())) return true;
+
+        // j. If nx is +∞𝔽 or ny is -∞𝔽, return false.
+        if ((nx == .number and nx.number.isPositiveInf()) or
+            (ny == .number and ny.number.isNegativeInf())) return false;
+
+        // k. If ℝ(nx) < ℝ(ny), return true; otherwise return false.
+        return switch (nx) {
+            .number => nx.number.asFloat() < @intToFloat(f64, ny.big_int.value.to(i1024) catch return true),
+            .big_int => @intToFloat(f64, nx.big_int.value.to(i1024) catch return false) < ny.number.asFloat(),
+        };
+    }
+}
+
 test "format" {
     var agent = try Agent.init(.{});
     defer agent.deinit();

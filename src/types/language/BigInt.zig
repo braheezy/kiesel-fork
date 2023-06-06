@@ -45,6 +45,13 @@ pub fn bitwiseNOT(self: Self) !Self {
     return .{ .value = cloned_value };
 }
 
+/// 6.1.6.2.12 BigInt::lessThan ( x, y )
+/// https://tc39.es/ecma262/#sec-numeric-types-bigint-lessThan
+pub fn lessThan(x: Self, y: Self) bool {
+    // 1. If ℝ(x) < ℝ(y), return true; otherwise return false.
+    return x.value.order(y.value) == .lt;
+}
+
 /// 6.1.6.2.13 BigInt::equal ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-equal
 pub fn equal(x: Self, y: Self) bool {
