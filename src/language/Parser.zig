@@ -510,10 +510,18 @@ fn acceptPropertyDefinition(self: *Self) !ast.PropertyDefinition {
     };
 }
 
-fn acceptUnaryExpression(self: *Self, operator_token: Tokenizer.Token) !ast.UnaryExpression {
+fn acceptUnaryExpression(self: *Self) !ast.UnaryExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const operator_token = try self.core.accept(RuleSet.oneOf(.{
+        .void,
+        .typeof,
+        .@"+",
+        .@"-",
+        .@"~",
+        .@"!",
+    }));
     const operator: ast.UnaryExpression.Operator = switch (operator_token.type) {
         .void => .void,
         .typeof => .typeof,
@@ -644,13 +652,13 @@ fn acceptExpression(self: *Self, ctx: AcceptContext) (ParserCore.AcceptError || 
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    if (self.core.accept(RuleSet.oneOf(.{ .void, .typeof, .@"+", .@"-", .@"~", .@"!" }))) |operator_token| {
-        const unary_expression = try self.acceptUnaryExpression(operator_token);
-        return .{ .unary_expression = unary_expression };
-    } else |_| {}
+    var expression: ast.Expression = if (self.acceptUnaryExpression()) |unary_expression|
+        .{ .unary_expression = unary_expression }
+    else |_| if (self.acceptPrimaryExpression()) |primary_expression|
+        .{ .primary_expression = primary_expression }
+    else |_|
+        return error.UnexpectedToken;
 
-    const primary_expression = try self.acceptPrimaryExpression();
-    var expression = ast.Expression{ .primary_expression = primary_expression };
     while (true) {
         const next_token = try self.core.peek() orelse break;
         const new_ctx = AcceptContext{
