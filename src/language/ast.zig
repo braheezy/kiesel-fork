@@ -829,6 +829,64 @@ pub const UnaryExpression = struct {
     }
 };
 
+/// https://tc39.es/ecma262/#prod-RelationalExpression
+pub const RelationalExpression = struct {
+    const Self = @This();
+
+    pub const Operator = enum {
+        @"<",
+        @">",
+        @"<=",
+        @">=",
+        instanceof,
+        in,
+    };
+
+    operator: Operator,
+    lhs_expression: *Expression,
+    rhs_expression: *Expression,
+
+    /// 13.10.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-relational-operators-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // RelationalExpression : RelationalExpression < ShiftExpression
+        // RelationalExpression : RelationalExpression > ShiftExpression
+        // RelationalExpression : RelationalExpression <= ShiftExpression
+        // RelationalExpression : RelationalExpression >= ShiftExpression
+        // RelationalExpression : RelationalExpression instanceof ShiftExpression
+        // RelationalExpression : RelationalExpression in ShiftExpression
+        // 1. Let lref be ? Evaluation of RelationalExpression.
+        try self.lhs_expression.generateBytecode(executable, ctx);
+
+        // 2. Let lval be ? GetValue(lref).
+        if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.load);
+
+        // 3. Let rref be ? Evaluation of ShiftExpression.
+        try self.rhs_expression.generateBytecode(executable, ctx);
+
+        // 4. Let rval be ? GetValue(rref).
+        if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.load);
+
+        switch (self.operator) {
+            .@"<" => try executable.addInstruction(.less_than),
+            .@">" => try executable.addInstruction(.greater_than),
+            .@"<=" => try executable.addInstruction(.less_than_equals),
+            .@">=" => try executable.addInstruction(.greater_than_equals),
+            .instanceof => try executable.addInstruction(.instanceof_operator),
+            .in => try executable.addInstruction(.has_property),
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("RelationalExpression", writer, indentation);
+        try self.lhs_expression.print(writer, indentation + 1);
+        try printString(@tagName(self.operator), writer, indentation + 1);
+        try self.rhs_expression.print(writer, indentation + 1);
+    }
+};
+
 /// https://tc39.es/ecma262/#prod-Expression
 pub const Expression = union(enum) {
     const Self = @This();
@@ -837,14 +895,14 @@ pub const Expression = union(enum) {
     member_expression: MemberExpression,
     call_expression: CallExpression,
     unary_expression: UnaryExpression,
+    relational_expression: RelationalExpression,
 
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
         return switch (query) {
             .is_reference => switch (self) {
                 .primary_expression => |primary_expression| primary_expression.analyze(query),
                 .member_expression => true,
-                .call_expression => false,
-                .unary_expression => false,
+                else => false,
             },
             .is_string_literal => switch (self) {
                 .primary_expression => |primary_expression| primary_expression.analyze(query),
@@ -859,6 +917,7 @@ pub const Expression = union(enum) {
             .member_expression => |member_expression| try member_expression.generateBytecode(executable, ctx),
             .call_expression => |call_expression| try call_expression.generateBytecode(executable, ctx),
             .unary_expression => |unary_expression| try unary_expression.generateBytecode(executable, ctx),
+            .relational_expression => |relational_expression| try relational_expression.generateBytecode(executable, ctx),
         }
     }
 
@@ -878,6 +937,10 @@ pub const Expression = union(enum) {
                 indentation + 1,
             ),
             .unary_expression => |unary_expression| try unary_expression.print(
+                writer,
+                indentation + 1,
+            ),
+            .relational_expression => |relational_expression| try relational_expression.print(
                 writer,
                 indentation + 1,
             ),

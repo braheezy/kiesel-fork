@@ -25,6 +25,14 @@ pub const Instruction = enum(u8) {
     evaluate_property_access_with_identifier_key,
     /// Store GetValue() as the result value.
     get_value,
+    /// Compare the last two values on the stack using the '>' operator rules.
+    greater_than,
+    /// Compare the last two values on the stack using the '>=' operator rules.
+    greater_than_equals,
+    /// Store HasProperty() as the result value.
+    has_property,
+    /// Store InstanceofOperator() as the result value.
+    instanceof_operator,
     /// Store InstantiateOrdinaryFunctionExpression() as the result value.
     instantiate_ordinary_function_expression,
     /// Jump to another instruction by setting the instruction pointer.
@@ -32,6 +40,10 @@ pub const Instruction = enum(u8) {
     /// Jump to one of two other instructions depending on whether the last value on the stack is
     /// truthy or not.
     jump_conditional,
+    /// Compare the last two values on the stack using the '<' operator rules.
+    less_than,
+    /// Compare the last two values on the stack using the '<=' operator rules.
+    less_than_equals,
     /// Load the result value and add it to the stack.
     load,
     /// Load a constant and add it to the stack.

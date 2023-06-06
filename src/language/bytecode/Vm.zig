@@ -16,6 +16,7 @@ const PropertyKey = types.PropertyKey;
 const Reference = types.Reference;
 const Value = types.Value;
 const arrayCreate = builtins.arrayCreate;
+const isLessThan = types.isLessThan;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const noexcept = utils.noexcept;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
@@ -168,6 +169,41 @@ fn directEval(agent: *Agent, arguments: []const Value, strict: bool) !Value {
 
     // v. Return ? PerformEval(evalArg, strictCaller, true).
     return performEval(agent, eval_arg, strict_caller, true);
+}
+
+/// 13.10.2 InstanceofOperator ( V, target )
+/// https://tc39.es/ecma262/#sec-instanceofoperator
+fn instanceofOperator(agent: *Agent, value: Value, target: Value) !bool {
+    // 1. If target is not an Object, throw a TypeError exception.
+    if (target != .object) {
+        return agent.throwException(
+            .type_error,
+            "Right-hand side of 'in' operator must be an object",
+        );
+    }
+
+    // 2. Let instOfHandler be ? GetMethod(target, @@hasInstance).
+    const maybe_instanceof_handler = try target.getMethod(
+        agent,
+        PropertyKey.from(agent.well_known_symbols.@"@@hasInstance"),
+    );
+
+    // 3. If instOfHandler is not undefined, then
+    if (maybe_instanceof_handler) |instanceof_handler| {
+        // a. Return ToBoolean(? Call(instOfHandler, target, « V »)).
+        return (try Value.from(instanceof_handler).call(agent, target, .{value})).toBoolean();
+    }
+
+    // 4. If IsCallable(target) is false, throw a TypeError exception.
+    if (!target.isCallable()) {
+        return agent.throwException(
+            .type_error,
+            try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{target}),
+        );
+    }
+
+    // 5. Return ? OrdinaryHasInstance(target, V).
+    return target.ordinaryHasInstance(value);
 }
 
 /// 15.2.5 Runtime Semantics: InstantiateOrdinaryFunctionExpression
@@ -393,6 +429,48 @@ pub fn run(self: *Self, executable: Executable) !Completion {
             if (self.reference) |reference| self.result = try reference.getValue(self.agent);
             self.reference = null;
         },
+        .greater_than => {
+            const rval = self.stack.pop();
+            const lval = self.stack.pop();
+
+            // 5. Let r be ? IsLessThan(rval, lval, false).
+            const result = try isLessThan(self.agent, rval, lval, .right_first);
+
+            // 6. If r is undefined, return false. Otherwise, return r.
+            self.result = Value.from(result orelse false);
+        },
+        .greater_than_equals => {
+            const rval = self.stack.pop();
+            const lval = self.stack.pop();
+
+            // 5. Let r be ? IsLessThan(lval, rval, true).
+            const result = try isLessThan(self.agent, lval, rval, .left_first);
+
+            // 6. If r is either true or undefined, return false. Otherwise, return true.
+            self.result = Value.from(!(result orelse true));
+        },
+        .has_property => {
+            const rval = self.stack.pop();
+            const lval = self.stack.pop();
+
+            // 5. If rval is not an Object, throw a TypeError exception.
+            if (rval != .object) return self.agent.throwException(
+                .type_error,
+                "Right-hand side of 'in' operator must be an object",
+            );
+
+            // 6. Return ? HasProperty(rval, ? ToPropertyKey(lval)).
+            self.result = Value.from(
+                try rval.object.hasProperty(try lval.toPropertyKey(self.agent)),
+            );
+        },
+        .instanceof_operator => {
+            const rval = self.stack.pop();
+            const lval = self.stack.pop();
+
+            // 5. Return ? InstanceofOperator(lval, rval).
+            self.result = Value.from(try instanceofOperator(self.agent, lval, rval));
+        },
         .instantiate_ordinary_function_expression => {
             const function_expression = self.fetchFunctionExpression(executable);
             const closure = try instantiateOrdinaryFunctionExpression(
@@ -408,6 +486,26 @@ pub fn run(self: *Self, executable: Executable) !Completion {
             const ip_alternate = self.fetchIndex(executable);
             const value = self.result.?;
             self.ip = if (value.toBoolean()) ip_consequent else ip_alternate;
+        },
+        .less_than => {
+            const rval = self.stack.pop();
+            const lval = self.stack.pop();
+
+            // 5. Let r be ? IsLessThan(lval, rval, true).
+            const result = try isLessThan(self.agent, lval, rval, .left_first);
+
+            // 6. If r is undefined, return false. Otherwise, return r.
+            self.result = Value.from(result orelse false);
+        },
+        .less_than_equals => {
+            const rval = self.stack.pop();
+            const lval = self.stack.pop();
+
+            // 5. Let r be ? IsLessThan(rval, lval, false).
+            const result = try isLessThan(self.agent, rval, lval, .right_first);
+
+            // 6. If r is either true or undefined, return false. Otherwise, return true.
+            self.result = Value.from(!(result orelse true));
         },
         .load => {
             const value = self.result.?;

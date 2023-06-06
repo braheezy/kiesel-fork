@@ -318,11 +318,13 @@ fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
         return error.UnexpectedToken;
 }
 
-fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression, _: AcceptContext) !ast.Expression {
+fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.Expression {
     if (self.acceptMemberExpression(primary_expression)) |member_expression|
         return .{ .member_expression = member_expression }
     else |_| if (self.acceptCallExpression(primary_expression)) |call_expression|
         return .{ .call_expression = call_expression }
+    else |_| if (self.acceptRelationalExpression(primary_expression, ctx)) |relational_expression|
+        return .{ .relational_expression = relational_expression }
     else |_|
         return error.UnexpectedToken;
 }
@@ -521,6 +523,32 @@ fn acceptUnaryExpression(self: *Self, operator_token: Tokenizer.Token) !ast.Unar
     const expression = try self.allocator.create(ast.Expression);
     expression.* = try self.acceptExpression(ctx);
     return .{ .operator = operator, .expression = expression };
+}
+
+fn acceptRelationalExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.RelationalExpression {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.oneOf(.{ .@">", .@"<", .@">=", .@"<=", .instanceof, .in }));
+    const operator: ast.RelationalExpression.Operator = switch (token.type) {
+        .@">" => .@">",
+        .@"<" => .@"<",
+        .@">=" => .@">=",
+        .@"<=" => .@"<=",
+        .instanceof => .instanceof,
+        .in => .in,
+        else => unreachable,
+    };
+    // Defer heap allocation of expression until we know this is a RelationalExpression
+    const lhs_expression = try self.allocator.create(ast.Expression);
+    lhs_expression.* = primary_expression;
+    const rhs_expression = try self.allocator.create(ast.Expression);
+    rhs_expression.* = try self.acceptExpression(ctx);
+    return .{
+        .operator = operator,
+        .lhs_expression = lhs_expression,
+        .rhs_expression = rhs_expression,
+    };
 }
 
 fn acceptExpression(self: *Self, ctx: AcceptContext) (ParserCore.AcceptError || error{OutOfMemory})!ast.Expression {
