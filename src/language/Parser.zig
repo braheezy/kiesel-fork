@@ -331,6 +331,8 @@ fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression, ct
         return .{ .logical_expression = logical_expression }
     else |_| if (self.acceptConditionalExpression(primary_expression)) |conditional_expression|
         return .{ .conditional_expression = conditional_expression }
+    else |_| if (self.acceptSequenceExpression(primary_expression)) |sequence_expression|
+        return .{ .sequence_expression = sequence_expression }
     else |_|
         return error.UnexpectedToken;
 }
@@ -623,6 +625,19 @@ fn acceptConditionalExpression(self: *Self, primary_expression: ast.Expression) 
         .consequent_expression = consequent_expression,
         .alternate_expression = alternate_expression,
     };
+}
+
+fn acceptSequenceExpression(self: *Self, primary_expression: ast.Expression) !ast.SequenceExpression {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    var expressions = std.ArrayList(ast.Expression).init(self.allocator);
+    while (self.core.accept(RuleSet.is(.@","))) |_| {
+        const expression = try self.acceptExpression(.{});
+        try expressions.append(expression);
+    } else |_| if (expressions.items.len == 0) return error.UnexpectedToken;
+    try expressions.insert(0, primary_expression);
+    return .{ .expressions = try expressions.toOwnedSlice() };
 }
 
 fn acceptExpression(self: *Self, ctx: AcceptContext) (ParserCore.AcceptError || error{OutOfMemory})!ast.Expression {

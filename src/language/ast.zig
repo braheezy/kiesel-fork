@@ -1130,6 +1130,32 @@ pub const ConditionalExpression = struct {
     }
 };
 
+pub const SequenceExpression = struct {
+    const Self = @This();
+
+    expressions: []const Expression,
+
+    /// 13.16.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-comma-operator-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // 1. Let lref be ? Evaluation of Expression.
+        // 2. Perform ? GetValue(lref).
+        // 3. Let rref be ? Evaluation of AssignmentExpression.
+        // 4. Return ? GetValue(rref).
+        for (self.expressions) |expression| {
+            try expression.generateBytecode(executable, ctx);
+            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("SequenceExpression", writer, indentation);
+        for (self.expressions) |expression| {
+            try expression.print(writer, indentation + 1);
+        }
+    }
+};
+
 /// https://tc39.es/ecma262/#prod-Expression
 pub const Expression = union(enum) {
     const Self = @This();
@@ -1142,6 +1168,7 @@ pub const Expression = union(enum) {
     equality_expression: EqualityExpression,
     logical_expression: LogicalExpression,
     conditional_expression: ConditionalExpression,
+    sequence_expression: SequenceExpression,
 
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
         return switch (query) {
@@ -1167,6 +1194,7 @@ pub const Expression = union(enum) {
             .equality_expression => |equality_expression| try equality_expression.generateBytecode(executable, ctx),
             .logical_expression => |logical_expression| try logical_expression.generateBytecode(executable, ctx),
             .conditional_expression => |conditional_expression| try conditional_expression.generateBytecode(executable, ctx),
+            .sequence_expression => |sequence_expression| try sequence_expression.generateBytecode(executable, ctx),
         }
     }
 
@@ -1202,6 +1230,10 @@ pub const Expression = union(enum) {
                 indentation + 1,
             ),
             .conditional_expression => |conditional_expression| try conditional_expression.print(
+                writer,
+                indentation + 1,
+            ),
+            .sequence_expression => |sequence_expression| try sequence_expression.print(
                 writer,
                 indentation + 1,
             ),
