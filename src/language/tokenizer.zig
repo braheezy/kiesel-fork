@@ -117,6 +117,7 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
     Pattern.create(.@"{", ptk.matchers.literal("{")),
     Pattern.create(.@"}", ptk.matchers.literal("}")),
     Pattern.create(.@"**=", ptk.matchers.literal("**=")),
+    Pattern.create(.@"**", ptk.matchers.literal("**")),
     Pattern.create(.@"*=", ptk.matchers.literal("*=")),
     Pattern.create(.@"*", ptk.matchers.literal("*")),
     Pattern.create(.@"/=", ptk.matchers.literal("/=")),

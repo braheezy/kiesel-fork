@@ -829,6 +829,65 @@ pub const UnaryExpression = struct {
     }
 };
 
+/// https://tc39.es/ecma262/#prod-ExponentiationExpression
+/// https://tc39.es/ecma262/#prod-MultiplicativeExpression
+/// https://tc39.es/ecma262/#prod-AdditiveExpression#
+/// https://tc39.es/ecma262/#prod-ShiftExpression
+/// https://tc39.es/ecma262/#prod-BitwiseANDExpression
+/// https://tc39.es/ecma262/#prod-BitwiseXORExpression
+/// https://tc39.es/ecma262/#prod-BitwiseORExpression
+pub const BinaryExpression = struct {
+    const Self = @This();
+
+    pub const Operator = enum {
+        @"**",
+        @"*",
+        @"/",
+        @"%",
+        @"+",
+        @"-",
+        @"<<",
+        @">>",
+        @">>>",
+        @"&",
+        @"^",
+        @"|",
+    };
+
+    operator: Operator,
+    lhs_expression: *Expression,
+    rhs_expression: *Expression,
+
+    /// 13.15.4 EvaluateStringOrNumericBinaryExpression ( leftOperand, opText, rightOperand )
+    /// https://tc39.es/ecma262/#sec-evaluatestringornumericbinaryexpression
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // 1. Let lref be ? Evaluation of leftOperand.
+        try self.lhs_expression.generateBytecode(executable, ctx);
+
+        // 2. Let lval be ? GetValue(lref).
+        if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.load);
+
+        // 3. Let rref be ? Evaluation of rightOperand.
+        try self.rhs_expression.generateBytecode(executable, ctx);
+
+        // 4. Let rval be ? GetValue(rref).
+        if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.load);
+
+        // 5. Return ? ApplyStringOrNumericBinaryOperator(lval, opText, rval).
+        try executable.addInstruction(.apply_string_or_numeric_binary_operator);
+        try executable.addIndex(@enumToInt(self.operator));
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("BinaryExpression", writer, indentation);
+        try self.lhs_expression.print(writer, indentation + 1);
+        try printString(@tagName(self.operator), writer, indentation + 1);
+        try self.rhs_expression.print(writer, indentation + 1);
+    }
+};
+
 /// https://tc39.es/ecma262/#prod-RelationalExpression
 pub const RelationalExpression = struct {
     const Self = @This();
@@ -1164,6 +1223,7 @@ pub const Expression = union(enum) {
     member_expression: MemberExpression,
     call_expression: CallExpression,
     unary_expression: UnaryExpression,
+    binary_expression: BinaryExpression,
     relational_expression: RelationalExpression,
     equality_expression: EqualityExpression,
     logical_expression: LogicalExpression,
@@ -1190,6 +1250,7 @@ pub const Expression = union(enum) {
             .member_expression => |member_expression| try member_expression.generateBytecode(executable, ctx),
             .call_expression => |call_expression| try call_expression.generateBytecode(executable, ctx),
             .unary_expression => |unary_expression| try unary_expression.generateBytecode(executable, ctx),
+            .binary_expression => |binary_expression| try binary_expression.generateBytecode(executable, ctx),
             .relational_expression => |relational_expression| try relational_expression.generateBytecode(executable, ctx),
             .equality_expression => |equality_expression| try equality_expression.generateBytecode(executable, ctx),
             .logical_expression => |logical_expression| try logical_expression.generateBytecode(executable, ctx),
@@ -1214,6 +1275,10 @@ pub const Expression = union(enum) {
                 indentation + 1,
             ),
             .unary_expression => |unary_expression| try unary_expression.print(
+                writer,
+                indentation + 1,
+            ),
+            .binary_expression => |binary_expression| try binary_expression.print(
                 writer,
                 indentation + 1,
             ),

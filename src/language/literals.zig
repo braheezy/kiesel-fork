@@ -121,7 +121,16 @@ pub fn parseNumericLiteral(
         },
         '+', '-' => switch (state) {
             .exponent_indicator => state = .exponent_sign,
-            else => return error.InvalidNumericLiteral,
+            else => switch (consume) {
+                // If we've not encountered an exponent sign these are binary operators.
+                .partial => return .{
+                    .text = str[0..i],
+                    .system = system,
+                    .production = production,
+                    .type = @"type",
+                },
+                .complete => return error.InvalidNumericLiteral,
+            },
         },
         'n' => switch (state) {
             .integer_digit => {

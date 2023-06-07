@@ -6,6 +6,8 @@ const IndexType = Executable.IndexType;
 pub const Instruction = enum(u8) {
     const Self = @This();
 
+    /// Store ApplyStringOrNumericBinaryOperator() as the result value.
+    apply_string_or_numeric_binary_operator,
     /// Store ArrayCreate(0) as the result value.
     array_create,
     /// Set an array's value at the given index.
@@ -92,6 +94,7 @@ pub const Instruction = enum(u8) {
             .jump_conditional,
             .resolve_binding,
             => 2,
+            .apply_string_or_numeric_binary_operator,
             .array_set_length,
             .array_set_value,
             .evaluate_property_access_with_expression_key,

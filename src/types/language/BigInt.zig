@@ -5,6 +5,10 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const execution = @import("../../execution.zig");
+
+const Agent = execution.Agent;
+
 const Self = @This();
 
 pub const Value = std.math.big.int.Managed;
@@ -45,6 +49,127 @@ pub fn bitwiseNOT(self: Self) !Self {
     return .{ .value = cloned_value };
 }
 
+/// 6.1.6.2.3 BigInt::exponentiate ( base, exponent )
+/// https://tc39.es/ecma262/#sec-numeric-types-bigint-exponentiate
+pub fn exponentiate(base: Self, agent: *Agent, exponent: Self) !Self {
+    const one = agent.pre_allocated.one;
+    const two = agent.pre_allocated.two;
+
+    // 1. If exponent < 0ℤ, throw a RangeError exception.
+    if (!exponent.value.isPositive() and !exponent.value.eqZero()) {
+        return agent.throwException(.range_error, "Exponent must be positive");
+    }
+
+    // 2. If base is 0ℤ and exponent is 0ℤ, return 1ℤ.
+    if (base.value.eqZero() and exponent.value.eqZero()) return .{ .value = one };
+
+    // 3. Return the BigInt value that represents ℝ(base) raised to the power ℝ(exponent).
+    var result_value = try one.clone();
+    var cloned_exponent = try exponent.value.clone();
+    cloned_exponent.abs();
+    while (!cloned_exponent.eqZero()) {
+        try result_value.mul(&result_value, &two);
+        try cloned_exponent.sub(&cloned_exponent, &one);
+    }
+    return .{ .value = result_value };
+}
+
+/// 6.1.6.2.4 BigInt::multiply ( x, y )
+/// https://tc39.es/ecma262/#sec-numeric-types-bigint-multiply
+pub fn multiply(x: Self, agent: *Agent, y: Self) !Self {
+    // 1. Return the BigInt value that represents the product of x and y.
+    var result_value = try Value.init(agent.gc_allocator);
+    try result_value.mul(&x.value, &y.value);
+    return .{ .value = result_value };
+}
+
+/// 6.1.6.2.5 BigInt::divide ( x, y )
+/// https://tc39.es/ecma262/#sec-numeric-types-bigint-divide
+pub fn divide(x: Self, agent: *Agent, y: Self) !Self {
+    // 1. If y is 0ℤ, throw a RangeError exception.
+    if (y.value.eqZero()) return agent.throwException(.range_error, "Division by zero");
+
+    // 2. Let quotient be ℝ(x) / ℝ(y).
+    // 3. Return ℤ(truncate(quotient)).
+    var quotient = try Value.init(agent.gc_allocator);
+    var r = try Value.init(agent.gc_allocator);
+    try quotient.divTrunc(&r, &x.value, &y.value);
+    return .{ .value = quotient };
+}
+
+/// 6.1.6.2.6 BigInt::remainder ( n, d )
+/// https://tc39.es/ecma262/#sec-numeric-types-bigint-remainder
+pub fn remainder(n: Self, agent: *Agent, d: Self) !Self {
+    // 1. If d is 0ℤ, throw a RangeError exception.
+    if (d.value.eqZero()) return agent.throwException(.range_error, "Division by zero");
+
+    // 2. If n is 0ℤ, return 0ℤ.
+    if (n.value.eqZero()) return n;
+
+    // 3. Let quotient be ℝ(n) / ℝ(d).
+    // 4. Let q be ℤ(truncate(quotient)).
+    // 5. Return n - (d × q).
+    var quotient = try Value.init(agent.gc_allocator);
+    var r = try Value.init(agent.gc_allocator);
+    try quotient.divTrunc(&r, &n.value, &d.value);
+    return .{ .value = r };
+}
+
+/// 6.1.6.2.7 BigInt::add ( x, y )
+/// https://tc39.es/ecma262/#sec-numeric-types-bigint-add
+pub fn add(x: Self, agent: *Agent, y: Self) !Self {
+    // 1. Return the BigInt value that represents the sum of x and y.
+    var result_value = try Value.init(agent.gc_allocator);
+    try result_value.add(&x.value, &y.value);
+    return .{ .value = result_value };
+}
+
+/// 6.1.6.2.8 BigInt::subtract ( x, y )
+/// https://tc39.es/ecma262/#sec-numeric-types-bigint-subtract
+pub fn subtract(x: Self, agent: *Agent, y: Self) !Self {
+    // 1. Return the BigInt value that represents the difference x minus y.
+    var result_value = try Value.init(agent.gc_allocator);
+    try result_value.sub(&x.value, &y.value);
+    return .{ .value = result_value };
+}
+
+/// 6.1.6.2.9 BigInt::leftShift ( x, y )
+/// https://tc39.es/ecma262/#sec-numeric-types-bigint-leftShift
+pub fn leftShift(_: Self, agent: *Agent, _: Self) !Self {
+    // 1. If y < 0ℤ, then
+    //     a. Return the BigInt value that represents ℝ(x) / 2^-ℝ(y), rounding down to the nearest integer, including for negative numbers.
+    // 2. Return the BigInt value that represents ℝ(x) × 2^ℝ(y).
+    // TODO: Figure out how to do this with built-in functionality, shiftLeft() only accepts an usize
+    return agent.throwException(.internal_error, "Left-shift for BigInts is not implemented");
+}
+
+/// 6.1.6.2.10 BigInt::signedRightShift ( x, y )
+/// https://tc39.es/ecma262/#sec-numeric-types-bigint-signedRightShift
+pub fn signedRightShift(x: Self, agent: *Agent, y: Self) !Self {
+    const error_message = std.fmt.comptimePrint(
+        "Cannot right-shift BigInt by more than {} bits",
+        .{std.math.maxInt(usize)},
+    );
+
+    // 1. Return BigInt::leftShift(x, -y).
+    var result_value = try Value.init(agent.gc_allocator);
+    try result_value.shiftRight(
+        &x.value,
+        y.value.to(usize) catch return agent.throwException(.internal_error, error_message),
+    );
+    return .{ .value = result_value };
+}
+
+/// 6.1.6.2.11 BigInt::unsignedRightShift ( x, y )
+/// https://tc39.es/ecma262/#sec-numeric-types-bigint-unsignedRightShift
+pub fn unsignedRightShift(_: Self, agent: *Agent, _: Self) !Self {
+    // 1. Throw a TypeError exception.
+    return agent.throwException(
+        .type_error,
+        "Unsigned right-shift is not supported for BigInts",
+    );
+}
+
 /// 6.1.6.2.12 BigInt::lessThan ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-lessThan
 pub fn lessThan(x: Self, y: Self) bool {
@@ -57,6 +182,33 @@ pub fn lessThan(x: Self, y: Self) bool {
 pub fn equal(x: Self, y: Self) bool {
     // 1. If ℝ(x) = ℝ(y), return true; otherwise return false.
     return x.value.eq(y.value);
+}
+
+/// 6.1.6.2.18 BigInt::bitwiseAND ( x, y )
+/// https://tc39.es/ecma262/#sec-numeric-types-bigint-bitwiseAND
+pub fn bitwiseAND(x: Self, agent: *Agent, y: Self) !Self {
+    // 1. Return BigIntBitwiseOp(&, x, y).
+    var result_value = try Value.init(agent.gc_allocator);
+    try result_value.bitAnd(&x.value, &y.value);
+    return .{ .value = result_value };
+}
+
+/// 6.1.6.2.19 BigInt::bitwiseXOR ( x, y )
+/// https://tc39.es/ecma262/#sec-numeric-types-bigint-bitwiseXOR
+pub fn bitwiseXOR(x: Self, agent: *Agent, y: Self) !Self {
+    // 1. Return BigIntBitwiseOp(^, x, y).
+    var result_value = try Value.init(agent.gc_allocator);
+    try result_value.bitXor(&x.value, &y.value);
+    return .{ .value = result_value };
+}
+
+/// 6.1.6.2.20 BigInt::bitwiseOR ( x, y )
+/// https://tc39.es/ecma262/#sec-numeric-types-bigint-bitwiseOR
+pub fn bitwiseOR(x: Self, agent: *Agent, y: Self) !Self {
+    // 1. Return BigIntBitwiseOp(|, x, y).
+    var result_value = try Value.init(agent.gc_allocator);
+    try result_value.bitOr(&x.value, &y.value);
+    return .{ .value = result_value };
 }
 
 /// 6.1.6.2.21 BigInt::toString ( x, radix )

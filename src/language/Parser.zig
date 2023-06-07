@@ -323,6 +323,8 @@ fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression, ct
         return .{ .member_expression = member_expression }
     else |_| if (self.acceptCallExpression(primary_expression)) |call_expression|
         return .{ .call_expression = call_expression }
+    else |_| if (self.acceptBinaryExpression(primary_expression, ctx)) |binary_expression|
+        return .{ .binary_expression = binary_expression }
     else |_| if (self.acceptRelationalExpression(primary_expression, ctx)) |relational_expression|
         return .{ .relational_expression = relational_expression }
     else |_| if (self.acceptEqualityExpression(primary_expression, ctx)) |equality_expression|
@@ -539,6 +541,51 @@ fn acceptUnaryExpression(self: *Self) !ast.UnaryExpression {
     const expression = try self.allocator.create(ast.Expression);
     expression.* = try self.acceptExpression(ctx);
     return .{ .operator = operator, .expression = expression };
+}
+
+fn acceptBinaryExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.BinaryExpression {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.oneOf(.{
+        .@"**",
+        .@"*",
+        .@"/",
+        .@"%",
+        .@"+",
+        .@"-",
+        .@"<<",
+        .@">>",
+        .@">>>",
+        .@"&",
+        .@"^",
+        .@"|",
+    }));
+    const operator: ast.BinaryExpression.Operator = switch (token.type) {
+        .@"**" => .@"**",
+        .@"*" => .@"*",
+        .@"/" => .@"/",
+        .@"%" => .@"%",
+        .@"+" => .@"+",
+        .@"-" => .@"-",
+        .@"<<" => .@"<<",
+        .@">>" => .@">>",
+        .@">>>" => .@">>>",
+        .@"&" => .@"&",
+        .@"^" => .@"^",
+        .@"|" => .@"|",
+        else => unreachable,
+    };
+    // Defer heap allocation of expression until we know this is a BinaryExpression
+    const lhs_expression = try self.allocator.create(ast.Expression);
+    lhs_expression.* = primary_expression;
+    const rhs_expression = try self.allocator.create(ast.Expression);
+    rhs_expression.* = try self.acceptExpression(ctx);
+    return .{
+        .operator = operator,
+        .lhs_expression = lhs_expression,
+        .rhs_expression = rhs_expression,
+    };
 }
 
 fn acceptRelationalExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.RelationalExpression {

@@ -208,6 +208,116 @@ fn instanceofOperator(agent: *Agent, value: Value, target: Value) !bool {
     return target.ordinaryHasInstance(value);
 }
 
+/// 13.15.3 ApplyStringOrNumericBinaryOperator ( lval, opText, rval )
+/// https://tc39.es/ecma262/#sec-applystringornumericbinaryoperator
+fn applyStringOrNumericBinaryOperator(agent: *Agent, lval: Value, operator: ast.BinaryExpression.Operator, rval: Value) !Value {
+    var final_lval = lval;
+    var final_rval = rval;
+
+    // 1. If opText is +, then
+    if (operator == .@"+") {
+        // a. Let lprim be ? ToPrimitive(lval).
+        const lprim = try lval.toPrimitive(agent, null);
+
+        // b. Let rprim be ? ToPrimitive(rval).
+        const rprim = try rval.toPrimitive(agent, null);
+
+        // c. If lprim is a String or rprim is a String, then
+        if (lprim == .string or rprim == .string) {
+            // i. Let lstr be ? ToString(lprim).
+            const lstr = try lprim.toString(agent);
+
+            // ii. Let rstr be ? ToString(rprim).
+            const rstr = try rprim.toString(agent);
+
+            // iii. Return the string-concatenation of lstr and rstr.
+            return Value.from(
+                try std.mem.concat(agent.gc_allocator, u8, &[_][]const u8{ lstr, rstr }),
+            );
+        }
+
+        // d. Set lval to lprim.
+        final_lval = lprim;
+
+        // e. Set rval to rprim.
+        final_rval = rprim;
+    }
+
+    // 2. NOTE: At this point, it must be a numeric operation.
+
+    // 3. Let lnum be ? ToNumeric(lval).
+    const lnum = try final_lval.toNumeric(agent);
+
+    // 4. Let rnum be ? ToNumeric(rval).
+    const rnum = try final_rval.toNumeric(agent);
+
+    // 5. If Type(lnum) is not Type(rnum), throw a TypeError exception.
+    if (@enumToInt(lnum) != @enumToInt(rnum)) {
+        return agent.throwException(
+            .type_error,
+            "Left-hand side and right-hand side of numeric binary expression must have the same type",
+        );
+    }
+
+    // 6. If lnum is a BigInt, then
+    if (lnum == .big_int) switch (operator) {
+        // a. If opText is **, return ? BigInt::exponentiate(lnum, rnum).
+        .@"**" => return Value.from(try lnum.big_int.exponentiate(agent, rnum.big_int)),
+
+        // b. If opText is /, return ? BigInt::divide(lnum, rnum).
+        .@"/" => return Value.from(try lnum.big_int.divide(agent, rnum.big_int)),
+
+        // c. If opText is %, return ? BigInt::remainder(lnum, rnum).
+        .@"%" => return Value.from(try lnum.big_int.remainder(agent, rnum.big_int)),
+
+        // d. If opText is >>>, return ? BigInt::unsignedRightShift(lnum, rnum).
+        .@">>>" => return Value.from(try lnum.big_int.unsignedRightShift(agent, rnum.big_int)),
+
+        else => {},
+    };
+
+    // 7. Let operation be the abstract operation associated with opText and Type(lnum) in the following table:
+    // 8. Return operation(lnum, rnum).
+    switch (operator) {
+        .@"**" => return Value.from(lnum.number.exponentiate(rnum.number)),
+        .@"*" => switch (lnum) {
+            .number => return Value.from(lnum.number.multiply(rnum.number)),
+            .big_int => return Value.from(try lnum.big_int.multiply(agent, rnum.big_int)),
+        },
+        .@"/" => return Value.from(lnum.number.divide(rnum.number)),
+        .@"%" => return Value.from(lnum.number.remainder(rnum.number)),
+        .@"+" => switch (lnum) {
+            .number => return Value.from(lnum.number.add(rnum.number)),
+            .big_int => return Value.from(try lnum.big_int.add(agent, rnum.big_int)),
+        },
+        .@"-" => switch (lnum) {
+            .number => return Value.from(lnum.number.subtract(rnum.number)),
+            .big_int => return Value.from(try lnum.big_int.subtract(agent, rnum.big_int)),
+        },
+        .@"<<" => switch (lnum) {
+            .number => return Value.from(lnum.number.leftShift(rnum.number)),
+            .big_int => return Value.from(try lnum.big_int.leftShift(agent, rnum.big_int)),
+        },
+        .@">>" => switch (lnum) {
+            .number => return Value.from(lnum.number.signedRightShift(rnum.number)),
+            .big_int => return Value.from(try lnum.big_int.signedRightShift(agent, rnum.big_int)),
+        },
+        .@">>>" => return Value.from(lnum.number.unsignedRightShift(rnum.number)),
+        .@"&" => switch (lnum) {
+            .number => return Value.from(lnum.number.bitwiseAND(rnum.number)),
+            .big_int => return Value.from(try lnum.big_int.bitwiseAND(agent, rnum.big_int)),
+        },
+        .@"^" => switch (lnum) {
+            .number => return Value.from(lnum.number.bitwiseXOR(rnum.number)),
+            .big_int => return Value.from(try lnum.big_int.bitwiseXOR(agent, rnum.big_int)),
+        },
+        .@"|" => switch (lnum) {
+            .number => return Value.from(lnum.number.bitwiseOR(rnum.number)),
+            .big_int => return Value.from(try lnum.big_int.bitwiseOR(agent, rnum.big_int)),
+        },
+    }
+}
+
 /// 15.2.5 Runtime Semantics: InstantiateOrdinaryFunctionExpression
 /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateordinaryfunctionexpression
 fn instantiateOrdinaryFunctionExpression(
@@ -300,6 +410,13 @@ fn instantiateOrdinaryFunctionExpression(
 
 pub fn run(self: *Self, executable: Executable) !Completion {
     while (self.fetchInstruction(executable)) |instruction| switch (instruction) {
+        .apply_string_or_numeric_binary_operator => {
+            const operator_type = self.fetchIndex(executable);
+            const operator = @intToEnum(ast.BinaryExpression.Operator, operator_type);
+            const rval = self.stack.pop();
+            const lval = self.stack.pop();
+            self.result = try applyStringOrNumericBinaryOperator(self.agent, lval, operator, rval);
+        },
         .array_create => self.result = Value.from(try arrayCreate(self.agent, 0, null)),
         .array_set_length => {
             const length = self.fetchIndex(executable);

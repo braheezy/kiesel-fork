@@ -92,6 +92,13 @@ pub const Number = union(enum) {
         };
     }
 
+    pub inline fn isZero(self: Self) bool {
+        return switch (self) {
+            .f64 => |x| x == 0,
+            .i32 => |x| x == 0,
+        };
+    }
+
     pub inline fn isPositiveZero(self: Self) bool {
         return switch (self) {
             .f64 => |x| x == 0 and !std.math.signbit(x),
@@ -127,6 +134,39 @@ pub const Number = union(enum) {
         };
     }
 
+    inline fn toInt32(self: Self) i32 {
+        return switch (self) {
+            .f64 => |x| blk: {
+                // Excerpt from Value.toInt32()
+                if (!std.math.isFinite(x) or x == 0) break :blk 0;
+                const int = @trunc(x);
+                const int32bit = @mod(int, pow_2_32);
+                break :blk @floatToInt(
+                    i32,
+                    if (int32bit >= pow_2_31) int32bit - pow_2_32 else int32bit,
+                );
+            },
+            .i32 => |x| x,
+        };
+    }
+
+    inline fn toUint32(self: Self) u32 {
+        return switch (self) {
+            .f64 => |x| blk: {
+                // Excerpt from Value.toUint32()
+                if (!std.math.isFinite(x) or x == 0) break :blk 0;
+                const int = @trunc(x);
+                const int32bit = @mod(int, pow_2_32);
+                break :blk @floatToInt(u32, int32bit);
+            },
+            .i32 => |x| blk: {
+                const int = @as(i64, x);
+                const int32bit = @mod(int, comptime @floatToInt(i64, pow_2_32));
+                break :blk @intCast(u32, int32bit);
+            },
+        };
+    }
+
     /// 6.1.6.1.1 Number::unaryMinus ( x )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-unaryMinus
     pub fn unaryMinus(self: Self) Self {
@@ -145,23 +185,249 @@ pub const Number = union(enum) {
     /// https://tc39.es/ecma262/#sec-numeric-types-number-bitwiseNOT
     pub fn bitwiseNOT(self: Self) Self {
         // 1. Let oldValue be ! ToInt32(x).
-        const old_value = switch (self) {
-            .f64 => |x| blk: {
-                // Excerpt from Value.toInt32()
-                if (!std.math.isFinite(x) or x == 0) break :blk 0;
-                const int = @trunc(x);
-                const int32bit = @mod(int, pow_2_32);
-                break :blk @floatToInt(
-                    i32,
-                    if (int32bit >= pow_2_31) int32bit - pow_2_32 else int32bit,
-                );
-            },
-            .i32 => |x| x,
-        };
+        const old_value = self.toInt32();
 
         // 2. Return the result of applying bitwise complement to oldValue. The mathematical value
         //    of the result is exactly representable as a 32-bit two's complement bit string.
         return .{ .i32 = ~old_value };
+    }
+
+    /// 6.1.6.1.3 Number::exponentiate ( base, exponent )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-exponentiate
+    pub fn exponentiate(base: Self, exponent: Self) Self {
+        // 1. If exponent is NaN, return NaN.
+        if (exponent.isNan()) return .{ .f64 = std.math.nan(f64) };
+
+        // 2. If exponent is either +0𝔽 or -0𝔽, return 1𝔽.
+        if (exponent.isZero()) return .{ .i32 = 1 };
+
+        // 3. If base is NaN, return NaN.
+        if (base.isNan()) return .{ .f64 = std.math.nan(f64) };
+
+        // 4. If base is +∞𝔽, then
+        if (base.isPositiveInf()) {
+            // a. If exponent > +0𝔽, return +∞𝔽. Otherwise, return +0𝔽.
+            if (exponent.asFloat() > 0)
+                return .{ .f64 = std.math.inf(f64) }
+            else
+                return .{ .i32 = 0 };
+        }
+
+        // 5. If base is -∞𝔽, then
+        if (base.isNegativeInf()) {
+            // a. If exponent > +0𝔽, then
+            if (exponent.asFloat() > 0) {
+                // i. If exponent is an odd integral Number, return -∞𝔽. Otherwise, return +∞𝔽.
+                if (@trunc(exponent.asFloat()) == exponent.asFloat() and
+                    @mod(exponent.asFloat(), 2) != 0)
+                    return .{ .f64 = -std.math.inf(f64) }
+                else
+                    return .{ .f64 = std.math.inf(f64) };
+            }
+            // b. Else,
+            else {
+                // i. If exponent is an odd integral Number, return -0𝔽. Otherwise, return +0𝔽.
+                if (@trunc(exponent.asFloat()) == exponent.asFloat() and
+                    @mod(exponent.asFloat(), 2) != 0)
+                    return .{ .f64 = -0.0 }
+                else
+                    return .{ .i32 = 0 };
+            }
+        }
+
+        // 6. If base is +0𝔽, then
+        if (base.isPositiveZero()) {
+            // a. If exponent > +0𝔽, return +0𝔽. Otherwise, return +∞𝔽.
+            if (exponent.asFloat() > 0)
+                return .{ .i32 = 0 }
+            else
+                return .{ .f64 = std.math.inf(f64) };
+        }
+
+        // 7. If base is -0𝔽, then
+        if (base.isNegativeZero()) {
+            // a. If exponent > +0𝔽, then
+            if (exponent.asFloat() > 0) {
+                // i. If exponent is an odd integral Number, return -0𝔽. Otherwise, return +0𝔽.
+                if (@trunc(exponent.asFloat()) == exponent.asFloat() and
+                    @mod(exponent.asFloat(), 2) != 0)
+                    return .{ .f64 = -0.0 }
+                else
+                    return .{ .i32 = 0 };
+            }
+            // b. Else,
+            else {
+                // i. If exponent is an odd integral Number, return -∞𝔽. Otherwise, return +∞𝔽.
+                if (@trunc(exponent.asFloat()) == exponent.asFloat() and
+                    @mod(exponent.asFloat(), 2) != 0)
+                    return .{ .f64 = -std.math.inf(f64) }
+                else
+                    return .{ .f64 = std.math.inf(f64) };
+            }
+        }
+
+        // 8. Assert: base is finite and is neither +0𝔽 nor -0𝔽.
+        std.debug.assert(base.isFinite() and !base.isZero());
+
+        // 9. If exponent is +∞𝔽, then
+        if (exponent.isPositiveInf()) {
+            // a. If abs(ℝ(base)) > 1, return +∞𝔽.
+            if (std.math.fabs(base.asFloat()) > 1) return .{ .f64 = std.math.inf(f64) };
+
+            // b. If abs(ℝ(base)) = 1, return NaN.
+            if (std.math.fabs(base.asFloat()) == 1) return .{ .f64 = std.math.nan(f64) };
+
+            // c. If abs(ℝ(base)) < 1, return +0𝔽.
+            if (std.math.fabs(base.asFloat()) < 1) return .{ .i32 = 0 };
+        }
+
+        // 10. If exponent is -∞𝔽, then
+        if (exponent.isNegativeInf()) {
+            // a. If abs(ℝ(base)) > 1, return +0𝔽.
+            if (std.math.fabs(base.asFloat()) > 1) return .{ .i32 = 0 };
+
+            // b. If abs(ℝ(base)) = 1, return NaN.
+            if (std.math.fabs(base.asFloat()) == 1) return .{ .f64 = std.math.nan(f64) };
+
+            // c. If abs(ℝ(base)) < 1, return +∞𝔽.
+            if (std.math.fabs(base.asFloat()) < 1) return .{ .f64 = std.math.inf(f64) };
+        }
+
+        // 11. Assert: exponent is finite and is neither +0𝔽 nor -0𝔽.
+        std.debug.assert(exponent.isFinite() and !exponent.isZero());
+
+        // 12. If base < -0𝔽 and exponent is not an integral Number, return NaN.
+        if (base.asFloat() < 0 and @trunc(exponent.asFloat()) != exponent.asFloat())
+            return .{ .f64 = std.math.nan(f64) };
+
+        // 13. Return an implementation-approximated Number value representing the result of
+        //     raising ℝ(base) to the ℝ(exponent) power.
+        return from(std.math.pow(f64, base.asFloat(), exponent.asFloat()));
+    }
+
+    /// 6.1.6.1.4 Number::multiply ( x, y )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-multiply
+    pub fn multiply(x: Self, y: Self) Self {
+        if (x == .i32 and y == .i32) {
+            if (std.math.mul(i32, x.i32, y.i32) catch null) |result| return .{ .i32 = result };
+        }
+        return from(x.asFloat() * y.asFloat());
+    }
+
+    /// 6.1.6.1.5 Number::divide ( x, y )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-divide
+    pub fn divide(x: Self, y: Self) Self {
+        return from(x.asFloat() / y.asFloat());
+    }
+
+    /// 6.1.6.1.6 Number::remainder ( n, d )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-remainder
+    pub fn remainder(n: Self, d: Self) Self {
+        // 1. If n is NaN or d is NaN, return NaN.
+        if (n.isNan() or d.isNan()) return .{ .f64 = std.math.nan(f64) };
+
+        // 2. If n is either +∞𝔽 or -∞𝔽, return NaN.
+        if (n.isPositiveInf() or n.isNegativeInf()) return .{ .f64 = std.math.nan(f64) };
+
+        // 3. If d is either +∞𝔽 or -∞𝔽, return n.
+        if (d.isPositiveInf() or d.isNegativeInf()) return n;
+
+        // 4. If d is either +0𝔽 or -0𝔽, return NaN.
+        if (d.isZero()) return .{ .f64 = std.math.nan(f64) };
+
+        // 5. If n is either +0𝔽 or -0𝔽, return n.
+        if (n.isZero()) return n;
+
+        // 6. Assert: n and d are finite and non-zero.
+        std.debug.assert(n.isFinite() and n.asFloat() != 0);
+        std.debug.assert(d.isFinite() and d.asFloat() != 0);
+
+        // 7. Let quotient be ℝ(n) / ℝ(d).
+        const quotient = n.asFloat() / d.asFloat();
+
+        // 8. Let q be truncate(quotient).
+        const q = @trunc(quotient);
+
+        // 9. Let r be ℝ(n) - (ℝ(d) × q).
+        const r = n.asFloat() - (d.asFloat() * q);
+
+        // 10. If r = 0 and n < -0𝔽, return -0𝔽.
+        if (r == 0 and n.asFloat() < 0) return .{ .f64 = -0.0 };
+
+        // 11. Return 𝔽(r).
+        return from(r);
+    }
+
+    /// 6.1.6.1.7 Number::add ( x, y )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-add
+    pub fn add(x: Self, y: Self) Self {
+        if (x == .i32 and y == .i32) {
+            if (std.math.add(i32, x.i32, y.i32) catch null) |result| return .{ .i32 = result };
+        }
+        return from(x.asFloat() + y.asFloat());
+    }
+
+    /// 6.1.6.1.8 Number::subtract ( x, y )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-subtract
+    pub fn subtract(x: Self, y: Self) Self {
+        // 1. Return Number::add(x, Number::unaryMinus(y)).
+        if (x == .i32 and y == .i32) {
+            if (std.math.sub(i32, x.i32, y.i32) catch null) |result| return .{ .i32 = result };
+        }
+        return from(x.asFloat() - y.asFloat());
+    }
+
+    /// 6.1.6.1.9 Number::leftShift ( x, y )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-leftShift
+    pub fn leftShift(x: Self, y: Self) Self {
+        // 1. Let lnum be ! ToInt32(x).
+        const lnum = x.toInt32();
+
+        // 2. Let rnum be ! ToUint32(y).
+        const rnum = y.toInt32();
+
+        // 3. Let shiftCount be ℝ(rnum) modulo 32.
+        const shift_count = @intCast(u5, @mod(rnum, 32));
+
+        // 4. Return the result of left shifting lnum by shiftCount bits. The mathematical value of
+        //    the result is exactly representable as a 32-bit two's complement bit string.
+        return .{ .i32 = lnum << shift_count };
+    }
+
+    /// 6.1.6.1.10 Number::signedRightShift ( x, y )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-signedRightShift
+    pub fn signedRightShift(x: Self, y: Self) Self {
+        // 1. Let lnum be ! ToInt32(x).
+        const lnum = x.toInt32();
+
+        // 2. Let rnum be ! ToUint32(y).
+        const rnum = y.toUint32();
+
+        // 3. Let shiftCount be ℝ(rnum) modulo 32.
+        const shift_count = @intCast(u5, @mod(rnum, 32));
+
+        // 4. Return the result of performing a sign-extending right shift of lnum by shiftCount
+        //    bits. The most significant bit is propagated. The mathematical value of the result
+        //    is exactly representable as a 32-bit two's complement bit string.
+        return .{ .i32 = lnum >> shift_count };
+    }
+
+    /// 6.1.6.1.11 Number::unsignedRightShift ( x, y )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-unsignedRightShift
+    pub fn unsignedRightShift(x: Self, y: Self) Self {
+        // 1. Let lnum be ! ToUint32(x).
+        const lnum = x.toUint32();
+
+        // 2. Let rnum be ! ToUint32(y).
+        const rnum = y.toUint32();
+
+        // 3. Let shiftCount be ℝ(rnum) modulo 32.
+        const shift_count = @intCast(u5, @mod(rnum, 32));
+
+        // 4. Return the result of performing a zero-filling right shift of lnum by shiftCount
+        //    bits. Vacated bits are filled with zero. The mathematical value of the result is
+        //    exactly representable as a 32-bit unsigned bit string.
+        return from(lnum >> shift_count);
     }
 
     /// 6.1.6.1.12 Number::lessThan ( x, y )
@@ -246,6 +512,61 @@ pub const Number = union(enum) {
         // 4. If x is y, return true.
         // 5. Return false.
         return x.asFloat() == y.asFloat();
+    }
+
+    /// 6.1.6.1.16 NumberBitwiseOp ( op, x, y )
+    /// https://tc39.es/ecma262/#sec-numberbitwiseop
+    inline fn numberBitwiseOp(comptime op: enum { @"&", @"^", @"|" }, x: Self, y: Self) i32 {
+        // 1. Let lnum be ! ToInt32(x).
+        const lnum = x.toInt32();
+
+        // 2. Let rnum be ! ToInt32(y).
+        const rnum = y.toInt32();
+
+        // 3. Let lbits be the 32-bit two's complement bit string representing ℝ(lnum).
+        // 4. Let rbits be the 32-bit two's complement bit string representing ℝ(rnum).
+
+        const result = switch (op) {
+            // 5. If op is &, then
+            // a. Let result be the result of applying the bitwise AND operation to lbits and rbits.
+            .@"&" => lnum & rnum,
+
+            // 6. Else if op is ^, then
+            // a. Let result be the result of applying the bitwise exclusive OR (XOR) operation to
+            //    lbits and rbits.
+            .@"^" => lnum ^ rnum,
+
+            // 7. Else,
+            // a. Assert: op is |.
+            // b. Let result be the result of applying the bitwise inclusive OR operation to lbits
+            //    and rbits.
+            .@"|" => lnum | rnum,
+        };
+
+        // 8. Return the Number value for the integer represented by the 32-bit two's complement
+        //    bit string result.
+        return result;
+    }
+
+    /// 6.1.6.1.17 Number::bitwiseAND ( x, y )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-bitwiseAND
+    pub fn bitwiseAND(x: Self, y: Self) Self {
+        // 1. Return NumberBitwiseOp(&, x, y).
+        return .{ .i32 = numberBitwiseOp(.@"&", x, y) };
+    }
+
+    /// 6.1.6.1.18 Number::bitwiseXOR ( x, y )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-bitwiseXOR
+    pub fn bitwiseXOR(x: Self, y: Self) Self {
+        // 1. Return NumberBitwiseOp(^, x, y).
+        return .{ .i32 = numberBitwiseOp(.@"^", x, y) };
+    }
+
+    /// 6.1.6.1.19 Number::bitwiseOR ( x, y )
+    /// https://tc39.es/ecma262/#sec-numeric-types-number-bitwiseOR
+    pub fn bitwiseOR(x: Self, y: Self) Self {
+        // 1. Return NumberBitwiseOp(|, x, y).
+        return .{ .i32 = numberBitwiseOp(.@"|", x, y) };
     }
 
     /// 6.1.6.1.20 Number::toString ( x, radix )
