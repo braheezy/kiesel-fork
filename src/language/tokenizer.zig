@@ -96,6 +96,8 @@ const Pattern = ptk.Pattern(TokenType);
 pub const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
     // NOTE: Needs to come first or strings such as 'ifelse' turn into two tokens
     Pattern.create(.identifier, identifierMatcher),
+    // NOTE: Needs to come before binary operator tokens
+    Pattern.create(.comment, commentMatcher),
     Pattern.create(.@"--", ptk.matchers.literal("--")),
     Pattern.create(.@"-=", ptk.matchers.literal("-=")),
     Pattern.create(.@"-", ptk.matchers.literal("-")),
@@ -153,7 +155,6 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
     Pattern.create(.@"|", ptk.matchers.literal("|")),
     Pattern.create(.@"~", ptk.matchers.literal("~")),
     Pattern.create(.@"await", ptk.matchers.literal("await")),
-    Pattern.create(.comment, commentMatcher),
     Pattern.create(.debugger, ptk.matchers.literal("debugger")),
     Pattern.create(.delete, ptk.matchers.literal("delete")),
     Pattern.create(.do, ptk.matchers.literal("do")),
@@ -245,9 +246,20 @@ fn whitespaceMatcher(str: []const u8) ?usize {
     return str.len - rest.len;
 }
 
+/// 12.4 Comments
+/// https://tc39.es/ecma262/#sec-comments
 fn commentMatcher(str: []const u8) ?usize {
-    // TODO: Implement me :^)
-    _ = str;
+    if (std.mem.startsWith(u8, str, "//")) {
+        for (line_terminators) |line_terminator| {
+            if (std.mem.indexOf(u8, str, line_terminator)) |index|
+                return index;
+        }
+        return str.len;
+    }
+    if (std.mem.startsWith(u8, str, "/*")) {
+        if (std.mem.indexOf(u8, str, "*/")) |index|
+            return index + 2;
+    }
     return null;
 }
 
