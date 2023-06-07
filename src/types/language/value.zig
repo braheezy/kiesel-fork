@@ -689,7 +689,7 @@ pub const Value = union(enum) {
     /// https://tc39.es/ecma262/#sec-isconstructor
     pub fn isConstructor(self: Self) bool {
         // 1. If argument is not an Object, return false.
-        if (!self == .object) return false;
+        if (self != .object) return false;
 
         // 2. If argument has a [[Construct]] internal method, return true.
         if (self.object.internalMethods().construct != null) return true;

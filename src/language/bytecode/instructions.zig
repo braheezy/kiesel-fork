@@ -21,6 +21,11 @@ pub const Instruction = enum(u8) {
     /// (last to first) as an argument, the values on the stack afterwards are the this value and
     /// lastly the function to call.
     evaluate_call,
+    /// Store EvaluateNew() as the result value.
+    /// This instruction has the number of argument values that need to be popped from the stack
+    /// (last to first) as an argument, the value on the stack afterwards is the constructor to
+    /// call.
+    evaluate_new,
     /// Store EvaluatePropertyAccessWithExpressionKey() as the result value.
     evaluate_property_access_with_expression_key,
     /// Store EvaluatePropertyAccessWithIdentifierKey() as the result value.
@@ -97,6 +102,7 @@ pub const Instruction = enum(u8) {
             .apply_string_or_numeric_binary_operator,
             .array_set_length,
             .array_set_value,
+            .evaluate_new,
             .evaluate_property_access_with_expression_key,
             .instantiate_ordinary_function_expression,
             .jump,

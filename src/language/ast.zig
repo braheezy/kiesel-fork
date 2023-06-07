@@ -219,6 +219,45 @@ pub const MemberExpression = struct {
     }
 };
 
+/// https://tc39.es/ecma262/#prod-NewExpression
+pub const NewExpression = struct {
+    const Self = @This();
+
+    expression: *Expression,
+    arguments: Arguments,
+
+    /// 13.3.5.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-new-operator-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // NewExpression : new NewExpression
+        // 1. Return ? EvaluateNew(NewExpression, empty).
+        // MemberExpression : new MemberExpression Arguments
+        // 1. Return ? EvaluateNew(MemberExpression, Arguments).
+        try self.expression.generateBytecode(executable, ctx);
+        if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.load);
+
+        for (self.arguments) |argument| {
+            try argument.generateBytecode(executable, ctx);
+            if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
+        }
+
+        try executable.addInstruction(.evaluate_new);
+        try executable.addIndex(self.arguments.len);
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("NewExpression", writer, indentation);
+        try printString("expression:", writer, indentation + 1);
+        try self.expression.print(writer, indentation + 2);
+        try printString("arguments:", writer, indentation + 1);
+        for (self.arguments) |argument| {
+            try argument.print(writer, indentation + 2);
+        }
+    }
+};
+
 /// https://tc39.es/ecma262/#prod-CallExpression
 pub const CallExpression = struct {
     const Self = @This();
@@ -1221,6 +1260,7 @@ pub const Expression = union(enum) {
 
     primary_expression: PrimaryExpression,
     member_expression: MemberExpression,
+    new_expression: NewExpression,
     call_expression: CallExpression,
     unary_expression: UnaryExpression,
     binary_expression: BinaryExpression,
@@ -1248,6 +1288,7 @@ pub const Expression = union(enum) {
         switch (self) {
             .primary_expression => |primary_expression| try primary_expression.generateBytecode(executable, ctx),
             .member_expression => |member_expression| try member_expression.generateBytecode(executable, ctx),
+            .new_expression => |new_expression| try new_expression.generateBytecode(executable, ctx),
             .call_expression => |call_expression| try call_expression.generateBytecode(executable, ctx),
             .unary_expression => |unary_expression| try unary_expression.generateBytecode(executable, ctx),
             .binary_expression => |binary_expression| try binary_expression.generateBytecode(executable, ctx),
@@ -1267,6 +1308,10 @@ pub const Expression = union(enum) {
                 indentation + 1,
             ),
             .member_expression => |member_expression| try member_expression.print(
+                writer,
+                indentation + 1,
+            ),
+            .new_expression => |new_expression| try new_expression.print(
                 writer,
                 indentation + 1,
             ),

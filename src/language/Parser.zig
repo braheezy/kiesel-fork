@@ -19,7 +19,10 @@ const Self = @This();
 allocator: Allocator,
 core: ParserCore,
 diagnostics: *ptk.Diagnostics,
-in_function_body: bool = false,
+state: struct {
+    in_function_body: bool = false,
+    call_expression_forbidden: bool = false,
+} = .{},
 
 const RuleSet = ptk.RuleSet(Tokenizer.TokenType);
 const ParserCore = ptk.ParserCore(Tokenizer, .{ .whitespace, .comment });
@@ -364,9 +367,27 @@ fn acceptMemberExpression(self: *Self, primary_expression: ast.Expression) !ast.
     return .{ .expression = expression, .property = property };
 }
 
+fn acceptNewExpression(self: *Self) !ast.NewExpression {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const tmp = temporaryChange(&self.state, "call_expression_forbidden", true);
+    defer tmp.restore();
+
+    _ = try self.core.accept(RuleSet.is(.new));
+    const ctx = AcceptContext{ .precedence = getPrecedence(.new) };
+    const expression = try self.allocator.create(ast.Expression);
+    expression.* = try self.acceptExpression(ctx);
+    tmp.restore();
+    const arguments = self.acceptArguments() catch &[_]ast.Expression{};
+    return .{ .expression = expression, .arguments = arguments };
+}
+
 fn acceptCallExpression(self: *Self, primary_expression: ast.Expression) !ast.CallExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
+
+    if (self.state.call_expression_forbidden) return error.AcceptError;
 
     const arguments = try self.acceptArguments();
     // Defer heap allocation of expression until we know this is a CallExpression
@@ -701,6 +722,8 @@ fn acceptExpression(self: *Self, ctx: AcceptContext) (ParserCore.AcceptError || 
 
     var expression: ast.Expression = if (self.acceptUnaryExpression()) |unary_expression|
         .{ .unary_expression = unary_expression }
+    else |_| if (self.acceptNewExpression()) |new_expression|
+        .{ .new_expression = new_expression }
     else |_| if (self.acceptPrimaryExpression()) |primary_expression|
         .{ .primary_expression = primary_expression }
     else |_|
@@ -901,7 +924,7 @@ fn acceptReturnStatement(self: *Self) !ast.ReturnStatement {
 
     _ = try self.core.accept(RuleSet.is(.@"return"));
 
-    if (!self.in_function_body) {
+    if (!self.state.in_function_body) {
         try self.diagnostics.emit(
             state.location,
             .@"error",
@@ -1013,7 +1036,7 @@ fn acceptFunctionBody(self: *Self) !ast.FunctionBody {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const tmp = temporaryChange(self, "in_function_body", true);
+    const tmp = temporaryChange(&self.state, "in_function_body", true);
     defer tmp.restore();
 
     const statement_list = try self.acceptStatementList();
