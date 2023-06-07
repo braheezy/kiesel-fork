@@ -334,7 +334,7 @@ fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression, ct
         return .{ .equality_expression = equality_expression }
     else |_| if (self.acceptLogicalExpression(primary_expression, ctx)) |logical_expression|
         return .{ .logical_expression = logical_expression }
-    else |_| if (self.acceptConditionalExpression(primary_expression)) |conditional_expression|
+    else |_| if (self.acceptConditionalExpression(primary_expression, ctx)) |conditional_expression|
         return .{ .conditional_expression = conditional_expression }
     else |_| if (self.acceptSequenceExpression(primary_expression)) |sequence_expression|
         return .{ .sequence_expression = sequence_expression }
@@ -682,12 +682,11 @@ fn acceptLogicalExpression(self: *Self, primary_expression: ast.Expression, ctx:
     };
 }
 
-fn acceptConditionalExpression(self: *Self, primary_expression: ast.Expression) !ast.ConditionalExpression {
+fn acceptConditionalExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.ConditionalExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const token = try self.core.accept(RuleSet.is(.@"?"));
-    const ctx = AcceptContext{ .precedence = getPrecedence(token.type), .associativity = getAssociativity(token.type) };
+    _ = try self.core.accept(RuleSet.is(.@"?"));
     // Defer heap allocation of expression until we know this is a ConditionalExpression
     const test_expression = try self.allocator.create(ast.Expression);
     test_expression.* = primary_expression;
