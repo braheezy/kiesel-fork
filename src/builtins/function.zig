@@ -318,11 +318,35 @@ pub const FunctionPrototype = struct {
     }
 
     pub fn init(realm: *Realm, object: Object) !void {
+        try defineBuiltinFunction(object, "call", call, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
     }
 
     fn behaviour(_: *Agent, _: Value, _: ArgumentsList) !Value {
         return .undefined;
+    }
+
+    /// 20.2.3.3 Function.prototype.call ( thisArg, ...args )
+    /// https://tc39.es/ecma262/#sec-function.prototype.call
+    fn call(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const this_arg = arguments.get(0);
+        const args = if (arguments.count() <= 1) &[_]Value{} else arguments.values[1..];
+
+        // 1. Let func be the this value.
+        const func = this_value;
+
+        // 2. If IsCallable(func) is false, throw a TypeError exception.
+        if (!func.isCallable()) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not a function", .{func}),
+            );
+        }
+
+        // TODO: 3. Perform PrepareForTailCall().
+
+        // 4. Return ? Call(func, thisArg, args).
+        return func.callAssumeCallable(this_arg, args);
     }
 
     /// 20.2.3.5 Function.prototype.toString ( )
