@@ -49,8 +49,6 @@ const Associativity = enum {
 };
 
 const PrecedenceAndAssociativityAltFlag = enum {
-    new_args,
-    function_args,
     postfix_increment,
     postfix_decrement,
     unary_plus,
@@ -134,7 +132,6 @@ fn getPrecedenceAndAssociativity(token_type: Tokenizer.TokenType) struct { Prece
 
 fn getPrecedenceAndAssociativityAlt(flag: PrecedenceAndAssociativityAltFlag) struct { Precedence, ?Associativity } {
     return switch (flag) {
-        .new_args, .function_args => .{ 17, null },
         .postfix_increment, .postfix_decrement => .{ 15, null },
         .unary_plus, .unary_minus => .{ 14, null },
     };
@@ -402,8 +399,7 @@ fn acceptArguments(self: *Self) !ast.Arguments {
 
     var arguments = std.ArrayList(ast.Expression).init(self.allocator);
     _ = try self.core.accept(RuleSet.is(.@"("));
-    const ctx = AcceptContext{ .precedence = getPrecedenceAlt(.function_args) };
-    while (self.acceptExpression(ctx)) |argument| {
+    while (self.acceptExpression(.{})) |argument| {
         try arguments.append(argument);
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
     } else |_| {}
