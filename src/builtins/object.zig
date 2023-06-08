@@ -214,6 +214,7 @@ pub const ObjectPrototype = struct {
 
     pub fn init(realm: *Realm, object: Object_) !void {
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
+        try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
     }
 
     /// 20.1.3.6 Object.prototype.toString ( )
@@ -263,6 +264,13 @@ pub const ObjectPrototype = struct {
 
         // 17. Return the string-concatenation of "[object ", tag, and "]".
         return Value.from(try std.fmt.allocPrint(agent.gc_allocator, "[object {s}]", .{tag}));
+    }
+
+    /// 20.1.3.7 Object.prototype.valueOf ( )
+    /// https://tc39.es/ecma262/#sec-object.prototype.valueof
+    fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Return ? ToObject(this value).
+        return Value.from(try this_value.toObject(agent));
     }
 };
 
