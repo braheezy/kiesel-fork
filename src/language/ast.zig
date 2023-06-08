@@ -1362,6 +1362,7 @@ pub const Statement = union(enum) {
     breakable_statement: BreakableStatement,
     return_statement: ReturnStatement,
     throw_statement: ThrowStatement,
+    try_statement: TryStatement,
     debugger_statement,
 
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
@@ -1401,6 +1402,9 @@ pub const Statement = union(enum) {
             .throw_statement => |throw_statement| {
                 try throw_statement.generateBytecode(executable, ctx);
             },
+            .try_statement => |try_statement| {
+                try try_statement.generateBytecode(executable, ctx);
+            },
 
             // DebuggerStatement : debugger ;
             .debugger_statement => {
@@ -1435,6 +1439,10 @@ pub const Statement = union(enum) {
                 indentation + 1,
             ),
             .throw_statement => |throw_statement| try throw_statement.print(
+                writer,
+                indentation + 1,
+            ),
+            .try_statement => |try_statement| try try_statement.print(
                 writer,
                 indentation + 1,
             ),
@@ -1928,6 +1936,111 @@ pub const ThrowStatement = struct {
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("ThrowStatement", writer, indentation);
         try self.expression.print(writer, indentation + 1);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-TryStatement
+pub const TryStatement = struct {
+    const Self = @This();
+
+    try_block: Block,
+    catch_parameter: ?[]const u8,
+    catch_block: ?Block,
+    finally_block: ?Block,
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("TryStatement", writer, indentation);
+        try printString("try:", writer, indentation + 1);
+        try self.try_block.print(writer, indentation + 2);
+        if (self.catch_block) |catch_block| {
+            try printString("catch:", writer, indentation + 1);
+            if (self.catch_parameter) |catch_parameter| {
+                try printString(catch_parameter, writer, indentation + 2);
+            }
+            try catch_block.print(writer, indentation + 2);
+        }
+        if (self.finally_block) |finally_block| {
+            try printString("finally:", writer, indentation + 1);
+            try finally_block.print(writer, indentation + 2);
+        }
+    }
+
+    /// 14.15.3 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-try-statement-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // TryStatement : try Block Catch
+        if (self.finally_block == null) {
+            try executable.addInstruction(.push_exception_jump_target);
+            const exception_jump_to_catch = try executable.addJumpIndex();
+
+            // 1. Let B be Completion(Evaluation of Block).
+            try executable.addInstructionWithConstant(.store_constant, .undefined);
+            try self.try_block.generateBytecode(executable, ctx);
+            try executable.addInstruction(.pop_exception_jump_target);
+            try executable.addInstruction(.jump);
+            const end_jump = try executable.addJumpIndex();
+
+            // 2. If B.[[Type]] is throw, let C be Completion(CatchClauseEvaluation of Catch with
+            //    argument B.[[Value]]).
+            try exception_jump_to_catch.setTargetHere();
+            try executable.addInstruction(.pop_exception_jump_target);
+            try executable.addInstructionWithConstant(.store_constant, .undefined);
+            try self.catch_block.?.generateBytecode(executable, ctx);
+
+            // 3. Else, let C be B.
+            // 4. Return ? UpdateEmpty(C, undefined).
+            try end_jump.setTargetHere();
+        }
+        // TryStatement : try Block Finally
+        else if (self.catch_block == null) {
+            try executable.addInstruction(.push_exception_jump_target);
+            const exception_jump_to_finally = try executable.addJumpIndex();
+
+            // 1. Let B be Completion(Evaluation of Block).
+            try executable.addInstructionWithConstant(.store_constant, .undefined);
+            try self.try_block.generateBytecode(executable, ctx);
+
+            // 2. Let F be Completion(Evaluation of Finally).
+            try exception_jump_to_finally.setTargetHere();
+            try executable.addInstruction(.pop_exception_jump_target);
+            try executable.addInstructionWithConstant(.store_constant, .undefined);
+            try self.finally_block.?.generateBytecode(executable, ctx);
+            try executable.addInstruction(.rethrow_exception_if_any);
+
+            // 3. If F.[[Type]] is normal, set F to B.
+            // 4. Return ? UpdateEmpty(F, undefined).
+        }
+        // TryStatement : try Block Catch Finally
+        else {
+            try executable.addInstruction(.push_exception_jump_target);
+            const exception_jump_to_catch = try executable.addJumpIndex();
+
+            // 1. Let B be Completion(Evaluation of Block).
+            try executable.addInstructionWithConstant(.store_constant, .undefined);
+            try self.try_block.generateBytecode(executable, ctx);
+            try executable.addInstruction(.jump);
+            const finally_jump = try executable.addJumpIndex();
+
+            // 2. If B.[[Type]] is throw, let C be Completion(CatchClauseEvaluation of Catch with argument B.[[Value]]).
+            // 3. Else, let C be B.
+            try exception_jump_to_catch.setTargetHere();
+            try executable.addInstruction(.pop_exception_jump_target);
+            try executable.addInstruction(.push_exception_jump_target);
+            const exception_jump_to_finally = try executable.addJumpIndex();
+            try executable.addInstructionWithConstant(.store_constant, .undefined);
+            try self.catch_block.?.generateBytecode(executable, ctx);
+
+            // 4. Let F be Completion(Evaluation of Finally).
+            try finally_jump.setTargetHere();
+            try exception_jump_to_finally.setTargetHere();
+            try executable.addInstruction(.pop_exception_jump_target);
+            try executable.addInstructionWithConstant(.store_constant, .undefined);
+            try self.finally_block.?.generateBytecode(executable, ctx);
+            try executable.addInstruction(.rethrow_exception_if_any);
+
+            // 5. If F.[[Type]] is normal, set F to C.
+            // 6. Return ? UpdateEmpty(F, undefined).
+        }
     }
 };
 

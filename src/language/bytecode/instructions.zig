@@ -67,10 +67,16 @@ pub const Instruction = enum(u8) {
     object_create,
     /// Set an object's property to the key/value pair from the last two values on the stack.
     object_set_property,
+    /// Pop a jump target for uncaught exceptions
+    pop_exception_jump_target,
+    /// Push a jump target for uncaught exceptions
+    push_exception_jump_target,
     /// Store ResolveBinding() as the result value.
     resolve_binding,
     /// Store ResolveThisBinding() as the result value.
     resolve_this_binding,
+    /// Rethrow the stored exception, if any.
+    rethrow_exception_if_any,
     /// Stop bytecode execution, indicating a return from the current function.
     @"return",
     /// Set the evaluation context reference to the last evaluated one, if any.
@@ -107,6 +113,7 @@ pub const Instruction = enum(u8) {
             .instantiate_ordinary_function_expression,
             .jump,
             .load_constant,
+            .push_exception_jump_target,
             .store_constant,
             => 1,
             else => 0,

@@ -763,6 +763,8 @@ fn acceptStatement(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!*
         statement.* = .{ .return_statement = return_statement }
     else |_| if (self.acceptThrowStatement()) |throw_statement|
         statement.* = .{ .throw_statement = throw_statement }
+    else |_| if (self.acceptTryStatement()) |try_statement|
+        statement.* = .{ .try_statement = try_statement }
     else |_| if (self.core.accept(RuleSet.is(.debugger))) |_|
         statement.* = .debugger_statement
     else |_|
@@ -952,6 +954,41 @@ fn acceptThrowStatement(self: *Self) !ast.ThrowStatement {
     try self.noLineTerminatorHere();
     const expression = try self.acceptExpression(.{});
     return .{ .expression = expression };
+}
+
+fn acceptTryStatement(self: *Self) !ast.TryStatement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"try"));
+    const try_block = try self.acceptBlock();
+    var catch_parameter: ?[]const u8 = null;
+    const catch_block = if (self.core.accept(RuleSet.is(.@"catch"))) |_| blk: {
+        if (self.core.accept(RuleSet.is(.@"("))) |_| {
+            catch_parameter = try self.acceptBindingIdentifier();
+            _ = try self.core.accept(RuleSet.is(.@")"));
+        } else |_| {}
+        break :blk try self.acceptBlock();
+    } else |_| null;
+    const finally_block = if (self.core.accept(RuleSet.is(.finally))) |_|
+        try self.acceptBlock()
+    else |_|
+        null;
+    if (catch_block == null and finally_block == null) {
+        try self.diagnostics.emit(
+            self.core.tokenizer.current_location,
+            .@"error",
+            "Try statement requires catch or finally block",
+            .{},
+        );
+        return error.UnexpectedToken;
+    }
+    return .{
+        .try_block = try_block,
+        .catch_parameter = catch_parameter,
+        .catch_block = catch_block,
+        .finally_block = finally_block,
+    };
 }
 
 fn acceptFormalParameters(self: *Self) !ast.FormalParameters {

@@ -168,6 +168,7 @@ pub fn print(self: Self, writer: anytype) !void {
             .array_set_value,
             .instantiate_ordinary_function_expression,
             .jump,
+            .push_exception_jump_target,
             => {
                 const index = iterator.instruction_args[0].?;
                 try writer.print("{}", .{index});

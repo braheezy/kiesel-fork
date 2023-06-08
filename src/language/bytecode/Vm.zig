@@ -33,7 +33,9 @@ agent: *Agent,
 ip: usize,
 stack: std.ArrayList(Value),
 evaluation_context_stack: std.ArrayList(EvaluationContext),
-result: ?Value,
+exception_jump_target_stack: std.ArrayList(usize),
+result: ?Value = null,
+exception: ?Value = null,
 reference: ?Reference = null,
 
 const EvaluationContext = struct {
@@ -43,13 +45,13 @@ const EvaluationContext = struct {
 pub fn init(agent: *Agent) !Self {
     var stack = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 32);
     var evaluation_context_stack = std.ArrayList(EvaluationContext).init(agent.gc_allocator);
+    var exception_jump_target_stack = std.ArrayList(usize).init(agent.gc_allocator);
     return .{
         .agent = agent,
         .ip = 0,
         .stack = stack,
         .evaluation_context_stack = evaluation_context_stack,
-        .result = null,
-        .reference = null,
+        .exception_jump_target_stack = exception_jump_target_stack,
     };
 }
 
@@ -434,8 +436,8 @@ fn instantiateOrdinaryFunctionExpression(
     }
 }
 
-pub fn run(self: *Self, executable: Executable) !Completion {
-    while (self.fetchInstruction(executable)) |instruction| switch (instruction) {
+pub fn executeInstruction(self: *Self, executable: Executable, instruction: Instruction) !void {
+    switch (instruction) {
         .apply_string_or_numeric_binary_operator => {
             const operator_type = self.fetchIndex(executable);
             const operator = @intToEnum(ast.BinaryExpression.Operator, operator_type);
@@ -501,7 +503,7 @@ pub fn run(self: *Self, executable: Executable) !Completion {
                     function.object.ptr == eval.ptr)
                 {
                     self.result = try directEval(self.agent, arguments.items, strict);
-                    continue;
+                    return;
                 }
             }
 
@@ -660,6 +662,11 @@ pub fn run(self: *Self, executable: Executable) !Completion {
             const value = self.result.?;
             self.ip = if (value.toBoolean()) ip_consequent else ip_alternate;
         },
+        .push_exception_jump_target => {
+            const jump_target = self.fetchIndex(executable);
+            try self.exception_jump_target_stack.append(jump_target);
+        },
+        .pop_exception_jump_target => _ = self.exception_jump_target_stack.pop(),
         .less_than => {
             const rval = self.stack.pop();
             const lval = self.stack.pop();
@@ -719,7 +726,11 @@ pub fn run(self: *Self, executable: Executable) !Completion {
             self.reference = try self.agent.resolveBinding(name, null, strict);
         },
         .resolve_this_binding => self.result = try self.agent.resolveThisBinding(),
-        .@"return" => return .{ .type = .@"return", .value = self.result, .target = null },
+        .rethrow_exception_if_any => if (self.exception) |value| {
+            self.agent.exception = value;
+            return error.ExceptionThrown;
+        },
+        .@"return" => {}, // Handled in run()
         .set_evaluation_context_reference => {
             try self.evaluation_context_stack.append(.{ .reference = self.reference });
         },
@@ -731,7 +742,6 @@ pub fn run(self: *Self, executable: Executable) !Completion {
         .throw => {
             const value = self.result.?;
             self.agent.exception = value;
-            // TODO: This will need to change when try/catch are implemented.
             return error.ExceptionThrown;
         },
         .to_number => {
@@ -755,7 +765,7 @@ pub fn run(self: *Self, executable: Executable) !Completion {
                 // a. If IsUnresolvableReference(val) is true, return "undefined".
                 if (reference.isUnresolvableReference()) {
                     self.result = Value.from("undefined");
-                    continue;
+                    return;
                 }
             }
 
@@ -808,6 +818,22 @@ pub fn run(self: *Self, executable: Executable) !Completion {
             };
         },
         _ => unreachable,
-    };
+    }
+}
+
+pub fn run(self: *Self, executable: Executable) !Completion {
+    while (self.fetchInstruction(executable)) |instruction| {
+        self.executeInstruction(executable, instruction) catch |err| {
+            if (self.exception_jump_target_stack.items.len != 0) {
+                // TODO: Store exceptiom and create catch binding
+                self.exception = self.agent.exception;
+                self.agent.exception = null;
+                self.ip = self.exception_jump_target_stack.getLast();
+            } else return err;
+        };
+        if (instruction == .@"return") {
+            return .{ .type = .@"return", .value = self.result, .target = null };
+        }
+    }
     return Completion.normal(self.result);
 }
