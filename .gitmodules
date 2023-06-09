@@ -3,7 +3,7 @@
 	url = https://github.com/MasterQ32/parser-toolkit
 [submodule "vendor/zig-libgc"]
 	path = vendor/zig-libgc
-	url = https://github.com/mitchellh/zig-libgc
+	url = https://github.com/linusg/zig-libgc
 [submodule "vendor/zig-args"]
 	path = vendor/zig-args
 	url = https://github.com/MasterQ32/zig-args
