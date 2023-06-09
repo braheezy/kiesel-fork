@@ -272,7 +272,7 @@ pub const CallExpression = struct {
         // 1. Let ref be ? Evaluation of CallExpression.
         try self.expression.generateBytecode(executable, ctx);
 
-        try executable.addInstruction(.set_evaluation_context_reference);
+        try executable.addInstruction(.push_reference);
 
         // 2. Let func be ? GetValue(ref).
         if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
@@ -295,6 +295,9 @@ pub const CallExpression = struct {
         try executable.addInstruction(.evaluate_call);
         try executable.addIndex(self.arguments.len);
         try executable.addIndex(@boolToInt(strict));
+
+        // TODO: We should probably also clean this up if something throws beforehand...
+        try executable.addInstruction(.pop_reference);
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {

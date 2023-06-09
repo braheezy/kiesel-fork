@@ -32,25 +32,21 @@ const Self = @This();
 agent: *Agent,
 ip: usize,
 stack: std.ArrayList(Value),
-evaluation_context_stack: std.ArrayList(EvaluationContext),
+reference_stack: std.ArrayList(?Reference),
 exception_jump_target_stack: std.ArrayList(usize),
 result: ?Value = null,
 exception: ?Value = null,
 reference: ?Reference = null,
 
-const EvaluationContext = struct {
-    reference: ?Reference = null,
-};
-
 pub fn init(agent: *Agent) !Self {
     var stack = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 32);
-    var evaluation_context_stack = std.ArrayList(EvaluationContext).init(agent.gc_allocator);
+    var reference_stack = std.ArrayList(?Reference).init(agent.gc_allocator);
     var exception_jump_target_stack = std.ArrayList(usize).init(agent.gc_allocator);
     return .{
         .agent = agent,
         .ip = 0,
         .stack = stack,
-        .evaluation_context_stack = evaluation_context_stack,
+        .reference_stack = reference_stack,
         .exception_jump_target_stack = exception_jump_target_stack,
     };
 }
@@ -117,9 +113,9 @@ fn evaluateNew(agent: *Agent, constructor: Value, arguments: []const Value) !Val
 
 /// 13.3.6.2 EvaluateCall ( func, ref, arguments, tailPosition )
 /// https://tc39.es/ecma262/#sec-evaluatecall
-fn evaluateCallGetThisValue(ctx: EvaluationContext) Value {
+fn evaluateCallGetThisValue(maybe_reference: ?Reference) Value {
     // 1. If ref is a Reference Record, then
-    if (ctx.reference) |reference| {
+    if (maybe_reference) |reference| {
         // a. If IsPropertyReference(ref) is true, then
         if (reference.isPropertyReference()) {
             // i. Let thisValue be GetThisValue(ref).
@@ -474,7 +470,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             };
         },
         .evaluate_call => {
-            const evaluation_context = self.evaluation_context_stack.pop();
+            const maybe_reference = self.reference_stack.getLast();
             const argument_count = self.fetchIndex(executable);
             const strict = self.fetchIndex(executable) == 1;
             var arguments = try std.ArrayList(Value).initCapacity(
@@ -494,7 +490,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
 
             // 6. If ref is a Reference Record, IsPropertyReference(ref) is false, and
             //    ref.[[ReferencedName]] is "eval", then
-            if (evaluation_context.reference) |reference| {
+            if (maybe_reference) |reference| {
                 if (!reference.isPropertyReference() and
                     reference.referenced_name == .string and
                     std.mem.eql(u8, reference.referenced_name.string, "eval") and
@@ -662,11 +658,6 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             const value = self.result.?;
             self.ip = if (value.toBoolean()) ip_consequent else ip_alternate;
         },
-        .push_exception_jump_target => {
-            const jump_target = self.fetchIndex(executable);
-            try self.exception_jump_target_stack.append(jump_target);
-        },
-        .pop_exception_jump_target => _ = self.exception_jump_target_stack.pop(),
         .less_than => {
             const rval = self.stack.pop();
             const lval = self.stack.pop();
@@ -696,8 +687,8 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             try self.stack.append(value);
         },
         .load_this_value => {
-            const evaluation_context = self.evaluation_context_stack.getLast();
-            const this_value = evaluateCallGetThisValue(evaluation_context);
+            const maybe_reference = self.reference_stack.getLast();
+            const this_value = evaluateCallGetThisValue(maybe_reference);
             try self.stack.append(this_value);
         },
         .logical_not => {
@@ -720,6 +711,13 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             object.createDataPropertyOrThrow(property_name, property_value) catch |err| try noexcept(err);
             self.result = Value.from(object);
         },
+        .pop_exception_jump_target => _ = self.exception_jump_target_stack.pop(),
+        .pop_reference => _ = self.reference_stack.pop(),
+        .push_exception_jump_target => {
+            const jump_target = self.fetchIndex(executable);
+            try self.exception_jump_target_stack.append(jump_target);
+        },
+        .push_reference => try self.reference_stack.append(self.reference),
         .resolve_binding => {
             const name = self.fetchIdentifier(executable);
             const strict = self.fetchIndex(executable) == 1;
@@ -731,9 +729,6 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             return error.ExceptionThrown;
         },
         .@"return" => {}, // Handled in run()
-        .set_evaluation_context_reference => {
-            try self.evaluation_context_stack.append(.{ .reference = self.reference });
-        },
         .store => self.result = self.stack.pop(),
         .store_constant => {
             const value = self.fetchConstant(executable);
