@@ -71,7 +71,7 @@ pub fn isPrivateReference(self: Self) bool {
 /// https://tc39.es/ecma262/#sec-getvalue
 pub fn getValue(self: Self, agent: *Agent) !Value {
     // 1. If V is not a Reference Record, return V.
-    // NOTE: This is handled ad the call site.
+    // NOTE: This is handled at the call site.
 
     // 2. If IsUnresolvableReference(V) is true, throw a ReferenceError exception.
     if (self.isUnresolvableReference()) {
@@ -93,7 +93,7 @@ pub fn getValue(self: Self, agent: *Agent) !Value {
 
         // b. If IsPrivateReference(V) is true, then
         if (self.isPrivateReference()) {
-            // i. Return ? PrivateGet(baseObj, V.[[ReferencedName]]).
+            // TODO: i. Return ? PrivateGet(baseObj, V.[[ReferencedName]]).
             @panic("Not implemented");
         }
 
@@ -116,7 +116,7 @@ pub fn getValue(self: Self, agent: *Agent) !Value {
         const base = self.base.environment;
 
         // c. Return ? base.GetBindingValue(V.[[ReferencedName]], V.[[Strict]]) (see 9.1).
-        return base.getBindingValue(self.referenced_name.string, self.strict);
+        return base.getBindingValue(agent, self.referenced_name.string, self.strict);
     }
 }
 

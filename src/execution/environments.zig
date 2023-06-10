@@ -6,8 +6,10 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const builtins = @import("../builtins.zig");
+const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
+const Agent = execution.Agent;
 const ECMAScriptFunction = builtins.ECMAScriptFunction;
 const Object = types.Object;
 const Reference = types.Reference;
@@ -76,12 +78,12 @@ pub const Environment = union(enum) {
         @compileError("Not implemented");
     }
 
-    pub fn getBindingValue(self: Self, name: []const u8, strict: bool) !Value {
+    pub fn getBindingValue(self: Self, agent: *Agent, name: []const u8, strict: bool) !Value {
         return switch (self) {
-            .declarative_environment => |env| env.getBindingValue(name, strict),
+            .declarative_environment => |env| env.getBindingValue(agent, name, strict),
             .object_environment => |env| env.getBindingValue(name, strict),
-            .function_environment => |env| env.declarative_environment.getBindingValue(name, strict),
-            .global_environment => |env| env.getBindingValue(name, strict),
+            .function_environment => |env| env.declarative_environment.getBindingValue(agent, name, strict),
+            .global_environment => |env| env.getBindingValue(agent, name, strict),
         };
     }
 
@@ -186,6 +188,8 @@ pub fn newDeclarativeEnvironment(
     env.* = .{
         // 2. Set env.[[OuterEnv]] to E.
         .outer_env = outer_env,
+
+        .bindings = std.StringArrayHashMap(DeclarativeEnvironment.Binding).init(allocator),
     };
 
     // 3. Return env.

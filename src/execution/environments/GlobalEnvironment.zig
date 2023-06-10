@@ -4,8 +4,10 @@
 const std = @import("std");
 
 const environments = @import("../environments.zig");
+const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
 
+const Agent = execution.Agent;
 const DeclarativeEnvironment = environments.DeclarativeEnvironment;
 const Environment = environments.Environment;
 const Object = types.Object;
@@ -43,12 +45,12 @@ pub fn hasBinding(self: Self, name: []const u8) !bool {
 
 /// 9.1.1.4.6 GetBindingValue ( N, S )
 /// https://tc39.es/ecma262/#sec-global-environment-records-getbindingvalue-n-s
-pub fn getBindingValue(self: Self, name: []const u8, strict: bool) !Value {
+pub fn getBindingValue(self: Self, agent: *Agent, name: []const u8, strict: bool) !Value {
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, then
     if (self.declarative_record.hasBinding(name)) {
         // a. Return ? DclRec.GetBindingValue(N, S).
-        return self.declarative_record.getBindingValue(name, strict);
+        return self.declarative_record.getBindingValue(agent, name, strict);
     }
 
     // 3. Let ObjRec be envRec.[[ObjectRecord]].
