@@ -4,8 +4,10 @@
 const std = @import("std");
 
 const environments = @import("../environments.zig");
+const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
 
+const Agent = execution.Agent;
 const Environment = environments.Environment;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
@@ -53,6 +55,27 @@ pub fn hasBinding(self: Self, name: []const u8) !bool {
 
     // 7. Return true.
     return true;
+}
+
+/// 9.1.1.2.5 SetMutableBinding ( N, V, S )
+/// https://tc39.es/ecma262/#sec-object-environment-records-setmutablebinding-n-v-s
+pub fn setMutableBinding(self: Self, agent: *Agent, name: []const u8, value: Value, strict: bool) !void {
+    // 1. Let bindingObject be envRec.[[BindingObject]].
+    // 2. Let stillExists be ? HasProperty(bindingObject, N).
+    const still_exists = try self.binding_object.hasProperty(PropertyKey.from(name));
+
+    // 3. If stillExists is false and S is true, throw a ReferenceError exception.
+    if (!still_exists and strict) {
+        return agent.throwException(
+            .reference_error,
+            try std.fmt.allocPrint(agent.gc_allocator, "'{s}' is not defined", .{name}),
+        );
+    }
+
+    // 4. Perform ? Set(bindingObject, N, V, S).
+    try self.binding_object.set(PropertyKey.from(name), value, if (strict) .throw else .ignore);
+
+    // 5. Return unused.
 }
 
 /// 9.1.1.2.6 GetBindingValue ( N, S )

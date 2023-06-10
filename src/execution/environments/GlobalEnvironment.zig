@@ -43,6 +43,21 @@ pub fn hasBinding(self: Self, name: []const u8) !bool {
     return self.object_record.hasBinding(name);
 }
 
+/// 9.1.1.4.5 SetMutableBinding ( N, V, S )
+/// https://tc39.es/ecma262/#sec-global-environment-records-setmutablebinding-n-v-s
+pub fn setMutableBinding(self: Self, agent: *Agent, name: []const u8, value: Value, strict: bool) !void {
+    // 1. Let DclRec be envRec.[[DeclarativeRecord]].
+    // 2. If ! DclRec.HasBinding(N) is true, then
+    if (self.declarative_record.hasBinding(name)) {
+        // a. Return ? DclRec.SetMutableBinding(N, V, S).
+        return self.declarative_record.setMutableBinding(agent, name, value, strict);
+    }
+
+    // 3. Let ObjRec be envRec.[[ObjectRecord]].
+    // 4. Return ? ObjRec.SetMutableBinding(N, V, S).
+    return self.object_record.setMutableBinding(agent, name, value, strict);
+}
+
 /// 9.1.1.4.6 GetBindingValue ( N, S )
 /// https://tc39.es/ecma262/#sec-global-environment-records-getbindingvalue-n-s
 pub fn getBindingValue(self: Self, agent: *Agent, name: []const u8, strict: bool) !Value {

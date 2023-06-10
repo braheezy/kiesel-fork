@@ -70,12 +70,13 @@ pub const Environment = union(enum) {
         @compileError("Not implemented");
     }
 
-    pub fn setMutableBinding(self: Self, name: []const u8, value: Value, strict: bool) bool {
-        _ = self;
-        _ = name;
-        _ = value;
-        _ = strict;
-        @compileError("Not implemented");
+    pub fn setMutableBinding(self: Self, agent: *Agent, name: []const u8, value: Value, strict: bool) !void {
+        return switch (self) {
+            .declarative_environment => |env| env.setMutableBinding(agent, name, value, strict),
+            .object_environment => |env| env.setMutableBinding(agent, name, value, strict),
+            .function_environment => |env| env.declarative_environment.setMutableBinding(agent, name, value, strict),
+            .global_environment => |env| env.setMutableBinding(agent, name, value, strict),
+        };
     }
 
     pub fn getBindingValue(self: Self, agent: *Agent, name: []const u8, strict: bool) !Value {
