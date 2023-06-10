@@ -122,10 +122,74 @@ pub fn getValue(self: Self, agent: *Agent) !Value {
 
 /// 6.2.5.6 PutValue ( V, W )
 /// https://tc39.es/ecma262/#sec-putvalue
-pub fn putValue(self: Self, value: Value) !void {
-    _ = self;
-    _ = value;
-    @compileError("Not implemented");
+pub fn putValue(self: Self, agent: *Agent, value: Value) !void {
+    // 1. If V is not a Reference Record, throw a ReferenceError exception.
+    // NOTE: This is handled at the call site.
+
+    // 2. If IsUnresolvableReference(V) is true, then
+    if (self.isUnresolvableReference()) {
+        // a. If V.[[Strict]] is true, throw a ReferenceError exception.
+        if (self.strict) {
+            return agent.throwException(
+                .reference_error,
+                try std.fmt.allocPrint(
+                    agent.gc_allocator,
+                    "'{s}' is not defined",
+                    .{self.referenced_name.string},
+                ),
+            );
+        }
+
+        // b. Let globalObj be GetGlobalObject().
+        const global_obj = agent.getGlobalObject();
+
+        // c. Perform ? Set(globalObj, V.[[ReferencedName]], W, false).
+        try global_obj.set(PropertyKey.from(self.referenced_name.string), value, .ignore);
+
+        // d. Return unused.
+        return;
+    }
+
+    // 3. If IsPropertyReference(V) is true, then
+    if (self.isPropertyReference()) {
+        // a. Let baseObj be ? ToObject(V.[[Base]]).
+        const base_object = try self.base.value.toObject(agent);
+
+        // b. If IsPrivateReference(V) is true, then
+        if (self.isPrivateReference()) {
+            // TODO: i. Return ? PrivateSet(baseObj, V.[[ReferencedName]], W).
+            @panic("Not implemented");
+        }
+
+        // c. Let succeeded be ? baseObj.[[Set]](V.[[ReferencedName]], W, GetThisValue(V)).
+        const referenced_name = switch (self.referenced_name) {
+            .string => |string| PropertyKey.from(string),
+            .symbol => |symbol| PropertyKey.from(symbol),
+            .private_name => unreachable,
+        };
+        const succeeded = try base_object.internalMethods().set(
+            base_object,
+            referenced_name,
+            value,
+            self.getThisValue(),
+        );
+
+        // d. If succeeded is false and V.[[Strict]] is true, throw a TypeError exception.
+        if (!succeeded and self.strict)
+            return agent.throwException(.type_error, "Could not set property");
+
+        // e. Return unused.
+        return;
+    }
+
+    // 4. Else,
+    // a. Let base be V.[[Base]].
+    // b. Assert: base is an Environment Record.
+    const base = self.base.environment;
+
+    // c. Return ? base.SetMutableBinding(V.[[ReferencedName]], W, V.[[Strict]]) (see 9.1).
+    const referenced_name = self.referenced_name.string;
+    return base.setMutableBinding(agent, referenced_name, value, self.strict);
 }
 
 /// 6.2.5.7 GetThisValue ( V )
