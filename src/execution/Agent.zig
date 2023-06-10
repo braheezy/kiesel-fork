@@ -260,6 +260,16 @@ pub fn resolveThisBinding(self: *Self) Error!Value {
     return env.getThisBinding();
 }
 
+/// 9.4.6 GetGlobalObject ( )
+/// https://tc39.es/ecma262/#sec-getglobalobject
+pub fn getGlobalObject(self: Self) Object {
+    // 1. Let currentRealm be the current Realm Record.
+    const current_realm = self.currentRealm();
+
+    // 2. Return currentRealm.[[GlobalObject]].
+    return current_realm.global_object;
+}
+
 test "well_known_symbols" {
     var agent = try init(.{});
     defer agent.deinit();
