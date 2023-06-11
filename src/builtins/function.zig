@@ -105,8 +105,8 @@ pub fn createDynamicFunction(
     // 1. Let currentRealm be the current Realm Record.
     const current_realm = realm;
 
-    // TODO: 2. Perform ? HostEnsureCanCompileStrings(currentRealm).
-    _ = current_realm;
+    // 2. Perform ? HostEnsureCanCompileStrings(currentRealm).
+    try agent.host_hooks.hostEnsureCanCompileStrings(current_realm);
 
     // 3. If newTarget is undefined, set newTarget to constructor.
     const new_target = maybe_new_target orelse constructor;

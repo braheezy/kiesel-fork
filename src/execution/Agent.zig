@@ -6,6 +6,7 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const default_host_hooks = @import("default_host_hooks.zig");
 const environments = @import("environments.zig");
 const types = @import("../types.zig");
 
@@ -32,6 +33,7 @@ pre_allocated: struct {
 exception: ?Value = null,
 symbol_id: usize = 0,
 well_known_symbols: WellKnownSymbols,
+host_hooks: HostHooks,
 execution_context_stack: std.ArrayList(ExecutionContext),
 
 pub const Options = struct {
@@ -65,6 +67,11 @@ pub const WellKnownSymbols = struct {
     @"@@unscopables": Symbol,
 };
 
+pub const HostHooks = struct {
+    hostEnsureCanCompileStrings: *const fn (callee_realm: *Realm) Error!void,
+    hostHasSourceTextAvailable: *const fn (func: Object) bool,
+};
+
 pub fn init(options: Options) !Self {
     gc.setAllInteriorPointers(true);
     var self = Self{
@@ -72,6 +79,7 @@ pub fn init(options: Options) !Self {
         .options = options,
         .pre_allocated = undefined,
         .well_known_symbols = undefined,
+        .host_hooks = undefined,
         .execution_context_stack = undefined,
     };
     if (options.debug.disable_gc) gc.disable();
@@ -81,7 +89,7 @@ pub fn init(options: Options) !Self {
         .pow_2_63 = try BigInt.Value.initSet(self.gc_allocator, std.math.pow(u64, 2, 63)),
         .pow_2_64 = try BigInt.Value.initSet(self.gc_allocator, std.math.pow(u128, 2, 64)),
     };
-    self.well_known_symbols = WellKnownSymbols{
+    self.well_known_symbols = .{
         .@"@@asyncIterator" = self.createSymbol("Symbol.asyncIterator") catch unreachable,
         .@"@@hasInstance" = self.createSymbol("Symbol.hasInstance") catch unreachable,
         .@"@@isConcatSpreadable" = self.createSymbol("Symbol.isConcatSpreadable") catch unreachable,
@@ -95,6 +103,10 @@ pub fn init(options: Options) !Self {
         .@"@@toPrimitive" = self.createSymbol("Symbol.toPrimitive") catch unreachable,
         .@"@@toStringTag" = self.createSymbol("Symbol.toStringTag") catch unreachable,
         .@"@@unscopables" = self.createSymbol("Symbol.unscopables") catch unreachable,
+    };
+    self.host_hooks = .{
+        .hostEnsureCanCompileStrings = default_host_hooks.hostEnsureCanCompileStrings,
+        .hostHasSourceTextAvailable = default_host_hooks.hostHasSourceTextAvailable,
     };
     self.execution_context_stack = std.ArrayList(ExecutionContext).init(self.gc_allocator);
     return self;
