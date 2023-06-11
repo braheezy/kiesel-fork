@@ -718,6 +718,11 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             try self.exception_jump_target_stack.append(jump_target);
         },
         .push_reference => try self.reference_stack.append(self.reference),
+        .put_value => {
+            const lref = self.reference_stack.getLast().?;
+            const rval = self.result.?;
+            try lref.putValue(self.agent, rval);
+        },
         .resolve_binding => {
             const name = self.fetchIdentifier(executable);
             const strict = self.fetchIndex(executable) == 1;

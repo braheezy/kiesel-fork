@@ -75,6 +75,8 @@ pub const Instruction = enum(u8) {
     push_exception_jump_target,
     /// Push the last evaluated reference, if any.
     push_reference,
+    /// Call PutValue() with the last reference on the reference stack and the result value.
+    put_value,
     /// Store ResolveBinding() as the result value.
     resolve_binding,
     /// Store ResolveThisBinding() as the result value.

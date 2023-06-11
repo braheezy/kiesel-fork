@@ -1231,6 +1231,252 @@ pub const ConditionalExpression = struct {
     }
 };
 
+/// https://tc39.es/ecma262/#prod-AssignmentExpression
+pub const AssignmentExpression = struct {
+    const Self = @This();
+
+    pub const Operator = enum {
+        @"=",
+        @"*=",
+        @"/=",
+        @"%=",
+        @"+=",
+        @"-=",
+        @"<<=",
+        @">>=",
+        @">>>=",
+        @"&=",
+        @"^=",
+        @"|=",
+        @"**=",
+        @"&&=",
+        @"||=",
+        @"??=",
+    };
+
+    operator: Operator,
+    lhs_expression: *Expression,
+    rhs_expression: *Expression,
+
+    /// 13.15.2 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-assignment-operators-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // AssignmentExpression : LeftHandSideExpression = AssignmentExpression
+        if (self.operator == .@"=") {
+            // 1. If LeftHandSideExpression is neither an ObjectLiteral nor an ArrayLiteral, then
+
+            // a. Let lref be ? Evaluation of LeftHandSideExpression.
+            try self.lhs_expression.generateBytecode(executable, ctx);
+            try executable.addInstruction(.push_reference);
+
+            // TODO: b. If IsAnonymousFunctionDefinition(AssignmentExpression) and IsIdentifierRef of
+            //          LeftHandSideExpression are both true, then
+            if (false) {
+                // i. Let rval be ? NamedEvaluation of AssignmentExpression with argument lref.[[ReferencedName]].
+            }
+            // c. Else,
+            else {
+                // i. Let rref be ? Evaluation of AssignmentExpression.
+                try self.rhs_expression.generateBytecode(executable, ctx);
+
+                // ii. Let rval be ? GetValue(rref).
+                if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            }
+
+            // d. Perform ? PutValue(lref, rval).
+            // e. Return rval.
+            try executable.addInstruction(.put_value);
+            try executable.addInstruction(.pop_reference);
+        }
+        // AssignmentExpression : LeftHandSideExpression AssignmentOperator AssignmentExpression
+        else if (self.operator != .@"&&=" and self.operator != .@"||=" and self.operator != .@"??=") {
+            // 1. Let lref be ? Evaluation of LeftHandSideExpression.
+            try self.lhs_expression.generateBytecode(executable, ctx);
+            try executable.addInstruction(.push_reference);
+
+            // 2. Let lval be ? GetValue(lref).
+            if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
+
+            // 3. Let rref be ? Evaluation of AssignmentExpression.
+            try self.rhs_expression.generateBytecode(executable, ctx);
+
+            // 4. Let rval be ? GetValue(rref).
+            if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
+
+            // 5. Let assignmentOpText be the source text matched by AssignmentOperator.
+            // 6. Let opText be the sequence of Unicode code points associated with assignmentOpText
+            //    in the following table:
+            const operator: BinaryExpression.Operator = switch (self.operator) {
+                .@"*=" => .@"*",
+                .@"/=" => .@"/",
+                .@"%=" => .@"%",
+                .@"+=" => .@"+",
+                .@"-=" => .@"-",
+                .@"<<=" => .@"<<",
+                .@">>=" => .@">>",
+                .@">>>=" => .@">>>",
+                .@"&=" => .@"&",
+                .@"^=" => .@"^",
+                .@"|=" => .@"|",
+                .@"**=" => .@"**",
+                else => unreachable,
+            };
+
+            // 7. Let r be ? ApplyStringOrNumericBinaryOperator(lval, opText, rval).
+            try executable.addInstruction(.apply_string_or_numeric_binary_operator);
+            try executable.addIndex(@enumToInt(operator));
+
+            // 8. Perform ? PutValue(lref, r).
+            // 9. Return r.
+            try executable.addInstruction(.put_value);
+            try executable.addInstruction(.pop_reference);
+        }
+        // AssignmentExpression : LeftHandSideExpression &&= AssignmentExpression
+        else if (self.operator == .@"&&=") {
+            // 1. Let lref be ? Evaluation of LeftHandSideExpression.
+            try self.lhs_expression.generateBytecode(executable, ctx);
+            try executable.addInstruction(.push_reference);
+
+            // 2. Let lval be ? GetValue(lref).
+            if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+            // 3. Let lbool be ToBoolean(lval).
+            try executable.addInstruction(.load);
+            try executable.addInstruction(.jump_conditional);
+            const consequent_jump = try executable.addJumpIndex();
+            const alternate_jump = try executable.addJumpIndex();
+
+            try consequent_jump.setTargetHere();
+
+            // TODO: 5. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and IsIdentifierRef
+            //          of LeftHandSideExpression is true, then
+            if (false) {
+                // a. Let rval be ? NamedEvaluation of AssignmentExpression with argument lref.[[ReferencedName]].
+            }
+            // 6. Else,
+            else {
+                // a. Let rref be ? Evaluation of AssignmentExpression.
+                try self.rhs_expression.generateBytecode(executable, ctx);
+
+                // b. Let rval be ? GetValue(rref).
+                if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            }
+
+            // 7. Perform ? PutValue(lref, rval).
+            // 8. Return rval.
+            try executable.addInstruction(.put_value);
+
+            try executable.addInstruction(.jump);
+            const end_jump = try executable.addJumpIndex();
+
+            // 4. If lbool is false, return lval.
+            try alternate_jump.setTargetHere();
+            try executable.addInstruction(.store); // Restore lval as the result value
+
+            try end_jump.setTargetHere();
+            try executable.addInstruction(.pop_reference);
+        }
+        // AssignmentExpression : LeftHandSideExpression ||= AssignmentExpression
+        else if (self.operator == .@"||=") {
+            // 1. Let lref be ? Evaluation of LeftHandSideExpression.
+            try self.lhs_expression.generateBytecode(executable, ctx);
+            try executable.addInstruction(.push_reference);
+
+            // 2. Let lval be ? GetValue(lref).
+            if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+            // 3. Let lbool be ToBoolean(lval).
+            try executable.addInstruction(.jump_conditional);
+            const consequent_jump = try executable.addJumpIndex();
+            const alternate_jump = try executable.addJumpIndex();
+
+            try alternate_jump.setTargetHere();
+
+            // TODO: 5. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and IsIdentifierRef
+            //          of LeftHandSideExpression is true, then
+            if (false) {
+                // a. Let rval be ? NamedEvaluation of AssignmentExpression with argument lref.[[ReferencedName]].
+            }
+            // 6. Else,
+            else {
+                // a. Let rref be ? Evaluation of AssignmentExpression.
+                try self.rhs_expression.generateBytecode(executable, ctx);
+
+                // b. Let rval be ? GetValue(rref).
+                if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            }
+
+            // 7. Perform ? PutValue(lref, rval).
+            // 8. Return rval.
+            try executable.addInstruction(.put_value);
+
+            // 4. If lbool is true, return lval.
+            try consequent_jump.setTargetHere();
+
+            try executable.addInstruction(.pop_reference);
+        }
+        // AssignmentExpression : LeftHandSideExpression ??= AssignmentExpression
+        else if (self.operator == .@"??=") {
+            // 1. Let lref be ? Evaluation of LeftHandSideExpression.
+            try self.lhs_expression.generateBytecode(executable, ctx);
+            try executable.addInstruction(.push_reference);
+
+            // 2. Let lval be ? GetValue(lref).
+            if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+            try executable.addInstruction(.load);
+
+            // 3. If lval is neither undefined nor null, return lval.
+            try executable.addInstruction(.load);
+            try executable.addInstructionWithConstant(.load_constant, .undefined);
+            try executable.addInstruction(.is_loosely_equal);
+
+            try executable.addInstruction(.jump_conditional);
+            const consequent_jump = try executable.addJumpIndex();
+            const alternate_jump = try executable.addJumpIndex();
+
+            try consequent_jump.setTargetHere();
+            try executable.addInstruction(.store); // Drop lval from the stack
+
+            // TODO: 4. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and
+            //          IsIdentifierRef of LeftHandSideExpression is true, then
+            if (false) {
+                // a. Let rval be ? NamedEvaluation of AssignmentExpression with argument lref.[[ReferencedName]].
+            }
+            // 5. Else,
+            else {
+                // a. Let rref be ? Evaluation of AssignmentExpression.
+                try self.rhs_expression.generateBytecode(executable, ctx);
+
+                // b. Let rval be ? GetValue(rref).
+                if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            }
+
+            // 6. Perform ? PutValue(lref, rval).
+            // 7. Return rval.
+            try executable.addInstruction(.put_value);
+
+            try executable.addInstruction(.jump);
+            const end_jump = try executable.addJumpIndex();
+
+            try alternate_jump.setTargetHere();
+            try executable.addInstruction(.store); // Restore lval as the result value
+
+            try end_jump.setTargetHere();
+            try executable.addInstruction(.pop_reference);
+        } else unreachable;
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("AssignmentExpression", writer, indentation);
+        try self.lhs_expression.print(writer, indentation + 1);
+        try printString(@tagName(self.operator), writer, indentation + 1);
+        try self.rhs_expression.print(writer, indentation + 1);
+    }
+};
+
 pub const SequenceExpression = struct {
     const Self = @This();
 
@@ -1271,7 +1517,43 @@ pub const Expression = union(enum) {
     equality_expression: EqualityExpression,
     logical_expression: LogicalExpression,
     conditional_expression: ConditionalExpression,
+    assignment_expression: AssignmentExpression,
     sequence_expression: SequenceExpression,
+
+    /// 8.6.4 Static Semantics: AssignmentTargetType
+    /// https://tc39.es/ecma262/#sec-static-semantics-assignmenttargettype
+    pub fn assignmentTargetType(self: Self) enum { simple, invalid } {
+        switch (self) {
+            .primary_expression => |primary_expression| switch (primary_expression) {
+                .identifier_reference => |identifier_reference| {
+                    // TODO: 1. If this IdentifierReference is contained in strict mode code and StringValue
+                    //    of Identifier is either "eval" or "arguments", return invalid.
+                    if (false and
+                        (std.mem.eql(u8, identifier_reference.identifier, "eval") or
+                        std.mem.eql(u8, identifier_reference.identifier, "arguments")))
+                        return .invalid;
+
+                    // 2. Return simple.
+                    return .simple;
+                },
+                .parenthesized_expression => |parenthesized_expression| {
+                    // 1. Let expr be the ParenthesizedExpression that is covered by
+                    //    CoverParenthesizedExpressionAndArrowParameterList.
+                    // 2. Return AssignmentTargetType of expr.
+                    return parenthesized_expression.expression.assignmentTargetType();
+                },
+                else => {},
+            },
+            .member_expression => {
+                // 1. Return simple.
+                return .simple;
+            },
+            else => {},
+        }
+
+        // 1. Return invalid.
+        return .invalid;
+    }
 
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
         return switch (query) {
@@ -1299,6 +1581,7 @@ pub const Expression = union(enum) {
             .equality_expression => |equality_expression| try equality_expression.generateBytecode(executable, ctx),
             .logical_expression => |logical_expression| try logical_expression.generateBytecode(executable, ctx),
             .conditional_expression => |conditional_expression| try conditional_expression.generateBytecode(executable, ctx),
+            .assignment_expression => |assignment_expression| try assignment_expression.generateBytecode(executable, ctx),
             .sequence_expression => |sequence_expression| try sequence_expression.generateBytecode(executable, ctx),
         }
     }
@@ -1343,6 +1626,10 @@ pub const Expression = union(enum) {
                 indentation + 1,
             ),
             .conditional_expression => |conditional_expression| try conditional_expression.print(
+                writer,
+                indentation + 1,
+            ),
+            .assignment_expression => |assignment_expression| try assignment_expression.print(
                 writer,
                 indentation + 1,
             ),

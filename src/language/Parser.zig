@@ -333,6 +333,8 @@ fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression, ct
         return .{ .logical_expression = logical_expression }
     else |_| if (self.acceptConditionalExpression(primary_expression, ctx)) |conditional_expression|
         return .{ .conditional_expression = conditional_expression }
+    else |_| if (self.acceptAssignmentExpression(primary_expression, ctx)) |assignment_expression|
+        return .{ .assignment_expression = assignment_expression }
     else |_| if (self.acceptSequenceExpression(primary_expression)) |sequence_expression|
         return .{ .sequence_expression = sequence_expression }
     else |_|
@@ -695,6 +697,71 @@ fn acceptConditionalExpression(self: *Self, primary_expression: ast.Expression, 
         .test_expression = test_expression,
         .consequent_expression = consequent_expression,
         .alternate_expression = alternate_expression,
+    };
+}
+
+fn acceptAssignmentExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.AssignmentExpression {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.oneOf(.{
+        .@"=",
+        .@"*=",
+        .@"/=",
+        .@"%=",
+        .@"+=",
+        .@"-=",
+        .@"<<=",
+        .@">>=",
+        .@">>>=",
+        .@"&=",
+        .@"^=",
+        .@"|=",
+        .@"**=",
+        .@"&&=",
+        .@"||=",
+        .@"??=",
+    }));
+    const operator: ast.AssignmentExpression.Operator = switch (token.type) {
+        .@"=" => .@"=",
+        .@"*=" => .@"*=",
+        .@"/=" => .@"/=",
+        .@"%=" => .@"%=",
+        .@"+=" => .@"+=",
+        .@"-=" => .@"-=",
+        .@"<<=" => .@"<<=",
+        .@">>=" => .@">>=",
+        .@">>>=" => .@">>>=",
+        .@"&=" => .@"&=",
+        .@"^=" => .@"^=",
+        .@"|=" => .@"|=",
+        .@"**=" => .@"**=",
+        .@"&&=" => .@"&&=",
+        .@"||=" => .@"||=",
+        .@"??=" => .@"??=",
+        else => unreachable,
+    };
+
+    // It is a Syntax Error if AssignmentTargetType of LeftHandSideExpression is not simple.
+    if (primary_expression.assignmentTargetType() != .simple) {
+        try self.diagnostics.emit(
+            state.location,
+            .@"error",
+            "Invalid left-hand side in assignment expression",
+            .{},
+        );
+        return error.UnexpectedToken;
+    }
+
+    // Defer heap allocation of expression until we know this is an AssignmentExpression
+    const lhs_expression = try self.allocator.create(ast.Expression);
+    lhs_expression.* = primary_expression;
+    const rhs_expression = try self.allocator.create(ast.Expression);
+    rhs_expression.* = try self.acceptExpression(ctx);
+    return .{
+        .operator = operator,
+        .lhs_expression = lhs_expression,
+        .rhs_expression = rhs_expression,
     };
 }
 
