@@ -415,11 +415,15 @@ pub const Value = union(enum) {
         // 1. Let number be ? ToNumber(argument).
         const number = try self.toNumber(agent);
 
-        // 2. If number is NaN, return +0𝔽.
+        // 2. If number is +∞𝔽, return 255𝔽.
+        // 3. If number is -∞𝔽, return +0𝔽.
+        // NOTE: This is handled in the switch below.
+
+        // 4. If number is NaN, return +0𝔽.
         if (number.isNan()) return 0;
 
-        // 3. If ℝ(number) ≤ 0, return +0𝔽.
-        // 4. If ℝ(number) ≥ 255, return 255𝔽.
+        // 5. If ℝ(number) ≤ 0, return +0𝔽.
+        // 6. If ℝ(number) ≥ 255, return 255𝔽.
         switch (number) {
             .f64 => |x| {
                 if (x <= 0) return 0;
@@ -431,20 +435,20 @@ pub const Value = union(enum) {
             },
         }
 
-        // 5. Let f be floor(ℝ(number)).
+        // 7. Let f be floor(ℝ(number)).
         const f = number.floor().asFloat();
         const f_int = @floatToInt(u8, f);
 
-        // 6. If f + 0.5 < ℝ(number), return 𝔽(f + 1).
+        // 8. If f + 0.5 < ℝ(number), return 𝔽(f + 1).
         if (f + 0.5 < number.asFloat()) return f_int + 1;
 
-        // 7. If ℝ(number) < f + 0.5, return 𝔽(f).
+        // 9. If ℝ(number) < f + 0.5, return 𝔽(f).
         if (number.asFloat() < f + 0.5) return f_int;
 
-        // 8. If f is odd, return 𝔽(f + 1).
+        // 10. If f is odd, return 𝔽(f + 1).
         if (f_int % 2 != 0) return f_int + 1;
 
-        // 9. Return 𝔽(f).
+        // 11. Return 𝔽(f).
         return f_int;
     }
 
