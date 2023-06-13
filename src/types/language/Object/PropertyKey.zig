@@ -2,7 +2,8 @@ const std = @import("std");
 
 const Symbol = @import("../Symbol.zig");
 
-/// A property key value is either an ECMAScript String value or a Symbol value.
+/// A property key is either a String or a Symbol. All Strings and Symbols, including the empty
+/// String, are valid as property keys.
 pub const PropertyKey = union(enum) {
     const Self = @This();
 
@@ -12,6 +13,8 @@ pub const PropertyKey = union(enum) {
     symbol: Symbol,
 
     // OPTIMIZATION: If the string is known to be an integer index, store it as a number.
+    /// An integer index is a property name n such that CanonicalNumericIndexString(n) returns an
+    /// integral Number in the inclusive interval from +0𝔽 to 𝔽(2^53 - 1).
     integer_index: IntegerIndex,
 
     pub inline fn from(value: anytype) Self {
@@ -35,15 +38,9 @@ pub const PropertyKey = union(enum) {
         }
     }
 
-    /// An integer index is a String-valued property key that is a canonical numeric string and
-    /// whose numeric value is either +0𝔽 or a positive integral Number ≤ 𝔽(2^53 - 1).
-    pub inline fn isIntegerIndex(self: Self) bool {
-        return self == .integer_index;
-    }
-
-    /// An array index is an integer index whose numeric value i is in the range
-    /// +0𝔽 ≤ i < 𝔽(2^32 - 1).
+    /// An array index is an integer index n such that CanonicalNumericIndexString(n) returns an
+    /// integral Number in the inclusive interval from +0𝔽 to 𝔽(2^32 - 2).
     pub inline fn isArrayIndex(self: Self) bool {
-        return self == .integer_index and self.integer_index < (std.math.maxInt(u32) - 1);
+        return self == .integer_index and self.integer_index <= (std.math.maxInt(u32) - 1);
     }
 };
