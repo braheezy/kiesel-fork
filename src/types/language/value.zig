@@ -621,7 +621,7 @@ pub const Value = union(enum) {
         if (length <= 0) return 0;
 
         // 3. Return 𝔽(min(len, 2^53 - 1)).
-        return @floatToInt(u53, std.math.min(length, std.math.maxInt(u53)));
+        return @floatToInt(u53, @min(length, std.math.maxInt(u53)));
     }
 
     /// 7.1.22 ToIndex ( value )
@@ -970,7 +970,7 @@ pub fn isLessThan(
         const ly = py_code_units.len;
 
         // c. For each integer i such that 0 ≤ i < min(lx, ly), in ascending order, do
-        for (0..std.math.min(lx, ly)) |i| {
+        for (0..@min(lx, ly)) |i| {
             // i. Let cx be the numeric value of the code unit at index i within px.
             const cx = px_code_units[i];
 
