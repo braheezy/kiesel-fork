@@ -230,13 +230,40 @@ pub fn arraySetLength(agent: *Agent, array: Object, property_descriptor: Propert
 
     // 17. For each own property key P of A such that P is an array index and ! ToUint32(P) ≥ newLen,
     //     in descending numeric index order, do
+    // NOTE: Deletion invalidates the ArrayHashMap.keys() array, so we have to make a copy
+    var indices = std.ArrayList(u32).init(agent.gc_allocator);
+    for (array.propertyStorage().hash_map.keys()) |property_key| {
+        if (property_key.isArrayIndex() and property_key.integer_index >= new_len) {
+            try indices.append(@intCast(u32, property_key.integer_index));
+        }
+    }
+    std.sort.insertion(u32, indices.items, {}, std.sort.desc(u32));
+    for (indices.items) |index| {
+        // a. Let deleteSucceeded be ! A.[[Delete]](P).
+        const delete_succeeded = array.internalMethods().delete(
+            array,
+            PropertyKey.from(@as(u53, index)),
+        ) catch |err| try noexcept(err);
 
-    //     a. Let deleteSucceeded be ! A.[[Delete]](P).
-    //     b. If deleteSucceeded is false, then
-    //         i. Set newLenDesc.[[Value]] to ! ToUint32(P) + 1𝔽.
-    //         ii. If newWritable is false, set newLenDesc.[[Writable]] to false.
-    //         iii. Perform ! OrdinaryDefineOwnProperty(A, "length", newLenDesc).
-    //         iv. Return false.
+        // b. If deleteSucceeded is false, then
+        if (!delete_succeeded) {
+            // i. Set newLenDesc.[[Value]] to ! ToUint32(P) + 1𝔽.
+            new_len_desc.value = Value.from(@intToFloat(f64, index) + 1);
+
+            // ii. If newWritable is false, set newLenDesc.[[Writable]] to false.
+            if (!new_writable) new_len_desc.writable = false;
+
+            // iii. Perform ! OrdinaryDefineOwnProperty(A, "length", newLenDesc).
+            _ = ordinaryDefineOwnProperty(
+                array,
+                PropertyKey.from("length"),
+                new_len_desc,
+            ) catch |err| try noexcept(err);
+
+            // iv. Return false.
+            return false;
+        }
+    }
 
     // 18. If newWritable is false, then
     if (!new_writable) {
