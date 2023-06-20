@@ -627,33 +627,15 @@ pub const Value = union(enum) {
     /// 7.1.22 ToIndex ( value )
     /// https://tc39.es/ecma262/#sec-toindex
     pub fn toIndex(self: Self, agent: *Agent) !u53 {
-        // 1. If value is undefined, then
-        if (self == .undefined) {
-            // a. Return 0.
-            return 0;
-        }
-        // 2. Else,
-        else {
-            // a. Let integer be ? ToIntegerOrInfinity(value).
-            const integer = try self.toIntegerOrInfinity(agent);
+        // 1. Let integer be ? ToIntegerOrInfinity(value).
+        const integer = try self.toIntegerOrInfinity(agent);
 
-            // b. Let clamped be ! ToLength(𝔽(integer)).
-            const clamped = Value.fromNumber(integer).toLength(agent) catch |err| switch (err) {
-                error.ExceptionThrown => unreachable,
-                // toNumber() can only allocate when coercing via toPrimitive().
-                error.OutOfMemory => unreachable,
-            };
+        // 2. If integer is not in the inclusive interval from 0 to 2^53 - 1, throw a RangeError exception.
+        if (integer < 0 or integer > std.math.maxInt(u53))
+            return agent.throwException(.range_error, "Value is not not a valid index");
 
-            // c. If SameValue(𝔽(integer), clamped) is false, throw a RangeError exception.
-            if (integer != @intToFloat(f64, clamped))
-                return agent.throwException(.range_error, "Value is not not a valid index");
-
-            // d. Assert: 0 ≤ integer ≤ 2^53 - 1.
-            std.debug.assert(0 <= integer and integer <= std.math.maxInt(u53));
-
-            // e. Return integer.
-            return @floatToInt(u53, integer);
-        }
+        // 3. Return integer.
+        return @floatToInt(u53, integer);
     }
 
     /// 7.2.2 IsArray ( argument )
