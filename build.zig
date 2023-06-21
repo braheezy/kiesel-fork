@@ -34,9 +34,7 @@ pub fn build(b: *std.Build) void {
         .source_file = .{ .path = "vendor/zig-libgc/src/gc.zig" },
     });
 
-    const ptk_module = b.createModule(.{
-        .source_file = .{ .path = "vendor/parser-toolkit/src/main.zig" },
-    });
+    const parser_toolkit = b.dependency("parser_toolkit", .{});
 
     const kiesel_module = b.addModule("kiesel", .{
         .source_file = .{ .path = "src/main.zig" },
@@ -46,7 +44,7 @@ pub fn build(b: *std.Build) void {
                 .name = "gc",
             },
             std.Build.ModuleDependency{
-                .module = ptk_module,
+                .module = parser_toolkit.module("parser-toolkit"),
                 .name = "ptk",
             },
         },
