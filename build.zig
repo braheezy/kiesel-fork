@@ -26,15 +26,12 @@ pub fn build(b: *std.Build) void {
         }
     }
 
-    const args_module = b.createModule(.{
-        .source_file = .{ .path = "vendor/zig-args/args.zig" },
-    });
-
     const gc_module = b.createModule(.{
         .source_file = .{ .path = "vendor/zig-libgc/src/gc.zig" },
     });
 
     const parser_toolkit = b.dependency("parser_toolkit", .{});
+    const zig_args = b.dependency("zig_args", .{});
 
     const kiesel_module = b.addModule("kiesel", .{
         .source_file = .{ .path = "src/main.zig" },
@@ -59,7 +56,7 @@ pub fn build(b: *std.Build) void {
     exe.linkLibrary(libgc);
     exe.addIncludePath("vendor/zig-libgc/vendor/bdwgc/include");
     exe.addModule("kiesel", kiesel_module);
-    exe.addModule("args", args_module);
+    exe.addModule("args", zig_args.module("args"));
 
     b.installArtifact(exe);
 
