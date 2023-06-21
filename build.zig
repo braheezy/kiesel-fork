@@ -30,6 +30,7 @@ pub fn build(b: *std.Build) void {
         .source_file = .{ .path = "vendor/zig-libgc/src/gc.zig" },
     });
 
+    const linenoise = b.dependency("linenoise", .{});
     const parser_toolkit = b.dependency("parser_toolkit", .{});
     const zig_args = b.dependency("zig_args", .{});
 
@@ -57,6 +58,7 @@ pub fn build(b: *std.Build) void {
     exe.addIncludePath("vendor/zig-libgc/vendor/bdwgc/include");
     exe.addModule("kiesel", kiesel_module);
     exe.addModule("args", zig_args.module("args"));
+    exe.addModule("linenoise", linenoise.module("linenoise"));
 
     b.installArtifact(exe);
 

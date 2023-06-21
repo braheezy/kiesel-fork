@@ -2,6 +2,10 @@
     .name = "kiesel",
     .version = "0.1.0",
     .dependencies = .{
+        .linenoise = .{
+            .url = "https://github.com/joachimschmidt557/linenoize/archive/0f3f47eef84cfbbb7fc87a4da39dbbd31412445c.tar.gz",
+            .hash = "122009c0b05345d0f6e6da8ff1a3a5d0788423d809f3995b55a241cd6fc0389a904b",
+        },
         .parser_toolkit = .{
             .url = "https://github.com/MasterQ32/parser-toolkit/archive/92c2875f2f91bf2a22b2be89b47ef0c3732f4812.tar.gz",
             .hash = "1220265768f85ae009c6c20fbcabda75f4caacbd7efc0945dc92d3cec363a84e1329",
