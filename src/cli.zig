@@ -2,6 +2,7 @@ const args = @import("args");
 const builtin = @import("builtin");
 const std = @import("std");
 const kiesel = @import("kiesel");
+const Linenoise = @import("linenoise").Linenoise;
 
 const gc = @cImport({
     @cInclude("gc.h");
@@ -56,7 +57,6 @@ const help =
     \\
 ;
 
-const stdin = std.io.getStdIn().reader();
 const stdout = std.io.getStdOut().writer();
 const stderr = std.io.getStdErr().writer();
 
@@ -111,19 +111,46 @@ fn run(
     };
 }
 
+fn getHistoryPath(allocator: Allocator) ![]const u8 {
+    const app_data_dir = try std.fs.getAppDataDir(allocator, "kiesel");
+    defer allocator.free(app_data_dir);
+
+    const history_path = try std.fs.path.join(allocator, &[_][]const u8{ app_data_dir, "history" });
+    errdefer allocator.free(history_path);
+
+    std.fs.makeDirAbsolute(app_data_dir) catch |err| switch (err) {
+        error.PathAlreadyExists => {},
+        else => return err,
+    };
+
+    const file = try std.fs.createFileAbsolute(history_path, .{ .truncate = false });
+    file.close();
+
+    return history_path;
+}
+
 fn repl(allocator: Allocator, realm: *Realm) !void {
+    var linenoise = Linenoise.init(allocator);
+    defer linenoise.deinit();
+
+    const history_path = try getHistoryPath(allocator);
+    defer allocator.free(history_path);
+
+    linenoise.history.load(history_path) catch stdout.writeAll("Failed to load history\n") catch {};
+    defer linenoise.history.save(history_path) catch stdout.writeAll("Failed to save history\n") catch {};
+
     while (true) {
-        try stdout.print("> ", .{});
-        if (try stdin.readUntilDelimiterOrEofAlloc(
-            allocator,
-            '\n',
-            std.math.maxInt(usize),
-        )) |source_text| {
+        if (linenoise.linenoise("> ") catch |err| switch (err) {
+            error.CtrlC => continue,
+            else => return err,
+        }) |source_text| {
             defer allocator.free(source_text);
 
             // Directly show another prompt when spamming enter, whitespace is evaluated
             // however (and will print 'undefined').
             if (source_text.len == 0) continue;
+
+            try linenoise.history.add(source_text);
 
             if (try run(allocator, realm, "repl", source_text)) |result| {
                 try stdout.print("{pretty}\n", .{result});
@@ -131,7 +158,7 @@ fn repl(allocator: Allocator, realm: *Realm) !void {
             // Handled exception & printed something, carry on
             else continue;
         }
-        // ^C pressed, exit REPL
+        // ^D pressed, exit REPL
         else break;
     }
 }
