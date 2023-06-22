@@ -25,6 +25,7 @@ const Realm = execution.Realm;
 const ScriptOrModule = execution.ScriptOrModule;
 const Value = types.Value;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
+const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const newFunctionEnvironment = execution.newFunctionEnvironment;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
@@ -243,9 +244,18 @@ pub fn ordinaryCallEvaluateBody(
     function: *ECMAScriptFunction,
     arguments_list: ArgumentsList,
 ) !Completion {
-    _ = arguments_list;
     // 1. Return ? EvaluateBody of F.[[ECMAScriptCode]] with arguments F and argumentsList.
-    // TODO: Implement this closer to spec and support arguments :^)
+    // TODO: Implement this closer to spec :^)
+    const callee_context = agent.runningExecutionContext();
+    const callee_env = callee_context.ecmascript_code.?.lexical_environment;
+    const env = try newDeclarativeEnvironment(agent.gc_allocator, callee_env);
+    callee_context.ecmascript_code.?.lexical_environment = .{ .declarative_environment = env };
+    for (function.fields.formal_parameters.items, 0..) |item, i| {
+        const identifier = item.formal_parameter.binding_element.identifier;
+        const value = arguments_list.get(i);
+        try env.createMutableBinding(identifier, false);
+        env.initializeBinding(identifier, value);
+    }
     return generateAndRunBytecode(agent, function.fields.ecmascript_code);
 }
 
