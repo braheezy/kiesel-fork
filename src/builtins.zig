@@ -7,6 +7,7 @@ const function = @import("builtins/function.zig");
 const global = @import("builtins/global.zig");
 const object = @import("builtins/object.zig");
 const ordinary = @import("builtins/ordinary.zig");
+const string = @import("builtins/string.zig");
 const throw_type_error = @import("builtins/throw_type_error.zig");
 
 pub const global_functions = global.global_functions;
@@ -27,6 +28,9 @@ pub const FunctionPrototype = function.FunctionPrototype;
 pub const Object = object.Object;
 pub const ObjectConstructor = object.ObjectConstructor;
 pub const ObjectPrototype = object.ObjectPrototype;
+pub const String = string.String;
+pub const StringConstructor = string.StringConstructor;
+pub const StringPrototype = string.StringPrototype;
 pub const ThrowTypeError = throw_type_error.ThrowTypeError;
 pub const addRestrictedFunctionProperties = ecmascript_function.addRestrictedFunctionProperties;
 pub const arrayCreate = array.arrayCreate;
