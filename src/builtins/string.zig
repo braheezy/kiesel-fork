@@ -134,6 +134,7 @@ pub const StringPrototype = struct {
         });
 
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
+        try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
 
         return object;
     }
@@ -167,6 +168,13 @@ pub const StringPrototype = struct {
     /// 22.1.3.29 String.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.tostring
     fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Return ? thisStringValue(this value).
+        return Value.from(try thisStringValue(agent, this_value));
+    }
+
+    /// 22.1.3.35 String.prototype.valueOf ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype.valueof
+    fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
         // 1. Return ? thisStringValue(this value).
         return Value.from(try thisStringValue(agent, this_value));
     }
