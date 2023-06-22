@@ -3,8 +3,9 @@
     .version = "0.1.0",
     .dependencies = .{
         .linenoise = .{
-            .url = "https://github.com/joachimschmidt557/linenoize/archive/0f3f47eef84cfbbb7fc87a4da39dbbd31412445c.tar.gz",
-            .hash = "122009c0b05345d0f6e6da8ff1a3a5d0788423d809f3995b55a241cd6fc0389a904b",
+            // NOTE: This points to a commit on my fork, update when https://github.com/joachimschmidt557/linenoize/pull/15 is merged
+            .url = "https://github.com/joachimschmidt557/linenoize/archive/7e966ae635e6aae14b9acd6a09fa8c10b51a7d7d.tar.gz",
+            .hash = "122091ec5c2e19230e066446ea79cc64eabe329827cf169127744791833c949e86df",
         },
         .parser_toolkit = .{
             .url = "https://github.com/MasterQ32/parser-toolkit/archive/92c2875f2f91bf2a22b2be89b47ef0c3732f4812.tar.gz",
