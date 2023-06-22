@@ -16,6 +16,7 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const PropertyKey = types.PropertyKey;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const noexcept = utils.noexcept;
@@ -132,6 +133,8 @@ pub const StringPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "toString", toString, 0, realm);
+
         return object;
     }
 
@@ -159,6 +162,13 @@ pub const StringPrototype = struct {
             .type_error,
             "This value must be a string or String object",
         );
+    }
+
+    /// 22.1.3.29 String.prototype.toString ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype.tostring
+    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Return ? thisStringValue(this value).
+        return Value.from(try thisStringValue(agent, this_value));
     }
 };
 
