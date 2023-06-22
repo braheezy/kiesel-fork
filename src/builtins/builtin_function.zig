@@ -66,7 +66,7 @@ pub const BuiltinFunction = Object.Factory(.{
 
 /// 10.3.1 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-built-in-function-objects-call-thisargument-argumentslist
-fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) !Value {
+pub fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) !Value {
     const agent = object.agent();
     const self = object.as(BuiltinFunction);
 
@@ -113,7 +113,7 @@ fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) !Va
 
 /// 10.3.2 [[Construct]] ( argumentsList, newTarget )
 /// https://tc39.es/ecma262/#sec-built-in-function-objects-construct-argumentslist-newtarget
-fn construct(object: Object, arguments_list: ArgumentsList, new_target: Object) !Object {
+pub fn construct(object: Object, arguments_list: ArgumentsList, new_target: Object) !Object {
     const agent = object.agent();
     const self = object.as(BuiltinFunction);
 

@@ -4,6 +4,7 @@
 const std = @import("std");
 
 const ast = @import("../language/ast.zig");
+const builtin_function = @import("./builtin_function.zig");
 const builtins = @import("../builtins.zig");
 const bytecode = @import("../language/bytecode.zig");
 const execution = @import("../execution.zig");
@@ -26,6 +27,7 @@ const Value = types.Value;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const newFunctionEnvironment = execution.newFunctionEnvironment;
 const noexcept = utils.noexcept;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 pub const ConstructorKind = enum {
     base,
@@ -360,6 +362,73 @@ pub fn addRestrictedFunctionProperties(function: Object, realm: *Realm) !void {
     ) catch |err| try noexcept(err);
 
     // 5. Return unused.
+}
+
+/// 10.2.5 MakeConstructor ( F [ , writablePrototype [ , prototype ] ] )
+/// https://tc39.es/ecma262/#sec-makeconstructor
+pub fn makeConstructor(
+    function: Object,
+    args: struct {
+        writable_prototype: bool = true,
+        prototype: ?Object = null,
+    },
+) !void {
+    const agent = function.agent();
+    const realm = agent.currentRealm();
+
+    // 1. If F is an ECMAScript function object, then
+    if (function.is(ECMAScriptFunction)) {
+        // a. Assert: IsConstructor(F) is false.
+        std.debug.assert(!Value.from(function).isConstructor());
+
+        // b. Assert: F is an extensible object that does not have a "prototype" own property.
+        std.debug.assert(
+            function.extensible().* and !function.propertyStorage().has(PropertyKey.from("prototype")),
+        );
+
+        // TODO: c. Set F.[[Construct]] to the definition specified in 10.2.2.
+    }
+    // 2. Else,
+    else {
+        // a. Set F.[[Construct]] to the definition specified in 10.3.2.
+        function.internalMethods().construct = builtin_function.construct;
+    }
+
+    // 3. Set F.[[ConstructorKind]] to base.
+    if (function.is(ECMAScriptFunction)) function.as(ECMAScriptFunction).fields.constructor_kind = .base;
+
+    // 4. If writablePrototype is not present, set writablePrototype to true.
+    // NOTE: This is done via the default argument.
+
+    // 5. If prototype is not present, then
+    const prototype = args.prototype orelse blk: {
+        // a. Set prototype to OrdinaryObjectCreate(%Object.prototype%).
+        const prototype = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+
+        // b. Perform ! DefinePropertyOrThrow(prototype, "constructor", PropertyDescriptor {
+        //      [[Value]]: F, [[Writable]]: writablePrototype, [[Enumerable]]: false, [[Configurable]]: true
+        //    }).
+        prototype.definePropertyOrThrow(PropertyKey.from("constructor"), .{
+            .value = Value.from(function),
+            .writable = args.writable_prototype,
+            .enumerable = false,
+            .configurable = true,
+        }) catch |err| try noexcept(err);
+
+        break :blk prototype;
+    };
+
+    // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
+    //      [[Value]]: prototype, [[Writable]]: writablePrototype, [[Enumerable]]: false, [[Configurable]]: false
+    //    }).
+    function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+        .value = Value.from(prototype),
+        .writable = args.writable_prototype,
+        .enumerable = false,
+        .configurable = false,
+    }) catch |err| try noexcept(err);
+
+    // 7. Return unused.
 }
 
 /// 10.2.9 SetFunctionName ( F, name [ , prefix ] )

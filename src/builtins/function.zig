@@ -25,6 +25,7 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
+const makeConstructor = builtins.makeConstructor;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
 const setFunctionName = builtins.setFunctionName;
 
@@ -287,7 +288,8 @@ pub fn createDynamicFunction(
 
         // 30. Else if kind is normal, then
         .normal => {
-            // TODO: a. Perform MakeConstructor(F).
+            // a. Perform MakeConstructor(F).
+            try makeConstructor(function, .{});
         },
 
         // 31. NOTE: Functions whose kind is async are not constructible and do not have a

@@ -18,6 +18,7 @@ const Object = types.Object;
 const PrivateEnvironment = execution.PrivateEnvironment;
 const PropertyKey = types.PropertyKey;
 const Value = types.Value;
+const makeConstructor = builtins.makeConstructor;
 const noexcept = utils.noexcept;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
 const setFunctionName = builtins.setFunctionName;
@@ -2413,7 +2414,8 @@ pub const FunctionDeclaration = struct {
         // 4. Perform SetFunctionName(F, name).
         try setFunctionName(function, PropertyKey.from(name), null);
 
-        // TODO: 5. Perform MakeConstructor(F).
+        // 5. Perform MakeConstructor(F).
+        try makeConstructor(function, .{});
 
         // 6. Return F.
         return function;

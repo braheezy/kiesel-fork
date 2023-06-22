@@ -20,6 +20,7 @@ const arrayCreate = builtins.arrayCreate;
 const isLessThan = types.isLessThan;
 const isLooselyEqual = types.isLooselyEqual;
 const isStrictlyEqual = types.isStrictlyEqual;
+const makeConstructor = builtins.makeConstructor;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const noexcept = utils.noexcept;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
@@ -389,7 +390,9 @@ fn instantiateOrdinaryFunctionExpression(
         // 9. Perform SetFunctionName(closure, name).
         try setFunctionName(closure, PropertyKey.from(name), null);
 
-        // TODO: 10. Perform MakeConstructor(closure).
+        // 10. Perform MakeConstructor(closure).
+        try makeConstructor(closure, .{});
+
         // TODO: 11. Perform ! funcEnv.InitializeBinding(name, closure).
 
         // 12. Return closure.
@@ -425,7 +428,8 @@ fn instantiateOrdinaryFunctionExpression(
         // 6. Perform SetFunctionName(closure, name).
         try setFunctionName(closure, PropertyKey.from(name), null);
 
-        // TODO: 7. Perform MakeConstructor(closure).
+        // 7. Perform MakeConstructor(closure).
+        try makeConstructor(closure, .{});
 
         // 8. Return closure.
         return closure;
