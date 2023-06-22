@@ -428,7 +428,13 @@ pub fn getFunctionRealm(self: Self) !*Realm {
     // 1. If obj has a [[Realm]] internal slot, then
     if (self.internalMethods().call != null) {
         // a. Return obj.[[Realm]].
-        return self.as(builtins.BuiltinFunction).fields.realm;
+        if (self.is(builtins.BuiltinFunction)) {
+            return self.as(builtins.BuiltinFunction).fields.realm;
+        } else if (self.is(builtins.ECMAScriptFunction)) {
+            return self.as(builtins.ECMAScriptFunction).fields.realm;
+        } else {
+            @panic("Unhandled function type in getFunctionRealm()");
+        }
     }
 
     // TODO: 2. If obj is a bound function exotic object, then

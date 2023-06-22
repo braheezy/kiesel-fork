@@ -470,8 +470,10 @@ pub fn setFunctionName(
     };
 
     // 4. If F has an [[InitialName]] internal slot, then
-    //     a. Set F.[[InitialName]] to name.
-    function.as(BuiltinFunction).fields.initial_name = name;
+    if (function.is(BuiltinFunction)) {
+        // a. Set F.[[InitialName]] to name.
+        function.as(BuiltinFunction).fields.initial_name = name;
+    }
 
     // 5. If prefix is present, then
     if (prefix != null) {
@@ -480,8 +482,10 @@ pub fn setFunctionName(
         name = try std.fmt.allocPrint(agent.gc_allocator, "{s} {s}", .{ prefix.?, name });
 
         // b. If F has an [[InitialName]] internal slot, then
-        //     i. Optionally, set F.[[InitialName]] to name.
-        function.as(BuiltinFunction).fields.initial_name = name;
+        if (function.is(BuiltinFunction)) {
+            // i. Optionally, set F.[[InitialName]] to name.
+            function.as(BuiltinFunction).fields.initial_name = name;
+        }
     }
 
     // 6. Perform ! DefinePropertyOrThrow(F, "name", PropertyDescriptor {
