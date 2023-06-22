@@ -28,6 +28,7 @@ const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const newFunctionEnvironment = execution.newFunctionEnvironment;
 const noexcept = utils.noexcept;
+const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 pub const ConstructorKind = enum {
@@ -259,6 +260,93 @@ pub fn ordinaryCallEvaluateBody(
     return generateAndRunBytecode(agent, function.fields.ecmascript_code);
 }
 
+/// 10.2.2 [[Construct]] ( argumentsList, newTarget )
+/// https://tc39.es/ecma262/#sec-ecmascript-function-objects-construct-argumentslist-newtarget
+pub fn construct(object: Object, arguments_list: ArgumentsList, new_target: Object) !Object {
+    const agent = object.agent();
+    const function = object.as(ECMAScriptFunction);
+
+    // 1. Let callerContext be the running execution context.
+    // NOTE: This is only used to restore the context, which is a simple pop().
+
+    // 2. Let kind be F.[[ConstructorKind]].
+    const kind = function.fields.constructor_kind;
+
+    var this_argument: Value = undefined;
+
+    // 3. If kind is base, then
+    if (kind == .base) {
+        // a. Let thisArgument be ? OrdinaryCreateFromConstructor(newTarget, "%Object.prototype%").
+        this_argument = Value.from(try ordinaryCreateFromConstructor(
+            builtins.Object,
+            agent,
+            new_target,
+            "%Object.prototype%",
+        ));
+    }
+
+    // 4. Let calleeContext be PrepareForOrdinaryCall(F, newTarget).
+    const callee_context = try prepareForOrdinaryCall(agent, function, new_target);
+
+    // 5. Assert: calleeContext is now the running execution context.
+    std.debug.assert(callee_context == agent.runningExecutionContext());
+
+    // 6. If kind is base, then
+    if (kind == .base) {
+        // a. Perform OrdinaryCallBindThis(F, calleeContext, thisArgument).
+        try ordinaryCallBindThis(agent, function, callee_context, this_argument);
+
+        // TODO: b. Let initializeResult be Completion(InitializeInstanceElements(thisArgument, F)).
+        // TODO: c. If initializeResult is an abrupt completion, then
+        // i. Remove calleeContext from the execution context stack and restore callerContext as
+        //    the running execution context.
+        // ii. Return ? initializeResult.
+    }
+
+    // 7. Let constructorEnv be the LexicalEnvironment of calleeContext.
+    const constructor_env = callee_context.ecmascript_code.?.lexical_environment;
+
+    // 8. Let result be Completion(OrdinaryCallEvaluateBody(F, argumentsList)).
+    const result = ordinaryCallEvaluateBody(agent, function, arguments_list);
+
+    // 9. Remove calleeContext from the execution context stack and restore callerContext as the
+    //    running execution context.
+    _ = agent.execution_context_stack.pop();
+
+    // 10. If result.[[Type]] is return, then
+    if (result) |completion| {
+        if (completion.type == .@"return") {
+            // a. If result.[[Value]] is an Object, return result.[[Value]].
+            if (completion.value.? == .object) return completion.value.?.object;
+
+            // b. If kind is base, return thisArgument.
+            if (kind == .base) return this_argument.object;
+
+            // c. If result.[[Value]] is not undefined, throw a TypeError exception.
+            if (completion.value.? != .undefined) {
+                return agent.throwException(
+                    .type_error,
+                    "Constructor must return an object or undefined",
+                );
+            }
+        }
+    }
+    // 11. Else,
+    else |err| {
+        // a. ReturnIfAbrupt(result).
+        return err;
+    }
+
+    // 12. Let thisBinding be ? constructorEnv.GetThisBinding().
+    const this_binding = try constructor_env.getThisBinding();
+
+    // 13. Assert: thisBinding is an Object.
+    std.debug.assert(this_binding == .object);
+
+    // 14. Return thisBinding.
+    return this_binding.object;
+}
+
 /// 10.2.3 OrdinaryFunctionCreate ( functionPrototype, sourceText, ParameterList, Body, thisMode, env, privateEnv )
 /// https://tc39.es/ecma262/#sec-ordinaryfunctioncreate
 pub fn ordinaryFunctionCreate(
@@ -396,7 +484,8 @@ pub fn makeConstructor(
             function.extensible().* and !function.propertyStorage().has(PropertyKey.from("prototype")),
         );
 
-        // TODO: c. Set F.[[Construct]] to the definition specified in 10.2.2.
+        // c. Set F.[[Construct]] to the definition specified in 10.2.2.
+        function.internalMethods().construct = construct;
     }
     // 2. Else,
     else {
