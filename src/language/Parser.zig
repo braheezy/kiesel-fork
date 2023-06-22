@@ -401,7 +401,8 @@ fn acceptArguments(self: *Self) !ast.Arguments {
 
     var arguments = std.ArrayList(ast.Expression).init(self.allocator);
     _ = try self.core.accept(RuleSet.is(.@"("));
-    while (self.acceptExpression(.{})) |argument| {
+    const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
+    while (self.acceptExpression(ctx)) |argument| {
         try arguments.append(argument);
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
     } else |_| {}
