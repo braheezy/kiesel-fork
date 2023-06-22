@@ -27,7 +27,7 @@ const ordinaryGetOwnProperty = ordinary.ordinaryGetOwnProperty;
 pub fn getArrayLength(array: Object) u32 {
     const property_descriptor = array.data.property_storage.get(PropertyKey.from("length")).?;
     const value = property_descriptor.value.?;
-    return @floatToInt(u32, value.number.asFloat());
+    return @intFromFloat(u32, value.number.asFloat());
 }
 
 /// 10.4.2.1 [[DefineOwnProperty]] ( P, Desc )
@@ -64,7 +64,7 @@ fn defineOwnProperty(
         std.debug.assert(std.math.isFinite(length) and std.math.trunc(length) == length);
 
         // f. Let index be ! ToUint32(P).
-        const index = @intToFloat(f64, property_key.integer_index);
+        const index = @floatFromInt(f64, property_key.integer_index);
 
         // g. If index ≥ length and lengthDesc.[[Writable]] is false, return false.
         if (index >= length and length_descriptor.writable == false)
@@ -167,7 +167,7 @@ pub fn arraySetLength(agent: *Agent, array: Object, property_descriptor: Propert
     const number_len = try property_descriptor.value.?.toNumber(agent);
 
     // 5. If SameValueZero(newLen, numberLen) is false, throw a RangeError exception.
-    if (@intToFloat(f64, new_len) != number_len.asFloat()) return agent.throwException(
+    if (@floatFromInt(f64, new_len) != number_len.asFloat()) return agent.throwException(
         .range_error,
         "Invalid array length",
     );
@@ -185,7 +185,7 @@ pub fn arraySetLength(agent: *Agent, array: Object, property_descriptor: Propert
     std.debug.assert(old_len_desc.configurable == false);
 
     // 10. Let oldLen be oldLenDesc.[[Value]].
-    const old_len = @floatToInt(u32, old_len_desc.value.?.number.asFloat());
+    const old_len = @intFromFloat(u32, old_len_desc.value.?.number.asFloat());
 
     // 11. If newLen ≥ oldLen, then
     if (new_len >= old_len) {
@@ -248,7 +248,7 @@ pub fn arraySetLength(agent: *Agent, array: Object, property_descriptor: Propert
         // b. If deleteSucceeded is false, then
         if (!delete_succeeded) {
             // i. Set newLenDesc.[[Value]] to ! ToUint32(P) + 1𝔽.
-            new_len_desc.value = Value.from(@intToFloat(f64, index) + 1);
+            new_len_desc.value = Value.from(@floatFromInt(f64, index) + 1);
 
             // ii. If newWritable is false, set newLenDesc.[[Writable]] to false.
             if (!new_writable) new_len_desc.writable = false;
@@ -360,7 +360,7 @@ pub const ArrayConstructor = struct {
                 int_len = len.toUint32(agent) catch unreachable;
 
                 // ii. If SameValueZero(intLen, len) is false, throw a RangeError exception.
-                if (@intToFloat(f64, int_len) != len.number.asFloat()) return agent.throwException(
+                if (@floatFromInt(f64, int_len) != len.number.asFloat()) return agent.throwException(
                     .range_error,
                     "Invalid array length",
                 );

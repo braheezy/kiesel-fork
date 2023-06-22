@@ -81,8 +81,8 @@ fn fetchFunctionExpression(self: *Self, executable: Executable) ast.FunctionExpr
 }
 
 fn fetchIndex(self: *Self, executable: Executable) Executable.IndexType {
-    const b1 = @enumToInt(self.fetchInstruction(executable).?);
-    const b2 = @enumToInt(self.fetchInstruction(executable).?);
+    const b1 = @intFromEnum(self.fetchInstruction(executable).?);
+    const b2 = @intFromEnum(self.fetchInstruction(executable).?);
     return std.mem.bytesToValue(Executable.IndexType, &[_]u8{ b1, b2 });
 }
 
@@ -276,7 +276,7 @@ fn applyStringOrNumericBinaryOperator(agent: *Agent, lval: Value, operator: ast.
     const rnum = try final_rval.toNumeric(agent);
 
     // 5. If Type(lnum) is not Type(rnum), throw a TypeError exception.
-    if (@enumToInt(lnum) != @enumToInt(rnum)) {
+    if (@intFromEnum(lnum) != @intFromEnum(rnum)) {
         return agent.throwException(
             .type_error,
             "Left-hand side and right-hand side of numeric binary expression must have the same type",
@@ -436,7 +436,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
     switch (instruction) {
         .apply_string_or_numeric_binary_operator => {
             const operator_type = self.fetchIndex(executable);
-            const operator = @intToEnum(ast.BinaryExpression.Operator, operator_type);
+            const operator = @enumFromInt(ast.BinaryExpression.Operator, operator_type);
             const rval = self.stack.pop();
             const lval = self.stack.pop();
             self.result = try applyStringOrNumericBinaryOperator(self.agent, lval, operator, rval);

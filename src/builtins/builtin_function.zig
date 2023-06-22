@@ -211,7 +211,7 @@ pub fn createBuiltinFunction(
     });
 
     // 10. Perform SetFunctionLength(func, length).
-    try setFunctionLength(function, @intToFloat(f64, args.length));
+    try setFunctionLength(function, @floatFromInt(f64, args.length));
 
     // 11. If prefix is not present, then
     //     a. Perform SetFunctionName(func, name).

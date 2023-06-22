@@ -95,8 +95,8 @@ const JumpIndex = struct {
         const instructions = self.executable.instructions.items;
         if (index >= std.math.maxInt(IndexType)) return error.IndexOutOfRange;
         const bytes = std.mem.toBytes(@intCast(IndexType, index));
-        instructions[self.index] = @intToEnum(Instruction, bytes[0]);
-        instructions[self.index + 1] = @intToEnum(Instruction, bytes[1]);
+        instructions[self.index] = @enumFromInt(Instruction, bytes[0]);
+        instructions[self.index + 1] = @enumFromInt(Instruction, bytes[1]);
     }
 
     pub fn setTargetHere(self: JumpIndex) !void {
@@ -116,8 +116,8 @@ pub fn addJumpIndex(self: *Self) !JumpIndex {
 pub fn addIndex(self: *Self, index: usize) !void {
     if (index >= std.math.maxInt(IndexType)) return error.IndexOutOfRange;
     const bytes = std.mem.toBytes(@intCast(IndexType, index));
-    try self.instructions.append(@intToEnum(Instruction, bytes[0]));
-    try self.instructions.append(@intToEnum(Instruction, bytes[1]));
+    try self.instructions.append(@enumFromInt(Instruction, bytes[0]));
+    try self.instructions.append(@enumFromInt(Instruction, bytes[1]));
 }
 
 pub fn print(self: Self, writer: anytype) !void {
@@ -139,7 +139,7 @@ pub fn print(self: Self, writer: anytype) !void {
         switch (instruction) {
             .apply_string_or_numeric_binary_operator => {
                 const operator_type = iterator.instruction_args[0].?;
-                const operator = @intToEnum(ast.BinaryExpression.Operator, operator_type);
+                const operator = @enumFromInt(ast.BinaryExpression.Operator, operator_type);
                 try writer.print("(operator: {s})", .{@tagName(operator)});
             },
             .evaluate_call => {
@@ -219,8 +219,8 @@ fn deduplicate(
             break :blk deduplicated_list.items.len - 1;
         };
         const bytes = std.mem.toBytes(@intCast(IndexType, index));
-        self.instructions.items[iterator.instruction_index + 1] = @intToEnum(Instruction, bytes[0]);
-        self.instructions.items[iterator.instruction_index + 2] = @intToEnum(Instruction, bytes[1]);
+        self.instructions.items[iterator.instruction_index + 1] = @enumFromInt(Instruction, bytes[0]);
+        self.instructions.items[iterator.instruction_index + 2] = @enumFromInt(Instruction, bytes[1]);
     };
     return deduplicated_list;
 }

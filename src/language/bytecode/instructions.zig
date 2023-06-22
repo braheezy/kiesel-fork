@@ -161,9 +161,9 @@ pub const InstructionIterator = struct {
         self.index += 1;
         self.instruction_args = [_]?IndexType{ null, null };
         for (0..instruction.argumentCount()) |i| {
-            const b1 = @enumToInt(self.instructions[self.index]);
+            const b1 = @intFromEnum(self.instructions[self.index]);
             self.index += 1;
-            const b2 = @enumToInt(self.instructions[self.index]);
+            const b2 = @intFromEnum(self.instructions[self.index]);
             self.index += 1;
             self.instruction_args[i] = std.mem.bytesToValue(IndexType, &[_]u8{ b1, b2 });
         }

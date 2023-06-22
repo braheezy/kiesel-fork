@@ -44,19 +44,19 @@ pub const Number = union(enum) {
         const T = @TypeOf(number);
         switch (@typeInfo(T)) {
             .Int, .ComptimeInt => {
-                if (@intToFloat(f64, number) <= @intToFloat(f64, std.math.maxInt(i32))) {
+                if (@floatFromInt(f64, number) <= @floatFromInt(f64, std.math.maxInt(i32))) {
                     return .{ .i32 = @intCast(i32, number) };
                 }
-                return .{ .f64 = @intToFloat(f64, number) };
+                return .{ .f64 = @floatFromInt(f64, number) };
             },
             .Float, .ComptimeFloat => {
                 const truncated = std.math.trunc(number);
                 if (std.math.isFinite(@as(f64, number)) and
                     !std.math.signbit(@as(f64, number)) and
                     truncated == number and
-                    truncated <= @intToFloat(f64, std.math.maxInt(i32)))
+                    truncated <= @floatFromInt(f64, std.math.maxInt(i32)))
                 {
-                    return .{ .i32 = @floatToInt(i32, truncated) };
+                    return .{ .i32 = @intFromFloat(i32, truncated) };
                 }
                 return .{ .f64 = @as(f64, number) };
             },
@@ -67,7 +67,7 @@ pub const Number = union(enum) {
     pub inline fn asFloat(self: Self) f64 {
         return switch (self) {
             .f64 => |x| x,
-            .i32 => |x| @intToFloat(f64, x),
+            .i32 => |x| @floatFromInt(f64, x),
         };
     }
 
@@ -141,7 +141,7 @@ pub const Number = union(enum) {
                 if (!std.math.isFinite(x) or x == 0) break :blk 0;
                 const int = @trunc(x);
                 const int32bit = @mod(int, pow_2_32);
-                break :blk @floatToInt(
+                break :blk @intFromFloat(
                     i32,
                     if (int32bit >= pow_2_31) int32bit - pow_2_32 else int32bit,
                 );
@@ -157,11 +157,11 @@ pub const Number = union(enum) {
                 if (!std.math.isFinite(x) or x == 0) break :blk 0;
                 const int = @trunc(x);
                 const int32bit = @mod(int, pow_2_32);
-                break :blk @floatToInt(u32, int32bit);
+                break :blk @intFromFloat(u32, int32bit);
             },
             .i32 => |x| blk: {
                 const int = @as(i64, x);
-                const int32bit = @mod(int, comptime @floatToInt(i64, pow_2_32));
+                const int32bit = @mod(int, comptime @intFromFloat(i64, pow_2_32));
                 break :blk @intCast(u32, int32bit);
             },
         };

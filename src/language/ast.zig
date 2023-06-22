@@ -84,7 +84,7 @@ pub const IdentifierReference = struct {
         // 1. Return ? ResolveBinding(StringValue of Identifier).
         try executable.addInstructionWithIdentifier(.resolve_binding, self.identifier);
         const strict = ctx.contained_in_strict_mode_code;
-        try executable.addIndex(@boolToInt(strict));
+        try executable.addIndex(@intFromBool(strict));
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
@@ -192,7 +192,7 @@ pub const MemberExpression = struct {
                 try expression.generateBytecode(executable, ctx);
                 try executable.addInstruction(.load);
                 try executable.addInstruction(.evaluate_property_access_with_expression_key);
-                try executable.addIndex(@boolToInt(strict));
+                try executable.addIndex(@intFromBool(strict));
             },
 
             // MemberExpression : MemberExpression . IdentifierName
@@ -202,7 +202,7 @@ pub const MemberExpression = struct {
                     .evaluate_property_access_with_identifier_key,
                     identifier,
                 );
-                try executable.addIndex(@boolToInt(strict));
+                try executable.addIndex(@intFromBool(strict));
             },
         }
     }
@@ -294,7 +294,7 @@ pub const CallExpression = struct {
         // 5. Return ? EvaluateCall(func, ref, Arguments, tailCall).
         try executable.addInstruction(.evaluate_call);
         try executable.addIndex(self.arguments.len);
-        try executable.addIndex(@boolToInt(strict));
+        try executable.addIndex(@intFromBool(strict));
 
         // TODO: We should probably also clean this up if something throws beforehand...
         try executable.addInstruction(.pop_reference);
@@ -440,7 +440,7 @@ pub const NumericLiteral = struct {
             .number => {
                 const number = switch (self.system) {
                     .decimal => std.fmt.parseFloat(f64, str) catch unreachable,
-                    else => @intToFloat(
+                    else => @floatFromInt(
                         f64,
                         std.fmt.parseInt(i128, str, base) catch unreachable,
                     ),
@@ -919,7 +919,7 @@ pub const BinaryExpression = struct {
 
         // 5. Return ? ApplyStringOrNumericBinaryOperator(lval, opText, rval).
         try executable.addInstruction(.apply_string_or_numeric_binary_operator);
-        try executable.addIndex(@enumToInt(self.operator));
+        try executable.addIndex(@intFromEnum(self.operator));
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
@@ -1326,7 +1326,7 @@ pub const AssignmentExpression = struct {
 
             // 7. Let r be ? ApplyStringOrNumericBinaryOperator(lval, opText, rval).
             try executable.addInstruction(.apply_string_or_numeric_binary_operator);
-            try executable.addIndex(@enumToInt(operator));
+            try executable.addIndex(@intFromEnum(operator));
 
             // 8. Perform ? PutValue(lref, r).
             // 9. Return r.

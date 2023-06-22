@@ -250,7 +250,7 @@ pub const Value = union(enum) {
             // 4. If argument is either null or false, return +0𝔽.
             // 5. If argument is true, return 1𝔽.
             .null => return Number.from(0),
-            .boolean => |boolean| return Number.from(@boolToInt(boolean)),
+            .boolean => |boolean| return Number.from(@intFromBool(boolean)),
 
             // 6. If argument is a String, return StringToNumber(argument).
             .string => |string| return stringToNumber(string),
@@ -307,7 +307,7 @@ pub const Value = union(enum) {
         const int32bit = @mod(int, pow_2_32);
 
         // 5. If int32bit ≥ 2^31, return 𝔽(int32bit - 2^32); otherwise return 𝔽(int32bit).
-        return @floatToInt(i32, if (int32bit >= pow_2_31) int32bit - pow_2_32 else int32bit);
+        return @intFromFloat(i32, if (int32bit >= pow_2_31) int32bit - pow_2_32 else int32bit);
     }
 
     /// 7.1.7 ToUint32 ( argument )
@@ -330,7 +330,7 @@ pub const Value = union(enum) {
         const int32bit = @mod(int, pow_2_32);
 
         // 5. Return 𝔽(int32bit).
-        return @floatToInt(u32, int32bit);
+        return @intFromFloat(u32, int32bit);
     }
 
     /// 7.1.8 ToInt16 ( argument )
@@ -349,7 +349,7 @@ pub const Value = union(enum) {
         const int16bit = @mod(int, pow_2_16);
 
         // 5. If int16bit ≥ 2^15, return 𝔽(int16bit - 2^16); otherwise return 𝔽(int16bit).
-        return @floatToInt(i16, if (int16bit >= pow_2_15) int16bit - pow_2_16 else int16bit);
+        return @intFromFloat(i16, if (int16bit >= pow_2_15) int16bit - pow_2_16 else int16bit);
     }
 
     /// 7.1.9 ToUint16 ( argument )
@@ -368,7 +368,7 @@ pub const Value = union(enum) {
         const int16bit = @mod(int, pow_2_16);
 
         // 5. Return 𝔽(int16bit).
-        return @floatToInt(u16, int16bit);
+        return @intFromFloat(u16, int16bit);
     }
 
     /// 7.1.10 ToInt8 ( argument )
@@ -387,7 +387,7 @@ pub const Value = union(enum) {
         const int8bit = @mod(int, pow_2_8);
 
         // 5. If int8bit ≥ 2^7, return 𝔽(int8bit - 2^8); otherwise return 𝔽(int8bit).
-        return @floatToInt(i8, if (int8bit >= pow_2_7) int8bit - pow_2_8 else int8bit);
+        return @intFromFloat(i8, if (int8bit >= pow_2_7) int8bit - pow_2_8 else int8bit);
     }
 
     /// 7.1.11 ToUint8 ( argument )
@@ -406,7 +406,7 @@ pub const Value = union(enum) {
         const int8bit = @mod(int, pow_2_8);
 
         // 5. Return 𝔽(int8bit).
-        return @floatToInt(u8, int8bit);
+        return @intFromFloat(u8, int8bit);
     }
 
     /// 7.1.12 ToUint8Clamp ( argument )
@@ -424,7 +424,7 @@ pub const Value = union(enum) {
 
         // 5. Let f be floor(clamped).
         const f = @floor(clamped);
-        const f_int = @floatToInt(u8, f);
+        const f_int = @intFromFloat(u8, f);
 
         // 6. If clamped < f + 0.5, return 𝔽(f).
         if (clamped < f + 0.5) return f_int;
@@ -452,7 +452,7 @@ pub const Value = union(enum) {
 
             // Return 1n if prim is true and 0n if prim is false.
             .boolean => |boolean| BigInt{
-                .value = try BigInt.Value.initSet(agent.gc_allocator, @boolToInt(boolean)),
+                .value = try BigInt.Value.initSet(agent.gc_allocator, @intFromBool(boolean)),
             },
 
             // Return prim.
@@ -605,7 +605,7 @@ pub const Value = union(enum) {
         if (length <= 0) return 0;
 
         // 3. Return 𝔽(min(len, 2^53 - 1)).
-        return @floatToInt(u53, @min(length, std.math.maxInt(u53)));
+        return @intFromFloat(u53, @min(length, std.math.maxInt(u53)));
     }
 
     /// 7.1.22 ToIndex ( value )
@@ -619,7 +619,7 @@ pub const Value = union(enum) {
             return agent.throwException(.range_error, "Value is not not a valid index");
 
         // 3. Return integer.
-        return @floatToInt(u53, integer);
+        return @intFromFloat(u53, integer);
     }
 
     /// 7.2.2 IsArray ( argument )
@@ -827,7 +827,7 @@ pub fn stringToBigInt(allocator: Allocator, string: []const u8) !?BigInt {
 /// https://tc39.es/ecma262/#sec-samevalue
 pub fn sameValue(x: Value, y: Value) bool {
     // 1. If Type(x) is not Type(y), return false.
-    if (@enumToInt(x) != @enumToInt(y)) return false;
+    if (@intFromEnum(x) != @intFromEnum(y)) return false;
 
     // 2. If x is a Number, then
     if (x == .number) {
@@ -843,7 +843,7 @@ pub fn sameValue(x: Value, y: Value) bool {
 /// https://tc39.es/ecma262/#sec-samevaluezero
 pub fn sameValueZero(x: Value, y: Value) bool {
     // 1. If Type(x) is not Type(y), return false.
-    if (@enumToInt(x) != @enumToInt(y)) return false;
+    if (@intFromEnum(x) != @intFromEnum(y)) return false;
 
     // 2. If x is a Number, then
     if (x == .number) {
@@ -859,7 +859,7 @@ pub fn sameValueZero(x: Value, y: Value) bool {
 /// https://tc39.es/ecma262/#sec-samevaluenonnumber
 pub fn sameValueNonNumber(x: Value, y: Value) bool {
     // 1. Assert: Type(x) is Type(y).
-    std.debug.assert(@enumToInt(x) == @enumToInt(y));
+    std.debug.assert(@intFromEnum(x) == @intFromEnum(y));
 
     return switch (x) {
         // 2. If x is either null or undefined, return true.
@@ -978,7 +978,7 @@ pub fn isLessThan(
         const ny = try py.toNumeric(agent);
 
         // f. If Type(nx) is Type(ny), then
-        if (@enumToInt(nx) == @enumToInt(ny)) {
+        if (@intFromEnum(nx) == @intFromEnum(ny)) {
             // i. If nx is a Number, then
             if (nx == .number) {
                 // 1. Return Number::lessThan(nx, ny).
@@ -1011,8 +1011,8 @@ pub fn isLessThan(
 
         // k. If ℝ(nx) < ℝ(ny), return true; otherwise return false.
         return switch (nx) {
-            .number => nx.number.asFloat() < @intToFloat(f64, ny.big_int.value.to(i1024) catch return true),
-            .big_int => @intToFloat(f64, nx.big_int.value.to(i1024) catch return false) < ny.number.asFloat(),
+            .number => nx.number.asFloat() < @floatFromInt(f64, ny.big_int.value.to(i1024) catch return true),
+            .big_int => @floatFromInt(f64, nx.big_int.value.to(i1024) catch return false) < ny.number.asFloat(),
         };
     }
 }
@@ -1021,7 +1021,7 @@ pub fn isLessThan(
 /// https://tc39.es/ecma262/#sec-islooselyequal
 pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) !bool {
     // 1. If Type(x) is Type(y), then
-    if (@enumToInt(x) == @enumToInt(y)) {
+    if (@intFromEnum(x) == @intFromEnum(y)) {
         // a. Return IsStrictlyEqual(x, y).
         return isStrictlyEqual(x, y);
     }
@@ -1112,7 +1112,7 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) !bool {
 /// https://tc39.es/ecma262/#sec-isstrictlyequal
 pub fn isStrictlyEqual(x: Value, y: Value) bool {
     // 1. If Type(x) is not Type(y), return false.
-    if (@enumToInt(x) != @enumToInt(y)) return false;
+    if (@intFromEnum(x) != @intFromEnum(y)) return false;
 
     // 2. If x is a Number, then
     if (x == .number) {
