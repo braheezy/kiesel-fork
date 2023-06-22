@@ -3,6 +3,10 @@
 
 const std = @import("std");
 
+const execution = @import("../../execution.zig");
+
+const Agent = execution.Agent;
+
 const Self = @This();
 
 pub const Id = usize;
@@ -28,6 +32,18 @@ pub fn format(
         try writer.writeAll("\"");
     }
     try writer.writeAll(")");
+}
+
+/// 20.4.3.3.1 SymbolDescriptiveString ( sym )
+/// https://tc39.es/ecma262/#sec-symboldescriptivestring
+pub fn descriptiveString(self: Self, agent: *Agent) ![]const u8 {
+    // 1. Let desc be sym's [[Description]] value.
+    // 2. If desc is undefined, set desc to the empty String.
+    // 3. Assert: desc is a String.
+    const description = self.description orelse "";
+
+    // 4. Return the string-concatenation of "Symbol(", desc, and ")".
+    return std.fmt.allocPrint(agent.gc_allocator, "Symbol({s})", .{description});
 }
 
 test "format" {
