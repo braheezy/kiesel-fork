@@ -58,6 +58,30 @@ fn prettyPrintArray(array: Object, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintPrimitiveWrapper(object: Object, writer: anytype) !void {
+    const tty_config = getTtyConfigForWriter(writer);
+
+    const name = blk: {
+        if (object.is(builtins.Boolean)) break :blk "Boolean";
+        if (object.is(builtins.String)) break :blk "String";
+        @panic("Unhandled object type in prettyPrintPrimitiveWrapper()");
+    };
+    const value = blk: {
+        if (object.is(builtins.Boolean)) break :blk Value.from(object.as(builtins.Boolean).fields.boolean_data);
+        if (object.is(builtins.String)) break :blk Value.from(object.as(builtins.String).fields.string_data);
+        @panic("Unhandled object type in prettyPrintPrimitiveWrapper()");
+    };
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(name);
+    try writer.writeAll("(");
+    try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}", .{value});
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintObject(object: Object, writer: anytype) !void {
     const property_storage = object.data.property_storage;
     const property_keys = ordinaryOwnPropertyKeys(object) catch return;
@@ -131,6 +155,8 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
 
         if (object.is(builtins.Array))
             return prettyPrintArray(object, writer);
+        if (object.is(builtins.Boolean) or object.is(builtins.String))
+            return prettyPrintPrimitiveWrapper(object, writer);
         return prettyPrintObject(object, writer);
     }
 
