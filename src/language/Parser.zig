@@ -907,9 +907,13 @@ fn acceptStatementListItem(self: *Self) !ast.StatementListItem {
         else |_|
             return error.UnexpectedToken;
     };
-    // ASI only applies if the parsed item was not an empty statement
-    if (statement_list_item != .statement or statement_list_item.statement.* != .empty_statement)
-        try self.acceptOrInsertSemicolon();
+    switch (statement_list_item) {
+        // ASI only applies if the parsed item was not an empty statement
+        .statement => |statement| if (statement.* != .empty_statement) {
+            try self.acceptOrInsertSemicolon();
+        },
+        else => {},
+    }
     return statement_list_item;
 }
 
