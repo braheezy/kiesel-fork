@@ -44,7 +44,7 @@ pub fn createMutableBinding(self: *Self, name: []const u8, deletable: bool) !voi
     try self.bindings.putNoClobber(name, .{
         .value = null,
         .strict = false,
-        .mutable = false,
+        .mutable = true,
         .deletable = deletable,
     });
 
