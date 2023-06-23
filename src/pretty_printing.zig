@@ -38,6 +38,7 @@ fn prettyPrintArray(array: Object, writer: anytype) !void {
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("[");
+    try tty_config.setColor(writer, .reset);
     if (length != 0) try writer.writeAll(" ");
     for (0..length) |i| {
         const property_key = PropertyKey.from(@intCast(PropertyKey.IntegerIndex, i));
@@ -50,8 +51,8 @@ fn prettyPrintArray(array: Object, writer: anytype) !void {
         }
         if (i + 1 < length) try writer.writeAll(", ");
     }
-    try tty_config.setColor(writer, .white);
     if (length != 0) try writer.writeAll(" ");
+    try tty_config.setColor(writer, .white);
     try writer.writeAll("]");
     try tty_config.setColor(writer, .reset);
 }
