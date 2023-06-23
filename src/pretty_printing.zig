@@ -9,6 +9,7 @@ const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Value = types.Value;
 const getArrayLength = @import("builtins/array.zig").getArrayLength;
+const ordinaryOwnPropertyKeys = builtins.ordinaryOwnPropertyKeys;
 
 const SeenObjects = std.AutoHashMap(*anyopaque, usize);
 const State = struct {
@@ -57,6 +58,57 @@ fn prettyPrintArray(array: Object, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintObject(object: Object, writer: anytype) !void {
+    const property_storage = object.data.property_storage;
+    const property_keys = ordinaryOwnPropertyKeys(object) catch return;
+    const length = property_keys.items.len;
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("{");
+    try tty_config.setColor(writer, .reset);
+    if (length != 0) try writer.writeAll(" ");
+    for (property_keys.items, 0..) |property_key, i| {
+        const property_descriptor = property_storage.get(property_key).?;
+        switch (property_key) {
+            .string => |string| {
+                try writer.writeAll("\"");
+                try tty_config.setColor(writer, .bold);
+                try writer.print("{s}", .{string});
+                try tty_config.setColor(writer, .reset);
+                try writer.writeAll("\"");
+            },
+            .symbol => |symbol| {
+                try writer.writeAll("[");
+                try tty_config.setColor(writer, .bold);
+                try writer.print("{s}", .{symbol});
+                try tty_config.setColor(writer, .reset);
+                try writer.writeAll("]");
+            },
+            .integer_index => |integer_index| {
+                try writer.writeAll("\"");
+                try tty_config.setColor(writer, .bold);
+                try writer.print("{}", .{integer_index});
+                try tty_config.setColor(writer, .reset);
+                try writer.writeAll("\"");
+            },
+        }
+        try writer.writeAll(": ");
+        if (property_descriptor.value) |value| {
+            try writer.print("{pretty}", .{value});
+        } else {
+            try tty_config.setColor(writer, .dim);
+            try writer.writeAll("<accessor>");
+            try tty_config.setColor(writer, .reset);
+        }
+        if (i + 1 < length) try writer.writeAll(", ");
+    }
+    if (length != 0) try writer.writeAll(" ");
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("}");
+    try tty_config.setColor(writer, .reset);
+}
+
 pub fn prettyPrintValue(value: Value, writer: anytype) !void {
     const print_in_progress = state.print_in_progress;
     state.print_in_progress = true;
@@ -79,6 +131,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
 
         if (object.is(builtins.Array))
             return prettyPrintArray(object, writer);
+        return prettyPrintObject(object, writer);
     }
 
     const color = switch (value) {
@@ -89,7 +142,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
         .symbol => Color.cyan,
         .number => Color.magenta,
         .big_int => Color.magenta,
-        .object => Color.white,
+        .object => unreachable,
     };
     try tty_config.setColor(writer, color);
     try writer.print("{}", .{value});
