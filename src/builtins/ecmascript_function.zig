@@ -31,6 +31,13 @@ const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
+// Non-standard helper to get the name property of a function
+pub fn getFunctionName(function: Object) []const u8 {
+    const property_descriptor = function.data.property_storage.get(PropertyKey.from("name")).?;
+    const value = property_descriptor.value.?;
+    return value.string;
+}
+
 pub const ConstructorKind = enum {
     base,
     derived,

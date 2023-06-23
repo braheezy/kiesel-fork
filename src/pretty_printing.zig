@@ -9,6 +9,7 @@ const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Value = types.Value;
 const getArrayLength = @import("builtins/array.zig").getArrayLength;
+const getFunctionName = @import("builtins/ecmascript_function.zig").getFunctionName;
 const ordinaryOwnPropertyKeys = builtins.ordinaryOwnPropertyKeys;
 
 const SeenObjects = std.AutoHashMap(*anyopaque, usize);
@@ -79,6 +80,16 @@ fn prettyPrintPrimitiveWrapper(object: Object, writer: anytype) !void {
     try writer.print("{pretty}", .{value});
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
+fn prettyPrintFunction(object: Object, writer: anytype) !void {
+    const name = getFunctionName(object);
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try writer.writeAll("fn ");
+    try tty_config.setColor(writer, .red);
+    try writer.writeAll(name);
     try tty_config.setColor(writer, .reset);
 }
 
@@ -157,6 +168,8 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
             return prettyPrintArray(object, writer);
         if (object.is(builtins.Boolean) or object.is(builtins.String))
             return prettyPrintPrimitiveWrapper(object, writer);
+        if (object.internalMethods().call != null)
+            return prettyPrintFunction(object, writer);
         return prettyPrintObject(object, writer);
     }
 
