@@ -10,6 +10,19 @@ const PropertyKey = types.PropertyKey;
 const Value = types.Value;
 const getArrayLength = @import("builtins/array.zig").getArrayLength;
 
+const SeenObjects = std.AutoHashMap(*anyopaque, usize);
+const State = struct {
+    seen_objects: SeenObjects,
+    print_in_progress: bool,
+};
+
+var buf: [@sizeOf(*anyopaque) * 1024]u8 = undefined;
+var fba = std.heap.FixedBufferAllocator.init(&buf);
+var state = State{
+    .seen_objects = SeenObjects.init(fba.allocator()),
+    .print_in_progress = false,
+};
+
 fn getTtyConfigForWriter(writer: anytype) std.io.tty.Config {
     const file = if (@TypeOf(writer.context) == std.fs.File)
         writer.context
@@ -18,7 +31,7 @@ fn getTtyConfigForWriter(writer: anytype) std.io.tty.Config {
     return std.io.tty.detectConfig(file);
 }
 
-pub fn prettyPrintArray(array: Object, writer: anytype) !void {
+fn prettyPrintArray(array: Object, writer: anytype) !void {
     const property_storage = array.data.property_storage;
     const length = getArrayLength(array);
     const tty_config = getTtyConfigForWriter(writer);
@@ -44,10 +57,29 @@ pub fn prettyPrintArray(array: Object, writer: anytype) !void {
 }
 
 pub fn prettyPrintValue(value: Value, writer: anytype) !void {
-    if (value == .object and value.object.is(builtins.Array)) {
-        return prettyPrintArray(value.object, writer);
-    }
+    const print_in_progress = state.print_in_progress;
+    state.print_in_progress = true;
+    defer if (!print_in_progress) {
+        state.seen_objects.clearRetainingCapacity();
+        state.print_in_progress = false;
+    };
+
     const tty_config = getTtyConfigForWriter(writer);
+
+    if (value == .object) {
+        const object = value.object;
+        if (state.seen_objects.get(object.ptr)) |i| {
+            try tty_config.setColor(writer, .dim);
+            try writer.print("<ref #{}>", .{i});
+            try tty_config.setColor(writer, .reset);
+            return;
+        }
+        state.seen_objects.putNoClobber(object.ptr, state.seen_objects.count()) catch return;
+
+        if (object.is(builtins.Array))
+            return prettyPrintArray(object, writer);
+    }
+
     const color = switch (value) {
         .undefined => Color.bright_black,
         .null => Color.yellow,
