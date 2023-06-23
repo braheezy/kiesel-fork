@@ -221,11 +221,13 @@ pub fn main() !u8 {
         const source_text = try file.reader().readAllAlloc(allocator, std.math.maxInt(usize));
         defer allocator.free(source_text);
         if (try run(allocator, realm, file_name, source_text)) |result| {
-            try stdout.print("{pretty}\n", .{result});
+            if (parsed_args.options.@"print-result")
+                try stdout.print("{pretty}\n", .{result});
         } else return 1;
     } else if (parsed_args.options.command) |source_text| {
         if (try run(allocator, realm, "command", source_text)) |result| {
-            try stdout.print("{pretty}\n", .{result});
+            if (parsed_args.options.@"print-result")
+                try stdout.print("{pretty}\n", .{result});
         } else return 1;
     } else {
         try repl(allocator, realm);
