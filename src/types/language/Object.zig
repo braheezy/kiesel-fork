@@ -425,6 +425,13 @@ pub fn testIntegrityLevel(self: Self, level: IntegrityLevel) !bool {
     return true;
 }
 
+/// 7.3.19 LengthOfArrayLike ( obj )
+/// https://tc39.es/ecma262/#sec-lengthofarraylike
+pub fn lengthOfArrayLike(self: Self) !u53 {
+    // 1. Return ℝ(? ToLength(? Get(obj, "length"))).
+    return (try self.get(PropertyKey.from("length"))).toLength(self.agent());
+}
+
 /// 7.3.25 GetFunctionRealm ( obj )
 /// https://tc39.es/ecma262/#sec-getfunctionrealm
 pub fn getFunctionRealm(self: Self) !*Realm {
