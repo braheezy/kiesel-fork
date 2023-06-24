@@ -320,12 +320,47 @@ pub const FunctionPrototype = struct {
     }
 
     pub fn init(realm: *Realm, object: Object) !void {
+        try defineBuiltinFunction(object, "apply", apply, 2, realm);
         try defineBuiltinFunction(object, "call", call, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
     }
 
     fn behaviour(_: *Agent, _: Value, _: ArgumentsList) !Value {
         return .undefined;
+    }
+
+    /// 20.2.3.1 Function.prototype.apply ( thisArg, argArray )
+    /// https://tc39.es/ecma262/#sec-function.prototype.apply
+    fn apply(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const this_arg = arguments.get(0);
+        const arg_array = arguments.get(1);
+
+        // 1. Let func be the this value.
+        const func = this_value;
+
+        // 2. If IsCallable(func) is false, throw a TypeError exception.
+        if (!func.isCallable()) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not a function", .{func}),
+            );
+        }
+
+        // 3. If argArray is either undefined or null, then
+        if (arg_array == .undefined or arg_array == .null) {
+            // TODO: a. Perform PrepareForTailCall().
+
+            // b. Return ? Call(func, thisArg).
+            return func.callAssumeCallableNoArgs(this_arg);
+        }
+
+        // 4. Let argList be ? CreateListFromArrayLike(argArray).
+        const arg_list = try arg_array.createListFromArrayLike(agent, .{});
+
+        // TODO: 5. Perform PrepareForTailCall().
+
+        // 6. Return ? Call(func, thisArg, argList).
+        return func.callAssumeCallable(this_arg, arg_list);
     }
 
     /// 20.2.3.3 Function.prototype.call ( thisArg, ...args )
