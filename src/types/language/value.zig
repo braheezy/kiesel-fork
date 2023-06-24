@@ -751,6 +751,63 @@ pub const Value = union(enum) {
         return self.callAssumeCallable(this_value, .{});
     }
 
+    /// 7.3.20 CreateListFromArrayLike ( obj [ , elementTypes ] )
+    /// https://tc39.es/ecma262/#sec-createlistfromarraylike
+    pub fn createListFromArrayLike(self: Self, agent: *Agent, args: struct {
+        element_types: ?[]const std.meta.Tag(Value) = null,
+    }) ![]Value {
+        // 1. If elementTypes is not present, set elementTypes to « Undefined, Null, Boolean,
+        //    String, Symbol, Number, BigInt, Object ».
+        const element_types = args.element_types orelse std.enums.values(std.meta.Tag(Value));
+
+        // 2. If obj is not an Object, throw a TypeError exception.
+        if (self != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{self}),
+            );
+        }
+
+        // 3. Let len be ? LengthOfArrayLike(obj).
+        const len = try self.object.lengthOfArrayLike();
+
+        // 4. Let list be a new empty List.
+        var list = try std.ArrayList(Value).initCapacity(agent.gc_allocator, len);
+        defer list.deinit();
+
+        // 5. Let index be 0.
+        var index: u53 = 0;
+
+        // 6. Repeat, while index < len,
+        while (index < len) : (index += 1) {
+            // a. Let indexName be ! ToString(𝔽(index)).
+            const index_name = PropertyKey.from(index);
+
+            // b. Let next be ? Get(obj, indexName).
+            const next = try self.get(agent, index_name);
+
+            // c. If elementTypes does not contain Type(next), throw a TypeError exception.
+            if (std.mem.indexOfScalar(std.meta.Tag(Value), element_types, next) == null) {
+                return agent.throwException(
+                    .type_error,
+                    try std.fmt.allocPrint(
+                        agent.gc_allocator,
+                        "Array element {} has invalid type '{s}'",
+                        .{ next, @tagName(next) },
+                    ),
+                );
+            }
+
+            // d. Append next to list.
+            list.appendAssumeCapacity(next);
+
+            // e. Set index to index + 1.
+        }
+
+        // 7. Return list.
+        return list.toOwnedSlice();
+    }
+
     /// 7.3.22 OrdinaryHasInstance ( C, O )
     /// https://tc39.es/ecma262/#sec-ordinaryhasinstance
     pub fn ordinaryHasInstance(self: Self, object_value: Value) !bool {
