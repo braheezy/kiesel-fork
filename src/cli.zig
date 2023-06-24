@@ -73,6 +73,7 @@ pub const Kiesel = struct {
         const gc_object = try ordinaryObjectCreate(realm.agent, try realm.intrinsics.@"%Object.prototype%"());
         try defineBuiltinFunction(gc_object, "collect", collect, 0, realm);
         try defineBuiltinFunction(kiesel_object, "createRealm", createRealm, 0, realm);
+        try defineBuiltinFunction(kiesel_object, "evalScript", evalScript, 1, realm);
         try defineBuiltinProperty(kiesel_object, "gc", Value.from(gc_object));
         try defineBuiltinFunction(kiesel_object, "print", print, 1, realm);
         return kiesel_object;
@@ -88,6 +89,43 @@ pub const Kiesel = struct {
         try realm.setRealmGlobalObject(null, null);
         const global = try realm.setDefaultGlobalBindings();
         return Value.from(global);
+    }
+
+    /// Algorithm from https://github.com/tc39/test262/blob/main/INTERPRETING.md
+    fn evalScript(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const source_text = try arguments.get(0).toString(agent);
+
+        // 1. Let hostDefined be any host-defined values for the provided sourceText (obtained in
+        //    an implementation dependent manner)
+        const host_defined = null;
+
+        // 2. Let realm be the current Realm Record.
+        const realm = agent.currentRealm();
+
+        var diagnostics = Diagnostics.init(agent.gc_allocator);
+        defer diagnostics.deinit();
+
+        // 3. Let s be ParseScript(sourceText, realm, hostDefined).
+        const script = Script.parse(source_text, realm, host_defined, .{
+            .diagnostics = &diagnostics,
+            .file_name = "evalScript",
+        }) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            // 4. If s is a List of errors, then
+            error.ParseError => {
+                // a. Let error be the first element of s.
+                const parse_error = diagnostics.errors.items[0];
+
+                // b. Return Completion{[[Type]]: throw, [[Value]]: error, [[Target]]: empty}.
+                return agent.throwException(.syntax_error, parse_error.message);
+            },
+        };
+
+        // 5. Let status be ScriptEvaluation(s).
+        const status = script.evaluate();
+
+        // 6. Return Completion(status).
+        return status;
     }
 
     fn print(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
