@@ -74,6 +74,7 @@ pub const Kiesel = struct {
         try defineBuiltinFunction(gc_object, "collect", collect, 0, realm);
         try defineBuiltinFunction(kiesel_object, "createRealm", createRealm, 0, realm);
         try defineBuiltinProperty(kiesel_object, "gc", Value.from(gc_object));
+        try defineBuiltinFunction(kiesel_object, "print", print, 1, realm);
         return kiesel_object;
     }
 
@@ -87,6 +88,12 @@ pub const Kiesel = struct {
         try realm.setRealmGlobalObject(null, null);
         const global = try realm.setDefaultGlobalBindings();
         return Value.from(global);
+    }
+
+    fn print(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const str = try arguments.get(0).toString(agent);
+        stdout.print("{s}\n", .{str}) catch {};
+        return .undefined;
     }
 };
 
