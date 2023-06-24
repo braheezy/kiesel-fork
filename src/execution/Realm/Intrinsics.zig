@@ -11,29 +11,30 @@ const Self = @This();
 
 realm: *Realm,
 
-const lazy_intrinsics = struct {
-    var @"%Array%": ?Object = null;
-    var @"%Array.prototype%": ?Object = null;
-    var @"%Boolean%": ?Object = null;
-    var @"%Boolean.prototype%": ?Object = null;
-    var @"%eval%": ?Object = null;
-    var @"%Function%": ?Object = null;
-    var @"%Function.prototype%": ?Object = null;
-    var @"%isFinite%": ?Object = null;
-    var @"%isNaN%": ?Object = null;
-    var @"%Object%": ?Object = null;
-    var @"%Object.prototype%": ?Object = null;
-    var @"%String%": ?Object = null;
-    var @"%String.prototype%": ?Object = null;
-    var @"%ThrowTypeError%": ?Object = null;
-};
+// Not stored as top-level properties so we can have methods of the same names
+lazy_intrinsics: struct {
+    @"%Array%": ?Object = null,
+    @"%Array.prototype%": ?Object = null,
+    @"%Boolean%": ?Object = null,
+    @"%Boolean.prototype%": ?Object = null,
+    @"%eval%": ?Object = null,
+    @"%Function%": ?Object = null,
+    @"%Function.prototype%": ?Object = null,
+    @"%isFinite%": ?Object = null,
+    @"%isNaN%": ?Object = null,
+    @"%Object%": ?Object = null,
+    @"%Object.prototype%": ?Object = null,
+    @"%String%": ?Object = null,
+    @"%String.prototype%": ?Object = null,
+    @"%ThrowTypeError%": ?Object = null,
+} = .{},
 
 inline fn lazyIntrinsic(
     self: *Self,
     comptime name: []const u8,
     comptime T: type,
 ) error{OutOfMemory}!Object {
-    const intrinsic = &@field(lazy_intrinsics, name);
+    const intrinsic = &@field(self.lazy_intrinsics, name);
     if (intrinsic.* == null) {
         // Intrinsics that have a dependency on themselves need to use two-stage initialization
         // when first created, otherwise create() goes into infinite recursion.
