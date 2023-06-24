@@ -72,6 +72,7 @@ pub const Kiesel = struct {
         const kiesel_object = try ordinaryObjectCreate(realm.agent, try realm.intrinsics.@"%Object.prototype%"());
         const gc_object = try ordinaryObjectCreate(realm.agent, try realm.intrinsics.@"%Object.prototype%"());
         try defineBuiltinFunction(gc_object, "collect", collect, 0, realm);
+        try defineBuiltinFunction(kiesel_object, "createRealm", createRealm, 0, realm);
         try defineBuiltinProperty(kiesel_object, "gc", Value.from(gc_object));
         return kiesel_object;
     }
@@ -79,6 +80,13 @@ pub const Kiesel = struct {
     fn collect(_: *Agent, _: Value, _: ArgumentsList) !Value {
         kiesel.gc.collect();
         return .undefined;
+    }
+
+    fn createRealm(agent: *Agent, _: Value, _: ArgumentsList) !Value {
+        const realm = try Realm.create(agent);
+        try realm.setRealmGlobalObject(null, null);
+        const global = try realm.setDefaultGlobalBindings();
+        return Value.from(global);
     }
 };
 
