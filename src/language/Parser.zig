@@ -887,6 +887,9 @@ fn acceptBlock(self: *Self) !ast.Block {
 }
 
 fn acceptStatementList(self: *Self) error{OutOfMemory}!ast.StatementList {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
     var statement_list_items = std.ArrayList(ast.StatementListItem).init(self.allocator);
     while (self.acceptStatementListItem()) |statement_list_item|
         try statement_list_items.append(statement_list_item)
