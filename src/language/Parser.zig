@@ -815,6 +815,8 @@ fn acceptStatement(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!*
 
     if (self.acceptBlockStatement()) |block_statement|
         statement.* = .{ .block_statement = block_statement }
+    else |_| if (self.acceptVariableStatement()) |variable_statement|
+        statement.* = .{ .variable_statement = variable_statement }
     else |_| if (self.core.accept(RuleSet.is(.@";"))) |_|
         statement.* = .empty_statement
     else |_| if (self.acceptExpressionStatement()) |expression_statement|
@@ -918,6 +920,39 @@ fn acceptStatementListItem(self: *Self) !ast.StatementListItem {
         else => {},
     }
     return statement_list_item;
+}
+
+fn acceptVariableStatement(self: *Self) !ast.VariableStatement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"var"));
+    return .{ .variable_declaration_list = try self.acceptVariableDeclarationList() };
+}
+
+fn acceptVariableDeclarationList(self: *Self) !ast.VariableDeclarationList {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    var variable_declarations = std.ArrayList(ast.VariableDeclaration).init(self.allocator);
+    while (self.acceptVariableDeclaration()) |variable_declaration| {
+        try variable_declarations.append(variable_declaration);
+        _ = self.core.accept(RuleSet.is(.@",")) catch break;
+    } else |_| {}
+    return .{ .items = try variable_declarations.toOwnedSlice() };
+}
+
+fn acceptVariableDeclaration(self: *Self) !ast.VariableDeclaration {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const binding_identifier = try self.acceptBindingIdentifier();
+    var initializer: ?ast.Expression = null;
+    if (self.core.accept(RuleSet.is(.@"="))) |_| {
+        const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
+        initializer = try self.acceptExpression(ctx);
+    } else |_| {}
+    return .{ .binding_identifier = binding_identifier, .initializer = initializer };
 }
 
 fn acceptExpressionStatement(self: *Self) !ast.ExpressionStatement {

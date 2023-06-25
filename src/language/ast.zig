@@ -1647,6 +1647,7 @@ pub const Statement = union(enum) {
     const Self = @This();
 
     block_statement: BlockStatement,
+    variable_statement: VariableStatement,
     empty_statement,
     expression_statement: ExpressionStatement,
     if_statement: IfStatement,
@@ -1673,6 +1674,9 @@ pub const Statement = union(enum) {
         switch (self) {
             .block_statement => |block_statement| {
                 try block_statement.generateBytecode(executable, ctx);
+            },
+            .variable_statement => |variable_statement| {
+                try variable_statement.generateBytecode(executable, ctx);
             },
 
             // EmptyStatement : ;
@@ -1712,6 +1716,10 @@ pub const Statement = union(enum) {
         try printString("Statement", writer, indentation);
         switch (self) {
             .block_statement => |block_statement| try block_statement.print(
+                writer,
+                indentation + 1,
+            ),
+            .variable_statement => |variable_statement| try variable_statement.print(
                 writer,
                 indentation + 1,
             ),
@@ -1924,6 +1932,104 @@ pub const StatementListItem = union(enum) {
         switch (self) {
             .statement => |statement| try statement.print(writer, indentation),
             .declaration => |declaration| try declaration.print(writer, indentation),
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-VariableStatement
+pub const VariableStatement = struct {
+    const Self = @This();
+
+    variable_declaration_list: VariableDeclarationList,
+
+    /// 14.3.2.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-variable-statement-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // VariableStatement : var VariableDeclarationList ;
+        // 1. Perform ? Evaluation of VariableDeclarationList.
+        try self.variable_declaration_list.generateBytecode(executable, ctx);
+
+        // 2. Return empty.
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("VariableStatement", writer, indentation);
+        try self.variable_declaration_list.print(writer, indentation + 1);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-VariableDeclarationList
+pub const VariableDeclarationList = struct {
+    const Self = @This();
+
+    items: []const VariableDeclaration,
+
+    /// 14.3.2.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-variable-statement-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // VariableDeclarationList : VariableDeclarationList , VariableDeclaration
+        // 1. Perform ? Evaluation of VariableDeclarationList.
+        // 2. Return ? Evaluation of VariableDeclaration.
+        for (self.items) |variable_declaration| {
+            try variable_declaration.generateBytecode(executable, ctx);
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'VariableDeclarationList' here, it's implied and only adds nesting.
+        for (self.items) |variable_declaration| {
+            try variable_declaration.print(writer, indentation);
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-VariableDeclaration
+pub const VariableDeclaration = struct {
+    const Self = @This();
+
+    binding_identifier: Identifier,
+    initializer: ?Expression,
+
+    /// 14.3.2.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-variable-statement-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // VariableDeclaration : BindingIdentifier
+        // 1. Return empty.
+        if (self.initializer == null) return;
+
+        // VariableDeclaration : BindingIdentifier Initializer
+        // 1. Let bindingId be StringValue of BindingIdentifier.
+        // 2. Let lhs be ? ResolveBinding(bindingId).
+        try executable.addInstructionWithIdentifier(.resolve_binding, self.binding_identifier);
+        const strict = ctx.contained_in_strict_mode_code;
+        try executable.addIndex(@intFromBool(strict));
+        try executable.addInstruction(.push_reference);
+
+        // TODO: 3. If IsAnonymousFunctionDefinition(Initializer) is true, then
+        // 4. Else,
+
+        // a. Let rhs be ? Evaluation of Initializer.
+        try self.initializer.?.generateBytecode(executable, ctx);
+
+        // b. Let value be ? GetValue(rhs).
+        // FIXME: This clobbers the result value and we don't have a good way of restoring it.
+        //        Should probably use the stack more and have explicit result store instructions.
+        if (self.initializer.?.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+        // 5. Perform ? PutValue(lhs, value).
+        try executable.addInstruction(.put_value);
+        try executable.addInstruction(.pop_reference);
+
+        // 6. Return empty.
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("VariableDeclaration", writer, indentation);
+        try printString("binding_identifier:", writer, indentation + 1);
+        try printString(self.binding_identifier, writer, indentation + 2);
+        if (self.initializer) |initializer| {
+            try printString("initializer:", writer, indentation + 1);
+            try initializer.print(writer, indentation + 2);
         }
     }
 };
