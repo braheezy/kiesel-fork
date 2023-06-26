@@ -772,7 +772,8 @@ pub const Value = union(enum) {
         const len = try self.object.lengthOfArrayLike();
 
         // 4. Let list be a new empty List.
-        var list = try std.ArrayList(Value).initCapacity(agent.gc_allocator, len);
+        if (len > std.math.maxInt(usize)) return error.OutOfMemory;
+        var list = try std.ArrayList(Value).initCapacity(agent.gc_allocator, @intCast(usize, len));
         defer list.deinit();
 
         // 5. Let index be 0.

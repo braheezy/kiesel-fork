@@ -130,7 +130,7 @@ pub fn print(self: Self, writer: anytype) !void {
     while (iterator.next()) |instruction| {
         try writer.print("{:>[1]}: ", .{
             iterator.instruction_index,
-            std.fmt.count("{d}", .{self.instructions.items.len}),
+            @intCast(usize, std.fmt.count("{d}", .{self.instructions.items.len})),
         });
         try tty_config.setColor(writer, .bold);
         try writer.writeAll(@tagName(instruction));
