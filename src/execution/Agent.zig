@@ -73,7 +73,6 @@ pub const HostHooks = struct {
 };
 
 pub fn init(options: Options) !Self {
-    gc.setAllInteriorPointers(true);
     var self = Self{
         .gc_allocator = gc.allocator(),
         .options = options,
