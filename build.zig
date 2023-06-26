@@ -11,12 +11,18 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     {
-        const cflags = [_][]const u8{
+        const cflags_common = [_][]const u8{
             // NOTE: These two are set by default when building libgc with CMake
             // https://github.com/ivmai/bdwgc/blob/3f419b623643adedb11d260afc92cdd347dba5d6/CMakeLists.txt#L137
             "-DALL_INTERIOR_POINTERS",
             "-DNO_EXECUTE_PERMISSION",
         };
+        const cflags_wasi = [_][]const u8{
+            "-D__wasi__",
+            "-D_WASI_EMULATED_SIGNAL",
+            "-Wl,wasi-emulated-signal",
+        };
+        const cflags = if (target.getOsTag() == .wasi) &(cflags_common ++ cflags_wasi) else &cflags_common;
         const libgc_srcs = [_][]const u8{
             "alloc.c",    "reclaim.c", "allchblk.c", "misc.c",     "mach_dep.c", "os_dep.c",
             "mark_rts.c", "headers.c", "mark.c",     "obj_map.c",  "blacklst.c", "finalize.c",
@@ -27,7 +33,7 @@ pub fn build(b: *std.Build) void {
         libgc.linkLibC();
         libgc.addIncludePath("vendor/zig-libgc/vendor/bdwgc/include");
         inline for (libgc_srcs) |src| {
-            libgc.addCSourceFile("vendor/zig-libgc/vendor/bdwgc/" ++ src, &cflags);
+            libgc.addCSourceFile("vendor/zig-libgc/vendor/bdwgc/" ++ src, cflags);
         }
     }
 

@@ -282,8 +282,11 @@ pub fn main() !u8 {
             if (parsed_args.options.@"print-result")
                 try stdout.print("{pretty}\n", .{result});
         } else return 1;
-    } else {
+    } else if (builtin.os.tag != .wasi) {
         try repl(allocator, realm);
+    } else {
+        try stderr.writeAll("REPL is not supported in this build!\n");
+        return 1;
     }
     return 0;
 }
