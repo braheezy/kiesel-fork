@@ -223,6 +223,35 @@ fn repl(allocator: Allocator, realm: *Realm) !void {
     }
 }
 
+fn replBasic(allocator: Allocator, realm: *Realm) !void {
+    const stdin = std.io.getStdIn().reader();
+
+    while (true) {
+        var array_list = std.ArrayList(u8).init(allocator);
+        defer array_list.deinit();
+        try stdout.writeAll("> ");
+        stdin.streamUntilDelimiter(array_list.writer(), '\n', std.math.maxInt(usize)) catch |err| switch (err) {
+            error.EndOfStream => {
+                try stdout.writeAll("\n");
+                break;
+            },
+            else => return err,
+        };
+        const source_text = try array_list.toOwnedSlice();
+        defer allocator.free(source_text);
+
+        // Directly show another prompt when spamming enter, whitespace is evaluated
+        // however (and will print 'undefined').
+        if (source_text.len == 0) continue;
+
+        if (try run(allocator, realm, "repl", source_text)) |result| {
+            try stdout.print("{pretty}\n", .{result});
+        }
+        // Handled exception & printed something, carry on
+        else continue;
+    }
+}
+
 pub fn main() !u8 {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -285,8 +314,7 @@ pub fn main() !u8 {
     } else if (builtin.os.tag != .wasi) {
         try repl(allocator, realm);
     } else {
-        try stderr.writeAll("REPL is not supported in this build!\n");
-        return 1;
+        try replBasic(allocator, realm);
     }
     return 0;
 }
