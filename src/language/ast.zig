@@ -439,12 +439,9 @@ pub const NumericLiteral = struct {
         const str = self.text[start..end];
         switch (self.type) {
             .number => {
-                const number = switch (self.system) {
+                const number: f64 = switch (self.system) {
                     .decimal => std.fmt.parseFloat(f64, str) catch unreachable,
-                    else => @floatFromInt(
-                        f64,
-                        std.fmt.parseInt(i128, str, base) catch unreachable,
-                    ),
+                    else => @floatFromInt(std.fmt.parseInt(i128, str, base) catch unreachable),
                 };
                 return Value.from(number);
             },

@@ -307,7 +307,7 @@ pub const Value = union(enum) {
         const int32bit = @mod(int, pow_2_32);
 
         // 5. If int32bit ≥ 2^31, return 𝔽(int32bit - 2^32); otherwise return 𝔽(int32bit).
-        return @intFromFloat(i32, if (int32bit >= pow_2_31) int32bit - pow_2_32 else int32bit);
+        return @intFromFloat(if (int32bit >= pow_2_31) int32bit - pow_2_32 else int32bit);
     }
 
     /// 7.1.7 ToUint32 ( argument )
@@ -315,7 +315,7 @@ pub const Value = union(enum) {
     pub fn toUint32(self: Self, agent: *Agent) !u32 {
         // OPTIMIZATION: We may already have a positive i32 :^)
         if (self == .number and self.number == .i32 and self.number.i32 >= 0)
-            return @intCast(u32, self.number.i32);
+            return @intCast(self.number.i32);
 
         // 1. Let number be ? ToNumber(argument).
         const number = try self.toNumber(agent);
@@ -330,7 +330,7 @@ pub const Value = union(enum) {
         const int32bit = @mod(int, pow_2_32);
 
         // 5. Return 𝔽(int32bit).
-        return @intFromFloat(u32, int32bit);
+        return @intFromFloat(int32bit);
     }
 
     /// 7.1.8 ToInt16 ( argument )
@@ -349,7 +349,7 @@ pub const Value = union(enum) {
         const int16bit = @mod(int, pow_2_16);
 
         // 5. If int16bit ≥ 2^15, return 𝔽(int16bit - 2^16); otherwise return 𝔽(int16bit).
-        return @intFromFloat(i16, if (int16bit >= pow_2_15) int16bit - pow_2_16 else int16bit);
+        return @intFromFloat(if (int16bit >= pow_2_15) int16bit - pow_2_16 else int16bit);
     }
 
     /// 7.1.9 ToUint16 ( argument )
@@ -368,7 +368,7 @@ pub const Value = union(enum) {
         const int16bit = @mod(int, pow_2_16);
 
         // 5. Return 𝔽(int16bit).
-        return @intFromFloat(u16, int16bit);
+        return @intFromFloat(int16bit);
     }
 
     /// 7.1.10 ToInt8 ( argument )
@@ -387,7 +387,7 @@ pub const Value = union(enum) {
         const int8bit = @mod(int, pow_2_8);
 
         // 5. If int8bit ≥ 2^7, return 𝔽(int8bit - 2^8); otherwise return 𝔽(int8bit).
-        return @intFromFloat(i8, if (int8bit >= pow_2_7) int8bit - pow_2_8 else int8bit);
+        return @intFromFloat(if (int8bit >= pow_2_7) int8bit - pow_2_8 else int8bit);
     }
 
     /// 7.1.11 ToUint8 ( argument )
@@ -406,7 +406,7 @@ pub const Value = union(enum) {
         const int8bit = @mod(int, pow_2_8);
 
         // 5. Return 𝔽(int8bit).
-        return @intFromFloat(u8, int8bit);
+        return @intFromFloat(int8bit);
     }
 
     /// 7.1.12 ToUint8Clamp ( argument )
@@ -424,7 +424,7 @@ pub const Value = union(enum) {
 
         // 5. Let f be floor(clamped).
         const f = @floor(clamped);
-        const f_int = @intFromFloat(u8, f);
+        const f_int: u8 = @intFromFloat(f);
 
         // 6. If clamped < f + 0.5, return 𝔽(f).
         if (clamped < f + 0.5) return f_int;
@@ -605,7 +605,7 @@ pub const Value = union(enum) {
         if (length <= 0) return 0;
 
         // 3. Return 𝔽(min(len, 2^53 - 1)).
-        return @intFromFloat(u53, @min(length, std.math.maxInt(u53)));
+        return @intFromFloat(@min(length, std.math.maxInt(u53)));
     }
 
     /// 7.1.22 ToIndex ( value )
@@ -619,7 +619,7 @@ pub const Value = union(enum) {
             return agent.throwException(.range_error, "Value is not not a valid index");
 
         // 3. Return integer.
-        return @intFromFloat(u53, integer);
+        return @intFromFloat(integer);
     }
 
     /// 7.2.2 IsArray ( argument )
@@ -773,7 +773,7 @@ pub const Value = union(enum) {
 
         // 4. Let list be a new empty List.
         if (len > std.math.maxInt(usize)) return error.OutOfMemory;
-        var list = try std.ArrayList(Value).initCapacity(agent.gc_allocator, @intCast(usize, len));
+        var list = try std.ArrayList(Value).initCapacity(agent.gc_allocator, @intCast(len));
         defer list.deinit();
 
         // 5. Let index be 0.

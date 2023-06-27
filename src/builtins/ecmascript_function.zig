@@ -430,7 +430,7 @@ pub fn ordinaryFunctionCreate(
     const len = parameter_list.expectedArgumentCount();
 
     // 22. Perform SetFunctionLength(F, len).
-    try setFunctionLength(function, @floatFromInt(f64, len));
+    try setFunctionLength(function, @floatFromInt(len));
 
     // 23. Return F.
     return function;

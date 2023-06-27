@@ -3,17 +3,17 @@
     .version = "0.1.0",
     .dependencies = .{
         .linenoise = .{
-            // NOTE: This points to a commit on my fork, update when https://github.com/joachimschmidt557/linenoize/pull/15 is merged
-            .url = "https://github.com/joachimschmidt557/linenoize/archive/7e966ae635e6aae14b9acd6a09fa8c10b51a7d7d.tar.gz",
-            .hash = "122091ec5c2e19230e066446ea79cc64eabe329827cf169127744791833c949e86df",
+            .url = "https://github.com/joachimschmidt557/linenoize/archive/7c5d3eff82e113bf887a0d895f08aaa9e1625109.tar.gz",
+            .hash = "12200be95c712af094b2ee9031212f2871c9fb8aafadb106bbc377fadcf41af08d07",
         },
         .parser_toolkit = .{
             .url = "https://github.com/MasterQ32/parser-toolkit/archive/92c2875f2f91bf2a22b2be89b47ef0c3732f4812.tar.gz",
             .hash = "1220265768f85ae009c6c20fbcabda75f4caacbd7efc0945dc92d3cec363a84e1329",
         },
+        // NOTE: This points to a commit on my fork, update when https://github.com/MasterQ32/zig-args/pull/43 is merged
         .zig_args = .{
-            .url = "https://github.com/MasterQ32/zig-args/archive/53f9b53d7bebe9baad52ed4d505b480540344946.tar.gz",
-            .hash = "122032821c42293e5175112c2519d8820a351ce41a335d6352d563db0624c38349ce",
+            .url = "https://github.com/MasterQ32/zig-args/archive/5311ceea18147dd19e93351b815516ef813a5b9c.tar.gz",
+            .hash = "12203d04cafc97f952d74cdb077e74c0ab3414f9f6b5fbd159112c62bfa584a0dbed",
         },
     },
 }

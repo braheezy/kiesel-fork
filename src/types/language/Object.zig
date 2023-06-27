@@ -70,7 +70,7 @@ pub inline fn is(self: Self, comptime T: type) bool {
 
 pub inline fn as(self: Self, comptime T: type) *T {
     std.debug.assert(self.is(T));
-    return @ptrCast(*T, @alignCast(@alignOf(T), self.ptr));
+    return @ptrCast(@alignCast(self.ptr));
 }
 
 // Helper functions so we don't have to say 'data' all the time

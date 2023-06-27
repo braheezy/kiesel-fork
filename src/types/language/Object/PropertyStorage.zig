@@ -58,9 +58,9 @@ const PropertyHashMap = std.ArrayHashMap(PropertyKey, PropertyDescriptor, struct
 
     pub fn hash(self: @This(), k: PropertyKey) u32 {
         return switch (k) {
-            .string => |string| @truncate(u32, hashString(string)),
-            .symbol => |symbol| @truncate(u32, hashSymbol(self, symbol.id)),
-            .integer_index => |integer_index| @truncate(u32, hashIntegerIndex(self, integer_index)),
+            .string => |string| @truncate(hashString(string)),
+            .symbol => |symbol| @truncate(hashSymbol(self, symbol.id)),
+            .integer_index => |integer_index| @truncate(hashIntegerIndex(self, integer_index)),
         };
     }
 

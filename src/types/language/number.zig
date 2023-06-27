@@ -44,19 +44,19 @@ pub const Number = union(enum) {
         const T = @TypeOf(number);
         switch (@typeInfo(T)) {
             .Int, .ComptimeInt => {
-                if (@floatFromInt(f64, number) <= @floatFromInt(f64, std.math.maxInt(i32))) {
-                    return .{ .i32 = @intCast(i32, number) };
+                if (@as(f64, @floatFromInt(number)) <= @as(f64, @floatFromInt(std.math.maxInt(i32)))) {
+                    return .{ .i32 = @intCast(number) };
                 }
-                return .{ .f64 = @floatFromInt(f64, number) };
+                return .{ .f64 = @floatFromInt(number) };
             },
             .Float, .ComptimeFloat => {
                 const truncated = std.math.trunc(number);
                 if (std.math.isFinite(@as(f64, number)) and
                     !std.math.signbit(@as(f64, number)) and
                     truncated == number and
-                    truncated <= @floatFromInt(f64, std.math.maxInt(i32)))
+                    truncated <= @as(f64, @floatFromInt(std.math.maxInt(i32))))
                 {
-                    return .{ .i32 = @intFromFloat(i32, truncated) };
+                    return .{ .i32 = @intFromFloat(truncated) };
                 }
                 return .{ .f64 = @as(f64, number) };
             },
@@ -67,7 +67,7 @@ pub const Number = union(enum) {
     pub inline fn asFloat(self: Self) f64 {
         return switch (self) {
             .f64 => |x| x,
-            .i32 => |x| @floatFromInt(f64, x),
+            .i32 => |x| @as(f64, @floatFromInt(x)),
         };
     }
 
@@ -141,9 +141,9 @@ pub const Number = union(enum) {
                 if (!std.math.isFinite(x) or x == 0) break :blk 0;
                 const int = @trunc(x);
                 const int32bit = @mod(int, pow_2_32);
-                break :blk @intFromFloat(
+                break :blk @as(
                     i32,
-                    if (int32bit >= pow_2_31) int32bit - pow_2_32 else int32bit,
+                    @intFromFloat(if (int32bit >= pow_2_31) int32bit - pow_2_32 else int32bit),
                 );
             },
             .i32 => |x| x,
@@ -157,12 +157,12 @@ pub const Number = union(enum) {
                 if (!std.math.isFinite(x) or x == 0) break :blk 0;
                 const int = @trunc(x);
                 const int32bit = @mod(int, pow_2_32);
-                break :blk @intFromFloat(u32, int32bit);
+                break :blk @as(u32, @intFromFloat(int32bit));
             },
             .i32 => |x| blk: {
                 const int = @as(i64, x);
-                const int32bit = @mod(int, comptime @intFromFloat(i64, pow_2_32));
-                break :blk @intCast(u32, int32bit);
+                const int32bit = @mod(int, comptime @as(i64, @intFromFloat(pow_2_32)));
+                break :blk @as(u32, @intCast(int32bit));
             },
         };
     }
@@ -387,7 +387,7 @@ pub const Number = union(enum) {
         const rnum = y.toInt32();
 
         // 3. Let shiftCount be ℝ(rnum) modulo 32.
-        const shift_count = @intCast(u5, @mod(rnum, 32));
+        const shift_count: u5 = @intCast(@mod(rnum, 32));
 
         // 4. Return the result of left shifting lnum by shiftCount bits. The mathematical value of
         //    the result is exactly representable as a 32-bit two's complement bit string.
@@ -404,7 +404,7 @@ pub const Number = union(enum) {
         const rnum = y.toUint32();
 
         // 3. Let shiftCount be ℝ(rnum) modulo 32.
-        const shift_count = @intCast(u5, @mod(rnum, 32));
+        const shift_count: u5 = @intCast(@mod(rnum, 32));
 
         // 4. Return the result of performing a sign-extending right shift of lnum by shiftCount
         //    bits. The most significant bit is propagated. The mathematical value of the result
@@ -422,7 +422,7 @@ pub const Number = union(enum) {
         const rnum = y.toUint32();
 
         // 3. Let shiftCount be ℝ(rnum) modulo 32.
-        const shift_count = @intCast(u5, @mod(rnum, 32));
+        const shift_count: u5 = @intCast(@mod(rnum, 32));
 
         // 4. Return the result of performing a zero-filling right shift of lnum by shiftCount
         //    bits. Vacated bits are filled with zero. The mathematical value of the result is

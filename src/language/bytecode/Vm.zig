@@ -440,7 +440,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
     switch (instruction) {
         .apply_string_or_numeric_binary_operator => {
             const operator_type = self.fetchIndex(executable);
-            const operator = @enumFromInt(ast.BinaryExpression.Operator, operator_type);
+            const operator: ast.BinaryExpression.Operator = @enumFromInt(operator_type);
             const rval = self.stack.pop();
             const lval = self.stack.pop();
             self.result = try applyStringOrNumericBinaryOperator(self.agent, lval, operator, rval);

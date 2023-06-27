@@ -43,7 +43,7 @@ fn prettyPrintArray(array: Object, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
     if (length != 0) try writer.writeAll(" ");
     for (0..length) |i| {
-        const property_key = PropertyKey.from(@intCast(PropertyKey.IntegerIndex, i));
+        const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i)));
         if (property_storage.get(property_key)) |property_descriptor| {
             try writer.print("{pretty}", .{property_descriptor.value.?});
         } else {
