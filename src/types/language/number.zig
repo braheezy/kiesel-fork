@@ -461,8 +461,10 @@ pub const Number = union(enum) {
         if (y.isNegativeInf()) return true;
 
         // 10. Assert: x and y are finite and non-zero.
-        std.debug.assert(std.math.isFinite(x.asFloat()) and x.asFloat() != 0);
-        std.debug.assert(std.math.isFinite(y.asFloat()) and y.asFloat() != 0);
+        // NOTE: This is a spec bug, the intended meaning is "x and y are not both zero".
+        //       See: https://github.com/tc39/ecma262/issues/3108
+        std.debug.assert(std.math.isFinite(x.asFloat()) and std.math.isFinite(y.asFloat()));
+        std.debug.assert(!(x.asFloat() == 0 and y.asFloat() == 0));
 
         // 11. If ℝ(x) < ℝ(y), return true. Otherwise, return false.
         return x.asFloat() < y.asFloat();
