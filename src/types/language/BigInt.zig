@@ -33,7 +33,7 @@ pub fn unaryMinus(self: Self) !Self {
     // 1.If x is 0ℤ, return 0ℤ.
     if (self.value.eqZero()) return self;
 
-    // 2. Return the BigInt value that represents the negation of ℝ(x).
+    // 2. Return -x.
     var cloned_value = try self.value.clone();
     cloned_value.negate();
     return .{ .value = cloned_value };
@@ -63,7 +63,7 @@ pub fn exponentiate(base: Self, agent: *Agent, exponent: Self) !Self {
     // 2. If base is 0ℤ and exponent is 0ℤ, return 1ℤ.
     if (base.value.eqZero() and exponent.value.eqZero()) return .{ .value = one };
 
-    // 3. Return the BigInt value that represents ℝ(base) raised to the power ℝ(exponent).
+    // 3. Return base raised to the power exponent.
     var result_value = try one.clone();
     var cloned_exponent = try exponent.value.clone();
     cloned_exponent.abs();
@@ -77,7 +77,7 @@ pub fn exponentiate(base: Self, agent: *Agent, exponent: Self) !Self {
 /// 6.1.6.2.4 BigInt::multiply ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-multiply
 pub fn multiply(x: Self, agent: *Agent, y: Self) !Self {
-    // 1. Return the BigInt value that represents the product of x and y.
+    // 1. Return x × y.
     var result_value = try Value.init(agent.gc_allocator);
     try result_value.mul(&x.value, &y.value);
     return .{ .value = result_value };
@@ -118,7 +118,7 @@ pub fn remainder(n: Self, agent: *Agent, d: Self) !Self {
 /// 6.1.6.2.7 BigInt::add ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-add
 pub fn add(x: Self, agent: *Agent, y: Self) !Self {
-    // 1. Return the BigInt value that represents the sum of x and y.
+    // 1. Return x + y.
     var result_value = try Value.init(agent.gc_allocator);
     try result_value.add(&x.value, &y.value);
     return .{ .value = result_value };
@@ -127,7 +127,7 @@ pub fn add(x: Self, agent: *Agent, y: Self) !Self {
 /// 6.1.6.2.8 BigInt::subtract ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-subtract
 pub fn subtract(x: Self, agent: *Agent, y: Self) !Self {
-    // 1. Return the BigInt value that represents the difference x minus y.
+    // 1. Return x - y.
     var result_value = try Value.init(agent.gc_allocator);
     try result_value.sub(&x.value, &y.value);
     return .{ .value = result_value };
@@ -137,8 +137,8 @@ pub fn subtract(x: Self, agent: *Agent, y: Self) !Self {
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-leftShift
 pub fn leftShift(_: Self, agent: *Agent, _: Self) !Self {
     // 1. If y < 0ℤ, then
-    //     a. Return the BigInt value that represents ℝ(x) / 2^-ℝ(y), rounding down to the nearest integer, including for negative numbers.
-    // 2. Return the BigInt value that represents ℝ(x) × 2^ℝ(y).
+    //     a. Return ℤ(floor(ℝ(x) / 2^-ℝ(y))).
+    // 2. Return x × 2ℤ^y.
     // TODO: Figure out how to do this with built-in functionality, shiftLeft() only accepts an usize
     return agent.throwException(.internal_error, "Left-shift for BigInts is not implemented");
 }
