@@ -9,6 +9,7 @@ const number = @import("builtins/number.zig");
 const object = @import("builtins/object.zig");
 const ordinary = @import("builtins/ordinary.zig");
 const string = @import("builtins/string.zig");
+const symbol = @import("builtins/symbol.zig");
 const throw_type_error = @import("builtins/throw_type_error.zig");
 
 pub const global_functions = global.global_functions;
@@ -35,6 +36,9 @@ pub const ObjectPrototype = object.ObjectPrototype;
 pub const String = string.String;
 pub const StringConstructor = string.StringConstructor;
 pub const StringPrototype = string.StringPrototype;
+pub const Symbol = symbol.Symbol;
+pub const SymbolConstructor = symbol.SymbolConstructor;
+pub const SymbolPrototype = symbol.SymbolPrototype;
 pub const ThrowTypeError = throw_type_error.ThrowTypeError;
 pub const addRestrictedFunctionProperties = ecmascript_function.addRestrictedFunctionProperties;
 pub const arrayCreate = array.arrayCreate;

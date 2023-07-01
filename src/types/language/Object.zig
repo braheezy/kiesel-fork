@@ -31,6 +31,7 @@ pub const Tag = enum(u32) {
     ecmascript_function,
     number,
     string,
+    symbol,
     _,
 };
 
@@ -64,6 +65,7 @@ pub inline fn is(self: Self, comptime T: type) bool {
         .{ builtins.ECMAScriptFunction, .ecmascript_function },
         .{ builtins.Number, .number },
         .{ builtins.String, .string },
+        .{ builtins.Symbol, .symbol },
     }) |entry| if (T == entry[0]) {
         return if (self.tag) |tag| tag == entry[1] else false;
     };
