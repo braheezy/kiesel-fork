@@ -1,0 +1,144 @@
+//! 21.1 Number Objects
+//! https://tc39.es/ecma262/#sec-number-objects
+
+const builtins = @import("../builtins.zig");
+const execution = @import("../execution.zig");
+const types = @import("../types.zig");
+const utils = @import("../utils.zig");
+
+const Agent = execution.Agent;
+const ArgumentsList = builtins.ArgumentsList;
+const Object = types.Object;
+const PropertyDescriptor = types.PropertyDescriptor;
+const Realm = execution.Realm;
+const Value = types.Value;
+const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinProperty = utils.defineBuiltinProperty;
+const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+
+/// 21.1.2 Properties of the Number Constructor
+/// https://tc39.es/ecma262/#sec-properties-of-the-number-constructor
+pub const NumberConstructor = struct {
+    pub fn create(realm: *Realm) !Object {
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+            .length = 1,
+            .name = "Number",
+            .realm = realm,
+            .prototype = try realm.intrinsics.@"%Function.prototype%"(),
+        });
+
+        // 21.1.2.15 Number.prototype
+        // https://tc39.es/ecma262/#sec-number.prototype
+        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+            .value = Value.from(try realm.intrinsics.@"%Number.prototype%"()),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
+        // 21.1.3.1 Number.prototype.constructor
+        // https://tc39.es/ecma262/#sec-number.prototype.constructor
+        try defineBuiltinProperty(
+            realm.intrinsics.@"%Number.prototype%"() catch unreachable,
+            "constructor",
+            Value.from(object),
+        );
+
+        return object;
+    }
+
+    /// 21.1.1.1 Number ( value )
+    /// https://tc39.es/ecma262/#sec-number-constructor-number-value
+    fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, new_target: ?Object) !Value {
+        const value = arguments.get(0);
+
+        const n = blk: {
+            // 1. If value is present, then
+            if (arguments.count() != 0) {
+                // a. Let prim be ? ToNumeric(value).
+                const primitive = try value.toNumeric(agent);
+
+                // b. If prim is a BigInt, let n be 𝔽(ℝ(prim)).
+                if (primitive == .big_int) break :blk types.Number.from(
+                    try primitive.big_int.asFloat(agent),
+                );
+
+                // c. Otherwise, let n be prim.
+                break :blk primitive.number;
+            }
+            // 2. Else,
+            else {
+                // a. Let n be +0𝔽.
+                break :blk types.Number.from(0);
+            }
+        };
+
+        // 3. If NewTarget is undefined, return n.
+        if (new_target == null) return Value.from(n);
+
+        // 4. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%Number.prototype%", « [[NumberData]] »).
+        const object = try ordinaryCreateFromConstructor(
+            Number,
+            agent,
+            new_target.?,
+            "%Number.prototype%",
+        );
+
+        // 5. Set O.[[NumberData]] to n.
+        object.as(Number).fields = .{ .number_data = n };
+
+        // 6. Return O.
+        return Value.from(object);
+    }
+};
+
+/// 21.1.3 Properties of the Number Prototype Object
+/// https://tc39.es/ecma262/#sec-properties-of-the-number-prototype-object
+pub const NumberPrototype = struct {
+    pub fn create(realm: *Realm) !Object {
+        const object = try Number.create(realm.agent, .{
+            .fields = .{
+                .number_data = types.Number.from(0),
+            },
+            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
+        });
+
+        return object;
+    }
+
+    /// https://tc39.es/ecma262/#thisnumbervalue
+    fn thisNumberValue(agent: *Agent, value: Value) !types.Number {
+        switch (value) {
+            // 1. If value is a Number, return value.
+            .number => |number| return number,
+
+            // 2. If value is an Object and value has a [[NumberData]] internal slot, then
+            .object => |object| if (object.is(Number)) {
+                // a. Let n be value.[[NumberData]].
+                // b. Assert: n is a Number.
+                const n = object.as(Number).fields.number_data;
+
+                // c. Return n.
+                return n;
+            },
+
+            else => {},
+        }
+
+        // 3. Throw a TypeError exception.
+        return agent.throwException(
+            .type_error,
+            "This value must be a number or Number object",
+        );
+    }
+};
+
+/// 21.1.4 Properties of Number Instances
+/// https://tc39.es/ecma262/#sec-properties-of-number-instances
+pub const Number = Object.Factory(.{
+    .Fields = struct {
+        /// [[NumberData]]
+        number_data: types.Number,
+    },
+    .tag = .number,
+});

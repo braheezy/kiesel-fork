@@ -64,11 +64,13 @@ fn prettyPrintPrimitiveWrapper(object: Object, writer: anytype) !void {
 
     const name = blk: {
         if (object.is(builtins.Boolean)) break :blk "Boolean";
+        if (object.is(builtins.Number)) break :blk "Number";
         if (object.is(builtins.String)) break :blk "String";
         @panic("Unhandled object type in prettyPrintPrimitiveWrapper()");
     };
     const value = blk: {
         if (object.is(builtins.Boolean)) break :blk Value.from(object.as(builtins.Boolean).fields.boolean_data);
+        if (object.is(builtins.Number)) break :blk Value.from(object.as(builtins.Number).fields.number_data);
         if (object.is(builtins.String)) break :blk Value.from(object.as(builtins.String).fields.string_data);
         @panic("Unhandled object type in prettyPrintPrimitiveWrapper()");
     };
@@ -166,7 +168,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
 
         if (object.is(builtins.Array))
             return prettyPrintArray(object, writer);
-        if (object.is(builtins.Boolean) or object.is(builtins.String))
+        if (object.is(builtins.Boolean) or object.is(builtins.Number) or object.is(builtins.String))
             return prettyPrintPrimitiveWrapper(object, writer);
         if (object.internalMethods().call != null)
             return prettyPrintFunction(object, writer);

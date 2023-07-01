@@ -29,6 +29,7 @@ pub const Tag = enum(u32) {
     boolean,
     builtin_function,
     ecmascript_function,
+    number,
     string,
     _,
 };
@@ -61,6 +62,7 @@ pub inline fn is(self: Self, comptime T: type) bool {
         .{ builtins.Boolean, .boolean },
         .{ builtins.BuiltinFunction, .builtin_function },
         .{ builtins.ECMAScriptFunction, .ecmascript_function },
+        .{ builtins.Number, .number },
         .{ builtins.String, .string },
     }) |entry| if (T == entry[0]) {
         return if (self.tag) |tag| tag == entry[1] else false;
