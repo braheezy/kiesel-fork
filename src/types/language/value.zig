@@ -569,9 +569,12 @@ pub const Value = union(enum) {
                 .fields = .{ .boolean_data = boolean },
                 .prototype = try realm.intrinsics.@"%Boolean.prototype%"(),
             }),
+            .string => |string| try builtins.String.create(agent, .{
+                .fields = .{ .string_data = string },
+                .prototype = try realm.intrinsics.@"%String.prototype%"(),
+            }),
             // TODO: Implement these objects
             .number => agent.throwException(.type_error, "toObject() not implemented for Number"),
-            .string => agent.throwException(.type_error, "toObject() not implemented for String"),
             .symbol => agent.throwException(.type_error, "toObject() not implemented for Symbol"),
             .big_int => agent.throwException(.type_error, "toObject() not implemented for BigInt"),
             .object => |object| object,
