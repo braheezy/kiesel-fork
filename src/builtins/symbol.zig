@@ -88,6 +88,15 @@ pub const SymbolPrototype = struct {
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
         try defineBuiltinFunction(object, "@@toPrimitive", @"@@toPrimitive", 1, realm);
 
+        // 20.4.3.6 Symbol.prototype [ @@toStringTag ]
+        // https://tc39.es/ecma262/#sec-symbol.prototype-@@tostringtag
+        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+            .value = Value.from("String"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
         return object;
     }
 
