@@ -27,6 +27,17 @@ pub fn format(
     try writer.writeAll("n");
 }
 
+pub fn asFloat(self: Self, agent: *Agent) !f64 {
+    // NOTE: We could also use to(i1024) here, which should cover the largest possible int for
+    //       an f64, but that fails to codegen on the Zig side for at least aarch64-macos and
+    //       wasm32-wasi. Going via toString() and parsing that into a float isn't great but
+    //       works for now.
+    return std.fmt.parseFloat(
+        f64,
+        try self.toString(agent.gc_allocator, 10),
+    ) catch unreachable;
+}
+
 /// 6.1.6.2.1 BigInt::unaryMinus ( x )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-unaryMinus
 pub fn unaryMinus(self: Self) !Self {

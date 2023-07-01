@@ -1068,19 +1068,9 @@ pub fn isLessThan(
             (ny == .number and ny.number.isNegativeInf())) return false;
 
         // k. If ℝ(nx) < ℝ(ny), return true; otherwise return false.
-        // NOTE: We could also use to(i1024) here, which should cover the largest possible int for
-        //       an f64, but that fails to codegen on the Zig side for at least aarch64-macos and
-        //       wasm32-wasi. Going via toString() and parsing that into a float isn't great but
-        //       works for now.
         return switch (nx) {
-            .number => nx.number.asFloat() < std.fmt.parseFloat(
-                f64,
-                try ny.big_int.toString(agent.gc_allocator, 10),
-            ) catch unreachable,
-            .big_int => std.fmt.parseFloat(
-                f64,
-                try nx.big_int.toString(agent.gc_allocator, 10),
-            ) catch unreachable < ny.number.asFloat(),
+            .number => nx.number.asFloat() < try ny.big_int.asFloat(agent),
+            .big_int => try nx.big_int.asFloat(agent) < ny.number.asFloat(),
         };
     }
 }
