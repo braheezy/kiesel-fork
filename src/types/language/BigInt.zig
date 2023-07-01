@@ -53,7 +53,6 @@ pub fn bitwiseNOT(self: Self) !Self {
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-exponentiate
 pub fn exponentiate(base: Self, agent: *Agent, exponent: Self) !Self {
     const one = agent.pre_allocated.one;
-    const two = agent.pre_allocated.two;
 
     // 1. If exponent < 0ℤ, throw a RangeError exception.
     if (!exponent.value.isPositive() and !exponent.value.eqZero()) {
@@ -61,14 +60,15 @@ pub fn exponentiate(base: Self, agent: *Agent, exponent: Self) !Self {
     }
 
     // 2. If base is 0ℤ and exponent is 0ℤ, return 1ℤ.
-    if (base.value.eqZero() and exponent.value.eqZero()) return .{ .value = one };
+    // NOTE: This also applies if the base is not zero.
+    if (exponent.value.eqZero()) return .{ .value = one };
 
     // 3. Return base raised to the power exponent.
-    var result_value = try one.clone();
+    var result_value = try base.value.clone();
     var cloned_exponent = try exponent.value.clone();
     cloned_exponent.abs();
-    while (!cloned_exponent.eqZero()) {
-        try result_value.mul(&result_value, &two);
+    while (cloned_exponent.order(one) == .gt) {
+        try result_value.mul(&result_value, &base.value);
         try cloned_exponent.sub(&cloned_exponent, &one);
     }
     return .{ .value = result_value };

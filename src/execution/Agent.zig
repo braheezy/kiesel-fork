@@ -26,7 +26,6 @@ gc_allocator: Allocator,
 options: Options,
 pre_allocated: struct {
     one: BigInt.Value,
-    two: BigInt.Value,
     pow_2_63: BigInt.Value,
     pow_2_64: BigInt.Value,
 },
@@ -84,7 +83,6 @@ pub fn init(options: Options) !Self {
     if (options.debug.disable_gc) gc.disable();
     self.pre_allocated = .{
         .one = try BigInt.Value.initSet(self.gc_allocator, 1),
-        .two = try BigInt.Value.initSet(self.gc_allocator, 2),
         .pow_2_63 = try BigInt.Value.initSet(self.gc_allocator, std.math.pow(u64, 2, 63)),
         .pow_2_64 = try BigInt.Value.initSet(self.gc_allocator, std.math.pow(u128, 2, 64)),
     };
@@ -113,7 +111,6 @@ pub fn init(options: Options) !Self {
 
 pub fn deinit(self: *Self) void {
     self.pre_allocated.one.deinit();
-    self.pre_allocated.two.deinit();
     self.pre_allocated.pow_2_63.deinit();
     self.pre_allocated.pow_2_64.deinit();
     self.execution_context_stack.deinit();
