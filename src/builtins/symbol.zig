@@ -86,6 +86,7 @@ pub const SymbolPrototype = struct {
 
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
+        try defineBuiltinFunction(object, "@@toPrimitive", @"@@toPrimitive", 1, realm);
 
         return object;
     }
@@ -130,6 +131,14 @@ pub const SymbolPrototype = struct {
     /// https://tc39.es/ecma262/#sec-symbol.prototype.valueof
     fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
         // 1. Return ? thisSymbolValue(this value).
+        return Value.from(try thisSymbolValue(agent, this_value));
+    }
+
+    /// 20.4.3.5 Symbol.prototype [ @@toPrimitive ] ( hint )
+    /// https://tc39.es/ecma262/#sec-symbol.prototype-@@toprimitive
+    fn @"@@toPrimitive"(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Return ? thisSymbolValue(this value).
+        // NOTE: The argument is ignored.
         return Value.from(try thisSymbolValue(agent, this_value));
     }
 };
