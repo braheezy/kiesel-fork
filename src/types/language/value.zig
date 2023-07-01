@@ -565,8 +565,8 @@ pub const Value = union(enum) {
         return switch (self) {
             .undefined => agent.throwException(.type_error, "Cannot convert undefined to Object"),
             .null => agent.throwException(.type_error, "Cannot convert null to Object"),
-            .boolean => try builtins.Boolean.create(agent, .{
-                .fields = .{ .boolean_data = false },
+            .boolean => |boolean| try builtins.Boolean.create(agent, .{
+                .fields = .{ .boolean_data = boolean },
                 .prototype = try realm.intrinsics.@"%Boolean.prototype%"(),
             }),
             // TODO: Implement these objects
