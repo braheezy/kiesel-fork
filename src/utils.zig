@@ -59,22 +59,29 @@ pub fn temporaryChange(
 
 pub fn defineBuiltinFunction(
     object: Object,
-    name: []const u8,
+    comptime name: []const u8,
     behaviour: *const Behaviour.RegularFn,
     length: u32,
     realm: *Realm,
 ) !void {
+    const function_name = if (comptime std.mem.startsWith(u8, name, "@@"))
+        std.fmt.comptimePrint("[Symbol.{s}]", .{name[2..]})
+    else
+        name;
     const function = try createBuiltinFunction(realm.agent, .{ .regular = behaviour }, .{
         .length = length,
-        .name = name,
+        .name = function_name,
         .realm = realm,
     });
     try defineBuiltinProperty(object, name, Value.from(function));
 }
 
-pub fn defineBuiltinProperty(object: Object, name: []const u8, value: anytype) !void {
+pub fn defineBuiltinProperty(object: Object, comptime name: []const u8, value: anytype) !void {
     const T = @TypeOf(value);
-    const property_key = PropertyKey.from(name);
+    const property_key = if (comptime std.mem.startsWith(u8, name, "@@"))
+        PropertyKey.from(@field(object.agent().well_known_symbols, name))
+    else
+        PropertyKey.from(name);
     const property_descriptor = if (T == Value)
         PropertyDescriptor{
             .value = value,
