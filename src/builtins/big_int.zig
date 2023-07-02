@@ -14,6 +14,7 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
@@ -94,6 +95,8 @@ pub const BigIntPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "toString", toString, 0, realm);
+
         return object;
     }
 
@@ -118,6 +121,27 @@ pub const BigIntPrototype = struct {
             .type_error,
             "This value must be a BigInt or BigInt object",
         );
+    }
+
+    /// 21.2.3.3 BigInt.prototype.toString ( [ radix ] )
+    /// https://tc39.es/ecma262/#sec-bigint.prototype.tostring
+    fn toString(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const radix = arguments.get(0);
+
+        // 1. Let x be ? thisBigIntValue(this value).
+        const x = try thisBigIntValue(agent, this_value);
+
+        // 2. If radix is undefined, let radixMV be 10.
+        // 3. Else, let radixMV be ? ToIntegerOrInfinity(radix).
+        const radix_mv = if (radix == .undefined) 10 else try radix.toIntegerOrInfinity(agent);
+
+        // 4. If radixMV is not in the inclusive interval from 2 to 36, throw a RangeError exception.
+        if (radix_mv < 2 or radix_mv > 36) {
+            return agent.throwException(.range_error, "Radix must be in range 2-36");
+        }
+
+        // 5. Return BigInt::toString(x, radixMV).
+        return Value.from(try x.toString(agent.gc_allocator, @intFromFloat(radix_mv)));
     }
 };
 
