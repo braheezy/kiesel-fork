@@ -96,6 +96,7 @@ pub const BigIntPrototype = struct {
         });
 
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
+        try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
 
         return object;
     }
@@ -142,6 +143,13 @@ pub const BigIntPrototype = struct {
 
         // 5. Return BigInt::toString(x, radixMV).
         return Value.from(try x.toString(agent.gc_allocator, @intFromFloat(radix_mv)));
+    }
+
+    /// 21.2.3.4 BigInt.prototype.valueOf ( )
+    /// https://tc39.es/ecma262/#sec-bigint.prototype.valueof
+    fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Return ? thisBigIntValue(this value).
+        return Value.from(try thisBigIntValue(agent, this_value));
     }
 };
 
