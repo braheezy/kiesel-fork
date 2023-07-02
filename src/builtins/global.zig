@@ -21,7 +21,7 @@ const NameAndPropertyDescriptor = struct {
     PropertyDescriptor,
 };
 
-pub fn globalObjectProperties(realm: *Realm) ![14]NameAndPropertyDescriptor {
+pub fn globalObjectProperties(realm: *Realm) ![15]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
     return [_]NameAndPropertyDescriptor{
         // 19.1.1 globalThis
@@ -55,6 +55,10 @@ pub fn globalObjectProperties(realm: *Realm) ![14]NameAndPropertyDescriptor {
         // 19.3.2 Array ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-array
         .{ "Array", .{ .value = Value.from(try realm.intrinsics.@"%Array%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.3.4 BigInt ( . . . )
+        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-bigint
+        .{ "BigInt", .{ .value = Value.from(try realm.intrinsics.@"%BigInt%"()), .writable = true, .enumerable = false, .configurable = true } },
 
         // 19.3.7 Boolean ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-boolean

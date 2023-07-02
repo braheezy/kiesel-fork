@@ -63,13 +63,14 @@ fn prettyPrintPrimitiveWrapper(object: Object, writer: anytype) !void {
     const tty_config = getTtyConfigForWriter(writer);
 
     const name = blk: {
-        if (object.is(builtins.Boolean)) break :blk "Boolean";
+        if (object.is(builtins.BigInt)) break :blk "BigInt";
         if (object.is(builtins.Number)) break :blk "Number";
         if (object.is(builtins.String)) break :blk "String";
         if (object.is(builtins.Symbol)) break :blk "Symbol";
         @panic("Unhandled object type in prettyPrintPrimitiveWrapper()");
     };
     const value = blk: {
+        if (object.is(builtins.BigInt)) break :blk Value.from(object.as(builtins.BigInt).fields.big_int_data);
         if (object.is(builtins.Boolean)) break :blk Value.from(object.as(builtins.Boolean).fields.boolean_data);
         if (object.is(builtins.Number)) break :blk Value.from(object.as(builtins.Number).fields.number_data);
         if (object.is(builtins.String)) break :blk Value.from(object.as(builtins.String).fields.string_data);
@@ -170,7 +171,8 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
 
         if (object.is(builtins.Array))
             return prettyPrintArray(object, writer);
-        if (object.is(builtins.Boolean) or
+        if (object.is(builtins.BigInt) or
+            object.is(builtins.Boolean) or
             object.is(builtins.Number) or
             object.is(builtins.String) or
             object.is(builtins.Symbol))

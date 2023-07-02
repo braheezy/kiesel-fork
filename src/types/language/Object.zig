@@ -26,6 +26,7 @@ const Self = @This();
 
 pub const Tag = enum(u32) {
     array,
+    big_int,
     boolean,
     builtin_function,
     ecmascript_function,
@@ -60,6 +61,7 @@ pub fn format(
 pub inline fn is(self: Self, comptime T: type) bool {
     inline for ([_]struct { type, Tag }{
         .{ builtins.Array, .array },
+        .{ builtins.BigInt, .big_int },
         .{ builtins.Boolean, .boolean },
         .{ builtins.BuiltinFunction, .builtin_function },
         .{ builtins.ECMAScriptFunction, .ecmascript_function },

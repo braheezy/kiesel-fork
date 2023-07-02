@@ -1,4 +1,5 @@
 const array = @import("builtins/array.zig");
+const big_int = @import("builtins/big_int.zig");
 const boolean = @import("builtins/boolean.zig");
 const builtin_function = @import("builtins/builtin_function.zig");
 const ecmascript_function = @import("builtins/ecmascript_function.zig");
@@ -20,6 +21,9 @@ pub const Array = array.Array;
 pub const ArrayConstructor = array.ArrayConstructor;
 pub const ArrayPrototype = array.ArrayPrototype;
 pub const Behaviour = builtin_function.Behaviour;
+pub const BigInt = big_int.BigInt;
+pub const BigIntConstructor = big_int.BigIntConstructor;
+pub const BigIntPrototype = big_int.BigIntPrototype;
 pub const Boolean = boolean.Boolean;
 pub const BooleanConstructor = boolean.BooleanConstructor;
 pub const BooleanPrototype = boolean.BooleanPrototype;

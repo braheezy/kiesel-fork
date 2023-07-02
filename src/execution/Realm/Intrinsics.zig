@@ -17,6 +17,8 @@ lazy_intrinsics: struct {
     @"%Array.prototype%": ?Object = null,
     @"%Boolean%": ?Object = null,
     @"%Boolean.prototype%": ?Object = null,
+    @"%BigInt%": ?Object = null,
+    @"%BigInt.prototype%": ?Object = null,
     @"%eval%": ?Object = null,
     @"%Function%": ?Object = null,
     @"%Function.prototype%": ?Object = null,
@@ -58,6 +60,12 @@ pub fn @"%Array%"(self: *Self) error{OutOfMemory}!Object {
 }
 pub fn @"%Array.prototype%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Array.prototype%", builtins.ArrayPrototype);
+}
+pub fn @"%BigInt%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%BigInt%", builtins.BigIntConstructor);
+}
+pub fn @"%BigInt.prototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%BigInt.prototype%", builtins.BigIntPrototype);
 }
 pub fn @"%Boolean%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Boolean%", builtins.BooleanConstructor);

@@ -581,8 +581,10 @@ pub const Value = union(enum) {
                 .fields = .{ .symbol_data = symbol },
                 .prototype = try realm.intrinsics.@"%Symbol.prototype%"(),
             }),
-            // TODO: Implement these objects
-            .big_int => agent.throwException(.type_error, "toObject() not implemented for BigInt"),
+            .big_int => |big_int| try builtins.BigInt.create(agent, .{
+                .fields = .{ .big_int_data = big_int },
+                .prototype = try realm.intrinsics.@"%BigInt.prototype%"(),
+            }),
             .object => |object| object,
         };
     }
