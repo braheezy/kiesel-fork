@@ -1169,8 +1169,14 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) !bool {
     // 13. If x is a BigInt and y is a Number, or if x is a Number and y is a BigInt, then
     if ((x == .big_int and y == .number) or (x == .number and y == .big_int)) {
         // a. If x is not finite or y is not finite, return false.
+        if ((x == .number and !x.number.isFinite()) or
+            (y == .number and !y.number.isFinite())) return false;
+
         // b. If ℝ(x) = ℝ(y), return true; otherwise return false.
-        // TODO
+        // TODO: Implement more efficient BigInt to f64 comparison
+        if ((x == .number and !x.isIntegralNumber()) or
+            (y == .number and !y.isIntegralNumber())) return false;
+        return std.mem.eql(u8, try x.toString(agent), try y.toString(agent));
     }
 
     // 14. Return false.
