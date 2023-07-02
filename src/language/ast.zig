@@ -191,6 +191,7 @@ pub const MemberExpression = struct {
             .expression => |expression| {
                 // 4. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
                 try expression.generateBytecode(executable, ctx);
+                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
                 try executable.addInstruction(.load);
                 try executable.addInstruction(.evaluate_property_access_with_expression_key);
                 try executable.addIndex(@intFromBool(strict));
