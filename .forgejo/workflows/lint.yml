@@ -1,0 +1,15 @@
+name: Lint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: docker
+    container:
+      image: ghcr.io/catthehacker/ubuntu:act-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: https://github.com/goto-bus-stop/setup-zig@v2
+      - run: zig fmt --check .
