@@ -42,7 +42,7 @@ pub fn asFloat(self: Self, agent: *Agent) !f64 {
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-unaryMinus
 pub fn unaryMinus(self: Self) !Self {
     // 1.If x is 0ℤ, return 0ℤ.
-    if (self.value.eqZero()) return self;
+    if (self.value.eqlZero()) return self;
 
     // 2. Return -x.
     var cloned_value = try self.value.clone();
@@ -66,13 +66,13 @@ pub fn exponentiate(base: Self, agent: *Agent, exponent: Self) !Self {
     const one = agent.pre_allocated.one;
 
     // 1. If exponent < 0ℤ, throw a RangeError exception.
-    if (!exponent.value.isPositive() and !exponent.value.eqZero()) {
+    if (!exponent.value.isPositive() and !exponent.value.eqlZero()) {
         return agent.throwException(.range_error, "Exponent must be positive");
     }
 
     // 2. If base is 0ℤ and exponent is 0ℤ, return 1ℤ.
     // NOTE: This also applies if the base is not zero.
-    if (exponent.value.eqZero()) return .{ .value = one };
+    if (exponent.value.eqlZero()) return .{ .value = one };
 
     // 3. Return base raised to the power exponent.
     var result_value = try base.value.clone();
@@ -98,7 +98,7 @@ pub fn multiply(x: Self, agent: *Agent, y: Self) !Self {
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-divide
 pub fn divide(x: Self, agent: *Agent, y: Self) !Self {
     // 1. If y is 0ℤ, throw a RangeError exception.
-    if (y.value.eqZero()) return agent.throwException(.range_error, "Division by zero");
+    if (y.value.eqlZero()) return agent.throwException(.range_error, "Division by zero");
 
     // 2. Let quotient be ℝ(x) / ℝ(y).
     // 3. Return ℤ(truncate(quotient)).
@@ -112,10 +112,10 @@ pub fn divide(x: Self, agent: *Agent, y: Self) !Self {
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-remainder
 pub fn remainder(n: Self, agent: *Agent, d: Self) !Self {
     // 1. If d is 0ℤ, throw a RangeError exception.
-    if (d.value.eqZero()) return agent.throwException(.range_error, "Division by zero");
+    if (d.value.eqlZero()) return agent.throwException(.range_error, "Division by zero");
 
     // 2. If n is 0ℤ, return 0ℤ.
-    if (n.value.eqZero()) return n;
+    if (n.value.eqlZero()) return n;
 
     // 3. Let quotient be ℝ(n) / ℝ(d).
     // 4. Let q be ℤ(truncate(quotient)).
@@ -192,7 +192,7 @@ pub fn lessThan(x: Self, y: Self) bool {
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-equal
 pub fn equal(x: Self, y: Self) bool {
     // 1. If ℝ(x) = ℝ(y), return true; otherwise return false.
-    return x.value.eq(y.value);
+    return x.value.eql(y.value);
 }
 
 /// 6.1.6.2.18 BigInt::bitwiseAND ( x, y )

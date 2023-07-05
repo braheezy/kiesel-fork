@@ -199,7 +199,7 @@ pub const Value = union(enum) {
             .number => |number| if (number.asFloat() == 0 or number.isNan()) {
                 return false;
             },
-            .big_int => |big_int| if (big_int.value.eqZero()) {
+            .big_int => |big_int| if (big_int.value.eqlZero()) {
                 return false;
             },
             .string => |string| if (string.len == 0) {
