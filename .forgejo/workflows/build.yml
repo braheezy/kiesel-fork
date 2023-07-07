@@ -1,0 +1,36 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: docker
+    container:
+      image: ghcr.io/catthehacker/ubuntu:act-22.04
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - uses: https://github.com/goto-bus-stop/setup-zig@v2
+      - name: Create build script
+        run: |
+          cat > build.sh << EOF
+          #!/bin/bash
+          zig build -Dtarget=\$1 -Doptimize=ReleaseSafe
+          mv zig-out/bin/\$2 zig-out/bin/\$3
+          curl \
+            -u "${{ secrets.ARTIFACT_UPLOAD_USER }}:${{ secrets.ARTIFACT_UPLOAD_PASSWORD }}" \
+            -F "path=@zig-out/bin/\$3" \
+            "https://files.kiesel.dev/upload?path=/"
+          EOF
+          chmod +x build.sh
+      - name: Build and upload kiesel-linux-aarch64
+        run: ./build.sh aarch64-linux-gnu kiesel kiesel-linux-aarch64
+      - name: Build and upload kiesel-linux-x86
+        run: ./build.sh x86-linux-gnu kiesel kiesel-linux-x86
+      - name: Build and upload kiesel-linux-x86_64
+        run: ./build.sh x86_64-linux-gnu kiesel kiesel-linux-x86_64
+      - name: Build and upload kiesel.wasm
+        run: ./build.sh wasm32-wasi kiesel.wasm kiesel.wasm
