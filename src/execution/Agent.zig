@@ -6,10 +6,12 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const builtins = @import("../builtins.zig");
 const default_host_hooks = @import("default_host_hooks.zig");
 const environments = @import("environments.zig");
 const types = @import("../types.zig");
 
+const ArgumentsList = builtins.ArgumentsList;
 const Environment = environments.Environment;
 const BigInt = types.BigInt;
 const ExecutionContext = @import("ExecutionContext.zig");
@@ -145,7 +147,7 @@ const ExceptionType = enum {
             .syntax_error => "SyntaxError",
             .type_error => "TypeError",
             .uri_error => "URIError",
-            .internal_error => "InternalError",
+            .internal_error => "Error",
         };
     }
 };
@@ -154,17 +156,27 @@ const ExceptionType = enum {
 /// https://tc39.es/ecma262/#sec-throw-an-exception
 pub fn throwException(
     self: *Self,
-    exception_type: ExceptionType,
+    comptime exception_type: ExceptionType,
     message: []const u8,
 ) error{ExceptionThrown} {
-    // TODO: Create an actual error object.
-    self.exception = Value.from(
-        std.fmt.allocPrint(
-            self.gc_allocator,
-            "{s}: {s}",
-            .{ exception_type.typeName(), message },
-        ) catch "InternalError: Out of memory",
-    );
+    const realm = self.currentRealm();
+    const constructor = @field(
+        Realm.Intrinsics,
+        "%" ++ exception_type.typeName() ++ "%",
+    )(&realm.intrinsics) catch unreachable; // Already allocated for the global object
+    self.exception = blk: {
+        const error_object = constructor.construct(.{
+            .arguments_list = ArgumentsList.from(.{Value.from(message)}),
+        }) catch |err| switch (err) {
+            error.OutOfMemory => break :blk Value.from("Out of memory"),
+            error.ExceptionThrown => unreachable,
+        };
+        if (exception_type == .internal_error) {
+            // We don't have a dedicated type for this, but let's at least adjust the name
+            error_object.as(builtins.Error).fields.error_data.name = "InternalError";
+        }
+        break :blk Value.from(error_object);
+    };
     return error.ExceptionThrown;
 }
 
