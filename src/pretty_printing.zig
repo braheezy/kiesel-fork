@@ -64,6 +64,7 @@ fn prettyPrintPrimitiveWrapper(object: Object, writer: anytype) !void {
 
     const name = blk: {
         if (object.is(builtins.BigInt)) break :blk "BigInt";
+        if (object.is(builtins.Boolean)) break :blk "Boolean";
         if (object.is(builtins.Number)) break :blk "Number";
         if (object.is(builtins.String)) break :blk "String";
         if (object.is(builtins.Symbol)) break :blk "Symbol";
