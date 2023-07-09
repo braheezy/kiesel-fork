@@ -240,12 +240,18 @@ pub const ObjectPrototype = struct {
         // 7. Else if O has a [[Call]] internal method, let builtinTag be "Function".
         else if (object.internalMethods().call) |_|
             "Function"
-        // TODO: 8. Else if O has an [[ErrorData]] internal slot, let builtinTag be "Error".
+        // 8. Else if O has an [[ErrorData]] internal slot, let builtinTag be "Error".
+        else if (object.is(builtins.Error))
+            "Error"
         // 9. Else if O has a [[BooleanData]] internal slot, let builtinTag be "Boolean".
         else if (object.is(builtins.Boolean))
             "Boolean"
-        // TODO: 10. Else if O has a [[NumberData]] internal slot, let builtinTag be "Number".
-        // TODO: 11. Else if O has a [[StringData]] internal slot, let builtinTag be "String".
+        // 10. Else if O has a [[NumberData]] internal slot, let builtinTag be "Number".
+        else if (object.is(builtins.Number))
+            "Number"
+        // 11. Else if O has a [[StringData]] internal slot, let builtinTag be "String".
+        else if (object.is(builtins.String))
+            "String"
         // TODO: 12. Else if O has a [[DateValue]] internal slot, let builtinTag be "Date".
         // TODO: 13. Else if O has a [[RegExpMatcher]] internal slot, let builtinTag be "RegExp".
         // 14. Else, let builtinTag be "Object".
