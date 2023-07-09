@@ -21,7 +21,7 @@ const NameAndPropertyDescriptor = struct {
     PropertyDescriptor,
 };
 
-pub fn globalObjectProperties(realm: *Realm) ![16]NameAndPropertyDescriptor {
+pub fn globalObjectProperties(realm: *Realm) ![22]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
     return [_]NameAndPropertyDescriptor{
         // 19.1.1 globalThis
@@ -68,6 +68,10 @@ pub fn globalObjectProperties(realm: *Realm) ![16]NameAndPropertyDescriptor {
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-error
         .{ "Error", .{ .value = Value.from(try realm.intrinsics.@"%Error%"()), .writable = true, .enumerable = false, .configurable = true } },
 
+        // 19.3.11 EvalError ( . . . )
+        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-evalerror
+        .{ "EvalError", .{ .value = Value.from(try realm.intrinsics.@"%EvalError%"()), .writable = true, .enumerable = false, .configurable = true } },
+
         // 19.3.15 Function ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-function
         .{ "Function", .{ .value = Value.from(try realm.intrinsics.@"%Function%"()), .writable = true, .enumerable = false, .configurable = true } },
@@ -80,6 +84,14 @@ pub fn globalObjectProperties(realm: *Realm) ![16]NameAndPropertyDescriptor {
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-object
         .{ "Object", .{ .value = Value.from(try realm.intrinsics.@"%Object%"()), .writable = true, .enumerable = false, .configurable = true } },
 
+        // 19.3.24 RangeError ( . . . )
+        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-rangeerror
+        .{ "RangeError", .{ .value = Value.from(try realm.intrinsics.@"%RangeError%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.3.25 ReferenceError ( . . . )
+        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-referenceerror
+        .{ "ReferenceError", .{ .value = Value.from(try realm.intrinsics.@"%ReferenceError%"()), .writable = true, .enumerable = false, .configurable = true } },
+
         // 19.3.29 String ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-string
         .{ "String", .{ .value = Value.from(try realm.intrinsics.@"%String%"()), .writable = true, .enumerable = false, .configurable = true } },
@@ -87,6 +99,18 @@ pub fn globalObjectProperties(realm: *Realm) ![16]NameAndPropertyDescriptor {
         // 19.3.30 Symbol ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-symbol
         .{ "Symbol", .{ .value = Value.from(try realm.intrinsics.@"%Symbol%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.3.31 SyntaxError ( . . . )
+        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-syntaxerror
+        .{ "SyntaxError", .{ .value = Value.from(try realm.intrinsics.@"%SyntaxError%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.3.32 TypeError ( . . . )
+        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-typeerror
+        .{ "TypeError", .{ .value = Value.from(try realm.intrinsics.@"%TypeError%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.3.37 URIError ( . . . )
+        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-urierror
+        .{ "URIError", .{ .value = Value.from(try realm.intrinsics.@"%URIError%"()), .writable = true, .enumerable = false, .configurable = true } },
     };
 }
 

@@ -21,6 +21,8 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
+const Self = @This();
+
 /// 20.5.2 Properties of the Error Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-error-constructor
 pub const ErrorConstructor = struct {
@@ -192,6 +194,169 @@ pub const Error = Object.Factory(.{
     },
     .tag = .@"error",
 });
+
+/// 20.5.5.1 EvalError
+/// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-evalerror
+pub const EvalError = NativeError();
+pub const EvalErrorConstructor = NativeErrorConstructor("EvalError");
+pub const EvalErrorPrototype = NativeErrorPrototype("EvalError");
+
+/// 20.5.5.2 RangeError
+/// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-rangeerror
+pub const RangeError = NativeError();
+pub const RangeErrorConstructor = NativeErrorConstructor("RangeError");
+pub const RangeErrorPrototype = NativeErrorPrototype("RangeError");
+
+/// 20.5.5.3 ReferenceError
+/// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-referenceerror
+pub const ReferenceError = NativeError();
+pub const ReferenceErrorConstructor = NativeErrorConstructor("ReferenceError");
+pub const ReferenceErrorPrototype = NativeErrorPrototype("ReferenceError");
+
+/// 20.5.5.4 SyntaxError
+/// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-syntaxerror
+pub const SyntaxError = NativeError();
+pub const SyntaxErrorConstructor = NativeErrorConstructor("SyntaxError");
+pub const SyntaxErrorPrototype = NativeErrorPrototype("SyntaxError");
+
+/// 20.5.5.5 TypeError
+/// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-typeerror
+pub const TypeError = NativeError();
+pub const TypeErrorConstructor = NativeErrorConstructor("TypeError");
+pub const TypeErrorPrototype = NativeErrorPrototype("TypeError");
+
+/// 20.5.5.6 URIError
+/// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-urierror
+pub const URIError = NativeError();
+pub const URIErrorConstructor = NativeErrorConstructor("URIError");
+pub const URIErrorPrototype = NativeErrorPrototype("URIError");
+
+/// 20.5.6.2 Properties of the NativeError Constructors
+/// https://tc39.es/ecma262/#sec-properties-of-the-nativeerror-constructors
+fn NativeErrorConstructor(comptime name: []const u8) type {
+    return struct {
+        pub fn create(realm: *Realm) !Object {
+            const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+                .length = 1,
+                .name = name,
+                .realm = realm,
+                .prototype = try realm.intrinsics.@"%Error%"(),
+            });
+
+            const prototypeFn = @field(Realm.Intrinsics, "%" ++ name ++ ".prototype%");
+
+            // 20.5.6.2.1 NativeError.prototype
+            // https://tc39.es/ecma262/#sec-nativeerror.prototype
+            try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+                .value = Value.from(try prototypeFn(&realm.intrinsics)),
+                .writable = false,
+                .enumerable = false,
+                .configurable = false,
+            });
+
+            // 20.5.6.3.1 NativeError.prototype.constructor
+            // https://tc39.es/ecma262/#sec-nativeerror.prototype.constructor
+            try defineBuiltinProperty(
+                prototypeFn(&realm.intrinsics) catch unreachable,
+                "constructor",
+                Value.from(object),
+            );
+
+            return object;
+        }
+
+        /// 20.5.6.1.1 NativeError ( message [ , options ] )
+        /// https://tc39.es/ecma262/#sec-nativeerror
+        fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, maybe_new_target: ?Object) !Value {
+            const message = arguments.get(0);
+            const options = arguments.get(1);
+
+            const T = @field(Self, name);
+
+            // 1. If NewTarget is undefined, let newTarget be the active function object; else let
+            //    newTarget be NewTarget.
+            const new_target = maybe_new_target orelse agent.activeFunctionObject();
+
+            // 2. Let O be ? OrdinaryCreateFromConstructor(
+            //      newTarget, "%NativeError.prototype%", « [[ErrorData]] »
+            //    ).
+            const object = try ordinaryCreateFromConstructor(
+                T,
+                agent,
+                new_target,
+                "%" ++ name ++ ".prototype%",
+            );
+
+            const native_error = @as(*T, @ptrCast(@alignCast(object.ptr)));
+
+            // Non-standard
+            native_error.fields = .{ .error_data = .{ .name = name, .message = "" } };
+            object.data.internal_methods.set = internalSet;
+
+            // 3. If message is not undefined, then
+            if (message != .undefined) {
+                // a. Let msg be ? ToString(message).
+                const msg = try message.toString(agent);
+
+                // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "message", msg).
+                object.createNonEnumerableDataPropertyOrThrow(
+                    PropertyKey.from("message"),
+                    Value.from(msg),
+                ) catch |err| try noexcept(err);
+
+                native_error.fields.error_data.message = msg;
+            }
+
+            // 4. Perform ? InstallErrorCause(O, options).
+            try installErrorCause(agent, object, options);
+
+            // 5. Return O.
+            return Value.from(object);
+        }
+    };
+}
+
+/// 20.5.6.3 Properties of the NativeError Prototype Objects
+/// https://tc39.es/ecma262/#sec-properties-of-the-nativeerror-prototype-objects
+fn NativeErrorPrototype(comptime name: []const u8) type {
+    return struct {
+        pub fn create(realm: *Realm) !Object {
+            const object = try builtins.Object.create(realm.agent, .{
+                .prototype = try realm.intrinsics.@"%Error.prototype%"(),
+            });
+
+            // 20.5.6.3.2 NativeError.prototype.message
+            // https://tc39.es/ecma262/#sec-nativeerror.prototype.message
+            try defineBuiltinProperty(
+                object,
+                "message",
+                Value.from(""),
+            );
+
+            // 20.5.6.3.3 NativeError.prototype.name
+            // https://tc39.es/ecma262/#sec-nativeerror.prototype.name
+            try defineBuiltinProperty(
+                object,
+                "name",
+                Value.from(name),
+            );
+
+            return object;
+        }
+    };
+}
+
+/// 20.5.6.4 Properties of NativeError Instances
+/// https://tc39.es/ecma262/#sec-properties-of-nativeerror-instances
+fn NativeError() type {
+    return Object.Factory(.{
+        // NOTE: This shares a tag with the plain Error objects as it is identified by the same
+        //       internal slot in the spec and thus subtypes are not distinguishable. For this
+        //       reason the Fields type must be identical for Object.as() casts to work.
+        .Fields = Error.Fields,
+        .tag = .@"error",
+    });
+}
 
 /// 20.5.8.1 InstallErrorCause ( O, options )
 /// https://tc39.es/ecma262/#sec-installerrorcause

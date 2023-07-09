@@ -22,6 +22,8 @@ lazy_intrinsics: struct {
     @"%Error%": ?Object = null,
     @"%Error.prototype%": ?Object = null,
     @"%eval%": ?Object = null,
+    @"%EvalError%": ?Object = null,
+    @"%EvalError.prototype%": ?Object = null,
     @"%Function%": ?Object = null,
     @"%Function.prototype%": ?Object = null,
     @"%isFinite%": ?Object = null,
@@ -30,11 +32,21 @@ lazy_intrinsics: struct {
     @"%Number.prototype%": ?Object = null,
     @"%Object%": ?Object = null,
     @"%Object.prototype%": ?Object = null,
+    @"%RangeError%": ?Object = null,
+    @"%RangeError.prototype%": ?Object = null,
+    @"%ReferenceError%": ?Object = null,
+    @"%ReferenceError.prototype%": ?Object = null,
     @"%String%": ?Object = null,
     @"%String.prototype%": ?Object = null,
     @"%Symbol%": ?Object = null,
     @"%Symbol.prototype%": ?Object = null,
+    @"%SyntaxError%": ?Object = null,
+    @"%SyntaxError.prototype%": ?Object = null,
     @"%ThrowTypeError%": ?Object = null,
+    @"%TypeError%": ?Object = null,
+    @"%TypeError.prototype%": ?Object = null,
+    @"%URIError%": ?Object = null,
+    @"%URIError.prototype%": ?Object = null,
 } = .{},
 
 inline fn lazyIntrinsic(
@@ -84,6 +96,12 @@ pub fn @"%Error.prototype%"(self: *Self) error{OutOfMemory}!Object {
 pub fn @"%eval%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%eval%", builtins.global_functions.Eval);
 }
+pub fn @"%EvalError%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%EvalError%", builtins.EvalErrorConstructor);
+}
+pub fn @"%EvalError.prototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%EvalError.prototype%", builtins.EvalErrorPrototype);
+}
 pub fn @"%Function%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Function%", builtins.FunctionConstructor);
 }
@@ -108,6 +126,18 @@ pub fn @"%Object%"(self: *Self) error{OutOfMemory}!Object {
 pub fn @"%Object.prototype%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Object.prototype%", builtins.ObjectPrototype);
 }
+pub fn @"%RangeError%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%RangeError%", builtins.RangeErrorConstructor);
+}
+pub fn @"%RangeError.prototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%RangeError.prototype%", builtins.RangeErrorPrototype);
+}
+pub fn @"%ReferenceError%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%ReferenceError%", builtins.ReferenceErrorConstructor);
+}
+pub fn @"%ReferenceError.prototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%ReferenceError.prototype%", builtins.ReferenceErrorPrototype);
+}
 pub fn @"%String%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%String%", builtins.StringConstructor);
 }
@@ -120,6 +150,24 @@ pub fn @"%Symbol%"(self: *Self) error{OutOfMemory}!Object {
 pub fn @"%Symbol.prototype%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Symbol.prototype%", builtins.SymbolPrototype);
 }
+pub fn @"%SyntaxError%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%SyntaxError%", builtins.SyntaxErrorConstructor);
+}
+pub fn @"%SyntaxError.prototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%SyntaxError.prototype%", builtins.SyntaxErrorPrototype);
+}
 pub fn @"%ThrowTypeError%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%ThrowTypeError%", builtins.ThrowTypeError);
+}
+pub fn @"%TypeError%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%TypeError%", builtins.TypeErrorConstructor);
+}
+pub fn @"%TypeError.prototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%TypeError.prototype%", builtins.TypeErrorPrototype);
+}
+pub fn @"%URIError%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%URIError%", builtins.URIErrorConstructor);
+}
+pub fn @"%URIError.prototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%URIError.prototype%", builtins.URIErrorPrototype);
 }
