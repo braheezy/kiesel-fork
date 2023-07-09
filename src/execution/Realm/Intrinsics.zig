@@ -15,10 +15,12 @@ realm: *Realm,
 lazy_intrinsics: struct {
     @"%Array%": ?Object = null,
     @"%Array.prototype%": ?Object = null,
-    @"%Boolean%": ?Object = null,
-    @"%Boolean.prototype%": ?Object = null,
     @"%BigInt%": ?Object = null,
     @"%BigInt.prototype%": ?Object = null,
+    @"%Boolean%": ?Object = null,
+    @"%Boolean.prototype%": ?Object = null,
+    @"%Error%": ?Object = null,
+    @"%Error.prototype%": ?Object = null,
     @"%eval%": ?Object = null,
     @"%Function%": ?Object = null,
     @"%Function.prototype%": ?Object = null,
@@ -72,6 +74,12 @@ pub fn @"%Boolean%"(self: *Self) error{OutOfMemory}!Object {
 }
 pub fn @"%Boolean.prototype%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Boolean.prototype%", builtins.BooleanPrototype);
+}
+pub fn @"%Error%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%Error%", builtins.ErrorConstructor);
+}
+pub fn @"%Error.prototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%Error.prototype%", builtins.ErrorPrototype);
 }
 pub fn @"%eval%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%eval%", builtins.global_functions.Eval);

@@ -59,6 +59,19 @@ fn prettyPrintArray(array: Object, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintError(@"error": Object, writer: anytype) !void {
+    const error_data = @"error".as(builtins.Error).fields.error_data;
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try tty_config.setColor(writer, .red);
+    try writer.writeAll(error_data.name);
+    if (error_data.message.len != 0) {
+        try writer.writeAll(": ");
+        try writer.writeAll(error_data.message);
+    }
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintPrimitiveWrapper(object: Object, writer: anytype) !void {
     const tty_config = getTtyConfigForWriter(writer);
 
@@ -172,6 +185,8 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
 
         if (object.is(builtins.Array))
             return prettyPrintArray(object, writer);
+        if (object.is(builtins.Error))
+            return prettyPrintError(object, writer);
         if (object.is(builtins.BigInt) or
             object.is(builtins.Boolean) or
             object.is(builtins.Number) or
