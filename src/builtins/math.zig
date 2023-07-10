@@ -58,6 +58,15 @@ pub const Math = struct {
             .configurable = false,
         });
 
+        // 21.3.1.5 Math.LOG2E
+        // https://tc39.es/ecma262/#sec-math.log2e
+        try defineBuiltinProperty(object, "LOG2E", PropertyDescriptor{
+            .value = Value.from(std.math.log2e),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
         return object;
     }
 };
