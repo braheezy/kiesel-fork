@@ -105,6 +105,7 @@ pub const NumberPrototype = struct {
         });
 
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
+        try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
 
         return object;
     }
@@ -154,6 +155,13 @@ pub const NumberPrototype = struct {
 
         // 5. Return Number::toString(x, radixMV).
         return Value.from(try x.toString(agent.gc_allocator, @intFromFloat(radix_mv)));
+    }
+
+    /// 21.1.3.7 Number.prototype.valueOf ( )
+    /// https://tc39.es/ecma262/#sec-number.prototype.valueof
+    fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Return ? thisNumberValue(this value).
+        return Value.from(try thisNumberValue(agent, this_value));
     }
 };
 
