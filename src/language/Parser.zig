@@ -348,9 +348,8 @@ fn acceptMemberExpression(self: *Self, primary_expression: ast.Expression) !ast.
     const token = try self.core.accept(RuleSet.oneOf(.{ .@"[", .@"." }));
     const property: ast.MemberExpression.Property = switch (token.type) {
         .@"[" => blk: {
-            const ctx = AcceptContext{ .precedence = getPrecedence(.@"[") };
             const property_expression = try self.allocator.create(ast.Expression);
-            property_expression.* = try self.acceptExpression(ctx);
+            property_expression.* = try self.acceptExpression(.{});
             _ = try self.core.accept(RuleSet.is(.@"]"));
             break :blk .{ .expression = property_expression };
         },
@@ -513,8 +512,7 @@ fn acceptPropertyDefinition(self: *Self) !ast.PropertyDefinition {
         property_name = .{ .literal_property_name = .{ .numeric_literal = numeric_literal } }
     else |_| if (self.core.accept(RuleSet.is(.@"["))) |_| {
         // ComputedPropertyName
-        const ctx = AcceptContext{ .precedence = getPrecedence(.@"[") };
-        const computed_property_name = try self.acceptExpression(ctx);
+        const computed_property_name = try self.acceptExpression(.{});
         property_name = ast.PropertyName{
             .computed_property_name = computed_property_name,
         };
