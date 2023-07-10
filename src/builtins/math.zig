@@ -31,6 +31,15 @@ pub const Math = struct {
             .configurable = false,
         });
 
+        // 21.3.1.2 Math.LN10
+        // https://tc39.es/ecma262/#sec-math.ln10
+        try defineBuiltinProperty(object, "LN10", PropertyDescriptor{
+            .value = Value.from(std.math.ln10),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
         return object;
     }
 };
