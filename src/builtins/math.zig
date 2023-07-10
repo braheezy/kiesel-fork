@@ -67,6 +67,15 @@ pub const Math = struct {
             .configurable = false,
         });
 
+        // 21.3.1.6 Math.PI
+        // https://tc39.es/ecma262/#sec-math.pi
+        try defineBuiltinProperty(object, "PI", PropertyDescriptor{
+            .value = Value.from(std.math.pi),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
         return object;
     }
 };
