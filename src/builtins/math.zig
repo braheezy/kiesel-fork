@@ -40,6 +40,15 @@ pub const Math = struct {
             .configurable = false,
         });
 
+        // 21.3.1.2 Math.LN2
+        // https://tc39.es/ecma262/#sec-math.ln2
+        try defineBuiltinProperty(object, "LN2", PropertyDescriptor{
+            .value = Value.from(std.math.ln2),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
         return object;
     }
 };
