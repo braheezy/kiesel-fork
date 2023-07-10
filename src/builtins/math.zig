@@ -85,6 +85,15 @@ pub const Math = struct {
             .configurable = false,
         });
 
+        // 21.3.1.8 Math.SQRT2
+        // https://tc39.es/ecma262/#sec-math.sqrt2
+        try defineBuiltinProperty(object, "SQRT2", PropertyDescriptor{
+            .value = Value.from(std.math.sqrt2),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
         return object;
     }
 };
