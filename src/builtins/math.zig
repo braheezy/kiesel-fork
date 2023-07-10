@@ -94,6 +94,15 @@ pub const Math = struct {
             .configurable = false,
         });
 
+        // 21.3.1.9 Math [ @@toStringTag ]
+        // https://tc39.es/ecma262/#sec-math-@@tostringtag
+        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+            .value = Value.from("Math"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
         return object;
     }
 };
