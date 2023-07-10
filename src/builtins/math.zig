@@ -49,6 +49,15 @@ pub const Math = struct {
             .configurable = false,
         });
 
+        // 21.3.1.4 Math.LOG10E
+        // https://tc39.es/ecma262/#sec-math.log10e
+        try defineBuiltinProperty(object, "LOG10E", PropertyDescriptor{
+            .value = Value.from(std.math.log10e),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
         return object;
     }
 };
