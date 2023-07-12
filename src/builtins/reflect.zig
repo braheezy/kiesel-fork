@@ -29,6 +29,7 @@ pub const Reflect = struct {
         try defineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 3, realm);
         try defineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm);
         try defineBuiltinFunction(object, "has", has, 2, realm);
+        try defineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm);
 
         return object;
     }
@@ -234,5 +235,22 @@ pub const Reflect = struct {
 
         // 3. Return ? target.[[HasProperty]](key).
         return Value.from(try target.object.internalMethods().hasProperty(target.object, key));
+    }
+
+    /// 28.1.9 Reflect.isExtensible ( target )
+    /// https://tc39.es/ecma262/#sec-reflect.isextensible
+    fn isExtensible(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const target = arguments.get(0);
+
+        // 1. If target is not an Object, throw a TypeError exception.
+        if (target != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{target}),
+            );
+        }
+
+        // 2. Return ? target.[[IsExtensible]]().
+        return Value.from(try target.object.internalMethods().isExtensible(target.object));
     }
 };
