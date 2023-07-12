@@ -27,6 +27,7 @@ pub const Reflect = struct {
         try defineBuiltinFunction(object, "deleteProperty", deleteProperty, 2, realm);
         try defineBuiltinFunction(object, "get", get, 1, realm);
         try defineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 3, realm);
+        try defineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm);
 
         return object;
     }
@@ -192,5 +193,24 @@ pub const Reflect = struct {
             )
         else
             return .undefined;
+    }
+
+    /// 28.1.7 Reflect.getPrototypeOf ( target )
+    /// https://tc39.es/ecma262/#sec-reflect.getprototypeof
+    fn getPrototypeOf(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const target = arguments.get(0);
+
+        // 1. If target is not an Object, throw a TypeError exception.
+        if (target != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{target}),
+            );
+        }
+
+        // 2. Return ? target.[[GetPrototypeOf]]().
+        return Value.from(
+            try target.object.internalMethods().getPrototypeOf(target.object) orelse return .undefined,
+        );
     }
 };
