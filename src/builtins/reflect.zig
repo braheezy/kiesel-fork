@@ -11,10 +11,12 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
 const Object = types.Object;
+const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
+const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 pub const Reflect = struct {
     pub fn create(realm: *Realm) !Object {
@@ -35,6 +37,15 @@ pub const Reflect = struct {
         try defineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm);
         try defineBuiltinFunction(object, "set", set, 3, realm);
         try defineBuiltinFunction(object, "setPrototypeOf", setPrototypeOf, 2, realm);
+
+        // 28.1.14 Reflect [ @@toStringTag ]
+        // https://tc39.es/ecma262/#sec-reflect-@@tostringtag
+        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+            .value = Value.from("Reflect"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
 
         return object;
     }
