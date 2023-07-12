@@ -26,6 +26,7 @@ pub const Reflect = struct {
         try defineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm);
         try defineBuiltinFunction(object, "deleteProperty", deleteProperty, 2, realm);
         try defineBuiltinFunction(object, "get", get, 1, realm);
+        try defineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 3, realm);
 
         return object;
     }
@@ -162,5 +163,34 @@ pub const Reflect = struct {
 
         // 4. Return ? target.[[Get]](key, receiver).
         return try target.object.internalMethods().get(target.object, key, receiver);
+    }
+
+    /// 28.1.6 Reflect.getOwnPropertyDescriptor ( target, propertyKey )
+    /// https://tc39.es/ecma262/#sec-reflect.getownpropertydescriptor
+    fn getOwnPropertyDescriptor(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const target = arguments.get(0);
+        const property_key = arguments.get(1);
+
+        // 1. If target is not an Object, throw a TypeError exception.
+        if (target != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{target}),
+            );
+        }
+
+        // 2. Let key be ? ToPropertyKey(propertyKey).
+        const key = try property_key.toPropertyKey(agent);
+
+        // 3. Let desc be ? target.[[GetOwnProperty]](key).
+        const maybe_descriptor = try target.object.internalMethods().getOwnProperty(target.object, key);
+
+        // 4. Return FromPropertyDescriptor(desc).
+        if (maybe_descriptor) |descriptor|
+            return Value.from(
+                try descriptor.fromPropertyDescriptor(agent) orelse return .undefined,
+            )
+        else
+            return .undefined;
     }
 };
