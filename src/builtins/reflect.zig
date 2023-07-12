@@ -32,6 +32,7 @@ pub const Reflect = struct {
         try defineBuiltinFunction(object, "has", has, 2, realm);
         try defineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm);
         try defineBuiltinFunction(object, "ownKeys", ownKeys, 1, realm);
+        try defineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm);
 
         return object;
     }
@@ -287,5 +288,22 @@ pub const Reflect = struct {
 
         // 3. Return CreateArrayFromList(keys).
         return Value.from(try createArrayFromList(agent, keys.items));
+    }
+
+    /// 28.1.11 Reflect.preventExtensions ( target )
+    /// https://tc39.es/ecma262/#sec-reflect.preventextensions
+    fn preventExtensions(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const target = arguments.get(0);
+
+        // 1. If target is not an Object, throw a TypeError exception.
+        if (target != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{target}),
+            );
+        }
+
+        // 2. Return ? target.[[PreventExtensions]]().
+        return Value.from(try target.object.internalMethods().preventExtensions(target.object));
     }
 };
