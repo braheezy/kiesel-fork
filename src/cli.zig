@@ -19,6 +19,7 @@ const Script = kiesel.language.Script;
 const Value = kiesel.types.Value;
 const defineBuiltinFunction = kiesel.utils.defineBuiltinFunction;
 const defineBuiltinProperty = kiesel.utils.defineBuiltinProperty;
+const formatParseError = kiesel.utils.formatParseError;
 const ordinaryObjectCreate = kiesel.builtins.ordinaryObjectCreate;
 
 const bdwgc_version_string = std.fmt.comptimePrint("{}.{}.{}", .{
@@ -119,7 +120,7 @@ pub const Kiesel = struct {
                 // b. Return Completion{[[Type]]: throw, [[Value]]: error, [[Target]]: empty}.
                 return agent.throwException(
                     .syntax_error,
-                    try agent.gc_allocator.dupe(u8, parse_error.message),
+                    try formatParseError(agent.gc_allocator, parse_error),
                 );
             },
         };

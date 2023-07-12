@@ -1,6 +1,10 @@
 //! Non-standard util functions
 
+const ptk = @import("ptk");
 const std = @import("std");
+
+const Allocator = std.mem.Allocator;
+const Error = ptk.Error;
 
 const builtins = @import("builtins.zig");
 const execution = @import("execution.zig");
@@ -52,6 +56,15 @@ pub fn temporaryChange(
 ) TemporaryChange(@TypeOf(lhs), field_name) {
     defer @field(lhs, field_name) = new_value;
     return .{ .lhs = lhs, .previous_value = @field(lhs, field_name) };
+}
+
+pub fn formatParseError(allocator: Allocator, parse_error: Error) ![]const u8 {
+    return std.fmt.allocPrint(allocator, "{s} ({s}:{}:{})", .{
+        parse_error.message,
+        parse_error.location.source orelse "<unknown>",
+        parse_error.location.line,
+        parse_error.location.column,
+    });
 }
 
 // NOTE: A lot of this behaviour is implied for all builtins and described at the end of

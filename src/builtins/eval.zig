@@ -5,6 +5,7 @@ const bytecode = @import("../language/bytecode.zig");
 const execution = @import("../execution.zig");
 const language = @import("../language.zig");
 const types = @import("../types.zig");
+const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Diagnostics = language.Diagnostics;
@@ -13,6 +14,7 @@ const ExecutionContext = execution.ExecutionContext;
 const Parser = @import("../language/Parser.zig");
 const PrivateEnvironment = execution.PrivateEnvironment;
 const Value = types.Value;
+const formatParseError = utils.formatParseError;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 
@@ -52,7 +54,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) !
             const parse_error = diagnostics.errors.items[0];
             return agent.throwException(
                 .syntax_error,
-                try agent.gc_allocator.dupe(u8, parse_error.message),
+                try formatParseError(agent.gc_allocator, parse_error),
             );
         },
     };

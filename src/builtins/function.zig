@@ -25,6 +25,7 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
+const formatParseError = utils.formatParseError;
 const makeConstructor = builtins.makeConstructor;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
 const setFunctionName = builtins.setFunctionName;
@@ -219,7 +220,7 @@ pub fn createDynamicFunction(
             const parse_error = diagnostics.errors.items[0];
             return agent.throwException(
                 .syntax_error,
-                try agent.gc_allocator.dupe(u8, parse_error.message),
+                try formatParseError(agent.gc_allocator, parse_error),
             );
         },
     };
@@ -235,7 +236,7 @@ pub fn createDynamicFunction(
             const parse_error = diagnostics.errors.items[0];
             return agent.throwException(
                 .syntax_error,
-                try agent.gc_allocator.dupe(u8, parse_error.message),
+                try formatParseError(agent.gc_allocator, parse_error),
             );
         },
     };
@@ -258,7 +259,7 @@ pub fn createDynamicFunction(
             const parse_error = diagnostics.errors.items[0];
             return agent.throwException(
                 .syntax_error,
-                try agent.gc_allocator.dupe(u8, parse_error.message),
+                try formatParseError(agent.gc_allocator, parse_error),
             );
         },
     };
