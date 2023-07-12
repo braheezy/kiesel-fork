@@ -155,7 +155,12 @@ fn run(
         .file_name = file_name,
     }) catch |err| switch (err) {
         error.ParseError => {
-            try diagnostics.print(stderr);
+            const parse_error = diagnostics.errors.items[0];
+            agent.throwException(
+                .syntax_error,
+                try formatParseError(agent.gc_allocator, parse_error),
+            ) catch {};
+            try stderr.print("Uncaught exception: {pretty}\n", .{agent.exception.?});
             return null;
         },
         error.OutOfMemory => return error.OutOfMemory,
