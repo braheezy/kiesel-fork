@@ -12,6 +12,7 @@ const ArgumentsList = builtins.ArgumentsList;
 const BigInt = @import("BigInt.zig");
 const Number = @import("number.zig").Number;
 const Object = @import("Object.zig");
+const PropertyDescriptor = @import("../spec/PropertyDescriptor.zig");
 const PropertyKey = Object.PropertyKey;
 const Symbol = @import("Symbol.zig");
 const noexcept = utils.noexcept;
@@ -129,6 +130,126 @@ pub const Value = union(enum) {
         } else {
             @compileError("Value.from() called with incompatible type " ++ @typeName(T));
         }
+    }
+
+    /// 6.2.6.5 ToPropertyDescriptor ( Obj )
+    /// https://tc39.es/ecma262/#sec-topropertydescriptor
+    pub fn toPropertyDescriptor(self: Self, agent: *Agent) !PropertyDescriptor {
+        // 1. If Obj is not an Object, throw a TypeError exception.
+        if (self != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{self}),
+            );
+        }
+
+        // 2. Let desc be a new Property Descriptor that initially has no fields.
+        var descriptor = PropertyDescriptor{};
+
+        // 3. Let hasEnumerable be ? HasProperty(Obj, "enumerable").
+        const has_enumerable = try self.object.hasProperty(PropertyKey.from("enumerable"));
+
+        // 4. If hasEnumerable is true, then
+        if (has_enumerable) {
+            // a. Let enumerable be ToBoolean(? Get(Obj, "enumerable")).
+            const enumerable = (try self.object.get(PropertyKey.from("enumerable"))).toBoolean();
+
+            // b. Set desc.[[Enumerable]] to enumerable.
+            descriptor.enumerable = enumerable;
+        }
+
+        // 5. Let hasConfigurable be ? HasProperty(Obj, "configurable").
+        const has_configurable = try self.object.hasProperty(PropertyKey.from("configurable"));
+
+        // 6. If hasConfigurable is true, then
+        if (has_configurable) {
+            // a. Let configurable be ToBoolean(? Get(Obj, "configurable")).
+            const configurable = (try self.object.get(PropertyKey.from("configurable"))).toBoolean();
+
+            // b. Set desc.[[Configurable]] to configurable.
+            descriptor.configurable = configurable;
+        }
+
+        // 7. Let hasValue be ? HasProperty(Obj, "value").
+        const has_value = try self.object.hasProperty(PropertyKey.from("value"));
+
+        // 8. If hasValue is true, then
+        if (has_value) {
+            // a. Let value be ? Get(Obj, "value").
+            const value = try self.object.get(PropertyKey.from("value"));
+
+            // b. Set desc.[[Value]] to value.
+            descriptor.value = value;
+        }
+
+        // 9. Let hasWritable be ? HasProperty(Obj, "writable").
+        const has_writable = try self.object.hasProperty(PropertyKey.from("writable"));
+
+        // 10. If hasWritable is true, then
+        if (has_writable) {
+            // a. Let writable be ToBoolean(? Get(Obj, "writable")).
+            const writable = (try self.object.get(PropertyKey.from("writable"))).toBoolean();
+
+            // b. Set desc.[[Writable]] to writable.
+            descriptor.writable = writable;
+        }
+
+        // 11. Let hasGet be ? HasProperty(Obj, "get").
+        const has_get = try self.object.hasProperty(PropertyKey.from("get"));
+
+        // 12. If hasGet is true, then
+        if (has_get) {
+            // a. Let getter be ? Get(Obj, "get").
+            const getter = try self.object.get(PropertyKey.from("get"));
+
+            // b. If IsCallable(getter) is false and getter is not undefined, throw a TypeError
+            //    exception.
+            if (!getter.isCallable()) {
+                return agent.throwException(
+                    .type_error,
+                    try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{getter}),
+                );
+            }
+
+            // c. Set desc.[[Get]] to getter.
+            descriptor.get = getter.object;
+        }
+
+        // 13. Let hasSet be ? HasProperty(Obj, "set").
+        const has_set = try self.object.hasProperty(PropertyKey.from("set"));
+
+        // 14. If hasSet is true, then
+        if (has_set) {
+            // a. Let setter be ? Get(Obj, "set").
+            const setter = try self.object.get(PropertyKey.from("set"));
+
+            // b. If IsCallable(setter) is false and setter is not undefined, throw a TypeError
+            //    exception.
+            if (!setter.isCallable()) {
+                return agent.throwException(
+                    .type_error,
+                    try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{setter}),
+                );
+            }
+
+            // c. Set desc.[[Set]] to setter.
+            descriptor.set = setter.object;
+        }
+
+        // 15. If desc has a [[Get]] field or desc has a [[Set]] field, then
+        if (descriptor.get != null or descriptor.set != null) {
+            // a. If desc has a [[Value]] field or desc has a [[Writable]] field, throw a TypeError
+            // exception.
+            if (descriptor.value != null or descriptor.writable != null) {
+                return agent.throwException(
+                    .type_error,
+                    "Descriptor with 'get' or 'set' property must not have 'value' or 'writable property'",
+                );
+            }
+        }
+
+        // 16. Return desc.
+        return descriptor;
     }
 
     /// 7.1.1 ToPrimitive ( input [ , preferredType ] )
