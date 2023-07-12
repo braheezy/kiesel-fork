@@ -50,7 +50,10 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) !
         error.ParseError => {
             // b. If script is a List of errors, throw a SyntaxError exception.
             const parse_error = diagnostics.errors.items[0];
-            return agent.throwException(.syntax_error, parse_error.message);
+            return agent.throwException(
+                .syntax_error,
+                try agent.gc_allocator.dupe(u8, parse_error.message),
+            );
         },
     };
 

@@ -117,7 +117,10 @@ pub const Kiesel = struct {
                 const parse_error = diagnostics.errors.items[0];
 
                 // b. Return Completion{[[Type]]: throw, [[Value]]: error, [[Target]]: empty}.
-                return agent.throwException(.syntax_error, parse_error.message);
+                return agent.throwException(
+                    .syntax_error,
+                    try agent.gc_allocator.dupe(u8, parse_error.message),
+                );
             },
         };
 
