@@ -28,6 +28,7 @@ pub const Reflect = struct {
         try defineBuiltinFunction(object, "get", get, 1, realm);
         try defineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 3, realm);
         try defineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm);
+        try defineBuiltinFunction(object, "has", has, 2, realm);
 
         return object;
     }
@@ -212,5 +213,26 @@ pub const Reflect = struct {
         return Value.from(
             try target.object.internalMethods().getPrototypeOf(target.object) orelse return .undefined,
         );
+    }
+
+    /// 28.1.8 Reflect.has ( target, propertyKey )
+    /// https://tc39.es/ecma262/#sec-reflect.has
+    fn has(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const target = arguments.get(0);
+        const property_key = arguments.get(1);
+
+        // 1. If target is not an Object, throw a TypeError exception.
+        if (target != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{target}),
+            );
+        }
+
+        // 2. Let key be ? ToPropertyKey(propertyKey).
+        const key = try property_key.toPropertyKey(agent);
+
+        // 3. Return ? target.[[HasProperty]](key).
+        return Value.from(try target.object.internalMethods().hasProperty(target.object, key));
     }
 };
