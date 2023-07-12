@@ -21,7 +21,7 @@ const NameAndPropertyDescriptor = struct {
     PropertyDescriptor,
 };
 
-pub fn globalObjectProperties(realm: *Realm) ![23]NameAndPropertyDescriptor {
+pub fn globalObjectProperties(realm: *Realm) ![24]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
     return [_]NameAndPropertyDescriptor{
         // 19.1.1 globalThis
@@ -115,6 +115,10 @@ pub fn globalObjectProperties(realm: *Realm) ![23]NameAndPropertyDescriptor {
         // 19.4.3 Math
         // https://tc39.es/ecma262/#sec-math
         .{ "Math", .{ .value = Value.from(try realm.intrinsics.@"%Math%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.4.4 Reflect
+        // https://tc39.es/ecma262/#sec-reflect
+        .{ "Reflect", .{ .value = Value.from(try realm.intrinsics.@"%Reflect%"()), .writable = true, .enumerable = false, .configurable = true } },
     };
 }
 
