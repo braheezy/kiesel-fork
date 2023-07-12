@@ -11,6 +11,7 @@ pub const PropertyKey = Object.PropertyKey;
 pub const Reference = spec.Reference;
 pub const Symbol = language.Symbol;
 pub const Value = language.Value;
+pub const createArrayFromList = language.createArrayFromList;
 pub const isLessThan = language.isLessThan;
 pub const isLooselyEqual = language.isLooselyEqual;
 pub const isStrictlyEqual = language.isStrictlyEqual;

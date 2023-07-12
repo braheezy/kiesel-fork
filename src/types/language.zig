@@ -5,6 +5,7 @@ pub const Number = @import("language/number.zig").Number;
 pub const Object = @import("language/Object.zig");
 pub const Symbol = @import("language/Symbol.zig");
 pub const Value = value.Value;
+pub const createArrayFromList = value.createArrayFromList;
 pub const isLessThan = value.isLessThan;
 pub const isLooselyEqual = value.isLooselyEqual;
 pub const isStrictlyEqual = value.isStrictlyEqual;

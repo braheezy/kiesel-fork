@@ -15,6 +15,7 @@ const Object = @import("Object.zig");
 const PropertyDescriptor = @import("../spec/PropertyDescriptor.zig");
 const PropertyKey = Object.PropertyKey;
 const Symbol = @import("Symbol.zig");
+const arrayCreate = builtins.arrayCreate;
 const noexcept = utils.noexcept;
 const prettyPrintValue = pretty_printing.prettyPrintValue;
 
@@ -1318,6 +1319,30 @@ pub fn isStrictlyEqual(x: Value, y: Value) bool {
 
     // 3. Return SameValueNonNumber(x, y).
     return sameValueNonNumber(x, y);
+}
+
+/// 7.3.18 CreateArrayFromList ( elements )
+/// https://tc39.es/ecma262/#sec-createarrayfromlist
+pub fn createArrayFromList(agent: *Agent, elements: []const Value) !Object {
+    // 1. Let array be ! ArrayCreate(0).
+    const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
+
+    // 2. Let n be 0.
+    // 3. For each element e of elements, do
+    for (elements, 0..) |element, n| {
+        const property_key = if (n <= std.math.maxInt(u53))
+            PropertyKey.from(@as(u53, @intCast(n)))
+        else
+            PropertyKey.from(try std.fmt.allocPrint(agent.gc_allocator, "{}", .{n}));
+
+        // a. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(n)), e).
+        array.createDataPropertyOrThrow(property_key, element) catch |err| try noexcept(err);
+
+        // b. Set n to n + 1.
+    }
+
+    // 4. Return array.
+    return array;
 }
 
 test "format" {
