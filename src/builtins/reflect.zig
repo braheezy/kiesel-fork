@@ -34,6 +34,7 @@ pub const Reflect = struct {
         try defineBuiltinFunction(object, "ownKeys", ownKeys, 1, realm);
         try defineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm);
         try defineBuiltinFunction(object, "set", set, 3, realm);
+        try defineBuiltinFunction(object, "setPrototypeOf", setPrototypeOf, 2, realm);
 
         return object;
     }
@@ -333,6 +334,37 @@ pub const Reflect = struct {
         // 4. Return ? target.[[Set]](key, V, receiver).
         return Value.from(
             try target.object.internalMethods().set(target.object, key, value, receiver),
+        );
+    }
+
+    /// 28.1.13 Reflect.setPrototypeOf ( target, proto )
+    /// https://tc39.es/ecma262/#sec-reflect.setprototypeof
+    fn setPrototypeOf(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const target = arguments.get(0);
+        const prototype = arguments.get(1);
+
+        // 1. If target is not an Object, throw a TypeError exception.
+        if (target != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{target}),
+            );
+        }
+
+        // 2. If proto is not an Object and proto is not null, throw a TypeError exception.
+        if (prototype != .object and prototype != .null) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object or null", .{prototype}),
+            );
+        }
+
+        // 3. Return ? target.[[SetPrototypeOf]](proto).
+        return Value.from(
+            try target.object.internalMethods().setPrototypeOf(
+                target.object,
+                if (prototype == .object) prototype.object else null,
+            ),
         );
     }
 };
