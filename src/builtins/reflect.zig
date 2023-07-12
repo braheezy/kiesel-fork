@@ -33,6 +33,7 @@ pub const Reflect = struct {
         try defineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm);
         try defineBuiltinFunction(object, "ownKeys", ownKeys, 1, realm);
         try defineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm);
+        try defineBuiltinFunction(object, "set", set, 3, realm);
 
         return object;
     }
@@ -305,5 +306,33 @@ pub const Reflect = struct {
 
         // 2. Return ? target.[[PreventExtensions]]().
         return Value.from(try target.object.internalMethods().preventExtensions(target.object));
+    }
+
+    /// 28.1.12 Reflect.set ( target, propertyKey, V [ , receiver ] )
+    /// https://tc39.es/ecma262/#sec-reflect.set
+    fn set(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const target = arguments.get(0);
+        const property_key = arguments.get(1);
+        const value = arguments.get(2);
+
+        // 1. If target is not an Object, throw a TypeError exception.
+        if (target != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{target}),
+            );
+        }
+
+        // 2. Let key be ? ToPropertyKey(propertyKey).
+        const key = try property_key.toPropertyKey(agent);
+
+        // 3. If receiver is not present, then
+        //     a. Set receiver to target.
+        const receiver = arguments.getOrNull(3) orelse target;
+
+        // 4. Return ? target.[[Set]](key, V, receiver).
+        return Value.from(
+            try target.object.internalMethods().set(target.object, key, value, receiver),
+        );
     }
 };
