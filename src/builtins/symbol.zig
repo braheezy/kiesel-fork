@@ -1,6 +1,8 @@
 //! 20.4 Symbol Objects
 //! https://tc39.es/ecma262/#sec-symbol-objects
 
+const std = @import("std");
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -37,6 +39,8 @@ pub const SymbolConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
+
+        try defineBuiltinFunction(object, "for", @"for", 1, realm);
 
         // 20.4.2.3 Symbol.hasInstance
         // https://tc39.es/ecma262/#sec-symbol.hasinstance
@@ -191,6 +195,36 @@ pub const SymbolConstructor = struct {
                 "Maximum number of symbols exceeded",
             ),
         });
+    }
+
+    // 20.4.2.2 Symbol.for ( key )
+    // https://tc39.es/ecma262/#sec-symbol.for
+    fn @"for"(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const key = arguments.get(0);
+
+        // 1. Let stringKey be ? ToString(key).
+        const string_key = try key.toString(agent);
+
+        // 2. For each element e of the GlobalSymbolRegistry List, do
+        //     a. If SameValue(e.[[Key]], stringKey) is true, return e.[[Symbol]].
+        if (agent.global_symbol_registry.get(string_key)) |symbol| return Value.from(symbol);
+
+        // 3. Assert: GlobalSymbolRegistry does not currently contain an entry for stringKey.
+        std.debug.assert(!agent.global_symbol_registry.contains(string_key));
+
+        // 4. Let newSymbol be a new Symbol whose [[Description]] is stringKey.
+        const new_symbol = agent.createSymbol(string_key) catch |err| switch (err) {
+            error.Overflow => return agent.throwException(
+                .internal_error,
+                "Maximum number of symbols exceeded",
+            ),
+        };
+
+        // 5. Append the Record { [[Key]]: stringKey, [[Symbol]]: newSymbol } to the GlobalSymbolRegistry List.
+        try agent.global_symbol_registry.putNoClobber(string_key, new_symbol);
+
+        // 6. Return newSymbol.
+        return Value.from(new_symbol);
     }
 };
 
