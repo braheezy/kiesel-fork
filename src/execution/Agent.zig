@@ -34,6 +34,7 @@ pre_allocated: struct {
 exception: ?Value = null,
 symbol_id: usize = 0,
 well_known_symbols: WellKnownSymbols,
+global_symbol_registry: std.StringArrayHashMap(Symbol),
 host_hooks: HostHooks,
 execution_context_stack: std.ArrayList(ExecutionContext),
 
@@ -79,6 +80,7 @@ pub fn init(options: Options) !Self {
         .options = options,
         .pre_allocated = undefined,
         .well_known_symbols = undefined,
+        .global_symbol_registry = undefined,
         .host_hooks = undefined,
         .execution_context_stack = undefined,
     };
@@ -103,6 +105,7 @@ pub fn init(options: Options) !Self {
         .@"@@toStringTag" = self.createSymbol("Symbol.toStringTag") catch unreachable,
         .@"@@unscopables" = self.createSymbol("Symbol.unscopables") catch unreachable,
     };
+    self.global_symbol_registry = std.StringArrayHashMap(Symbol).init(self.gc_allocator);
     self.host_hooks = .{
         .hostEnsureCanCompileStrings = default_host_hooks.hostEnsureCanCompileStrings,
         .hostHasSourceTextAvailable = default_host_hooks.hostHasSourceTextAvailable,
@@ -115,6 +118,7 @@ pub fn deinit(self: *Self) void {
     self.pre_allocated.one.deinit();
     self.pre_allocated.pow_2_63.deinit();
     self.pre_allocated.pow_2_64.deinit();
+    self.global_symbol_registry.deinit();
     self.execution_context_stack.deinit();
 }
 
