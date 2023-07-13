@@ -21,6 +21,7 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// https://tc39.es/ecma262/#sec-properties-of-the-symbol-constructor
 pub const SymbolConstructor = struct {
     pub fn create(realm: *Realm) !Object {
+        const agent = realm.agent;
         const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
             .length = 0,
             .name = "Symbol",
@@ -28,10 +29,127 @@ pub const SymbolConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        // 20.4.2.1 Symbol.asyncIterator
+        // https://tc39.es/ecma262/#sec-symbol.asynciterator
+        try defineBuiltinProperty(object, "asyncIterator", PropertyDescriptor{
+            .value = Value.from(agent.well_known_symbols.@"@@asyncIterator"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
+        // 20.4.2.3 Symbol.hasInstance
+        // https://tc39.es/ecma262/#sec-symbol.hasinstance
+        try defineBuiltinProperty(object, "hasInstance", PropertyDescriptor{
+            .value = Value.from(agent.well_known_symbols.@"@@hasInstance"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
+        // 20.4.2.4 Symbol.isConcatSpreadable
+        // https://tc39.es/ecma262/#sec-symbol.isconcatspreadable
+        try defineBuiltinProperty(object, "isConcatSpreadable", PropertyDescriptor{
+            .value = Value.from(agent.well_known_symbols.@"@@isConcatSpreadable"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
+        // 20.4.2.5 Symbol.iterator
+        // https://tc39.es/ecma262/#sec-symbol.iterator
+        try defineBuiltinProperty(object, "iterator", PropertyDescriptor{
+            .value = Value.from(agent.well_known_symbols.@"@@iterator"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
+        // 20.4.2.7 Symbol.match
+        // https://tc39.es/ecma262/#sec-symbol.match
+        try defineBuiltinProperty(object, "match", PropertyDescriptor{
+            .value = Value.from(agent.well_known_symbols.@"@@match"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
+        // 20.4.2.8 Symbol.matchAll
+        // https://tc39.es/ecma262/#sec-symbol.matchall
+        try defineBuiltinProperty(object, "matchAll", PropertyDescriptor{
+            .value = Value.from(agent.well_known_symbols.@"@@matchAll"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
         // 20.4.2.9 Symbol.prototype
         // https://tc39.es/ecma262/#sec-symbol.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Symbol.prototype%"()),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
+        // 20.4.2.10 Symbol.replace
+        // https://tc39.es/ecma262/#sec-symbol.replace
+        try defineBuiltinProperty(object, "replace", PropertyDescriptor{
+            .value = Value.from(agent.well_known_symbols.@"@@replace"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
+        // 20.4.2.11 Symbol.search
+        // https://tc39.es/ecma262/#sec-symbol.search
+        try defineBuiltinProperty(object, "search", PropertyDescriptor{
+            .value = Value.from(agent.well_known_symbols.@"@@search"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
+        // 20.4.2.12 Symbol.species
+        // https://tc39.es/ecma262/#sec-symbol.species
+        try defineBuiltinProperty(object, "species", PropertyDescriptor{
+            .value = Value.from(agent.well_known_symbols.@"@@species"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
+        // 20.4.2.13 Symbol.split
+        // https://tc39.es/ecma262/#sec-symbol.split
+        try defineBuiltinProperty(object, "split", PropertyDescriptor{
+            .value = Value.from(agent.well_known_symbols.@"@@split"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
+        // 20.4.2.14 Symbol.toPrimitive
+        // https://tc39.es/ecma262/#sec-symbol.toprimitive
+        try defineBuiltinProperty(object, "toPrimitive", PropertyDescriptor{
+            .value = Value.from(agent.well_known_symbols.@"@@toPrimitive"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
+        // 20.4.2.15 Symbol.toStringTag
+        // https://tc39.es/ecma262/#sec-symbol.tostringtag
+        try defineBuiltinProperty(object, "toStringTag", PropertyDescriptor{
+            .value = Value.from(agent.well_known_symbols.@"@@toStringTag"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
+        // 20.4.2.16 Symbol.unscopables
+        // https://tc39.es/ecma262/#sec-symbol.unscopables
+        try defineBuiltinProperty(object, "unscopables", PropertyDescriptor{
+            .value = Value.from(agent.well_known_symbols.@"@@unscopables"),
             .writable = false,
             .enumerable = false,
             .configurable = false,
