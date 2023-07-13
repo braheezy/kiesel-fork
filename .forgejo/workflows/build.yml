@@ -51,3 +51,7 @@ jobs:
         run: |
           ./build.sh wasm32-wasi
           ./upload.sh zig-out/bin/kiesel.wasm
+      - name: Update version.txt
+        run: |
+          git rev-parse --short=9 main > version.txt
+          ./upload.sh version.txt
