@@ -69,6 +69,8 @@ pub const SymbolConstructor = struct {
             .configurable = false,
         });
 
+        try defineBuiltinFunction(object, "keyFor", keyFor, 1, realm);
+
         // 20.4.2.7 Symbol.match
         // https://tc39.es/ecma262/#sec-symbol.match
         try defineBuiltinProperty(object, "match", PropertyDescriptor{
@@ -226,6 +228,23 @@ pub const SymbolConstructor = struct {
         // 6. Return newSymbol.
         return Value.from(new_symbol);
     }
+
+    // 20.4.2.6 Symbol.keyFor ( sym )
+    // https://tc39.es/ecma262/#sec-symbol.keyfor
+    fn keyFor(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const symbol = arguments.get(0);
+
+        // 1. If sym is not a Symbol, throw a TypeError exception.
+        if (symbol != .symbol) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not a Symbol", .{symbol}),
+            );
+        }
+
+        // 2. Return KeyForSymbol(sym).
+        return Value.from(keyForSymbol(agent, symbol.symbol) orelse return .undefined);
+    }
 };
 
 /// 20.4.3 Properties of the Symbol Prototype Object
@@ -313,3 +332,17 @@ pub const Symbol = Object.Factory(.{
     },
     .tag = .symbol,
 });
+
+/// 20.4.5.1 KeyForSymbol ( sym )
+/// https://tc39.es/ecma262/#sec-keyforsymbol
+pub fn keyForSymbol(agent: *Agent, symbol: types.Symbol) ?[]const u8 {
+    // 1. For each element e of the GlobalSymbolRegistry List, do
+    for (agent.global_symbol_registry.values()) |entry| {
+        // a. If SameValue(e.[[Symbol]], sym) is true, return e.[[Key]].
+        if (entry.id == symbol.id) return entry.description;
+    }
+
+    // 2. Assert: GlobalSymbolRegistry does not currently contain an entry for sym.
+    // 3. Return undefined.
+    return null;
+}
