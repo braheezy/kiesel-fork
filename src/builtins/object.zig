@@ -39,6 +39,7 @@ pub const ObjectConstructor = struct {
 
         try defineBuiltinFunction(object, "create", create_, 2, realm);
         try defineBuiltinFunction(object, "defineProperties", defineProperties, 2, realm);
+        try defineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm);
         try defineBuiltinFunction(object, "freeze", freeze, 1, realm);
         try defineBuiltinFunction(object, "is", is, 2, realm);
         try defineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm);
@@ -188,6 +189,34 @@ pub const ObjectConstructor = struct {
         }
 
         // 6. Return O.
+        return object;
+    }
+
+    /// 20.1.2.4 Object.defineProperty ( O, P, Attributes )
+    /// https://tc39.es/ecma262/#sec-object.defineproperty
+    fn defineProperty(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
+        const property = arguments.get(1);
+        const attributes = arguments.get(2);
+
+        // 1. If O is not an Object, throw a TypeError exception.
+        if (object != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{object}),
+            );
+        }
+
+        // 2. Let key be ? ToPropertyKey(P).
+        const property_key = try property.toPropertyKey(agent);
+
+        // 3. Let desc be ? ToPropertyDescriptor(Attributes).
+        const property_descriptor = try attributes.toPropertyDescriptor(agent);
+
+        // 4. Perform ? DefinePropertyOrThrow(O, key, desc).
+        try object.object.definePropertyOrThrow(property_key, property_descriptor);
+
+        // 5. Return O.
         return object;
     }
 
