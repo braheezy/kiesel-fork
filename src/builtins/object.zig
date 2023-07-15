@@ -37,6 +37,7 @@ pub const ObjectConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "create", create_, 2, realm);
         try defineBuiltinFunction(object, "freeze", freeze, 1, realm);
         try defineBuiltinFunction(object, "is", is, 2, realm);
         try defineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm);
@@ -91,6 +92,84 @@ pub const ObjectConstructor = struct {
         // 3. Return ! ToObject(value).
         // TODO: Use `catch |err| try noexcept(err)` once Value.toObject() is fully implemented
         return Value.from(try value.toObject(agent));
+    }
+
+    /// 20.1.2.2 Object.create ( O, Properties )
+    /// https://tc39.es/ecma262/#sec-object.create
+    fn create_(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
+        const properties = arguments.get(1);
+
+        // 1. If O is not an Object and O is not null, throw a TypeError exception.
+        if (object != .object and object != .null) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(
+                    agent.gc_allocator,
+                    "{} is not an Object or null",
+                    .{object},
+                ),
+            );
+        }
+
+        // 2. Let obj be OrdinaryObjectCreate(O).
+        const obj = try ordinaryObjectCreate(agent, if (object == .object) object.object else null);
+
+        // 3. If Properties is not undefined, then
+        if (properties != .undefined) {
+            // a. Return ? ObjectDefineProperties(obj, Properties).
+            return Value.from(try objectDefineProperties(agent, obj, properties));
+        }
+
+        // 4. Return obj.
+        return Value.from(obj);
+    }
+
+    /// 20.1.2.3.1 ObjectDefineProperties ( O, Properties )
+    /// https://tc39.es/ecma262/#sec-objectdefineproperties
+    fn objectDefineProperties(agent: *Agent, object: Object_, properties: Value) !Object_ {
+        // 1. Let props be ? ToObject(Properties).
+        const props = try properties.toObject(agent);
+
+        // 2. Let keys be ? props.[[OwnPropertyKeys]]().
+        const keys = try props.internalMethods().ownPropertyKeys(props);
+        defer keys.deinit();
+
+        const Property = struct {
+            key: PropertyKey,
+            descriptor: PropertyDescriptor,
+        };
+
+        // 3. Let descriptors be a new empty List.
+        var descriptors = std.ArrayList(Property).init(agent.gc_allocator);
+        defer descriptors.deinit();
+
+        // 4. For each element nextKey of keys, do
+        for (keys.items) |next_key| {
+            // a. Let propDesc be ? props.[[GetOwnProperty]](nextKey).
+            const maybe_property_descriptor = try props.internalMethods().getOwnProperty(props, next_key);
+
+            // b. If propDesc is not undefined and propDesc.[[Enumerable]] is true, then
+            if (maybe_property_descriptor) |property_descriptor| if (property_descriptor.enumerable == true) {
+                // i. Let descObj be ? Get(props, nextKey).
+                const descriptor_object = try props.get(next_key);
+
+                // ii. Let desc be ? ToPropertyDescriptor(descObj).
+                const descriptor = try descriptor_object.toPropertyDescriptor(agent);
+
+                // iii. Append the Record { [[Key]]: nextKey, [[Descriptor]]: desc } to descriptors.
+                try descriptors.append(.{ .key = next_key, .descriptor = descriptor });
+            };
+        }
+
+        // 5. For each element property of descriptors, do
+        for (descriptors.items) |property| {
+            // a. Perform ? DefinePropertyOrThrow(O, property.[[Key]], property.[[Descriptor]]).
+            try object.definePropertyOrThrow(property.key, property.descriptor);
+        }
+
+        // 6. Return O.
+        return object;
     }
 
     /// 20.1.2.6 Object.freeze ( O )
