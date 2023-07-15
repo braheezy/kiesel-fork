@@ -41,6 +41,7 @@ pub const ObjectConstructor = struct {
         try defineBuiltinFunction(object, "defineProperties", defineProperties, 2, realm);
         try defineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm);
         try defineBuiltinFunction(object, "freeze", freeze, 1, realm);
+        try defineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 2, realm);
         try defineBuiltinFunction(object, "is", is, 2, realm);
         try defineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm);
         try defineBuiltinFunction(object, "isFrozen", isFrozen, 1, realm);
@@ -236,6 +237,28 @@ pub const ObjectConstructor = struct {
 
         // 4. Return O.
         return object;
+    }
+
+    /// 20.1.2.8 Object.getOwnPropertyDescriptor ( O, P )
+    /// https://tc39.es/ecma262/#sec-object.getownpropertydescriptor
+    fn getOwnPropertyDescriptor(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
+        const property = arguments.get(1);
+
+        // 1. Let obj be ? ToObject(O).
+        const obj = try object.toObject(agent);
+
+        // 2. Let key be ? ToPropertyKey(P).
+        const property_key = try property.toPropertyKey(agent);
+
+        // 3. Let desc be ? obj.[[GetOwnProperty]](key).
+        const maybe_descriptor = try obj.internalMethods().getOwnProperty(obj, property_key);
+
+        // 4. Return FromPropertyDescriptor(desc).
+        if (maybe_descriptor) |descriptor|
+            return Value.from(try descriptor.fromPropertyDescriptor(agent))
+        else
+            return .undefined;
     }
 
     /// 20.1.2.14 Object.is ( value1, value2 )
