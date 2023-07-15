@@ -206,9 +206,7 @@ pub const Reflect = struct {
 
         // 4. Return FromPropertyDescriptor(desc).
         if (maybe_descriptor) |descriptor|
-            return Value.from(
-                try descriptor.fromPropertyDescriptor(agent) orelse return .undefined,
-            )
+            return Value.from(try descriptor.fromPropertyDescriptor(agent))
         else
             return .undefined;
     }
