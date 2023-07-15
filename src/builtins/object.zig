@@ -42,6 +42,7 @@ pub const ObjectConstructor = struct {
         try defineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm);
         try defineBuiltinFunction(object, "freeze", freeze, 1, realm);
         try defineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 2, realm);
+        try defineBuiltinFunction(object, "getOwnPropertyDescriptors", getOwnPropertyDescriptors, 1, realm);
         try defineBuiltinFunction(object, "is", is, 2, realm);
         try defineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm);
         try defineBuiltinFunction(object, "isFrozen", isFrozen, 1, realm);
@@ -259,6 +260,44 @@ pub const ObjectConstructor = struct {
             return Value.from(try descriptor.fromPropertyDescriptor(agent))
         else
             return .undefined;
+    }
+
+    /// 20.1.2.9 Object.getOwnPropertyDescriptors ( O )
+    /// https://tc39.es/ecma262/#sec-object.getownpropertydescriptors
+    fn getOwnPropertyDescriptors(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const realm = agent.currentRealm();
+        const object = arguments.get(0);
+
+        // 1. Let obj be ? ToObject(O).
+        const obj = try object.toObject(agent);
+
+        // 2. Let ownKeys be ? obj.[[OwnPropertyKeys]]().
+        const own_keys = try obj.internalMethods().ownPropertyKeys(obj);
+        defer own_keys.deinit();
+
+        // 3. Let descriptors be OrdinaryObjectCreate(%Object.prototype%).
+        const descriptors = try ordinaryObjectCreate(
+            agent,
+            try realm.intrinsics.@"%Object.prototype%"(),
+        );
+
+        // 4. For each element key of ownKeys, do
+        for (own_keys.items) |key| {
+            // a. Let desc be ? obj.[[GetOwnProperty]](key).
+            if (try obj.internalMethods().getOwnProperty(obj, key)) |property_descriptor| {
+                // b. Let descriptor be FromPropertyDescriptor(desc).
+                const descriptor = try property_descriptor.fromPropertyDescriptor(agent);
+
+                // c. If descriptor is not undefined, perform ! CreateDataPropertyOrThrow(descriptors, key, descriptor).
+                descriptors.createDataPropertyOrThrow(
+                    key,
+                    Value.from(descriptor),
+                ) catch |err| try noexcept(err);
+            }
+        }
+
+        // 5. Return descriptors.
+        return Value.from(descriptors);
     }
 
     /// 20.1.2.14 Object.is ( value1, value2 )
