@@ -232,6 +232,7 @@ pub fn arraySetLength(agent: *Agent, array: Object, property_descriptor: Propert
     //     in descending numeric index order, do
     // NOTE: Deletion invalidates the ArrayHashMap.keys() array, so we have to make a copy
     var indices = std.ArrayList(u32).init(agent.gc_allocator);
+    defer indices.deinit();
     for (array.propertyStorage().hash_map.keys()) |property_key| {
         if (property_key.isArrayIndex() and property_key.integer_index >= new_len) {
             try indices.append(@as(u32, @intCast(property_key.integer_index)));

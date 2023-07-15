@@ -338,6 +338,7 @@ pub fn setIntegrityLevel(self: Self, level: IntegrityLevel) !bool {
 
     // 3. Let keys be ? O.[[OwnPropertyKeys]]().
     const keys = try self.internalMethods().ownPropertyKeys(self);
+    defer keys.deinit();
 
     switch (level) {
         // 4. If level is sealed,
@@ -407,6 +408,7 @@ pub fn testIntegrityLevel(self: Self, level: IntegrityLevel) !bool {
 
     // 4. Let keys be ? O.[[OwnPropertyKeys]]().
     const keys = try self.internalMethods().ownPropertyKeys(self);
+    defer keys.deinit();
 
     // 5. For each element k of keys, do
     for (keys.items) |property_key| {

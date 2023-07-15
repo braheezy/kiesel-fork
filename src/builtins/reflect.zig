@@ -285,8 +285,13 @@ pub const Reflect = struct {
 
         // 2. Let keys be ? target.[[OwnPropertyKeys]]().
         const property_keys = try target.object.internalMethods().ownPropertyKeys(target.object);
+        defer property_keys.deinit();
         // TODO: Add createArrayFromList() overload for type conversions
-        var keys = try std.ArrayList(Value).initCapacity(agent.gc_allocator, property_keys.items.len);
+        var keys = try std.ArrayList(Value).initCapacity(
+            agent.gc_allocator,
+            property_keys.items.len,
+        );
+        defer keys.deinit();
         for (property_keys.items) |property_key| {
             keys.appendAssumeCapacity(switch (property_key) {
                 .string => |string| Value.from(string),

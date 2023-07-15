@@ -54,6 +54,8 @@ pub fn init(agent: *Agent) !Self {
 
 pub fn deinit(self: Self) void {
     self.stack.deinit();
+    self.reference_stack.deinit();
+    self.exception_jump_target_stack.deinit();
 }
 
 fn fetchInstruction(self: *Self, executable: Executable) ?Instruction {
@@ -520,6 +522,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
                 self.agent.gc_allocator,
                 argument_count,
             );
+            defer arguments.deinit();
             for (0..argument_count) |_| {
                 const argument = self.stack.pop();
                 try arguments.append(argument);

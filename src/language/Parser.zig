@@ -399,6 +399,7 @@ fn acceptArguments(self: *Self) !ast.Arguments {
     errdefer self.core.restoreState(state);
 
     var arguments = std.ArrayList(ast.Expression).init(self.allocator);
+    defer arguments.deinit();
     _ = try self.core.accept(RuleSet.is(.@"("));
     const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
     while (self.acceptExpression(ctx)) |argument| {
@@ -453,6 +454,7 @@ fn acceptArrayLiteral(self: *Self) !ast.ArrayLiteral {
 
     _ = try self.core.accept(RuleSet.is(.@"["));
     var elements = std.ArrayList(ast.ArrayLiteral.Element).init(self.allocator);
+    defer elements.deinit();
     const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
     while (true) {
         if (self.acceptExpression(ctx)) |expression| {
@@ -481,6 +483,7 @@ fn acceptPropertyDefinitionList(self: *Self) !ast.PropertyDefinitionList {
     errdefer self.core.restoreState(state);
 
     var property_definitions = std.ArrayList(ast.PropertyDefinition).init(self.allocator);
+    defer property_definitions.deinit();
     while (true) {
         if (self.acceptPropertyDefinition()) |property_definition| {
             try property_definitions.append(property_definition);
@@ -769,6 +772,7 @@ fn acceptSequenceExpression(self: *Self, primary_expression: ast.Expression) !as
     errdefer self.core.restoreState(state);
 
     var expressions = std.ArrayList(ast.Expression).init(self.allocator);
+    defer expressions.deinit();
     while (self.core.accept(RuleSet.is(.@","))) |_| {
         const expression = try self.acceptExpression(.{});
         try expressions.append(expression);
@@ -891,6 +895,7 @@ fn acceptStatementList(self: *Self) error{OutOfMemory}!ast.StatementList {
     errdefer self.core.restoreState(state);
 
     var statement_list_items = std.ArrayList(ast.StatementListItem).init(self.allocator);
+    defer statement_list_items.deinit();
     while (self.acceptStatementListItem()) |statement_list_item|
         try statement_list_items.append(statement_list_item)
     else |_| {}
@@ -933,6 +938,7 @@ fn acceptVariableDeclarationList(self: *Self) !ast.VariableDeclarationList {
     errdefer self.core.restoreState(state);
 
     var variable_declarations = std.ArrayList(ast.VariableDeclaration).init(self.allocator);
+    defer variable_declarations.deinit();
     while (self.acceptVariableDeclaration()) |variable_declaration| {
         try variable_declarations.append(variable_declaration);
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
@@ -1100,6 +1106,7 @@ fn acceptFormalParameters(self: *Self) !ast.FormalParameters {
     errdefer self.core.restoreState(state);
 
     var formal_parameters_items = std.ArrayList(ast.FormalParameters.Item).init(self.allocator);
+    defer formal_parameters_items.deinit();
     while (self.acceptBindingIdentifier()) |identifier| {
         const formal_parameter = ast.FormalParameter{
             .binding_element = .{ .identifier = identifier },
