@@ -38,6 +38,7 @@ pub const ObjectConstructor = struct {
         });
 
         try defineBuiltinFunction(object, "create", create_, 2, realm);
+        try defineBuiltinFunction(object, "defineProperties", defineProperties, 2, realm);
         try defineBuiltinFunction(object, "freeze", freeze, 1, realm);
         try defineBuiltinFunction(object, "is", is, 2, realm);
         try defineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm);
@@ -123,6 +124,24 @@ pub const ObjectConstructor = struct {
 
         // 4. Return obj.
         return Value.from(obj);
+    }
+
+    /// 20.1.2.3 Object.defineProperties ( O, Properties )
+    /// https://tc39.es/ecma262/#sec-object.defineproperties
+    fn defineProperties(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
+        const properties = arguments.get(1);
+
+        // 1. If O is not an Object, throw a TypeError exception.
+        if (object != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{object}),
+            );
+        }
+
+        // 2. Return ? ObjectDefineProperties(O, Properties).
+        return Value.from(try objectDefineProperties(agent, object.object, properties));
     }
 
     /// 20.1.2.3.1 ObjectDefineProperties ( O, Properties )
