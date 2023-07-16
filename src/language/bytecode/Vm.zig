@@ -834,7 +834,7 @@ pub fn run(self: *Self, executable: Executable) !Completion {
     while (self.fetchInstruction(executable)) |instruction| {
         self.executeInstruction(executable, instruction) catch |err| {
             if (self.exception_jump_target_stack.items.len != 0) {
-                // TODO: Store exceptiom and create catch binding
+                // TODO: Store exception and create catch binding
                 self.exception = self.agent.exception;
                 self.agent.exception = null;
                 self.ip = self.exception_jump_target_stack.getLast();

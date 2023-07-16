@@ -766,7 +766,7 @@ pub const Value = union(enum) {
         // 1. If argument is not an Object, return false.
         if (self != .object) return false;
 
-        // TODO: 2. If argument is an Array exotic object, return true.
+        // 2. If argument is an Array exotic object, return true.
         if (self.object.is(builtins.Array)) return true;
 
         // TODO: 3. If argument is a Proxy exotic object, then
