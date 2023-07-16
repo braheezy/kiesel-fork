@@ -19,6 +19,7 @@ const Symbol = @import("Symbol.zig");
 const arrayCreate = builtins.arrayCreate;
 const noexcept = utils.noexcept;
 const prettyPrintValue = pretty_printing.prettyPrintValue;
+const stringCreate = builtins.stringCreate;
 
 const pow_2_7 = std.math.pow(f64, 2, 7);
 const pow_2_8 = std.math.pow(f64, 2, 8);
@@ -698,10 +699,11 @@ pub const Value = union(enum) {
                 .fields = .{ .number_data = number },
                 .prototype = try realm.intrinsics.@"%Number.prototype%"(),
             }),
-            .string => |string| try builtins.String.create(agent, .{
-                .fields = .{ .string_data = string },
-                .prototype = try realm.intrinsics.@"%String.prototype%"(),
-            }),
+            .string => |string| try stringCreate(
+                agent,
+                string,
+                try realm.intrinsics.@"%String.prototype%"(),
+            ),
             .symbol => |symbol| try builtins.Symbol.create(agent, .{
                 .fields = .{ .symbol_data = symbol },
                 .prototype = try realm.intrinsics.@"%Symbol.prototype%"(),

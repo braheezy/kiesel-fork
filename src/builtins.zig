@@ -96,6 +96,7 @@ pub const ordinarySetWithOwnDescriptor = ordinary.ordinarySetWithOwnDescriptor;
 pub const performEval = eval.performEval;
 pub const setFunctionLength = ecmascript_function.setFunctionLength;
 pub const setFunctionName = ecmascript_function.setFunctionName;
+pub const stringCreate = string.stringCreate;
 
 test {
     _ = builtin_function;
