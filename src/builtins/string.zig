@@ -1,6 +1,8 @@
 //! 22.1 String Objects
 //! https://tc39.es/ecma262/#sec-string-objects
 
+const std = @import("std");
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -18,6 +20,20 @@ const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const noexcept = utils.noexcept;
+const ordinaryGetOwnProperty = builtins.ordinaryGetOwnProperty;
+
+/// 10.4.3.1 [[GetOwnProperty]] ( P )
+/// https://tc39.es/ecma262/#sec-string-exotic-objects-getownproperty-p
+fn getOwnProperty(object: Object, property_key: PropertyKey) !?PropertyDescriptor {
+    // 1. Let desc be OrdinaryGetOwnProperty(S, P).
+    const property_descriptor = ordinaryGetOwnProperty(object, property_key);
+
+    // 2. If desc is not undefined, return desc.
+    if (property_descriptor != null) return property_descriptor;
+
+    // 3. Return StringGetOwnProperty(S, P).
+    return stringGetOwnProperty(object.as(String), property_key);
+}
 
 /// 10.4.3.4 StringCreate ( value, prototype )
 /// https://tc39.es/ecma262/#sec-stringcreate
@@ -31,11 +47,15 @@ pub fn stringCreate(agent: *Agent, value: types.String, prototype: Object) !Obje
             // 3. Set S.[[StringData]] to value.
             .string_data = value,
         },
-    });
 
-    // TODO: 4. Set S.[[GetOwnProperty]] as specified in 10.4.3.1.
-    // TODO: 5. Set S.[[DefineOwnProperty]] as specified in 10.4.3.2.
-    // TODO: 6. Set S.[[OwnPropertyKeys]] as specified in 10.4.3.3.
+        .internal_methods = .{
+            // 4. Set S.[[GetOwnProperty]] as specified in 10.4.3.1.
+            .getOwnProperty = getOwnProperty,
+
+            // TODO: 5. Set S.[[DefineOwnProperty]] as specified in 10.4.3.2.
+            // TODO: 6. Set S.[[OwnPropertyKeys]] as specified in 10.4.3.3.
+        },
+    });
 
     // 7. Let length be the length of value.
     const length = value.utf16Length();
@@ -52,6 +72,39 @@ pub fn stringCreate(agent: *Agent, value: types.String, prototype: Object) !Obje
 
     // 9. Return S.
     return string;
+}
+
+/// 10.4.3.5 StringGetOwnProperty ( S, P )
+/// https://tc39.es/ecma262/#sec-stringgetownproperty
+fn stringGetOwnProperty(string: *const String, property_key: PropertyKey) !?PropertyDescriptor {
+    const agent = string.data.agent;
+
+    // 1. If P is not a String, return undefined.
+    // 2. Let index be CanonicalNumericIndexString(P).
+    // 3. If index is undefined, return undefined.
+    // 4. If IsIntegralNumber(index) is false, return undefined.
+    // 5. If index is -0𝔽, return undefined.
+    if (property_key != .integer_index) return null;
+    if (property_key.integer_index > std.math.maxInt(usize) - 1) return null;
+    const index: usize = @intCast(property_key.integer_index);
+
+    // 6. Let str be S.[[StringData]].
+    // 7. Assert: str is a String.
+    const str = string.fields.string_data;
+
+    // 8. Let len be the length of str.
+    const len = str.utf16Length();
+
+    // 9. If ℝ(index) < 0 or len ≤ ℝ(index), return undefined.
+    if (len <= index) return null;
+
+    // 10. Let resultStr be the substring of str from ℝ(index) to ℝ(index) + 1.
+    const result_str = try agent.gc_allocator.dupe(u8, str.value[index .. index + 1]);
+
+    // 11. Return the PropertyDescriptor {
+    //       [[Value]]: resultStr, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
+    //     }.
+    return .{ .value = Value.from(result_str), .writable = false, .enumerable = true, .configurable = false };
 }
 
 /// 22.1.2 Properties of the String Constructor
