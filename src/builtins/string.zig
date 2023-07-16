@@ -1,8 +1,6 @@
 //! 22.1 String Objects
 //! https://tc39.es/ecma262/#sec-string-objects
 
-const std = @import("std");
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -40,7 +38,7 @@ pub fn stringCreate(agent: *Agent, value: types.String, prototype: Object) !Obje
     // TODO: 6. Set S.[[OwnPropertyKeys]] as specified in 10.4.3.3.
 
     // 7. Let length be the length of value.
-    const length = std.unicode.calcUtf16LeLen(value.value) catch unreachable;
+    const length = value.utf16Length();
 
     // 8. Perform ! DefinePropertyOrThrow(S, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
