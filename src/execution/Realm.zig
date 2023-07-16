@@ -1,6 +1,9 @@
 //! 9.3 Realms
 //! https://tc39.es/ecma262/#sec-code-realms
 
+const std = @import("std");
+const Xoroshiro128 = std.rand.Xoroshiro128;
+
 const builtins = @import("../builtins.zig");
 const environments = @import("environments.zig");
 const types = @import("../types.zig");
@@ -20,6 +23,7 @@ pub const Intrinsics = @import("Realm/Intrinsics.zig");
 const Self = @This();
 
 agent: *Agent,
+rng: Xoroshiro128,
 
 /// [[Intrinsics]]
 intrinsics: Intrinsics,
@@ -50,6 +54,7 @@ pub fn create(agent: *Agent) !*Self {
     realm.* = .{
         .agent = realm.agent,
         .intrinsics = realm.intrinsics,
+        .rng = Xoroshiro128.init(@intFromPtr(realm)),
 
         // 3. Set realmRec.[[GlobalObject]] to undefined.
         .global_object = undefined,

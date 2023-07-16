@@ -8,10 +8,13 @@ const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
+const Agent = execution.Agent;
+const ArgumentsList = builtins.ArgumentsList;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 /// 21.3.1 Value Properties of the Math Object
@@ -103,6 +106,16 @@ pub const Math = struct {
             .configurable = true,
         });
 
+        try defineBuiltinFunction(object, "random", random, 0, realm);
+
         return object;
+    }
+
+    /// 21.3.2.27 Math.random ( )
+    /// https://tc39.es/ecma262/#sec-math.random
+    fn random(agent: *Agent, _: Value, _: ArgumentsList) !Value {
+        const realm = agent.currentRealm();
+        const value = @min(realm.rng.random().float(f64), 1 - std.math.floatEps(f64));
+        return Value.from(value);
     }
 };
