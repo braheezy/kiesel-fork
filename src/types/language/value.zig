@@ -1116,14 +1116,8 @@ pub fn isLessThan(
 
     // 3. If px is a String and py is a String, then
     if (px == .string and py == .string) {
-        const px_code_units = std.unicode.utf8ToUtf16LeWithNull(agent.gc_allocator, px.string.value) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.InvalidUtf8 => unreachable,
-        };
-        const py_code_units = std.unicode.utf8ToUtf16LeWithNull(agent.gc_allocator, py.string.value) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.InvalidUtf8 => unreachable,
-        };
+        const px_code_units = try px.string.utf16CodeUnits(agent.gc_allocator);
+        const py_code_units = try py.string.utf16CodeUnits(agent.gc_allocator);
 
         // a. Let lx be the length of px.
         const lx = px_code_units.len;
