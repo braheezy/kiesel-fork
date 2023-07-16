@@ -43,6 +43,26 @@ pub fn hasBinding(self: Self, name: []const u8) !bool {
     return self.object_record.hasBinding(name);
 }
 
+/// 9.1.1.4.3 CreateImmutableBinding ( N, S )
+/// https://tc39.es/ecma262/#sec-global-environment-records-createimmutablebinding-n-s
+pub fn createImmutableBinding(self: *Self, agent: *Agent, name: []const u8, strict: bool) !void {
+    // 1. Let DclRec be envRec.[[DeclarativeRecord]].
+    // 2. If ! DclRec.HasBinding(N) is true, throw a TypeError exception.
+    if (self.declarative_record.hasBinding(name)) {
+        return agent.throwException(
+            .type_error,
+            try std.fmt.allocPrint(
+                agent.gc_allocator,
+                "Binding for '{s}' already exists",
+                .{name},
+            ),
+        );
+    }
+
+    // 3. Return ! DclRec.CreateImmutableBinding(N, S).
+    return self.declarative_record.createImmutableBinding(name, strict);
+}
+
 /// 9.1.1.4.5 SetMutableBinding ( N, V, S )
 /// https://tc39.es/ecma262/#sec-global-environment-records-setmutablebinding-n-v-s
 pub fn setMutableBinding(self: Self, agent: *Agent, name: []const u8, value: Value, strict: bool) !void {

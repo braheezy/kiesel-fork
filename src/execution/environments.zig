@@ -56,11 +56,13 @@ pub const Environment = union(enum) {
         @compileError("Not implemented");
     }
 
-    pub fn createImmutableBinding(self: Self, name: []const u8, strict: bool) bool {
-        _ = self;
-        _ = name;
-        _ = strict;
-        @compileError("Not implemented");
+    pub fn createImmutableBinding(self: Self, agent: *Agent, name: []const u8, strict: bool) !void {
+        return switch (self) {
+            .declarative_environment => |env| env.createImmutableBinding(name, strict),
+            .object_environment => |env| env.createImmutableBinding(name, strict),
+            .function_environment => |env| env.declarative_environment.createImmutableBinding(name, strict),
+            .global_environment => |env| env.createImmutableBinding(agent, name, strict),
+        };
     }
 
     pub fn initializeBinding(self: Self, name: []const u8, value: Value) bool {

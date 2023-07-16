@@ -57,6 +57,14 @@ pub fn hasBinding(self: Self, name: []const u8) !bool {
     return true;
 }
 
+/// 9.1.1.2.3 CreateImmutableBinding ( N, S )
+/// https://tc39.es/ecma262/#sec-object-environment-records-createimmutablebinding-n-s
+pub fn createImmutableBinding(_: Self, _: []const u8, _: bool) noreturn {
+    // The CreateImmutableBinding concrete method of an Object Environment Record is never used
+    // within this specification.
+    @panic("ObjectEnvironment.createImmutableBinding() must not be called");
+}
+
 /// 9.1.1.2.5 SetMutableBinding ( N, V, S )
 /// https://tc39.es/ecma262/#sec-object-environment-records-setmutablebinding-n-v-s
 pub fn setMutableBinding(self: Self, agent: *Agent, name: []const u8, value: Value, strict: bool) !void {

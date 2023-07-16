@@ -51,6 +51,22 @@ pub fn createMutableBinding(self: *Self, name: []const u8, deletable: bool) !voi
     // 3. Return unused.
 }
 
+/// 9.1.1.1.3 CreateImmutableBinding ( N, S )
+/// https://tc39.es/ecma262/#sec-declarative-environment-records-createimmutablebinding-n-s
+pub fn createImmutableBinding(self: *Self, name: []const u8, strict: bool) !void {
+    // 1. Assert: envRec does not already have a binding for N.
+    // 2. Create an immutable binding in envRec for N and record that it is uninitialized. If S is
+    //    true, record that the newly created binding is a strict binding.
+    try self.bindings.putNoClobber(name, .{
+        .value = null,
+        .strict = strict,
+        .mutable = false,
+        .deletable = false,
+    });
+
+    // 3. Return unused.
+}
+
 /// 9.1.1.1.4 InitializeBinding ( N, V )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-initializebinding-n-v
 pub fn initializeBinding(self: Self, name: []const u8, value: Value) void {
