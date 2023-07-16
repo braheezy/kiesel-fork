@@ -17,6 +17,7 @@ const PropertyKey = Object.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const noexcept = utils.noexcept;
@@ -296,6 +297,8 @@ pub const ArrayConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "isArray", isArray, 1, realm);
+
         // 23.1.2.4 Array.prototype
         // https://tc39.es/ecma262/#sec-array.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -404,6 +407,15 @@ pub const ArrayConstructor = struct {
             // f. Return array.
             return Value.from(array);
         }
+    }
+
+    /// 23.1.2.2 Array.isArray ( arg )
+    /// https://tc39.es/ecma262/#sec-array.isarray
+    fn isArray(_: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const arg = arguments.get(0);
+
+        // 1. Return ? IsArray(arg).
+        return Value.from(try arg.isArray());
     }
 };
 
