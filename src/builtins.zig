@@ -76,6 +76,7 @@ pub const arraySetLength = array.arraySetLength;
 pub const createBuiltinFunction = builtin_function.createBuiltinFunction;
 pub const getPrototypeFromConstructor = ordinary.getPrototypeFromConstructor;
 pub const globalObjectProperties = global.globalObjectProperties;
+pub const isCompatiblePropertyDescriptor = ordinary.isCompatiblePropertyDescriptor;
 pub const makeConstructor = ecmascript_function.makeConstructor;
 pub const ordinaryCreateFromConstructor = ordinary.ordinaryCreateFromConstructor;
 pub const ordinaryDefineOwnProperty = ordinary.ordinaryDefineOwnProperty;

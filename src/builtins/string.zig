@@ -19,7 +19,9 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
+const isCompatiblePropertyDescriptor = builtins.isCompatiblePropertyDescriptor;
 const noexcept = utils.noexcept;
+const ordinaryDefineOwnProperty = builtins.ordinaryDefineOwnProperty;
 const ordinaryGetOwnProperty = builtins.ordinaryGetOwnProperty;
 
 /// 10.4.3.1 [[GetOwnProperty]] ( P )
@@ -33,6 +35,35 @@ fn getOwnProperty(object: Object, property_key: PropertyKey) !?PropertyDescripto
 
     // 3. Return StringGetOwnProperty(S, P).
     return stringGetOwnProperty(object.as(String), property_key);
+}
+
+/// 10.4.3.2 [[DefineOwnProperty]] ( P, Desc )
+/// https://tc39.es/ecma262/#sec-string-exotic-objects-defineownproperty-p-desc
+fn defineOwnProperty(
+    object: Object,
+    property_key: PropertyKey,
+    property_descriptor: PropertyDescriptor,
+) !bool {
+    const string = object.as(String);
+
+    // 1. Let stringDesc be StringGetOwnProperty(S, P).
+    const maybe_string_property_descriptor = try stringGetOwnProperty(string, property_key);
+
+    // 2. If stringDesc is not undefined, then
+    if (maybe_string_property_descriptor) |string_property_descriptor| {
+        // a. Let extensible be S.[[Extensible]].
+        const extensible = string.data.extensible;
+
+        // b. Return IsCompatiblePropertyDescriptor(extensible, Desc, stringDesc).
+        return isCompatiblePropertyDescriptor(
+            extensible,
+            property_descriptor,
+            string_property_descriptor,
+        );
+    }
+
+    // 3. Return ! OrdinaryDefineOwnProperty(S, P, Desc).
+    return ordinaryDefineOwnProperty(object, property_key, property_descriptor);
 }
 
 /// 10.4.3.4 StringCreate ( value, prototype )
@@ -52,7 +83,9 @@ pub fn stringCreate(agent: *Agent, value: types.String, prototype: Object) !Obje
             // 4. Set S.[[GetOwnProperty]] as specified in 10.4.3.1.
             .getOwnProperty = getOwnProperty,
 
-            // TODO: 5. Set S.[[DefineOwnProperty]] as specified in 10.4.3.2.
+            // 5. Set S.[[DefineOwnProperty]] as specified in 10.4.3.2.
+            .defineOwnProperty = defineOwnProperty,
+
             // TODO: 6. Set S.[[OwnPropertyKeys]] as specified in 10.4.3.3.
         },
     });
