@@ -733,6 +733,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             const lref = self.reference_stack.getLast().?;
             const rval = self.result.?;
             try lref.putValue(self.agent, rval);
+            self.reference = null;
         },
         .resolve_binding => {
             const name = self.fetchIdentifier(executable);
