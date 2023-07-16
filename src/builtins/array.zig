@@ -298,6 +298,7 @@ pub const ArrayConstructor = struct {
         });
 
         try defineBuiltinFunction(object, "isArray", isArray, 1, realm);
+        try defineBuiltinFunction(object, "of", of, 0, realm);
 
         // 23.1.2.4 Array.prototype
         // https://tc39.es/ecma262/#sec-array.prototype
@@ -416,6 +417,54 @@ pub const ArrayConstructor = struct {
 
         // 1. Return ? IsArray(arg).
         return Value.from(try arg.isArray());
+    }
+
+    /// 23.1.2.3 Array.of ( ...items )
+    /// https://tc39.es/ecma262/#sec-array.of
+    fn of(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        // 1. Let len be the number of elements in items.
+        const len = arguments.count();
+
+        // 2. Let lenNumber be 𝔽(len).
+        const len_number = Value.from(len);
+
+        // 3. Let C be the this value.
+        const constructor = this_value;
+
+        // 4. If IsConstructor(C) is true, then
+        const array = blk: {
+            if (constructor.isConstructor()) {
+                // a. Let A be ? Construct(C, « lenNumber »).
+                break :blk try constructor.object.construct(.{
+                    .arguments_list = ArgumentsList.from(.{len_number}),
+                });
+            }
+            // 5. Else,
+            else {
+                // a. Let A be ? ArrayCreate(len).
+                break :blk try arrayCreate(agent, len, null);
+            }
+        };
+
+        // 6. Let k be 0.
+        // 7. Repeat, while k < len,
+        for (arguments.values, 0..) |k_value, k| {
+            // a. Let kValue be items[k].
+
+            // b. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(k)));
+
+            // c. Perform ? CreateDataPropertyOrThrow(A, Pk, kValue).
+            try array.createDataPropertyOrThrow(property_key, k_value);
+
+            // d. Set k to k + 1.
+        }
+
+        // 8. Perform ? Set(A, "length", lenNumber, true).
+        try array.set(PropertyKey.from("length"), len_number, .throw);
+
+        // 9. Return A.
+        return Value.from(array);
     }
 };
 
