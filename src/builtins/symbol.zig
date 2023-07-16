@@ -187,7 +187,7 @@ pub const SymbolConstructor = struct {
             if (description == .undefined) break :blk null;
 
             // 3. Else, let descString be ? ToString(description).
-            break :blk try description.toString(agent);
+            break :blk (try description.toString(agent)).value;
         };
 
         // 4. Return a new Symbol whose [[Description]] is descString.
@@ -205,7 +205,7 @@ pub const SymbolConstructor = struct {
         const key = arguments.get(0);
 
         // 1. Let stringKey be ? ToString(key).
-        const string_key = try key.toString(agent);
+        const string_key = (try key.toString(agent)).value;
 
         // 2. For each element e of the GlobalSymbolRegistry List, do
         //     a. If SameValue(e.[[Key]], stringKey) is true, return e.[[Symbol]].

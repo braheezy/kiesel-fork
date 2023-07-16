@@ -15,6 +15,7 @@ const Instruction = instructions_.Instruction;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Reference = types.Reference;
+const String = types.String;
 const Value = types.Value;
 const arrayCreate = builtins.arrayCreate;
 const isLessThan = types.isLessThan;
@@ -258,8 +259,9 @@ fn applyStringOrNumericBinaryOperator(agent: *Agent, lval: Value, operator: ast.
             const rstr = try rprim.toString(agent);
 
             // iii. Return the string-concatenation of lstr and rstr.
+            // TODO: Implement rope strings
             return Value.from(
-                try std.mem.concat(agent.gc_allocator, u8, &[_][]const u8{ lstr, rstr }),
+                try std.mem.concat(agent.gc_allocator, u8, &[_][]const u8{ lstr.value, rstr.value }),
             );
         }
 

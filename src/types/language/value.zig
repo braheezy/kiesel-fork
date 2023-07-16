@@ -14,6 +14,7 @@ const Number = @import("number.zig").Number;
 const Object = @import("Object.zig");
 const PropertyDescriptor = @import("../spec/PropertyDescriptor.zig");
 const PropertyKey = Object.PropertyKey;
+const String = @import("String.zig");
 const Symbol = @import("Symbol.zig");
 const arrayCreate = builtins.arrayCreate;
 const noexcept = utils.noexcept;
@@ -52,7 +53,7 @@ pub const Value = union(enum) {
 
     /// 6.1.4 The String Type
     /// https://tc39.es/ecma262/#sec-ecmascript-language-types-string-type
-    string: []const u8,
+    string: String,
 
     /// 6.1.5 The Symbol Type
     /// https://tc39.es/ecma262/#sec-ecmascript-language-types-symbol-type
@@ -84,7 +85,7 @@ pub const Value = union(enum) {
             .boolean => |boolean| try writer.writeAll(if (boolean) "true" else "false"),
             .string => |string| {
                 try writer.writeAll("\"");
-                try writer.writeAll(string);
+                try writer.writeAll(string.value);
                 try writer.writeAll("\"");
             },
             .symbol => |symbol| try writer.print("{}", .{symbol}),
@@ -113,21 +114,23 @@ pub const Value = union(enum) {
         } else if (@typeInfo(T) == .Pointer) {
             // FIXME: This is not great, but for now we can let the compiler do the rest as strings
             //        are the only pointers we support here.
-            return .{ .string = value };
-        } else if (T == Symbol) {
-            return .{ .symbol = value };
+            return .{ .string = .{ .value = value } };
         } else if (@typeInfo(T) == .Int or
             @typeInfo(T) == .ComptimeInt or
             @typeInfo(T) == .Float or
             @typeInfo(T) == .ComptimeFloat)
         {
             return .{ .number = Number.from(value) };
-        } else if (T == Number) {
-            return .{ .number = value };
         } else if (T == BigInt) {
             return .{ .big_int = value };
+        } else if (T == Number) {
+            return .{ .number = value };
         } else if (T == Object) {
             return .{ .object = value };
+        } else if (T == String) {
+            return .{ .string = value };
+        } else if (T == Symbol) {
+            return .{ .symbol = value };
         } else {
             @compileError("Value.from() called with incompatible type " ++ @typeName(T));
         }
@@ -324,7 +327,7 @@ pub const Value = union(enum) {
             .big_int => |big_int| if (big_int.value.eqlZero()) {
                 return false;
             },
-            .string => |string| if (string.len == 0) {
+            .string => |string| if (string.value.len == 0) {
                 return false;
             },
             else => {},
@@ -639,7 +642,7 @@ pub const Value = union(enum) {
 
     /// 7.1.17 ToString ( argument )
     /// https://tc39.es/ecma262/#sec-tostring
-    pub fn toString(self: Self, agent: *Agent) ![]const u8 {
+    pub fn toString(self: Self, agent: *Agent) !String {
         return switch (self) {
             // 1. If argument is a String, return argument.
             .string => |string| string,
@@ -651,14 +654,14 @@ pub const Value = union(enum) {
             ),
 
             // 3. If argument is undefined, return "undefined".
-            .undefined => "undefined",
+            .undefined => String.from("undefined"),
 
             // 4. If argument is null, return "null".
-            .null => "null",
+            .null => String.from("null"),
 
             // 5. If argument is true, return "true".
             // 6. If argument is false, return "false".
-            .boolean => |boolean| if (boolean) "true" else "false",
+            .boolean => |boolean| String.from(if (boolean) "true" else "false"),
 
             // 7. If argument is a Number, return Number::toString(argument, 10).
             .number => |number| number.toString(agent.gc_allocator, 10),
@@ -725,7 +728,7 @@ pub const Value = union(enum) {
 
         // 3. Return ! ToString(key).
         const string = key.toString(agent) catch |err| try noexcept(err);
-        return PropertyKey.from(string);
+        return PropertyKey.from(string.value);
     }
 
     /// 7.1.20 ToLength ( argument )
@@ -983,19 +986,19 @@ pub const Value = union(enum) {
 
 /// 7.1.4.1.1 StringToNumber ( str )
 /// https://tc39.es/ecma262/#sec-stringtonumber
-pub fn stringToNumber(string: []const u8) Number {
+pub fn stringToNumber(string: String) Number {
     // 1. Let text be StringToCodePoints(str).
 
     // 2. Let literal be ParseText(text, StringNumericLiteral).
     // 3. If literal is a List of errors, return NaN.
     // 4. Return StringNumericValue of literal.
     // TODO: Implement the proper string parsing grammar!
-    return Number.from(std.fmt.parseFloat(f64, string) catch std.math.nan(f64));
+    return Number.from(std.fmt.parseFloat(f64, string.value) catch std.math.nan(f64));
 }
 
 /// 7.1.14 StringToBigInt ( str )
 /// https://tc39.es/ecma262/#sec-stringtobigint
-pub fn stringToBigInt(allocator: Allocator, string: []const u8) !?BigInt {
+pub fn stringToBigInt(allocator: Allocator, string: String) !?BigInt {
 
     // 1. Let text be StringToCodePoints(str).
 
@@ -1006,7 +1009,7 @@ pub fn stringToBigInt(allocator: Allocator, string: []const u8) !?BigInt {
     // 6. Return ℤ(mv).
     // TODO: Implement the proper string parsing grammar!
     var value = try BigInt.Value.init(allocator);
-    value.setString(10, string) catch |err| return switch (err) {
+    value.setString(10, string.value) catch |err| return switch (err) {
         error.OutOfMemory => error.OutOfMemory,
         error.InvalidCharacter => null,
         error.InvalidBase => unreachable,
@@ -1063,7 +1066,7 @@ pub fn sameValueNonNumber(x: Value, y: Value) bool {
         // 4. If x is a String, then
         //     a. If x and y have the same length and the same code units in the same positions,
         //        return true; otherwise, return false.
-        .string => std.mem.eql(u8, x.string, y.string),
+        .string => std.mem.eql(u8, x.string.value, y.string.value),
 
         // 5. If x is a Boolean, then
         //     a. If x and y are both true or both false, return true; otherwise, return false.
@@ -1111,11 +1114,11 @@ pub fn isLessThan(
 
     // 3. If px is a String and py is a String, then
     if (px == .string and py == .string) {
-        const px_code_units = std.unicode.utf8ToUtf16LeWithNull(agent.gc_allocator, px.string) catch |err| switch (err) {
+        const px_code_units = std.unicode.utf8ToUtf16LeWithNull(agent.gc_allocator, px.string.value) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             error.InvalidUtf8 => unreachable,
         };
-        const py_code_units = std.unicode.utf8ToUtf16LeWithNull(agent.gc_allocator, py.string) catch |err| switch (err) {
+        const py_code_units = std.unicode.utf8ToUtf16LeWithNull(agent.gc_allocator, py.string.value) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             error.InvalidUtf8 => unreachable,
         };
@@ -1298,7 +1301,7 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) !bool {
         // TODO: Implement more efficient BigInt to f64 comparison
         if ((x == .number and !x.isIntegralNumber()) or
             (y == .number and !y.isIntegralNumber())) return false;
-        return std.mem.eql(u8, try x.toString(agent), try y.toString(agent));
+        return std.mem.eql(u8, (try x.toString(agent)).value, (try y.toString(agent)).value);
     }
 
     // 14. Return false.
@@ -1390,9 +1393,9 @@ test "Value.from" {
     const inf = std.math.inf(f64);
     try std.testing.expectEqual(Value.from(true).boolean, true);
     try std.testing.expectEqual(Value.from(false).boolean, false);
-    try std.testing.expectEqual(Value.from("").string, "");
-    try std.testing.expectEqual(Value.from("foo").string, "foo");
-    try std.testing.expectEqual(Value.from("123").string, "123");
+    try std.testing.expectEqual(Value.from("").string.value, "");
+    try std.testing.expectEqual(Value.from("foo").string.value, "foo");
+    try std.testing.expectEqual(Value.from("123").string.value, "123");
     try std.testing.expectEqual(Value.from(0).number.i32, 0);
     try std.testing.expectEqual(Value.from(0.0).number.i32, 0);
     try std.testing.expectEqual(Value.from(123).number.i32, 123);

@@ -23,7 +23,7 @@ const noexcept = utils.noexcept;
 
 /// 10.4.3.4 StringCreate ( value, prototype )
 /// https://tc39.es/ecma262/#sec-stringcreate
-pub fn stringCreate(agent: *Agent, value: []const u8, prototype: Object) !Object {
+pub fn stringCreate(agent: *Agent, value: types.String, prototype: Object) !Object {
     // 1. Let S be MakeBasicObject(« [[Prototype]], [[Extensible]], [[StringData]] »).
     const string = try String.create(agent, .{
         // 2. Set S.[[Prototype]] to prototype.
@@ -40,7 +40,7 @@ pub fn stringCreate(agent: *Agent, value: []const u8, prototype: Object) !Object
     // TODO: 6. Set S.[[OwnPropertyKeys]] as specified in 10.4.3.3.
 
     // 7. Let length be the length of value.
-    const length = std.unicode.calcUtf16LeLen(value) catch unreachable;
+    const length = std.unicode.calcUtf16LeLen(value.value) catch unreachable;
 
     // 8. Perform ! DefinePropertyOrThrow(S, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
@@ -96,7 +96,7 @@ pub const StringConstructor = struct {
             // 1. If value is not present, then
             if (arguments.count() == 0) {
                 // a. Let s be the empty String.
-                break :blk "";
+                break :blk types.String.from("");
             }
             // 2. Else,
             else {
@@ -128,7 +128,7 @@ pub const StringPrototype = struct {
     pub fn create(realm: *Realm) !Object {
         const object = try String.create(realm.agent, .{
             .fields = .{
-                .string_data = "",
+                .string_data = types.String.from(""),
             },
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
@@ -140,7 +140,7 @@ pub const StringPrototype = struct {
     }
 
     /// https://tc39.es/ecma262/#thisstringvalue
-    fn thisStringValue(agent: *Agent, value: Value) ![]const u8 {
+    fn thisStringValue(agent: *Agent, value: Value) !types.String {
         switch (value) {
             // 1. If value is a String, return value.
             .string => |string| return string,
@@ -185,7 +185,7 @@ pub const StringPrototype = struct {
 pub const String = Object.Factory(.{
     .Fields = struct {
         /// [[StringData]]
-        string_data: []const u8,
+        string_data: types.String,
     },
     .tag = .string,
 });

@@ -182,7 +182,7 @@ pub fn createDynamicFunction(
         );
         defer argument_strings.deinit();
         for (parameter_args.values) |arg| {
-            argument_strings.appendAssumeCapacity(try arg.toString(agent));
+            argument_strings.appendAssumeCapacity((try arg.toString(agent)).value);
         }
         parameters_string = try std.mem.join(agent.gc_allocator, ",", argument_strings.items);
     }
@@ -192,7 +192,7 @@ pub fn createDynamicFunction(
     const body_string = try std.fmt.allocPrint(
         agent.gc_allocator,
         "\n{s}\n",
-        .{try body_arg.toString(agent)},
+        .{(try body_arg.toString(agent)).value},
     );
 
     // 12. Let sourceString be the string-concatenation of prefix, " anonymous(", P, 0x000A

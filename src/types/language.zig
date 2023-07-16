@@ -3,6 +3,7 @@ const value = @import("language/value.zig");
 pub const BigInt = @import("language/BigInt.zig");
 pub const Number = @import("language/number.zig").Number;
 pub const Object = @import("language/Object.zig");
+pub const String = @import("language/String.zig");
 pub const Symbol = @import("language/Symbol.zig");
 pub const Value = value.Value;
 pub const createArrayFromList = value.createArrayFromList;
@@ -16,6 +17,7 @@ test {
     _ = BigInt;
     _ = Number;
     _ = Object;
+    _ = String;
     _ = Symbol;
     _ = Value;
 }

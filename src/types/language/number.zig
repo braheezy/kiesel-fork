@@ -5,6 +5,10 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const types = @import("../../types.zig");
+
+const String = types.String;
+
 const pow_2_31 = std.math.pow(f64, 2, 31);
 const pow_2_32 = std.math.pow(f64, 2, 32);
 
@@ -573,26 +577,30 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.20 Number::toString ( x, radix )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-tostring
-    pub fn toString(self: Self, allocator: Allocator, radix: u8) ![]const u8 {
+    pub fn toString(self: Self, allocator: Allocator, radix: u8) !String {
         // 1. If x is NaN, return "NaN".
-        if (self.isNan()) return "NaN";
+        if (self.isNan()) return String.from("NaN");
 
         // 2. If x is either +0𝔽 or -0𝔽, return "0".
-        if (self.isPositiveZero() or self.isNegativeZero()) return "0";
+        if (self.isPositiveZero() or self.isNegativeZero()) return String.from("0");
 
         // 3. If x < -0𝔽, return the string-concatenation of "-" and Number::toString(-x, radix).
-        if (self.asFloat() < 0) return std.fmt.allocPrint(allocator, "-{s}", .{
-            try self.unaryMinus().toString(allocator, radix),
-        });
+        if (self.asFloat() < 0) {
+            return String.from(
+                try std.fmt.allocPrint(allocator, "-{s}", .{
+                    (try self.unaryMinus().toString(allocator, radix)).value,
+                }),
+            );
+        }
 
         // 4. If x is +∞𝔽, return "Infinity".
-        if (self.isPositiveInf()) return "Infinity";
+        if (self.isPositiveInf()) return String.from("Infinity");
 
         // TODO: Implement steps 5-12 according to spec!
-        return switch (self) {
+        return String.from(try switch (self) {
             .f64 => |x| std.fmt.allocPrint(allocator, "{}", .{x}),
             .i32 => |x| std.fmt.allocPrint(allocator, "{}", .{x}),
-        };
+        });
     }
 };
 

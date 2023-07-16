@@ -453,7 +453,7 @@ pub const ObjectPrototype = struct {
 
         // 16. If tag is not a String, set tag to builtinTag.
         const tag = switch (tag_value) {
-            .string => |string| string,
+            .string => |string| string.value,
             else => builtin_tag,
         };
 

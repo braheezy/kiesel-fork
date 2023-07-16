@@ -14,6 +14,7 @@ const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
+const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
@@ -87,7 +88,7 @@ pub const ErrorConstructor = struct {
                 Value.from(msg),
             ) catch |err| try noexcept(err);
 
-            object.as(Error).fields.error_data.message = msg;
+            object.as(Error).fields.error_data.message = msg.value;
         }
 
         // 4. Perform ? InstallErrorCause(O, options).
@@ -105,9 +106,9 @@ pub const ErrorConstructor = struct {
 fn internalSet(object: Object, property_key: PropertyKey, value: Value, receiver: Value) !bool {
     if (property_key == .string and value == .string) {
         if (std.mem.eql(u8, property_key.string, "name")) {
-            object.as(Error).fields.error_data.name = value.string;
+            object.as(Error).fields.error_data.name = value.string.value;
         } else if (std.mem.eql(u8, property_key.string, "message")) {
-            object.as(Error).fields.error_data.message = value.string;
+            object.as(Error).fields.error_data.message = value.string.value;
         }
     }
     return builtins.ordinarySet(object, property_key, value, receiver);
@@ -159,13 +160,13 @@ pub const ErrorPrototype = struct {
         const name = try object.get(PropertyKey.from("name"));
 
         // 4. If name is undefined, set name to "Error"; otherwise set name to ? ToString(name).
-        const name_string = if (name == .undefined) "Error" else try name.toString(agent);
+        const name_string = if (name == .undefined) "Error" else (try name.toString(agent)).value;
 
         // 5. Let msg be ? Get(O, "message").
         const msg = try object.get(PropertyKey.from("message"));
 
         // 6. If msg is undefined, set msg to the empty String; otherwise set msg to ? ToString(msg).
-        const msg_string = if (msg == .undefined) "" else try msg.toString(agent);
+        const msg_string = if (msg == .undefined) "" else (try msg.toString(agent)).value;
 
         // 7. If name is the empty String, return msg.
         if (name_string.len == 0) return Value.from(msg_string);
@@ -304,7 +305,7 @@ fn NativeErrorConstructor(comptime name: []const u8) type {
                     Value.from(msg),
                 ) catch |err| try noexcept(err);
 
-                native_error.fields.error_data.message = msg;
+                native_error.fields.error_data.message = msg.value;
             }
 
             // 4. Perform ? InstallErrorCause(O, options).

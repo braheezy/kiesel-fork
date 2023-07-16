@@ -6,8 +6,10 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const execution = @import("../../execution.zig");
+const types = @import("../../types.zig");
 
 const Agent = execution.Agent;
+const String = types.String;
 
 const Self = @This();
 
@@ -34,7 +36,7 @@ pub fn asFloat(self: Self, agent: *Agent) !f64 {
     //       works for now.
     return std.fmt.parseFloat(
         f64,
-        try self.toString(agent.gc_allocator, 10),
+        (try self.toString(agent.gc_allocator, 10)).value,
     ) catch unreachable;
 }
 
@@ -224,14 +226,14 @@ pub fn bitwiseOR(x: Self, agent: *Agent, y: Self) !Self {
 
 /// 6.1.6.2.21 BigInt::toString ( x, radix )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-tostring
-pub fn toString(self: Self, allocator: Allocator, radix: u8) ![]const u8 {
+pub fn toString(self: Self, allocator: Allocator, radix: u8) !String {
     // 1. If x < 0ℤ, return the string-concatenation of "-" and BigInt::toString(-x, radix).
     // 2. Return the String value consisting of the representation of x using radix radix.
-    return self.value.toString(allocator, radix, .lower) catch |err| switch (err) {
+    return String.from(self.value.toString(allocator, radix, .lower) catch |err| switch (err) {
         // This is an internal API, the base should always be valid.
         error.InvalidBase => @panic("BigInt.toString() called with invalid base"),
         error.OutOfMemory => return error.OutOfMemory,
-    };
+    });
 }
 
 test "format" {

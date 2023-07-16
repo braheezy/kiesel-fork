@@ -35,7 +35,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 pub fn getFunctionName(function: Object) []const u8 {
     const property_descriptor = function.data.property_storage.get(PropertyKey.from("name")).?;
     const value = property_descriptor.value.?;
-    return value.string;
+    return value.string.value;
 }
 
 pub const ConstructorKind = enum {
