@@ -49,6 +49,7 @@ pub const ObjectConstructor = struct {
         try defineBuiltinFunction(object, "isSealed", isSealed, 1, realm);
         try defineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm);
         try defineBuiltinFunction(object, "seal", seal, 1, realm);
+        try defineBuiltinFunction(object, "setPrototypeOf", setPrototypeOf, 2, realm);
 
         // 20.1.2.20 Object.prototype
         // https://tc39.es/ecma262/#sec-object.prototype
@@ -379,6 +380,43 @@ pub const ObjectConstructor = struct {
         if (!status) return agent.throwException(.type_error, "Could not prevent extensions");
 
         // 4. Return O.
+        return object;
+    }
+
+    /// 20.1.2.22 Object.setPrototypeOf ( O, proto )
+    /// https://tc39.es/ecma262/#sec-object.seal
+    fn setPrototypeOf(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
+        const prototype = arguments.get(1);
+
+        // 1. Set O to ? RequireObjectCoercible(O).
+        _ = try object.requireObjectCoercible(agent);
+
+        // 2. If proto is not an Object and proto is not null, throw a TypeError exception.
+        if (prototype != .object and prototype != .null) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(
+                    agent.gc_allocator,
+                    "{} is not an Object or null",
+                    .{prototype},
+                ),
+            );
+        }
+
+        // 3. If O is not an Object, return O.
+        if (object != .object) return object;
+
+        // 4. Let status be ? O.[[SetPrototypeOf]](proto).
+        const status = try object.object.internalMethods().setPrototypeOf(
+            object.object,
+            if (prototype == .object) prototype.object else null,
+        );
+
+        // 5. If status is false, throw a TypeError exception.
+        if (!status) return agent.throwException(.type_error, "Could not set prototype");
+
+        // 6. Return O.
         return object;
     }
 };
