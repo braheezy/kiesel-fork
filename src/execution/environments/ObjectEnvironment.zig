@@ -57,6 +57,23 @@ pub fn hasBinding(self: Self, name: []const u8) !bool {
     return true;
 }
 
+/// 9.1.1.2.2 CreateMutableBinding ( N, D )
+/// https://tc39.es/ecma262/#sec-object-environment-records-createmutablebinding-n-d
+pub fn createMutableBinding(self: Self, name: []const u8, deletable: bool) !void {
+    // 1. Let bindingObject be envRec.[[BindingObject]].
+    // 2. Perform ? DefinePropertyOrThrow(bindingObject, N, PropertyDescriptor {
+    //      [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: D
+    //    }).
+    try self.binding_object.definePropertyOrThrow(PropertyKey.from(name), .{
+        .value = .undefined,
+        .writable = true,
+        .enumerable = true,
+        .configurable = deletable,
+    });
+
+    // 3. Return unused.
+}
+
 /// 9.1.1.2.3 CreateImmutableBinding ( N, S )
 /// https://tc39.es/ecma262/#sec-object-environment-records-createimmutablebinding-n-s
 pub fn createImmutableBinding(_: Self, _: []const u8, _: bool) noreturn {
