@@ -84,6 +84,22 @@ pub fn createImmutableBinding(self: *Self, agent: *Agent, name: []const u8, stri
     return self.declarative_record.createImmutableBinding(name, strict);
 }
 
+/// 9.1.1.4.4 InitializeBinding ( N, V )
+/// https://tc39.es/ecma262/#sec-global-environment-records-initializebinding-n-v
+pub fn initializeBinding(self: Self, agent: *Agent, name: []const u8, value: Value) !void {
+    // 1. Let DclRec be envRec.[[DeclarativeRecord]].
+    // 2. If ! DclRec.HasBinding(N) is true, then
+    if (self.declarative_record.hasBinding(name)) {
+        // a. Return ! DclRec.InitializeBinding(N, V).
+        return self.declarative_record.initializeBinding(name, value);
+    }
+
+    // 3. Assert: If the binding exists, it must be in the Object Environment Record.
+    // 4. Let ObjRec be envRec.[[ObjectRecord]].
+    // 5. Return ? ObjRec.InitializeBinding(N, V).
+    return self.object_record.initializeBinding(agent, name, value);
+}
+
 /// 9.1.1.4.5 SetMutableBinding ( N, V, S )
 /// https://tc39.es/ecma262/#sec-global-environment-records-setmutablebinding-n-v-s
 pub fn setMutableBinding(self: Self, agent: *Agent, name: []const u8, value: Value, strict: bool) !void {
