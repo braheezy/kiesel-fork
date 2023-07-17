@@ -67,11 +67,13 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn initializeBinding(self: Self, name: []const u8, value: Value) bool {
-        _ = self;
-        _ = name;
-        _ = value;
-        @compileError("Not implemented");
+    pub fn initializeBinding(self: Self, agent: *Agent, name: []const u8, value: Value) !void {
+        return switch (self) {
+            .declarative_environment => |env| env.initializeBinding(name, value),
+            .object_environment => |env| env.initializeBinding(agent, name, value),
+            .function_environment => |env| env.declarative_environment.initializeBinding(name, value),
+            .global_environment => |env| env.initializeBinding(agent, name, value),
+        };
     }
 
     pub fn setMutableBinding(self: Self, agent: *Agent, name: []const u8, value: Value, strict: bool) !void {
