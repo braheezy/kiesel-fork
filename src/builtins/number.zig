@@ -28,6 +28,8 @@ pub const NumberConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "isFinite", isFinite, 1, realm);
+
         // 21.1.2.15 Number.prototype
         // https://tc39.es/ecma262/#sec-number.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -90,6 +92,21 @@ pub const NumberConstructor = struct {
 
         // 6. Return O.
         return Value.from(object);
+    }
+
+    /// 21.1.2.2 Number.isFinite ( number )
+    /// https://tc39.es/ecma262/#sec-number.isfinite
+    fn isFinite(_: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const number = arguments.get(0);
+
+        // 1. If number is not a Number, return false.
+        if (number != .number) return Value.from(false);
+
+        // 2. If number is not finite, return false.
+        if (!number.number.isFinite()) return Value.from(false);
+
+        // 3. Otherwise, return true.
+        return Value.from(true);
     }
 };
 
