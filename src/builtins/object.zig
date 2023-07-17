@@ -44,6 +44,7 @@ pub const ObjectConstructor = struct {
         try defineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 2, realm);
         try defineBuiltinFunction(object, "getOwnPropertyDescriptors", getOwnPropertyDescriptors, 1, realm);
         try defineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm);
+        try defineBuiltinFunction(object, "hasOwn", hasOwn, 2, realm);
         try defineBuiltinFunction(object, "is", is, 2, realm);
         try defineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm);
         try defineBuiltinFunction(object, "isFrozen", isFrozen, 1, realm);
@@ -312,6 +313,22 @@ pub const ObjectConstructor = struct {
 
         // 2. Return ? obj.[[GetPrototypeOf]]().
         return Value.from(try obj.internalMethods().getPrototypeOf(obj) orelse return .null);
+    }
+
+    /// 20.1.2.13 Object.hasOwn ( O, P )
+    /// https://tc39.es/ecma262/#sec-object.hasown
+    fn hasOwn(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
+        const property = arguments.get(1);
+
+        // 1. Let obj be ? ToObject(O).
+        const obj = try object.toObject(agent);
+
+        // 2. Let key be ? ToPropertyKey(P).
+        const property_key = try property.toPropertyKey(agent);
+
+        // 3. Return ? HasOwnProperty(obj, key).
+        return Value.from(try obj.hasOwnProperty(property_key));
     }
 
     /// 20.1.2.14 Object.is ( value1, value2 )
