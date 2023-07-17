@@ -360,24 +360,6 @@ pub const ObjectConstructor = struct {
         return Value.from(try object.object.testIntegrityLevel(.sealed));
     }
 
-    /// 20.1.2.21 Object.seal ( O )
-    /// https://tc39.es/ecma262/#sec-object.seal
-    fn seal(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
-        const object = arguments.get(0);
-
-        // 1. If O is not an Object, return O.
-        if (object != .object) return Value.from(true);
-
-        // 2. Let status be ? SetIntegrityLevel(O, sealed).
-        const status = try object.object.setIntegrityLevel(.sealed);
-
-        // 3. If status is false, throw a TypeError exception.
-        if (!status) return agent.throwException(.type_error, "Could not seal object");
-
-        // 4. Return O.
-        return object;
-    }
-
     /// 20.1.2.19 Object.preventExtensions ( O )
     /// https://tc39.es/ecma262/#sec-object.preventextensions
     fn preventExtensions(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
@@ -391,6 +373,24 @@ pub const ObjectConstructor = struct {
 
         // 3. If status is false, throw a TypeError exception.
         if (!status) return agent.throwException(.type_error, "Could not prevent extensions");
+
+        // 4. Return O.
+        return object;
+    }
+
+    /// 20.1.2.21 Object.seal ( O )
+    /// https://tc39.es/ecma262/#sec-object.seal
+    fn seal(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
+
+        // 1. If O is not an Object, return O.
+        if (object != .object) return Value.from(true);
+
+        // 2. Let status be ? SetIntegrityLevel(O, sealed).
+        const status = try object.object.setIntegrityLevel(.sealed);
+
+        // 3. If status is false, throw a TypeError exception.
+        if (!status) return agent.throwException(.type_error, "Could not seal object");
 
         // 4. Return O.
         return object;
