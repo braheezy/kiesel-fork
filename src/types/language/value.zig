@@ -760,6 +760,16 @@ pub const Value = union(enum) {
         return @intFromFloat(integer);
     }
 
+    /// 7.2.1 RequireObjectCoercible ( argument )
+    /// https://tc39.es/ecma262/#sec-requireobjectcoercible
+    pub fn requireObjectCoercible(self: Self, agent: *Agent) !Self {
+        switch (self) {
+            .undefined => return agent.throwException(.type_error, "Cannot convert undefined to Object"),
+            .null => return agent.throwException(.type_error, "Cannot convert null to Object"),
+            else => return self,
+        }
+    }
+
     /// 7.2.2 IsArray ( argument )
     /// https://tc39.es/ecma262/#sec-isarray
     pub fn isArray(self: Self) !bool {
