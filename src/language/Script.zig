@@ -93,6 +93,19 @@ pub fn evaluate(self: *Self) !Value {
     const script = self.ecmascript_code;
 
     // TODO: 12. Let result be Completion(GlobalDeclarationInstantiation(script, globalEnv)).
+    // NOTE: This is totally ad-hoc for now.
+    const var_scoped_declarations = try script.statement_list.varScopedDeclarations(agent.gc_allocator);
+    defer agent.gc_allocator.free(var_scoped_declarations);
+    var seen = std.StringHashMap(void).init(agent.gc_allocator);
+    defer seen.deinit();
+    for (var_scoped_declarations) |variable_declaration| {
+        const var_name = variable_declaration.binding_identifier;
+        if (!seen.contains(var_name)) {
+            try global_env.createGlobalVarBinding(agent, var_name, false);
+            try seen.putNoClobber(var_name, {});
+        }
+    }
+
     const result_no_value: error{ExceptionThrown}!void = {};
 
     // 13. If result.[[Type]] is normal, then

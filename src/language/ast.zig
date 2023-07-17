@@ -1875,6 +1875,22 @@ pub const StatementList = struct {
 
     items: []const StatementListItem,
 
+    // FIXME: This is very incomplete but at least works for top-level var decls :^)
+    pub fn varScopedDeclarations(self: Self, allocator: Allocator) ![]const VariableDeclaration {
+        var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
+        defer variable_declarations.deinit();
+        for (self.items) |item| switch (item) {
+            .statement => |statement| switch (statement.*) {
+                .variable_statement => |variable_statement| for (variable_statement.variable_declaration_list.items) |variable_declaration| {
+                    try variable_declarations.append(variable_declaration);
+                },
+                else => {},
+            },
+            else => {},
+        };
+        return variable_declarations.toOwnedSlice();
+    }
+
     /// 11.2.1 Directive Prologues and the Use Strict Directive
     /// https://tc39.es/ecma262/#sec-directive-prologues-and-the-use-strict-directive
     pub fn containsDirective(self: Self, directive: []const u8) bool {
