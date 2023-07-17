@@ -12,6 +12,7 @@ const DeclarativeEnvironment = environments.DeclarativeEnvironment;
 const Environment = environments.Environment;
 const Object = types.Object;
 const ObjectEnvironment = environments.ObjectEnvironment;
+const PropertyKey = types.PropertyKey;
 const Value = types.Value;
 
 const Self = @This();
@@ -112,4 +113,39 @@ pub fn withBaseObject(_: Self) ?Object {
 pub fn getThisBinding(self: Self) Object {
     // 1. Return envRec.[[GlobalThisValue]].
     return self.global_this_value;
+}
+
+/// 9.1.1.4.17 CreateGlobalVarBinding ( N, D )
+/// https://tc39.es/ecma262/#sec-createglobalvarbinding
+pub fn createGlobalVarBinding(self: *Self, agent: *Agent, name: []const u8, deletable: bool) !void {
+    // 1. Let ObjRec be envRec.[[ObjectRecord]].
+    // 2. Let globalObject be ObjRec.[[BindingObject]].
+    const global_object = self.object_record.binding_object;
+
+    // 3. Let hasProperty be ? HasOwnProperty(globalObject, N).
+    const has_property = try global_object.hasOwnProperty(PropertyKey.from(name));
+
+    // 4. Let extensible be ? IsExtensible(globalObject).
+    const extensible = try global_object.isExtensible();
+
+    // 5. If hasProperty is false and extensible is true, then
+    if (!has_property and extensible) {
+        // a. Perform ? ObjRec.CreateMutableBinding(N, D).
+        try self.object_record.createMutableBinding(name, deletable);
+
+        // b. Perform ? ObjRec.InitializeBinding(N, undefined).
+        try self.object_record.initializeBinding(agent, name, .undefined);
+    }
+
+    // 6. If envRec.[[VarNames]] does not contain N, then
+    // FIXME: Surely there's a better way to do this...
+    const contains = for (self.var_names.items) |var_name| {
+        if (std.mem.eql(u8, var_name, name)) break true;
+    } else false;
+    if (!contains) {
+        // a. Append N to envRec.[[VarNames]].
+        try self.var_names.append(name);
+    }
+
+    // 7. Return unused.
 }
