@@ -29,6 +29,7 @@ pub const NumberConstructor = struct {
         });
 
         try defineBuiltinFunction(object, "isFinite", isFinite, 1, realm);
+        try defineBuiltinFunction(object, "isInteger", isInteger, 1, realm);
 
         // 21.1.2.15 Number.prototype
         // https://tc39.es/ecma262/#sec-number.prototype
@@ -107,6 +108,15 @@ pub const NumberConstructor = struct {
 
         // 3. Otherwise, return true.
         return Value.from(true);
+    }
+
+    /// 21.1.2.3 Number.isInteger ( number )
+    /// https://tc39.es/ecma262/#sec-number.isinteger
+    fn isInteger(_: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const number = arguments.get(0);
+
+        // 1. Return IsIntegralNumber(number).
+        return Value.from(number.isIntegralNumber());
     }
 };
 
