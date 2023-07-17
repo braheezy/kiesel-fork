@@ -49,11 +49,13 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn createMutableBinding(self: Self, name: []const u8, deletable: bool) bool {
-        _ = self;
-        _ = name;
-        _ = deletable;
-        @compileError("Not implemented");
+    pub fn createMutableBinding(self: Self, agent: *Agent, name: []const u8, deletable: bool) !void {
+        return switch (self) {
+            .declarative_environment => |env| env.createMutableBinding(name, deletable),
+            .object_environment => |env| env.createMutableBinding(name, deletable),
+            .function_environment => |env| env.declarative_environment.createMutableBinding(name, deletable),
+            .global_environment => |env| env.createMutableBinding(agent, name, deletable),
+        };
     }
 
     pub fn createImmutableBinding(self: Self, agent: *Agent, name: []const u8, strict: bool) !void {
