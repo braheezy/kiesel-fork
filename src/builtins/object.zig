@@ -43,6 +43,7 @@ pub const ObjectConstructor = struct {
         try defineBuiltinFunction(object, "freeze", freeze, 1, realm);
         try defineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 2, realm);
         try defineBuiltinFunction(object, "getOwnPropertyDescriptors", getOwnPropertyDescriptors, 1, realm);
+        try defineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm);
         try defineBuiltinFunction(object, "is", is, 2, realm);
         try defineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm);
         try defineBuiltinFunction(object, "isFrozen", isFrozen, 1, realm);
@@ -299,6 +300,18 @@ pub const ObjectConstructor = struct {
 
         // 5. Return descriptors.
         return Value.from(descriptors);
+    }
+
+    /// 20.1.2.12 Object.getPrototypeOf ( O )
+    /// https://tc39.es/ecma262/#sec-object.getprototypeof
+    fn getPrototypeOf(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
+
+        // 1. Let obj be ? ToObject(O).
+        const obj = try object.toObject(agent);
+
+        // 2. Return ? obj.[[GetPrototypeOf]]().
+        return Value.from(try obj.internalMethods().getPrototypeOf(obj) orelse return .null);
     }
 
     /// 20.1.2.14 Object.is ( value1, value2 )
