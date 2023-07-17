@@ -30,6 +30,7 @@ pub const NumberConstructor = struct {
 
         try defineBuiltinFunction(object, "isFinite", isFinite, 1, realm);
         try defineBuiltinFunction(object, "isInteger", isInteger, 1, realm);
+        try defineBuiltinFunction(object, "isNaN", isNaN, 1, realm);
 
         // 21.1.2.15 Number.prototype
         // https://tc39.es/ecma262/#sec-number.prototype
@@ -117,6 +118,21 @@ pub const NumberConstructor = struct {
 
         // 1. Return IsIntegralNumber(number).
         return Value.from(number.isIntegralNumber());
+    }
+
+    /// 21.1.2.4 Number.isNaN ( number )
+    /// https://tc39.es/ecma262/#sec-number.isnan
+    fn isNaN(_: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const number = arguments.get(0);
+
+        // 1. If number is not a Number, return false.
+        if (number != .number) return Value.from(false);
+
+        // 2. If number is NaN, return true.
+        if (number.number.isNan()) return Value.from(true);
+
+        // 3. Otherwise, return false.
+        return Value.from(false);
     }
 };
 
