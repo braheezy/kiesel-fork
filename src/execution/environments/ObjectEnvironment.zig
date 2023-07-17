@@ -65,6 +65,15 @@ pub fn createImmutableBinding(_: Self, _: []const u8, _: bool) noreturn {
     @panic("ObjectEnvironment.createImmutableBinding() must not be called");
 }
 
+/// 9.1.1.2.4 InitializeBinding ( N, V )
+/// https://tc39.es/ecma262/#sec-object-environment-records-initializebinding-n-v
+pub fn initializeBinding(self: Self, agent: *Agent, name: []const u8, value: Value) !void {
+    // 1. Perform ? envRec.SetMutableBinding(N, V, false).
+    try self.setMutableBinding(agent, name, value, false);
+
+    // 2. Return unused.
+}
+
 /// 9.1.1.2.5 SetMutableBinding ( N, V, S )
 /// https://tc39.es/ecma262/#sec-object-environment-records-setmutablebinding-n-v-s
 pub fn setMutableBinding(self: Self, agent: *Agent, name: []const u8, value: Value, strict: bool) !void {
