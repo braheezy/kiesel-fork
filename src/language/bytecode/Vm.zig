@@ -479,6 +479,15 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
                 else => unreachable,
             };
         },
+        .create_catch_binding => {
+            const name = self.fetchIdentifier(executable);
+            const thrown_value = self.exception.?;
+            self.exception = null;
+            const running_context = self.agent.runningExecutionContext();
+            const catch_env = running_context.ecmascript_code.?.lexical_environment;
+            try catch_env.createMutableBinding(self.agent, name, false);
+            try catch_env.initializeBinding(self.agent, name, thrown_value);
+        },
         .evaluate_call => {
             const maybe_reference = self.reference_stack.getLast();
             const argument_count = self.fetchIndex(executable);
@@ -837,7 +846,6 @@ pub fn run(self: *Self, executable: Executable) !Completion {
     while (self.fetchInstruction(executable)) |instruction| {
         self.executeInstruction(executable, instruction) catch |err| {
             if (self.exception_jump_target_stack.items.len != 0) {
-                // TODO: Store exception and create catch binding
                 self.exception = self.agent.exception;
                 self.agent.exception = null;
                 self.ip = self.exception_jump_target_stack.getLast();

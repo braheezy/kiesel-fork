@@ -2356,7 +2356,7 @@ pub const TryStatement = struct {
     const Self = @This();
 
     try_block: Block,
-    catch_parameter: ?[]const u8,
+    catch_parameter: ?Identifier, // TODO: Binding patterns
     catch_block: ?Block,
     finally_block: ?Block,
 
@@ -2394,8 +2394,13 @@ pub const TryStatement = struct {
 
             // 2. If B.[[Type]] is throw, let C be Completion(CatchClauseEvaluation of Catch with
             //    argument B.[[Value]]).
+            // TODO: Create a new lexical environment
             try exception_jump_to_catch.setTargetHere();
             try executable.addInstruction(.pop_exception_jump_target);
+            if (self.catch_parameter) |catch_parameter| try executable.addInstructionWithIdentifier(
+                .create_catch_binding,
+                catch_parameter,
+            );
             try executable.addInstructionWithConstant(.store_constant, .undefined);
             try self.catch_block.?.generateBytecode(executable, ctx);
 
@@ -2435,10 +2440,15 @@ pub const TryStatement = struct {
 
             // 2. If B.[[Type]] is throw, let C be Completion(CatchClauseEvaluation of Catch with argument B.[[Value]]).
             // 3. Else, let C be B.
+            // TODO: Create a new lexical environment
             try exception_jump_to_catch.setTargetHere();
             try executable.addInstruction(.pop_exception_jump_target);
             try executable.addInstruction(.push_exception_jump_target);
             const exception_jump_to_finally = try executable.addJumpIndex();
+            if (self.catch_parameter) |catch_parameter| try executable.addInstructionWithIdentifier(
+                .create_catch_binding,
+                catch_parameter,
+            );
             try executable.addInstructionWithConstant(.store_constant, .undefined);
             try self.catch_block.?.generateBytecode(executable, ctx);
 

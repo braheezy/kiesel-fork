@@ -142,6 +142,11 @@ pub fn print(self: Self, writer: anytype) !void {
                 const operator: ast.BinaryExpression.Operator = @enumFromInt(operator_type);
                 try writer.print("(operator: {s})", .{@tagName(operator)});
             },
+            .create_catch_binding => {
+                const identifier_index = iterator.instruction_args[0].?;
+                const identifier = self.identifiers.items[identifier_index];
+                try writer.print("{s} [{}]", .{ identifier, identifier_index });
+            },
             .evaluate_call => {
                 const argument_count = iterator.instruction_args[0].?;
                 const strict = iterator.instruction_args[1].? == 1;

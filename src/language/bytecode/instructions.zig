@@ -16,6 +16,8 @@ pub const Instruction = enum(u8) {
     array_set_length,
     /// Apply bitwise NOT to the last value on the stack and store it as the result value.
     bitwise_not,
+    /// Create a catch binding for the given name and populate it with the stored exception.
+    create_catch_binding,
     /// Store EvaluateCall() as the result value.
     /// This instruction has the number of argument values that need to be popped from the stack
     /// (last to first) as an argument, the values on the stack afterwards are the this value and
@@ -112,6 +114,7 @@ pub const Instruction = enum(u8) {
             .apply_string_or_numeric_binary_operator,
             .array_set_length,
             .array_set_value,
+            .create_catch_binding,
             .evaluate_new,
             .evaluate_property_access_with_expression_key,
             .instantiate_ordinary_function_expression,
@@ -133,7 +136,10 @@ pub const Instruction = enum(u8) {
 
     pub fn hasIdentifierIndex(self: Self) bool {
         return switch (self) {
-            .evaluate_property_access_with_identifier_key, .resolve_binding => true,
+            .create_catch_binding,
+            .evaluate_property_access_with_identifier_key,
+            .resolve_binding,
+            => true,
             else => false,
         };
     }
