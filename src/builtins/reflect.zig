@@ -226,7 +226,7 @@ pub const Reflect = struct {
 
         // 2. Return ? target.[[GetPrototypeOf]]().
         return Value.from(
-            try target.object.internalMethods().getPrototypeOf(target.object) orelse return .undefined,
+            try target.object.internalMethods().getPrototypeOf(target.object) orelse return .null,
         );
     }
 
