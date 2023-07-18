@@ -94,10 +94,13 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn deleteBinding(self: Self, name: []const u8) bool {
-        _ = self;
-        _ = name;
-        @compileError("Not implemented");
+    pub fn deleteBinding(self: Self, name: []const u8) !bool {
+        return switch (self) {
+            .declarative_environment => |env| env.deleteBinding(name),
+            .object_environment => |env| env.deleteBinding(name),
+            .function_environment => |env| env.declarative_environment.deleteBinding(name),
+            .global_environment => |env| env.deleteBinding(name),
+        };
     }
 
     pub fn hasThisBinding(self: Self) bool {

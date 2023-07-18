@@ -130,6 +130,46 @@ pub fn getBindingValue(self: Self, agent: *Agent, name: []const u8, strict: bool
     return self.object_record.getBindingValue(name, strict);
 }
 
+/// 9.1.1.4.7 DeleteBinding ( N )
+/// https://tc39.es/ecma262/#sec-global-environment-records-deletebinding-n
+pub fn deleteBinding(self: *Self, name: []const u8) !bool {
+    // 1. Let DclRec be envRec.[[DeclarativeRecord]].
+    // 2. If ! DclRec.HasBinding(N) is true, then
+    if (self.declarative_record.hasBinding(name)) {
+        // a. Return ! DclRec.DeleteBinding(N).
+        return self.declarative_record.deleteBinding(name);
+    }
+
+    // 3. Let ObjRec be envRec.[[ObjectRecord]].
+    // 4. Let globalObject be ObjRec.[[BindingObject]].
+    const global_object = self.object_record.binding_object;
+
+    // 5. Let existingProp be ? HasOwnProperty(globalObject, N).
+    const existing_prop = try global_object.hasOwnProperty(PropertyKey.from(name));
+
+    // 6. If existingProp is true, then
+    if (existing_prop) {
+        // a. Let status be ? ObjRec.DeleteBinding(N).
+        const status = try self.object_record.deleteBinding(name);
+
+        // b. If status is true and envRec.[[VarNames]] contains N, then
+        // FIXME: Surely there's a better way to do this...
+        const index = for (self.var_names.items, 0..) |var_name, i| {
+            if (std.mem.eql(u8, var_name, name)) break i;
+        } else null;
+        if (status and index != null) {
+            // i. Remove N from envRec.[[VarNames]].
+            _ = self.var_names.orderedRemove(index.?);
+        }
+
+        // c. Return status.
+        return status;
+    }
+
+    // 7. Return true.
+    return true;
+}
+
 /// 9.1.1.4.8 HasThisBinding ( )
 /// https://tc39.es/ecma262/#sec-global-environment-records-hasthisbinding
 pub fn hasThisBinding(_: Self) bool {

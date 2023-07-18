@@ -135,6 +135,17 @@ pub fn getBindingValue(self: Self, name: []const u8, strict: bool) !Value {
     return self.binding_object.get(PropertyKey.from(name));
 }
 
+/// 9.1.1.2.7 DeleteBinding ( N )
+/// https://tc39.es/ecma262/#sec-object-environment-records-deletebinding-n
+pub fn deleteBinding(self: Self, name: []const u8) !bool {
+    // 1. Let bindingObject be envRec.[[BindingObject]].
+    // 2. Return ? bindingObject.[[Delete]](N).
+    return self.binding_object.internalMethods().delete(
+        self.binding_object,
+        PropertyKey.from(name),
+    );
+}
+
 /// 9.1.1.2.8 HasThisBinding ( )
 /// https://tc39.es/ecma262/#sec-object-environment-records-hasthisbinding
 pub fn hasThisBinding(_: Self) bool {

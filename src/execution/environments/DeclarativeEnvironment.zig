@@ -165,6 +165,23 @@ pub fn getBindingValue(self: Self, agent: *Agent, name: []const u8, _: bool) !Va
     );
 }
 
+/// 9.1.1.1.7 DeleteBinding ( N )
+/// https://tc39.es/ecma262/#sec-declarative-environment-records-deletebinding-n
+pub fn deleteBinding(self: *Self, name: []const u8) bool {
+    // 1. Assert: envRec has a binding for N.
+    const binding_index = self.bindings.getIndex(name).?;
+    const binding = self.bindings.values()[binding_index];
+
+    // 2. If the binding for N in envRec cannot be deleted, return false.
+    if (!binding.deletable) return false;
+
+    // 3. Remove the binding for N from envRec.
+    self.bindings.orderedRemoveAt(binding_index);
+
+    // 4. Return true.
+    return true;
+}
+
 /// 9.1.1.1.8 HasThisBinding ( )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-hasthisbinding
 pub fn hasThisBinding(_: Self) bool {
