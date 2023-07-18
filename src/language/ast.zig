@@ -759,6 +759,7 @@ pub const UnaryExpression = struct {
     const Self = @This();
 
     pub const Operator = enum {
+        delete,
         void,
         typeof,
         @"+",
@@ -772,6 +773,21 @@ pub const UnaryExpression = struct {
 
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
         switch (self.operator) {
+            // 13.5.1.2 Runtime Semantics: Evaluation
+            // https://tc39.es/ecma262/#sec-delete-operator-runtime-semantics-evaluation
+            // UnaryExpression : delete UnaryExpression
+            .delete => {
+                // 1. Let ref be ? Evaluation of UnaryExpression.
+                try self.expression.generateBytecode(executable, ctx);
+
+                if (!self.expression.analyze(.is_reference))
+                    // 2. If ref is not a Reference Record, return true.
+                    try executable.addInstructionWithConstant(.store_constant, Value.from(true))
+                else
+                    // 3-5.
+                    try executable.addInstruction(.delete);
+            },
+
             // 13.5.2.1 Runtime Semantics: Evaluation
             // https://tc39.es/ecma262/#sec-void-operator-runtime-semantics-evaluation
             // UnaryExpression : void UnaryExpression

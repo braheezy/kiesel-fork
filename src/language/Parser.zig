@@ -538,6 +538,7 @@ fn acceptUnaryExpression(self: *Self) !ast.UnaryExpression {
     errdefer self.core.restoreState(state);
 
     const operator_token = try self.core.accept(RuleSet.oneOf(.{
+        .delete,
         .void,
         .typeof,
         .@"+",
@@ -546,6 +547,7 @@ fn acceptUnaryExpression(self: *Self) !ast.UnaryExpression {
         .@"!",
     }));
     const operator: ast.UnaryExpression.Operator = switch (operator_token.type) {
+        .delete => .delete,
         .void => .void,
         .typeof => .typeof,
         .@"+" => .@"+",

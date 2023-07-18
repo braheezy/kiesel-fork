@@ -18,6 +18,8 @@ pub const Instruction = enum(u8) {
     bitwise_not,
     /// Create a catch binding for the given name and populate it with the stored exception.
     create_catch_binding,
+    /// Apply the delete operation to the evaluated expression and set it as the result value.
+    delete,
     /// Store EvaluateCall() as the result value.
     /// This instruction has the number of argument values that need to be popped from the stack
     /// (last to first) as an argument, the values on the stack afterwards are the this value and
