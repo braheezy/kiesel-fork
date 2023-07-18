@@ -107,6 +107,7 @@ pub const PrimaryExpression = union(enum) {
     array_literal: ArrayLiteral,
     object_literal: ObjectLiteral,
     function_expression: FunctionExpression,
+    arrow_function: ArrowFunction,
     parenthesized_expression: ParenthesizedExpression,
 
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
@@ -136,6 +137,7 @@ pub const PrimaryExpression = union(enum) {
             .array_literal => |array_literal| try array_literal.generateBytecode(executable, ctx),
             .object_literal => |object_literal| try object_literal.generateBytecode(executable, ctx),
             .function_expression => |function_expression| try function_expression.generateBytecode(executable, ctx),
+            .arrow_function => |arrow_function| try arrow_function.generateBytecode(executable, ctx),
             .parenthesized_expression => |parenthesized_expression| try parenthesized_expression.generateBytecode(executable, ctx),
         }
     }
@@ -152,6 +154,7 @@ pub const PrimaryExpression = union(enum) {
             .array_literal => |array_literal| try array_literal.print(writer, indentation),
             .object_literal => |object_literal| try object_literal.print(writer, indentation),
             .function_expression => |function_expression| try function_expression.print(writer, indentation),
+            .arrow_function => |arrow_function| try arrow_function.print(writer, indentation),
             .parenthesized_expression => |parenthesized_expression| try parenthesized_expression.print(
                 writer,
                 indentation,
@@ -2611,7 +2614,7 @@ pub const FunctionExpression = struct {
         // 1. Return InstantiateOrdinaryFunctionExpression of FunctionExpression.
         try executable.addInstructionWithFunctionExpression(
             .instantiate_ordinary_function_expression,
-            self,
+            .{ .function_expression = self },
         );
     }
 
@@ -2653,6 +2656,33 @@ pub const FunctionBody = struct {
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         // Omit printing 'FunctionBody' here, it's implied and only adds nesting.
         try self.statement_list.print(writer, indentation);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ArrowFunction
+pub const ArrowFunction = struct {
+    const Self = @This();
+
+    arrow_parameters: FormalParameters,
+    function_body: FunctionBody,
+    source_text: []const u8,
+
+    /// 15.3.5 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, _: *BytecodeContext) !void {
+        // 1. Return InstantiateArrowFunctionExpression of ArrowFunction.
+        try executable.addInstructionWithFunctionExpression(
+            .instantiate_arrow_function_expression,
+            .{ .arrow_function = self },
+        );
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("ArrowFunction", writer, indentation);
+        try printString("arrow_parameters:", writer, indentation + 1);
+        try self.arrow_parameters.print(writer, indentation + 2);
+        try printString("function_body:", writer, indentation + 1);
+        try self.function_body.print(writer, indentation + 2);
     }
 };
 

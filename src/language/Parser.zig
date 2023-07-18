@@ -312,6 +312,8 @@ fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
         return .{ .object_literal = object_literal }
     else |_| if (self.acceptFunctionExpression()) |function_expression|
         return .{ .function_expression = function_expression }
+    else |_| if (self.acceptArrowFunction()) |arrow_function|
+        return .{ .arrow_function = arrow_function }
     else |_| if (self.acceptParenthesizedExpression()) |parenthesized_expression|
         return .{ .parenthesized_expression = parenthesized_expression }
     else |_|
@@ -1190,4 +1192,43 @@ fn acceptFunctionBody(self: *Self) !ast.FunctionBody {
 
     const statement_list = try self.acceptStatementList();
     return .{ .statement_list = statement_list };
+}
+
+fn acceptArrowFunction(self: *Self) !ast.ArrowFunction {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    // TODO: Support arrow function with a single parameter and no parentheses
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    // We need to do this after consuming the '(' token to skip preceeding whitespace.
+    const start_offset = self.core.tokenizer.offset - (comptime "(".len);
+    const formal_parameters = try self.acceptFormalParameters();
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    _ = try self.core.accept(RuleSet.is(.@"=>"));
+    try self.noLineTerminatorHere();
+    const function_body = blk: {
+        if (self.core.accept(RuleSet.is(.@"{"))) |_| {
+            const function_body = try self.acceptFunctionBody();
+            _ = try self.core.accept(RuleSet.is(.@"}"));
+            break :blk function_body;
+        } else |_| {
+            const expression_body = try self.acceptExpression(.{});
+            // Synthesize a FunctionBody with return statement
+            const statement = try self.allocator.create(ast.Statement);
+            statement.* = ast.Statement{ .return_statement = .{ .expression = expression_body } };
+            const items = try self.allocator.alloc(ast.StatementListItem, 1);
+            items[0] = .{ .statement = statement };
+            break :blk ast.FunctionBody{ .statement_list = ast.StatementList{ .items = items } };
+        }
+    };
+    const end_offset = self.core.tokenizer.offset;
+    const source_text = try self.allocator.dupe(
+        u8,
+        self.core.tokenizer.source[start_offset..end_offset],
+    );
+    return .{
+        .arrow_parameters = formal_parameters,
+        .function_body = function_body,
+        .source_text = source_text,
+    };
 }

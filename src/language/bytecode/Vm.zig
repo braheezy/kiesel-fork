@@ -9,6 +9,7 @@ const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const ArrowOrOrdinaryFunctionExpression = Executable.ArrowOrOrdinaryFunctionExpression;
 const Completion = types.Completion;
 const Executable = @import("Executable.zig");
 const Instruction = instructions_.Instruction;
@@ -78,7 +79,7 @@ fn fetchIdentifier(self: *Self, executable: Executable) []const u8 {
     return identifiers[index];
 }
 
-fn fetchFunctionExpression(self: *Self, executable: Executable) ast.FunctionExpression {
+fn fetchFunctionExpression(self: *Self, executable: Executable) ArrowOrOrdinaryFunctionExpression {
     const function_expressions = executable.function_expressions.items;
     const index = self.fetchIndex(executable);
     return function_expressions[index];
@@ -442,6 +443,47 @@ fn instantiateOrdinaryFunctionExpression(
     }
 }
 
+/// 15.3.4 Runtime Semantics: InstantiateArrowFunctionExpression
+/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiatearrowfunctionexpression
+fn instantiateArrowFunctionExpression(
+    agent: *Agent,
+    arrow_function: ast.ArrowFunction,
+    default_name: ?[]const u8,
+) !Object {
+    const realm = agent.currentRealm();
+
+    // 1. If name is not present, set name to "".
+    const name = default_name orelse "";
+
+    // 2. Let env be the LexicalEnvironment of the running execution context.
+    const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+    // 3. Let privateEnv be the running execution context's PrivateEnvironment.
+    const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+
+    // 4. Let sourceText be the source text matched by ArrowFunction.
+    const source_text = arrow_function.source_text;
+
+    // 5. Let closure be OrdinaryFunctionCreate(%Function.prototype%, sourceText, ArrowParameters,
+    //    ConciseBody, lexical-this, env, privateEnv).
+    const closure = try ordinaryFunctionCreate(
+        agent,
+        try realm.intrinsics.@"%Function.prototype%"(),
+        source_text,
+        arrow_function.arrow_parameters,
+        arrow_function.function_body,
+        .lexical_this,
+        env,
+        private_env,
+    );
+
+    // 6. Perform SetFunctionName(closure, name).
+    try setFunctionName(closure, PropertyKey.from(name), null);
+
+    // 7. Return closure.
+    return closure;
+}
+
 pub fn executeInstruction(self: *Self, executable: Executable, instruction: Instruction) !void {
     switch (instruction) {
         .apply_string_or_numeric_binary_operator => {
@@ -704,11 +746,20 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             // 5. Return ? InstanceofOperator(lval, rval).
             self.result = Value.from(try instanceofOperator(self.agent, lval, rval));
         },
+        .instantiate_arrow_function_expression => {
+            const function_expression = self.fetchFunctionExpression(executable);
+            const closure = try instantiateArrowFunctionExpression(
+                self.agent,
+                function_expression.arrow_function,
+                null,
+            );
+            self.result = Value.from(closure);
+        },
         .instantiate_ordinary_function_expression => {
             const function_expression = self.fetchFunctionExpression(executable);
             const closure = try instantiateOrdinaryFunctionExpression(
                 self.agent,
-                function_expression,
+                function_expression.function_expression,
                 null,
             );
             self.result = Value.from(closure);
