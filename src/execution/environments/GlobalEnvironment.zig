@@ -27,7 +27,7 @@ global_this_value: Object,
 declarative_record: *DeclarativeEnvironment,
 
 /// [[VarNames]]
-var_names: std.ArrayList([]const u8),
+var_names: std.StringHashMap(void),
 
 /// [[OuterEnv]]
 outer_env: ?Environment,
@@ -153,13 +153,10 @@ pub fn deleteBinding(self: *Self, name: []const u8) !bool {
         const status = try self.object_record.deleteBinding(name);
 
         // b. If status is true and envRec.[[VarNames]] contains N, then
-        // FIXME: Surely there's a better way to do this...
-        const index = for (self.var_names.items, 0..) |var_name, i| {
-            if (std.mem.eql(u8, var_name, name)) break i;
-        } else null;
-        if (status and index != null) {
+        const key_ptr = self.var_names.getKeyPtr(name);
+        if (status and key_ptr != null) {
             // i. Remove N from envRec.[[VarNames]].
-            _ = self.var_names.orderedRemove(index.?);
+            self.var_names.removeByPtr(key_ptr.?);
         }
 
         // c. Return status.
@@ -214,13 +211,9 @@ pub fn createGlobalVarBinding(self: *Self, agent: *Agent, name: []const u8, dele
     }
 
     // 6. If envRec.[[VarNames]] does not contain N, then
-    // FIXME: Surely there's a better way to do this...
-    const contains = for (self.var_names.items) |var_name| {
-        if (std.mem.eql(u8, var_name, name)) break true;
-    } else false;
-    if (!contains) {
+    if (!self.var_names.contains(name)) {
         // a. Append N to envRec.[[VarNames]].
-        try self.var_names.append(name);
+        try self.var_names.putNoClobber(name, {});
     }
 
     // 7. Return unused.

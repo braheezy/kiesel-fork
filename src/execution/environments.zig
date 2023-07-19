@@ -294,7 +294,7 @@ pub fn newGlobalEnvironment(
         .declarative_record = declarative_record,
 
         // 7. Set env.[[VarNames]] to a new empty List.
-        .var_names = std.ArrayList([]const u8).init(allocator),
+        .var_names = std.StringHashMap(void).init(allocator),
 
         // 8. Set env.[[OuterEnv]] to null.
         .outer_env = null,
