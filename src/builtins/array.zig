@@ -493,7 +493,58 @@ pub const ArrayPrototype = struct {
             .configurable = false,
         });
 
+        try defineBuiltinFunction(object, "join", join, 1, realm);
+
         return object;
+    }
+
+    /// 23.1.3.18 Array.prototype.join ( separator )
+    /// https://tc39.es/ecma262/#sec-array.prototype.join
+    fn join(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const separator = arguments.get(0);
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+
+        // 3. If separator is undefined, let sep be ",".
+        // 4. Else, let sep be ? ToString(separator).
+        const sep = if (separator == .undefined) "," else (try separator.toString(agent)).value;
+
+        // 5. Let R be the empty String.
+        if (len > std.math.maxInt(usize)) return error.OutOfMemory;
+        var elements = try std.ArrayList([]const u8).initCapacity(agent.gc_allocator, @intCast(len));
+        defer elements.deinit();
+
+        // 6. Let k be 0.
+        // 7. Repeat, while k < len,
+        for (0..@intCast(len)) |k| {
+            // a. If k > 0, set R to the string-concatenation of R and sep.
+
+            // b. Let element be ? Get(O, ! ToString(𝔽(k))).
+            const element = try object.get(
+                PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(k))),
+            );
+
+            // c. If element is either undefined or null, let next be the empty String; otherwise,
+            //    let next be ? ToString(element).
+            const next = if (element == .undefined or element == .null)
+                ""
+            else
+                (try element.toString(agent)).value;
+
+            // d. Set R to the string-concatenation of R and next.
+            try elements.append(next);
+
+            // e. Set k to k + 1.
+        }
+
+        // 8. Return R.
+        return Value.from(
+            try std.mem.join(agent.gc_allocator, sep, elements.items),
+        );
     }
 };
 
