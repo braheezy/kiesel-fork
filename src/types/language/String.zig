@@ -23,3 +23,15 @@ pub inline fn utf16CodeUnits(self: Self, allocator: Allocator) ![]const u16 {
         error.InvalidUtf8 => unreachable,
     };
 }
+
+pub inline fn substring(self: Self, allocator: Allocator, start: usize, end: usize) ![]const u8 {
+    const code_units = try self.utf16CodeUnits(allocator);
+    defer allocator.free(code_units);
+    return std.unicode.utf16leToUtf8Alloc(allocator, code_units[start..end]) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.DanglingSurrogateHalf,
+        error.ExpectedSecondSurrogateHalf,
+        error.UnexpectedSecondSurrogateHalf,
+        => unreachable,
+    };
+}
