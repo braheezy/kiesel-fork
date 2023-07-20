@@ -315,13 +315,14 @@ pub fn hasOwnProperty(self: Self, property_key: PropertyKey) !bool {
 /// https://tc39.es/ecma262/#sec-construct
 pub fn construct(
     self: Self,
-    args: struct { arguments_list: ?ArgumentsList = null, new_target: ?Self = null },
+    arguments: anytype,
+    maybe_new_target: ?Self,
 ) !Self {
     // 1. If newTarget is not present, set newTarget to F.
-    const new_target = args.new_target orelse self;
+    const new_target = maybe_new_target orelse self;
 
     // 2. If argumentsList is not present, set argumentsList to a new empty List.
-    const arguments_list = args.arguments_list orelse ArgumentsList.from(.{});
+    const arguments_list = ArgumentsList.from(arguments);
 
     // 3. Return ? F.[[Construct]](argumentsList, newTarget).
     return self.internalMethods().construct.?(self, arguments_list, new_target);

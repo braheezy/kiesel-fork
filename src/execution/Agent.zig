@@ -169,9 +169,7 @@ pub fn throwException(
         "%" ++ exception_type.typeName() ++ "%",
     )(&realm.intrinsics) catch unreachable; // Already allocated for the global object
     self.exception = blk: {
-        const error_object = constructor.construct(.{
-            .arguments_list = ArgumentsList.from(.{Value.from(message)}),
-        }) catch |err| switch (err) {
+        const error_object = constructor.construct(.{Value.from(message)}, null) catch |err| switch (err) {
             error.OutOfMemory => break :blk Value.from("Out of memory"),
             error.ExceptionThrown => unreachable,
         };

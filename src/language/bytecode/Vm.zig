@@ -111,9 +111,7 @@ fn evaluateNew(agent: *Agent, constructor: Value, arguments: []const Value) !Val
     }
 
     // 6. Return ? Construct(constructor, argList).
-    return Value.from(try constructor.object.construct(.{
-        .arguments_list = ArgumentsList.from(arguments),
-    }));
+    return Value.from(try constructor.object.construct(arguments, null));
 }
 
 /// 13.3.6.2 EvaluateCall ( func, ref, arguments, tailPosition )

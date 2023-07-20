@@ -199,9 +199,7 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: usize) 
     }
 
     // 8. Return ? Construct(C, « 𝔽(length) »).
-    return constructor.object.construct(.{
-        .arguments_list = ArgumentsList.from(.{Value.from(length)}),
-    });
+    return constructor.object.construct(.{Value.from(length)}, null);
 }
 
 /// 10.4.2.4 ArraySetLength ( A, Desc )
@@ -503,9 +501,7 @@ pub const ArrayConstructor = struct {
         const array = blk: {
             if (constructor.isConstructor()) {
                 // a. Let A be ? Construct(C, « lenNumber »).
-                break :blk try constructor.object.construct(.{
-                    .arguments_list = ArgumentsList.from(.{len_number}),
-                });
+                break :blk try constructor.object.construct(.{len_number}, null);
             }
             // 5. Else,
             else {

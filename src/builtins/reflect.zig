@@ -105,10 +105,7 @@ pub const Reflect = struct {
         const args = try arguments_list.createListFromArrayLike(agent, .{});
 
         // 5. Return ? Construct(target, args, newTarget).
-        return Value.from(try target.object.construct(.{
-            .arguments_list = ArgumentsList.from(args),
-            .new_target = new_target.object,
-        }));
+        return Value.from(try target.object.construct(args, new_target.object));
     }
 
     /// 28.1.3 Reflect.defineProperty ( target, propertyKey, attributes )
