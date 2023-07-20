@@ -58,6 +58,36 @@ pub fn temporaryChange(
     return .{ .lhs = lhs, .previous_value = @field(lhs, field_name) };
 }
 
+pub fn trimLeft(haystack: []const u8, needles: []const []const u8) []const u8 {
+    var trimmed = haystack;
+    while (trimmed.len > 0) {
+        for (needles) |needle| {
+            if (std.mem.startsWith(u8, trimmed, needle)) {
+                trimmed = trimmed[needle.len..];
+                break;
+            }
+        } else break;
+    }
+    return trimmed;
+}
+
+pub fn trimRight(haystack: []const u8, needles: []const []const u8) []const u8 {
+    var trimmed = haystack;
+    while (trimmed.len > 0) {
+        for (needles) |needle| {
+            if (std.mem.endsWith(u8, trimmed, needle)) {
+                trimmed = trimmed[0..trimmed.len - needle.len];
+                break;
+            }
+        } else break;
+    }
+    return trimmed;
+}
+
+pub fn trim(haystack: []const u8, needles: []const []const u8) []const u8 {
+    return trimLeft(trimRight(haystack, needles), needles);
+}
+
 pub fn formatParseError(allocator: Allocator, parse_error: Error) ![]const u8 {
     return std.fmt.allocPrint(allocator, "{s} ({s}:{}:{})", .{
         parse_error.message,
