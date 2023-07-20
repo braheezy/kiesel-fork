@@ -102,6 +102,14 @@ pub fn fromPropertyDescriptor(self: Self, agent: *Agent) !Object {
             Value.from(get),
         ) catch |err| try noexcept(err);
     }
+    // NOTE: `get` being null can mean that it is either absent or undefined, if `set` is non-null
+    //       we can assume the latter.
+    else if (self.set) |_| {
+        object.createDataPropertyOrThrow(
+            PropertyKey.from("get"),
+            .undefined,
+        ) catch |err| try noexcept(err);
+    }
 
     // 7. If Desc has a [[Set]] field, then
     if (self.set) |set| {
@@ -109,6 +117,14 @@ pub fn fromPropertyDescriptor(self: Self, agent: *Agent) !Object {
         object.createDataPropertyOrThrow(
             PropertyKey.from("set"),
             Value.from(set),
+        ) catch |err| try noexcept(err);
+    }
+    // NOTE: `set` being null can mean that it is either absent or undefined, if `get` is non-null
+    //       we can assume the latter.
+    else if (self.get) |_| {
+        object.createDataPropertyOrThrow(
+            PropertyKey.from("set"),
+            .undefined,
         ) catch |err| try noexcept(err);
     }
 
