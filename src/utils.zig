@@ -10,6 +10,7 @@ const builtins = @import("builtins.zig");
 const execution = @import("execution.zig");
 const types = @import("types.zig");
 
+const Agent = execution.Agent;
 const Behaviour = builtins.Behaviour;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
@@ -76,7 +77,7 @@ pub fn trimRight(haystack: []const u8, needles: []const []const u8) []const u8 {
     while (trimmed.len > 0) {
         for (needles) |needle| {
             if (std.mem.endsWith(u8, trimmed, needle)) {
-                trimmed = trimmed[0..trimmed.len - needle.len];
+                trimmed = trimmed[0 .. trimmed.len - needle.len];
                 break;
             }
         } else break;
@@ -100,6 +101,54 @@ pub fn formatParseError(allocator: Allocator, parse_error: Error) ![]const u8 {
 // NOTE: A lot of this behaviour is implied for all builtins and described at the end of
 // https://tc39.es/ecma262/#sec-ecmascript-standard-built-in-objects.
 
+fn getFunctionName(comptime name: []const u8) []const u8 {
+    return if (comptime std.mem.startsWith(u8, name, "@@"))
+        std.fmt.comptimePrint("[Symbol.{s}]", .{name[2..]})
+    else
+        name;
+}
+
+inline fn getPropertyKey(comptime name: []const u8, agent: *Agent) PropertyKey {
+    return if (comptime std.mem.startsWith(u8, name, "@@"))
+        PropertyKey.from(@field(agent.well_known_symbols, name))
+    else
+        PropertyKey.from(name);
+}
+
+pub fn defineBuiltinAccessor(
+    object: Object,
+    comptime name: []const u8,
+    getter: ?*const Behaviour.RegularFn,
+    setter: ?*const Behaviour.RegularFn,
+    realm: *Realm,
+) !void {
+    std.debug.assert(getter != null or setter != null);
+    const getter_function = if (getter) |behaviour| blk: {
+        const function_name = std.fmt.comptimePrint("get {s}", .{comptime getFunctionName(name)});
+        break :blk try createBuiltinFunction(realm.agent, .{ .regular = behaviour }, .{
+            .length = 0,
+            .name = function_name,
+            .realm = realm,
+        });
+    } else null;
+    const setter_function = if (setter) |behaviour| blk: {
+        const function_name = std.fmt.comptimePrint("set {s}", .{comptime getFunctionName(name)});
+        break :blk try createBuiltinFunction(realm.agent, .{ .regular = behaviour }, .{
+            .length = 0,
+            .name = function_name,
+            .realm = realm,
+        });
+    } else null;
+    const property_key = getPropertyKey(name, object.agent());
+    const property_descriptor = PropertyDescriptor{
+        .get = getter_function,
+        .set = setter_function,
+        .enumerable = false,
+        .configurable = true,
+    };
+    object.definePropertyOrThrow(property_key, property_descriptor) catch |err| try noexcept(err);
+}
+
 pub fn defineBuiltinFunction(
     object: Object,
     comptime name: []const u8,
@@ -107,10 +156,7 @@ pub fn defineBuiltinFunction(
     length: u32,
     realm: *Realm,
 ) !void {
-    const function_name = if (comptime std.mem.startsWith(u8, name, "@@"))
-        std.fmt.comptimePrint("[Symbol.{s}]", .{name[2..]})
-    else
-        name;
+    const function_name = comptime getFunctionName(name);
     const function = try createBuiltinFunction(realm.agent, .{ .regular = behaviour }, .{
         .length = length,
         .name = function_name,
@@ -121,10 +167,7 @@ pub fn defineBuiltinFunction(
 
 pub fn defineBuiltinProperty(object: Object, comptime name: []const u8, value: anytype) !void {
     const T = @TypeOf(value);
-    const property_key = if (comptime std.mem.startsWith(u8, name, "@@"))
-        PropertyKey.from(@field(object.agent().well_known_symbols, name))
-    else
-        PropertyKey.from(name);
+    const property_key = getPropertyKey(name, object.agent());
     const property_descriptor = if (T == Value)
         PropertyDescriptor{
             .value = value,
