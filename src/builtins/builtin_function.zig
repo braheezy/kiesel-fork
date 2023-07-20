@@ -99,8 +99,8 @@ pub fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList)
     //     conforms to the specification of F. thisArgument is the this value, argumentsList
     //     provides the named parameters, and the NewTarget value is undefined.
     const result = switch (self.fields.behaviour) {
-        .regular => |regularFn| try regularFn(agent, this_argument, arguments_list),
-        .constructor => |constructorFn| try constructorFn(agent, this_argument, arguments_list, null),
+        .regular => |regularFn| regularFn(agent, this_argument, arguments_list),
+        .constructor => |constructorFn| constructorFn(agent, this_argument, arguments_list, null),
     };
 
     // 11. Remove calleeContext from the execution context stack and restore callerContext as the
