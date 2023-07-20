@@ -5,6 +5,7 @@ const builtins = @import("../../builtins.zig");
 const types = @import("../../types.zig");
 
 const Object = types.Object;
+const PropertyKey = types.PropertyKey;
 const Realm = @import("../Realm.zig");
 
 const Self = @This();
@@ -33,6 +34,7 @@ lazy_intrinsics: struct {
     @"%Number.prototype%": ?Object = null,
     @"%Object%": ?Object = null,
     @"%Object.prototype%": ?Object = null,
+    @"%Object.prototype.toString%": ?Object = null,
     @"%RangeError%": ?Object = null,
     @"%RangeError.prototype%": ?Object = null,
     @"%ReferenceError%": ?Object = null,
@@ -130,6 +132,15 @@ pub fn @"%Object%"(self: *Self) error{OutOfMemory}!Object {
 }
 pub fn @"%Object.prototype%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Object.prototype%", builtins.ObjectPrototype);
+}
+pub fn @"%Object.prototype.toString%"(self: *Self) error{OutOfMemory}!Object {
+    const intrinsic = &self.lazy_intrinsics.@"%Object.prototype.toString%";
+    if (intrinsic.* == null) {
+        const object_prototype = try @"%Object.prototype%"(self);
+        const property_descriptor = object_prototype.data.property_storage.get(PropertyKey.from("toString"));
+        intrinsic.* = property_descriptor.?.value.?.object;
+    }
+    return intrinsic.*.?;
 }
 pub fn @"%RangeError%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%RangeError%", builtins.RangeErrorConstructor);

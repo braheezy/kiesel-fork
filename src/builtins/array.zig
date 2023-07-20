@@ -494,6 +494,7 @@ pub const ArrayPrototype = struct {
         });
 
         try defineBuiltinFunction(object, "join", join, 1, realm);
+        try defineBuiltinFunction(object, "toString", toString, 0, realm);
 
         return object;
     }
@@ -545,6 +546,24 @@ pub const ArrayPrototype = struct {
         return Value.from(
             try std.mem.join(agent.gc_allocator, sep, elements.items),
         );
+    }
+
+    /// 23.1.3.36 Array.prototype.toString ( )
+    /// https://tc39.es/ecma262/#sec-array.prototype.tostring
+    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        const realm = agent.currentRealm();
+
+        // 1. Let array be ? ToObject(this value).
+        const array = try this_value.toObject(agent);
+
+        // 2. Let func be ? Get(array, "join").
+        var func = try array.get(PropertyKey.from("join"));
+
+        // 3. If IsCallable(func) is false, set func to the intrinsic function %Object.prototype.toString%.
+        if (!func.isCallable()) func = Value.from(try realm.intrinsics.@"%Object.prototype.toString%"());
+
+        // 4. Return ? Call(func, array).
+        return func.callAssumeCallableNoArgs(Value.from(array));
     }
 };
 
