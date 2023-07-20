@@ -520,14 +520,14 @@ pub const ArrayPrototype = struct {
         defer elements.deinit();
 
         // 6. Let k be 0.
+        var k: u53 = 0;
+
         // 7. Repeat, while k < len,
-        for (0..@intCast(len)) |k| {
+        while (k < len) : (k += 1) {
             // a. If k > 0, set R to the string-concatenation of R and sep.
 
             // b. Let element be ? Get(O, ! ToString(𝔽(k))).
-            const element = try object.get(
-                PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(k))),
-            );
+            const element = try object.get(PropertyKey.from(k));
 
             // c. If element is either undefined or null, let next be the empty String; otherwise,
             //    let next be ? ToString(element).
