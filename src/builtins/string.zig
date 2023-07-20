@@ -132,7 +132,7 @@ fn stringGetOwnProperty(string: *const String, property_key: PropertyKey) !?Prop
     if (len <= index) return null;
 
     // 10. Let resultStr be the substring of str from ℝ(index) to ℝ(index) + 1.
-    const result_str = try agent.gc_allocator.dupe(u8, str.value[index .. index + 1]);
+    const result_str = try str.substring(agent.gc_allocator, index, index + 1);
 
     // 11. Return the PropertyDescriptor {
     //       [[Value]]: resultStr, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
