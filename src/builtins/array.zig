@@ -17,6 +17,7 @@ const PropertyKey = Object.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
@@ -308,6 +309,15 @@ pub const ArrayConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
+
+        // 23.1.2.5 get Array [ @@species ]
+        // https://tc39.es/ecma262/#sec-get-array-@@species
+        try defineBuiltinAccessor(object, "@@species", struct {
+            fn getter(_: *Agent, this_value: Value, _: ArgumentsList) !Value {
+                // 1. Return the this value.
+                return this_value;
+            }
+        }.getter, null, realm);
 
         // 23.1.3.3 Array.prototype.constructor
         // https://tc39.es/ecma262/#sec-array.prototype.constructor
