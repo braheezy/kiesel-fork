@@ -5,6 +5,7 @@ const Allocator = std.mem.Allocator;
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const pretty_printing = @import("../../pretty_printing.zig");
+const tokenizer = @import("../../language/tokenizer.zig");
 const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
@@ -20,6 +21,9 @@ const arrayCreate = builtins.arrayCreate;
 const noexcept = utils.noexcept;
 const prettyPrintValue = pretty_printing.prettyPrintValue;
 const stringCreate = builtins.stringCreate;
+const trim = utils.trim;
+const line_terminators = tokenizer.line_terminators;
+const whitespace = tokenizer.whitespace;
 
 const pow_2_7 = std.math.pow(f64, 2, 7);
 const pow_2_8 = std.math.pow(f64, 2, 8);
@@ -1005,7 +1009,9 @@ pub fn stringToNumber(string: String) Number {
     // 3. If literal is a List of errors, return NaN.
     // 4. Return StringNumericValue of literal.
     // TODO: Implement the proper string parsing grammar!
-    return Number.from(std.fmt.parseFloat(f64, string.value) catch std.math.nan(f64));
+    const value = trim(string.value, &(whitespace ++ line_terminators));
+    if (value.len == 0) return Number.from(0);
+    return Number.from(std.fmt.parseFloat(f64, value) catch std.math.nan(f64));
 }
 
 /// 7.1.14 StringToBigInt ( str )
