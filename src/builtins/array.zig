@@ -495,6 +495,7 @@ pub const ArrayPrototype = struct {
 
         try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
         try defineBuiltinFunction(object, "join", join, 1, realm);
+        try defineBuiltinFunction(object, "push", push, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
 
         return object;
@@ -597,6 +598,39 @@ pub const ArrayPrototype = struct {
         return Value.from(
             try std.mem.join(agent.gc_allocator, sep, elements.items),
         );
+    }
+
+    /// 23.1.3.23 Array.prototype.push ( ...items )
+    /// https://tc39.es/ecma262/#sec-array.prototype.push
+    fn push(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        var len = try object.lengthOfArrayLike();
+
+        // 3. Let argCount be the number of elements in items.
+        const arg_count = arguments.count();
+
+        // 4. If len + argCount > 2^53 - 1, throw a TypeError exception.
+        _ = std.math.add(u53, len, @as(u53, @intCast(arg_count))) catch {
+            return agent.throwException(.type_error, "");
+        };
+
+        // 5. For each element E of items, do
+        for (arguments.values) |element| {
+            // a. Perform ? Set(O, ! ToString(𝔽(len)), E, true).
+            try object.set(PropertyKey.from(len), element, .throw);
+
+            // b. Set len to len + 1.
+            len += 1;
+        }
+
+        // 6. Perform ? Set(O, "length", 𝔽(len), true).
+        try object.set(PropertyKey.from("length"), Value.from(len), .throw);
+
+        // 7. Return 𝔽(len).
+        return Value.from(len);
     }
 
     /// 23.1.3.36 Array.prototype.toString ( )
