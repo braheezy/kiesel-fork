@@ -495,6 +495,7 @@ pub const ArrayPrototype = struct {
 
         try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
         try defineBuiltinFunction(object, "join", join, 1, realm);
+        try defineBuiltinFunction(object, "pop", pop, 0, realm);
         try defineBuiltinFunction(object, "push", push, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
 
@@ -631,6 +632,48 @@ pub const ArrayPrototype = struct {
 
         // 7. Return 𝔽(len).
         return Value.from(len);
+    }
+
+    /// 23.1.3.22 Array.prototype.pop ( )
+    /// https://tc39.es/ecma262/#sec-array.prototype.pop
+    fn pop(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+
+        // If len = 0, then
+        if (len == 0) {
+            // a. Perform ? Set(O, "length", +0𝔽, true).
+            try object.set(PropertyKey.from("length"), Value.from(0), .throw);
+
+            // b. Return undefined.
+            return .undefined;
+        }
+        // 4. Else,
+        else {
+            // a. Assert: len > 0.
+            std.debug.assert(len > 0);
+
+            // b. Let newLen be 𝔽(len - 1).
+            const new_len = len - 1;
+
+            // c. Let index be ! ToString(newLen).
+            const property_key = PropertyKey.from(new_len);
+
+            // d. Let element be ? Get(O, index).
+            const element = try object.get(property_key);
+
+            // e. Perform ? DeletePropertyOrThrow(O, index).
+            try object.deletePropertyOrThrow(property_key);
+
+            // f. Perform ? Set(O, "length", newLen, true).
+            try object.set(PropertyKey.from("length"), Value.from(new_len), .throw);
+
+            // g. Return element.
+            return element;
+        }
     }
 
     /// 23.1.3.36 Array.prototype.toString ( )
