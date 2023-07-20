@@ -146,6 +146,64 @@ pub fn arrayCreate(agent: *Agent, length: usize, maybe_prototype: ?Object) !Obje
     return array;
 }
 
+/// 10.4.2.3 ArraySpeciesCreate ( originalArray, length )
+/// https://tc39.es/ecma262/#sec-arrayspeciescreate
+pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: usize) !Object {
+    // 1. Let isArray be ? IsArray(originalArray).
+    const is_array = try Value.from(original_array).isArray();
+
+    // 2. If isArray is false, return ? ArrayCreate(length).
+    if (!is_array) return arrayCreate(agent, length, null);
+
+    // 3. Let C be ? Get(originalArray, "constructor").
+    var constructor = try original_array.get(PropertyKey.from("constructor"));
+
+    // 4. If IsConstructor(C) is true, then
+    if (constructor.isConstructor()) {
+        // a. Let thisRealm be the current Realm Record.
+        const this_realm = agent.currentRealm();
+
+        // b. Let realmC be ? GetFunctionRealm(C).
+        const constructor_realm = try constructor.object.getFunctionRealm();
+
+        // c. If thisRealm and realmC are not the same Realm Record, then
+        if (this_realm != constructor_realm) {
+            // i. If SameValue(C, realmC.[[Intrinsics]].[[%Array%]]) is true, set C to undefined.
+            if (constructor.object.ptr == (try constructor_realm.intrinsics.@"%Array%"()).ptr) {
+                constructor = .undefined;
+            }
+        }
+    }
+
+    // 5. If C is an Object, then
+    if (constructor == .object) {
+        // a. Set C to ? Get(C, @@species).
+        constructor = try constructor.get(
+            agent,
+            PropertyKey.from(agent.well_known_symbols.@"@@species"),
+        );
+
+        // b. If C is null, set C to undefined.
+        if (constructor == .null) constructor = .undefined;
+    }
+
+    // 6. If C is undefined, return ? ArrayCreate(length).
+    if (constructor == .undefined) return arrayCreate(agent, length, null);
+
+    // 7. If IsConstructor(C) is false, throw a TypeError exception.
+    if (!constructor.isConstructor()) {
+        return agent.throwException(
+            .type_error,
+            try std.fmt.allocPrint(agent.gc_allocator, "{} is not a constructor", .{constructor}),
+        );
+    }
+
+    // 8. Return ? Construct(C, « 𝔽(length) »).
+    return constructor.object.construct(.{
+        .arguments_list = ArgumentsList.from(.{Value.from(length)}),
+    });
+}
+
 /// 10.4.2.4 ArraySetLength ( A, Desc )
 /// https://tc39.es/ecma262/#sec-arraysetlength
 pub fn arraySetLength(agent: *Agent, array: Object, property_descriptor: PropertyDescriptor) !bool {

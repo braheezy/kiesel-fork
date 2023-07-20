@@ -73,6 +73,7 @@ pub const URIErrorPrototype = @"error".URIErrorPrototype;
 pub const addRestrictedFunctionProperties = ecmascript_function.addRestrictedFunctionProperties;
 pub const arrayCreate = array.arrayCreate;
 pub const arraySetLength = array.arraySetLength;
+pub const arraySpeciesCreate = array.arraySpeciesCreate;
 pub const createBuiltinFunction = builtin_function.createBuiltinFunction;
 pub const getPrototypeFromConstructor = ordinary.getPrototypeFromConstructor;
 pub const globalObjectProperties = global.globalObjectProperties;
