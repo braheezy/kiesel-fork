@@ -10,9 +10,8 @@
             .url = "https://github.com/MasterQ32/parser-toolkit/archive/92c2875f2f91bf2a22b2be89b47ef0c3732f4812.tar.gz",
             .hash = "1220265768f85ae009c6c20fbcabda75f4caacbd7efc0945dc92d3cec363a84e1329",
         },
-        // NOTE: This points to a commit on my fork, update when https://github.com/MasterQ32/zig-args/pull/43 is merged
         .zig_args = .{
-            .url = "https://github.com/MasterQ32/zig-args/archive/5311ceea18147dd19e93351b815516ef813a5b9c.tar.gz",
+            .url = "https://github.com/MasterQ32/zig-args/archive/91d1e89fb89a4d01dec7c9aec95b0a324080ebcc.tar.gz",
             .hash = "12203d04cafc97f952d74cdb077e74c0ab3414f9f6b5fbd159112c62bfa584a0dbed",
         },
     },
