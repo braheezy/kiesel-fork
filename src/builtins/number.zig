@@ -93,6 +93,15 @@ pub const NumberConstructor = struct {
             .configurable = false,
         });
 
+        // 21.1.2.14 Number.POSITIVE_INFINITY
+        // https://tc39.es/ecma262/#sec-number.positive_infinity
+        try defineBuiltinProperty(object, "POSITIVE_INFINITY", PropertyDescriptor{
+            .value = Value.infinity(),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
         try defineBuiltinFunction(object, "isFinite", isFinite, 1, realm);
         try defineBuiltinFunction(object, "isInteger", isInteger, 1, realm);
         try defineBuiltinFunction(object, "isNaN", isNaN, 1, realm);
