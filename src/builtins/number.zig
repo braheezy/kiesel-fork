@@ -39,6 +39,15 @@ pub const NumberConstructor = struct {
             .configurable = false,
         });
 
+        // 21.1.2.6 Number.MAX_SAFE_INTEGER
+        // https://tc39.es/ecma262/#sec-number.max_safe_integer
+        try defineBuiltinProperty(object, "MAX_SAFE_INTEGER", PropertyDescriptor{
+            .value = Value.from(std.math.maxInt(u53)),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
         try defineBuiltinFunction(object, "isFinite", isFinite, 1, realm);
         try defineBuiltinFunction(object, "isInteger", isInteger, 1, realm);
         try defineBuiltinFunction(object, "isNaN", isNaN, 1, realm);
