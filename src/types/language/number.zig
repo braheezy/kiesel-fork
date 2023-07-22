@@ -58,7 +58,8 @@ pub const Number = union(enum) {
                 if (std.math.isFinite(@as(f64, number)) and
                     !std.math.signbit(@as(f64, number)) and
                     truncated == number and
-                    truncated <= @as(f64, @floatFromInt(std.math.maxInt(i32))))
+                    truncated <= @as(f64, @floatFromInt(std.math.maxInt(i32))) and
+                    truncated >= @as(f64, @floatFromInt(std.math.minInt(i32))))
                 {
                     return .{ .i32 = @intFromFloat(truncated) };
                 }
