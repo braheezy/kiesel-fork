@@ -66,6 +66,15 @@ pub const NumberConstructor = struct {
             .configurable = false,
         });
 
+        // 21.1.2.8 Number.MIN_VALUE
+        // https://tc39.es/ecma262/#sec-number.min_value
+        try defineBuiltinProperty(object, "MIN_VALUE", PropertyDescriptor{
+            .value = Value.from(std.math.floatTrueMin(f64)),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
         try defineBuiltinFunction(object, "isFinite", isFinite, 1, realm);
         try defineBuiltinFunction(object, "isInteger", isInteger, 1, realm);
         try defineBuiltinFunction(object, "isNaN", isNaN, 1, realm);
