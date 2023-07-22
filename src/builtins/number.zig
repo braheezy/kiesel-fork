@@ -84,6 +84,15 @@ pub const NumberConstructor = struct {
             .configurable = false,
         });
 
+        // 21.1.2.11 Number.NEGATIVE_INFINITY
+        // https://tc39.es/ecma262/#sec-number.negative_infinity
+        try defineBuiltinProperty(object, "NEGATIVE_INFINITY", PropertyDescriptor{
+            .value = Value.negativeInfinity(),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
         try defineBuiltinFunction(object, "isFinite", isFinite, 1, realm);
         try defineBuiltinFunction(object, "isInteger", isInteger, 1, realm);
         try defineBuiltinFunction(object, "isNaN", isNaN, 1, realm);
