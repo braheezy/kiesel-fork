@@ -459,10 +459,10 @@ pub const Number = union(enum) {
         if (y.isPositiveInf()) return true;
 
         // 8. If y is -∞𝔽, return false.
-        if (x.isNegativeInf()) return false;
+        if (y.isNegativeInf()) return false;
 
         // 9. If x is -∞𝔽, return true.
-        if (y.isNegativeInf()) return true;
+        if (x.isNegativeInf()) return true;
 
         // 10. Assert: x and y are finite and non-zero.
         // NOTE: This is a spec bug, the intended meaning is "x and y are not both zero".
