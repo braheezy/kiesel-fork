@@ -1,6 +1,8 @@
 //! 21.1 Number Objects
 //! https://tc39.es/ecma262/#sec-number-objects
 
+const std = @import("std");
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -26,6 +28,15 @@ pub const NumberConstructor = struct {
             .name = "Number",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
+        });
+
+        // 21.1.2.1 Number.EPSILON
+        // https://tc39.es/ecma262/#sec-number.epsilon
+        try defineBuiltinProperty(object, "EPSILON", PropertyDescriptor{
+            .value = Value.from(std.math.floatEps(f64)),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
         });
 
         try defineBuiltinFunction(object, "isFinite", isFinite, 1, realm);
