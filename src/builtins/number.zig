@@ -105,6 +105,7 @@ pub const NumberConstructor = struct {
         try defineBuiltinFunction(object, "isFinite", isFinite, 1, realm);
         try defineBuiltinFunction(object, "isInteger", isInteger, 1, realm);
         try defineBuiltinFunction(object, "isNaN", isNaN, 1, realm);
+        try defineBuiltinFunction(object, "isSafeInteger", isSafeInteger, 1, realm);
 
         // 21.1.2.15 Number.prototype
         // https://tc39.es/ecma262/#sec-number.prototype
@@ -206,6 +207,23 @@ pub const NumberConstructor = struct {
         if (number.number.isNan()) return Value.from(true);
 
         // 3. Otherwise, return false.
+        return Value.from(false);
+    }
+
+    // 21.1.2.5 Number.isSafeInteger ( number )
+    // https://tc39.es/ecma262/#sec-number.issafeinteger
+    fn isSafeInteger(_: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const number = arguments.get(0);
+
+        // 1. If IsIntegralNumber(number) is true, then
+        if (number.isIntegralNumber()) {
+            // a. If abs(ℝ(number)) ≤ 2^53 - 1, return true.
+            if (std.math.fabs(number.number.asFloat()) <= @as(f64, @floatFromInt(std.math.maxInt(u53)))) {
+                return Value.from(true);
+            }
+        }
+
+        // 2. Return false.
         return Value.from(false);
     }
 };
