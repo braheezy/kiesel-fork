@@ -218,6 +218,7 @@ pub const StringPrototype = struct {
         });
 
         try defineBuiltinFunction(object, "charAt", charAt, 1, realm);
+        try defineBuiltinFunction(object, "charCodeAt", charCodeAt, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
 
@@ -273,6 +274,34 @@ pub const StringPrototype = struct {
 
         // 6. Return the substring of S from position to position + 1.
         return Value.from(try string.substring(agent.gc_allocator, position, position + 1));
+    }
+
+    /// 22.1.3.3 String.prototype.charCodeAt ( pos )
+    /// https://tc39.es/ecma262/#sec-string.prototype.charcodeat
+    fn charCodeAt(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const pos = arguments.get(0);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 3. Let position be ? ToIntegerOrInfinity(pos).
+        const position_f64 = try pos.toIntegerOrInfinity(agent);
+
+        // 4. Let size be the length of S.
+        const size = string.utf16Length();
+
+        // 5. If position < 0 or position ≥ size, return NaN.
+        if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return Value.nan();
+        const position: usize = @intFromFloat(position_f64);
+
+        // 6. Return the Number value for the numeric value of the code unit at index position
+        //    within the String S.
+        const code_units = try string.utf16CodeUnits(agent.gc_allocator);
+        defer agent.gc_allocator.free(code_units);
+        return Value.from(code_units[position]);
     }
 
     /// 22.1.3.29 String.prototype.toString ( )
