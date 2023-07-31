@@ -662,7 +662,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             self.reference = Reference{
                 .base = .{ .value = base_value },
                 .referenced_name = switch (property_key) {
-                    .string => |string| .{ .string = string },
+                    .string => |string| .{ .string = string.value },
                     .symbol => |symbol| .{ .symbol = symbol },
                     .integer_index => |integer_index| .{
                         .string = try std.fmt.allocPrint(

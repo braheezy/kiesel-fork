@@ -552,7 +552,7 @@ pub fn setFunctionName(
     );
 
     var name = switch (name_property_key) {
-        .string => |string| string,
+        .string => |string| string.value,
         .integer_index => |integer_index| try std.fmt.allocPrint(
             agent.gc_allocator,
             "{d}",

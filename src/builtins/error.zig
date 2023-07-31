@@ -105,9 +105,9 @@ pub const ErrorConstructor = struct {
 ///       message and doesn't act on property changes.
 fn internalSet(object: Object, property_key: PropertyKey, value: Value, receiver: Value) !bool {
     if (property_key == .string and value == .string) {
-        if (std.mem.eql(u8, property_key.string, "name")) {
+        if (std.mem.eql(u8, property_key.string.value, "name")) {
             object.as(Error).fields.error_data.name = value.string.value;
-        } else if (std.mem.eql(u8, property_key.string, "message")) {
+        } else if (std.mem.eql(u8, property_key.string.value, "message")) {
             object.as(Error).fields.error_data.message = value.string.value;
         }
     }

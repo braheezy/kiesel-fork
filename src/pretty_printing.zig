@@ -128,7 +128,7 @@ fn prettyPrintObject(object: Object, writer: anytype) !void {
             .string => |string| {
                 try writer.writeAll("\"");
                 try tty_config.setColor(writer, .bold);
-                try writer.print("{s}", .{string});
+                try writer.print("{s}", .{string.value});
                 try tty_config.setColor(writer, .reset);
                 try writer.writeAll("\"");
             },

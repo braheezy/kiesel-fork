@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const String = @import("../String.zig");
 const Symbol = @import("../Symbol.zig");
 
 /// A property key is either a String or a Symbol. All Strings and Symbols, including the empty
@@ -9,7 +10,7 @@ pub const PropertyKey = union(enum) {
 
     pub const IntegerIndex = u53;
 
-    string: []const u8,
+    string: String,
     symbol: Symbol,
 
     // OPTIMIZATION: If the string is known to be an integer index, store it as a number.
@@ -27,8 +28,10 @@ pub const PropertyKey = union(enum) {
             if (std.fmt.parseUnsigned(IntegerIndex, value, 10)) |integer_index| {
                 return .{ .integer_index = integer_index };
             } else |_| {
-                return .{ .string = value };
+                return .{ .string = String.from(value) };
             }
+        } else if (T == String) {
+            return .{ .string = value };
         } else if (T == Symbol) {
             return .{ .symbol = value };
         } else if (T == IntegerIndex or @typeInfo(T) == .ComptimeInt) {

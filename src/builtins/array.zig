@@ -42,7 +42,7 @@ fn defineOwnProperty(
     const agent = array.agent();
 
     // 1. If P is "length", then
-    if (property_key == .string and std.mem.eql(u8, property_key.string, "length")) {
+    if (property_key == .string and std.mem.eql(u8, property_key.string.value, "length")) {
         // a. Return ? ArraySetLength(A, Desc).
         return arraySetLength(agent, array, property_descriptor);
     }

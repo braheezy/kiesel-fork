@@ -31,7 +31,7 @@ pub fn get(self: Self, property_key: PropertyKey) ?PropertyDescriptor {
 pub fn set(self: *Self, property_key: PropertyKey, property_descriptor: PropertyDescriptor) !void {
     const property_key_copy = switch (property_key) {
         // Copy the string since it might outlive the source text - identifiers are just slices of that.
-        .string => |string| PropertyKey.from(try self.hash_map.allocator.dupe(u8, string)),
+        .string => |string| PropertyKey.from(try self.hash_map.allocator.dupe(u8, string.value)),
         else => property_key,
     };
     try self.hash_map.put(property_key_copy, property_descriptor);
@@ -58,7 +58,7 @@ const PropertyHashMap = std.ArrayHashMap(PropertyKey, PropertyDescriptor, struct
 
     pub fn hash(self: @This(), k: PropertyKey) u32 {
         return switch (k) {
-            .string => |string| @truncate(hashString(string)),
+            .string => |string| @truncate(hashString(string.value)),
             .symbol => |symbol| @truncate(hashSymbol(self, symbol.id)),
             .integer_index => |integer_index| @truncate(hashIntegerIndex(self, integer_index)),
         };
@@ -69,9 +69,9 @@ const PropertyHashMap = std.ArrayHashMap(PropertyKey, PropertyDescriptor, struct
         _ = self;
         return switch (a) {
             .string => |a_string| switch (b) {
-                .string => |b_string| eqlString(a_string, b_string),
+                .string => |b_string| eqlString(a_string.value, b_string.value),
                 .symbol => false,
-                .integer_index => |b_integer_index| eqlStringAndIntegerIndex(a_string, b_integer_index),
+                .integer_index => |b_integer_index| eqlStringAndIntegerIndex(a_string.value, b_integer_index),
             },
             .symbol => |a_symbol| switch (b) {
                 .string => false,
@@ -79,7 +79,7 @@ const PropertyHashMap = std.ArrayHashMap(PropertyKey, PropertyDescriptor, struct
                 .integer_index => false,
             },
             .integer_index => |a_integer_index| switch (b) {
-                .string => |b_string| eqlStringAndIntegerIndex(b_string, a_integer_index),
+                .string => |b_string| eqlStringAndIntegerIndex(b_string.value, a_integer_index),
                 .symbol => false,
                 .integer_index => |b_integer_index| a_integer_index == b_integer_index,
             },
