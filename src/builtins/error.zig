@@ -74,7 +74,9 @@ pub const ErrorConstructor = struct {
         );
 
         // Non-standard
-        object.as(Error).fields = .{ .error_data = .{ .name = "Error", .message = "" } };
+        object.as(Error).fields = .{
+            .error_data = .{ .name = String.from("Error"), .message = String.from("") },
+        };
         object.data.internal_methods.set = internalSet;
 
         // 3. If message is not undefined, then
@@ -88,7 +90,7 @@ pub const ErrorConstructor = struct {
                 Value.from(msg),
             ) catch |err| try noexcept(err);
 
-            object.as(Error).fields.error_data.message = msg.value;
+            object.as(Error).fields.error_data.message = msg;
         }
 
         // 4. Perform ? InstallErrorCause(O, options).
@@ -106,9 +108,9 @@ pub const ErrorConstructor = struct {
 fn internalSet(object: Object, property_key: PropertyKey, value: Value, receiver: Value) !bool {
     if (property_key == .string and value == .string) {
         if (std.mem.eql(u8, property_key.string.value, "name")) {
-            object.as(Error).fields.error_data.name = value.string.value;
+            object.as(Error).fields.error_data.name = value.string;
         } else if (std.mem.eql(u8, property_key.string.value, "message")) {
-            object.as(Error).fields.error_data.message = value.string.value;
+            object.as(Error).fields.error_data.message = value.string;
         }
     }
     return builtins.ordinarySet(object, property_key, value, receiver);
@@ -189,8 +191,8 @@ pub const Error = Object.Factory(.{
         // NOTE: [[ErrorData]] is undefined in the spec, we use it to store the name and message
         //       for pretty-printing purposes without property lookup.
         error_data: struct {
-            name: []const u8,
-            message: []const u8,
+            name: String,
+            message: String,
         },
     },
     .tag = .@"error",
@@ -291,7 +293,9 @@ fn NativeErrorConstructor(comptime name: []const u8) type {
             const native_error = @as(*T, @ptrCast(@alignCast(object.ptr)));
 
             // Non-standard
-            native_error.fields = .{ .error_data = .{ .name = name, .message = "" } };
+            native_error.fields = .{
+                .error_data = .{ .name = String.from(name), .message = String.from("") },
+            };
             object.data.internal_methods.set = internalSet;
 
             // 3. If message is not undefined, then
@@ -305,7 +309,7 @@ fn NativeErrorConstructor(comptime name: []const u8) type {
                     Value.from(msg),
                 ) catch |err| try noexcept(err);
 
-                native_error.fields.error_data.message = msg.value;
+                native_error.fields.error_data.message = msg;
             }
 
             // 4. Perform ? InstallErrorCause(O, options).

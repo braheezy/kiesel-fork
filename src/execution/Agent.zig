@@ -176,7 +176,7 @@ pub fn throwException(
         };
         if (exception_type == .internal_error) {
             // We don't have a dedicated type for this, but let's at least adjust the name
-            error_object.as(builtins.Error).fields.error_data.name = "InternalError";
+            error_object.as(builtins.Error).fields.error_data.name = String.from("InternalError");
         }
         break :blk Value.from(error_object);
     };

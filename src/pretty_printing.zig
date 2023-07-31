@@ -64,10 +64,10 @@ fn prettyPrintError(@"error": Object, writer: anytype) !void {
     const tty_config = getTtyConfigForWriter(writer);
 
     try tty_config.setColor(writer, .red);
-    try writer.writeAll(error_data.name);
-    if (error_data.message.len != 0) {
+    try writer.writeAll(error_data.name.value);
+    if (error_data.message.value.len != 0) {
         try writer.writeAll(": ");
-        try writer.writeAll(error_data.message);
+        try writer.writeAll(error_data.message.value);
     }
     try tty_config.setColor(writer, .reset);
 }
