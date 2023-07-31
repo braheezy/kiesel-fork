@@ -20,6 +20,7 @@ const Parser = @import("../language/Parser.zig");
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
+const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
@@ -419,10 +420,10 @@ pub const FunctionPrototype = struct {
         //    func.[[InitialName]].
         if (func == .object and func.object.is(BuiltinFunction)) {
             const builtin_function = func.object.as(BuiltinFunction);
-            const name = builtin_function.fields.initial_name orelse "";
+            const name = builtin_function.fields.initial_name orelse String.from("");
             const source_text = try std.fmt.allocPrint(
                 agent.gc_allocator,
-                "function {s}() {{ [native code] }}",
+                "function {}() {{ [native code] }}",
                 .{name},
             );
             return Value.from(source_text);

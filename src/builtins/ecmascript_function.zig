@@ -23,6 +23,7 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const ScriptOrModule = execution.ScriptOrModule;
+const String = types.String;
 const Value = types.Value;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
@@ -552,12 +553,12 @@ pub fn setFunctionName(
     );
 
     var name = switch (name_property_key) {
-        .string => |string| string.value,
-        .integer_index => |integer_index| try std.fmt.allocPrint(
+        .string => |string| string,
+        .integer_index => |integer_index| String.from(try std.fmt.allocPrint(
             agent.gc_allocator,
             "{d}",
             .{integer_index},
-        ),
+        )),
 
         // 2. If name is a Symbol, then
         .symbol => |symbol| blk: {
@@ -565,10 +566,14 @@ pub fn setFunctionName(
             const description = symbol.description;
 
             // b. If description is undefined, set name to the empty String.
-            if (description == null) break :blk "";
+            if (description == null) break :blk String.from("");
 
             // c. Else, set name to the string-concatenation of "[", description, and "]".
-            break :blk try std.fmt.allocPrint(agent.gc_allocator, "[{s}]", .{description.?.value});
+            break :blk String.from(try std.fmt.allocPrint(
+                agent.gc_allocator,
+                "[{s}]",
+                .{description.?.value},
+            ));
         },
 
         // TODO: 3. Else if name is a Private Name, then
@@ -585,7 +590,9 @@ pub fn setFunctionName(
     if (prefix != null) {
         // a. Set name to the string-concatenation of prefix, the code unit 0x0020 (SPACE), and
         //    name.
-        name = try std.fmt.allocPrint(agent.gc_allocator, "{s} {s}", .{ prefix.?, name });
+        name = String.from(
+            try std.fmt.allocPrint(agent.gc_allocator, "{s} {}", .{ prefix.?, name }),
+        );
 
         // b. If F has an [[InitialName]] internal slot, then
         if (function.is(BuiltinFunction)) {

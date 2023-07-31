@@ -10,6 +10,7 @@ const ExecutionContext = execution.ExecutionContext;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
+const String = types.String;
 const Value = types.Value;
 const setFunctionLength = ecmascript_function.setFunctionLength;
 const setFunctionName = ecmascript_function.setFunctionName;
@@ -59,7 +60,7 @@ pub const BuiltinFunction = Object.Factory(.{
         realm: *Realm,
 
         /// [[InitialName]]
-        initial_name: ?[]const u8,
+        initial_name: ?String,
     },
     .tag = .builtin_function,
 });
