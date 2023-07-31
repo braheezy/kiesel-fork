@@ -13,6 +13,7 @@ const ArgumentsList = builtins.ArgumentsList;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
+const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
@@ -187,7 +188,7 @@ pub const SymbolConstructor = struct {
             if (description == .undefined) break :blk null;
 
             // 3. Else, let descString be ? ToString(description).
-            break :blk (try description.toString(agent)).value;
+            break :blk try description.toString(agent);
         };
 
         // 4. Return a new Symbol whose [[Description]] is descString.
@@ -205,14 +206,14 @@ pub const SymbolConstructor = struct {
         const key = arguments.get(0);
 
         // 1. Let stringKey be ? ToString(key).
-        const string_key = (try key.toString(agent)).value;
+        const string_key = try key.toString(agent);
 
         // 2. For each element e of the GlobalSymbolRegistry List, do
         //     a. If SameValue(e.[[Key]], stringKey) is true, return e.[[Symbol]].
-        if (agent.global_symbol_registry.get(string_key)) |symbol| return Value.from(symbol);
+        if (agent.global_symbol_registry.get(string_key.value)) |symbol| return Value.from(symbol);
 
         // 3. Assert: GlobalSymbolRegistry does not currently contain an entry for stringKey.
-        std.debug.assert(!agent.global_symbol_registry.contains(string_key));
+        std.debug.assert(!agent.global_symbol_registry.contains(string_key.value));
 
         // 4. Let newSymbol be a new Symbol whose [[Description]] is stringKey.
         const new_symbol = agent.createSymbol(string_key) catch |err| switch (err) {
@@ -223,7 +224,7 @@ pub const SymbolConstructor = struct {
         };
 
         // 5. Append the Record { [[Key]]: stringKey, [[Symbol]]: newSymbol } to the GlobalSymbolRegistry List.
-        try agent.global_symbol_registry.putNoClobber(string_key, new_symbol);
+        try agent.global_symbol_registry.putNoClobber(string_key.value, new_symbol);
 
         // 6. Return newSymbol.
         return Value.from(new_symbol);
@@ -335,7 +336,7 @@ pub const Symbol = Object.Factory(.{
 
 /// 20.4.5.1 KeyForSymbol ( sym )
 /// https://tc39.es/ecma262/#sec-keyforsymbol
-pub fn keyForSymbol(agent: *Agent, symbol: types.Symbol) ?[]const u8 {
+pub fn keyForSymbol(agent: *Agent, symbol: types.Symbol) ?String {
     // 1. For each element e of the GlobalSymbolRegistry List, do
     for (agent.global_symbol_registry.values()) |entry| {
         // a. If SameValue(e.[[Symbol]], sym) is true, return e.[[Key]].

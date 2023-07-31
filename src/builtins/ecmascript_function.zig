@@ -568,7 +568,7 @@ pub fn setFunctionName(
             if (description == null) break :blk "";
 
             // c. Else, set name to the string-concatenation of "[", description, and "]".
-            break :blk try std.fmt.allocPrint(agent.gc_allocator, "[{s}]", .{description.?});
+            break :blk try std.fmt.allocPrint(agent.gc_allocator, "[{s}]", .{description.?.value});
         },
 
         // TODO: 3. Else if name is a Private Name, then

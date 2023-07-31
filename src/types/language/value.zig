@@ -1373,7 +1373,7 @@ test "format" {
         .{ Value.from(false), "false" },
         .{ Value.from("foo"), "\"foo\"" },
         .{ Value.from(Symbol{ .id = 0, .description = null }), "Symbol()" },
-        .{ Value.from(Symbol{ .id = 0, .description = "foo" }), "Symbol(\"foo\")" },
+        .{ Value.from(Symbol{ .id = 0, .description = String.from("foo") }), "Symbol(\"foo\")" },
         .{ Value.from(BigInt{ .value = try BigInt.Value.initSet(std.testing.allocator, 123) }), "123n" },
         .{ Value.from(object), "[object Object]" },
     };

@@ -4,8 +4,10 @@
 const std = @import("std");
 
 const execution = @import("../../execution.zig");
+const types = @import("../../types.zig");
 
 const Agent = execution.Agent;
+const String = types.String;
 
 const Self = @This();
 
@@ -15,7 +17,7 @@ pub const Id = usize;
 id: Id,
 
 /// [[Description]]
-description: ?[]const u8,
+description: ?String,
 
 pub fn format(
     self: Self,
@@ -28,7 +30,7 @@ pub fn format(
     try writer.writeAll("Symbol(");
     if (self.description) |description| {
         try writer.writeAll("\"");
-        try writer.writeAll(description);
+        try writer.writeAll(description.value);
         try writer.writeAll("\"");
     }
     try writer.writeAll(")");
@@ -40,17 +42,17 @@ pub fn descriptiveString(self: Self, agent: *Agent) ![]const u8 {
     // 1. Let desc be sym's [[Description]] value.
     // 2. If desc is undefined, set desc to the empty String.
     // 3. Assert: desc is a String.
-    const description = self.description orelse "";
+    const description = self.description orelse String.from("");
 
     // 4. Return the string-concatenation of "Symbol(", desc, and ")".
-    return std.fmt.allocPrint(agent.gc_allocator, "Symbol({s})", .{description});
+    return std.fmt.allocPrint(agent.gc_allocator, "Symbol({s})", .{description.value});
 }
 
 test "format" {
     const test_cases = [_]struct { Self, []const u8 }{
         .{ .{ .id = 0, .description = null }, "Symbol()" },
-        .{ .{ .id = 1, .description = "" }, "Symbol(\"\")" },
-        .{ .{ .id = 2, .description = "foo" }, "Symbol(\"foo\")" },
+        .{ .{ .id = 1, .description = String.from("") }, "Symbol(\"\")" },
+        .{ .{ .id = 2, .description = String.from("foo") }, "Symbol(\"foo\")" },
     };
     for (test_cases) |test_case| {
         const symbol = test_case[0];

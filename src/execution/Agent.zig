@@ -18,6 +18,7 @@ const ExecutionContext = @import("ExecutionContext.zig");
 const Object = types.Object;
 const Realm = @import("Realm.zig");
 const Reference = types.Reference;
+const String = types.String;
 const Symbol = types.Symbol;
 const Value = types.Value;
 const getIdentifierReference = environments.getIdentifierReference;
@@ -91,19 +92,19 @@ pub fn init(options: Options) !Self {
         .pow_2_64 = try BigInt.Value.initSet(self.gc_allocator, std.math.pow(u128, 2, 64)),
     };
     self.well_known_symbols = .{
-        .@"@@asyncIterator" = self.createSymbol("Symbol.asyncIterator") catch unreachable,
-        .@"@@hasInstance" = self.createSymbol("Symbol.hasInstance") catch unreachable,
-        .@"@@isConcatSpreadable" = self.createSymbol("Symbol.isConcatSpreadable") catch unreachable,
-        .@"@@iterator" = self.createSymbol("Symbol.iterator") catch unreachable,
-        .@"@@match" = self.createSymbol("Symbol.match") catch unreachable,
-        .@"@@matchAll" = self.createSymbol("Symbol.matchAll") catch unreachable,
-        .@"@@replace" = self.createSymbol("Symbol.replace") catch unreachable,
-        .@"@@search" = self.createSymbol("Symbol.search") catch unreachable,
-        .@"@@species" = self.createSymbol("Symbol.species") catch unreachable,
-        .@"@@split" = self.createSymbol("Symbol.split") catch unreachable,
-        .@"@@toPrimitive" = self.createSymbol("Symbol.toPrimitive") catch unreachable,
-        .@"@@toStringTag" = self.createSymbol("Symbol.toStringTag") catch unreachable,
-        .@"@@unscopables" = self.createSymbol("Symbol.unscopables") catch unreachable,
+        .@"@@asyncIterator" = self.createSymbol(String.from("Symbol.asyncIterator")) catch unreachable,
+        .@"@@hasInstance" = self.createSymbol(String.from("Symbol.hasInstance")) catch unreachable,
+        .@"@@isConcatSpreadable" = self.createSymbol(String.from("Symbol.isConcatSpreadable")) catch unreachable,
+        .@"@@iterator" = self.createSymbol(String.from("Symbol.iterator")) catch unreachable,
+        .@"@@match" = self.createSymbol(String.from("Symbol.match")) catch unreachable,
+        .@"@@matchAll" = self.createSymbol(String.from("Symbol.matchAll")) catch unreachable,
+        .@"@@replace" = self.createSymbol(String.from("Symbol.replace")) catch unreachable,
+        .@"@@search" = self.createSymbol(String.from("Symbol.search")) catch unreachable,
+        .@"@@species" = self.createSymbol(String.from("Symbol.species")) catch unreachable,
+        .@"@@split" = self.createSymbol(String.from("Symbol.split")) catch unreachable,
+        .@"@@toPrimitive" = self.createSymbol(String.from("Symbol.toPrimitive")) catch unreachable,
+        .@"@@toStringTag" = self.createSymbol(String.from("Symbol.toStringTag")) catch unreachable,
+        .@"@@unscopables" = self.createSymbol(String.from("Symbol.unscopables")) catch unreachable,
     };
     self.global_symbol_registry = std.StringArrayHashMap(Symbol).init(self.gc_allocator);
     self.host_hooks = .{
@@ -122,7 +123,7 @@ pub fn deinit(self: *Self) void {
     self.execution_context_stack.deinit();
 }
 
-pub fn createSymbol(self: *Self, description: ?[]const u8) !Symbol {
+pub fn createSymbol(self: *Self, description: ?String) !Symbol {
     const id = blk: {
         const next_symbol_id = try std.math.add(usize, self.symbol_id, 1);
         defer self.symbol_id = next_symbol_id;
@@ -297,5 +298,5 @@ test "well_known_symbols" {
     defer agent.deinit();
     const unscopables = agent.well_known_symbols.@"@@unscopables";
     try std.testing.expectEqual(unscopables.id, 12);
-    try std.testing.expectEqualStrings(unscopables.description.?, "Symbol.unscopables");
+    try std.testing.expectEqualStrings(unscopables.description.?.value, "Symbol.unscopables");
 }
