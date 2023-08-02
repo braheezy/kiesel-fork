@@ -2,9 +2,10 @@
     .name = "kiesel",
     .version = "0.1.0",
     .dependencies = .{
+        // NOTE: This points to a commit on my fork, update when https://github.com/joachimschmidt557/linenoize/pull/16 is merged
         .linenoise = .{
-            .url = "https://github.com/joachimschmidt557/linenoize/archive/7c5d3eff82e113bf887a0d895f08aaa9e1625109.tar.gz",
-            .hash = "12200be95c712af094b2ee9031212f2871c9fb8aafadb106bbc377fadcf41af08d07",
+            .url = "https://github.com/joachimschmidt557/linenoize/archive/41030665f7f98dcd5525b2f2e2ced0c2fd70e1fb.tar.gz",
+            .hash = "1220aa9878b4bfa6a70a10793ae8ad42ea7cb1bbd1394c78613c3a9480aae0694d79",
         },
         .parser_toolkit = .{
             .url = "https://github.com/MasterQ32/parser-toolkit/archive/92c2875f2f91bf2a22b2be89b47ef0c3732f4812.tar.gz",

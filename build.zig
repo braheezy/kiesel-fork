@@ -31,9 +31,12 @@ pub fn build(b: *std.Build) void {
         };
 
         libgc.linkLibC();
-        libgc.addIncludePath("vendor/zig-libgc/vendor/bdwgc/include");
+        libgc.addIncludePath(.{ .path = "vendor/zig-libgc/vendor/bdwgc/include" });
         inline for (libgc_srcs) |src| {
-            libgc.addCSourceFile("vendor/zig-libgc/vendor/bdwgc/" ++ src, cflags);
+            libgc.addCSourceFile(.{
+                .file = .{ .path = "vendor/zig-libgc/vendor/bdwgc/" ++ src },
+                .flags = cflags,
+            });
         }
     }
 
@@ -66,7 +69,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe.linkLibrary(libgc);
-    exe.addIncludePath("vendor/zig-libgc/vendor/bdwgc/include");
+    exe.addIncludePath(.{ .path = "vendor/zig-libgc/vendor/bdwgc/include" });
     exe.addModule("kiesel", kiesel_module);
     exe.addModule("args", zig_args.module("args"));
     exe.addModule("linenoise", linenoise.module("linenoise"));
@@ -89,7 +92,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     unit_tests.linkLibrary(libgc);
-    unit_tests.addIncludePath("vendor/zig-libgc/vendor/bdwgc/include");
+    unit_tests.addIncludePath(.{ .path = "vendor/zig-libgc/vendor/bdwgc/include" });
     unit_tests.addModule("gc", gc_module);
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
