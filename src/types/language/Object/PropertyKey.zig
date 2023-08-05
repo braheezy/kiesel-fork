@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const String = @import("../String.zig");
+const String = @import("../string.zig").String;
 const Symbol = @import("../Symbol.zig");
 
 /// A property key is either a String or a Symbol. All Strings and Symbols, including the empty
