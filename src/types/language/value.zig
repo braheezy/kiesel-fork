@@ -1084,7 +1084,7 @@ pub fn sameValueNonNumber(x: Value, y: Value) bool {
         // 4. If x is a String, then
         //     a. If x and y have the same length and the same code units in the same positions,
         //        return true; otherwise, return false.
-        .string => std.mem.eql(u8, x.string.utf8, y.string.utf8),
+        .string => x.string.eql(y.string),
 
         // 5. If x is a Boolean, then
         //     a. If x and y are both true or both false, return true; otherwise, return false.
@@ -1313,7 +1313,7 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) !bool {
         // TODO: Implement more efficient BigInt to f64 comparison
         if ((x == .number and !x.isIntegralNumber()) or
             (y == .number and !y.isIntegralNumber())) return false;
-        return std.mem.eql(u8, (try x.toString(agent)).utf8, (try y.toString(agent)).utf8);
+        return (try x.toString(agent)).eql(try y.toString(agent));
     }
 
     // 14. Return false.

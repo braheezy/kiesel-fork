@@ -38,6 +38,10 @@ pub const String = union(enum) {
         };
     }
 
+    pub inline fn eql(a: Self, b: Self) bool {
+        return std.mem.eql(u8, a.utf8, b.utf8);
+    }
+
     pub inline fn substring(self: Self, allocator: Allocator, start: usize, end: usize) ![]const u8 {
         const code_units = try self.utf16CodeUnits(allocator);
         defer allocator.free(code_units);

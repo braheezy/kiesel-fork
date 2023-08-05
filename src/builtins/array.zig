@@ -15,6 +15,7 @@ const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = Object.PropertyKey;
 const Realm = execution.Realm;
+const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
@@ -42,7 +43,7 @@ fn defineOwnProperty(
     const agent = array.agent();
 
     // 1. If P is "length", then
-    if (property_key == .string and std.mem.eql(u8, property_key.string.utf8, "length")) {
+    if (property_key == .string and property_key.string.eql(String.from("length"))) {
         // a. Return ? ArraySetLength(A, Desc).
         return arraySetLength(agent, array, property_descriptor);
     }
