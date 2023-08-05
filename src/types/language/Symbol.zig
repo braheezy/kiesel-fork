@@ -30,7 +30,7 @@ pub fn format(
     try writer.writeAll("Symbol(");
     if (self.description) |description| {
         try writer.writeAll("\"");
-        try writer.writeAll(description.value);
+        try writer.writeAll(description.utf8);
         try writer.writeAll("\"");
     }
     try writer.writeAll(")");
@@ -45,7 +45,7 @@ pub fn descriptiveString(self: Self, agent: *Agent) ![]const u8 {
     const description = self.description orelse String.from("");
 
     // 4. Return the string-concatenation of "Symbol(", desc, and ")".
-    return std.fmt.allocPrint(agent.gc_allocator, "Symbol({s})", .{description.value});
+    return std.fmt.allocPrint(agent.gc_allocator, "Symbol({s})", .{description.utf8});
 }
 
 test "format" {

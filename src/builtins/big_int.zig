@@ -81,7 +81,7 @@ fn numberToBigInt(agent: *Agent, number: Number) !types.BigInt {
     // 2. Return ℤ(ℝ(number)).
     const string = try number.toString(agent.gc_allocator, 10);
     var value = try types.BigInt.Value.init(agent.gc_allocator);
-    value.setString(10, string.value) catch |err| switch (err) {
+    value.setString(10, string.utf8) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.InvalidBase, error.InvalidCharacter => unreachable,
     };

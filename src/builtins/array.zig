@@ -42,7 +42,7 @@ fn defineOwnProperty(
     const agent = array.agent();
 
     // 1. If P is "length", then
-    if (property_key == .string and std.mem.eql(u8, property_key.string.value, "length")) {
+    if (property_key == .string and std.mem.eql(u8, property_key.string.utf8, "length")) {
         // a. Return ? ArraySetLength(A, Desc).
         return arraySetLength(agent, array, property_descriptor);
     }
@@ -620,7 +620,7 @@ pub const ArrayPrototype = struct {
 
         // 3. If separator is undefined, let sep be ",".
         // 4. Else, let sep be ? ToString(separator).
-        const sep = if (separator == .undefined) "," else (try separator.toString(agent)).value;
+        const sep = if (separator == .undefined) "," else (try separator.toString(agent)).utf8;
 
         // 5. Let R be the empty String.
         if (len > std.math.maxInt(usize)) return error.OutOfMemory;
@@ -642,7 +642,7 @@ pub const ArrayPrototype = struct {
             const next = if (element == .undefined or element == .null)
                 ""
             else
-                (try element.toString(agent)).value;
+                (try element.toString(agent)).utf8;
 
             // d. Set R to the string-concatenation of R and next.
             try elements.append(next);

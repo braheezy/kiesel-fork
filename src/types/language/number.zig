@@ -589,7 +589,7 @@ pub const Number = union(enum) {
         if (self.asFloat() < 0) {
             return String.from(
                 try std.fmt.allocPrint(allocator, "-{s}", .{
-                    (try self.unaryMinus().toString(allocator, radix)).value,
+                    (try self.unaryMinus().toString(allocator, radix)).utf8,
                 }),
             );
         }

@@ -107,7 +107,7 @@ pub const Kiesel = struct {
         defer diagnostics.deinit();
 
         // 3. Let s be ParseScript(sourceText, realm, hostDefined).
-        const script = Script.parse(source_text.value, realm, host_defined, .{
+        const script = Script.parse(source_text.utf8, realm, host_defined, .{
             .diagnostics = &diagnostics,
             .file_name = "evalScript",
         }) catch |err| switch (err) {
@@ -134,7 +134,7 @@ pub const Kiesel = struct {
 
     fn print(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
         const str = try arguments.get(0).toString(agent);
-        stdout.print("{s}\n", .{str.value}) catch {};
+        stdout.print("{s}\n", .{str.utf8}) catch {};
         return .undefined;
     }
 };

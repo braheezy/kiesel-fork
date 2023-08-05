@@ -36,7 +36,7 @@ pub fn asFloat(self: Self, agent: *Agent) !f64 {
     //       works for now.
     return std.fmt.parseFloat(
         f64,
-        (try self.toString(agent.gc_allocator, 10)).value,
+        (try self.toString(agent.gc_allocator, 10)).utf8,
     ) catch unreachable;
 }
 

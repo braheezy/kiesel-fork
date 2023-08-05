@@ -210,10 +210,10 @@ pub const SymbolConstructor = struct {
 
         // 2. For each element e of the GlobalSymbolRegistry List, do
         //     a. If SameValue(e.[[Key]], stringKey) is true, return e.[[Symbol]].
-        if (agent.global_symbol_registry.get(string_key.value)) |symbol| return Value.from(symbol);
+        if (agent.global_symbol_registry.get(string_key.utf8)) |symbol| return Value.from(symbol);
 
         // 3. Assert: GlobalSymbolRegistry does not currently contain an entry for stringKey.
-        std.debug.assert(!agent.global_symbol_registry.contains(string_key.value));
+        std.debug.assert(!agent.global_symbol_registry.contains(string_key.utf8));
 
         // 4. Let newSymbol be a new Symbol whose [[Description]] is stringKey.
         const new_symbol = agent.createSymbol(string_key) catch |err| switch (err) {
@@ -224,7 +224,7 @@ pub const SymbolConstructor = struct {
         };
 
         // 5. Append the Record { [[Key]]: stringKey, [[Symbol]]: newSymbol } to the GlobalSymbolRegistry List.
-        try agent.global_symbol_registry.putNoClobber(string_key.value, new_symbol);
+        try agent.global_symbol_registry.putNoClobber(string_key.utf8, new_symbol);
 
         // 6. Return newSymbol.
         return Value.from(new_symbol);

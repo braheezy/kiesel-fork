@@ -260,7 +260,7 @@ fn applyStringOrNumericBinaryOperator(agent: *Agent, lval: Value, operator: ast.
             // iii. Return the string-concatenation of lstr and rstr.
             // TODO: Implement rope strings
             return Value.from(
-                try std.mem.concat(agent.gc_allocator, u8, &[_][]const u8{ lstr.value, rstr.value }),
+                try std.mem.concat(agent.gc_allocator, u8, &[_][]const u8{ lstr.utf8, rstr.utf8 }),
             );
         }
 
@@ -662,7 +662,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             self.reference = Reference{
                 .base = .{ .value = base_value },
                 .referenced_name = switch (property_key) {
-                    .string => |string| .{ .string = string.value },
+                    .string => |string| .{ .string = string.utf8 },
                     .symbol => |symbol| .{ .symbol = symbol },
                     .integer_index => |integer_index| .{
                         .string = try std.fmt.allocPrint(

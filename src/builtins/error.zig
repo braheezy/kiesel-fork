@@ -107,9 +107,9 @@ pub const ErrorConstructor = struct {
 ///       message and doesn't act on property changes.
 fn internalSet(object: Object, property_key: PropertyKey, value: Value, receiver: Value) !bool {
     if (property_key == .string and value == .string) {
-        if (std.mem.eql(u8, property_key.string.value, "name")) {
+        if (std.mem.eql(u8, property_key.string.utf8, "name")) {
             object.as(Error).fields.error_data.name = value.string;
-        } else if (std.mem.eql(u8, property_key.string.value, "message")) {
+        } else if (std.mem.eql(u8, property_key.string.utf8, "message")) {
             object.as(Error).fields.error_data.message = value.string;
         }
     }
@@ -162,13 +162,13 @@ pub const ErrorPrototype = struct {
         const name = try object.get(PropertyKey.from("name"));
 
         // 4. If name is undefined, set name to "Error"; otherwise set name to ? ToString(name).
-        const name_string = if (name == .undefined) "Error" else (try name.toString(agent)).value;
+        const name_string = if (name == .undefined) "Error" else (try name.toString(agent)).utf8;
 
         // 5. Let msg be ? Get(O, "message").
         const msg = try object.get(PropertyKey.from("message"));
 
         // 6. If msg is undefined, set msg to the empty String; otherwise set msg to ? ToString(msg).
-        const msg_string = if (msg == .undefined) "" else (try msg.toString(agent)).value;
+        const msg_string = if (msg == .undefined) "" else (try msg.toString(agent)).utf8;
 
         // 7. If name is the empty String, return msg.
         if (name_string.len == 0) return Value.from(msg_string);

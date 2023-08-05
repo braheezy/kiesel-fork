@@ -90,7 +90,7 @@ pub const Value = union(enum) {
             .boolean => |boolean| try writer.writeAll(if (boolean) "true" else "false"),
             .string => |string| {
                 try writer.writeAll("\"");
-                try writer.writeAll(string.value);
+                try writer.writeAll(string.utf8);
                 try writer.writeAll("\"");
             },
             .symbol => |symbol| try writer.print("{}", .{symbol}),
@@ -119,7 +119,7 @@ pub const Value = union(enum) {
         } else if (@typeInfo(T) == .Pointer) {
             // FIXME: This is not great, but for now we can let the compiler do the rest as strings
             //        are the only pointers we support here.
-            return .{ .string = .{ .value = value } };
+            return .{ .string = .{ .utf8 = value } };
         } else if (@typeInfo(T) == .Int or
             @typeInfo(T) == .ComptimeInt or
             @typeInfo(T) == .Float or
@@ -332,7 +332,7 @@ pub const Value = union(enum) {
             .big_int => |big_int| if (big_int.value.eqlZero()) {
                 return false;
             },
-            .string => |string| if (string.value.len == 0) {
+            .string => |string| if (string.utf8.len == 0) {
                 return false;
             },
             else => {},
@@ -734,7 +734,7 @@ pub const Value = union(enum) {
 
         // 3. Return ! ToString(key).
         const string = key.toString(agent) catch |err| try noexcept(err);
-        return PropertyKey.from(string.value);
+        return PropertyKey.from(string.utf8);
     }
 
     /// 7.1.20 ToLength ( argument )
@@ -1009,7 +1009,7 @@ pub fn stringToNumber(string: String) Number {
     // 3. If literal is a List of errors, return NaN.
     // 4. Return StringNumericValue of literal.
     // TODO: Implement the proper string parsing grammar!
-    const value = trim(string.value, &(whitespace ++ line_terminators));
+    const value = trim(string.utf8, &(whitespace ++ line_terminators));
     if (value.len == 0) return Number.from(0);
     return Number.from(std.fmt.parseFloat(f64, value) catch std.math.nan(f64));
 }
@@ -1027,7 +1027,7 @@ pub fn stringToBigInt(allocator: Allocator, string: String) !?BigInt {
     // 6. Return ℤ(mv).
     // TODO: Implement the proper string parsing grammar!
     var value = try BigInt.Value.init(allocator);
-    value.setString(10, string.value) catch |err| return switch (err) {
+    value.setString(10, string.utf8) catch |err| return switch (err) {
         error.OutOfMemory => error.OutOfMemory,
         error.InvalidCharacter => null,
         error.InvalidBase => unreachable,
@@ -1084,7 +1084,7 @@ pub fn sameValueNonNumber(x: Value, y: Value) bool {
         // 4. If x is a String, then
         //     a. If x and y have the same length and the same code units in the same positions,
         //        return true; otherwise, return false.
-        .string => std.mem.eql(u8, x.string.value, y.string.value),
+        .string => std.mem.eql(u8, x.string.utf8, y.string.utf8),
 
         // 5. If x is a Boolean, then
         //     a. If x and y are both true or both false, return true; otherwise, return false.
@@ -1313,7 +1313,7 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) !bool {
         // TODO: Implement more efficient BigInt to f64 comparison
         if ((x == .number and !x.isIntegralNumber()) or
             (y == .number and !y.isIntegralNumber())) return false;
-        return std.mem.eql(u8, (try x.toString(agent)).value, (try y.toString(agent)).value);
+        return std.mem.eql(u8, (try x.toString(agent)).utf8, (try y.toString(agent)).utf8);
     }
 
     // 14. Return false.
@@ -1405,9 +1405,9 @@ test "Value.from" {
     const inf = std.math.inf(f64);
     try std.testing.expectEqual(Value.from(true).boolean, true);
     try std.testing.expectEqual(Value.from(false).boolean, false);
-    try std.testing.expectEqual(Value.from("").string.value, "");
-    try std.testing.expectEqual(Value.from("foo").string.value, "foo");
-    try std.testing.expectEqual(Value.from("123").string.value, "123");
+    try std.testing.expectEqual(Value.from("").string.utf8, "");
+    try std.testing.expectEqual(Value.from("foo").string.utf8, "foo");
+    try std.testing.expectEqual(Value.from("123").string.utf8, "123");
     try std.testing.expectEqual(Value.from(0).number.i32, 0);
     try std.testing.expectEqual(Value.from(0.0).number.i32, 0);
     try std.testing.expectEqual(Value.from(123).number.i32, 123);

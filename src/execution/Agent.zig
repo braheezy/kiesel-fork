@@ -298,5 +298,5 @@ test "well_known_symbols" {
     defer agent.deinit();
     const unscopables = agent.well_known_symbols.@"@@unscopables";
     try std.testing.expectEqual(unscopables.id, 12);
-    try std.testing.expectEqualStrings(unscopables.description.?.value, "Symbol.unscopables");
+    try std.testing.expectEqualStrings(unscopables.description.?.utf8, "Symbol.unscopables");
 }

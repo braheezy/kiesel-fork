@@ -36,7 +36,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 pub fn getFunctionName(function: Object) []const u8 {
     const property_descriptor = function.data.property_storage.get(PropertyKey.from("name")).?;
     const value = property_descriptor.value.?;
-    return value.string.value;
+    return value.string.utf8;
 }
 
 pub const ConstructorKind = enum {
@@ -572,7 +572,7 @@ pub fn setFunctionName(
             break :blk String.from(try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "[{s}]",
-                .{description.?.value},
+                .{description.?.utf8},
             ));
         },
 

@@ -44,7 +44,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) !
     defer diagnostics.deinit();
 
     // a. Let script be ParseText(StringToCodePoints(x), Script).
-    const script = Parser.parse(ast.Script, agent.gc_allocator, x.string.value, .{
+    const script = Parser.parse(ast.Script, agent.gc_allocator, x.string.utf8, .{
         .diagnostics = &diagnostics,
         .file_name = "eval",
     }) catch |err| switch (err) {
