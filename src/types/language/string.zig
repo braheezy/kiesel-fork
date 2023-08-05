@@ -10,6 +10,19 @@ pub const String = union(enum) {
 
     utf8: []const u8,
 
+    pub fn format(
+        self: Self,
+        comptime fmt: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        _ = fmt;
+        _ = options;
+        switch (self) {
+            .utf8 => |utf8| try writer.print("{s}", .{utf8}),
+        }
+    }
+
     pub inline fn from(utf8: []const u8) Self {
         return .{ .utf8 = utf8 };
     }
@@ -37,3 +50,18 @@ pub const String = union(enum) {
         };
     }
 };
+
+test "format" {
+    const test_cases = [_]struct { String, []const u8 }{
+        .{ String.from(""), "" },
+        .{ String.from("foo"), "foo" },
+        .{ String.from("123"), "123" },
+    };
+    for (test_cases) |test_case| {
+        const string = test_case[0];
+        const expected = test_case[1];
+        const actual = try std.fmt.allocPrint(std.testing.allocator, "{}", .{string});
+        defer std.testing.allocator.free(actual);
+        try std.testing.expectEqualStrings(expected, actual);
+    }
+}

@@ -588,8 +588,8 @@ pub const Number = union(enum) {
         // 3. If x < -0𝔽, return the string-concatenation of "-" and Number::toString(-x, radix).
         if (self.asFloat() < 0) {
             return String.from(
-                try std.fmt.allocPrint(allocator, "-{s}", .{
-                    (try self.unaryMinus().toString(allocator, radix)).utf8,
+                try std.fmt.allocPrint(allocator, "-{}", .{
+                    try self.unaryMinus().toString(allocator, radix),
                 }),
             );
         }

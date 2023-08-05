@@ -64,10 +64,10 @@ fn prettyPrintError(@"error": Object, writer: anytype) !void {
     const tty_config = getTtyConfigForWriter(writer);
 
     try tty_config.setColor(writer, .red);
-    try writer.writeAll(error_data.name.utf8);
-    if (error_data.message.utf8.len != 0) {
-        try writer.writeAll(": ");
-        try writer.writeAll(error_data.message.utf8);
+    if (error_data.message.utf16Length() == 0) {
+        try writer.print("{}", .{error_data.name});
+    } else {
+        try writer.print("{}: {}", .{ error_data.name, error_data.message });
     }
     try tty_config.setColor(writer, .reset);
 }
@@ -128,14 +128,14 @@ fn prettyPrintObject(object: Object, writer: anytype) !void {
             .string => |string| {
                 try writer.writeAll("\"");
                 try tty_config.setColor(writer, .bold);
-                try writer.print("{s}", .{string.utf8});
+                try writer.print("{}", .{string});
                 try tty_config.setColor(writer, .reset);
                 try writer.writeAll("\"");
             },
             .symbol => |symbol| {
                 try writer.writeAll("[");
                 try tty_config.setColor(writer, .bold);
-                try writer.print("{s}", .{symbol});
+                try writer.print("{}", .{symbol});
                 try tty_config.setColor(writer, .reset);
                 try writer.writeAll("]");
             },

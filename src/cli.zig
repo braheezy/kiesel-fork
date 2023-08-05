@@ -134,7 +134,7 @@ pub const Kiesel = struct {
 
     fn print(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
         const str = try arguments.get(0).toString(agent);
-        stdout.print("{s}\n", .{str.utf8}) catch {};
+        stdout.print("{}\n", .{str}) catch {};
         return .undefined;
     }
 };
