@@ -222,7 +222,7 @@ pub fn ordinaryDefineOwnProperty(
 pub fn isCompatiblePropertyDescriptor(
     extensible: bool,
     descriptor: PropertyDescriptor,
-    current: PropertyDescriptor,
+    current: ?PropertyDescriptor,
 ) bool {
     // 1. Return ValidateAndApplyPropertyDescriptor(undefined, "", Extensible, Desc, Current).
     return validateAndApplyPropertyDescriptor(
