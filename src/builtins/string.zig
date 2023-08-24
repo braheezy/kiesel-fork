@@ -225,7 +225,8 @@ pub const StringPrototype = struct {
         return object;
     }
 
-    /// https://tc39.es/ecma262/#thisstringvalue
+    /// 22.1.3.35.1 thisStringValue ( value )
+    /// https://tc39.es/ecma262/#sec-thisstringvalue
     fn thisStringValue(agent: *Agent, value: Value) !types.String {
         switch (value) {
             // 1. If value is a String, return value.

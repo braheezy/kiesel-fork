@@ -111,7 +111,8 @@ pub const BigIntPrototype = struct {
         return object;
     }
 
-    /// https://tc39.es/ecma262/#thisbigintvalue
+    /// 21.2.3.4.1 thisBigIntValue ( value )
+    /// https://tc39.es/ecma262/#sec-thisbigintvalue
     fn thisBigIntValue(agent: *Agent, value: Value) !types.BigInt {
         switch (value) {
             // 1. If value is a BigInt, return value.

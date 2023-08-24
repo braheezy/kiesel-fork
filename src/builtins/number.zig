@@ -245,7 +245,8 @@ pub const NumberPrototype = struct {
         return object;
     }
 
-    /// https://tc39.es/ecma262/#thisnumbervalue
+    /// 21.1.3.7.1 thisNumberValue ( value )
+    /// https://tc39.es/ecma262/#sec-thisnumbervalue
     fn thisNumberValue(agent: *Agent, value: Value) !types.Number {
         switch (value) {
             // 1. If value is a Number, return value.

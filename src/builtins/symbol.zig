@@ -272,7 +272,8 @@ pub const SymbolPrototype = struct {
         return object;
     }
 
-    /// https://tc39.es/ecma262/#thissymbolvalue
+    /// 20.4.3.4.1 thisSymbolValue ( value )
+    /// https://tc39.es/ecma262/#sec-thissymbolvalue
     fn thisSymbolValue(agent: *Agent, value: Value) !types.Symbol {
         switch (value) {
             // 1. If value is a Symbol, return value.

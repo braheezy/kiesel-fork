@@ -92,7 +92,8 @@ pub const BooleanPrototype = struct {
         return object;
     }
 
-    /// https://tc39.es/ecma262/#thisbooleanvalue
+    /// 20.3.3.3.1 thisBooleanValue ( value )
+    /// https://tc39.es/ecma262/#sec-thisbooleanvalue
     fn thisBooleanValue(agent: *Agent, value: Value) !bool {
         switch (value) {
             // 1. If value is a Boolean, return value.
