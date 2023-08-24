@@ -343,7 +343,7 @@ fn validateAndApplyPropertyDescriptor(
 
             // ii. If Desc has a [[Enumerable]] field, let enumerable be Desc.[[Enumerable]]; else
             //     let enumerable be current.[[Enumerable]].
-            const enumerable = descriptor.configurable orelse current.enumerable.?;
+            const enumerable = descriptor.enumerable orelse current.enumerable.?;
 
             // iii. Replace the property named P of object O with an accessor property whose
             //      [[Configurable]] and [[Enumerable]] attributes are set to configurable and
