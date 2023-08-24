@@ -7,12 +7,12 @@
             .hash = "1220aa9878b4bfa6a70a10793ae8ad42ea7cb1bbd1394c78613c3a9480aae0694d79",
         },
         .parser_toolkit = .{
-            .url = "https://github.com/MasterQ32/parser-toolkit/archive/92c2875f2f91bf2a22b2be89b47ef0c3732f4812.tar.gz",
-            .hash = "1220265768f85ae009c6c20fbcabda75f4caacbd7efc0945dc92d3cec363a84e1329",
+            .url = "https://github.com/MasterQ32/parser-toolkit/archive/7e7188bfaa46d0ba36d1ef31c1f368d264aa6876.tar.gz",
+            .hash = "12202ae562efbd6a4f12f1b10c5237329d19d1be15eec7fa1b0b02f5658500bfcbfd",
         },
         .zig_args = .{
-            .url = "https://github.com/MasterQ32/zig-args/archive/91d1e89fb89a4d01dec7c9aec95b0a324080ebcc.tar.gz",
-            .hash = "12203d04cafc97f952d74cdb077e74c0ab3414f9f6b5fbd159112c62bfa584a0dbed",
+            .url = "https://github.com/MasterQ32/zig-args/archive/bb2eced8ddf28114b3a1ff761c2d80b90b1a61e2.tar.gz",
+            .hash = "12208556082c280af264ca2a174fd04fc7a35f865bfe59e2c61f4a977bf7a65063e4",
         },
     },
 }
