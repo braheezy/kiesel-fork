@@ -69,10 +69,34 @@ pub const BuiltinFunction = Object.Factory(.{
 /// https://tc39.es/ecma262/#sec-built-in-function-objects-call-thisargument-argumentslist
 pub fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) !Value {
     const agent = object.agent();
-    const self = object.as(BuiltinFunction);
+    const function = object.as(BuiltinFunction);
 
+    // 1. Return ? BuiltinCallOrConstruct(F, thisArgument, argumentsList, undefined).
+    return builtinCallOrConstruct(agent, function, this_argument, arguments_list, null);
+}
+
+/// 10.3.2 [[Construct]] ( argumentsList, newTarget )
+/// https://tc39.es/ecma262/#sec-built-in-function-objects-construct-argumentslist-newtarget
+pub fn construct(object: Object, arguments_list: ArgumentsList, new_target: Object) !Object {
+    const agent = object.agent();
+    const function = object.as(BuiltinFunction);
+
+    // 1. Return ? BuiltinCallOrConstruct(F, uninitialized, argumentsList, newTarget).
+    return (try builtinCallOrConstruct(agent, function, null, arguments_list, new_target)).object;
+}
+
+/// 10.3.3 BuiltinCallOrConstruct ( F, thisArgument, argumentsList, newTarget )
+/// https://tc39.es/ecma262/#sec-builtincallorconstruct
+pub fn builtinCallOrConstruct(
+    agent: *Agent,
+    function: *BuiltinFunction,
+    this_argument: ?Value,
+    arguments_list: ArgumentsList,
+    new_target: ?Object,
+) !Value {
     // 1. Let callerContext be the running execution context.
     const caller_context = agent.runningExecutionContext();
+    _ = caller_context;
 
     // TODO: 2. If callerContext is not already suspended, suspend callerContext.
     _ = caller_context;
@@ -80,11 +104,11 @@ pub fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList)
     // 3. Let calleeContext be a new execution context.
     const callee_context = ExecutionContext{
         // 4. Set the Function of calleeContext to F.
-        .function = object,
+        .function = function.object(),
 
         // 5. Let calleeRealm be F.[[Realm]].
         // 6. Set the Realm of calleeContext to calleeRealm.
-        .realm = self.fields.realm,
+        .realm = function.fields.realm,
 
         // 7. Set the ScriptOrModule of calleeContext to null.
         .script_or_module = null,
@@ -97,11 +121,12 @@ pub fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList)
     try agent.execution_context_stack.append(callee_context);
 
     // 10. Let result be the Completion Record that is the result of evaluating F in a manner that
-    //     conforms to the specification of F. thisArgument is the this value, argumentsList
-    //     provides the named parameters, and the NewTarget value is undefined.
-    const result = switch (self.fields.behaviour) {
-        .regular => |regularFn| regularFn(agent, this_argument, arguments_list),
-        .constructor => |constructorFn| constructorFn(agent, this_argument, arguments_list, null),
+    //     conforms to the specification of F. If thisArgument is uninitialized, the this value is
+    //     uninitialized; otherwise, thisArgument provides the this value. argumentsList provides
+    //     the named parameters. newTarget provides the NewTarget value.
+    const result = switch (function.fields.behaviour) {
+        .regular => |regularFn| regularFn(agent, this_argument.?, arguments_list),
+        .constructor => |constructorFn| try constructorFn(agent, this_argument orelse undefined, arguments_list, new_target),
     };
 
     // 11. Remove calleeContext from the execution context stack and restore callerContext as the
@@ -112,54 +137,7 @@ pub fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList)
     return result;
 }
 
-/// 10.3.2 [[Construct]] ( argumentsList, newTarget )
-/// https://tc39.es/ecma262/#sec-built-in-function-objects-construct-argumentslist-newtarget
-pub fn construct(object: Object, arguments_list: ArgumentsList, new_target: Object) !Object {
-    const agent = object.agent();
-    const self = object.as(BuiltinFunction);
-
-    // 1. Let callerContext be the running execution context.
-    const caller_context = agent.runningExecutionContext();
-
-    // TODO: 2. If callerContext is not already suspended, suspend callerContext.
-    _ = caller_context;
-
-    // 3. Let calleeContext be a new execution context.
-    const callee_context = ExecutionContext{
-        // 4. Set the Function of calleeContext to F.
-        .function = object,
-
-        // 5. Let calleeRealm be F.[[Realm]].
-        // 6. Set the Realm of calleeContext to calleeRealm.
-        .realm = self.fields.realm,
-
-        // 7. Set the ScriptOrModule of calleeContext to null.
-        .script_or_module = null,
-    };
-
-    // 8. Perform any necessary implementation-defined initialization of calleeContext.
-
-    // 9. Push calleeContext onto the execution context stack; calleeContext is now the running
-    //    execution context.
-    try agent.execution_context_stack.append(callee_context);
-
-    // 10. Let result be the Completion Record that is the result of evaluating F in a manner that
-    //     conforms to the specification of F. The this value is uninitialized, argumentsList
-    //     provides the named parameters, and newTarget provides the NewTarget value.
-    const result = switch (self.fields.behaviour) {
-        .regular => unreachable,
-        .constructor => |constructorFn| try constructorFn(agent, undefined, arguments_list, new_target),
-    };
-
-    // 11. Remove calleeContext from the execution context stack and restore callerContext as the
-    //     running execution context.
-    _ = agent.execution_context_stack.pop();
-
-    // 12. Return ? result.
-    return result.object;
-}
-
-/// 10.3.3 CreateBuiltinFunction ( behaviour, length, name, additionalInternalSlotsList [ , realm [ , prototype [ , prefix ] ] ] )
+/// 10.3.4 CreateBuiltinFunction ( behaviour, length, name, additionalInternalSlotsList [ , realm [ , prototype [ , prefix ] ] ] )
 /// https://tc39.es/ecma262/#sec-createbuiltinfunction
 pub fn createBuiltinFunction(
     agent: *Agent,
