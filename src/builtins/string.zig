@@ -225,7 +225,7 @@ pub const StringPrototype = struct {
         return object;
     }
 
-    /// 22.1.3.35.1 thisStringValue ( value )
+    /// 22.1.3.35.1 ThisStringValue ( value )
     /// https://tc39.es/ecma262/#sec-thisstringvalue
     fn thisStringValue(agent: *Agent, value: Value) !types.String {
         switch (value) {
@@ -308,14 +308,14 @@ pub const StringPrototype = struct {
     /// 22.1.3.29 String.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.tostring
     fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
-        // 1. Return ? thisStringValue(this value).
+        // 1. Return ? ThisStringValue(this value).
         return Value.from(try thisStringValue(agent, this_value));
     }
 
     /// 22.1.3.35 String.prototype.valueOf ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.valueof
     fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
-        // 1. Return ? thisStringValue(this value).
+        // 1. Return ? ThisStringValue(this value).
         return Value.from(try thisStringValue(agent, this_value));
     }
 };

@@ -272,7 +272,7 @@ pub const SymbolPrototype = struct {
         return object;
     }
 
-    /// 20.4.3.4.1 thisSymbolValue ( value )
+    /// 20.4.3.4.1 ThisSymbolValue ( value )
     /// https://tc39.es/ecma262/#sec-thissymbolvalue
     fn thisSymbolValue(agent: *Agent, value: Value) !types.Symbol {
         switch (value) {
@@ -302,7 +302,7 @@ pub const SymbolPrototype = struct {
     /// 20.4.3.3 Symbol.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-symbol.prototype.tostring
     fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
-        // 1. Let sym be ? thisSymbolValue(this value).
+        // 1. Let sym be ? ThisSymbolValue(this value).
         const symbol = try thisSymbolValue(agent, this_value);
 
         // 2. Return SymbolDescriptiveString(sym).
@@ -312,14 +312,14 @@ pub const SymbolPrototype = struct {
     /// 20.4.3.4 Symbol.prototype.valueOf ( )
     /// https://tc39.es/ecma262/#sec-symbol.prototype.valueof
     fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
-        // 1. Return ? thisSymbolValue(this value).
+        // 1. Return ? ThisSymbolValue(this value).
         return Value.from(try thisSymbolValue(agent, this_value));
     }
 
     /// 20.4.3.5 Symbol.prototype [ @@toPrimitive ] ( hint )
     /// https://tc39.es/ecma262/#sec-symbol.prototype-@@toprimitive
     fn @"@@toPrimitive"(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
-        // 1. Return ? thisSymbolValue(this value).
+        // 1. Return ? ThisSymbolValue(this value).
         // NOTE: The argument is ignored.
         return Value.from(try thisSymbolValue(agent, this_value));
     }

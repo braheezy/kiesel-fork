@@ -111,7 +111,7 @@ pub const BigIntPrototype = struct {
         return object;
     }
 
-    /// 21.2.3.4.1 thisBigIntValue ( value )
+    /// 21.2.3.4.1 ThisBigIntValue ( value )
     /// https://tc39.es/ecma262/#sec-thisbigintvalue
     fn thisBigIntValue(agent: *Agent, value: Value) !types.BigInt {
         switch (value) {
@@ -140,7 +140,7 @@ pub const BigIntPrototype = struct {
     fn toString(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
         const radix = arguments.get(0);
 
-        // 1. Let x be ? thisBigIntValue(this value).
+        // 1. Let x be ? ThisBigIntValue(this value).
         const x = try thisBigIntValue(agent, this_value);
 
         // 2. If radix is undefined, let radixMV be 10.
@@ -159,7 +159,7 @@ pub const BigIntPrototype = struct {
     /// 21.2.3.4 BigInt.prototype.valueOf ( )
     /// https://tc39.es/ecma262/#sec-bigint.prototype.valueof
     fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
-        // 1. Return ? thisBigIntValue(this value).
+        // 1. Return ? ThisBigIntValue(this value).
         return Value.from(try thisBigIntValue(agent, this_value));
     }
 };

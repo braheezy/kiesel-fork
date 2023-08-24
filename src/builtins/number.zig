@@ -245,7 +245,7 @@ pub const NumberPrototype = struct {
         return object;
     }
 
-    /// 21.1.3.7.1 thisNumberValue ( value )
+    /// 21.1.3.7.1 ThisNumberValue ( value )
     /// https://tc39.es/ecma262/#sec-thisnumbervalue
     fn thisNumberValue(agent: *Agent, value: Value) !types.Number {
         switch (value) {
@@ -277,7 +277,7 @@ pub const NumberPrototype = struct {
     fn toString(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
         const radix = arguments.get(0);
 
-        // 1. Let x be ? thisNumberValue(this value).
+        // 1. Let x be ? ThisNumberValue(this value).
         const x = try thisNumberValue(agent, this_value);
 
         // 2. If radix is undefined, let radixMV be 10.
@@ -296,7 +296,7 @@ pub const NumberPrototype = struct {
     /// 21.1.3.7 Number.prototype.valueOf ( )
     /// https://tc39.es/ecma262/#sec-number.prototype.valueof
     fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
-        // 1. Return ? thisNumberValue(this value).
+        // 1. Return ? ThisNumberValue(this value).
         return Value.from(try thisNumberValue(agent, this_value));
     }
 };

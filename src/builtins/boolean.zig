@@ -92,7 +92,7 @@ pub const BooleanPrototype = struct {
         return object;
     }
 
-    /// 20.3.3.3.1 thisBooleanValue ( value )
+    /// 20.3.3.3.1 ThisBooleanValue ( value )
     /// https://tc39.es/ecma262/#sec-thisbooleanvalue
     fn thisBooleanValue(agent: *Agent, value: Value) !bool {
         switch (value) {
@@ -122,7 +122,7 @@ pub const BooleanPrototype = struct {
     /// 20.3.3.2 Boolean.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-boolean.prototype.tostring
     fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
-        // 1. Let b be ? thisBooleanValue(this value).
+        // 1. Let b be ? ThisBooleanValue(this value).
         const b = try thisBooleanValue(agent, this_value);
 
         // 2. If b is true, return "true"; else return "false".
@@ -132,7 +132,7 @@ pub const BooleanPrototype = struct {
     /// 20.3.3.3 Boolean.prototype.valueOf ( )
     /// https://tc39.es/ecma262/#sec-boolean.prototype.valueof
     fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
-        // 1. Return ? thisBooleanValue(this value).
+        // 1. Return ? ThisBooleanValue(this value).
         return Value.from(try thisBooleanValue(agent, this_value));
     }
 };
