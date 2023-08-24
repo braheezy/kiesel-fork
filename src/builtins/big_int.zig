@@ -164,8 +164,8 @@ pub const BigIntPrototype = struct {
     }
 };
 
-/// TODO: The spec has nothing to link for this.
-/// See: https://github.com/tc39/ecma262/issues/3110
+/// 21.2.4 Properties of BigInt Instances
+/// https://tc39.es/ecma262/#sec-properties-of-bigint-instances
 pub const BigInt = Object.Factory(.{
     .Fields = struct {
         /// [[BigIntData]]
