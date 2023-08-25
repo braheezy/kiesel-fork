@@ -262,8 +262,8 @@ pub fn ordinaryCallEvaluateBody(
     for (function.fields.formal_parameters.items, 0..) |item, i| {
         const identifier = item.formal_parameter.binding_element.identifier;
         const value = arguments_list.get(i);
-        try env.createMutableBinding(identifier, false);
-        env.initializeBinding(identifier, value);
+        try env.createMutableBinding(agent, identifier, false);
+        env.initializeBinding(agent, identifier, value);
     }
     return generateAndRunBytecode(agent, function.fields.ecmascript_code);
 }

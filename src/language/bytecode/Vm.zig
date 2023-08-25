@@ -370,7 +370,7 @@ fn instantiateOrdinaryFunctionExpression(
         const func_env = try newDeclarativeEnvironment(agent.gc_allocator, outer_env);
 
         // 5. Perform ! funcEnv.CreateImmutableBinding(name, false).
-        try func_env.createImmutableBinding(name, false);
+        try func_env.createImmutableBinding(agent, name, false);
 
         // 6. Let privateEnv be the running execution context's PrivateEnvironment.
         const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
@@ -398,7 +398,7 @@ fn instantiateOrdinaryFunctionExpression(
         try makeConstructor(closure, .{});
 
         // 11. Perform ! funcEnv.InitializeBinding(name, closure).
-        func_env.initializeBinding(name, Value.from(closure));
+        func_env.initializeBinding(agent, name, Value.from(closure));
 
         // 12. Return closure.
         return closure;

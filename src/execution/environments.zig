@@ -33,82 +33,62 @@ pub const Environment = union(enum) {
 
     pub fn outerEnv(self: Self) ?Self {
         return switch (self) {
-            .declarative_environment => |env| env.outer_env,
-            .object_environment => |env| env.outer_env,
-            .function_environment => |env| env.outer_env,
-            .global_environment => |env| env.outer_env,
+            inline else => |env| env.outer_env,
         };
     }
 
     pub fn hasBinding(self: Self, name: []const u8) !bool {
         return switch (self) {
-            .declarative_environment => |env| env.hasBinding(name),
-            .object_environment => |env| env.hasBinding(name),
             .function_environment => |env| env.declarative_environment.hasBinding(name),
-            .global_environment => |env| env.hasBinding(name),
+            inline else => |env| env.hasBinding(name),
         };
     }
 
     pub fn createMutableBinding(self: Self, agent: *Agent, name: []const u8, deletable: bool) !void {
         return switch (self) {
-            .declarative_environment => |env| env.createMutableBinding(name, deletable),
-            .object_environment => |env| env.createMutableBinding(name, deletable),
-            .function_environment => |env| env.declarative_environment.createMutableBinding(name, deletable),
-            .global_environment => |env| env.createMutableBinding(agent, name, deletable),
+            .function_environment => |env| env.declarative_environment.createMutableBinding(agent, name, deletable),
+            inline else => |env| env.createMutableBinding(agent, name, deletable),
         };
     }
 
     pub fn createImmutableBinding(self: Self, agent: *Agent, name: []const u8, strict: bool) !void {
         return switch (self) {
-            .declarative_environment => |env| env.createImmutableBinding(name, strict),
-            .object_environment => |env| env.createImmutableBinding(name, strict),
-            .function_environment => |env| env.declarative_environment.createImmutableBinding(name, strict),
-            .global_environment => |env| env.createImmutableBinding(agent, name, strict),
+            .function_environment => |env| env.declarative_environment.createImmutableBinding(agent, name, strict),
+            inline else => |env| env.createImmutableBinding(agent, name, strict),
         };
     }
 
     pub fn initializeBinding(self: Self, agent: *Agent, name: []const u8, value: Value) !void {
         return switch (self) {
-            .declarative_environment => |env| env.initializeBinding(name, value),
-            .object_environment => |env| env.initializeBinding(agent, name, value),
-            .function_environment => |env| env.declarative_environment.initializeBinding(name, value),
-            .global_environment => |env| env.initializeBinding(agent, name, value),
+            .function_environment => |env| env.declarative_environment.initializeBinding(agent, name, value),
+            inline else => |env| env.initializeBinding(agent, name, value),
         };
     }
 
     pub fn setMutableBinding(self: Self, agent: *Agent, name: []const u8, value: Value, strict: bool) !void {
         return switch (self) {
-            .declarative_environment => |env| env.setMutableBinding(agent, name, value, strict),
-            .object_environment => |env| env.setMutableBinding(agent, name, value, strict),
             .function_environment => |env| env.declarative_environment.setMutableBinding(agent, name, value, strict),
-            .global_environment => |env| env.setMutableBinding(agent, name, value, strict),
+            inline else => |env| env.setMutableBinding(agent, name, value, strict),
         };
     }
 
     pub fn getBindingValue(self: Self, agent: *Agent, name: []const u8, strict: bool) !Value {
         return switch (self) {
-            .declarative_environment => |env| env.getBindingValue(agent, name, strict),
-            .object_environment => |env| env.getBindingValue(name, strict),
             .function_environment => |env| env.declarative_environment.getBindingValue(agent, name, strict),
-            .global_environment => |env| env.getBindingValue(agent, name, strict),
+            inline else => |env| env.getBindingValue(agent, name, strict),
         };
     }
 
     pub fn deleteBinding(self: Self, name: []const u8) !bool {
         return switch (self) {
-            .declarative_environment => |env| env.deleteBinding(name),
-            .object_environment => |env| env.deleteBinding(name),
             .function_environment => |env| env.declarative_environment.deleteBinding(name),
-            .global_environment => |env| env.deleteBinding(name),
+            inline else => |env| env.deleteBinding(name),
         };
     }
 
     pub fn hasThisBinding(self: Self) bool {
         return switch (self) {
-            .declarative_environment => |env| env.hasThisBinding(),
-            .object_environment => |env| env.hasThisBinding(),
-            .function_environment => |env| env.hasThisBinding(),
-            .global_environment => |env| env.hasThisBinding(),
+            inline else => |env| env.hasThisBinding(),
         };
     }
 
@@ -119,17 +99,16 @@ pub const Environment = union(enum) {
 
     pub fn withBaseObject(self: Self) ?Object {
         return switch (self) {
-            .declarative_environment => |env| env.withBaseObject(),
-            .object_environment => |env| env.withBaseObject(),
             .function_environment => |env| env.declarative_environment.withBaseObject(),
-            .global_environment => |env| env.withBaseObject(),
+            inline else => |env| env.withBaseObject(),
         };
     }
 
     pub fn getThisBinding(self: Self) !Value {
         return switch (self) {
-            .declarative_environment => unreachable,
-            .object_environment => unreachable,
+            .declarative_environment,
+            .object_environment,
+            => unreachable,
             .function_environment => |env| env.getThisBinding(),
             .global_environment => |env| Value.from(env.getThisBinding()),
         };

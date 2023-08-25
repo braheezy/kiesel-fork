@@ -59,7 +59,7 @@ pub fn hasBinding(self: Self, name: []const u8) !bool {
 
 /// 9.1.1.2.2 CreateMutableBinding ( N, D )
 /// https://tc39.es/ecma262/#sec-object-environment-records-createmutablebinding-n-d
-pub fn createMutableBinding(self: Self, name: []const u8, deletable: bool) !void {
+pub fn createMutableBinding(self: Self, _: *Agent, name: []const u8, deletable: bool) !void {
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Perform ? DefinePropertyOrThrow(bindingObject, N, PropertyDescriptor {
     //      [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: D
@@ -114,9 +114,7 @@ pub fn setMutableBinding(self: Self, agent: *Agent, name: []const u8, value: Val
 
 /// 9.1.1.2.6 GetBindingValue ( N, S )
 /// https://tc39.es/ecma262/#sec-object-environment-records-getbindingvalue-n-s
-pub fn getBindingValue(self: Self, name: []const u8, strict: bool) !Value {
-    const agent = self.binding_object.agent();
-
+pub fn getBindingValue(self: Self, agent: *Agent, name: []const u8, strict: bool) !Value {
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Let value be ? HasProperty(bindingObject, N).
     const value = try self.binding_object.hasProperty(PropertyKey.from(name));

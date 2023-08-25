@@ -61,7 +61,7 @@ pub fn createMutableBinding(self: *Self, agent: *Agent, name: []const u8, deleta
     }
 
     // 3. Return ! DclRec.CreateMutableBinding(N, D).
-    return self.declarative_record.createMutableBinding(name, deletable);
+    return self.declarative_record.createMutableBinding(agent, name, deletable);
 }
 
 /// 9.1.1.4.3 CreateImmutableBinding ( N, S )
@@ -91,7 +91,7 @@ pub fn initializeBinding(self: Self, agent: *Agent, name: []const u8, value: Val
     // 2. If ! DclRec.HasBinding(N) is true, then
     if (self.declarative_record.hasBinding(name)) {
         // a. Return ! DclRec.InitializeBinding(N, V).
-        return self.declarative_record.initializeBinding(name, value);
+        return self.declarative_record.initializeBinding(agent, name, value);
     }
 
     // 3. Assert: If the binding exists, it must be in the Object Environment Record.
@@ -127,7 +127,7 @@ pub fn getBindingValue(self: Self, agent: *Agent, name: []const u8, strict: bool
 
     // 3. Let ObjRec be envRec.[[ObjectRecord]].
     // 4. Return ? ObjRec.GetBindingValue(N, S).
-    return self.object_record.getBindingValue(name, strict);
+    return self.object_record.getBindingValue(agent, name, strict);
 }
 
 /// 9.1.1.4.7 DeleteBinding ( N )
@@ -204,7 +204,7 @@ pub fn createGlobalVarBinding(self: *Self, agent: *Agent, name: []const u8, dele
     // 5. If hasProperty is false and extensible is true, then
     if (!has_property and extensible) {
         // a. Perform ? ObjRec.CreateMutableBinding(N, D).
-        try self.object_record.createMutableBinding(name, deletable);
+        try self.object_record.createMutableBinding(agent, name, deletable);
 
         // b. Perform ? ObjRec.InitializeBinding(N, undefined).
         try self.object_record.initializeBinding(agent, name, .undefined);
