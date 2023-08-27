@@ -109,9 +109,15 @@ fn prettyPrintFunction(object: Object, writer: anytype) !void {
     const tty_config = getTtyConfigForWriter(writer);
 
     try writer.writeAll("fn ");
-    try tty_config.setColor(writer, .red);
-    try writer.writeAll(name);
-    try tty_config.setColor(writer, .reset);
+    if (name.len != 0) {
+        try tty_config.setColor(writer, .red);
+        try writer.writeAll(name);
+        try tty_config.setColor(writer, .reset);
+    } else {
+        try tty_config.setColor(writer, .dim);
+        try writer.writeAll("<anonymous>");
+        try tty_config.setColor(writer, .reset);
+    }
 }
 
 fn prettyPrintObject(object: Object, writer: anytype) !void {
