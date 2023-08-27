@@ -55,6 +55,7 @@ pub const ObjectConstructor = struct {
         try defineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm);
         try defineBuiltinFunction(object, "seal", seal, 1, realm);
         try defineBuiltinFunction(object, "setPrototypeOf", setPrototypeOf, 2, realm);
+        try defineBuiltinFunction(object, "values", values, 1, realm);
 
         // 20.1.2.20 Object.prototype
         // https://tc39.es/ecma262/#sec-object.prototype
@@ -483,6 +484,22 @@ pub const ObjectConstructor = struct {
 
         // 6. Return O.
         return object;
+    }
+
+    /// 20.1.2.23 Object.values ( O )
+    /// https://tc39.es/ecma262/#sec-object.values
+    fn values(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
+
+        // 1. Let obj be ? ToObject(O).
+        const obj = try object.toObject(agent);
+
+        // 2. Let valueList be ? EnumerableOwnProperties(obj, value).
+        const value_list = try obj.enumerableOwnProperties(.value);
+        defer value_list.deinit();
+
+        // 3. Return CreateArrayFromList(valueList).
+        return Value.from(try createArrayFromList(agent, value_list.items));
     }
 };
 
