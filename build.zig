@@ -44,6 +44,7 @@ pub fn build(b: *std.Build) void {
         .source_file = .{ .path = "vendor/zig-libgc/src/gc.zig" },
     });
 
+    const any_pointer = b.dependency("any_pointer", .{});
     const linenoise = b.dependency("linenoise", .{});
     const parser_toolkit = b.dependency("parser_toolkit", .{});
     const zig_args = b.dependency("zig_args", .{});
@@ -51,6 +52,10 @@ pub fn build(b: *std.Build) void {
     const kiesel_module = b.addModule("kiesel", .{
         .source_file = .{ .path = "src/main.zig" },
         .dependencies = &.{
+            std.Build.ModuleDependency{
+                .module = any_pointer.module("any-pointer"),
+                .name = "any-pointer",
+            },
             std.Build.ModuleDependency{
                 .module = gc_module,
                 .name = "gc",
@@ -93,6 +98,7 @@ pub fn build(b: *std.Build) void {
     });
     unit_tests.linkLibrary(libgc);
     unit_tests.addIncludePath(.{ .path = "vendor/zig-libgc/vendor/bdwgc/include" });
+    unit_tests.addModule("any-pointer", any_pointer.module("any-pointer"));
     unit_tests.addModule("gc", gc_module);
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
