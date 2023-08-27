@@ -2,7 +2,10 @@
 //! https://tc39.es/ecma262/#sec-code-realms
 
 const std = @import("std");
+
 const Xoroshiro128 = std.rand.Xoroshiro128;
+
+const SafePointer = @import("any-pointer").SafePointer;
 
 const builtins = @import("../builtins.zig");
 const environments = @import("environments.zig");
@@ -35,7 +38,7 @@ global_object: Object,
 global_env: *GlobalEnvironment,
 
 /// [[HostDefined]]
-host_defined: ?*anyopaque = null,
+host_defined: SafePointer = SafePointer.null_pointer,
 
 // TODO: [[TemplateMap]], [[LoadedModules]]
 

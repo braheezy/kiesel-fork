@@ -2,7 +2,9 @@ const args = @import("args");
 const builtin = @import("builtin");
 const std = @import("std");
 const kiesel = @import("kiesel");
+
 const Linenoise = @import("linenoise").Linenoise;
+const SafePointer = @import("any-pointer").SafePointer;
 
 const gc = @cImport({
     @cInclude("gc.h");
@@ -98,7 +100,7 @@ pub const Kiesel = struct {
 
         // 1. Let hostDefined be any host-defined values for the provided sourceText (obtained in
         //    an implementation dependent manner)
-        const host_defined = null;
+        const host_defined = SafePointer.null_pointer;
 
         // 2. Let realm be the current Realm Record.
         const realm = agent.currentRealm();
@@ -150,7 +152,7 @@ fn run(
     var diagnostics = Diagnostics.init(allocator);
     defer diagnostics.deinit();
 
-    const script = Script.parse(source_text, realm, null, .{
+    const script = Script.parse(source_text, realm, SafePointer.null_pointer, .{
         .diagnostics = &diagnostics,
         .file_name = file_name,
     }) catch |err| switch (err) {

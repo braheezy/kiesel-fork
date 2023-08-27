@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const SafePointer = @import("any-pointer").SafePointer;
+
 const ast = @import("ast.zig");
 const bytecode = @import("bytecode.zig");
 const execution = @import("../execution.zig");
@@ -25,14 +27,14 @@ ecmascript_code: ast.Script,
 // TODO: [[LoadedModules]]
 
 /// [[HostDefined]]
-host_defined: ?*anyopaque = null,
+host_defined: SafePointer = SafePointer.null_pointer,
 
 /// 16.1.5 ParseScript ( sourceText, realm, hostDefined )
 /// https://tc39.es/ecma262/#sec-parse-script
 pub fn parse(
     source_text: []const u8,
     realm: *Realm,
-    host_defined: ?*anyopaque,
+    host_defined: SafePointer,
     ctx: Parser.ParseContext,
 ) !*Self {
     const agent = realm.agent;

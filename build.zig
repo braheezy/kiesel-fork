@@ -76,6 +76,7 @@ pub fn build(b: *std.Build) void {
     exe.linkLibrary(libgc);
     exe.addIncludePath(.{ .path = "vendor/zig-libgc/vendor/bdwgc/include" });
     exe.addModule("kiesel", kiesel_module);
+    exe.addModule("any-pointer", any_pointer.module("any-pointer"));
     exe.addModule("args", zig_args.module("args"));
     exe.addModule("linenoise", linenoise.module("linenoise"));
 
