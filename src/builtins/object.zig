@@ -80,7 +80,7 @@ pub const ObjectConstructor = struct {
         const value = arguments.get(0);
 
         // 1. If NewTarget is neither undefined nor the active function object, then
-        if (new_target != null and new_target.?.ptr.eql(agent.activeFunctionObject().ptr)) {
+        if (new_target != null and new_target.?.sameValue(agent.activeFunctionObject())) {
             // a. Return ? OrdinaryCreateFromConstructor(NewTarget, "%Object.prototype%").
             return Value.from(try ordinaryCreateFromConstructor(
                 Object,

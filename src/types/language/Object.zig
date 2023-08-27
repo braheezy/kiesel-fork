@@ -104,6 +104,11 @@ pub inline fn propertyStorage(self: Self) *PropertyStorage {
     return &self.data.property_storage;
 }
 
+/// Shortcut for the SameValue AO applied on two objects (i.e. pointer equality)
+pub fn sameValue(self: Self, other: Self) bool {
+    return self.ptr.eql(other.ptr);
+}
+
 /// 7.1.1.1 OrdinaryToPrimitive ( O, hint )
 /// https://tc39.es/ecma262/#sec-ordinarytoprimitive
 pub fn ordinaryToPrimitive(self: Self, hint: PreferredType) !Value {
