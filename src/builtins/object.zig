@@ -38,6 +38,7 @@ pub const ObjectConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "assign", assign, 2, realm);
         try defineBuiltinFunction(object, "create", create_, 2, realm);
         try defineBuiltinFunction(object, "defineProperties", defineProperties, 2, realm);
         try defineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm);
@@ -103,6 +104,50 @@ pub const ObjectConstructor = struct {
         // 3. Return ! ToObject(value).
         // TODO: Use `catch |err| try noexcept(err)` once Value.toObject() is fully implemented
         return Value.from(try value.toObject(agent));
+    }
+
+    /// 20.1.2.1 Object.assign ( target, ...sources )
+    /// https://tc39.es/ecma262/#sec-object.assign
+    fn assign(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const target = arguments.get(0);
+        const sources = arguments.values[1..];
+
+        // 1. Let to be ? ToObject(target).
+        const to = try target.toObject(agent);
+
+        // 2. If only one argument was passed, return to.
+        if (arguments.count() == 1) return Value.from(to);
+
+        // 3. For each element nextSource of sources, do
+        for (sources) |next_source| {
+            // a. If nextSource is neither undefined nor null, then
+            if (next_source != .undefined and next_source != .null) {
+                // i. Let from be ! ToObject(nextSource).
+                const from = next_source.toObject(agent) catch |err| try noexcept(err);
+
+                // ii. Let keys be ? from.[[OwnPropertyKeys]]().
+                const keys_ = try from.internalMethods().ownPropertyKeys(from);
+                defer keys_.deinit();
+
+                // iii. For each element nextKey of keys, do
+                for (keys_.items) |next_key| {
+                    // 1. Let desc be ? from.[[GetOwnProperty]](nextKey).
+                    const descriptor = try from.internalMethods().getOwnProperty(from, next_key);
+
+                    // 2. If desc is not undefined and desc.[[Enumerable]] is true, then
+                    if (descriptor != null and descriptor.?.enumerable == true) {
+                        // a. Let propValue be ? Get(from, nextKey).
+                        const property_value = try from.get(next_key);
+
+                        // b. Perform ? Set(to, nextKey, propValue, true).
+                        try to.set(next_key, property_value, .throw);
+                    }
+                }
+            }
+        }
+
+        // 4. Return to.
+        return Value.from(to);
     }
 
     /// 20.1.2.2 Object.create ( O, Properties )
