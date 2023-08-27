@@ -2,10 +2,9 @@
     .name = "kiesel",
     .version = "0.1.0",
     .dependencies = .{
-        // TODO: Point this to upstream once https://github.com/MasterQ32/any-pointer/pull/6 is merged
         .any_pointer = .{
-            .url = "https://github.com/linusg/any-pointer/archive/9135d170e8729e8636a088f226ddf70f58b5055d.tar.gz",
-            .hash = "122039ee87bf16ceee7e491f0cfa6ac62c47b8fdaad68c82ac27e796faeb8a3ee501",
+            .url = "https://github.com/MasterQ32/any-pointer/archive/88bd1b406d58bc9e82159581ea3e71a004011058.tar.gz",
+            .hash = "1220d00cd17f9b1f840ea4bee9b552547e1ca5938517018078046c83b71f332d3b5e",
         },
         .linenoise = .{
             .url = "https://github.com/joachimschmidt557/linenoize/archive/180e8d1d8df4811d20ab7e216da9a6e2c35eb3a5.tar.gz",
