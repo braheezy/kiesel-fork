@@ -150,6 +150,48 @@ pub fn fromPropertyDescriptor(self: Self, agent: *Agent) !Object {
     return object;
 }
 
+/// 6.2.6.6 CompletePropertyDescriptor ( Desc )
+/// https://tc39.es/ecma262/#sec-completepropertydescriptor
+pub fn completePropertyDescriptor(self: *Self) void {
+    // 1. Let like be the Record {
+    //      [[Value]]: undefined,
+    //      [[Writable]]: false,
+    //      [[Get]]: undefined,
+    //      [[Set]]: undefined,
+    //      [[Enumerable]]: false,
+    //      [[Configurable]]: false
+    //    }.
+    const like = Self{
+        .value = .undefined,
+        .writable = false,
+        .enumerable = false,
+        .configurable = false,
+    };
+
+    // 2. If IsGenericDescriptor(Desc) is true or IsDataDescriptor(Desc) is true, then
+    if (self.isGenericDescriptor() or self.isDataDescriptor()) {
+        // a. If Desc does not have a [[Value]] field, set Desc.[[Value]] to like.[[Value]].
+        if (self.value == null) self.value = like.value;
+
+        // b. If Desc does not have a [[Writable]] field, set Desc.[[Writable]] to like.[[Writable]].
+        if (self.writable == null) self.writable = like.writable;
+    }
+    // 3. Else,
+    else {
+        // a. If Desc does not have a [[Get]] field, set Desc.[[Get]] to like.[[Get]].
+        // b. If Desc does not have a [[Set]] field, set Desc.[[Set]] to like.[[Set]].
+        // NOTE: These are no-ops, the fields can't be missing.
+    }
+
+    // 4. If Desc does not have an [[Enumerable]] field, set Desc.[[Enumerable]] to like.[[Enumerable]].
+    if (self.enumerable == null) self.enumerable = like.enumerable;
+
+    // 5. If Desc does not have a [[Configurable]] field, set Desc.[[Configurable]] to like.[[Configurable]].
+    if (self.configurable == null) self.configurable = like.configurable;
+
+    // 6. Return unused.
+}
+
 pub inline fn isFullyPopulated(self: Self) bool {
     return ((self.value != null and self.writable != null) or
         (self.get != null or self.set != null)) and
