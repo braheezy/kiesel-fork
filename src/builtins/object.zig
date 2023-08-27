@@ -51,6 +51,7 @@ pub const ObjectConstructor = struct {
         try defineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm);
         try defineBuiltinFunction(object, "isFrozen", isFrozen, 1, realm);
         try defineBuiltinFunction(object, "isSealed", isSealed, 1, realm);
+        try defineBuiltinFunction(object, "keys", keys, 1, realm);
         try defineBuiltinFunction(object, "preventExtensions", preventExtensions, 1, realm);
         try defineBuiltinFunction(object, "seal", seal, 1, realm);
         try defineBuiltinFunction(object, "setPrototypeOf", setPrototypeOf, 2, realm);
@@ -159,8 +160,8 @@ pub const ObjectConstructor = struct {
         const props = try properties.toObject(agent);
 
         // 2. Let keys be ? props.[[OwnPropertyKeys]]().
-        const keys = try props.internalMethods().ownPropertyKeys(props);
-        defer keys.deinit();
+        const keys_ = try props.internalMethods().ownPropertyKeys(props);
+        defer keys_.deinit();
 
         const Property = struct {
             key: PropertyKey,
@@ -172,7 +173,7 @@ pub const ObjectConstructor = struct {
         defer descriptors.deinit();
 
         // 4. For each element nextKey of keys, do
-        for (keys.items) |next_key| {
+        for (keys_.items) |next_key| {
             // a. Let propDesc be ? props.[[GetOwnProperty]](nextKey).
             const maybe_property_descriptor = try props.internalMethods().getOwnProperty(props, next_key);
 
@@ -393,6 +394,22 @@ pub const ObjectConstructor = struct {
 
         // 2. Return ? TestIntegrityLevel(O, sealed).
         return Value.from(try object.object.testIntegrityLevel(.sealed));
+    }
+
+    /// 20.1.2.18 Object.keys ( O )
+    /// https://tc39.es/ecma262/#sec-object.keys
+    fn keys(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
+
+        // 1. Let obj be ? ToObject(O).
+        const obj = try object.toObject(agent);
+
+        // 2. Let keyList be ? EnumerableOwnProperties(obj, key).
+        const key_list = try obj.enumerableOwnProperties(.key);
+        defer key_list.deinit();
+
+        // 3. Return CreateArrayFromList(keyList).
+        return Value.from(try createArrayFromList(agent, key_list.items));
     }
 
     /// 20.1.2.19 Object.preventExtensions ( O )
