@@ -1212,7 +1212,8 @@ fn acceptArrowFunction(self: *Self) !ast.ArrowFunction {
             _ = try self.core.accept(RuleSet.is(.@"}"));
             break :blk function_body;
         } else |_| {
-            const expression_body = try self.acceptExpression(.{});
+            const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
+            const expression_body = try self.acceptExpression(ctx);
             // Synthesize a FunctionBody with return statement
             const statement = try self.allocator.create(ast.Statement);
             statement.* = ast.Statement{ .return_statement = .{ .expression = expression_body } };
