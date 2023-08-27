@@ -476,15 +476,7 @@ pub fn enumerableOwnProperties(
                 // 1. If kind is key, then
                 if (kind == .key) {
                     // a. Append key to results.
-                    try results.append(switch (key) {
-                        .string => |string| Value.from(string),
-                        .symbol => unreachable,
-                        .integer_index => |integer_index| Value.from(try std.fmt.allocPrint(
-                            self.agent().gc_allocator,
-                            "{}",
-                            .{integer_index},
-                        )),
-                    });
+                    try results.append(try key.toValue(self.agent()));
                 }
                 // 2. Else,
                 else {
@@ -504,18 +496,7 @@ pub fn enumerableOwnProperties(
                         // ii. Let entry be CreateArrayFromList(« key, value »).
                         const entry = Value.from(try createArrayFromList(
                             self.agent(),
-                            &.{
-                                switch (key) {
-                                    .string => |string| Value.from(string),
-                                    .symbol => unreachable,
-                                    .integer_index => |integer_index| Value.from(try std.fmt.allocPrint(
-                                        self.agent().gc_allocator,
-                                        "{}",
-                                        .{integer_index},
-                                    )),
-                                },
-                                value,
-                            },
+                            &.{ try key.toValue(self.agent()), value },
                         ));
 
                         // iii. Append entry to results.

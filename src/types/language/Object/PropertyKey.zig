@@ -1,7 +1,11 @@
 const std = @import("std");
 
+const execution = @import("../../../execution.zig");
+
+const Agent = execution.Agent;
 const String = @import("../string.zig").String;
 const Symbol = @import("../Symbol.zig");
+const Value = @import("../value.zig").Value;
 
 /// A property key is either a String or a Symbol. All Strings and Symbols, including the empty
 /// String, are valid as property keys.
@@ -45,5 +49,19 @@ pub const PropertyKey = union(enum) {
     /// integral Number in the inclusive interval from +0𝔽 to 𝔽(2^32 - 2).
     pub inline fn isArrayIndex(self: Self) bool {
         return self == .integer_index and self.integer_index <= (std.math.maxInt(u32) - 1);
+    }
+
+    /// Non-standard helper to convert a `PropertyKey` to a `Value` - they *are* plain (string or
+    /// symbol) values in the spec.
+    pub fn toValue(self: Self, agent: *Agent) !Value {
+        return switch (self) {
+            .string => |string| Value.from(string),
+            .symbol => |symbol| Value.from(symbol),
+            .integer_index => |integer_index| Value.from(try std.fmt.allocPrint(
+                agent.gc_allocator,
+                "{}",
+                .{integer_index},
+            )),
+        };
     }
 };

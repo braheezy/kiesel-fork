@@ -288,15 +288,7 @@ pub const Reflect = struct {
         );
         defer keys.deinit();
         for (property_keys.items) |property_key| {
-            keys.appendAssumeCapacity(switch (property_key) {
-                .string => |string| Value.from(string),
-                .symbol => |symbol| Value.from(symbol),
-                .integer_index => |integer_index| Value.from(try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "{}",
-                    .{integer_index},
-                )),
-            });
+            keys.appendAssumeCapacity(try property_key.toValue(agent));
         }
 
         // 3. Return CreateArrayFromList(keys).
