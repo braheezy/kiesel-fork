@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const AnyPointer = @import("any-pointer").AnyPointer;
+
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const spec = @import("../spec.zig");
@@ -42,7 +44,7 @@ pub const IntegrityLevel = enum {
     frozen,
 };
 
-ptr: *anyopaque,
+ptr: AnyPointer,
 data: *Data,
 tag: ?Tag,
 
@@ -77,8 +79,7 @@ pub inline fn is(self: Self, comptime T: type) bool {
 }
 
 pub inline fn as(self: Self, comptime T: type) *T {
-    std.debug.assert(self.is(T));
-    return @ptrCast(@alignCast(self.ptr));
+    return self.ptr.cast(*T);
 }
 
 // Helper functions so we don't have to say 'data' all the time

@@ -995,7 +995,7 @@ pub const Value = union(enum) {
             if (object == null) return false;
 
             // c. If SameValue(P, O) is true, return true.
-            if (prototype.object.ptr == object.?.ptr) return true;
+            if (prototype.object.ptr.eql(object.?.ptr)) return true;
         }
     }
 };
@@ -1093,7 +1093,7 @@ pub fn sameValueNonNumber(x: Value, y: Value) bool {
         // 6. NOTE: All other ECMAScript language values are compared by identity.
         // 7. If x is y, return true; otherwise, return false.
         .symbol => x.symbol.id == y.symbol.id,
-        .object => x.object.ptr == y.object.ptr,
+        .object => x.object.ptr.eql(y.object.ptr),
 
         .number => unreachable,
     };

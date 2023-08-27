@@ -290,7 +290,7 @@ fn NativeErrorConstructor(comptime name: []const u8) type {
                 "%" ++ name ++ ".prototype%",
             );
 
-            const native_error = @as(*T, @ptrCast(@alignCast(object.ptr)));
+            const native_error = object.ptr.cast(*T);
 
             // Non-standard
             native_error.fields = .{

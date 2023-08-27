@@ -611,7 +611,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
                     std.mem.eql(u8, reference.referenced_name.string, "eval") and
 
                     // a. If SameValue(func, %eval%) is true, then
-                    function.object.ptr == eval.ptr)
+                    function.object.ptr.eql(eval.ptr))
                 {
                     self.result = try directEval(self.agent, arguments.items, strict);
                     return;

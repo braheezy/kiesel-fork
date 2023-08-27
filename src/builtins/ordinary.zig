@@ -62,7 +62,7 @@ pub fn ordinarySetPrototypeOf(object: Object, prototype: ?Object) bool {
     // 2. If SameValue(V, current) is true, return true.
     if (prototype) |prototype_object| {
         if (current) |current_object| {
-            if (current_object.ptr == prototype_object.ptr) return true;
+            if (current_object.ptr.eql(prototype_object.ptr)) return true;
         }
     } else if (current == null) {
         return true;
@@ -84,7 +84,7 @@ pub fn ordinarySetPrototypeOf(object: Object, prototype: ?Object) bool {
         //     i. Set done to true.
 
         // b. Else if SameValue(p, O) is true, then
-        if (parent_prototype_object.ptr == object.ptr) {
+        if (parent_prototype_object.ptr.eql(object.ptr)) {
             // i. Return false.
             return false;
         }
@@ -314,13 +314,13 @@ fn validateAndApplyPropertyDescriptor(
             //    return false.
             if (descriptor.get != null and
                 current.get != null and
-                descriptor.get.?.ptr != current.get.?.ptr) return false;
+                !descriptor.get.?.ptr.eql(current.get.?.ptr)) return false;
 
             // ii. If Desc has a [[Set]] field and SameValue(Desc.[[Set]], current.[[Set]]) is
             //     false, return false.
             if (descriptor.set != null and
                 current.set != null and
-                descriptor.set.?.ptr != current.set.?.ptr) return false;
+                !descriptor.set.?.ptr.eql(current.set.?.ptr)) return false;
         }
         // e. Else if current.[[Writable]] is false, then
         else if (!current.writable.?) {

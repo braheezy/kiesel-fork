@@ -2,6 +2,8 @@ const std = @import("std");
 
 const Color = std.io.tty.Color;
 
+const AnyPointer = @import("any-pointer").AnyPointer;
+
 const builtins = @import("builtins.zig");
 const types = @import("types.zig");
 
@@ -12,7 +14,7 @@ const getArrayLength = @import("builtins/array.zig").getArrayLength;
 const getFunctionName = @import("builtins/ecmascript_function.zig").getFunctionName;
 const ordinaryOwnPropertyKeys = builtins.ordinaryOwnPropertyKeys;
 
-const SeenObjects = std.AutoHashMap(*anyopaque, usize);
+const SeenObjects = std.AutoHashMap(AnyPointer, usize);
 const State = struct {
     seen_objects: SeenObjects,
     print_in_progress: bool,

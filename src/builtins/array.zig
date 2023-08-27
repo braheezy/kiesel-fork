@@ -170,7 +170,7 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: usize) 
         // c. If thisRealm and realmC are not the same Realm Record, then
         if (this_realm != constructor_realm) {
             // i. If SameValue(C, realmC.[[Intrinsics]].[[%Array%]]) is true, set C to undefined.
-            if (constructor.object.ptr == (try constructor_realm.intrinsics.@"%Array%"()).ptr) {
+            if (constructor.object.ptr.eql((try constructor_realm.intrinsics.@"%Array%"()).ptr)) {
                 constructor = .undefined;
             }
         }

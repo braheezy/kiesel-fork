@@ -1,3 +1,5 @@
+const AnyPointer = @import("any-pointer").AnyPointer;
+
 const execution = @import("../../../execution.zig");
 
 const Agent = execution.Agent;
@@ -50,7 +52,7 @@ pub fn Factory(
 
         pub fn object(self: *Self) Object {
             return .{
-                .ptr = self,
+                .ptr = AnyPointer.make(*Self, self),
                 .data = &self.data,
                 .tag = options.tag,
             };
