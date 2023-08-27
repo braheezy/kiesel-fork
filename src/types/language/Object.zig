@@ -8,6 +8,7 @@ const AnyPointer = @import("any-pointer").AnyPointer;
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const spec = @import("../spec.zig");
+const types = @import("../../types.zig");
 const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
@@ -16,6 +17,7 @@ const PreferredType = Value.PreferredType;
 const PropertyDescriptor = spec.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = @import("value.zig").Value;
+const createArrayFromList = types.createArrayFromList;
 const noexcept = utils.noexcept;
 
 pub const Data = @import("Object/Data.zig");
@@ -447,6 +449,85 @@ pub fn testIntegrityLevel(self: Self, level: IntegrityLevel) !bool {
 pub fn lengthOfArrayLike(self: Self) !u53 {
     // 1. Return ℝ(? ToLength(? Get(obj, "length"))).
     return (try self.get(PropertyKey.from("length"))).toLength(self.agent());
+}
+
+/// 7.3.24 EnumerableOwnProperties ( O, kind )
+/// https://tc39.es/ecma262/#sec-enumerableownproperties
+pub fn enumerableOwnProperties(
+    self: Self,
+    comptime kind: enum { key, value, @"key+value" },
+) !std.ArrayList(Value) {
+    // 1. Let ownKeys be ? O.[[OwnPropertyKeys]]().
+    const own_keys = try self.internalMethods().ownPropertyKeys(self);
+    defer own_keys.deinit();
+
+    // 2. Let results be a new empty List.
+    var results = std.ArrayList(Value).init(self.agent().gc_allocator);
+
+    // 3. For each element key of ownKeys, do
+    for (own_keys.items) |key| {
+        // a. If key is a String, then
+        if (key == .string or key == .integer_index) {
+            // i. Let desc be ? O.[[GetOwnProperty]](key).
+            const descriptor = try self.internalMethods().getOwnProperty(self, key);
+
+            // ii. If desc is not undefined and desc.[[Enumerable]] is true, then
+            if (descriptor != null and descriptor.?.enumerable == true) {
+                // 1. If kind is key, then
+                if (kind == .key) {
+                    // a. Append key to results.
+                    try results.append(switch (key) {
+                        .string => |string| Value.from(string),
+                        .symbol => unreachable,
+                        .integer_index => |integer_index| Value.from(try std.fmt.allocPrint(
+                            self.agent().gc_allocator,
+                            "{}",
+                            .{integer_index},
+                        )),
+                    });
+                }
+                // 2. Else,
+                else {
+                    // a. Let value be ? Get(O, key).
+                    const value = try self.get(key);
+
+                    // b. If kind is value, then
+                    if (kind == .value) {
+                        // i. Append value to results.
+                        try results.append(value);
+                    }
+                    // c. Else,
+                    else {
+                        // i. Assert: kind is key+value.
+                        std.debug.assert(kind == .@"key+value");
+
+                        // ii. Let entry be CreateArrayFromList(« key, value »).
+                        const entry = Value.from(try createArrayFromList(
+                            self.agent(),
+                            &.{
+                                switch (key) {
+                                    .string => |string| Value.from(string),
+                                    .symbol => unreachable,
+                                    .integer_index => |integer_index| Value.from(try std.fmt.allocPrint(
+                                        self.agent().gc_allocator,
+                                        "{}",
+                                        .{integer_index},
+                                    )),
+                                },
+                                value,
+                            },
+                        ));
+
+                        // iii. Append entry to results.
+                        try results.append(entry);
+                    }
+                }
+            }
+        }
+    }
+
+    // 4. Return results.
+    return results;
 }
 
 /// 7.3.25 GetFunctionRealm ( obj )
