@@ -16,6 +16,7 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
+const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
@@ -40,6 +41,7 @@ pub const ObjectConstructor = struct {
         try defineBuiltinFunction(object, "create", create_, 2, realm);
         try defineBuiltinFunction(object, "defineProperties", defineProperties, 2, realm);
         try defineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm);
+        try defineBuiltinFunction(object, "entries", entries, 1, realm);
         try defineBuiltinFunction(object, "freeze", freeze, 1, realm);
         try defineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 2, realm);
         try defineBuiltinFunction(object, "getOwnPropertyDescriptors", getOwnPropertyDescriptors, 1, realm);
@@ -223,6 +225,22 @@ pub const ObjectConstructor = struct {
 
         // 5. Return O.
         return object;
+    }
+
+    /// 20.1.2.5 Object.entries ( O )
+    /// https://tc39.es/ecma262/#sec-object.entries
+    fn entries(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
+
+        // 1. Let obj be ? ToObject(O).
+        const obj = try object.toObject(agent);
+
+        // 2. Let entryList be ? EnumerableOwnProperties(obj, key+value).
+        const entry_list = try obj.enumerableOwnProperties(.@"key+value");
+        defer entry_list.deinit();
+
+        // 3. Return CreateArrayFromList(entryList).
+        return Value.from(try createArrayFromList(agent, entry_list.items));
     }
 
     /// 20.1.2.6 Object.freeze ( O )
