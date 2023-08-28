@@ -378,7 +378,7 @@ pub const FunctionPrototype = struct {
     /// https://tc39.es/ecma262/#sec-function.prototype.call
     fn call(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
         const this_arg = arguments.get(0);
-        const args = if (arguments.count() <= 1) &[_]Value{} else arguments.values[1..];
+        const args = if (arguments.count() <= 1) &.{} else arguments.values[1..];
 
         // 1. Let func be the this value.
         const func = this_value;

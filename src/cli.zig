@@ -186,7 +186,7 @@ fn getHistoryPath(allocator: Allocator) ![]const u8 {
     const app_data_dir = try std.fs.getAppDataDir(allocator, "kiesel");
     defer allocator.free(app_data_dir);
 
-    const history_path = try std.fs.path.join(allocator, &[_][]const u8{ app_data_dir, "history" });
+    const history_path = try std.fs.path.join(allocator, &.{ app_data_dir, "history" });
     errdefer allocator.free(history_path);
 
     std.fs.makeDirAbsolute(app_data_dir) catch |err| switch (err) {

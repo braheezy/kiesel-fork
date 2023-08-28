@@ -260,7 +260,7 @@ fn applyStringOrNumericBinaryOperator(agent: *Agent, lval: Value, operator: ast.
             // iii. Return the string-concatenation of lstr and rstr.
             // TODO: Implement rope strings
             return Value.from(
-                try std.mem.concat(agent.gc_allocator, u8, &[_][]const u8{ lstr.utf8, rstr.utf8 }),
+                try std.mem.concat(agent.gc_allocator, u8, &.{ lstr.utf8, rstr.utf8 }),
             );
         }
 

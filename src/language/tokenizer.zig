@@ -97,7 +97,7 @@ const TokenType = enum {
 
 const Pattern = ptk.Pattern(TokenType);
 
-pub const Tokenizer = ptk.Tokenizer(TokenType, &[_]Pattern{
+pub const Tokenizer = ptk.Tokenizer(TokenType, &.{
     // NOTE: Needs to come first or strings such as 'ifelse' turn into two tokens
     Pattern.create(.identifier, identifierMatcher),
     // NOTE: Needs to come before binary operator tokens

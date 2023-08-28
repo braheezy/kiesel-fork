@@ -379,7 +379,7 @@ fn acceptNewExpression(self: *Self) !ast.NewExpression {
     const expression = try self.allocator.create(ast.Expression);
     expression.* = try self.acceptExpression(ctx);
     tmp.restore();
-    const arguments = self.acceptArguments() catch &[_]ast.Expression{};
+    const arguments = self.acceptArguments() catch &.{};
     return .{ .expression = expression, .arguments = arguments };
 }
 
