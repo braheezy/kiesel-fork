@@ -567,8 +567,24 @@ pub const ObjectPrototype = struct {
     }
 
     pub fn init(realm: *Realm, object: Object_) !void {
+        try defineBuiltinFunction(object, "hasOwnProperty", hasOwnProperty, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
+    }
+
+    /// 20.1.3.2 Object.prototype.hasOwnProperty ( V )
+    /// https://tc39.es/ecma262/#sec-object.prototype.hasownproperty
+    fn hasOwnProperty(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const value = arguments.get(0);
+
+        // 1. Let P be ? ToPropertyKey(V).
+        const property_key = try value.toPropertyKey(agent);
+
+        // 2. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 3. Return ? HasOwnProperty(O, P).
+        return Value.from(try object.hasOwnProperty(property_key));
     }
 
     /// 20.1.3.6 Object.prototype.toString ( )
