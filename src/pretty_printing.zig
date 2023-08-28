@@ -74,6 +74,28 @@ fn prettyPrintError(@"error": Object, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintProxy(proxy: Object, writer: anytype) !void {
+    const proxy_target = proxy.as(builtins.Proxy).fields.proxy_target;
+    const proxy_handler = proxy.as(builtins.Proxy).fields.proxy_handler;
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Proxy(");
+    try tty_config.setColor(writer, .reset);
+    if (proxy_target != null and proxy_handler != null) {
+        try writer.print("{pretty}", .{Value.from(proxy_target.?)});
+        try writer.writeAll(", ");
+        try writer.print("{pretty}", .{Value.from(proxy_handler.?)});
+    } else {
+        try tty_config.setColor(writer, .dim);
+        try writer.writeAll("<revoked>");
+        try tty_config.setColor(writer, .reset);
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintPrimitiveWrapper(object: Object, writer: anytype) !void {
     const tty_config = getTtyConfigForWriter(writer);
 
@@ -201,6 +223,8 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
             object.is(builtins.String) or
             object.is(builtins.Symbol))
             return prettyPrintPrimitiveWrapper(object, writer);
+        if (object.is(builtins.Proxy))
+            return prettyPrintProxy(object, writer);
         if (object.internalMethods().call != null)
             return prettyPrintFunction(object, writer);
         return prettyPrintObject(object, writer);

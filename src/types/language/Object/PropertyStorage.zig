@@ -42,10 +42,10 @@ pub fn remove(self: *Self, property_key: PropertyKey) void {
     std.debug.assert(removed);
 }
 
-const PropertyHashMap = std.ArrayHashMap(PropertyKey, PropertyDescriptor, struct {
+pub const PropertyKeyHashMapContext = struct {
     const hashString = std.hash_map.hashString;
-    const hashSymbol = std.hash_map.getAutoHashFn(Symbol.Id, @This());
-    const hashIntegerIndex = std.hash_map.getAutoHashFn(PropertyKey.IntegerIndex, @This());
+    const hashSymbol = std.hash_map.getAutoHashFn(Symbol.Id, struct {});
+    const hashIntegerIndex = std.hash_map.getAutoHashFn(PropertyKey.IntegerIndex, struct {});
 
     const eqlString = std.hash_map.eqlString;
 
@@ -56,17 +56,15 @@ const PropertyHashMap = std.ArrayHashMap(PropertyKey, PropertyDescriptor, struct
         return eqlString(string, &index_string);
     }
 
-    pub fn hash(self: @This(), k: PropertyKey) u32 {
-        return switch (k) {
-            .string => |string| @truncate(hashString(string.utf8)),
-            .symbol => |symbol| @truncate(hashSymbol(self, symbol.id)),
-            .integer_index => |integer_index| @truncate(hashIntegerIndex(self, integer_index)),
+    pub fn hash(_: anytype, property_key: PropertyKey) u64 {
+        return switch (property_key) {
+            .string => |string| hashString(string.utf8),
+            .symbol => |symbol| hashSymbol(.{}, symbol.id),
+            .integer_index => |integer_index| hashIntegerIndex(.{}, integer_index),
         };
     }
 
-    pub fn eql(self: @This(), a: PropertyKey, b: PropertyKey, b_index_in_hashmap: usize) bool {
-        _ = b_index_in_hashmap;
-        _ = self;
+    pub fn eql(_: anytype, a: PropertyKey, b: PropertyKey) bool {
         return switch (a) {
             .string => |a_string| switch (b) {
                 .string => |b_string| eqlString(a_string.utf8, b_string.utf8),
@@ -84,5 +82,16 @@ const PropertyHashMap = std.ArrayHashMap(PropertyKey, PropertyDescriptor, struct
                 .integer_index => |b_integer_index| a_integer_index == b_integer_index,
             },
         };
+    }
+};
+
+const PropertyHashMap = std.ArrayHashMap(PropertyKey, PropertyDescriptor, struct {
+    pub fn hash(self: @This(), property_key: PropertyKey) u32 {
+        return @truncate(PropertyKeyHashMapContext.hash(self, property_key));
+    }
+
+    pub fn eql(self: @This(), a: PropertyKey, b: PropertyKey, b_index_in_hashmap: usize) bool {
+        _ = b_index_in_hashmap;
+        return PropertyKeyHashMapContext.eql(self, a, b);
     }
 }, false);

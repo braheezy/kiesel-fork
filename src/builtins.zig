@@ -11,6 +11,7 @@ const math = @import("builtins/math.zig");
 const number = @import("builtins/number.zig");
 const object = @import("builtins/object.zig");
 const ordinary = @import("builtins/ordinary.zig");
+const proxy = @import("builtins/proxy.zig");
 const reflect = @import("builtins/reflect.zig");
 const string = @import("builtins/string.zig");
 const symbol = @import("builtins/symbol.zig");
@@ -47,6 +48,8 @@ pub const NumberPrototype = number.NumberPrototype;
 pub const Object = object.Object;
 pub const ObjectConstructor = object.ObjectConstructor;
 pub const ObjectPrototype = object.ObjectPrototype;
+pub const Proxy = proxy.Proxy;
+pub const ProxyConstructor = proxy.ProxyConstructor;
 pub const RangeError = @"error".RangeError;
 pub const RangeErrorConstructor = @"error".RangeErrorConstructor;
 pub const RangeErrorPrototype = @"error".RangeErrorPrototype;
@@ -99,6 +102,7 @@ pub const performEval = eval.performEval;
 pub const setFunctionLength = ecmascript_function.setFunctionLength;
 pub const setFunctionName = ecmascript_function.setFunctionName;
 pub const stringCreate = string.stringCreate;
+pub const validateNonRevokedProxy = proxy.validateNonRevokedProxy;
 
 test {
     _ = builtin_function;

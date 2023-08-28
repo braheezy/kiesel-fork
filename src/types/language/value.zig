@@ -22,6 +22,7 @@ const noexcept = utils.noexcept;
 const prettyPrintValue = pretty_printing.prettyPrintValue;
 const stringCreate = builtins.stringCreate;
 const trim = utils.trim;
+const validateNonRevokedProxy = builtins.validateNonRevokedProxy;
 const line_terminators = tokenizer.line_terminators;
 const whitespace = tokenizer.whitespace;
 
@@ -783,11 +784,16 @@ pub const Value = union(enum) {
         // 2. If argument is an Array exotic object, return true.
         if (self.object.is(builtins.Array)) return true;
 
-        // TODO: 3. If argument is a Proxy exotic object, then
-        if (false) {
-            // TODO: a. Perform ? ValidateNonRevokedProxy(argument).
-            // TODO: b. Let proxyTarget be argument.[[ProxyTarget]].
-            // TODO: c. Return ? IsArray(proxyTarget).
+        // 3. If argument is a Proxy exotic object, then
+        if (self.object.is(builtins.Proxy)) {
+            // a. Perform ? ValidateNonRevokedProxy(argument).
+            try validateNonRevokedProxy(self.object.as(builtins.Proxy));
+
+            // b. Let proxyTarget be argument.[[ProxyTarget]].
+            const proxy_target = self.object.as(builtins.Proxy).fields.proxy_target;
+
+            // c. Return ? IsArray(proxyTarget).
+            return Value.from(proxy_target.?).isArray();
         }
 
         // 4. Return false.

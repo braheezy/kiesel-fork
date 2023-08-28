@@ -19,6 +19,7 @@ const Realm = execution.Realm;
 const Value = @import("value.zig").Value;
 const createArrayFromList = types.createArrayFromList;
 const noexcept = utils.noexcept;
+const validateNonRevokedProxy = builtins.validateNonRevokedProxy;
 
 pub const Data = @import("Object/Data.zig");
 pub const Factory = @import("Object/Factory.zig").Factory;
@@ -36,6 +37,7 @@ pub const Tag = enum(u32) {
     ecmascript_function,
     @"error",
     number,
+    proxy,
     string,
     symbol,
     _,
@@ -72,6 +74,7 @@ pub inline fn is(self: Self, comptime T: type) bool {
         .{ builtins.ECMAScriptFunction, .ecmascript_function },
         .{ builtins.Error, .@"error" },
         .{ builtins.Number, .number },
+        .{ builtins.Proxy, .proxy },
         .{ builtins.String, .string },
         .{ builtins.Symbol, .symbol },
     }) |entry| if (T == entry[0]) {
@@ -521,7 +524,7 @@ pub fn getFunctionRealm(self: Self) !*Realm {
             return self.as(builtins.BuiltinFunction).fields.realm;
         } else if (self.is(builtins.ECMAScriptFunction)) {
             return self.as(builtins.ECMAScriptFunction).fields.realm;
-        } else {
+        } else if (!self.is(builtins.Proxy)) {
             @panic("Unhandled function type in getFunctionRealm()");
         }
     }
@@ -530,10 +533,17 @@ pub fn getFunctionRealm(self: Self) !*Realm {
     //     a. Let boundTargetFunction be obj.[[BoundTargetFunction]].
     //     b. Return ? GetFunctionRealm(boundTargetFunction).
 
-    // TODO: 3. If obj is a Proxy exotic object, then
-    //     a. Perform ? ValidateNonRevokedProxy(obj).
-    //     b. Let proxyTarget be obj.[[ProxyTarget]].
-    //     c. Return ? GetFunctionRealm(proxyTarget).
+    // 3. If obj is a Proxy exotic object, then
+    if (self.is(builtins.Proxy)) {
+        // a. Perform ? ValidateNonRevokedProxy(obj).
+        try validateNonRevokedProxy(self.as(builtins.Proxy));
+
+        // b. Let proxyTarget be obj.[[ProxyTarget]].
+        const proxy_target = self.as(builtins.Proxy).fields.proxy_target;
+
+        // c. Return ? GetFunctionRealm(proxyTarget).
+        return proxy_target.?.getFunctionRealm();
+    }
 
     // 4. Return the current Realm Record.
     return self.agent().currentRealm();
