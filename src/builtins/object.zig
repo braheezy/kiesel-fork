@@ -569,6 +569,7 @@ pub const ObjectPrototype = struct {
     pub fn init(realm: *Realm, object: Object_) !void {
         try defineBuiltinFunction(object, "hasOwnProperty", hasOwnProperty, 1, realm);
         try defineBuiltinFunction(object, "isPrototypeOf", isPrototypeOf, 1, realm);
+        try defineBuiltinFunction(object, "propertyIsEnumerable", propertyIsEnumerable, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
     }
@@ -612,6 +613,27 @@ pub const ObjectPrototype = struct {
             // c. If SameValue(O, V) is true, return true.
             if (object.sameValue(prototype.?)) return Value.from(true);
         }
+    }
+
+    /// 20.1.3.4 Object.prototype.propertyIsEnumerable ( V )
+    /// https://tc39.es/ecma262/#sec-object.prototype.propertyisenumerable
+    fn propertyIsEnumerable(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const value = arguments.get(0);
+
+        // 1. Let P be ? ToPropertyKey(V).
+        const property_key = try value.toPropertyKey(agent);
+
+        // 2. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 3. Let desc be ? O.[[GetOwnProperty]](P).
+        const property_descriptor = try object.internalMethods().getOwnProperty(object, property_key);
+
+        // 4. If desc is undefined, return false.
+        if (property_descriptor == null) return Value.from(false);
+
+        // 5. Return desc.[[Enumerable]].
+        return Value.from(property_descriptor.?.enumerable.?);
     }
 
     /// 20.1.3.6 Object.prototype.toString ( )
