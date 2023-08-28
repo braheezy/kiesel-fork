@@ -568,6 +568,7 @@ pub const ObjectPrototype = struct {
 
     pub fn init(realm: *Realm, object: Object_) !void {
         try defineBuiltinFunction(object, "hasOwnProperty", hasOwnProperty, 1, realm);
+        try defineBuiltinFunction(object, "isPrototypeOf", isPrototypeOf, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
     }
@@ -585,6 +586,32 @@ pub const ObjectPrototype = struct {
 
         // 3. Return ? HasOwnProperty(O, P).
         return Value.from(try object.hasOwnProperty(property_key));
+    }
+
+    /// 20.1.3.3 Object.prototype.isPrototypeOf ( V )
+    /// https://tc39.es/ecma262/#sec-object.prototype.isprototypeof
+    fn isPrototypeOf(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const value = arguments.get(0);
+
+        // 1. If V is not an Object, return false.
+        if (value != .object) return Value.from(false);
+
+        // 2. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        var prototype: ?Object_ = value.object;
+
+        // 3. Repeat,
+        while (true) {
+            // a. Set V to ? V.[[GetPrototypeOf]]().
+            prototype = try prototype.?.internalMethods().getPrototypeOf(prototype.?);
+
+            // b. If V is null, return false.
+            if (prototype == null) return Value.from(false);
+
+            // c. If SameValue(O, V) is true, return true.
+            if (object.sameValue(prototype.?)) return Value.from(true);
+        }
     }
 
     /// 20.1.3.6 Object.prototype.toString ( )
