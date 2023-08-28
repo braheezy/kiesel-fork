@@ -570,6 +570,7 @@ pub const ObjectPrototype = struct {
         try defineBuiltinFunction(object, "hasOwnProperty", hasOwnProperty, 1, realm);
         try defineBuiltinFunction(object, "isPrototypeOf", isPrototypeOf, 1, realm);
         try defineBuiltinFunction(object, "propertyIsEnumerable", propertyIsEnumerable, 1, realm);
+        try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
     }
@@ -634,6 +635,16 @@ pub const ObjectPrototype = struct {
 
         // 5. Return desc.[[Enumerable]].
         return Value.from(property_descriptor.?.enumerable.?);
+    }
+
+    /// 20.1.3.5 Object.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
+    /// https://tc39.es/ecma262/#sec-object.prototype.tolocalestring
+    fn toLocaleString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let O be the this value.
+        const object = try this_value.toObject(agent);
+
+        // 2. Return ? Invoke(O, "toString").
+        return Value.from(object).invoke(agent, PropertyKey.from("toString"), .{});
     }
 
     /// 20.1.3.6 Object.prototype.toString ( )
