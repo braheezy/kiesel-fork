@@ -1,6 +1,8 @@
 //! 10.3 Built-in Function Objects
 //! https://tc39.es/ecma262/#sec-built-in-function-objects-call-thisargument-argumentslist
 
+const SafePointer = @import("any-pointer").SafePointer;
+
 const ecmascript_function = @import("ecmascript_function.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -61,6 +63,8 @@ pub const BuiltinFunction = Object.Factory(.{
 
         /// [[InitialName]]
         initial_name: ?String,
+
+        additional_fields: SafePointer,
     },
     .tag = .builtin_function,
 });
@@ -150,6 +154,7 @@ pub fn createBuiltinFunction(
         //       so the null state can serve as 'not present'.
         prototype: ?Object = null,
         prefix: ?[]const u8 = null,
+        additional_fields: SafePointer = SafePointer.null_pointer,
     },
 ) !Object {
     // 1. If realm is not present, set realm to the current Realm Record.
@@ -186,6 +191,8 @@ pub fn createBuiltinFunction(
 
             // 9. Set func.[[InitialName]] to null.
             .initial_name = null,
+
+            .additional_fields = args.additional_fields,
         },
     });
 
