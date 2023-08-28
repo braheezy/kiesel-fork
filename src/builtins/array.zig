@@ -553,6 +553,7 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "map", map, 1, realm);
         try defineBuiltinFunction(object, "pop", pop, 0, realm);
         try defineBuiltinFunction(object, "push", push, 1, realm);
+        try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
 
         return object;
@@ -787,6 +788,59 @@ pub const ArrayPrototype = struct {
             // g. Return element.
             return element;
         }
+    }
+
+    /// 23.1.3.32 Array.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
+    /// https://tc39.es/ecma262/#sec-array.prototype.tolocalestring
+    fn toLocaleString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let array be ? ToObject(this value).
+        const array = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(array).
+        const len = try array.lengthOfArrayLike();
+
+        // 3. Let separator be the implementation-defined list-separator String value appropriate
+        //    for the host environment's current locale (such as ", ").
+        const separator = ", ";
+
+        // 4. Let R be the empty String.
+        if (len > std.math.maxInt(usize)) return error.OutOfMemory;
+        var elements = try std.ArrayList([]const u8).initCapacity(agent.gc_allocator, @intCast(len));
+        defer elements.deinit();
+
+        // 5. Let k be 0.
+        var k: u53 = 0;
+
+        // 6. Repeat, while k < len,
+        while (k < len) : (k += 1) {
+            // a. If k > 0, then
+            // i. Set R to the string-concatenation of R and separator.
+
+            // b. Let nextElement be ? Get(array, ! ToString(𝔽(k))).
+            const next_element = try array.get(PropertyKey.from(k));
+
+            // c. If nextElement is neither undefined nor null, then
+            if (next_element != .undefined and next_element != .null) {
+                // i. Let S be ? ToString(? Invoke(nextElement, "toLocaleString")).
+                const string = try (try next_element.invoke(
+                    agent,
+                    PropertyKey.from("toLocaleString"),
+                    .{},
+                )).toString(agent);
+
+                // ii. Set R to the string-concatenation of R and S.
+                try elements.append(string.utf8);
+            } else {
+                try elements.append("");
+            }
+
+            // d. Set k to k + 1.
+        }
+
+        // 7. Return R.
+        return Value.from(
+            try std.mem.join(agent.gc_allocator, separator, elements.items),
+        );
     }
 
     /// 23.1.3.36 Array.prototype.toString ( )
