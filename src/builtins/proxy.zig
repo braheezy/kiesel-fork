@@ -3,9 +3,12 @@
 
 const std = @import("std");
 
+const SafePointer = @import("any-pointer").SafePointer;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
+const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
@@ -17,7 +20,10 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const isCompatiblePropertyDescriptor = builtins.isCompatiblePropertyDescriptor;
+const noexcept = utils.noexcept;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const sameValue = types.sameValue;
 
 /// 10.5.1 [[GetPrototypeOf]] ( )
@@ -1063,6 +1069,8 @@ pub const ProxyConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "revocable", revocable, 2, realm);
+
         return object;
     }
 
@@ -1079,6 +1087,79 @@ pub const ProxyConstructor = struct {
 
         // 2. Return ? ProxyCreate(target, handler).
         return Value.from(try proxyCreate(agent, target, handler));
+    }
+
+    /// 28.2.2.1 Proxy.revocable ( target, handler )
+    /// https://tc39.es/ecma262/#sec-proxy.revocable
+    fn revocable(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const realm = agent.currentRealm();
+        const target = arguments.get(0);
+        const handler = arguments.get(1);
+
+        const AdditionalFields = struct {
+            revocable_proxy: ?Object,
+        };
+
+        // 1. Let proxy be ? ProxyCreate(target, handler).
+        const proxy = try proxyCreate(agent, target, handler);
+
+        // 2. Let revokerClosure be a new Abstract Closure with no parameters that captures nothing
+        //    and performs the following steps when called:
+        const revoker_closure = struct {
+            fn func(agent_: *Agent, _: Value, _: ArgumentsList) !Value {
+                // a. Let F be the active function object.
+                const function = agent_.activeFunctionObject();
+
+                // b. Let p be F.[[RevocableProxy]].
+                const additional_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
+                const revocable_proxy = additional_fields.revocable_proxy;
+
+                // c. If p is null, return undefined.
+                if (revocable_proxy == null) return .undefined;
+
+                // d. Set F.[[RevocableProxy]] to null.
+                additional_fields.revocable_proxy = null;
+
+                // e. Assert: p is a Proxy exotic object.
+                // f. Set p.[[ProxyTarget]] to null.
+                revocable_proxy.?.as(Proxy).fields.proxy_target = null;
+
+                // g. Set p.[[ProxyHandler]] to null.
+                revocable_proxy.?.as(Proxy).fields.proxy_handler = null;
+
+                // h. Return undefined.
+                return .undefined;
+            }
+        }.func;
+
+        // 3. Let revoker be CreateBuiltinFunction(revokerClosure, 0, "", « [[RevocableProxy]] »).
+        const additional_fields = try agent.gc_allocator.create(AdditionalFields);
+        const revoker = try createBuiltinFunction(agent, .{ .regular = revoker_closure }, .{
+            .length = 0,
+            .name = "",
+            .additional_fields = SafePointer.make(*AdditionalFields, additional_fields),
+        });
+
+        // 4. Set revoker.[[RevocableProxy]] to proxy.
+        additional_fields.* = .{ .revocable_proxy = proxy };
+
+        // 5. Let result be OrdinaryObjectCreate(%Object.prototype%).
+        const result = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+
+        // 6. Perform ! CreateDataPropertyOrThrow(result, "proxy", proxy).
+        result.createDataPropertyOrThrow(
+            PropertyKey.from("proxy"),
+            Value.from(proxy),
+        ) catch |err| try noexcept(err);
+
+        // 7. Perform ! CreateDataPropertyOrThrow(result, "revoke", revoker).
+        result.createDataPropertyOrThrow(
+            PropertyKey.from("revoke"),
+            Value.from(revoker),
+        ) catch |err| try noexcept(err);
+
+        // 8. Return result.
+        return Value.from(result);
     }
 };
 
