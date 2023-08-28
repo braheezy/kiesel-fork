@@ -967,6 +967,18 @@ pub const Value = union(enum) {
         return list.toOwnedSlice();
     }
 
+    /// 7.3.21 Invoke ( V, P [ , argumentsList ] )
+    /// https://tc39.es/ecma262/#sec-invoke
+    pub fn invoke(self: Self, agent: *Agent, property_key: PropertyKey, arguments: anytype) !Value {
+        // 1. If argumentsList is not present, set argumentsList to a new empty List.
+
+        // 2. Let func be ? GetV(V, P).
+        const function = try self.get(agent, property_key);
+
+        // 3. Return ? Call(func, V, argumentsList).
+        return function.call(agent, self, arguments);
+    }
+
     /// 7.3.22 OrdinaryHasInstance ( C, O )
     /// https://tc39.es/ecma262/#sec-ordinaryhasinstance
     pub fn ordinaryHasInstance(self: Self, object_value: Value) !bool {
