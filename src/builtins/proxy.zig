@@ -1010,7 +1010,7 @@ fn proxyCreate(agent: *Agent, target: Value, handler: Value) !Object {
     if (handler != .object) {
         return agent.throwException(
             .type_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{target}),
+            try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{handler}),
         );
     }
 
