@@ -239,6 +239,7 @@ pub const NumberPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
 
@@ -270,6 +271,13 @@ pub const NumberPrototype = struct {
             .type_error,
             "This value must be a number or Number object",
         );
+    }
+
+    /// 21.1.3.4 Number.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
+    /// https://tc39.es/ecma262/#sec-number.prototype.tolocalestring
+    fn toLocaleString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        const x = try thisNumberValue(agent, this_value);
+        return Value.from(try x.toString(agent.gc_allocator, 10));
     }
 
     /// 21.1.3.6 Number.prototype.toString ( [ radix ] )
