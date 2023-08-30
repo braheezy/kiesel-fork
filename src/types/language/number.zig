@@ -599,7 +599,10 @@ pub const Number = union(enum) {
 
         // TODO: Implement steps 5-12 according to spec!
         return String.from(try switch (self) {
-            .f64 => |x| std.fmt.allocPrint(allocator, "{}", .{x}),
+            .f64 => |x| if (x <= @as(f64, 1e-5) or x >= @as(f64, 1e21))
+                std.fmt.allocPrint(allocator, "{0e}", .{x})
+            else
+                std.fmt.allocPrint(allocator, "{0d}", .{x}),
             .i32 => |x| std.fmt.allocPrint(allocator, "{}", .{x}),
         });
     }
