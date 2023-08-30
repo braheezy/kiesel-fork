@@ -17,6 +17,7 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
+const createArrayFromListMapToValue = types.createArrayFromListMapToValue;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
@@ -46,6 +47,8 @@ pub const ObjectConstructor = struct {
         try defineBuiltinFunction(object, "freeze", freeze, 1, realm);
         try defineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 2, realm);
         try defineBuiltinFunction(object, "getOwnPropertyDescriptors", getOwnPropertyDescriptors, 1, realm);
+        try defineBuiltinFunction(object, "getOwnPropertyNames", getOwnPropertyNames, 1, realm);
+        try defineBuiltinFunction(object, "getOwnPropertySymbols", getOwnPropertySymbols, 1, realm);
         try defineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm);
         try defineBuiltinFunction(object, "hasOwn", hasOwn, 2, realm);
         try defineBuiltinFunction(object, "is", is, 2, realm);
@@ -366,6 +369,72 @@ pub const ObjectConstructor = struct {
 
         // 5. Return descriptors.
         return Value.from(descriptors);
+    }
+
+    /// 20.1.2.10 Object.getOwnPropertyNames ( O )
+    /// https://tc39.es/ecma262/#sec-object.getownpropertynames
+    fn getOwnPropertyNames(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
+
+        // 1. Return CreateArrayFromList(? GetOwnPropertyKeys(O, string)).
+        const property_keys = try getOwnPropertyKeys(agent, object, .string);
+        defer property_keys.deinit();
+        return Value.from(
+            try createArrayFromListMapToValue(agent, PropertyKey, property_keys.items, struct {
+                fn mapFn(agent_: *Agent, property_key: PropertyKey) !Value {
+                    return property_key.toValue(agent_);
+                }
+            }.mapFn),
+        );
+    }
+
+    /// 20.1.2.11 Object.getOwnPropertySymbols ( O )
+    /// https://tc39.es/ecma262/#sec-object.getownpropertysymbols
+    fn getOwnPropertySymbols(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const object = arguments.get(0);
+
+        // 1. Return CreateArrayFromList(? GetOwnPropertyKeys(O, symbol)).
+        const property_keys = try getOwnPropertyKeys(agent, object, .symbol);
+        defer property_keys.deinit();
+        return Value.from(
+            try createArrayFromListMapToValue(agent, PropertyKey, property_keys.items, struct {
+                fn mapFn(agent_: *Agent, property_key: PropertyKey) !Value {
+                    return property_key.toValue(agent_);
+                }
+            }.mapFn),
+        );
+    }
+
+    /// 20.1.2.11.1 GetOwnPropertyKeys ( O, type )
+    /// https://tc39.es/ecma262/#sec-getownpropertykeys
+    fn getOwnPropertyKeys(
+        agent: *Agent,
+        object: Value,
+        comptime @"type": enum { string, symbol },
+    ) !std.ArrayList(PropertyKey) {
+        // 1. Let obj be ? ToObject(O).
+        const obj = try object.toObject(agent);
+
+        // 2. Let keys be ? obj.[[OwnPropertyKeys]]().
+        const keys_ = try obj.internalMethods().ownPropertyKeys(obj);
+
+        // 3. Let nameList be a new empty List.
+        var name_list = std.ArrayList(PropertyKey).init(agent.gc_allocator);
+
+        // 4. For each element nextKey of keys, do
+        for (keys_.items) |next_key| {
+            // a. If nextKey is a Symbol and type is symbol, or if nextKey is a String and type is
+            //    string, then
+            if ((next_key == .symbol and @"type" == .symbol) or
+                ((next_key == .string or next_key == .integer_index) and @"type" == .string))
+            {
+                // i. Append nextKey to nameList.
+                try name_list.append(next_key);
+            }
+        }
+
+        // 5. Return nameList.
+        return name_list;
     }
 
     /// 20.1.2.12 Object.getPrototypeOf ( O )
