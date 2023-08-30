@@ -12,9 +12,10 @@ const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
-const createArrayFromList = types.createArrayFromList;
+const createArrayFromListMapToValue = types.createArrayFromListMapToValue;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 
@@ -279,20 +280,17 @@ pub const Reflect = struct {
         }
 
         // 2. Let keys be ? target.[[OwnPropertyKeys]]().
-        const property_keys = try target.object.internalMethods().ownPropertyKeys(target.object);
-        defer property_keys.deinit();
-        // TODO: Add createArrayFromList() overload for type conversions
-        var keys = try std.ArrayList(Value).initCapacity(
-            agent.gc_allocator,
-            property_keys.items.len,
-        );
+        const keys = try target.object.internalMethods().ownPropertyKeys(target.object);
         defer keys.deinit();
-        for (property_keys.items) |property_key| {
-            keys.appendAssumeCapacity(try property_key.toValue(agent));
-        }
 
         // 3. Return CreateArrayFromList(keys).
-        return Value.from(try createArrayFromList(agent, keys.items));
+        return Value.from(
+            try createArrayFromListMapToValue(agent, PropertyKey, keys.items, struct {
+                fn mapFn(agent_: *Agent, property_key: PropertyKey) !Value {
+                    return property_key.toValue(agent_);
+                }
+            }.mapFn),
+        );
     }
 
     /// 28.1.11 Reflect.preventExtensions ( target )

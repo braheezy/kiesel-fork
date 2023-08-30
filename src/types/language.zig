@@ -7,6 +7,7 @@ pub const String = @import("language/string.zig").String;
 pub const Symbol = @import("language/Symbol.zig");
 pub const Value = value.Value;
 pub const createArrayFromList = value.createArrayFromList;
+pub const createArrayFromListMapToValue = value.createArrayFromListMapToValue;
 pub const isLessThan = value.isLessThan;
 pub const isLooselyEqual = value.isLooselyEqual;
 pub const isStrictlyEqual = value.isStrictlyEqual;

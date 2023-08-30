@@ -13,6 +13,7 @@ pub const String = language.String;
 pub const Symbol = language.Symbol;
 pub const Value = language.Value;
 pub const createArrayFromList = language.createArrayFromList;
+pub const createArrayFromListMapToValue = language.createArrayFromListMapToValue;
 pub const isLessThan = language.isLessThan;
 pub const isLooselyEqual = language.isLooselyEqual;
 pub const isStrictlyEqual = language.isStrictlyEqual;

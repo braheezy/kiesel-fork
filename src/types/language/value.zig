@@ -1378,6 +1378,36 @@ pub fn createArrayFromList(agent: *Agent, elements: []const Value) !Object {
     return array;
 }
 
+pub fn createArrayFromListMapToValue(
+    agent: *Agent,
+    comptime T: type,
+    elements: []const T,
+    mapFn: fn (*Agent, T) Agent.Error!Value,
+) !Object {
+    // 1. Let array be ! ArrayCreate(0).
+    const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
+
+    // 2. Let n be 0.
+    // 3. For each element e of elements, do
+    for (elements, 0..) |element, n| {
+        const property_key = if (n <= std.math.maxInt(u53))
+            PropertyKey.from(@as(u53, @intCast(n)))
+        else
+            PropertyKey.from(try std.fmt.allocPrint(agent.gc_allocator, "{}", .{n}));
+
+        // a. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(n)), e).
+        array.createDataPropertyOrThrow(
+            property_key,
+            try mapFn(agent, element),
+        ) catch |err| try noexcept(err);
+
+        // b. Set n to n + 1.
+    }
+
+    // 4. Return array.
+    return array;
+}
+
 test "format" {
     var agent = try Agent.init(.{});
     defer agent.deinit();
