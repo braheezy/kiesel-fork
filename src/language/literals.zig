@@ -112,10 +112,20 @@ pub fn parseNumericLiteral(
             else => return error.InvalidNumericLiteral,
         },
         '.' => switch (state) {
-            .start, .integer_digit => {
-                if (system != .decimal or production != .regular)
-                    return error.InvalidNumericLiteral;
-                state = .fraction_period;
+            .start => state = .fraction_period,
+            .integer_digit, .fraction_digit, .exponent_digit => {
+                if (state == .integer_digit and system == .decimal and production == .regular) {
+                    state = .fraction_period;
+                } else switch (consume) {
+                    // Start of a member expression, terminate the literal
+                    .partial => return .{
+                        .text = str[0..i],
+                        .system = system,
+                        .production = production,
+                        .type = @"type",
+                    },
+                    .complete => return error.InvalidNumericLiteral,
+                }
             },
             else => return error.InvalidNumericLiteral,
         },
