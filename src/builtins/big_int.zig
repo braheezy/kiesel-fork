@@ -96,6 +96,7 @@ pub const BigIntPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
 
@@ -133,6 +134,13 @@ pub const BigIntPrototype = struct {
             .type_error,
             "This value must be a BigInt or BigInt object",
         );
+    }
+
+    /// 21.2.3.2 BigInt.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
+    /// https://tc39.es/ecma262/#sec-bigint.prototype.tolocalestring
+    fn toLocaleString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        const x = try thisBigIntValue(agent, this_value);
+        return Value.from(try x.toString(agent.gc_allocator, 10));
     }
 
     /// 21.2.3.3 BigInt.prototype.toString ( [ radix ] )
