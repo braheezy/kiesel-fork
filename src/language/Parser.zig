@@ -837,7 +837,7 @@ fn acceptStatement(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!*
         statement.* = .{ .throw_statement = throw_statement }
     else |_| if (self.acceptTryStatement()) |try_statement|
         statement.* = .{ .try_statement = try_statement }
-    else |_| if (self.core.accept(RuleSet.is(.debugger))) |_|
+    else |_| if (self.acceptDebuggerStatement()) |_|
         statement.* = .debugger_statement
     else |_|
         return error.UnexpectedToken;
@@ -919,13 +919,6 @@ fn acceptStatementListItem(self: *Self) !ast.StatementListItem {
         else |_|
             return error.UnexpectedToken;
     };
-    switch (statement_list_item) {
-        // ASI only applies if the parsed item was not an empty statement
-        .statement => |statement| if (statement.* != .empty_statement) {
-            try self.acceptOrInsertSemicolon();
-        },
-        else => {},
-    }
     return statement_list_item;
 }
 
@@ -934,7 +927,9 @@ fn acceptVariableStatement(self: *Self) !ast.VariableStatement {
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.@"var"));
-    return .{ .variable_declaration_list = try self.acceptVariableDeclarationList() };
+    const variable_declaration_list = try self.acceptVariableDeclarationList();
+    try self.acceptOrInsertSemicolon();
+    return .{ .variable_declaration_list = variable_declaration_list };
 }
 
 fn acceptVariableDeclarationList(self: *Self) !ast.VariableDeclarationList {
@@ -967,7 +962,9 @@ fn acceptExpressionStatement(self: *Self) !ast.ExpressionStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    return .{ .expression = try self.acceptExpression(.{}) };
+    const expression = try self.acceptExpression(.{});
+    try self.acceptOrInsertSemicolon();
+    return .{ .expression = expression };
 }
 
 fn acceptIfStatement(self: *Self) !ast.IfStatement {
@@ -1051,12 +1048,14 @@ fn acceptReturnStatement(self: *Self) !ast.ReturnStatement {
 
     if (self.noLineTerminatorHere()) |_| {
         if (self.acceptExpression(.{})) |expression| {
+            try self.acceptOrInsertSemicolon();
             return .{ .expression = expression };
         } else |_| {}
     } else |_| {
         // Drop emitted 'unexpected newline' error
         _ = self.diagnostics.errors.pop();
     }
+    try self.acceptOrInsertSemicolon();
     return .{ .expression = null };
 }
 
@@ -1067,6 +1066,7 @@ fn acceptThrowStatement(self: *Self) !ast.ThrowStatement {
     _ = try self.core.accept(RuleSet.is(.throw));
     try self.noLineTerminatorHere();
     const expression = try self.acceptExpression(.{});
+    try self.acceptOrInsertSemicolon();
     return .{ .expression = expression };
 }
 
@@ -1103,6 +1103,14 @@ fn acceptTryStatement(self: *Self) !ast.TryStatement {
         .catch_block = catch_block,
         .finally_block = finally_block,
     };
+}
+
+fn acceptDebuggerStatement(self: *Self) !void {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.debugger));
+    try self.acceptOrInsertSemicolon();
 }
 
 fn acceptFormalParameters(self: *Self) !ast.FormalParameters {
