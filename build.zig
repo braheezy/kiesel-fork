@@ -57,10 +57,6 @@ pub fn build(b: *std.Build) void {
                 .name = "any-pointer",
             },
             std.Build.ModuleDependency{
-                .module = gc_module,
-                .name = "gc",
-            },
-            std.Build.ModuleDependency{
                 .module = parser_toolkit.module("parser-toolkit"),
                 .name = "ptk",
             },
@@ -78,6 +74,7 @@ pub fn build(b: *std.Build) void {
     exe.addModule("kiesel", kiesel_module);
     exe.addModule("any-pointer", any_pointer.module("any-pointer"));
     exe.addModule("args", zig_args.module("args"));
+    exe.addModule("gc", gc_module);
     exe.addModule("linenoise", linenoise.module("linenoise"));
 
     b.installArtifact(exe);

@@ -1409,7 +1409,8 @@ pub fn createArrayFromListMapToValue(
 }
 
 test "format" {
-    var agent = try Agent.init(.{});
+    const gc = @import("gc");
+    var agent = try Agent.init(gc.allocator(), .{});
     defer agent.deinit();
     const object = try builtins.Object.create(&agent, .{
         .prototype = null,

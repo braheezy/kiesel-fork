@@ -1,7 +1,6 @@
 //! 9.7 Agents
 //! https://tc39.es/ecma262/#sec-agents
 
-const gc = @import("gc");
 const std = @import("std");
 
 const Allocator = std.mem.Allocator;
@@ -41,7 +40,6 @@ execution_context_stack: std.ArrayList(ExecutionContext),
 
 pub const Options = struct {
     debug: struct {
-        disable_gc: bool = false,
         print_ast: bool = false,
         print_bytecode: bool = false,
     } = .{},
@@ -75,9 +73,9 @@ pub const HostHooks = struct {
     hostHasSourceTextAvailable: *const fn (func: Object) bool,
 };
 
-pub fn init(options: Options) !Self {
+pub fn init(gc_allocator: Allocator, options: Options) !Self {
     var self = Self{
-        .gc_allocator = gc.allocator(),
+        .gc_allocator = gc_allocator,
         .options = options,
         .pre_allocated = undefined,
         .well_known_symbols = undefined,
@@ -85,7 +83,6 @@ pub fn init(options: Options) !Self {
         .host_hooks = undefined,
         .execution_context_stack = undefined,
     };
-    if (options.debug.disable_gc) gc.disable();
     self.pre_allocated = .{
         .one = try BigInt.Value.initSet(self.gc_allocator, 1),
         .pow_2_63 = try BigInt.Value.initSet(self.gc_allocator, std.math.pow(u64, 2, 63)),
@@ -294,7 +291,8 @@ pub fn getGlobalObject(self: Self) Object {
 }
 
 test "well_known_symbols" {
-    var agent = try init(.{});
+    const gc = @import("gc");
+    var agent = try init(gc.allocator(), .{});
     defer agent.deinit();
     const unscopables = agent.well_known_symbols.@"@@unscopables";
     try std.testing.expectEqual(unscopables.id, 12);

@@ -550,7 +550,8 @@ pub fn getFunctionRealm(self: Self) !*Realm {
 }
 
 test "format" {
-    var agent_ = try Agent.init(.{});
+    const gc = @import("gc");
+    var agent_ = try Agent.init(gc.allocator(), .{});
     defer agent_.deinit();
     const object = try builtins.Object.create(&agent_, .{
         .prototype = null,

@@ -1,12 +1,14 @@
-const args = @import("args");
 const builtin = @import("builtin");
 const std = @import("std");
+
+const args = @import("args");
+const gc = @import("gc");
 const kiesel = @import("kiesel");
 
 const Linenoise = @import("linenoise").Linenoise;
 const SafePointer = @import("any-pointer").SafePointer;
 
-const gc = @cImport({
+const gc_h = @cImport({
     @cInclude("gc.h");
 });
 
@@ -25,9 +27,9 @@ const formatParseError = kiesel.utils.formatParseError;
 const ordinaryObjectCreate = kiesel.builtins.ordinaryObjectCreate;
 
 const bdwgc_version_string = std.fmt.comptimePrint("{}.{}.{}", .{
-    gc.GC_VERSION_MAJOR,
-    gc.GC_VERSION_MINOR,
-    gc.GC_VERSION_MICRO,
+    gc_h.GC_VERSION_MAJOR,
+    gc_h.GC_VERSION_MINOR,
+    gc_h.GC_VERSION_MICRO,
 });
 
 const version = std.fmt.comptimePrint(
@@ -57,7 +59,7 @@ pub const Kiesel = struct {
     }
 
     fn collect(_: *Agent, _: Value, _: ArgumentsList) !Value {
-        kiesel.gc.collect();
+        gc.collect();
         return .undefined;
     }
 
@@ -282,9 +284,9 @@ pub fn main() !u8 {
         return 0;
     }
 
-    var agent = try Agent.init(.{
+    if (parsed_args.options.@"disable-gc") gc.disable();
+    var agent = try Agent.init(gc.allocator(), .{
         .debug = .{
-            .disable_gc = parsed_args.options.@"disable-gc",
             .print_ast = parsed_args.options.@"print-ast",
             .print_bytecode = parsed_args.options.@"print-bytecode",
         },

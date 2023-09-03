@@ -1,6 +1,5 @@
 pub const builtins = @import("builtins.zig");
 pub const execution = @import("execution.zig");
-pub const gc = @import("gc");
 pub const language = @import("language.zig");
 pub const types = @import("types.zig");
 pub const utils = @import("utils.zig");
