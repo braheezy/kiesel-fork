@@ -16,6 +16,9 @@ pub fn build(b: *std.Build) void {
             // https://github.com/ivmai/bdwgc/blob/3f419b623643adedb11d260afc92cdd347dba5d6/CMakeLists.txt#L137
             "-DALL_INTERIOR_POINTERS",
             "-DNO_EXECUTE_PERMISSION",
+            // FIXME: libgc fails to recognize interior pointers somewhere when building in release mode,
+            //        enabling this circumvents this bug until it is investigated and fixed properly.
+            "-DGC_ASSERTIONS",
         };
         const cflags_wasi = [_][]const u8{
             "-D__wasi__",
