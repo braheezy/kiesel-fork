@@ -25,6 +25,7 @@ const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const noexcept = utils.noexcept;
 const ordinaryDefineOwnProperty = ordinary.ordinaryDefineOwnProperty;
 const ordinaryGetOwnProperty = ordinary.ordinaryGetOwnProperty;
+const ordinaryObjectCreate = ordinary.ordinaryObjectCreate;
 
 // Non-standard helper to get the length property of an array
 pub fn getArrayLength(array: Object) u32 {
@@ -555,6 +556,48 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "push", push, 1, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
+
+        // 23.1.3.41 Array.prototype [ @@unscopables ]
+        // https://tc39.es/ecma262/#sec-array.prototype-@@unscopables
+        try defineBuiltinProperty(object, "@@unscopables", PropertyDescriptor{
+            .value = blk: {
+                // 1. Let unscopableList be OrdinaryObjectCreate(null).
+                const unscopable_list = try ordinaryObjectCreate(realm.agent, null);
+
+                // 2. Perform ! CreateDataPropertyOrThrow(unscopableList, "at", true).
+                // 3. Perform ! CreateDataPropertyOrThrow(unscopableList, "copyWithin", true).
+                // 4. Perform ! CreateDataPropertyOrThrow(unscopableList, "entries", true).
+                // 5. Perform ! CreateDataPropertyOrThrow(unscopableList, "fill", true).
+                // 6. Perform ! CreateDataPropertyOrThrow(unscopableList, "find", true).
+                // 7. Perform ! CreateDataPropertyOrThrow(unscopableList, "findIndex", true).
+                // 8. Perform ! CreateDataPropertyOrThrow(unscopableList, "findLast", true).
+                // 9. Perform ! CreateDataPropertyOrThrow(unscopableList, "findLastIndex", true).
+                // 10. Perform ! CreateDataPropertyOrThrow(unscopableList, "flat", true).
+                // 11. Perform ! CreateDataPropertyOrThrow(unscopableList, "flatMap", true).
+                // 12. Perform ! CreateDataPropertyOrThrow(unscopableList, "includes", true).
+                // 13. Perform ! CreateDataPropertyOrThrow(unscopableList, "keys", true).
+                // 14. Perform ! CreateDataPropertyOrThrow(unscopableList, "toReversed", true).
+                // 15. Perform ! CreateDataPropertyOrThrow(unscopableList, "toSorted", true).
+                // 16. Perform ! CreateDataPropertyOrThrow(unscopableList, "toSpliced", true).
+                // 17. Perform ! CreateDataPropertyOrThrow(unscopableList, "values", true).
+                inline for (.{
+                    "at",         "copyWithin",    "entries",   "fill",    "find",     "findIndex",
+                    "findLast",   "findLastIndex", "flat",      "flatMap", "includes", "keys",
+                    "toReversed", "toSorted",      "toSpliced", "values",
+                }) |name| {
+                    unscopable_list.createDataPropertyOrThrow(
+                        PropertyKey.from(name),
+                        Value.from(true),
+                    ) catch |err| try noexcept(err);
+                }
+
+                // 18. Return unscopableList.
+                break :blk Value.from(unscopable_list);
+            },
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
 
         return object;
     }
