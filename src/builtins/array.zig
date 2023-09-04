@@ -551,6 +551,7 @@ pub const ArrayPrototype = struct {
             .configurable = false,
         });
 
+        try defineBuiltinFunction(object, "find", find, 1, realm);
         try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
         try defineBuiltinFunction(object, "includes", includes, 1, realm);
         try defineBuiltinFunction(object, "indexOf", indexOf, 1, realm);
@@ -604,6 +605,25 @@ pub const ArrayPrototype = struct {
         });
 
         return object;
+    }
+
+    /// 23.1.3.9 Array.prototype.find ( predicate [ , thisArg ] )
+    /// https://tc39.es/ecma262/#sec-array.prototype.find
+    fn find(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const predicate = arguments.get(0);
+        const this_arg = arguments.get(1);
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+
+        // 3. Let findRec be ? FindViaPredicate(O, len, ascending, predicate, thisArg).
+        const find_record = try findViaPredicate(object, len, .ascending, predicate, this_arg);
+
+        // 4. Return findRec.[[Value]].
+        return find_record.value;
     }
 
     /// 23.1.3.15 Array.prototype.forEach ( callbackfn [ , thisArg ] )
@@ -1016,6 +1036,55 @@ pub const ArrayPrototype = struct {
         return func.callAssumeCallableNoArgs(Value.from(array));
     }
 };
+
+/// 23.1.3.12.1 FindViaPredicate ( O, len, direction, predicate, thisArg )
+/// https://tc39.es/ecma262/#sec-findviapredicate
+pub fn findViaPredicate(
+    object: Object,
+    len: u53,
+    comptime direction: enum { ascending, descending },
+    predicate: Value,
+    this_arg: Value,
+) !struct { index: Value, value: Value } {
+    const agent = object.agent();
+
+    // 1. If IsCallable(predicate) is false, throw a TypeError exception.
+    if (!predicate.isCallable()) {
+        return agent.throwException(
+            .type_error,
+            try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{predicate}),
+        );
+    }
+
+    // 2. If direction is ascending, then
+    //     a. Let indices be a List of the integers in the interval from 0 (inclusive) to len
+    //        (exclusive), in ascending order.
+    // 3. Else,
+    //     a. Let indices be a List of the integers in the interval from 0 (inclusive) to len
+    //        (exclusive), in descending order.
+    // 4. For each integer k of indices, do
+    var k: u53 = if (direction == .ascending) 0 else len;
+    while (if (direction == .ascending) k < len else k > 0) : (k = if (direction == .ascending) k + 1 else k - 1) {
+        // a. Let Pk be ! ToString(𝔽(k)).
+        const property_key = PropertyKey.from(k);
+
+        // b. NOTE: If O is a TypedArray, the following invocation of Get will return a normal completion.
+        // c. Let kValue be ? Get(O, Pk).
+        const k_value = try object.get(property_key);
+
+        // d. Let testResult be ? Call(predicate, thisArg, « kValue, 𝔽(k), O »).
+        const test_result = try predicate.callAssumeCallable(
+            this_arg,
+            .{ k_value, Value.from(k), Value.from(object) },
+        );
+
+        // e. If ToBoolean(testResult) is true, return the Record { [[Index]]: 𝔽(k), [[Value]]: kValue }.
+        if (test_result.toBoolean()) return .{ .index = Value.from(k), .value = k_value };
+    }
+
+    // 5. Return the Record { [[Index]]: -1𝔽, [[Value]]: undefined }.
+    return .{ .index = Value.from(-1), .value = .undefined };
+}
 
 /// 23.1.4 Properties of Array Instances
 /// https://tc39.es/ecma262/#sec-properties-of-array-instances
