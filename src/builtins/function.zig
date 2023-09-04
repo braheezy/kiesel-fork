@@ -157,7 +157,7 @@ pub fn createDynamicFunction(
         .@"async" => @compileError("Not implemented"),
 
         // 7. Else,
-        // TODO: a. Assert: kind is asyncGenerator.
+        // TODO: a. Assert: kind is async-generator.
         .async_generator => @compileError("Not implemented"),
     }
 
@@ -294,7 +294,7 @@ pub fn createDynamicFunction(
         // TODO: 28. If kind is generator, then
         .generator => @compileError("Not implemented"),
 
-        // TODO: 29. Else if kind is asyncGenerator, then
+        // TODO: 29. Else if kind is async-generator, then
         .async_generator => @compileError("Not implemented"),
 
         // 30. Else if kind is normal, then
