@@ -804,8 +804,8 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             self.result = Value.from(!(result orelse true));
         },
         .load => {
-            const value = self.result.?;
-            try self.stack.append(value);
+            // Handle null value to allow load of 'empty' result at beginning of script
+            if (self.result) |value| try self.stack.append(value);
         },
         .load_constant => {
             const value = self.fetchConstant(executable);
@@ -860,7 +860,10 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             return error.ExceptionThrown;
         },
         .@"return" => {}, // Handled in run()
-        .store => self.result = self.stack.pop(),
+        .store => {
+            // Handle empty stack to allow restoring a null `.load`
+            self.result = self.stack.popOrNull();
+        },
         .store_constant => {
             const value = self.fetchConstant(executable);
             self.result = value;

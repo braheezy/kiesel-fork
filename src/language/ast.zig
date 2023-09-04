@@ -2034,6 +2034,7 @@ pub const VariableDeclaration = struct {
         // VariableDeclaration : BindingIdentifier Initializer
         // 1. Let bindingId be StringValue of BindingIdentifier.
         // 2. Let lhs be ? ResolveBinding(bindingId).
+        try executable.addInstruction(.load);
         try executable.addInstructionWithIdentifier(.resolve_binding, self.binding_identifier);
         const strict = ctx.contained_in_strict_mode_code;
         try executable.addIndex(@intFromBool(strict));
@@ -2055,6 +2056,7 @@ pub const VariableDeclaration = struct {
         try executable.addInstruction(.pop_reference);
 
         // 6. Return empty.
+        try executable.addInstruction(.store);
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
