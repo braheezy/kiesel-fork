@@ -553,6 +553,7 @@ pub const ArrayPrototype = struct {
 
         try defineBuiltinFunction(object, "find", find, 1, realm);
         try defineBuiltinFunction(object, "findIndex", findIndex, 1, realm);
+        try defineBuiltinFunction(object, "findLast", findLast, 1, realm);
         try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
         try defineBuiltinFunction(object, "includes", includes, 1, realm);
         try defineBuiltinFunction(object, "indexOf", indexOf, 1, realm);
@@ -644,6 +645,25 @@ pub const ArrayPrototype = struct {
 
         // 4. Return findRec.[[Index]].
         return find_record.index;
+    }
+
+    /// 23.1.3.11 Array.prototype.findLast ( predicate [ , thisArg ] )
+    /// https://tc39.es/ecma262/#sec-array.prototype.findlast
+    fn findLast(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const predicate = arguments.get(0);
+        const this_arg = arguments.get(1);
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+
+        // 3. Let findRec be ? FindViaPredicate(O, len, descending, predicate, thisArg).
+        const find_record = try findViaPredicate(object, len, .descending, predicate, this_arg);
+
+        // 4. Return findRec.[[Value]].
+        return find_record.value;
     }
 
     /// 23.1.3.15 Array.prototype.forEach ( callbackfn [ , thisArg ] )
