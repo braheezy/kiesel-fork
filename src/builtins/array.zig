@@ -26,6 +26,7 @@ const noexcept = utils.noexcept;
 const ordinaryDefineOwnProperty = ordinary.ordinaryDefineOwnProperty;
 const ordinaryGetOwnProperty = ordinary.ordinaryGetOwnProperty;
 const ordinaryObjectCreate = ordinary.ordinaryObjectCreate;
+const sameValueZero = types.sameValueZero;
 
 // Non-standard helper to get the length property of an array
 pub fn getArrayLength(array: Object) u32 {
@@ -550,6 +551,7 @@ pub const ArrayPrototype = struct {
         });
 
         try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
+        try defineBuiltinFunction(object, "includes", includes, 1, realm);
         try defineBuiltinFunction(object, "join", join, 1, realm);
         try defineBuiltinFunction(object, "map", map, 1, realm);
         try defineBuiltinFunction(object, "pop", pop, 0, realm);
@@ -650,6 +652,57 @@ pub const ArrayPrototype = struct {
 
         // 6. Return undefined.
         return .undefined;
+    }
+
+    /// 23.1.3.16 Array.prototype.includes ( searchElement [ , fromIndex ] )
+    /// https://tc39.es/ecma262/#sec-array.prototype.includes
+    fn includes(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const search_element = arguments.get(0);
+        const from_index = arguments.get(1);
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+
+        // 3. If len = 0, return false.
+        if (len == 0) return Value.from(false);
+
+        // 4. Let n be ? ToIntegerOrInfinity(fromIndex).
+        var n = try from_index.toIntegerOrInfinity(agent);
+
+        // 5. Assert: If fromIndex is undefined, then n is 0.
+        if (from_index == .undefined) std.debug.assert(n == 0);
+
+        // 6. If n = +∞, return false.
+        if (n == std.math.inf(f64)) return Value.from(false);
+
+        // 7. Else if n = -∞, set n to 0.
+        if (n == -std.math.inf(f64)) n = 0;
+
+        // 8. If n ≥ 0, then
+        //     a. Let k be n.
+        // 9. Else,
+        //     a. Let k be len + n.
+        //     b. If k < 0, set k to 0.
+        const k_f64 = if (n >= 0) n else @max(@as(f64, @floatFromInt(len)) + n, 0);
+        if (k_f64 >= std.math.maxInt(u53)) return Value.from(false);
+        var k: u53 = @intFromFloat(k_f64);
+
+        // 10. Repeat, while k < len,
+        while (k < len) : (k += 1) {
+            // a. Let elementK be ? Get(O, ! ToString(𝔽(k))).
+            const element_k = try object.get(PropertyKey.from(k));
+
+            // b. If SameValueZero(searchElement, elementK) is true, return true.
+            if (sameValueZero(search_element, element_k)) return Value.from(true);
+
+            // c. Set k to k + 1.
+        }
+
+        // 11. Return false.
+        return Value.from(false);
     }
 
     /// 23.1.3.18 Array.prototype.join ( separator )
