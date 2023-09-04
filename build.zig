@@ -71,6 +71,7 @@ pub fn build(b: *std.Build) void {
         .root_source_file = .{ .path = "src/cli.zig" },
         .target = target,
         .optimize = optimize,
+        .single_threaded = true,
     });
     exe.linkLibrary(libgc);
     exe.addIncludePath(.{ .path = "vendor/zig-libgc/vendor/bdwgc/include" });
