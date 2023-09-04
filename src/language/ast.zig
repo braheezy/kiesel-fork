@@ -1688,6 +1688,37 @@ pub const Statement = union(enum) {
         };
     }
 
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(self: Self, allocator: Allocator) error{OutOfMemory}![]const VariableDeclaration {
+        switch (self) {
+            // Statement :
+            //     EmptyStatement
+            //     ExpressionStatement
+            //     ContinueStatement
+            //     BreakStatement
+            //     ReturnStatement
+            //     ThrowStatement
+            //     DebuggerStatement
+            // 1. Return a new empty List.
+            .empty_statement,
+            .expression_statement,
+            .return_statement,
+            .throw_statement,
+            .debugger_statement,
+            => return &.{},
+
+            .block_statement => |block_statement| return block_statement.block.statement_list.varScopedDeclarations(allocator),
+            .variable_statement => |variable_statement| return variable_statement.variable_declaration_list.varScopedDeclarations(allocator),
+            .if_statement => |if_statement| return if_statement.varScopedDeclarations(allocator),
+            .breakable_statement => |breakable_statement| switch (breakable_statement.iteration_statement) {
+                .do_while_statement => |do_while_statement| return do_while_statement.varScopedDeclarations(allocator),
+                .while_statement => |while_statement| return while_statement.varScopedDeclarations(allocator),
+            },
+            .try_statement => |try_statement| return try_statement.varScopedDeclarations(allocator),
+        }
+    }
+
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
         switch (self) {
             .block_statement => |block_statement| {
@@ -1894,18 +1925,21 @@ pub const StatementList = struct {
 
     items: []const StatementListItem,
 
-    // FIXME: This is very incomplete but at least works for top-level var decls :^)
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn varScopedDeclarations(self: Self, allocator: Allocator) ![]const VariableDeclaration {
+        // StatementList : StatementList StatementListItem
+        // 1. Let declarations1 be VarScopedDeclarations of StatementList.
+        // 2. Let declarations2 be VarScopedDeclarations of StatementListItem.
+        // 3. Return the list-concatenation of declarations1 and declarations2.
+        // StatementListItem : Declaration
+        // 1. Return a new empty List.
         var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
-        defer variable_declarations.deinit();
         for (self.items) |item| switch (item) {
-            .statement => |statement| switch (statement.*) {
-                .variable_statement => |variable_statement| for (variable_statement.variable_declaration_list.items) |variable_declaration| {
-                    try variable_declarations.append(variable_declaration);
-                },
-                else => {},
+            .statement => |statement| {
+                try variable_declarations.appendSlice(try statement.varScopedDeclarations(allocator));
             },
-            else => {},
+            .declaration => {},
         };
         return variable_declarations.toOwnedSlice();
     }
@@ -1997,6 +2031,17 @@ pub const VariableDeclarationList = struct {
     const Self = @This();
 
     items: []const VariableDeclaration,
+
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(self: Self, _: Allocator) ![]const VariableDeclaration {
+        // VariableDeclarationList : VariableDeclaration
+        // 1. Return « VariableDeclaration ».
+        // VariableDeclarationList : VariableDeclarationList , VariableDeclaration
+        // 1. Let declarations1 be VarScopedDeclarations of VariableDeclarationList.
+        // 2. Return the list-concatenation of declarations1 and « VariableDeclaration ».
+        return self.items;
+    }
 
     /// 14.3.2.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-variable-statement-runtime-semantics-evaluation
@@ -2118,6 +2163,25 @@ pub const IfStatement = struct {
     consequent_statement: *Statement,
     alternate_statement: ?*Statement,
 
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(self: Self, allocator: Allocator) ![]const VariableDeclaration {
+        // IfStatement : if ( Expression ) Statement else Statement
+        // 1. Let declarations1 be VarScopedDeclarations of the first Statement.
+        // 2. Let declarations2 be VarScopedDeclarations of the second Statement.
+        // 3. Return the list-concatenation of declarations1 and declarations2.
+        if (self.alternate_statement != null) {
+            var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
+            try variable_declarations.appendSlice(try self.consequent_statement.varScopedDeclarations(allocator));
+            try variable_declarations.appendSlice(try self.alternate_statement.?.varScopedDeclarations(allocator));
+            return variable_declarations.toOwnedSlice();
+        }
+
+        // IfStatement : if ( Expression ) Statement
+        // 1. Return the VarScopedDeclarations of Statement.
+        return self.consequent_statement.varScopedDeclarations(allocator);
+    }
+
     /// 14.6.2 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-if-statement-runtime-semantics-evaluation
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
@@ -2207,6 +2271,14 @@ pub const DoWhileStatement = struct {
     test_expression: Expression,
     consequent_statement: *Statement,
 
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(self: Self, allocator: Allocator) ![]const VariableDeclaration {
+        // DoWhileStatement : do Statement while ( Expression ) ;
+        // 1. Return the VarScopedDeclarations of Statement.
+        return self.consequent_statement.varScopedDeclarations(allocator);
+    }
+
     /// 14.7.2.2 Runtime Semantics: DoWhileLoopEvaluation
     /// https://tc39.es/ecma262/#sec-runtime-semantics-dowhileloopevaluation
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
@@ -2260,6 +2332,14 @@ pub const WhileStatement = struct {
 
     test_expression: Expression,
     consequent_statement: *Statement,
+
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(self: Self, allocator: Allocator) ![]const VariableDeclaration {
+        // WhileStatement : while ( Expression ) Statement
+        // 1. Return the VarScopedDeclarations of Statement.
+        return self.consequent_statement.varScopedDeclarations(allocator);
+    }
 
     /// 14.7.3.2 Runtime Semantics: WhileLoopEvaluation
     /// https://tc39.es/ecma262/#sec-runtime-semantics-whileloopevaluation
@@ -2380,6 +2460,35 @@ pub const TryStatement = struct {
     catch_parameter: ?Identifier, // TODO: Binding patterns
     catch_block: ?Block,
     finally_block: ?Block,
+
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(self: Self, allocator: Allocator) ![]const VariableDeclaration {
+        // TryStatement : try Block Catch
+        // 1. Let declarations1 be VarScopedDeclarations of Block.
+        // 2. Let declarations2 be VarScopedDeclarations of Catch.
+        // 3. Return the list-concatenation of declarations1 and declarations2.
+        // TryStatement : try Block Finally
+        // 1. Let declarations1 be VarScopedDeclarations of Block.
+        // 2. Let declarations2 be VarScopedDeclarations of Finally.
+        // 3. Return the list-concatenation of declarations1 and declarations2.
+        // TryStatement : try Block Catch Finally
+        // 1. Let declarations1 be VarScopedDeclarations of Block.
+        // 2. Let declarations2 be VarScopedDeclarations of Catch.
+        // 3. Let declarations3 be VarScopedDeclarations of Finally.
+        // 4. Return the list-concatenation of declarations1, declarations2, and declarations3.
+        // Catch : catch ( CatchParameter ) Block
+        // 1. Return the VarScopedDeclarations of Block.
+        var var_declarations = std.ArrayList(VariableDeclaration).init(allocator);
+        try var_declarations.appendSlice(try self.try_block.statement_list.varScopedDeclarations(allocator));
+        if (self.catch_block) |catch_block| {
+            try var_declarations.appendSlice(try catch_block.statement_list.varScopedDeclarations(allocator));
+        }
+        if (self.finally_block) |finally_block| {
+            try var_declarations.appendSlice(try finally_block.statement_list.varScopedDeclarations(allocator));
+        }
+        return var_declarations.toOwnedSlice();
+    }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("TryStatement", writer, indentation);
