@@ -2490,23 +2490,6 @@ pub const TryStatement = struct {
         return var_declarations.toOwnedSlice();
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
-        try printString("TryStatement", writer, indentation);
-        try printString("try:", writer, indentation + 1);
-        try self.try_block.print(writer, indentation + 2);
-        if (self.catch_block) |catch_block| {
-            try printString("catch:", writer, indentation + 1);
-            if (self.catch_parameter) |catch_parameter| {
-                try printString(catch_parameter, writer, indentation + 2);
-            }
-            try catch_block.print(writer, indentation + 2);
-        }
-        if (self.finally_block) |finally_block| {
-            try printString("finally:", writer, indentation + 1);
-            try finally_block.print(writer, indentation + 2);
-        }
-    }
-
     /// 14.15.3 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-try-statement-runtime-semantics-evaluation
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
@@ -2592,6 +2575,23 @@ pub const TryStatement = struct {
 
             // 5. If F.[[Type]] is normal, set F to C.
             // 6. Return ? UpdateEmpty(F, undefined).
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("TryStatement", writer, indentation);
+        try printString("try:", writer, indentation + 1);
+        try self.try_block.print(writer, indentation + 2);
+        if (self.catch_block) |catch_block| {
+            try printString("catch:", writer, indentation + 1);
+            if (self.catch_parameter) |catch_parameter| {
+                try printString(catch_parameter, writer, indentation + 2);
+            }
+            try catch_block.print(writer, indentation + 2);
+        }
+        if (self.finally_block) |finally_block| {
+            try printString("finally:", writer, indentation + 1);
+            try finally_block.print(writer, indentation + 2);
         }
     }
 };
