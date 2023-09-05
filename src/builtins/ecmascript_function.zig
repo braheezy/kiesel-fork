@@ -25,6 +25,7 @@ const Realm = execution.Realm;
 const ScriptOrModule = execution.ScriptOrModule;
 const String = types.String;
 const Value = types.Value;
+const createUnmappedArgumentsObject = builtins.createUnmappedArgumentsObject;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const newFunctionEnvironment = execution.newFunctionEnvironment;
@@ -259,6 +260,11 @@ pub fn ordinaryCallEvaluateBody(
     const callee_env = callee_context.ecmascript_code.?.lexical_environment;
     const env = try newDeclarativeEnvironment(agent.gc_allocator, callee_env);
     callee_context.ecmascript_code.?.lexical_environment = .{ .declarative_environment = env };
+
+    const arguments_object = try createUnmappedArgumentsObject(agent, arguments_list.values);
+    try env.createMutableBinding(agent, "arguments", false);
+    env.initializeBinding(agent, "arguments", Value.from(arguments_object));
+
     for (function.fields.formal_parameters.items, 0..) |item, i| {
         const identifier = item.formal_parameter.binding_element.identifier;
         const value = arguments_list.get(i);

@@ -30,6 +30,7 @@ pub const PropertyStorage = @import("Object/PropertyStorage.zig");
 const Self = @This();
 
 pub const Tag = enum(u32) {
+    arguments,
     array,
     big_int,
     boolean,
@@ -67,6 +68,7 @@ pub fn format(
 
 pub inline fn is(self: Self, comptime T: type) bool {
     inline for ([_]struct { type, Tag }{
+        .{ builtins.Arguments, .arguments },
         .{ builtins.Array, .array },
         .{ builtins.BigInt, .big_int },
         .{ builtins.Boolean, .boolean },

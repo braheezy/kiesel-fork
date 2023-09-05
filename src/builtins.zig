@@ -1,3 +1,4 @@
+const arguments = @import("builtins/arguments.zig");
 const array = @import("builtins/array.zig");
 const big_int = @import("builtins/big_int.zig");
 const boolean = @import("builtins/boolean.zig");
@@ -20,6 +21,7 @@ const throw_type_error = @import("builtins/throw_type_error.zig");
 pub const global_functions = global.global_functions;
 pub const ordinary_internal_methods = ordinary.ordinary_internal_methods;
 
+pub const Arguments = arguments.Arguments;
 pub const ArgumentsList = builtin_function.ArgumentsList;
 pub const Array = array.Array;
 pub const ArrayConstructor = array.ArrayConstructor;
@@ -78,6 +80,7 @@ pub const arrayCreate = array.arrayCreate;
 pub const arraySetLength = array.arraySetLength;
 pub const arraySpeciesCreate = array.arraySpeciesCreate;
 pub const createBuiltinFunction = builtin_function.createBuiltinFunction;
+pub const createUnmappedArgumentsObject = arguments.createUnmappedArgumentsObject;
 pub const getPrototypeFromConstructor = ordinary.getPrototypeFromConstructor;
 pub const globalObjectProperties = global.globalObjectProperties;
 pub const isCompatiblePropertyDescriptor = ordinary.isCompatiblePropertyDescriptor;

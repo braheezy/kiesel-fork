@@ -735,7 +735,9 @@ pub const ObjectPrototype = struct {
         // 5. If isArray is true, let builtinTag be "Array".
         const builtin_tag = if (is_array)
             "Array"
-        // TODO: 6. Else if O has a [[ParameterMap]] internal slot, let builtinTag be "Arguments".
+        // 6. Else if O has a [[ParameterMap]] internal slot, let builtinTag be "Arguments".
+        else if (object.is(builtins.Arguments))
+            "Arguments"
         // 7. Else if O has a [[Call]] internal method, let builtinTag be "Function".
         else if (object.internalMethods().call) |_|
             "Function"
