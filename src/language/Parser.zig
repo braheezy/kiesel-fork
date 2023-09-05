@@ -285,6 +285,9 @@ fn acceptIdentifierReference(self: *Self) !ast.IdentifierReference {
     errdefer self.core.restoreState(state);
 
     const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .@"await" }));
+    if (self.core.peek() catch null) |next_token| {
+        if (next_token.type == .@"=>") return error.AcceptError;
+    }
     return .{ .identifier = try self.allocator.dupe(u8, token.text) };
 }
 
@@ -1206,12 +1209,26 @@ fn acceptArrowFunction(self: *Self) !ast.ArrowFunction {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    // TODO: Support arrow function with a single parameter and no parentheses
-    _ = try self.core.accept(RuleSet.is(.@"("));
-    // We need to do this after consuming the '(' token to skip preceeding whitespace.
-    const start_offset = self.core.tokenizer.offset - (comptime "(".len);
-    const formal_parameters = try self.acceptFormalParameters();
-    _ = try self.core.accept(RuleSet.is(.@")"));
+    var start_offset: usize = undefined;
+    var formal_parameters: ast.FormalParameters = undefined;
+    if (self.acceptBindingIdentifier()) |identifier| {
+        // We need to do this after consuming the identifier token to skip preceeding whitespace.
+        start_offset = self.core.tokenizer.offset - identifier.len;
+        var formal_parameters_items = try std.ArrayList(ast.FormalParameters.Item).initCapacity(
+            self.allocator,
+            1,
+        );
+        formal_parameters_items.appendAssumeCapacity(.{
+            .formal_parameter = .{ .binding_element = .{ .identifier = identifier } },
+        });
+        formal_parameters = .{ .items = try formal_parameters_items.toOwnedSlice() };
+    } else |_| {
+        _ = try self.core.accept(RuleSet.is(.@"("));
+        // We need to do this after consuming the '(' token to skip preceeding whitespace.
+        start_offset = self.core.tokenizer.offset - (comptime "(".len);
+        formal_parameters = try self.acceptFormalParameters();
+        _ = try self.core.accept(RuleSet.is(.@")"));
+    }
     _ = try self.core.accept(RuleSet.is(.@"=>"));
     try self.noLineTerminatorHere();
     const function_body = blk: {
