@@ -2689,7 +2689,19 @@ pub const FunctionDeclaration = struct {
         //        It's enough to get ECMAScript Functions Objects up and running however :^)
         const realm = ctx.agent.currentRealm();
         const env = Environment{ .global_environment = realm.global_env };
-        const function = try self.instantiateOrdinaryFunctionObject(ctx.agent, env, null);
+        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
+
+        // Copy `self` so that we can assign the function body's strictness, which is needed for
+        // the deferred bytecode generation.
+        // FIXME: This should ideally happen at parse time.
+        var function_declaration = self;
+        function_declaration.function_body.strict = strict;
+
+        const function = try function_declaration.instantiateOrdinaryFunctionObject(
+            ctx.agent,
+            env,
+            null,
+        );
         realm.global_env.object_record.binding_object.set(
             PropertyKey.from(self.identifier),
             Value.from(function),
@@ -2721,11 +2733,19 @@ pub const FunctionExpression = struct {
 
     /// 15.2.6 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, _: *BytecodeContext) !void {
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
+
+        // Copy `self` so that we can assign the function body's strictness, which is needed for
+        // the deferred bytecode generation.
+        // FIXME: This should ideally happen at parse time.
+        var function_expression = self;
+        function_expression.function_body.strict = strict;
+
         // 1. Return InstantiateOrdinaryFunctionExpression of FunctionExpression.
         try executable.addInstructionWithFunctionExpression(
             .instantiate_ordinary_function_expression,
-            .{ .function_expression = self },
+            .{ .function_expression = function_expression },
         );
     }
 
@@ -2745,6 +2765,7 @@ pub const FunctionBody = struct {
     const Self = @This();
 
     statement_list: StatementList,
+    strict: ?bool = null, // Unassigned until bytecode generation
 
     /// 15.2.2 Static Semantics: FunctionBodyContainsUseStrict
     /// https://tc39.es/ecma262/#sec-static-semantics-functionbodycontainsusestrict
@@ -2755,11 +2776,7 @@ pub const FunctionBody = struct {
     }
 
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
-        const tmp = temporaryChange(
-            ctx,
-            "contained_in_strict_mode_code",
-            ctx.contained_in_strict_mode_code or self.functionBodyContainsUseStrict(),
-        );
+        const tmp = temporaryChange(ctx, "contained_in_strict_mode_code", self.strict.?);
         defer tmp.restore();
         try self.statement_list.generateBytecode(executable, ctx);
     }
