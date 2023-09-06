@@ -13,6 +13,7 @@ const containsLineTerminator = tokenizer_.containsLineTerminator;
 const parseNumericLiteral = literals.parseNumericLiteral;
 const parseStringLiteral = literals.parseStringLiteral;
 const temporaryChange = utils.temporaryChange;
+const reserved_words = tokenizer_.reserved_words;
 
 const Self = @This();
 
@@ -280,6 +281,21 @@ fn acceptParenthesizedExpression(self: *Self) !ast.ParenthesizedExpression {
     return .{ .expression = expression };
 }
 
+fn acceptIdentifierName(self: *Self) !ast.Identifier {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const reserved_word_token_types = comptime blk: {
+        var reserved_word_token_types: [reserved_words.len]Tokenizer.TokenType = .{};
+        for (reserved_words, 0..) |reserved_word, i| {
+            reserved_word_token_types[i] = @field(Tokenizer.TokenType, reserved_word);
+        }
+        break :blk reserved_word_token_types;
+    };
+    const token = try self.core.accept(RuleSet.oneOf(.{.identifier} ++ reserved_word_token_types));
+    return self.allocator.dupe(u8, token.text);
+}
+
 fn acceptIdentifierReference(self: *Self) !ast.IdentifierReference {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
@@ -358,10 +374,7 @@ fn acceptMemberExpression(self: *Self, primary_expression: ast.Expression) !ast.
             _ = try self.core.accept(RuleSet.is(.@"]"));
             break :blk .{ .expression = property_expression };
         },
-        .@"." => blk: {
-            const identifier_token = try self.core.accept(RuleSet.is(.identifier));
-            break :blk .{ .identifier = try self.allocator.dupe(u8, identifier_token.text) };
-        },
+        .@"." => .{ .identifier = try self.acceptIdentifierName() },
         else => unreachable,
     };
     // Defer heap allocation of expression until we know this is a MemberExpression
@@ -509,10 +522,12 @@ fn acceptPropertyDefinition(self: *Self) !ast.PropertyDefinition {
         if (token == null or token.?.type != .@":")
             return .{ .identifier_reference = identifier_reference };
         // LiteralPropertyName : IdentifierName
-        property_name = .{
-            .literal_property_name = .{ .identifier = identifier_reference.identifier },
-        };
-    } else |_| if (self.acceptStringLiteral()) |string_literal|
+        const identifier = identifier_reference.identifier;
+        property_name = .{ .literal_property_name = .{ .identifier = identifier } };
+    } else |_| if (self.acceptIdentifierName()) |identifier|
+        // LiteralPropertyName : IdentifierName
+        property_name = .{ .literal_property_name = .{ .identifier = identifier } }
+    else |_| if (self.acceptStringLiteral()) |string_literal|
         // LiteralPropertyName : StringLiteral
         property_name = .{ .literal_property_name = .{ .string_literal = string_literal } }
     else |_| if (self.acceptNumericLiteral()) |numeric_literal|
