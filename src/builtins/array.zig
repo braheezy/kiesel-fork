@@ -565,6 +565,7 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "map", map, 1, realm);
         try defineBuiltinFunction(object, "pop", pop, 0, realm);
         try defineBuiltinFunction(object, "push", push, 1, realm);
+        try defineBuiltinFunction(object, "some", some, 1, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
 
@@ -1166,6 +1167,59 @@ pub const ArrayPrototype = struct {
 
         // 7. Return 𝔽(len).
         return Value.from(len);
+    }
+
+    /// 23.1.3.29 Array.prototype.some ( callbackfn [ , thisArg ] )
+    /// https://tc39.es/ecma262/#sec-array.prototype.some
+    fn some(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const callback_fn = arguments.get(0);
+        const this_arg = arguments.get(1);
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+
+        // 3. If IsCallable(callbackfn) is false, throw a TypeError exception.
+        if (!callback_fn.isCallable()) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{callback_fn}),
+            );
+        }
+
+        // 4. Let k be 0.
+        var k: u53 = 0;
+
+        // 5. Repeat, while k < len,
+        while (k < len) : (k += 1) {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
+
+            // b. Let kPresent be ? HasProperty(O, Pk).
+            const k_present = try object.hasProperty(property_key);
+
+            // c. If kPresent is true, then
+            if (k_present) {
+                // i. Let kValue be ? Get(O, Pk).
+                const k_value = try object.get(property_key);
+
+                // ii. Let testResult be ToBoolean(? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »)).
+                const test_result = (try callback_fn.callAssumeCallable(
+                    this_arg,
+                    .{ k_value, Value.from(k), Value.from(object) },
+                )).toBoolean();
+
+                // iii. If testResult is true, return true.
+                if (test_result) return Value.from(true);
+            }
+
+            // d. Set k to k + 1.
+        }
+
+        // 6. Return true.
+        return Value.from(false);
     }
 
     /// 23.1.3.32 Array.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
