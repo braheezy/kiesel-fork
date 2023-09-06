@@ -568,6 +568,7 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "some", some, 1, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
+        try defineBuiltinFunction(object, "with", with, 2, realm);
 
         // 23.1.3.41 Array.prototype [ @@unscopables ]
         // https://tc39.es/ecma262/#sec-array.prototype-@@unscopables
@@ -1291,6 +1292,63 @@ pub const ArrayPrototype = struct {
 
         // 4. Return ? Call(func, array).
         return func.callAssumeCallableNoArgs(Value.from(array));
+    }
+
+    /// 23.1.3.39 Array.prototype.with ( index, value )
+    /// https://tc39.es/ecma262/#sec-array.prototype.with
+    fn with(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const index = arguments.get(0);
+        const value = arguments.get(1);
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+
+        // 3. Let relativeIndex be ? ToIntegerOrInfinity(index).
+        const relative_index = try index.toIntegerOrInfinity(agent);
+
+        // 4. If relativeIndex ≥ 0, let actualIndex be relativeIndex.
+        // 5. Else, let actualIndex be len + relativeIndex.
+        const actual_index_f64 = if (relative_index >= 0)
+            relative_index
+        else
+            @as(f64, @floatFromInt(len)) + relative_index;
+
+        // 6. If actualIndex ≥ len or actualIndex < 0, throw a RangeError exception.
+        if (actual_index_f64 >= @as(f64, @floatFromInt(len)) or actual_index_f64 < 0) {
+            return agent.throwException(.range_error, "Index is out of array bounds");
+        }
+        const actual_index: u53 = @intFromFloat(actual_index_f64);
+
+        // 7. Let A be ? ArrayCreate(len).
+        if (len > std.math.maxInt(usize)) return error.OutOfMemory;
+        const array = try arrayCreate(agent, @intCast(len), null);
+
+        // 8. Let k be 0.
+        var k: u53 = 0;
+
+        // 9. Repeat, while k < len,
+        while (k < len) : (k += 1) {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
+
+            // b. If k is actualIndex, let fromValue be value.
+            // c. Else, let fromValue be ? Get(O, Pk).
+            const from_value = if (k == actual_index)
+                value
+            else
+                try object.get(property_key);
+
+            // d. Perform ! CreateDataPropertyOrThrow(A, Pk, fromValue).
+            array.createDataPropertyOrThrow(property_key, from_value) catch |err| try noexcept(err);
+
+            // e. Set k to k + 1.
+        }
+
+        // 10. Return A.
+        return Value.from(array);
     }
 };
 
