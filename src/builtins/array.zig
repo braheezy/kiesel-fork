@@ -552,6 +552,7 @@ pub const ArrayPrototype = struct {
         });
 
         try defineBuiltinFunction(object, "at", at, 1, realm);
+        try defineBuiltinFunction(object, "every", every, 1, realm);
         try defineBuiltinFunction(object, "find", find, 1, realm);
         try defineBuiltinFunction(object, "findIndex", findIndex, 1, realm);
         try defineBuiltinFunction(object, "findLast", findLast, 1, realm);
@@ -640,6 +641,59 @@ pub const ArrayPrototype = struct {
 
         // 7. Return ? Get(O, ! ToString(𝔽(k))).
         return object.get(PropertyKey.from(k));
+    }
+
+    /// 23.1.3.6 Array.prototype.every ( callbackfn [ , thisArg ] )
+    /// https://tc39.es/ecma262/#sec-array.prototype.every
+    fn every(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const callback_fn = arguments.get(0);
+        const this_arg = arguments.get(1);
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+
+        // 3. If IsCallable(callbackfn) is false, throw a TypeError exception.
+        if (!callback_fn.isCallable()) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{callback_fn}),
+            );
+        }
+
+        // 4. Let k be 0.
+        var k: u53 = 0;
+
+        // 5. Repeat, while k < len,
+        while (k < len) : (k += 1) {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
+
+            // b. Let kPresent be ? HasProperty(O, Pk).
+            const k_present = try object.hasProperty(property_key);
+
+            // c. If kPresent is true, then
+            if (k_present) {
+                // i. Let kValue be ? Get(O, Pk).
+                const k_value = try object.get(property_key);
+
+                // ii. Let testResult be ToBoolean(? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »)).
+                const test_result = (try callback_fn.callAssumeCallable(
+                    this_arg,
+                    .{ k_value, Value.from(k), Value.from(object) },
+                )).toBoolean();
+
+                // iii. If testResult is false, return false.
+                if (!test_result) return Value.from(false);
+            }
+
+            // d. Set k to k + 1.
+        }
+
+        // 6. Return true.
+        return Value.from(true);
     }
 
     /// 23.1.3.9 Array.prototype.find ( predicate [ , thisArg ] )
