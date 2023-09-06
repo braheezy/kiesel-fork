@@ -551,6 +551,7 @@ pub const ArrayPrototype = struct {
             .configurable = false,
         });
 
+        try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinFunction(object, "find", find, 1, realm);
         try defineBuiltinFunction(object, "findIndex", findIndex, 1, realm);
         try defineBuiltinFunction(object, "findLast", findLast, 1, realm);
@@ -609,6 +610,36 @@ pub const ArrayPrototype = struct {
         });
 
         return object;
+    }
+
+    /// 23.1.3.1 Array.prototype.at ( index )
+    /// https://tc39.es/ecma262/#sec-array.prototype.at
+    fn at(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const index = arguments.get(0);
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+
+        // 3. Let relativeIndex be ? ToIntegerOrInfinity(index).
+        const relative_index = try index.toIntegerOrInfinity(agent);
+
+        // 4. If relativeIndex ≥ 0, then
+        //     a. Let k be relativeIndex.
+        // 5. Else,
+        //     a. Let k be len + relativeIndex.
+        const k_f64 = if (relative_index >= 0)
+            relative_index
+        else
+            @as(f64, @floatFromInt(len)) + relative_index;
+
+        // 6. If k < 0 or k ≥ len, return undefined.
+        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return .undefined;
+        const k: u53 = @intFromFloat(k_f64);
+
+        // 7. Return ? Get(O, ! ToString(𝔽(k))).
+        return object.get(PropertyKey.from(k));
     }
 
     /// 23.1.3.9 Array.prototype.find ( predicate [ , thisArg ] )
