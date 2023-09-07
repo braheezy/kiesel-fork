@@ -201,3 +201,17 @@ pub fn getThisValue(self: Self) Value {
     // 2. If IsSuperReference(V) is true, return V.[[ThisValue]]; otherwise return V.[[Base]].
     return if (self.isSuperReference()) self.this_value.? else self.base.value;
 }
+
+/// 6.2.5.8 InitializeReferencedBinding ( V, W )
+/// https://tc39.es/ecma262/#sec-initializereferencedbinding
+pub fn initializeReferencedBinding(self: Self, agent: *Agent, value: Value) !void {
+    // 1. Assert: IsUnresolvableReference(V) is false.
+    std.debug.assert(!self.isUnresolvableReference());
+
+    // 2. Let base be V.[[Base]].
+    // 3. Assert: base is an Environment Record.
+    const base = self.base.environment;
+
+    // 4. Return ? base.InitializeBinding(V.[[ReferencedName]], W).
+    return base.initializeBinding(agent, self.referenced_name.string, value);
+}
