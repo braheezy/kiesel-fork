@@ -25,6 +25,7 @@ const Realm = execution.Realm;
 const ScriptOrModule = execution.ScriptOrModule;
 const String = types.String;
 const Value = types.Value;
+const containsSlice = utils.containsSlice;
 const createUnmappedArgumentsObject = builtins.createUnmappedArgumentsObject;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
@@ -255,48 +256,19 @@ pub fn ordinaryCallEvaluateBody(
     arguments_list: ArgumentsList,
 ) !Completion {
     // 1. Return ? EvaluateBody of F.[[ECMAScriptCode]] with arguments F and argumentsList.
-    // TODO: Implement this closer to spec :^)
-    var callee_context = agent.runningExecutionContext();
-    const strict = function.fields.strict;
-    const callee_env = callee_context.ecmascript_code.?.lexical_environment;
-    const env = try newDeclarativeEnvironment(agent.gc_allocator, callee_env);
-    callee_context.ecmascript_code.?.lexical_environment = .{ .declarative_environment = env };
 
-    const arguments_object = try createUnmappedArgumentsObject(agent, arguments_list.values);
-    try env.createMutableBinding(agent, "arguments", false);
-    env.initializeBinding(agent, "arguments", Value.from(arguments_object));
+    // 10.2.1.3 Runtime Semantics: EvaluateBody
+    // https://tc39.es/ecma262/#sec-runtime-semantics-evaluatebody
+    // FunctionBody : FunctionStatementList
+    // 1. Return ? EvaluateFunctionBody of FunctionBody with arguments functionObject and argumentsList.
 
-    for (function.fields.formal_parameters.items, 0..) |item, i| {
-        const identifier = item.formal_parameter.binding_element.identifier;
-        const value = arguments_list.get(i);
-        try env.createMutableBinding(agent, identifier, false);
-        env.initializeBinding(agent, identifier, value);
-    }
-    const var_env = try newDeclarativeEnvironment(agent.gc_allocator, .{ .declarative_environment = env });
-    callee_context.ecmascript_code.?.variable_environment = .{ .declarative_environment = var_env };
+    // 15.2.3 Runtime Semantics: EvaluateFunctionBody
+    // https://tc39.es/ecma262/#sec-runtime-semantics-evaluatefunctionbody
+    // FunctionBody : FunctionStatementList
+    // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
+    try functionDeclarationInstantiation(agent, function, arguments_list);
 
-    // TODO: This should use VarDeclaredNames
-    const var_scoped_declarations = try function.fields.ecmascript_code.statement_list.varScopedDeclarations(
-        agent.gc_allocator,
-    );
-    defer agent.gc_allocator.free(var_scoped_declarations);
-    var instantiated_var_names = std.StringHashMap(void).init(agent.gc_allocator);
-    defer instantiated_var_names.deinit();
-    for (var_scoped_declarations) |variable_declaration| {
-        const var_name = variable_declaration.binding_identifier;
-        if (!instantiated_var_names.contains(var_name)) {
-            try instantiated_var_names.putNoClobber(var_name, {});
-            try var_env.createMutableBinding(agent, var_name, false);
-            var_env.initializeBinding(agent, var_name, .undefined);
-        }
-    }
-
-    const lex_env = if (!strict)
-        try newDeclarativeEnvironment(agent.gc_allocator, .{ .declarative_environment = var_env })
-    else
-        var_env;
-    callee_context.ecmascript_code.?.lexical_environment = .{ .declarative_environment = lex_env };
-
+    // 2. Return ? Evaluation of FunctionStatementList.
     return generateAndRunBytecode(agent, function.fields.ecmascript_code);
 }
 
@@ -670,4 +642,326 @@ pub fn setFunctionLength(function: Object, length: f64) !void {
     }) catch |err| try noexcept(err);
 
     // 3. Return unused.
+}
+
+/// 10.2.11 FunctionDeclarationInstantiation ( func, argumentsList )
+/// https://tc39.es/ecma262/#sec-functiondeclarationinstantiation
+fn functionDeclarationInstantiation(agent: *Agent, function: *ECMAScriptFunction, arguments_list: ArgumentsList) !void {
+    // 1. Let calleeContext be the running execution context.
+    var callee_context = agent.runningExecutionContext();
+
+    // 2. Let code be func.[[ECMAScriptCode]].
+    const code = function.fields.ecmascript_code;
+
+    // 3. Let strict be func.[[Strict]].
+    const strict = function.fields.strict;
+
+    // 4. Let formals be func.[[FormalParameters]].
+    const formals = function.fields.formal_parameters;
+
+    // 5. Let parameterNames be the BoundNames of formals.
+    const parameter_names = try formals.boundNames(agent.gc_allocator);
+    defer agent.gc_allocator.free(parameter_names);
+
+    // 6. If parameterNames has any duplicate entries, let hasDuplicates be true. Otherwise, let
+    //    hasDuplicates be false.
+    const has_duplicates = blk: {
+        var unique_names = std.StringHashMap(void).init(agent.gc_allocator);
+        defer unique_names.deinit();
+        if (parameter_names.len > std.math.maxInt(u32)) return error.OutOfMemory;
+        try unique_names.ensureTotalCapacity(@intCast(parameter_names.len));
+        for (parameter_names) |parameter_name| {
+            if (unique_names.contains(parameter_name)) break :blk true;
+            unique_names.putAssumeCapacityNoClobber(parameter_name, {});
+        }
+        break :blk false;
+    };
+
+    // TODO: 7. Let simpleParameterList be IsSimpleParameterList of formals.
+    const simple_parameter_list = true;
+
+    // TODO: 8. Let hasParameterExpressions be ContainsExpression of formals.
+    const has_parameter_expressions = false;
+
+    // TODO: 9. Let varNames be the VarDeclaredNames of code.
+
+    // 10. Let varDeclarations be the VarScopedDeclarations of code.
+    const var_declarations = try code.varScopedDeclarations(
+        agent.gc_allocator,
+    );
+    defer agent.gc_allocator.free(var_declarations);
+
+    // TODO: 11. Let lexicalNames be the LexicallyDeclaredNames of code.
+    const lexical_names = &[_][]const u8{};
+
+    // 12. Let functionNames be a new empty List.
+    var function_names = std.StringHashMap(void).init(agent.gc_allocator);
+    defer function_names.deinit();
+
+    // TODO: 13. Let functionsToInitialize be a new empty List.
+
+    // 14. For each element d of varDeclarations, in reverse List order, do
+    var it = std.mem.reverseIterator(var_declarations);
+    while (it.next()) |_| {
+        // TODO: a. If d is neither a VariableDeclaration nor a ForBinding nor a BindingIdentifier, then
+    }
+
+    // 15. Let argumentsObjectNeeded be true.
+    var arguments_object_needed = true;
+
+    // 16. If func.[[ThisMode]] is lexical, then
+    if (function.fields.this_mode == .lexical) {
+        // a. NOTE: Arrow functions never have an arguments object.
+        // b. Set argumentsObjectNeeded to false.
+        arguments_object_needed = false;
+    }
+    // 17. Else if parameterNames contains "arguments", then
+    else if (containsSlice(parameter_names, "arguments")) {
+        // a. Set argumentsObjectNeeded to false.
+        arguments_object_needed = false;
+    }
+    // 18. Else if hasParameterExpressions is false, then
+    else if (!has_parameter_expressions) {
+        // a. If functionNames contains "arguments" or lexicalNames contains "arguments", then
+        if (function_names.contains("arguments") or containsSlice(lexical_names, "arguments")) {
+            // i. Set argumentsObjectNeeded to false.
+            arguments_object_needed = false;
+        }
+    }
+
+    // 19. If strict is true or hasParameterExpressions is false, then
+    const env = if (strict or !has_parameter_expressions) blk: {
+        // a. NOTE: Only a single Environment Record is needed for the parameters, since calls
+        //    to eval in strict mode code cannot create new bindings which are visible outside
+        //    of the eval.
+
+        // b. Let env be the LexicalEnvironment of calleeContext.
+        break :blk callee_context.ecmascript_code.?.lexical_environment;
+    }
+    // 20. Else,
+    else blk: {
+        // a. NOTE: A separate Environment Record is needed to ensure that bindings created by
+        //    direct eval calls in the formal parameter list are outside the environment where
+        //    parameters are declared.
+
+        // b. Let calleeEnv be the LexicalEnvironment of calleeContext.
+        const callee_env = callee_context.ecmascript_code.?.lexical_environment;
+
+        // c. Let env be NewDeclarativeEnvironment(calleeEnv).
+        const env = Environment{
+            .declarative_environment = try newDeclarativeEnvironment(
+                agent.gc_allocator,
+                callee_env,
+            ),
+        };
+
+        // d. Assert: The VariableEnvironment of calleeContext is calleeEnv.
+        std.debug.assert(
+            std.meta.eql(callee_context.ecmascript_code.?.variable_environment, callee_env),
+        );
+
+        // e. Set the LexicalEnvironment of calleeContext to env.
+        callee_context.ecmascript_code.?.lexical_environment = env;
+
+        break :blk env;
+    };
+
+    // 21. For each String paramName of parameterNames, do
+    for (parameter_names) |parameter_name| {
+        // a. Let alreadyDeclared be ! env.HasBinding(paramName).
+        const already_declared = try env.hasBinding(parameter_name);
+
+        // b. NOTE: Early errors ensure that duplicate parameter names can only occur in non-strict
+        //    functions that do not have parameter default values or rest parameters.
+
+        // c. If alreadyDeclared is false, then
+        if (!already_declared) {
+            // i. Perform ! env.CreateMutableBinding(paramName, false).
+            try env.createMutableBinding(agent, parameter_name, false);
+
+            // ii. If hasDuplicates is true, then
+            if (has_duplicates) {
+                // 1. Perform ! env.InitializeBinding(paramName, undefined).
+                try env.initializeBinding(agent, parameter_name, .undefined);
+            }
+        }
+    }
+
+    // 22. If argumentsObjectNeeded is true, then
+    const parameter_bindings = if (arguments_object_needed) blk: {
+        // a. If strict is true or simpleParameterList is false, then
+        const arguments_object = if (strict or !simple_parameter_list) ao_blk: {
+            // i. Let ao be CreateUnmappedArgumentsObject(argumentsList).
+            break :ao_blk try createUnmappedArgumentsObject(agent, arguments_list.values);
+        }
+        // b. Else,
+        else ao_blk: {
+            // i. NOTE: A mapped argument object is only provided for non-strict functions that
+            //    don't have a rest parameter, any parameter default value initializers, or any
+            //    destructured parameters.
+
+            // ii. Let ao be CreateMappedArgumentsObject(func, formals, argumentsList, env).
+            // TODO: This should use CreateMappedArgumentsObject
+            break :ao_blk try createUnmappedArgumentsObject(agent, arguments_list.values);
+        };
+
+        // c. If strict is true, then
+        if (strict) {
+            // i. Perform ! env.CreateImmutableBinding("arguments", false).
+            try env.createImmutableBinding(agent, "arguments", false);
+
+            // ii. NOTE: In strict mode code early errors prevent attempting to assign to this
+            //     binding, so its mutability is not observable.
+        }
+        // d. Else,
+        else {
+            // i. Perform ! env.CreateMutableBinding("arguments", false).
+            try env.createMutableBinding(agent, "arguments", false);
+        }
+
+        // e. Perform ! env.InitializeBinding("arguments", ao).
+        try env.initializeBinding(agent, "arguments", Value.from(arguments_object));
+
+        // f. Let parameterBindings be the list-concatenation of parameterNames and « "arguments" ».
+        var parameter_bindings = try std.ArrayList([]const u8).initCapacity(
+            agent.gc_allocator,
+            parameter_names.len + 1,
+        );
+        parameter_bindings.appendSliceAssumeCapacity(parameter_names);
+        parameter_bindings.appendAssumeCapacity("arguments");
+        break :blk try parameter_bindings.toOwnedSlice();
+    }
+    // 23. Else,
+    else blk: {
+        // a. Let parameterBindings be parameterNames.
+        break :blk parameter_names;
+    };
+    defer if (arguments_object_needed) agent.gc_allocator.free(parameter_bindings);
+
+    // TODO: 24-26.
+    // NOTE: Ad-hoc implementation of IteratorBindingInitialization for SingleNameBinding
+    for (parameter_names, 0..) |parameter_name, i| {
+        const environment = if (has_duplicates) null else env;
+        const value = arguments_list.get(i);
+        const reference = try agent.resolveBinding(parameter_name, environment, strict);
+        if (environment == null)
+            try reference.putValue(agent, value)
+        else
+            try reference.initializeReferencedBinding(agent, value);
+    }
+
+    // 27. If hasParameterExpressions is false, then
+    const var_env = if (!has_parameter_expressions) blk: {
+        // a. NOTE: Only a single Environment Record is needed for the parameters and top-level vars.
+
+        // b. Let instantiatedVarNames be a copy of the List parameterBindings.
+        var instantiated_var_names = std.StringHashMap(void).init(agent.gc_allocator);
+        defer instantiated_var_names.deinit();
+
+        if (parameter_bindings.len > std.math.maxInt(u32)) return error.OutOfMemory;
+        try instantiated_var_names.ensureTotalCapacity(@intCast(parameter_bindings.len));
+        for (parameter_bindings) |parameter_binding| {
+            instantiated_var_names.putAssumeCapacityNoClobber(parameter_binding, {});
+        }
+
+        // c. For each element n of varNames, do
+        // TODO: This should use VarDeclaredNames
+        for (var_declarations) |var_declaration| {
+            const var_name = var_declaration.binding_identifier;
+
+            // i. If instantiatedVarNames does not contain n, then
+            if (!instantiated_var_names.contains(var_name)) {
+                // 1. Append n to instantiatedVarNames.
+                try instantiated_var_names.putNoClobber(var_name, {});
+
+                // 2. Perform ! env.CreateMutableBinding(n, false).
+                try env.createMutableBinding(agent, var_name, false);
+
+                // 3. Perform ! env.InitializeBinding(n, undefined).
+                try env.initializeBinding(agent, var_name, .undefined);
+            }
+        }
+
+        // d. Let varEnv be env.
+        break :blk env;
+    }
+    // 28. Else,
+    else blk: {
+        // a. NOTE: A separate Environment Record is needed to ensure that closures created by
+        //    expressions in the formal parameter list do not have visibility of declarations in
+        //    the function body.
+
+        // b. Let varEnv be NewDeclarativeEnvironment(env).
+        const var_env = Environment{
+            .declarative_environment = try newDeclarativeEnvironment(agent.gc_allocator, env),
+        };
+
+        // c. Set the VariableEnvironment of calleeContext to varEnv.
+        callee_context.ecmascript_code.?.variable_environment = var_env;
+
+        // d. Let instantiatedVarNames be a new empty List.
+        var instantiated_var_names = std.StringHashMap(void).init(agent.gc_allocator);
+        defer instantiated_var_names.deinit();
+
+        // e. For each element n of varNames, do
+        // TODO: This should use VarDeclaredNames
+        for (var_declarations) |var_declaration| {
+            const var_name = var_declaration.binding_identifier;
+
+            // i. If instantiatedVarNames does not contain n, then
+            if (!instantiated_var_names.contains(var_name)) {
+                // 1. Append n to instantiatedVarNames.
+                try instantiated_var_names.putNoClobber(var_name, {});
+
+                // 2. Perform ! varEnv.CreateMutableBinding(n, false).
+                try var_env.createMutableBinding(agent, var_name, false);
+
+                // 3. If parameterBindings does not contain n, or if functionNames contains n, then
+                //     a. Let initialValue be undefined.
+                // 4. Else,
+                //     a. Let initialValue be ! env.GetBindingValue(n, false).
+                const initial_value = if (!containsSlice(parameter_names, var_name) or
+                    function_names.contains(var_name))
+                    .undefined
+                else
+                    try env.getBindingValue(agent, var_name, false);
+
+                // 5. Perform ! varEnv.InitializeBinding(n, initialValue).
+                try var_env.initializeBinding(agent, var_name, initial_value);
+
+                // 6. NOTE: A var with the same name as a formal parameter initially has the same
+                //    value as the corresponding initialized parameter.
+            }
+        }
+
+        break :blk var_env;
+    };
+
+    // 29. NOTE: Annex B.3.2.1 adds additional steps at this point.
+
+    // 30. If strict is false, then
+    const lex_env = if (!strict) blk: {
+        // a. Let lexEnv be NewDeclarativeEnvironment(varEnv).
+        break :blk Environment{
+            .declarative_environment = try newDeclarativeEnvironment(agent.gc_allocator, var_env),
+        };
+
+        // b. NOTE: Non-strict functions use a separate Environment Record for top-level lexical
+        //    declarations so that a direct eval can determine whether any var scoped declarations
+        //    introduced by the eval code conflict with pre-existing top-level lexically scoped
+        //    declarations. This is not needed for strict functions because a strict direct eval
+        //    always places all declarations into a new Environment Record.
+    }
+    // 31. Else,
+    else blk: {
+        // a. Let lexEnv be varEnv.
+        break :blk var_env;
+    };
+
+    // 32. Set the LexicalEnvironment of calleeContext to lexEnv.
+    callee_context.ecmascript_code.?.lexical_environment = lex_env;
+
+    // TODO: 33-36.
+
+    // 37. Return unused.
 }
