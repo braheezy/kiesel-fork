@@ -256,7 +256,8 @@ pub fn ordinaryCallEvaluateBody(
 ) !Completion {
     // 1. Return ? EvaluateBody of F.[[ECMAScriptCode]] with arguments F and argumentsList.
     // TODO: Implement this closer to spec :^)
-    const callee_context = agent.runningExecutionContext();
+    var callee_context = agent.runningExecutionContext();
+    const strict = function.fields.strict;
     const callee_env = callee_context.ecmascript_code.?.lexical_environment;
     const env = try newDeclarativeEnvironment(agent.gc_allocator, callee_env);
     callee_context.ecmascript_code.?.lexical_environment = .{ .declarative_environment = env };
@@ -271,6 +272,31 @@ pub fn ordinaryCallEvaluateBody(
         try env.createMutableBinding(agent, identifier, false);
         env.initializeBinding(agent, identifier, value);
     }
+    const var_env = try newDeclarativeEnvironment(agent.gc_allocator, .{ .declarative_environment = env });
+    callee_context.ecmascript_code.?.variable_environment = .{ .declarative_environment = var_env };
+
+    // TODO: This should use VarDeclaredNames
+    const var_scoped_declarations = try function.fields.ecmascript_code.statement_list.varScopedDeclarations(
+        agent.gc_allocator,
+    );
+    defer agent.gc_allocator.free(var_scoped_declarations);
+    var instantiated_var_names = std.StringHashMap(void).init(agent.gc_allocator);
+    defer instantiated_var_names.deinit();
+    for (var_scoped_declarations) |variable_declaration| {
+        const var_name = variable_declaration.binding_identifier;
+        if (!instantiated_var_names.contains(var_name)) {
+            try instantiated_var_names.putNoClobber(var_name, {});
+            try var_env.createMutableBinding(agent, var_name, false);
+            var_env.initializeBinding(agent, var_name, .undefined);
+        }
+    }
+
+    const lex_env = if (!strict)
+        try newDeclarativeEnvironment(agent.gc_allocator, .{ .declarative_environment = var_env })
+    else
+        var_env;
+    callee_context.ecmascript_code.?.lexical_environment = .{ .declarative_environment = lex_env };
+
     return generateAndRunBytecode(agent, function.fields.ecmascript_code);
 }
 
