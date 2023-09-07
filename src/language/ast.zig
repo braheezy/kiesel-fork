@@ -2785,6 +2785,17 @@ pub const FunctionBody = struct {
     statement_list: StatementList,
     strict: ?bool = null, // Unassigned until bytecode generation
 
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(self: Self, allocator: Allocator) error{OutOfMemory}![]const VariableDeclaration {
+        // FunctionStatementList : [empty]
+        // 1. Return a new empty List.
+        // FunctionStatementList : StatementList
+        // 1. Return the TopLevelVarScopedDeclarations of StatementList.
+        // TODO: This should use TopLevelVarScopedDeclarations
+        return self.statement_list.varScopedDeclarations(allocator);
+    }
+
     /// 15.2.2 Static Semantics: FunctionBodyContainsUseStrict
     /// https://tc39.es/ecma262/#sec-static-semantics-functionbodycontainsusestrict
     pub fn functionBodyContainsUseStrict(self: Self) bool {
