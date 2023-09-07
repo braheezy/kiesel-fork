@@ -81,7 +81,7 @@ pub fn createImmutableBinding(self: *Self, agent: *Agent, name: []const u8, stri
     }
 
     // 3. Return ! DclRec.CreateImmutableBinding(N, S).
-    return self.declarative_record.createImmutableBinding(name, strict);
+    return self.declarative_record.createImmutableBinding(agent, name, strict);
 }
 
 /// 9.1.1.4.4 InitializeBinding ( N, V )

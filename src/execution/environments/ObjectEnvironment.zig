@@ -76,7 +76,7 @@ pub fn createMutableBinding(self: Self, _: *Agent, name: []const u8, deletable: 
 
 /// 9.1.1.2.3 CreateImmutableBinding ( N, S )
 /// https://tc39.es/ecma262/#sec-object-environment-records-createimmutablebinding-n-s
-pub fn createImmutableBinding(_: Self, _: []const u8, _: bool) noreturn {
+pub fn createImmutableBinding(_: Self, _: *Agent, _: []const u8, _: bool) noreturn {
     // The CreateImmutableBinding concrete method of an Object Environment Record is never used
     // within this specification.
     @panic("ObjectEnvironment.createImmutableBinding() must not be called");
