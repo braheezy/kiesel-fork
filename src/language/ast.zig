@@ -2826,11 +2826,19 @@ pub const ArrowFunction = struct {
 
     /// 15.3.5 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, _: *BytecodeContext) !void {
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
+
+        // Copy `self` so that we can assign the function body's strictness, which is needed for
+        // the deferred bytecode generation.
+        // FIXME: This should ideally happen at parse time.
+        var arrow_function = self;
+        arrow_function.function_body.strict = strict;
+
         // 1. Return InstantiateArrowFunctionExpression of ArrowFunction.
         try executable.addInstructionWithFunctionExpression(
             .instantiate_arrow_function_expression,
-            .{ .arrow_function = self },
+            .{ .arrow_function = arrow_function },
         );
     }
 
