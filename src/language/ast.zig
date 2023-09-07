@@ -2607,6 +2607,24 @@ pub const FormalParameters = struct {
 
     items: []const Item,
 
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn boundNames(self: Self, allocator: Allocator) ![]const []const u8 {
+        var bound_names = try std.ArrayList([]const u8).initCapacity(allocator, self.items.len);
+        // FormalParameterList : FormalParameterList , FormalParameter
+        // 1. Let names1 be BoundNames of FormalParameterList.
+        // 2. Let names2 be BoundNames of FormalParameter.
+        // 3. Return the list-concatenation of names1 and names2.
+        for (self.items) |item| {
+            // BindingElement : BindingPattern Initializeropt
+            // 1. Return the BoundNames of BindingPattern.
+            // SingleNameBinding : BindingIdentifier Initializeropt
+            // 1. Return the BoundNames of BindingIdentifier.
+            bound_names.appendAssumeCapacity(item.formal_parameter.binding_element.identifier);
+        }
+        return bound_names.toOwnedSlice();
+    }
+
     /// 15.1.5 Static Semantics: ExpectedArgumentCount
     /// https://tc39.es/ecma262/#sec-static-semantics-expectedargumentcount
     pub fn expectedArgumentCount(self: Self) usize {
