@@ -59,6 +59,17 @@ pub fn temporaryChange(
     return .{ .lhs = lhs, .previous_value = @field(lhs, field_name) };
 }
 
+pub fn indexOfSlice(haystack: []const []const u8, needle: []const u8) ?usize {
+    for (haystack, 0..) |value, i| {
+        if (std.mem.eql(u8, value, needle)) return i;
+    }
+    return null;
+}
+
+pub fn containsSlice(haystack: []const []const u8, needle: []const u8) bool {
+    return indexOfSlice(haystack, needle) != null;
+}
+
 pub fn trimLeft(haystack: []const u8, needles: []const []const u8) []const u8 {
     var trimmed = haystack;
     while (trimmed.len > 0) {
