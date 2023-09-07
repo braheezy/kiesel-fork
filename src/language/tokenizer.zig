@@ -111,7 +111,7 @@ const TokenType = enum {
 
 const Pattern = ptk.Pattern(TokenType);
 
-pub const Tokenizer = ptk.Tokenizer(TokenType, &.{
+const patterns = .{
     // NOTE: Needs to come first or strings such as 'ifelse' turn into two tokens
     Pattern.create(.identifier, identifierMatcher),
     // NOTE: Needs to come before binary operator tokens
@@ -127,6 +127,7 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &.{
     Pattern.create(.@"!", ptk.matchers.literal("!")),
     Pattern.create(.@"??=", ptk.matchers.literal("??=")),
     Pattern.create(.@"??", ptk.matchers.literal("??")),
+    Pattern.create(.@"?.", ptk.matchers.literal("?.")),
     Pattern.create(.@"?", ptk.matchers.literal("?")),
     Pattern.create(.@"...", ptk.matchers.literal("...")),
     Pattern.create(.@".", ptk.matchers.literal(".")),
@@ -174,9 +175,13 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &.{
     Pattern.create(.@"~", ptk.matchers.literal("~")),
     Pattern.create(.@"await", ptk.matchers.literal("await")),
     Pattern.create(.@"break", ptk.matchers.literal("break")),
+    Pattern.create(.case, ptk.matchers.literal("case")),
     Pattern.create(.@"catch", ptk.matchers.literal("catch")),
+    Pattern.create(.class, ptk.matchers.literal("class")),
+    Pattern.create(.@"const", ptk.matchers.literal("const")),
     Pattern.create(.@"continue", ptk.matchers.literal("continue")),
     Pattern.create(.debugger, ptk.matchers.literal("debugger")),
+    Pattern.create(.default, ptk.matchers.literal("default")),
     Pattern.create(.delete, ptk.matchers.literal("delete")),
     Pattern.create(.do, ptk.matchers.literal("do")),
     Pattern.create(.@"else", ptk.matchers.literal("else")),
@@ -210,7 +215,22 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &.{
     Pattern.create(.with, ptk.matchers.literal("with")),
     Pattern.create(.@"yield*", ptk.matchers.literal("yield*")),
     Pattern.create(.yield, ptk.matchers.literal("yield")),
-});
+};
+
+pub const Tokenizer = ptk.Tokenizer(TokenType, &patterns);
+
+comptime {
+    @setEvalBranchQuota(10000);
+    token_types: for (std.enums.values(TokenType)) |token_type| {
+        for (patterns) |pattern| {
+            if (pattern.type == token_type) continue :token_types;
+        }
+        @compileError(@ptrCast(std.fmt.comptimePrint(
+            "No pattern found for TokenType.@\"{s}\"",
+            .{@tagName(token_type)},
+        )));
+    }
+}
 
 /// 12.2 White Space
 /// https://tc39.es/ecma262/#sec-white-space

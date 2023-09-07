@@ -102,6 +102,7 @@ pub fn build(b: *std.Build) void {
     unit_tests.addIncludePath(.{ .path = "vendor/zig-libgc/vendor/bdwgc/include" });
     unit_tests.addModule("any-pointer", any_pointer.module("any-pointer"));
     unit_tests.addModule("gc", gc_module);
+    unit_tests.addModule("ptk", parser_toolkit.module("parser-toolkit"));
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
     const test_step = b.step("test", "Run unit tests");
