@@ -1057,7 +1057,7 @@ pub fn stringToBigInt(allocator: Allocator, string: String) !?BigInt {
 /// https://tc39.es/ecma262/#sec-samevalue
 pub fn sameValue(x: Value, y: Value) bool {
     // 1. If Type(x) is not Type(y), return false.
-    if (@intFromEnum(x) != @intFromEnum(y)) return false;
+    if (std.meta.activeTag(x) != std.meta.activeTag(y)) return false;
 
     // 2. If x is a Number, then
     if (x == .number) {
@@ -1073,7 +1073,7 @@ pub fn sameValue(x: Value, y: Value) bool {
 /// https://tc39.es/ecma262/#sec-samevaluezero
 pub fn sameValueZero(x: Value, y: Value) bool {
     // 1. If Type(x) is not Type(y), return false.
-    if (@intFromEnum(x) != @intFromEnum(y)) return false;
+    if (std.meta.activeTag(x) != std.meta.activeTag(y)) return false;
 
     // 2. If x is a Number, then
     if (x == .number) {
@@ -1089,7 +1089,7 @@ pub fn sameValueZero(x: Value, y: Value) bool {
 /// https://tc39.es/ecma262/#sec-samevaluenonnumber
 pub fn sameValueNonNumber(x: Value, y: Value) bool {
     // 1. Assert: Type(x) is Type(y).
-    std.debug.assert(@intFromEnum(x) == @intFromEnum(y));
+    std.debug.assert(std.meta.activeTag(x) == std.meta.activeTag(y));
 
     return switch (x) {
         // 2. If x is either null or undefined, return true.
@@ -1202,7 +1202,7 @@ pub fn isLessThan(
         const ny = try py.toNumeric(agent);
 
         // f. If Type(nx) is Type(ny), then
-        if (@intFromEnum(nx) == @intFromEnum(ny)) {
+        if (std.meta.activeTag(nx) == std.meta.activeTag(ny)) {
             // i. If nx is a Number, then
             if (nx == .number) {
                 // 1. Return Number::lessThan(nx, ny).
@@ -1245,7 +1245,7 @@ pub fn isLessThan(
 /// https://tc39.es/ecma262/#sec-islooselyequal
 pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) !bool {
     // 1. If Type(x) is Type(y), then
-    if (@intFromEnum(x) == @intFromEnum(y)) {
+    if (std.meta.activeTag(x) == std.meta.activeTag(y)) {
         // a. Return IsStrictlyEqual(x, y).
         return isStrictlyEqual(x, y);
     }
@@ -1342,7 +1342,7 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) !bool {
 /// https://tc39.es/ecma262/#sec-isstrictlyequal
 pub fn isStrictlyEqual(x: Value, y: Value) bool {
     // 1. If Type(x) is not Type(y), return false.
-    if (@intFromEnum(x) != @intFromEnum(y)) return false;
+    if (std.meta.activeTag(x) != std.meta.activeTag(y)) return false;
 
     // 2. If x is a Number, then
     if (x == .number) {

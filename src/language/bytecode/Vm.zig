@@ -280,7 +280,7 @@ fn applyStringOrNumericBinaryOperator(agent: *Agent, lval: Value, operator: ast.
     const rnum = try final_rval.toNumeric(agent);
 
     // 5. If Type(lnum) is not Type(rnum), throw a TypeError exception.
-    if (@intFromEnum(lnum) != @intFromEnum(rnum)) {
+    if (std.meta.activeTag(lnum) != std.meta.activeTag(rnum)) {
         return agent.throwException(
             .type_error,
             "Left-hand side and right-hand side of numeric binary expression must have the same type",
