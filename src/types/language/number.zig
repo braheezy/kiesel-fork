@@ -180,7 +180,9 @@ pub const Number = union(enum) {
 
         // 2. Return the result of negating x; that is, compute a Number with the same magnitude
         //    but opposite sign.
-        return switch (self) {
+        return if (self.isZero())
+            .{ .f64 = -self.asFloat() }
+        else switch (self) {
             .f64 => |x| .{ .f64 = -x },
             .i32 => |x| .{ .i32 = -x },
         };
