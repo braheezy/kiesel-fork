@@ -112,6 +112,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "pow", pow, 2, realm);
         try defineBuiltinFunction(object, "random", random, 0, realm);
         try defineBuiltinFunction(object, "round", round, 1, realm);
+        try defineBuiltinFunction(object, "trunc", trunc, 1, realm);
 
         return object;
     }
@@ -203,5 +204,20 @@ pub const Math = struct {
             rounded = rounded.subtract(.{ .i32 = 1 });
         }
         return Value.from(rounded);
+    }
+
+    /// 21.3.2.35 Math.trunc ( x )
+    /// https://tc39.es/ecma262/#sec-math.trunc
+    fn trunc(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const x = arguments.get(0);
+
+        // 1. Let n be ? ToNumber(x).
+        const n = try x.toNumber(agent);
+
+        // 2. If n is not finite or n is either +0𝔽 or -0𝔽, return n.
+        // 3. If n < 1𝔽 and n > +0𝔽, return +0𝔽.
+        // 4. If n < -0𝔽 and n > -1𝔽, return -0𝔽.
+        // 5. Return the integral Number nearest n in the direction of +0𝔽.
+        return Value.from(n.truncate());
     }
 };
