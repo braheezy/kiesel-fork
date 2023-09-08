@@ -130,7 +130,7 @@ pub fn builtinCallOrConstruct(
     //     the named parameters. newTarget provides the NewTarget value.
     const result = switch (function.fields.behaviour) {
         .regular => |regularFn| regularFn(agent, this_argument.?, arguments_list),
-        .constructor => |constructorFn| try constructorFn(agent, this_argument orelse undefined, arguments_list, new_target),
+        .constructor => |constructorFn| constructorFn(agent, this_argument orelse undefined, arguments_list, new_target),
     };
 
     // 11. Remove calleeContext from the execution context stack and restore callerContext as the
