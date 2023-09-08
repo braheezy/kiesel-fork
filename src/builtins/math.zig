@@ -107,6 +107,7 @@ pub const Math = struct {
         });
 
         try defineBuiltinFunction(object, "abs", abs, 1, realm);
+        try defineBuiltinFunction(object, "ceil", ceil, 1, realm);
         try defineBuiltinFunction(object, "random", random, 0, realm);
 
         return object;
@@ -126,6 +127,21 @@ pub const Math = struct {
         // 5. If n < -0𝔽, return -n.
         // 6. Return n.
         return Value.from(@fabs(n.asFloat()));
+    }
+
+    /// 21.3.2.10 Math.ceil ( x )
+    /// https://tc39.es/ecma262/#sec-math.ceil
+    fn ceil(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const x = arguments.get(0);
+
+        // 1. Let n be ? ToNumber(x).
+        const n = try x.toNumber(agent);
+
+        // 2. If n is not finite or n is either +0𝔽 or -0𝔽, return n.
+        // 3. If n < -0𝔽 and n > -1𝔽, return -0𝔽.
+        // 4. If n is an integral Number, return n.
+        // 5. Return the smallest (closest to -∞) integral Number value that is not less than n.
+        return Value.from(n.ceil());
     }
 
     /// 21.3.2.27 Math.random ( )

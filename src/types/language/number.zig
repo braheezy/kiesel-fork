@@ -132,6 +132,13 @@ pub const Number = union(enum) {
         };
     }
 
+    pub inline fn ceil(self: Self) Self {
+        return switch (self) {
+            .f64 => |x| .{ .f64 = @ceil(x) },
+            .i32 => |x| .{ .i32 = x },
+        };
+    }
+
     pub inline fn floor(self: Self) Self {
         return switch (self) {
             .f64 => |x| .{ .f64 = @floor(x) },
