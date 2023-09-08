@@ -109,6 +109,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "abs", abs, 1, realm);
         try defineBuiltinFunction(object, "ceil", ceil, 1, realm);
         try defineBuiltinFunction(object, "floor", floor, 1, realm);
+        try defineBuiltinFunction(object, "pow", pow, 2, realm);
         try defineBuiltinFunction(object, "random", random, 0, realm);
 
         return object;
@@ -158,6 +159,22 @@ pub const Math = struct {
         // 4. If n is an integral Number, return n.
         // 5. Return the greatest (closest to +∞) integral Number value that is not greater than n.
         return Value.from(n.floor());
+    }
+
+    /// 21.3.2.26 Math.pow ( base, exponent )
+    /// https://tc39.es/ecma262/#sec-math.pow
+    fn pow(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const base_value = arguments.get(0);
+        const exponent_value = arguments.get(1);
+
+        // 1. Set base to ? ToNumber(base).
+        const base = try base_value.toNumber(agent);
+
+        // 2. Set exponent to ? ToNumber(exponent).
+        const exponent = try exponent_value.toNumber(agent);
+
+        // 3. Return Number::exponentiate(base, exponent).
+        return Value.from(base.exponentiate(exponent));
     }
 
     /// 21.3.2.27 Math.random ( )
