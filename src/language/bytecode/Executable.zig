@@ -95,7 +95,7 @@ pub fn addInstructionWithFunctionExpression(
     try self.addIndex(self.function_expressions.items.len - 1);
 }
 
-const JumpIndex = struct {
+pub const JumpIndex = struct {
     executable: *Self,
     index: usize,
 

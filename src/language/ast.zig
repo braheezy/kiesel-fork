@@ -1637,6 +1637,7 @@ pub const Statement = union(enum) {
             .breakable_statement => |breakable_statement| switch (breakable_statement.iteration_statement) {
                 .do_while_statement => |do_while_statement| return do_while_statement.varScopedDeclarations(allocator),
                 .while_statement => |while_statement| return while_statement.varScopedDeclarations(allocator),
+                .for_statement => |for_statement| return for_statement.varScopedDeclarations(allocator),
             },
             .try_statement => |try_statement| return try_statement.varScopedDeclarations(allocator),
         }
@@ -2199,6 +2200,7 @@ pub const IterationStatement = union(enum) {
 
     do_while_statement: DoWhileStatement,
     while_statement: WhileStatement,
+    for_statement: ForStatement,
 
     /// 14.7.1.2 Runtime Semantics: LoopEvaluation
     /// https://tc39.es/ecma262/#sec-runtime-semantics-loopevaluation
@@ -2209,10 +2211,17 @@ pub const IterationStatement = union(enum) {
                 // 1. Return ? DoWhileLoopEvaluation of DoWhileStatement with argument labelSet.
                 try do_while_statement.generateBytecode(executable, ctx);
             },
+
             // IterationStatement : WhileStatement
             .while_statement => |while_statement| {
                 // 1. Return ? WhileLoopEvaluation of WhileStatement with argument labelSet.
                 try while_statement.generateBytecode(executable, ctx);
+            },
+
+            // IterationStatement : ForStatement
+            .for_statement => |for_statement| {
+                // 1. Return ? ForLoopEvaluation of ForStatement with argument labelSet.
+                try for_statement.generateBytecode(executable, ctx);
             },
         }
     }
@@ -2346,6 +2355,157 @@ pub const WhileStatement = struct {
         try printString("WhileStatement", writer, indentation);
         try printString("test:", writer, indentation + 1);
         try self.test_expression.print(writer, indentation + 2);
+        try printString("consequent:", writer, indentation + 1);
+        try self.consequent_statement.print(writer, indentation + 2);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ForStatement
+pub const ForStatement = struct {
+    const Self = @This();
+
+    pub const Initializer = union(enum) {
+        expression: Expression,
+        variable_statement: VariableStatement,
+        lexical_declaration: LexicalDeclaration,
+    };
+
+    initializer: ?Initializer,
+    test_expression: ?Expression,
+    increment_expression: ?Expression,
+    consequent_statement: *Statement,
+
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(self: Self, allocator: Allocator) ![]const VariableDeclaration {
+        // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
+        // 1. Let declarations1 be VarScopedDeclarations of VariableDeclarationList.
+        // 2. Let declarations2 be VarScopedDeclarations of Statement.
+        // 3. Return the list-concatenation of declarations1 and declarations2.
+        if (self.initializer != null and self.initializer.? == .variable_statement) {
+            var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
+            try variable_declarations.appendSlice(try self.initializer.?.variable_statement.variable_declaration_list.varScopedDeclarations(allocator));
+            try variable_declarations.appendSlice(try self.consequent_statement.varScopedDeclarations(allocator));
+            return variable_declarations.toOwnedSlice();
+        }
+
+        // ForStatement : for ( Expression[opt] ; Expression[opt] ; Expression[opt] ) Statement
+        // 1. Return the VarScopedDeclarations of Statement.
+        // ForStatement : for ( LexicalDeclaration Expression[opt] ; Expression[opt] ) Statement
+        // 1. Return the VarScopedDeclarations of Statement.
+        return self.consequent_statement.varScopedDeclarations(allocator);
+    }
+
+    /// 14.7.4.2 Runtime Semantics: ForLoopEvaluation
+    /// https://tc39.es/ecma262/#sec-runtime-semantics-forloopevaluation
+    /// 14.7.4.3 ForBodyEvaluation ( test, increment, stmt, perIterationBindings, labelSet )
+    /// https://tc39.es/ecma262/#sec-forbodyevaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        if (self.initializer) |initializer| switch (initializer) {
+            // ForStatement : for ( Expression[opt] ; Expression[opt] ; Expression[opt] ) Statement
+            .expression => |expression| {
+                // 1. If the first Expression is present, then
+                //     a. Let exprRef be ? Evaluation of the first Expression.
+                //     b. Perform ? GetValue(exprRef).
+                try expression.generateBytecode(executable, ctx);
+                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+                // 2. If the second Expression is present, let test be the second Expression;
+                //    otherwise, let test be empty.
+                // 3. If the third Expression is present, let increment be the third Expression;
+                //    otherwise, let increment be empty.
+                // 4. Return ? ForBodyEvaluation(test, increment, Statement, « », labelSet).
+            },
+
+            // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
+            .variable_statement => |variable_statement| {
+                // 1. Perform ? Evaluation of VariableDeclarationList.
+                try variable_statement.generateBytecode(executable, ctx);
+
+                // 2. If the first Expression is present, let test be the first Expression;
+                //    otherwise, let test be empty.
+                // 3. If the second Expression is present, let increment be the second Expression;
+                //    otherwise, let increment be empty.
+                // 4. Return ? ForBodyEvaluation(test, increment, Statement, « », labelSet).
+            },
+
+            // ForStatement : for ( LexicalDeclaration Expression[opt] ; Expression[opt] ) Statement
+            .lexical_declaration => |lexical_declaration| {
+                // TODO: Implement this fully once lexical declarations behave different than var decls
+                try lexical_declaration.generateBytecode(executable, ctx);
+            },
+        };
+
+        // 1. Let V be undefined.
+        try executable.addInstructionWithConstant(.load_constant, .undefined);
+
+        // TODO: 2. Perform ? CreatePerIterationEnvironment(perIterationBindings).
+
+        // 3. Repeat,
+        const start_index = executable.instructions.items.len;
+
+        var end_jump: Executable.JumpIndex = undefined;
+
+        // a. If test is not empty, then
+        if (self.test_expression) |test_expression| {
+            // i. Let testRef be ? Evaluation of test.
+            try test_expression.generateBytecode(executable, ctx);
+
+            // ii. Let testValue be ? GetValue(testRef).
+            if (test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+            // iii. If ToBoolean(testValue) is false, return V.
+            try executable.addInstruction(.jump_conditional);
+            const consequent_jump = try executable.addJumpIndex();
+            end_jump = try executable.addJumpIndex();
+            try consequent_jump.setTargetHere();
+        }
+
+        // b. Let result be Completion(Evaluation of stmt).
+        try executable.addInstruction(.store);
+        try self.consequent_statement.generateBytecode(executable, ctx);
+        try executable.addInstruction(.load);
+
+        // TODO: c. If LoopContinues(result, labelSet) is false, return ? UpdateEmpty(result, V).
+
+        // d. If result.[[Value]] is not empty, set V to result.[[Value]].
+        // NOTE: This is done by the store/load sequence around each consequent execution.
+
+        // TODO: e. Perform ? CreatePerIterationEnvironment(perIterationBindings).
+
+        // f. If increment is not empty, then
+        if (self.increment_expression) |increment_expression| {
+            // i. Let incRef be ? Evaluation of increment.
+            try increment_expression.generateBytecode(executable, ctx);
+
+            // ii. Perform ? GetValue(incRef).
+            if (increment_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        }
+
+        try executable.addInstruction(.jump);
+        const start_jump = try executable.addJumpIndex();
+        try start_jump.setTarget(start_index);
+
+        if (self.test_expression != null) try end_jump.setTargetHere();
+        try executable.addInstruction(.store);
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("ForStatement", writer, indentation);
+        if (self.initializer) |initializer| {
+            try printString("initializer:", writer, indentation + 1);
+            switch (initializer) {
+                inline else => |node| try node.print(writer, indentation + 2),
+            }
+        }
+        if (self.test_expression) |test_expression| {
+            try printString("test:", writer, indentation + 1);
+            try test_expression.print(writer, indentation + 2);
+        }
+        if (self.increment_expression) |increment_expression| {
+            try printString("increment:", writer, indentation + 1);
+            try increment_expression.print(writer, indentation + 2);
+        }
         try printString("consequent:", writer, indentation + 1);
         try self.consequent_statement.print(writer, indentation + 2);
     }

@@ -839,7 +839,7 @@ fn acceptStatement(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!*
 
     if (self.acceptBlockStatement()) |block_statement|
         statement.* = .{ .block_statement = block_statement }
-    else |_| if (self.acceptVariableStatement()) |variable_statement|
+    else |_| if (self.acceptVariableStatement(false)) |variable_statement|
         statement.* = .{ .variable_statement = variable_statement }
     else |_| if (self.core.accept(RuleSet.is(.@";"))) |_|
         statement.* = .empty_statement
@@ -870,7 +870,7 @@ fn acceptDeclaration(self: *Self) !*ast.Declaration {
 
     if (self.acceptHoistableDeclaration()) |hoistable_declaration|
         declaration.* = .{ .hoistable_declaration = hoistable_declaration }
-    else |_| if (self.acceptLexicalDeclaration()) |lexical_declaration|
+    else |_| if (self.acceptLexicalDeclaration(false)) |lexical_declaration|
         declaration.* = .{ .lexical_declaration = lexical_declaration }
     else |_|
         return error.UnexpectedToken;
@@ -942,7 +942,7 @@ fn acceptStatementListItem(self: *Self) !ast.StatementListItem {
     return statement_list_item;
 }
 
-fn acceptLexicalDeclaration(self: *Self) !ast.LexicalDeclaration {
+fn acceptLexicalDeclaration(self: *Self, for_initializer: bool) !ast.LexicalDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -957,7 +957,7 @@ fn acceptLexicalDeclaration(self: *Self) !ast.LexicalDeclaration {
         else => unreachable,
     };
     const binding_list = try self.acceptBindingList();
-    try self.acceptOrInsertSemicolon();
+    if (!for_initializer) try self.acceptOrInsertSemicolon();
     return .{ .type = @"type", .binding_list = binding_list };
 }
 
@@ -986,13 +986,13 @@ fn acceptLexicalBinding(self: *Self) !ast.LexicalBinding {
     return .{ .binding_identifier = binding_identifier, .initializer = initializer };
 }
 
-fn acceptVariableStatement(self: *Self) !ast.VariableStatement {
+fn acceptVariableStatement(self: *Self, for_initializer: bool) !ast.VariableStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.@"var"));
     const variable_declaration_list = try self.acceptVariableDeclarationList();
-    try self.acceptOrInsertSemicolon();
+    if (!for_initializer) try self.acceptOrInsertSemicolon();
     return .{ .variable_declaration_list = variable_declaration_list };
 }
 
@@ -1059,6 +1059,8 @@ fn acceptIterationStatement(self: *Self) !ast.IterationStatement {
         return .{ .do_while_statement = do_while_statement }
     else |_| if (self.acceptWhileStatement()) |while_statement|
         return .{ .while_statement = while_statement }
+    else |_| if (self.acceptForStatement()) |for_statement|
+        return .{ .for_statement = for_statement }
     else |_|
         return error.UnexpectedToken;
 }
@@ -1090,6 +1092,34 @@ fn acceptWhileStatement(self: *Self) !ast.WhileStatement {
     const consequent_statement = try self.acceptStatement();
     return .{
         .test_expression = test_expression,
+        .consequent_statement = consequent_statement,
+    };
+}
+
+fn acceptForStatement(self: *Self) !ast.ForStatement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"for"));
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    var initializer: ?ast.ForStatement.Initializer = null;
+    if (self.acceptExpression(.{})) |expression|
+        initializer = .{ .expression = expression }
+    else |_| if (self.acceptVariableStatement(true)) |variable_statement|
+        initializer = .{ .variable_statement = variable_statement }
+    else |_| if (self.acceptLexicalDeclaration(true)) |lexical_declaration|
+        initializer = .{ .lexical_declaration = lexical_declaration }
+    else |_| {}
+    _ = try self.core.accept(RuleSet.is(.@";"));
+    const test_expression = self.acceptExpression(.{}) catch null;
+    _ = try self.core.accept(RuleSet.is(.@";"));
+    const increment_expression = self.acceptExpression(.{}) catch null;
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    const consequent_statement = try self.acceptStatement();
+    return .{
+        .initializer = initializer,
+        .test_expression = test_expression,
+        .increment_expression = increment_expression,
         .consequent_statement = consequent_statement,
     };
 }
