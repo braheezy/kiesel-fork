@@ -52,6 +52,8 @@ const Associativity = enum {
 const PrecedenceAndAssociativityAltFlag = enum {
     postfix_increment,
     postfix_decrement,
+    prefix_increment,
+    prefix_decrement,
     unary_plus,
     unary_minus,
 };
@@ -134,7 +136,7 @@ fn getPrecedenceAndAssociativity(token_type: Tokenizer.TokenType) struct { Prece
 fn getPrecedenceAndAssociativityAlt(flag: PrecedenceAndAssociativityAltFlag) struct { Precedence, ?Associativity } {
     return switch (flag) {
         .postfix_increment, .postfix_decrement => .{ 15, null },
-        .unary_plus, .unary_minus => .{ 14, null },
+        .prefix_increment, .prefix_decrement, .unary_plus, .unary_minus => .{ 14, null },
     };
 }
 
@@ -344,6 +346,8 @@ fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression, ct
         return .{ .member_expression = member_expression }
     else |_| if (self.acceptCallExpression(primary_expression)) |call_expression|
         return .{ .call_expression = call_expression }
+    else |_| if (self.acceptUpdateExpression(primary_expression)) |update_expression|
+        return .{ .update_expression = update_expression }
     else |_| if (self.acceptBinaryExpression(primary_expression, ctx)) |binary_expression|
         return .{ .binary_expression = binary_expression }
     else |_| if (self.acceptRelationalExpression(primary_expression, ctx)) |relational_expression|
@@ -426,6 +430,63 @@ fn acceptArguments(self: *Self) !ast.Arguments {
     } else |_| {}
     _ = try self.core.accept(RuleSet.is(.@")"));
     return arguments.toOwnedSlice();
+}
+
+fn acceptUpdateExpression(self: *Self, primary_expression: ?ast.Expression) !ast.UpdateExpression {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const operator_token = try self.core.accept(RuleSet.oneOf(.{ .@"++", .@"--" }));
+    const operator: ast.UpdateExpression.Operator = switch (operator_token.type) {
+        .@"++" => .@"++",
+        .@"--" => .@"--",
+        else => unreachable,
+    };
+
+    var @"type": ast.UpdateExpression.Type = undefined;
+
+    // Defer heap allocation of expression until we know this is an UpdateExpression
+    const expression = try self.allocator.create(ast.Expression);
+    if (primary_expression == null) {
+        const ctx: AcceptContext = switch (operator_token.type) {
+            .@"++" => .{ .precedence = getPrecedenceAlt(.prefix_increment), .associativity = getAssociativityAlt(.prefix_increment) },
+            .@"--" => .{ .precedence = getPrecedenceAlt(.prefix_decrement), .associativity = getAssociativityAlt(.prefix_decrement) },
+            else => unreachable,
+        };
+        expression.* = try self.acceptExpression(ctx);
+        @"type" = .prefix;
+    } else {
+        expression.* = primary_expression.?;
+        @"type" = .postfix;
+    }
+
+    // It is an early Syntax Error if AssignmentTargetType of LeftHandSideExpression is not simple.
+    if (@"type" == .prefix and expression.assignmentTargetType() != .simple) {
+        try self.diagnostics.emit(
+            state.location,
+            .@"error",
+            "Invalid left-hand side in update expression",
+            .{},
+        );
+        return error.UnexpectedToken;
+    }
+
+    // It is an early Syntax Error if AssignmentTargetType of UnaryExpression is not simple.
+    if (@"type" == .postfix and expression.assignmentTargetType() != .simple) {
+        try self.diagnostics.emit(
+            state.location,
+            .@"error",
+            "Invalid right-hand side in update expression",
+            .{},
+        );
+        return error.UnexpectedToken;
+    }
+
+    return .{
+        .type = @"type",
+        .operator = operator,
+        .expression = expression,
+    };
 }
 
 fn acceptLiteral(self: *Self) !ast.Literal {
@@ -809,6 +870,8 @@ fn acceptExpression(self: *Self, ctx: AcceptContext) (ParserCore.AcceptError || 
 
     var expression: ast.Expression = if (self.acceptUnaryExpression()) |unary_expression|
         .{ .unary_expression = unary_expression }
+    else |_| if (self.acceptUpdateExpression(null)) |update_expression|
+        .{ .update_expression = update_expression }
     else |_| if (self.acceptNewExpression()) |new_expression|
         .{ .new_expression = new_expression }
     else |_| if (self.acceptPrimaryExpression()) |primary_expression|

@@ -738,6 +738,144 @@ pub const PropertyName = union(enum) {
     }
 };
 
+/// https://tc39.es/ecma262/#prod-UpdateExpression
+pub const UpdateExpression = struct {
+    const Self = @This();
+
+    pub const Type = enum {
+        prefix,
+        postfix,
+    };
+
+    pub const Operator = enum {
+        @"++",
+        @"--",
+    };
+
+    type: Type,
+    operator: Operator,
+    expression: *Expression,
+
+    /// 13.4.2.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-postfix-increment-operator-runtime-semantics-evaluation
+    /// 13.4.3.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-postfix-decrement-operator-runtime-semantics-evaluation
+    /// 13.4.4.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-prefix-increment-operator-runtime-semantics-evaluation
+    /// 13.4.5.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-prefix-decrement-operator-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
+        // UpdateExpression : LeftHandSideExpression ++
+        if (self.type == .postfix and self.operator == .@"++") {
+            // 1. Let lhs be ? Evaluation of LeftHandSideExpression.
+            try self.expression.generateBytecode(executable, ctx);
+            try executable.addInstruction(.push_reference);
+
+            // 2. Let oldValue be ? ToNumeric(? GetValue(lhs)).
+            if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.to_numeric);
+
+            try executable.addInstruction(.load);
+
+            // 3. If oldValue is a Number, then
+            //     a. Let newValue be Number::add(oldValue, 1𝔽).
+            // 4. Else,
+            //     a. Assert: oldValue is a BigInt.
+            //     b. Let newValue be BigInt::add(oldValue, 1ℤ).
+            try executable.addInstruction(.increment);
+
+            // 5. Perform ? PutValue(lhs, newValue).
+            try executable.addInstruction(.put_value);
+            try executable.addInstruction(.pop_reference);
+
+            // 6. Return oldValue.
+            try executable.addInstruction(.store);
+        }
+        // UpdateExpression : LeftHandSideExpression --
+        else if (self.type == .postfix and self.operator == .@"--") {
+            // 1. Let lhs be ? Evaluation of LeftHandSideExpression.
+            try self.expression.generateBytecode(executable, ctx);
+            try executable.addInstruction(.push_reference);
+
+            // 2. Let oldValue be ? ToNumeric(? GetValue(lhs)).
+            if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.to_numeric);
+
+            try executable.addInstruction(.load);
+
+            // 3. If oldValue is a Number, then
+            //     a. Let newValue be Number::subtract(oldValue, 1𝔽).
+            // 4. Else,
+            //     a. Assert: oldValue is a BigInt.
+            //     b. Let newValue be BigInt::subtract(oldValue, 1ℤ).
+            try executable.addInstruction(.decrement);
+
+            // 5. Perform ? PutValue(lhs, newValue).
+            try executable.addInstruction(.put_value);
+            try executable.addInstruction(.pop_reference);
+
+            // 6. Return oldValue.
+            try executable.addInstruction(.store);
+        }
+        // UpdateExpression : ++ UnaryExpression
+        else if (self.type == .prefix and self.operator == .@"++") {
+            // 1. Let expr be ? Evaluation of UnaryExpression.
+            try self.expression.generateBytecode(executable, ctx);
+            try executable.addInstruction(.push_reference);
+
+            // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
+            if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.to_numeric);
+
+            // 3. If oldValue is a Number, then
+            //     a. Let newValue be Number::add(oldValue, 1𝔽).
+            // 4. Else,
+            //     a. Assert: oldValue is a BigInt.
+            //     b. Let newValue be BigInt::add(oldValue, 1ℤ).
+            try executable.addInstruction(.increment);
+
+            // 5. Perform ? PutValue(expr, newValue).
+            try executable.addInstruction(.put_value);
+            try executable.addInstruction(.pop_reference);
+
+            // 6. Return newValue.
+        }
+        // UpdateExpression : -- UnaryExpression
+        else if (self.type == .prefix and self.operator == .@"--") {
+            // 1. Let expr be ? Evaluation of UnaryExpression.
+            try self.expression.generateBytecode(executable, ctx);
+            try executable.addInstruction(.push_reference);
+
+            // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
+            if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.to_numeric);
+
+            // 3. If oldValue is a Number, then
+            //     a. Let newValue be Number::subtract(oldValue, 1𝔽).
+            // 4. Else,
+            //     a. Assert: oldValue is a BigInt.
+            //     b. Let newValue be BigInt::subtract(oldValue, 1ℤ).
+            try executable.addInstruction(.decrement);
+
+            // 5. Perform ? PutValue(expr, newValue).
+            try executable.addInstruction(.put_value);
+            try executable.addInstruction(.pop_reference);
+
+            // 6. Return newValue.
+        } else unreachable;
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
+        try printString("UpdateExpression", writer, indentation);
+        try printString("type:", writer, indentation + 1);
+        try printString(@tagName(self.type), writer, indentation + 2);
+        try printString("operator:", writer, indentation + 1);
+        try printString(@tagName(self.operator), writer, indentation + 2);
+        try printString("expression:", writer, indentation + 1);
+        try self.expression.print(writer, indentation + 2);
+    }
+};
+
 /// https://tc39.es/ecma262/#prod-UnaryExpression
 pub const UnaryExpression = struct {
     const Self = @This();
@@ -1511,6 +1649,7 @@ pub const Expression = union(enum) {
     member_expression: MemberExpression,
     new_expression: NewExpression,
     call_expression: CallExpression,
+    update_expression: UpdateExpression,
     unary_expression: UnaryExpression,
     binary_expression: BinaryExpression,
     relational_expression: RelationalExpression,

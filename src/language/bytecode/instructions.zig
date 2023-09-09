@@ -18,6 +18,8 @@ pub const Instruction = enum(u8) {
     bitwise_not,
     /// Create a catch binding for the given name and populate it with the stored exception.
     create_catch_binding,
+    /// Decrement the numeric result value by one.
+    decrement,
     /// Apply the delete operation to the evaluated expression and set it as the result value.
     delete,
     /// Store EvaluateCall() as the result value.
@@ -42,6 +44,8 @@ pub const Instruction = enum(u8) {
     greater_than_equals,
     /// Store HasProperty() as the result value.
     has_property,
+    /// Increment the numeric result value by one.
+    increment,
     /// Store InstanceofOperator() as the result value.
     instanceof_operator,
     /// Store InstantiateArrowFunctionExpression() as the result value.
