@@ -1208,9 +1208,10 @@ fn acceptReturnStatement(self: *Self) !ast.ReturnStatement {
             try self.acceptOrInsertSemicolon();
             return .{ .expression = expression };
         } else |_| {}
-    } else |_| {
+    } else |err| switch (err) {
         // Drop emitted 'unexpected newline' error
-        _ = self.diagnostics.errors.pop();
+        error.UnexpectedToken => _ = self.diagnostics.errors.pop(),
+        else => {},
     }
     try self.acceptOrInsertSemicolon();
     return .{ .expression = null };
