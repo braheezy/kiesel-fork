@@ -1804,6 +1804,7 @@ pub const Declaration = union(enum) {
     const Self = @This();
 
     hoistable_declaration: HoistableDeclaration,
+    lexical_declaration: LexicalDeclaration,
 
     pub fn analyze(_: Self, query: AnalyzeQuery) bool {
         return switch (query) {
@@ -1815,6 +1816,7 @@ pub const Declaration = union(enum) {
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         switch (self) {
             .hoistable_declaration => |hoistable_declaration| try hoistable_declaration.generateBytecode(executable, ctx),
+            .lexical_declaration => |lexical_declaration| try lexical_declaration.generateBytecode(executable, ctx),
         }
     }
 
@@ -1822,6 +1824,10 @@ pub const Declaration = union(enum) {
         try printString("Declaration", writer, indentation);
         switch (self) {
             .hoistable_declaration => |hoistable_declaration| try hoistable_declaration.print(
+                writer,
+                indentation + 1,
+            ),
+            .lexical_declaration => |lexical_declaration| try lexical_declaration.print(
                 writer,
                 indentation + 1,
             ),
@@ -1939,7 +1945,18 @@ pub const StatementList = struct {
             .statement => |statement| {
                 try variable_declarations.appendSlice(try statement.varScopedDeclarations(allocator));
             },
-            .declaration => {},
+            .declaration => |declaration| switch (declaration.*) {
+                // HACK: Emit lexical declarations too while they're codegen'd as var decls
+                .lexical_declaration => |lexical_declaration| {
+                    for (lexical_declaration.binding_list.items) |lexical_binding| {
+                        try variable_declarations.append(.{
+                            .binding_identifier = lexical_binding.binding_identifier,
+                            .initializer = lexical_binding.initializer,
+                        });
+                    }
+                },
+                else => {},
+            },
         };
         return variable_declarations.toOwnedSlice();
     }
@@ -2000,6 +2017,89 @@ pub const StatementListItem = union(enum) {
         switch (self) {
             .statement => |statement| try statement.print(writer, indentation),
             .declaration => |declaration| try declaration.print(writer, indentation),
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-LexicalDeclaration
+pub const LexicalDeclaration = struct {
+    const Self = @This();
+
+    pub const Type = enum {
+        let,
+        @"const",
+    };
+
+    type: Type,
+    binding_list: BindingList,
+
+    /// 14.3.1.2 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-let-and-const-declarations-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // LexicalDeclaration : LetOrConst BindingList ;
+        // 1. Perform ? Evaluation of BindingList.
+        try self.binding_list.generateBytecode(executable, ctx);
+
+        // 2. Return empty.
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("LexicalDeclaration", writer, indentation);
+        try printString(@tagName(self.type), writer, indentation + 1);
+        try self.binding_list.print(writer, indentation + 1);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-BindingList
+pub const BindingList = struct {
+    const Self = @This();
+
+    items: []const LexicalBinding,
+
+    /// 14.3.1.2 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-let-and-const-declarations-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // BindingList : BindingList , LexicalBinding
+        // 1. Perform ? Evaluation of BindingList.
+        // 2. Return ? Evaluation of LexicalBinding.
+        for (self.items) |lexical_binding| {
+            try lexical_binding.generateBytecode(executable, ctx);
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'BindingList' here, it's implied and only adds nesting.
+        for (self.items) |lexical_binding| {
+            try lexical_binding.print(writer, indentation);
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-LexicalBinding
+pub const LexicalBinding = struct {
+    const Self = @This();
+
+    binding_identifier: Identifier,
+    initializer: ?Expression,
+
+    /// 14.3.1.2 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-let-and-const-declarations-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // TODO: Implement this properly, we just codegen a VariableDeclaration for now
+        const variable_declaration = VariableDeclaration{
+            .binding_identifier = self.binding_identifier,
+            .initializer = self.initializer,
+        };
+        try variable_declaration.generateBytecode(executable, ctx);
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("LexicalBinding", writer, indentation);
+        try printString("binding_identifier:", writer, indentation + 1);
+        try printString(self.binding_identifier, writer, indentation + 2);
+        if (self.initializer) |initializer| {
+            try printString("initializer:", writer, indentation + 1);
+            try initializer.print(writer, indentation + 2);
         }
     }
 };

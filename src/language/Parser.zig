@@ -870,6 +870,8 @@ fn acceptDeclaration(self: *Self) !*ast.Declaration {
 
     if (self.acceptHoistableDeclaration()) |hoistable_declaration|
         declaration.* = .{ .hoistable_declaration = hoistable_declaration }
+    else |_| if (self.acceptLexicalDeclaration()) |lexical_declaration|
+        declaration.* = .{ .lexical_declaration = lexical_declaration }
     else |_|
         return error.UnexpectedToken;
     return declaration;
@@ -938,6 +940,50 @@ fn acceptStatementListItem(self: *Self) !ast.StatementListItem {
             return error.UnexpectedToken;
     };
     return statement_list_item;
+}
+
+fn acceptLexicalDeclaration(self: *Self) !ast.LexicalDeclaration {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const let_or_const = self.core.accept(RuleSet.is(.@"const")) catch blk: {
+        const identifier = try self.core.accept(RuleSet.is(.identifier));
+        if (!std.mem.eql(u8, identifier.text, "let")) return error.AcceptError;
+        break :blk identifier;
+    };
+    const @"type": ast.LexicalDeclaration.Type = switch (let_or_const.type) {
+        .identifier => .let,
+        .@"const" => .@"const",
+        else => unreachable,
+    };
+    const binding_list = try self.acceptBindingList();
+    try self.acceptOrInsertSemicolon();
+    return .{ .type = @"type", .binding_list = binding_list };
+}
+
+fn acceptBindingList(self: *Self) !ast.BindingList {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    var lexical_bindings = std.ArrayList(ast.LexicalBinding).init(self.allocator);
+    while (self.acceptLexicalBinding()) |lexical_binding| {
+        try lexical_bindings.append(lexical_binding);
+        _ = self.core.accept(RuleSet.is(.@",")) catch break;
+    } else |_| {}
+    return .{ .items = try lexical_bindings.toOwnedSlice() };
+}
+
+fn acceptLexicalBinding(self: *Self) !ast.LexicalBinding {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const binding_identifier = try self.acceptBindingIdentifier();
+    var initializer: ?ast.Expression = null;
+    if (self.core.accept(RuleSet.is(.@"="))) |_| {
+        const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
+        initializer = try self.acceptExpression(ctx);
+    } else |_| {}
+    return .{ .binding_identifier = binding_identifier, .initializer = initializer };
 }
 
 fn acceptVariableStatement(self: *Self) !ast.VariableStatement {
