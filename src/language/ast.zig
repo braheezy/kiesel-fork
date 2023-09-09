@@ -131,14 +131,7 @@ pub const PrimaryExpression = union(enum) {
                 // 1. Return ? ResolveThisBinding().
                 try executable.addInstruction(.resolve_this_binding);
             },
-
-            .identifier_reference => |identifier_reference| try identifier_reference.generateBytecode(executable, ctx),
-            .literal => |literal| try literal.generateBytecode(executable, ctx),
-            .array_literal => |array_literal| try array_literal.generateBytecode(executable, ctx),
-            .object_literal => |object_literal| try object_literal.generateBytecode(executable, ctx),
-            .function_expression => |function_expression| try function_expression.generateBytecode(executable, ctx),
-            .arrow_function => |arrow_function| try arrow_function.generateBytecode(executable, ctx),
-            .parenthesized_expression => |parenthesized_expression| try parenthesized_expression.generateBytecode(executable, ctx),
+            inline else => |node| try node.generateBytecode(executable, ctx),
         }
     }
 
@@ -146,19 +139,7 @@ pub const PrimaryExpression = union(enum) {
         // Omit printing 'PrimaryExpression' here, it's implied and only adds nesting.
         switch (self) {
             .this => try printString("this", writer, indentation),
-            .identifier_reference => |identifier_reference| try identifier_reference.print(
-                writer,
-                indentation,
-            ),
-            .literal => |literal| try literal.print(writer, indentation),
-            .array_literal => |array_literal| try array_literal.print(writer, indentation),
-            .object_literal => |object_literal| try object_literal.print(writer, indentation),
-            .function_expression => |function_expression| try function_expression.print(writer, indentation),
-            .arrow_function => |arrow_function| try arrow_function.print(writer, indentation),
-            .parenthesized_expression => |parenthesized_expression| try parenthesized_expression.print(
-                writer,
-                indentation,
-            ),
+            inline else => |node| try node.print(writer, indentation),
         }
     }
 };
@@ -1590,72 +1571,14 @@ pub const Expression = union(enum) {
 
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
         switch (self) {
-            .primary_expression => |primary_expression| try primary_expression.generateBytecode(executable, ctx),
-            .member_expression => |member_expression| try member_expression.generateBytecode(executable, ctx),
-            .new_expression => |new_expression| try new_expression.generateBytecode(executable, ctx),
-            .call_expression => |call_expression| try call_expression.generateBytecode(executable, ctx),
-            .unary_expression => |unary_expression| try unary_expression.generateBytecode(executable, ctx),
-            .binary_expression => |binary_expression| try binary_expression.generateBytecode(executable, ctx),
-            .relational_expression => |relational_expression| try relational_expression.generateBytecode(executable, ctx),
-            .equality_expression => |equality_expression| try equality_expression.generateBytecode(executable, ctx),
-            .logical_expression => |logical_expression| try logical_expression.generateBytecode(executable, ctx),
-            .conditional_expression => |conditional_expression| try conditional_expression.generateBytecode(executable, ctx),
-            .assignment_expression => |assignment_expression| try assignment_expression.generateBytecode(executable, ctx),
-            .sequence_expression => |sequence_expression| try sequence_expression.generateBytecode(executable, ctx),
+            inline else => |node| try node.generateBytecode(executable, ctx),
         }
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
         try printString("Expression", writer, indentation);
         switch (self) {
-            .primary_expression => |primary_expression| try primary_expression.print(
-                writer,
-                indentation + 1,
-            ),
-            .member_expression => |member_expression| try member_expression.print(
-                writer,
-                indentation + 1,
-            ),
-            .new_expression => |new_expression| try new_expression.print(
-                writer,
-                indentation + 1,
-            ),
-            .call_expression => |call_expression| try call_expression.print(
-                writer,
-                indentation + 1,
-            ),
-            .unary_expression => |unary_expression| try unary_expression.print(
-                writer,
-                indentation + 1,
-            ),
-            .binary_expression => |binary_expression| try binary_expression.print(
-                writer,
-                indentation + 1,
-            ),
-            .relational_expression => |relational_expression| try relational_expression.print(
-                writer,
-                indentation + 1,
-            ),
-            .equality_expression => |equality_expression| try equality_expression.print(
-                writer,
-                indentation + 1,
-            ),
-            .logical_expression => |logical_expression| try logical_expression.print(
-                writer,
-                indentation + 1,
-            ),
-            .conditional_expression => |conditional_expression| try conditional_expression.print(
-                writer,
-                indentation + 1,
-            ),
-            .assignment_expression => |assignment_expression| try assignment_expression.print(
-                writer,
-                indentation + 1,
-            ),
-            .sequence_expression => |sequence_expression| try sequence_expression.print(
-                writer,
-                indentation + 1,
-            ),
+            inline else => |node| try node.print(writer, indentation + 1),
         }
     }
 };
@@ -1721,33 +1644,9 @@ pub const Statement = union(enum) {
 
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
         switch (self) {
-            .block_statement => |block_statement| {
-                try block_statement.generateBytecode(executable, ctx);
-            },
-            .variable_statement => |variable_statement| {
-                try variable_statement.generateBytecode(executable, ctx);
-            },
-
             // EmptyStatement : ;
             .empty_statement => {
                 // 1. Return empty.
-            },
-
-            .expression_statement => |expression_statement| {
-                try expression_statement.generateBytecode(executable, ctx);
-            },
-            .if_statement => |if_statement| try if_statement.generateBytecode(executable, ctx),
-            .breakable_statement => |breakable_statement| {
-                try breakable_statement.generateBytecode(executable, ctx);
-            },
-            .return_statement => |return_statement| {
-                try return_statement.generateBytecode(executable, ctx);
-            },
-            .throw_statement => |throw_statement| {
-                try throw_statement.generateBytecode(executable, ctx);
-            },
-            .try_statement => |try_statement| {
-                try try_statement.generateBytecode(executable, ctx);
             },
 
             // DebuggerStatement : debugger ;
@@ -1758,43 +1657,17 @@ pub const Statement = union(enum) {
                 // 2. Else,
                 //     a. Return empty.
             },
+
+            inline else => |node| try node.generateBytecode(executable, ctx),
         }
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
         try printString("Statement", writer, indentation);
         switch (self) {
-            .block_statement => |block_statement| try block_statement.print(
-                writer,
-                indentation + 1,
-            ),
-            .variable_statement => |variable_statement| try variable_statement.print(
-                writer,
-                indentation + 1,
-            ),
             .empty_statement => try printString("empty", writer, indentation + 1),
-            .expression_statement => |expression_statement| try expression_statement.print(
-                writer,
-                indentation + 1,
-            ),
-            .if_statement => |if_statement| try if_statement.print(writer, indentation + 1),
-            .breakable_statement => |breakable_statement| try breakable_statement.print(
-                writer,
-                indentation + 1,
-            ),
-            .return_statement => |return_statement| try return_statement.print(
-                writer,
-                indentation + 1,
-            ),
-            .throw_statement => |throw_statement| try throw_statement.print(
-                writer,
-                indentation + 1,
-            ),
-            .try_statement => |try_statement| try try_statement.print(
-                writer,
-                indentation + 1,
-            ),
             .debugger_statement => try printString("debugger", writer, indentation + 1),
+            inline else => |node| try node.print(writer, indentation + 1),
         }
     }
 };
@@ -1815,22 +1688,14 @@ pub const Declaration = union(enum) {
 
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         switch (self) {
-            .hoistable_declaration => |hoistable_declaration| try hoistable_declaration.generateBytecode(executable, ctx),
-            .lexical_declaration => |lexical_declaration| try lexical_declaration.generateBytecode(executable, ctx),
+            inline else => |node| try node.generateBytecode(executable, ctx),
         }
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("Declaration", writer, indentation);
         switch (self) {
-            .hoistable_declaration => |hoistable_declaration| try hoistable_declaration.print(
-                writer,
-                indentation + 1,
-            ),
-            .lexical_declaration => |lexical_declaration| try lexical_declaration.print(
-                writer,
-                indentation + 1,
-            ),
+            inline else => |node| try node.print(writer, indentation + 1),
         }
     }
 };
@@ -2000,23 +1865,20 @@ pub const StatementListItem = union(enum) {
 
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
         return switch (self) {
-            .statement => |statement| statement.analyze(query),
-            .declaration => |declaration| declaration.analyze(query),
+            inline else => |node| node.analyze(query),
         };
     }
 
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         switch (self) {
-            .statement => |statement| try statement.generateBytecode(executable, ctx),
-            .declaration => |declaration| try declaration.generateBytecode(executable, ctx),
+            inline else => |node| try node.generateBytecode(executable, ctx),
         }
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         // Omit printing 'StatementListItem' here, it's implied and only adds nesting.
         switch (self) {
-            .statement => |statement| try statement.print(writer, indentation),
-            .declaration => |declaration| try declaration.print(writer, indentation),
+            inline else => |node| try node.print(writer, indentation),
         }
     }
 };
@@ -2358,8 +2220,7 @@ pub const IterationStatement = union(enum) {
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         // Omit printing 'IterationStatement' here, it's implied and only adds nesting.
         switch (self) {
-            .do_while_statement => |do_while_statement| try do_while_statement.print(writer, indentation),
-            .while_statement => |while_statement| try while_statement.print(writer, indentation),
+            inline else => |node| try node.print(writer, indentation),
         }
     }
 };
