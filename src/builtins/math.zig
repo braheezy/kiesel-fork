@@ -115,6 +115,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "atanh", atanh, 1, realm);
         try defineBuiltinFunction(object, "ceil", ceil, 1, realm);
         try defineBuiltinFunction(object, "clz32", clz32, 1, realm);
+        try defineBuiltinFunction(object, "cos", cos, 1, realm);
         try defineBuiltinFunction(object, "floor", floor, 1, realm);
         try defineBuiltinFunction(object, "pow", pow, 2, realm);
         try defineBuiltinFunction(object, "random", random, 0, realm);
@@ -265,6 +266,21 @@ pub const Math = struct {
 
         // 3. Return 𝔽(p).
         return Value.from(p);
+    }
+
+    /// 21.3.2.12 Math.cos ( x )
+    /// https://tc39.es/ecma262/#sec-math.cos
+    fn cos(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const x = arguments.get(0);
+
+        // 1. Let n be ? ToNumber(x).
+        const n = try x.toNumber(agent);
+
+        // 2. If n is not finite, return NaN.
+        // 3. If n is either +0𝔽 or -0𝔽, return 1𝔽.
+        // 4. Return an implementation-approximated Number value representing the result of the
+        //    cosine of ℝ(n).
+        return Value.from(@cos(n.asFloat()));
     }
 
     /// 21.3.2.16 Math.floor ( x )
