@@ -108,6 +108,7 @@ pub const Math = struct {
 
         try defineBuiltinFunction(object, "abs", abs, 1, realm);
         try defineBuiltinFunction(object, "acos", acos, 1, realm);
+        try defineBuiltinFunction(object, "acosh", acosh, 1, realm);
         try defineBuiltinFunction(object, "ceil", ceil, 1, realm);
         try defineBuiltinFunction(object, "clz32", clz32, 1, realm);
         try defineBuiltinFunction(object, "floor", floor, 1, realm);
@@ -149,6 +150,22 @@ pub const Math = struct {
         // 4. Return an implementation-approximated Number value representing the result of the
         //    inverse cosine of ℝ(n).
         return Value.from(std.math.acos(n.asFloat()));
+    }
+
+    /// 21.3.2.3 Math.acosh ( x )
+    /// https://tc39.es/ecma262/#sec-math.acosh
+    fn acosh(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const x = arguments.get(0);
+
+        // 1. Let n be ? ToNumber(x).
+        const n = try x.toNumber(agent);
+
+        // 2. If n is either NaN or +∞𝔽, return n.
+        // 3. If n is 1𝔽, return +0𝔽.
+        // 4. If n < 1𝔽, return NaN.
+        // 5. Return an implementation-approximated Number value representing the result of the
+        //    inverse hyperbolic cosine of ℝ(n).
+        return Value.from(std.math.acosh(n.asFloat()));
     }
 
     /// 21.3.2.10 Math.ceil ( x )
