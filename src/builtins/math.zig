@@ -123,6 +123,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "round", round, 1, realm);
         try defineBuiltinFunction(object, "sign", sign, 1, realm);
         try defineBuiltinFunction(object, "sin", sin, 1, realm);
+        try defineBuiltinFunction(object, "sinh", sinh, 1, realm);
         try defineBuiltinFunction(object, "trunc", trunc, 1, realm);
 
         return object;
@@ -388,6 +389,20 @@ pub const Math = struct {
         // 4. Return an implementation-approximated Number value representing the result of the
         //    sine of ℝ(n).
         return Value.from(@sin(n.asFloat()));
+    }
+
+    /// 21.3.2.31 Math.sinh ( x )
+    /// https://tc39.es/ecma262/#sec-math.sinh
+    fn sinh(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const x = arguments.get(0);
+
+        // 1. Let n be ? ToNumber(x).
+        const n = try x.toNumber(agent);
+
+        // 2. If n is not finite or n is either +0𝔽 or -0𝔽, return n.
+        // 3. Return an implementation-approximated Number value representing the result of the
+        //    hyperbolic sine of ℝ(n).
+        return Value.from(std.math.sinh(n.asFloat()));
     }
 
     /// 21.3.2.35 Math.trunc ( x )
