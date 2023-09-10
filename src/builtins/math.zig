@@ -110,6 +110,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "acos", acos, 1, realm);
         try defineBuiltinFunction(object, "acosh", acosh, 1, realm);
         try defineBuiltinFunction(object, "asin", asin, 1, realm);
+        try defineBuiltinFunction(object, "asinh", asinh, 1, realm);
         try defineBuiltinFunction(object, "ceil", ceil, 1, realm);
         try defineBuiltinFunction(object, "clz32", clz32, 1, realm);
         try defineBuiltinFunction(object, "floor", floor, 1, realm);
@@ -182,6 +183,23 @@ pub const Math = struct {
         // 4. Return an implementation-approximated Number value representing the result of the
         //    inverse sine of ℝ(n).
         return Value.from(std.math.asin(n.asFloat()));
+    }
+
+    /// 21.3.2.5 Math.asinh ( x )
+    /// https://tc39.es/ecma262/#sec-math.asinh
+    fn asinh(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const x = arguments.get(0);
+
+        // 1. Let n be ? ToNumber(x).
+        const n = try x.toNumber(agent);
+
+        // 2. If n is one of NaN, +0𝔽, or -0𝔽, return n.
+        // 3. If n > 1𝔽 or n < -1𝔽, return NaN.
+        // 4. Return an implementation-approximated Number value representing the result of the
+        //    inverse sine of ℝ(n).
+        // TODO: Remove this special case for -0 once https://github.com/ziglang/zig/issues/17111 is fixed
+        if (n.isZero()) return Value.from(n);
+        return Value.from(std.math.asinh(n.asFloat()));
     }
 
     /// 21.3.2.10 Math.ceil ( x )
