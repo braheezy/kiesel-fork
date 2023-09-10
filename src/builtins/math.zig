@@ -124,6 +124,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "sign", sign, 1, realm);
         try defineBuiltinFunction(object, "sin", sin, 1, realm);
         try defineBuiltinFunction(object, "sinh", sinh, 1, realm);
+        try defineBuiltinFunction(object, "sqrt", sqrt, 1, realm);
         try defineBuiltinFunction(object, "tan", tan, 1, realm);
         try defineBuiltinFunction(object, "tanh", tanh, 1, realm);
         try defineBuiltinFunction(object, "trunc", trunc, 1, realm);
@@ -405,6 +406,21 @@ pub const Math = struct {
         // 3. Return an implementation-approximated Number value representing the result of the
         //    hyperbolic sine of ℝ(n).
         return Value.from(std.math.sinh(n.asFloat()));
+    }
+
+    /// 21.3.2.32 Math.sqrt ( x )
+    /// https://tc39.es/ecma262/#sec-math.sqrt
+    fn sqrt(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const x = arguments.get(0);
+
+        // 1. Let n be ? ToNumber(x).
+        const n = try x.toNumber(agent);
+
+        // 2. If n is one of NaN, +0𝔽, -0𝔽, or +∞𝔽, return n.
+        // 3. If n < -0𝔽, return NaN.
+        // 4. Return an implementation-approximated Number value representing the result of the
+        //    square root of ℝ(n).
+        return Value.from(@sqrt(n.asFloat()));
     }
 
     /// 21.3.2.33 Math.tan ( x )
