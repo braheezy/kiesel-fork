@@ -125,6 +125,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "sin", sin, 1, realm);
         try defineBuiltinFunction(object, "sinh", sinh, 1, realm);
         try defineBuiltinFunction(object, "tan", tan, 1, realm);
+        try defineBuiltinFunction(object, "tanh", tanh, 1, realm);
         try defineBuiltinFunction(object, "trunc", trunc, 1, realm);
 
         return object;
@@ -419,6 +420,22 @@ pub const Math = struct {
         // 4. Return an implementation-approximated Number value representing the result of the
         //    tangent of ℝ(n).
         return Value.from(@tan(n.asFloat()));
+    }
+
+    /// 21.3.2.34 Math.tanh ( x )
+    /// https://tc39.es/ecma262/#sec-math.tanh
+    fn tanh(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const x = arguments.get(0);
+
+        // 1. Let n be ? ToNumber(x).
+        const n = try x.toNumber(agent);
+
+        // 2. If n is one of NaN, +0𝔽, or -0𝔽, return n.
+        // 3. If n is +∞𝔽, return 1𝔽.
+        // 4. If n is -∞𝔽, return -1𝔽.
+        // 5. Return an implementation-approximated Number value representing the result of the
+        //    hyperbolic tangent of ℝ(n).
+        return Value.from(std.math.tanh(n.asFloat()));
     }
 
     /// 21.3.2.35 Math.trunc ( x )
