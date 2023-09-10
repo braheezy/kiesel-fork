@@ -30,6 +30,10 @@ this point. Pull requests and issues are disabled for the time being, if you
 want to report a bug (not missing feature, most features are missing!), please
 ping me directly.
 
+Further reading:
+
+- [Kiesel Devlog #1: Now passing 25% of test252!](https://linus.dev/posts/kiesel-devlog-1/)
+
 ## Build
 
 Dependencies managed through [`build.zig.zon`](./build.zig.zon) will be
