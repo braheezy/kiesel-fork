@@ -116,6 +116,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "ceil", ceil, 1, realm);
         try defineBuiltinFunction(object, "clz32", clz32, 1, realm);
         try defineBuiltinFunction(object, "cos", cos, 1, realm);
+        try defineBuiltinFunction(object, "cosh", cosh, 1, realm);
         try defineBuiltinFunction(object, "floor", floor, 1, realm);
         try defineBuiltinFunction(object, "pow", pow, 2, realm);
         try defineBuiltinFunction(object, "random", random, 0, realm);
@@ -281,6 +282,22 @@ pub const Math = struct {
         // 4. Return an implementation-approximated Number value representing the result of the
         //    cosine of ℝ(n).
         return Value.from(@cos(n.asFloat()));
+    }
+
+    /// 21.3.2.13 Math.cosh ( x )
+    /// https://tc39.es/ecma262/#sec-math.cosh
+    fn cosh(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const x = arguments.get(0);
+
+        // 1. Let n be ? ToNumber(x).
+        const n = try x.toNumber(agent);
+
+        // 2. If n is NaN, return NaN.
+        // 3. If n is either +∞𝔽 or -∞𝔽, return +∞𝔽.
+        // 4. If n is either +0𝔽 or -0𝔽, return 1𝔽.
+        // 5. Return an implementation-approximated Number value representing the result of the
+        //    hyperbolic cosine of ℝ(n).
+        return Value.from(std.math.cosh(n.asFloat()));
     }
 
     /// 21.3.2.16 Math.floor ( x )
