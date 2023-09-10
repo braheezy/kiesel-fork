@@ -113,6 +113,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "asinh", asinh, 1, realm);
         try defineBuiltinFunction(object, "atan", atan, 1, realm);
         try defineBuiltinFunction(object, "atanh", atanh, 1, realm);
+        try defineBuiltinFunction(object, "cbrt", cbrt, 1, realm);
         try defineBuiltinFunction(object, "ceil", ceil, 1, realm);
         try defineBuiltinFunction(object, "clz32", clz32, 1, realm);
         try defineBuiltinFunction(object, "cos", cos, 1, realm);
@@ -242,6 +243,22 @@ pub const Math = struct {
         // 6. Return an implementation-approximated Number value representing the result of the
         //    inverse hyperbolic tangent of ℝ(n).
         return Value.from(std.math.atanh(n.asFloat()));
+    }
+
+    /// 21.3.2.9 Math.cbrt ( x )
+    /// https://tc39.es/ecma262/#sec-math.cbrt
+    fn cbrt(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const x = arguments.get(0);
+
+        // 1. Let n be ? ToNumber(x).
+        const n = try x.toNumber(agent);
+
+        // 2. If n is not finite or n is either +0𝔽 or -0𝔽, return n.
+        // 3. Return an implementation-approximated Number value representing the result of the
+        //    cube root of ℝ(n).
+        // TODO: Remove this special case for -0 once https://github.com/ziglang/zig/issues/17112 is fixed
+        if (n.isZero()) return Value.from(n);
+        return Value.from(std.math.cbrt(n.asFloat()));
     }
 
     /// 21.3.2.10 Math.ceil ( x )
