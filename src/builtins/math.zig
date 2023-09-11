@@ -121,6 +121,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "exp", exp, 1, realm);
         try defineBuiltinFunction(object, "expm1", expm1, 1, realm);
         try defineBuiltinFunction(object, "floor", floor, 1, realm);
+        try defineBuiltinFunction(object, "log", log, 1, realm);
         try defineBuiltinFunction(object, "pow", pow, 2, realm);
         try defineBuiltinFunction(object, "random", random, 0, realm);
         try defineBuiltinFunction(object, "round", round, 1, realm);
@@ -369,6 +370,23 @@ pub const Math = struct {
         // 4. If n is an integral Number, return n.
         // 5. Return the greatest (closest to +∞) integral Number value that is not greater than n.
         return Value.from(n.floor());
+    }
+
+    /// 21.3.2.20 Math.log ( x )
+    /// https://tc39.es/ecma262/#sec-math.log
+    fn log(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const x = arguments.get(0);
+
+        // 1. Let n be ? ToNumber(x).
+        const n = try x.toNumber(agent);
+
+        // 2. If n is either NaN or +∞𝔽, return n.
+        // 3. If n is 1𝔽, return +0𝔽.
+        // 4. If n is either +0𝔽 or -0𝔽, return -∞𝔽.
+        // 5. If n < -0𝔽, return NaN.
+        // 6. Return an implementation-approximated Number value representing the result of the
+        //    natural logarithm of ℝ(n).
+        return Value.from(@log(n.asFloat()));
     }
 
     /// 21.3.2.26 Math.pow ( base, exponent )
