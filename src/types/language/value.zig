@@ -19,6 +19,7 @@ const String = @import("string.zig").String;
 const Symbol = @import("Symbol.zig");
 const arrayCreate = builtins.arrayCreate;
 const noexcept = utils.noexcept;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const prettyPrintValue = pretty_printing.prettyPrintValue;
 const stringCreate = builtins.stringCreate;
 const trim = utils.trim;
@@ -1406,6 +1407,19 @@ pub fn createArrayFromListMapToValue(
 
     // 4. Return array.
     return array;
+}
+
+/// 9.2.12 CoerceOptionsToObject ( options )
+/// https://tc39.es/ecma402/#sec-coerceoptionstoobject
+pub fn coerceOptionsToObject(agent: *Agent, options: Value) !Object {
+    // 1. If options is undefined, then
+    if (options == .undefined) {
+        // a. Return OrdinaryObjectCreate(null).
+        return ordinaryObjectCreate(agent, null);
+    }
+
+    // 2. Return ? ToObject(options).
+    return options.toObject(agent);
 }
 
 test "format" {
