@@ -21,9 +21,11 @@ const Object = kiesel.types.Object;
 const Realm = kiesel.execution.Realm;
 const Script = kiesel.language.Script;
 const Value = kiesel.types.Value;
+const coerceOptionsToObject = kiesel.types.coerceOptionsToObject;
 const defineBuiltinFunction = kiesel.utils.defineBuiltinFunction;
 const defineBuiltinProperty = kiesel.utils.defineBuiltinProperty;
 const formatParseError = kiesel.utils.formatParseError;
+const getOption = kiesel.types.getOption;
 const ordinaryObjectCreate = kiesel.builtins.ordinaryObjectCreate;
 
 const bdwgc_version_string = std.fmt.comptimePrint("{}.{}.{}", .{
@@ -111,8 +113,13 @@ pub const Kiesel = struct {
     }
 
     fn print(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
-        const str = try arguments.get(0).toString(agent);
-        stdout.print("{}\n", .{str}) catch {};
+        const value = arguments.get(0);
+        const options = try coerceOptionsToObject(agent, arguments.get(1));
+        const pretty = try getOption(options, "pretty", .boolean, null, false);
+        if (pretty)
+            stdout.print("{pretty}\n", .{value}) catch {}
+        else
+            stdout.print("{}\n", .{try value.toString(agent)}) catch {};
         return .undefined;
     }
 };
