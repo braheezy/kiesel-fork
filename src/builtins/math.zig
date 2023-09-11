@@ -122,6 +122,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "expm1", expm1, 1, realm);
         try defineBuiltinFunction(object, "floor", floor, 1, realm);
         try defineBuiltinFunction(object, "log", log, 1, realm);
+        try defineBuiltinFunction(object, "log1p", log1p, 1, realm);
         try defineBuiltinFunction(object, "pow", pow, 2, realm);
         try defineBuiltinFunction(object, "random", random, 0, realm);
         try defineBuiltinFunction(object, "round", round, 1, realm);
@@ -387,6 +388,23 @@ pub const Math = struct {
         // 6. Return an implementation-approximated Number value representing the result of the
         //    natural logarithm of ℝ(n).
         return Value.from(@log(n.asFloat()));
+    }
+
+    /// 21.3.2.21 Math.log1p ( x )
+    /// https://tc39.es/ecma262/#sec-math.log1p
+    fn log1p(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const x = arguments.get(0);
+
+        // 1. Let n be ? ToNumber(x).
+        const n = try x.toNumber(agent);
+
+        // 2. If n is one of NaN, +0𝔽, -0𝔽, or +∞𝔽, return n.
+        // 3. If n is -1𝔽, return -∞𝔽.
+        // 4. If n < -1𝔽, return NaN.
+        // 5. Return an implementation-approximated Number value representing the result of the
+        //    natural logarithm of 1 + ℝ(n).
+        if (n.isNegativeZero()) return Value.from(n);
+        return Value.from(@log(1 + n.asFloat()));
     }
 
     /// 21.3.2.26 Math.pow ( base, exponent )
