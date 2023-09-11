@@ -738,6 +738,7 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "some", some, 1, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
+        try defineBuiltinFunction(object, "values", values, 0, realm);
         try defineBuiltinFunction(object, "with", with, 2, realm);
 
         // 23.1.3.41 Array.prototype [ @@unscopables ]
@@ -1482,6 +1483,16 @@ pub const ArrayPrototype = struct {
 
         // 4. Return ? Call(func, array).
         return func.callAssumeCallableNoArgs(Value.from(array));
+    }
+
+    /// 23.1.3.38 Array.prototype.values ( )
+    /// https://tc39.es/ecma262/#sec-array.prototype.values
+    fn values(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Return CreateArrayIterator(O, value).
+        return Value.from(try createArrayIterator(agent, object, .value));
     }
 
     /// 23.1.3.39 Array.prototype.with ( index, value )
