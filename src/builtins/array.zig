@@ -11,6 +11,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const Iterator = types.Iterator;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = Object.PropertyKey;
@@ -21,6 +22,7 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
+const getIteratorFromMethod = types.getIteratorFromMethod;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const isStrictlyEqual = types.isStrictlyEqual;
 const noexcept = utils.noexcept;
@@ -358,6 +360,7 @@ pub const ArrayConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "from", from, 1, realm);
         try defineBuiltinFunction(object, "isArray", isArray, 1, realm);
         try defineBuiltinFunction(object, "of", of, 0, realm);
 
@@ -478,6 +481,170 @@ pub const ArrayConstructor = struct {
             // f. Return array.
             return Value.from(array);
         }
+    }
+
+    /// 23.1.2.1 Array.from ( items [ , mapfn [ , thisArg ] ] )
+    /// https://tc39.es/ecma262/#sec-array.from
+    fn from(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const items = arguments.get(0);
+        const map_fn = arguments.get(1);
+        const this_arg = arguments.get(2);
+
+        // 1. Let C be the this value.
+        const constructor = this_value;
+
+        // 2. If mapfn is undefined, then
+        const mapping = if (map_fn == .undefined) blk: {
+            // a. Let mapping be false.
+            break :blk false;
+        }
+        // 3. Else,
+        else blk: {
+            // a. If IsCallable(mapfn) is false, throw a TypeError exception.
+            if (!map_fn.isCallable()) {
+                return agent.throwException(
+                    .type_error,
+                    try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{map_fn}),
+                );
+            }
+
+            // b. Let mapping be true.
+            break :blk true;
+        };
+
+        // 4. Let usingIterator be ? GetMethod(items, @@iterator).
+        const using_iterator = try items.getMethod(
+            agent,
+            PropertyKey.from(agent.well_known_symbols.@"@@iterator"),
+        );
+
+        // 5. If usingIterator is not undefined, then
+        if (using_iterator != null) {
+            // a. If IsConstructor(C) is true, then
+            const array = if (constructor.isConstructor()) blk: {
+                // i. Let A be ? Construct(C).
+                break :blk try constructor.object.construct(.{}, null);
+            }
+            // b. Else,
+            else blk: {
+                // i. Let A be ! ArrayCreate(0).
+                break :blk try arrayCreate(agent, 0, null);
+            };
+
+            // c. Let iteratorRecord be ? GetIteratorFromMethod(items, usingIterator).
+            const iterator = try getIteratorFromMethod(agent, items, using_iterator.?);
+
+            // d. Let k be 0.
+            var k: u53 = 0;
+
+            // e. Repeat,
+            while (true) : (k += 1) {
+                // i. If k ≥ 2^53 - 1, then
+                if (k == std.math.maxInt(u53)) {
+                    // 1. Let error be ThrowCompletion(a newly created TypeError object).
+                    const @"error" = agent.throwException(.type_error, "uhh");
+
+                    // 2. Return ? IteratorClose(iteratorRecord, error).
+                    return iterator.close(@as(Agent.Error!Value, @"error"));
+                }
+
+                // ii. Let Pk be ! ToString(𝔽(k)).
+                const property_key = PropertyKey.from(k);
+
+                // iii. Let next be ? IteratorStep(iteratorRecord).
+                const next = try iterator.step();
+
+                // iv. If next is false, then
+                if (next == null) {
+                    // 1. Perform ? Set(A, "length", 𝔽(k), true).
+                    try array.set(PropertyKey.from("length"), Value.from(k), .throw);
+
+                    // 2. Return A.
+                    return Value.from(array);
+                }
+
+                // v. Let nextValue be ? IteratorValue(next).
+                const next_value = try Iterator.value(next.?);
+
+                // vi. If mapping is true, then
+                const mapped_value = if (mapping) blk: {
+                    // 1. Let mappedValue be Completion(Call(mapfn, thisArg, « nextValue, 𝔽(k) »)).
+                    break :blk map_fn.callAssumeCallable(
+                        this_arg,
+                        .{ next_value, Value.from(k) },
+                    ) catch |err| {
+                        // 2. IfAbruptCloseIterator(mappedValue, iteratorRecord).
+                        return iterator.close(@as(Agent.Error!Value, err));
+                    };
+                }
+                // vii. Else,
+                else blk: {
+                    // 1. Let mappedValue be nextValue.
+                    break :blk next_value;
+                };
+
+                // viii. Let defineStatus be Completion(CreateDataPropertyOrThrow(A, Pk, mappedValue)).
+                _ = array.createDataPropertyOrThrow(property_key, mapped_value) catch |err| {
+                    // ix. IfAbruptCloseIterator(defineStatus, iteratorRecord).
+                    return iterator.close(@as(Agent.Error!Value, err));
+                };
+
+                // x. Set k to k + 1.
+            }
+        }
+
+        // 6. NOTE: items is not an Iterable so assume it is an array-like object.
+        // 7. Let arrayLike be ! ToObject(items).
+        const array_like = items.toObject(agent) catch |err| try noexcept(err);
+
+        // 8. Let len be ? LengthOfArrayLike(arrayLike).
+        const len = try array_like.lengthOfArrayLike();
+
+        // 9. If IsConstructor(C) is true, then
+        const array = if (constructor.isConstructor()) blk: {
+            // a. Let A be ? Construct(C, « 𝔽(len) »).
+            break :blk try constructor.object.construct(.{Value.from(len)}, null);
+        }
+        // 10. Else,
+        else blk: {
+            // a. Let A be ? ArrayCreate(len).
+            if (len > std.math.maxInt(usize)) return error.OutOfMemory;
+            break :blk try arrayCreate(agent, @intCast(len), null);
+        };
+
+        // 11. Let k be 0.
+        var k: u53 = 0;
+
+        // 12. Repeat, while k < len,
+        while (k < len) : (k += 1) {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
+
+            // b. Let kValue be ? Get(arrayLike, Pk).
+            const k_value = try array_like.get(property_key);
+
+            // c. If mapping is true, then
+            const mapped_value = if (mapping) blk: {
+                // i. Let mappedValue be ? Call(mapfn, thisArg, « kValue, 𝔽(k) »).
+                break :blk try map_fn.callAssumeCallable(this_arg, .{ k_value, Value.from(k) });
+            }
+            // d. Else,
+            else blk: {
+                // i. Let mappedValue be kValue.
+                break :blk k_value;
+            };
+
+            // e. Perform ? CreateDataPropertyOrThrow(A, Pk, mappedValue).
+            try array.createDataPropertyOrThrow(property_key, mapped_value);
+
+            // f. Set k to k + 1.
+        }
+
+        // 13. Perform ? Set(A, "length", 𝔽(len), true).
+        try array.set(PropertyKey.from("length"), Value.from(len), .throw);
+
+        // 14. Return A.
+        return Value.from(array);
     }
 
     /// 23.1.2.2 Array.isArray ( arg )
