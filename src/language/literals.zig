@@ -151,11 +151,17 @@ pub fn parseNumericLiteral(
             else => return error.InvalidNumericLiteral,
         },
         else => switch (consume) {
-            .partial => return .{
-                .text = str[0..i],
-                .system = system,
-                .production = production,
-                .type = @"type",
+            .partial => {
+                // Special case: fraction_period is allowed as an end state, but not on its own
+                // This avoids '.' on its own being tokenized as .numeric
+                if (state == .fraction_period and i == 1) return error.InvalidNumericLiteral;
+
+                return .{
+                    .text = str[0..i],
+                    .system = system,
+                    .production = production,
+                    .type = @"type",
+                };
             },
             .complete => return error.InvalidNumericLiteral,
         },

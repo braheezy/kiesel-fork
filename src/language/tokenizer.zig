@@ -112,10 +112,15 @@ const TokenType = enum {
 const Pattern = ptk.Pattern(TokenType);
 
 const patterns = .{
-    // NOTE: Needs to come first or strings such as 'ifelse' turn into two tokens
+    // NOTE: Needs to come first or identifiers such as 'ifelse' turn into two tokens
     Pattern.create(.identifier, identifierMatcher),
-    // NOTE: Needs to come before binary operator tokens
+    // NOTE: A few of these need to come first to take priority over single-character tokens such
+    //       as '/' (vs '// foo') or '.' (vs '.123'). For simplicity we group all the non-literal
+    //       matchers here.
     Pattern.create(.comment, commentMatcher),
+    Pattern.create(.numeric, numericMatcher),
+    Pattern.create(.string, stringMatcher),
+    Pattern.create(.whitespace, whitespaceMatcher),
     Pattern.create(.@"--", ptk.matchers.literal("--")),
     Pattern.create(.@"-=", ptk.matchers.literal("-=")),
     Pattern.create(.@"-", ptk.matchers.literal("-")),
@@ -198,9 +203,7 @@ const patterns = .{
     Pattern.create(.in, ptk.matchers.literal("in")),
     Pattern.create(.new, ptk.matchers.literal("new")),
     Pattern.create(.null, ptk.matchers.literal("null")),
-    Pattern.create(.numeric, numericMatcher),
     Pattern.create(.@"return", ptk.matchers.literal("return")),
-    Pattern.create(.string, stringMatcher),
     Pattern.create(.super, ptk.matchers.literal("super")),
     Pattern.create(.@"switch", ptk.matchers.literal("switch")),
     Pattern.create(.this, ptk.matchers.literal("this")),
@@ -211,7 +214,6 @@ const patterns = .{
     Pattern.create(.@"var", ptk.matchers.literal("var")),
     Pattern.create(.void, ptk.matchers.literal("void")),
     Pattern.create(.@"while", ptk.matchers.literal("while")),
-    Pattern.create(.whitespace, whitespaceMatcher),
     Pattern.create(.with, ptk.matchers.literal("with")),
     Pattern.create(.@"yield*", ptk.matchers.literal("yield*")),
     Pattern.create(.yield, ptk.matchers.literal("yield")),
