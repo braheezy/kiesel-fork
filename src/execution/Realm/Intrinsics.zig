@@ -18,6 +18,7 @@ lazy_intrinsics: struct {
     @"%AggregateError.prototype%": ?Object = null,
     @"%Array%": ?Object = null,
     @"%Array.prototype%": ?Object = null,
+    @"%ArrayIteratorPrototype%": ?Object = null,
     @"%BigInt%": ?Object = null,
     @"%BigInt.prototype%": ?Object = null,
     @"%Boolean%": ?Object = null,
@@ -88,6 +89,9 @@ pub fn @"%Array%"(self: *Self) error{OutOfMemory}!Object {
 }
 pub fn @"%Array.prototype%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Array.prototype%", builtins.ArrayPrototype);
+}
+pub fn @"%ArrayIteratorPrototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%ArrayIteratorPrototype%", builtins.ArrayIteratorPrototype);
 }
 pub fn @"%BigInt%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%BigInt%", builtins.BigIntConstructor);

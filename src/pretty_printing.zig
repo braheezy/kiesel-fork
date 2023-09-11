@@ -61,6 +61,19 @@ fn prettyPrintArray(array: Object, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintArrayIterator(array_iterator: Object, writer: anytype) !void {
+    const array = array_iterator.as(builtins.ArrayIterator).fields.array;
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("%ArrayIterator%(");
+    try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}", .{Value.from(array)});
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintError(@"error": Object, writer: anytype) !void {
     const error_data = @"error".as(builtins.Error).fields.error_data;
     const tty_config = getTtyConfigForWriter(writer);
@@ -215,6 +228,8 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
 
         if (object.is(builtins.Array))
             return prettyPrintArray(object, writer);
+        if (object.is(builtins.ArrayIterator))
+            return prettyPrintArrayIterator(object, writer);
         if (object.is(builtins.Error))
             return prettyPrintError(object, writer);
         if (object.is(builtins.BigInt) or

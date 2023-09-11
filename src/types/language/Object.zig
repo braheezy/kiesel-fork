@@ -32,6 +32,7 @@ const Self = @This();
 pub const Tag = enum(u32) {
     arguments,
     array,
+    array_iterator,
     big_int,
     boolean,
     builtin_function,
@@ -47,6 +48,12 @@ pub const Tag = enum(u32) {
 pub const IntegrityLevel = enum {
     sealed,
     frozen,
+};
+
+pub const PropertyKind = enum {
+    key,
+    value,
+    @"key+value",
 };
 
 ptr: AnyPointer,
@@ -70,6 +77,7 @@ pub inline fn is(self: Self, comptime T: type) bool {
     inline for ([_]struct { type, Tag }{
         .{ builtins.Arguments, .arguments },
         .{ builtins.Array, .array },
+        .{ builtins.ArrayIterator, .array_iterator },
         .{ builtins.BigInt, .big_int },
         .{ builtins.Boolean, .boolean },
         .{ builtins.BuiltinFunction, .builtin_function },
@@ -460,7 +468,7 @@ pub fn lengthOfArrayLike(self: Self) !u53 {
 /// https://tc39.es/ecma262/#sec-enumerableownproperties
 pub fn enumerableOwnProperties(
     self: Self,
-    comptime kind: enum { key, value, @"key+value" },
+    comptime kind: PropertyKind,
 ) !std.ArrayList(Value) {
     // 1. Let ownKeys be ? O.[[OwnPropertyKeys]]().
     const own_keys = try self.internalMethods().ownPropertyKeys(self);
