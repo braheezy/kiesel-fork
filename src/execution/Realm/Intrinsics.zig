@@ -31,6 +31,7 @@ lazy_intrinsics: struct {
     @"%Function.prototype%": ?Object = null,
     @"%isFinite%": ?Object = null,
     @"%isNaN%": ?Object = null,
+    @"%IteratorPrototype%": ?Object = null,
     @"%Math%": ?Object = null,
     @"%Number%": ?Object = null,
     @"%Number.prototype%": ?Object = null,
@@ -126,6 +127,9 @@ pub fn @"%isFinite%"(self: *Self) error{OutOfMemory}!Object {
 }
 pub fn @"%isNaN%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%isNaN%", builtins.global_functions.IsNaN);
+}
+pub fn @"%IteratorPrototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%IteratorPrototype%", builtins.IteratorPrototype);
 }
 pub fn @"%Math%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Math%", builtins.Math);
