@@ -741,6 +741,11 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "values", values, 0, realm);
         try defineBuiltinFunction(object, "with", with, 2, realm);
 
+        // 23.1.3.40 Array.prototype [ @@iterator ] ( )
+        // https://tc39.es/ecma262/#sec-array.prototype-@@iterator
+        const @"%Array.prototype.values%" = object.propertyStorage().get(PropertyKey.from("values")).?;
+        try defineBuiltinProperty(object, "@@iterator", @"%Array.prototype.values%");
+
         // 23.1.3.41 Array.prototype [ @@unscopables ]
         // https://tc39.es/ecma262/#sec-array.prototype-@@unscopables
         try defineBuiltinProperty(object, "@@unscopables", PropertyDescriptor{
