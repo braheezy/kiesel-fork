@@ -16,9 +16,11 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
+const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
+const getIterator = types.getIterator;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
@@ -362,6 +364,140 @@ fn NativeError() type {
         .tag = .@"error",
     });
 }
+
+/// 20.5.7.1 The AggregateError Constructor
+/// https://tc39.es/ecma262/#sec-aggregate-error-constructor
+pub const AggregateErrorConstructor = struct {
+    pub fn create(realm: *Realm) !Object {
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+            .length = 2,
+            .name = "AggregateError",
+            .realm = realm,
+            .prototype = try realm.intrinsics.@"%Error%"(),
+        });
+
+        // 20.5.7.2.1 AggregateError.prototype
+        // https://tc39.es/ecma262/#sec-aggregate-error.prototype
+        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+            .value = Value.from(try realm.intrinsics.@"%AggregateError.prototype%"()),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+
+        // 20.5.7.3.1 AggregateError.prototype.constructor
+        // https://tc39.es/ecma262/#sec-aggregate-error.prototype.constructor
+        try defineBuiltinProperty(
+            realm.intrinsics.@"%AggregateError.prototype%"() catch unreachable,
+            "constructor",
+            Value.from(object),
+        );
+
+        return object;
+    }
+
+    /// 20.5.7.1.1 AggregateError ( errors, message [ , options ] )
+    /// https://tc39.es/ecma262/#sec-aggregate-error
+    fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, maybe_new_target: ?Object) !Value {
+        const errors = arguments.get(0);
+        const message = arguments.get(1);
+        const options = arguments.get(2);
+
+        // 1. If NewTarget is undefined, let newTarget be the active function object; else let
+        //    newTarget be NewTarget.
+        const new_target = maybe_new_target orelse agent.activeFunctionObject();
+
+        // 2. Let O be ? OrdinaryCreateFromConstructor(newTarget, "%AggregateError.prototype%", « [[ErrorData]] »).
+        const object = try ordinaryCreateFromConstructor(
+            AggregateError,
+            agent,
+            new_target,
+            "%AggregateError.prototype%",
+        );
+
+        // Non-standard
+        object.as(Error).fields = .{
+            .error_data = .{ .name = String.from("AggregateError"), .message = String.from("") },
+        };
+        object.data.internal_methods.set = internalSet;
+
+        // 3. If message is not undefined, then
+        if (message != .undefined) {
+            // a. Let msg be ? ToString(message).
+            const msg = try message.toString(agent);
+
+            // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "message", msg).
+            object.createNonEnumerableDataPropertyOrThrow(
+                PropertyKey.from("message"),
+                Value.from(msg),
+            ) catch |err| try noexcept(err);
+
+            object.as(Error).fields.error_data.message = msg;
+        }
+
+        // 4. Perform ? InstallErrorCause(O, options).
+        try installErrorCause(agent, object, options);
+
+        // 5. Let errorsList be ? IteratorToList(? GetIterator(errors, sync)).
+        const errors_list = try (try getIterator(agent, errors, .sync)).toList();
+        defer agent.gc_allocator.free(errors_list);
+
+        // 6. Perform ! DefinePropertyOrThrow(O, "errors", PropertyDescriptor {
+        //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
+        //      [[Value]]: CreateArrayFromList(errorsList)
+        //    }).
+        object.definePropertyOrThrow(
+            PropertyKey.from("errors"),
+            .{
+                .configurable = true,
+                .enumerable = false,
+                .writable = true,
+                .value = Value.from(try createArrayFromList(agent, errors_list)),
+            },
+        ) catch |err| try noexcept(err);
+
+        // 7. Return O.
+        return Value.from(object);
+    }
+};
+
+/// 20.5.7.3 Properties of the AggregateError Prototype Object
+/// https://tc39.es/ecma262/#sec-properties-of-the-aggregate-error-prototype-objects
+pub const AggregateErrorPrototype = struct {
+    pub fn create(realm: *Realm) !Object {
+        const object = try builtins.Object.create(realm.agent, .{
+            .prototype = try realm.intrinsics.@"%Error.prototype%"(),
+        });
+
+        // 20.5.7.3.2 AggregateError.prototype.message
+        // https://tc39.es/ecma262/#sec-aggregate-error.prototype.message
+        try defineBuiltinProperty(
+            object,
+            "message",
+            Value.from(""),
+        );
+
+        // 20.5.7.3.3 AggregateError.prototype.name
+        // https://tc39.es/ecma262/#sec-aggregate-error.prototype.name
+        try defineBuiltinProperty(
+            object,
+            "name",
+            Value.from("AggregateError"),
+        );
+
+        return object;
+    }
+};
+
+/// 20.5.7.4 Properties of AggregateError Instances
+/// https://tc39.es/ecma262/#sec-properties-of-aggregate-error-instances
+pub const AggregateError = Object.Factory(.{
+    // NOTE: This shares a tag with the plain Error objects as it is identified by the same
+    //       internal slot in the spec and thus subtypes are not distinguishable. For this
+    //       reason the Fields type must be identical for Object.as() casts to work.
+    .Fields = Error.Fields,
+    .tag = .@"error",
+});
 
 /// 20.5.8.1 InstallErrorCause ( O, options )
 /// https://tc39.es/ecma262/#sec-installerrorcause

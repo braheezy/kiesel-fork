@@ -14,6 +14,8 @@ realm: *Realm,
 
 // Not stored as top-level properties so we can have methods of the same names
 lazy_intrinsics: struct {
+    @"%AggregateError%": ?Object = null,
+    @"%AggregateError.prototype%": ?Object = null,
     @"%Array%": ?Object = null,
     @"%Array.prototype%": ?Object = null,
     @"%BigInt%": ?Object = null,
@@ -74,6 +76,12 @@ inline fn lazyIntrinsic(
     return intrinsic.*.?;
 }
 
+pub fn @"%AggregateError%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%AggregateError%", builtins.AggregateErrorConstructor);
+}
+pub fn @"%AggregateError.prototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%AggregateError.prototype%", builtins.AggregateErrorPrototype);
+}
 pub fn @"%Array%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Array%", builtins.ArrayConstructor);
 }

@@ -21,6 +21,9 @@ const throw_type_error = @import("builtins/throw_type_error.zig");
 pub const global_functions = global.global_functions;
 pub const ordinary_internal_methods = ordinary.ordinary_internal_methods;
 
+pub const AggregateError = @"error".AggregateError;
+pub const AggregateErrorConstructor = @"error".AggregateErrorConstructor;
+pub const AggregateErrorPrototype = @"error".AggregateErrorPrototype;
 pub const Arguments = arguments.Arguments;
 pub const ArgumentsList = builtin_function.ArgumentsList;
 pub const Array = array.Array;
