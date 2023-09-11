@@ -9,6 +9,7 @@ pub const Value = value.Value;
 pub const coerceOptionsToObject = value.coerceOptionsToObject;
 pub const createArrayFromList = value.createArrayFromList;
 pub const createArrayFromListMapToValue = value.createArrayFromListMapToValue;
+pub const getOption = value.getOption;
 pub const isLessThan = value.isLessThan;
 pub const isLooselyEqual = value.isLooselyEqual;
 pub const isStrictlyEqual = value.isStrictlyEqual;

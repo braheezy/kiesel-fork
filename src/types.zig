@@ -19,6 +19,7 @@ pub const createArrayFromListMapToValue = language.createArrayFromListMapToValue
 pub const createIterResultObject = spec.createIterResultObject;
 pub const getIterator = spec.getIterator;
 pub const getIteratorFromMethod = spec.getIteratorFromMethod;
+pub const getOption = language.getOption;
 pub const isLessThan = language.isLessThan;
 pub const isLooselyEqual = language.isLooselyEqual;
 pub const isStrictlyEqual = language.isStrictlyEqual;

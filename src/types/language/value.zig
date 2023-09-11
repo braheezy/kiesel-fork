@@ -1422,6 +1422,95 @@ pub fn coerceOptionsToObject(agent: *Agent, options: Value) !Object {
     return options.toObject(agent);
 }
 
+/// 9.2.13 GetOption ( options, property, type, values, default )
+/// https://tc39.es/ecma402/#sec-getoption
+pub fn getOption(
+    options: Object,
+    comptime property: []const u8,
+    comptime @"type": enum {
+        const Self = @This();
+
+        boolean,
+        number,
+        string,
+
+        fn T(comptime self: Self) type {
+            return switch (self) {
+                .boolean => bool,
+                .number => Number,
+                .string => String,
+            };
+        }
+    },
+    comptime values: ?[]const @"type".T(),
+    comptime default: ?@"type".T(),
+) !@"type".T() {
+    const agent = options.agent();
+
+    // 1. Let value be ? Get(options, property).
+    const value = try options.get(PropertyKey.from(property));
+
+    // 2. If value is undefined, then
+    if (value == .undefined) {
+        // a. If default is required, throw a RangeError exception.
+        if (default == null) {
+            return agent.throwException(
+                .range_error,
+                std.fmt.comptimePrint("Required option '{s}' must not be undefined", .{property}),
+            );
+        }
+
+        // b. Return default.
+        return default.?;
+    }
+
+    const coerced_value = switch (@"type") {
+        // 3. If type is boolean, then
+        .boolean => blk: {
+            // a. Set value to ToBoolean(value).
+            break :blk value.toBoolean();
+        },
+
+        // 4. Else if type is number, then
+        .number => blk: {
+            // a. Set value to ? ToNumber(value).
+            const number = try value.toNumber(agent);
+
+            // b. If value is NaN, throw a RangeError exception.
+            if (number.isNan()) {
+                return agent.throwException(
+                    .range_error,
+                    std.fmt.comptimePrint("Number option '{s}' must not be NaN", .{property}),
+                );
+            }
+
+            break :blk number;
+        },
+
+        // 5. Else,
+        //     a. Assert: type is string.
+        .string => blk: {
+            // b. Set value to ? ToString(value).
+            break :blk value.toBoolean();
+        },
+    };
+
+    // 6. If values is not empty and values does not contain value, throw a RangeError exception.
+    if (values != null) {
+        for (values.?) |permitted_value| {
+            if (sameValue(Value.from(coerced_value), Value.from(permitted_value))) break;
+        } else {
+            return agent.throwException(
+                .range_error,
+                std.fmt.comptimePrint("Invalid value for option '{s}'", .{property}),
+            );
+        }
+    }
+
+    // 7. Return value.
+    return coerced_value;
+}
+
 test "format" {
     const gc = @import("gc");
     var agent = try Agent.init(gc.allocator(), .{});
