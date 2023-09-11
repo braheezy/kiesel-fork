@@ -119,6 +119,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "cos", cos, 1, realm);
         try defineBuiltinFunction(object, "cosh", cosh, 1, realm);
         try defineBuiltinFunction(object, "exp", exp, 1, realm);
+        try defineBuiltinFunction(object, "expm1", expm1, 1, realm);
         try defineBuiltinFunction(object, "floor", floor, 1, realm);
         try defineBuiltinFunction(object, "pow", pow, 2, realm);
         try defineBuiltinFunction(object, "random", random, 0, realm);
@@ -337,6 +338,22 @@ pub const Math = struct {
         // 5. Return an implementation-approximated Number value representing the result of the
         //    exponential function of ℝ(n).
         return Value.from(@exp(n.asFloat()));
+    }
+
+    /// 21.3.2.15 Math.expm1 ( x )
+    /// https://tc39.es/ecma262/#sec-math.expm1
+    fn expm1(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const x = arguments.get(0);
+
+        // 1. Let n be ? ToNumber(x).
+        const n = try x.toNumber(agent);
+
+        // 2. If n is one of NaN, +0𝔽, -0𝔽, or +∞𝔽, return n.
+        // 3. If n is -∞𝔽, return -1𝔽.
+        // 4. Return an implementation-approximated Number value representing the result of
+        //    subtracting 1 from the exponential function of ℝ(n).
+        if (n.isNegativeZero()) return Value.from(n);
+        return Value.from(@exp(n.asFloat()) - 1);
     }
 
     /// 21.3.2.16 Math.floor ( x )
