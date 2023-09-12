@@ -739,6 +739,7 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "some", some, 1, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
+        try defineBuiltinFunction(object, "unshift", unshift, 1, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
         try defineBuiltinFunction(object, "with", with, 2, realm);
 
@@ -1554,6 +1555,79 @@ pub const ArrayPrototype = struct {
 
         // 4. Return ? Call(func, array).
         return func.callAssumeCallableNoArgs(Value.from(array));
+    }
+
+    /// 23.1.3.37 Array.prototype.unshift ( ...items )
+    /// https://tc39.es/ecma262/#sec-array.prototype.unshift
+    fn unshift(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+
+        // 3. Let argCount be the number of elements in items.
+        const arg_count = arguments.count();
+
+        // 4. If argCount > 0, then
+        if (arg_count > 0) {
+            // a. If len + argCount > 2^53 - 1, throw a TypeError exception.
+            if (std.meta.isError(std.math.add(u53, len, @intCast(arg_count)))) {
+                return agent.throwException(.type_error, "Maximum array length exceeded");
+            }
+
+            // b. Let k be len.
+            var k = len;
+
+            // c. Repeat, while k > 0,
+            while (k > 0) : (k -= 1) {
+                // i. Let from be ! ToString(𝔽(k - 1)).
+                const from = PropertyKey.from(k - 1);
+
+                // ii. Let to be ! ToString(𝔽(k + argCount - 1)).
+                const to = PropertyKey.from(
+                    k + @as(PropertyKey.IntegerIndex, @intCast(arg_count)) - 1,
+                );
+
+                // iii. Let fromPresent be ? HasProperty(O, from).
+                const from_present = try object.hasProperty(from);
+
+                // iv. If fromPresent is true, then
+                if (from_present) {
+                    // 1. Let fromValue be ? Get(O, from).
+                    const from_value = try object.get(from);
+
+                    // 2. Perform ? Set(O, to, fromValue, true).
+                    try object.set(to, from_value, .throw);
+                }
+                // v. Else,
+                else {
+                    // 1. Assert: fromPresent is false.
+                    std.debug.assert(!from_present);
+
+                    // 2. Perform ? DeletePropertyOrThrow(O, to).
+                    try object.deletePropertyOrThrow(to);
+                }
+
+                // vi. Set k to k - 1.
+            }
+
+            // d. Let j be +0𝔽.
+            // e. For each element E of items, do
+            for (arguments.values, 0..) |element, j| {
+                // i. Perform ? Set(O, ! ToString(j), E, true).
+                const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(j)));
+                try object.set(property_key, element, .throw);
+
+                // ii. Set j to j + 1𝔽.
+            }
+        }
+
+        // 5. Perform ? Set(O, "length", 𝔽(len + argCount), true).
+        try object.set(PropertyKey.from("length"), Value.from(len + arg_count), .throw);
+
+        // 6. Return 𝔽(len + argCount).
+        return Value.from(len + @as(u53, @intCast(arg_count)));
     }
 
     /// 23.1.3.38 Array.prototype.values ( )
