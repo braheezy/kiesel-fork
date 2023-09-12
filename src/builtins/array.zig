@@ -735,6 +735,7 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "map", map, 1, realm);
         try defineBuiltinFunction(object, "pop", pop, 0, realm);
         try defineBuiltinFunction(object, "push", push, 1, realm);
+        try defineBuiltinFunction(object, "shift", shift, 0, realm);
         try defineBuiltinFunction(object, "some", some, 1, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
@@ -1364,6 +1365,71 @@ pub const ArrayPrototype = struct {
 
         // 7. Return 𝔽(len).
         return Value.from(len);
+    }
+
+    /// 23.1.3.27 Array.prototype.shift ( )
+    /// https://tc39.es/ecma262/#sec-array.prototype.shift
+    fn shift(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+
+        // 3. If len = 0, then
+        if (len == 0) {
+            // a. Perform ? Set(O, "length", +0𝔽, true).
+            try object.set(PropertyKey.from("length"), Value.from(0), .throw);
+
+            // b. Return undefined.
+            return .undefined;
+        }
+
+        // 4. Let first be ? Get(O, "0").
+        const first = object.get(PropertyKey.from(0));
+
+        // 5. Let k be 1.
+        var k: u53 = 1;
+
+        // 6. Repeat, while k < len,
+        while (k < len) : (k += 1) {
+            // a. Let from be ! ToString(𝔽(k)).
+            const from = PropertyKey.from(k);
+
+            // b. Let to be ! ToString(𝔽(k - 1)).
+            const to = PropertyKey.from(k - 1);
+
+            // c. Let fromPresent be ? HasProperty(O, from).
+            const from_present = try object.hasProperty(from);
+
+            // d. If fromPresent is true, then
+            if (from_present) {
+                // i. Let fromVal be ? Get(O, from).
+                const from_value = try object.get(from);
+
+                // ii. Perform ? Set(O, to, fromVal, true).
+                try object.set(to, from_value, .throw);
+            }
+            // e. Else,
+            else {
+                // i. Assert: fromPresent is false.
+                std.debug.assert(!from_present);
+
+                // ii. Perform ? DeletePropertyOrThrow(O, to).
+                try object.deletePropertyOrThrow(to);
+            }
+
+            // f. Set k to k + 1.
+        }
+
+        // 7. Perform ? DeletePropertyOrThrow(O, ! ToString(𝔽(len - 1))).
+        try object.deletePropertyOrThrow(PropertyKey.from(len - 1));
+
+        // 8. Perform ? Set(O, "length", 𝔽(len - 1), true).
+        try object.set(PropertyKey.from("length"), Value.from(len - 1), .throw);
+
+        // 9. Return first.
+        return first;
     }
 
     /// 23.1.3.29 Array.prototype.some ( callbackfn [ , thisArg ] )
