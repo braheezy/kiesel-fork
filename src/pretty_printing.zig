@@ -117,6 +117,27 @@ fn prettyPrintProxy(proxy: Object, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintStringIterator(string_iterator: Object, writer: anytype) !void {
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("%StringIterator%(");
+    try tty_config.setColor(writer, .reset);
+    switch (string_iterator.as(builtins.StringIterator).fields) {
+        .state => |state_| {
+            try writer.print("{pretty}", .{Value.from(state_.it.bytes)});
+        },
+        .completed => {
+            try tty_config.setColor(writer, .dim);
+            try writer.writeAll("<completed>");
+            try tty_config.setColor(writer, .reset);
+        },
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintPrimitiveWrapper(object: Object, writer: anytype) !void {
     const tty_config = getTtyConfigForWriter(writer);
 
@@ -248,6 +269,8 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
             return prettyPrintPrimitiveWrapper(object, writer);
         if (object.is(builtins.Proxy))
             return prettyPrintProxy(object, writer);
+        if (object.is(builtins.StringIterator))
+            return prettyPrintStringIterator(object, writer);
         if (object.internalMethods().call != null)
             return prettyPrintFunction(object, writer);
         return prettyPrintObject(object, writer);

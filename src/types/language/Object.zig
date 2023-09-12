@@ -41,6 +41,7 @@ pub const Tag = enum(u32) {
     number,
     proxy,
     string,
+    string_iterator,
     symbol,
     _,
 };
@@ -86,6 +87,7 @@ pub inline fn is(self: Self, comptime T: type) bool {
         .{ builtins.Number, .number },
         .{ builtins.Proxy, .proxy },
         .{ builtins.String, .string },
+        .{ builtins.StringIterator, .string_iterator },
         .{ builtins.Symbol, .symbol },
     }) |entry| if (T == entry[0]) {
         return if (self.tag) |tag| tag == entry[1] else false;

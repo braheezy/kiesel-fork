@@ -17,6 +17,7 @@ const ordinary = @import("builtins/ordinary.zig");
 const proxy = @import("builtins/proxy.zig");
 const reflect = @import("builtins/reflect.zig");
 const string = @import("builtins/string.zig");
+const string_iterator = @import("builtins/string_iterator.zig");
 const symbol = @import("builtins/symbol.zig");
 const throw_type_error = @import("builtins/throw_type_error.zig");
 
@@ -69,6 +70,8 @@ pub const ReferenceErrorPrototype = @"error".ReferenceErrorPrototype;
 pub const Reflect = reflect.Reflect;
 pub const String = string.String;
 pub const StringConstructor = string.StringConstructor;
+pub const StringIterator = string_iterator.StringIterator;
+pub const StringIteratorPrototype = string_iterator.StringIteratorPrototype;
 pub const StringPrototype = string.StringPrototype;
 pub const Symbol = symbol.Symbol;
 pub const SymbolConstructor = symbol.SymbolConstructor;
