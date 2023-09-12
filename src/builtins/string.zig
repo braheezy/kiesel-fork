@@ -218,6 +218,7 @@ pub const StringPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinFunction(object, "charAt", charAt, 1, realm);
         try defineBuiltinFunction(object, "charCodeAt", charCodeAt, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
@@ -252,6 +253,40 @@ pub const StringPrototype = struct {
             .type_error,
             "This value must be a string or String object",
         );
+    }
+
+    /// 22.1.3.1 String.prototype.at ( index )
+    /// https://tc39.es/ecma262/#sec-string.prototype.at
+    fn at(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const index = arguments.get(0);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 3. Let len be the length of S.
+        const len = string.utf16Length();
+
+        // 4. Let relativeIndex be ? ToIntegerOrInfinity(index).
+        const relative_index = try index.toIntegerOrInfinity(agent);
+
+        // 5. If relativeIndex ≥ 0, then
+        //     a. Let k be relativeIndex.
+        // 6. Else,
+        //     a. Let k be len + relativeIndex.
+        const k_f64 = if (relative_index >= 0)
+            relative_index
+        else
+            @as(f64, @floatFromInt(len)) + relative_index;
+
+        // 7. If k < 0 or k ≥ len, return undefined.
+        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return .undefined;
+        const k: usize = @intFromFloat(k_f64);
+
+        // 8. Return the substring of S from k to k + 1.
+        return Value.from(try string.substring(agent.gc_allocator, k, k + 1));
     }
 
     /// 22.1.3.2 String.prototype.charAt ( pos )
