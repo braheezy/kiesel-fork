@@ -13,6 +13,7 @@ const ArgumentsList = builtins.ArgumentsList;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
+const StringIterator = builtins.StringIterator;
 const Value = types.Value;
 const PropertyKey = types.PropertyKey;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -221,6 +222,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "charCodeAt", charCodeAt, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
+        try defineBuiltinFunction(object, "@@iterator", @"@@iterator", 0, realm);
 
         return object;
     }
@@ -317,6 +319,30 @@ pub const StringPrototype = struct {
     fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
         // 1. Return ? ThisStringValue(this value).
         return Value.from(try thisStringValue(agent, this_value));
+    }
+
+    /// 22.1.3.36 String.prototype [ @@iterator ] ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype-@@iterator
+    fn @"@@iterator"(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        const realm = agent.currentRealm();
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Let s be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 3. Let closure be a new Abstract Closure with no parameters that captures s and performs
+        //    the following steps when called:
+        //    [...]
+        // 4. Return CreateIteratorFromClosure(closure, "%StringIteratorPrototype%", %StringIteratorPrototype%).
+        const it = std.unicode.Utf16LeIterator.init(try string.utf16CodeUnits(agent.gc_allocator));
+        return Value.from(try StringIterator.create(agent, .{
+            .prototype = try realm.intrinsics.@"%StringIteratorPrototype%"(),
+            .fields = .{
+                .state = .{ .it = it },
+            },
+        }));
     }
 };
 
