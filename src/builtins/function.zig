@@ -404,8 +404,8 @@ pub const FunctionPrototype = struct {
         // 1. Let func be the this value.
         const func = this_value;
 
-        // // 2. If func is an Object, func has a [[SourceText]] internal slot, func.[[SourceText]] is
-        // //    a sequence of Unicode code points, and HostHasSourceTextAvailable(func) is true, then
+        // 2. If func is an Object, func has a [[SourceText]] internal slot, func.[[SourceText]] is
+        //    a sequence of Unicode code points, and HostHasSourceTextAvailable(func) is true, then
         if (func == .object and func.object.is(ECMAScriptFunction)) {
             const ecmascript_function = func.object.as(ECMAScriptFunction);
 
