@@ -62,13 +62,21 @@ fn prettyPrintArray(array: Object, writer: anytype) !void {
 }
 
 fn prettyPrintArrayIterator(array_iterator: Object, writer: anytype) !void {
-    const array = array_iterator.as(builtins.ArrayIterator).fields.array;
     const tty_config = getTtyConfigForWriter(writer);
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("%ArrayIterator%(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}", .{Value.from(array)});
+    switch (array_iterator.as(builtins.ArrayIterator).fields) {
+        .state => |state_| {
+            try writer.print("{pretty}", .{Value.from(state_.array)});
+        },
+        .completed => {
+            try tty_config.setColor(writer, .dim);
+            try writer.writeAll("<completed>");
+            try tty_config.setColor(writer, .reset);
+        },
+    }
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);

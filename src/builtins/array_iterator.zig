@@ -35,7 +35,9 @@ pub fn createArrayIterator(
     // 2. Return CreateIteratorFromClosure(closure, "%ArrayIteratorPrototype%", %ArrayIteratorPrototype%).
     return ArrayIterator.create(agent, .{
         .prototype = try realm.intrinsics.@"%ArrayIteratorPrototype%"(),
-        .fields = .{ .array = array, .kind = kind, .index = 0 },
+        .fields = .{
+            .state = .{ .array = array, .kind = kind, .index = 0 },
+        },
     });
 }
 
@@ -64,18 +66,25 @@ pub const ArrayIteratorPrototype = struct {
     /// 23.1.5.2.1 %ArrayIteratorPrototype%.next ( )
     /// https://tc39.es/ecma262/#sec-%arrayiteratorprototype%.next
     fn next(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
-        if (this_value != .object or !this_value.object.is(ArrayIterator)) {
-            return agent.throwException(.type_error, "This value must be an Array Iterator");
-        }
-        const array_iterator = this_value.object.as(ArrayIterator);
-        const array = array_iterator.fields.array;
-        const kind = array_iterator.fields.kind;
-        const index = array_iterator.fields.index;
-
         // 1. Return ? GeneratorResume(this value, empty, "%ArrayIteratorPrototype%").
         // NOTE: In the absence of generators this implements one loop iteration of the
         //       CreateArrayIterator closure. State is kept track of through the ArrayIterator
         //       instance instead of as local variables. This should not be observable.
+
+        // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
+        if (this_value != .object or !this_value.object.is(ArrayIterator)) {
+            return agent.throwException(.type_error, "This value must be an Array Iterator");
+        }
+        const array_iterator = this_value.object.as(ArrayIterator);
+
+        // 2. If state is completed, return CreateIterResultObject(undefined, true).
+        if (array_iterator.fields == .completed) {
+            return Value.from(try createIterResultObject(agent, .undefined, true));
+        }
+
+        const array = array_iterator.fields.state.array;
+        const kind = array_iterator.fields.state.kind;
+        const index = array_iterator.fields.state.index;
 
         // TODO: i. If array has a [[TypedArrayName]] internal slot, then
         const len = if (false) {
@@ -90,6 +99,7 @@ pub const ArrayIteratorPrototype = struct {
 
         // iii. If index ≥ len, return NormalCompletion(undefined).
         if (index >= len) {
+            array_iterator.fields = .completed;
             return Value.from(try createIterResultObject(agent, .undefined, true));
         }
 
@@ -126,7 +136,7 @@ pub const ArrayIteratorPrototype = struct {
         };
 
         // viii. Set index to index + 1.
-        array_iterator.fields.index += 1;
+        array_iterator.fields.state.index += 1;
 
         // vii. Perform ? GeneratorYield(CreateIterResultObject(result, false)).
         return Value.from(try createIterResultObject(agent, result, false));
@@ -134,10 +144,13 @@ pub const ArrayIteratorPrototype = struct {
 };
 
 pub const ArrayIterator = Object.Factory(.{
-    .Fields = struct {
-        array: Object,
-        kind: Object.PropertyKind,
-        index: u53,
+    .Fields = union(enum) {
+        state: struct {
+            array: Object,
+            kind: Object.PropertyKind,
+            index: u53,
+        },
+        completed,
     },
     .tag = .array_iterator,
 });
