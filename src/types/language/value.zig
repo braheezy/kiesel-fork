@@ -118,15 +118,9 @@ pub const Value = union(enum) {
         const T = @TypeOf(value);
         if (T == bool) {
             return .{ .boolean = value };
-        } else if (@typeInfo(T) == .Pointer) {
-            // FIXME: This is not great, but for now we can let the compiler do the rest as strings
-            //        are the only pointers we support here.
-            return .{ .string = .{ .utf8 = value } };
-        } else if (@typeInfo(T) == .Int or
-            @typeInfo(T) == .ComptimeInt or
-            @typeInfo(T) == .Float or
-            @typeInfo(T) == .ComptimeFloat)
-        {
+        } else if (comptime std.meta.trait.isZigString(T)) {
+            return .{ .string = String.from(value) };
+        } else if (comptime std.meta.trait.isNumber(T)) {
             return .{ .number = Number.from(value) };
         } else if (T == BigInt) {
             return .{ .big_int = value };

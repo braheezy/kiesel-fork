@@ -1,6 +1,8 @@
 //! 10.3 Built-in Function Objects
 //! https://tc39.es/ecma262/#sec-built-in-function-objects-call-thisargument-argumentslist
 
+const std = @import("std");
+
 const SafePointer = @import("any-pointer").SafePointer;
 
 const ecmascript_function = @import("ecmascript_function.zig");
@@ -24,9 +26,9 @@ pub const ArgumentsList = struct {
 
     pub inline fn from(values: anytype) Self {
         const T = @TypeOf(values);
-        if (@typeInfo(T) == .Struct and @typeInfo(T).Struct.is_tuple) {
+        if (comptime std.meta.trait.isTuple(T)) {
             return .{ .values = &values };
-        } else if (@typeInfo(T) == .Pointer) {
+        } else if (comptime std.meta.trait.isSlice(T)) {
             return .{ .values = values };
         } else {
             @compileError("ArgumentsList.from() called with incompatible type " ++ @typeName(T));

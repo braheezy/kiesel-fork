@@ -24,9 +24,7 @@ pub const PropertyKey = union(enum) {
 
     pub inline fn from(value: anytype) Self {
         const T = @TypeOf(value);
-        if (@typeInfo(T) == .Pointer) {
-            // FIXME: This is not great, but for now we can let the compiler do the rest as strings
-            //        are the only pointers we support here.
+        if (comptime std.meta.trait.isZigString(T)) {
             // FIXME: This should use CanonicalNumericIndexString to reject numeric strings that
             //        are not canonical.
             if (std.fmt.parseUnsigned(IntegerIndex, value, 10)) |integer_index| {
