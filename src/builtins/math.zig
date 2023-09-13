@@ -213,8 +213,6 @@ pub const Math = struct {
         // 3. If n > 1𝔽 or n < -1𝔽, return NaN.
         // 4. Return an implementation-approximated Number value representing the result of the
         //    inverse sine of ℝ(n).
-        // TODO: Remove this special case for -0 once https://github.com/ziglang/zig/issues/17111 is fixed
-        if (n.isZero()) return Value.from(n);
         return Value.from(std.math.asinh(n.asFloat()));
     }
 
@@ -262,8 +260,6 @@ pub const Math = struct {
         // 2. If n is not finite or n is either +0𝔽 or -0𝔽, return n.
         // 3. Return an implementation-approximated Number value representing the result of the
         //    cube root of ℝ(n).
-        // TODO: Remove this special case for -0 once https://github.com/ziglang/zig/issues/17112 is fixed
-        if (n.isZero()) return Value.from(n);
         return Value.from(std.math.cbrt(n.asFloat()));
     }
 
