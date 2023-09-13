@@ -717,6 +717,7 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
         try defineBuiltinFunction(object, "every", every, 1, realm);
+        try defineBuiltinFunction(object, "filter", filter, 1, realm);
         try defineBuiltinFunction(object, "find", find, 1, realm);
         try defineBuiltinFunction(object, "findIndex", findIndex, 1, realm);
         try defineBuiltinFunction(object, "findLast", findLast, 1, realm);
@@ -879,6 +880,71 @@ pub const ArrayPrototype = struct {
 
         // 6. Return true.
         return Value.from(true);
+    }
+
+    /// 23.1.3.8 Array.prototype.filter ( callbackfn [ , thisArg ] )
+    /// https://tc39.es/ecma262/#sec-array.prototype.filter
+    fn filter(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const callback_fn = arguments.get(0);
+        const this_arg = arguments.get(1);
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+
+        // 3. If IsCallable(callbackfn) is false, throw a TypeError exception.
+        if (!callback_fn.isCallable()) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{callback_fn}),
+            );
+        }
+
+        // 4. Let A be ? ArraySpeciesCreate(O, 0).
+        const array = try arraySpeciesCreate(agent, object, 0);
+
+        // 5. Let k be 0.
+        var k: u53 = 0;
+
+        // 6. Let to be 0.
+        var to: u53 = 0;
+
+        // 7. Repeat, while k < len,
+        while (k < len) : (k += 1) {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
+
+            // b. Let kPresent be ? HasProperty(O, Pk).
+            const k_present = try object.hasProperty(property_key);
+
+            // c. If kPresent is true, then
+            if (k_present) {
+                // i. Let kValue be ? Get(O, Pk).
+                const k_value = try object.get(property_key);
+
+                // ii. Let selected be ToBoolean(? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »)).
+                const selected = (try callback_fn.callAssumeCallable(
+                    this_arg,
+                    .{ k_value, Value.from(k), Value.from(object) },
+                )).toBoolean();
+
+                // iii. If selected is true, then
+                if (selected) {
+                    // 1. Perform ? CreateDataPropertyOrThrow(A, ! ToString(𝔽(to)), kValue).
+                    try array.createDataPropertyOrThrow(PropertyKey.from(to), k_value);
+
+                    // 2. Set to to to + 1.
+                    to += 1;
+                }
+            }
+
+            // d. Set k to k + 1.
+        }
+
+        // 8. Return A.
+        return Value.from(array);
     }
 
     /// 23.1.3.9 Array.prototype.find ( predicate [ , thisArg ] )
