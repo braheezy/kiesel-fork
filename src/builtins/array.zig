@@ -708,16 +708,11 @@ pub const ArrayConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-array-prototype-object
 pub const ArrayPrototype = struct {
     pub fn create(realm: *Realm) !Object {
-        const object = try Array.create(realm.agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
-
-        try defineBuiltinProperty(object, "length", PropertyDescriptor{
-            .value = Value.from(0),
-            .writable = true,
-            .enumerable = false,
-            .configurable = false,
-        });
+        const object = arrayCreate(
+            realm.agent,
+            0,
+            try realm.intrinsics.@"%Object.prototype%"(),
+        ) catch |err| try noexcept(err);
 
         try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
