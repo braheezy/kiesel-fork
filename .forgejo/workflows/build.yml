@@ -53,5 +53,5 @@ jobs:
           ./upload.sh zig-out/bin/kiesel.wasm
       - name: Update version.txt
         run: |
-          git rev-parse --short=9 main > version.txt
+          git rev-parse main > version.txt
           ./upload.sh version.txt
