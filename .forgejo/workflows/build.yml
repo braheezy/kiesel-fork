@@ -32,7 +32,7 @@ jobs:
           curl \
             -u "${{ secrets.ARTIFACT_UPLOAD_USER }}:${{ secrets.ARTIFACT_UPLOAD_PASSWORD }}" \
             -F "path=@\$1" \
-            "https://files.kiesel.dev/upload?path=/"
+            "https://files.kiesel.dev/upload?path=/files"
           EOF
           chmod +x upload.sh
       - name: Build and upload kiesel-linux-aarch64
