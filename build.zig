@@ -22,6 +22,9 @@ pub fn build(b: *std.Build) void {
         };
         const cflags_wasi = [_][]const u8{
             "-D__wasi__",
+            // NOTE: This gets set to 4096 by default which then causes wasi-libc to randomly abort().
+            //       Should probably be fixed upstream.
+            "-DHBLKSIZE=65536",
             "-D_WASI_EMULATED_SIGNAL",
             "-Wl,wasi-emulated-signal",
         };
