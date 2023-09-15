@@ -32,7 +32,8 @@ ping me directly.
 
 Further reading:
 
-- [Kiesel Devlog #1: Now passing 25% of test252!](https://linus.dev/posts/kiesel-devlog-1/)
+- [Kiesel Devlog #1: Now passing 25% of test262!](https://linus.dev/posts/kiesel-devlog-1/)
+- [Kiesel Devlog #2: Iterators, more math, and a bug in the Zig stdlib](https://linus.dev/posts/kiesel-devlog-2/)
 
 ## Build
 
