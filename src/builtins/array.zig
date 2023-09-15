@@ -732,6 +732,7 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "pop", pop, 0, realm);
         try defineBuiltinFunction(object, "push", push, 1, realm);
         try defineBuiltinFunction(object, "reduce", reduce, 1, realm);
+        try defineBuiltinFunction(object, "reduceRight", reduceRight, 1, realm);
         try defineBuiltinFunction(object, "shift", shift, 0, realm);
         try defineBuiltinFunction(object, "some", some, 1, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
@@ -1521,6 +1522,103 @@ pub const ArrayPrototype = struct {
             }
 
             // d. Set k to k + 1.
+        }
+
+        // 10. Return accumulator.
+        return accumulator;
+    }
+
+    /// 23.1.3.25 Array.prototype.reduceRight ( callbackfn [ , initialValue ] )
+    /// https://tc39.es/ecma262/#sec-array.prototype.reduceright
+    fn reduceRight(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const callback_fn = arguments.get(0);
+        const initial_value = arguments.getOrNull(1);
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+
+        // 3. If IsCallable(callbackfn) is false, throw a TypeError exception.
+        if (!callback_fn.isCallable()) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{callback_fn}),
+            );
+        }
+
+        // 4. If len = 0 and initialValue is not present, throw a TypeError exception.
+        if (len == 0 and initial_value == null) {
+            return agent.throwException(
+                .type_error,
+                "Cannot reduce empty array without initial value",
+            );
+        }
+
+        // 5. Let k be len - 1.
+        var k: ?u53 = std.math.sub(u53, len, 1) catch null;
+
+        // 6. Let accumulator be undefined.
+        var accumulator: Value = undefined;
+
+        // 7. If initialValue is present, then
+        if (initial_value != null) {
+            // a. Set accumulator to initialValue.
+            accumulator = initial_value.?;
+        }
+        // 8. Else,
+        else {
+            // a. Let kPresent be false.
+            var k_present = false;
+
+            // b. Repeat, while kPresent is false and k ≥ 0,
+            while (!k_present and k != null) : (k = (std.math.sub(u53, k.?, 1) catch null)) {
+                // i. Let Pk be ! ToString(𝔽(k)).
+                const property_key = PropertyKey.from(k.?);
+
+                // ii. Set kPresent to ? HasProperty(O, Pk).
+                k_present = try object.hasProperty(property_key);
+
+                // iii. If kPresent is true, then
+                if (k_present) {
+                    // 1. Set accumulator to ? Get(O, Pk).
+                    accumulator = try object.get(property_key);
+                }
+
+                // iv. Set k to k - 1.
+            }
+
+            // c. If kPresent is false, throw a TypeError exception.
+            if (!k_present) {
+                return agent.throwException(
+                    .type_error,
+                    "Cannot reduce empty array without initial value",
+                );
+            }
+        }
+
+        // 9. Repeat, while k ≥ 0,
+        while (k != null) : (k = (std.math.sub(u53, k.?, 1) catch null)) {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k.?);
+
+            // b. Let kPresent be ? HasProperty(O, Pk).
+            const k_present = try object.hasProperty(property_key);
+
+            // c. If kPresent is true, then
+            if (k_present) {
+                // i. Let kValue be ? Get(O, Pk).
+                const k_value = try object.get(property_key);
+
+                // ii. Set accumulator to ? Call(callbackfn, undefined, « accumulator, kValue, 𝔽(k), O »).
+                accumulator = try callback_fn.callAssumeCallable(
+                    .undefined,
+                    .{ accumulator, k_value, Value.from(k.?), Value.from(object) },
+                );
+            }
+
+            // d. Set k to k - 1.
         }
 
         // 10. Return accumulator.
