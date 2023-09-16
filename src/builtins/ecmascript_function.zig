@@ -861,7 +861,7 @@ fn functionDeclarationInstantiation(agent: *Agent, function: *ECMAScriptFunction
         if (parameter_bindings.len > std.math.maxInt(u32)) return error.OutOfMemory;
         try instantiated_var_names.ensureTotalCapacity(@intCast(parameter_bindings.len));
         for (parameter_bindings) |parameter_binding| {
-            instantiated_var_names.putAssumeCapacityNoClobber(parameter_binding, {});
+            instantiated_var_names.putAssumeCapacity(parameter_binding, {});
         }
 
         // c. For each element n of varNames, do
