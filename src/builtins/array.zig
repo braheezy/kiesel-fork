@@ -738,6 +738,7 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "reduce", reduce, 1, realm);
         try defineBuiltinFunction(object, "reduceRight", reduceRight, 1, realm);
         try defineBuiltinFunction(object, "shift", shift, 0, realm);
+        try defineBuiltinFunction(object, "slice", slice, 2, realm);
         try defineBuiltinFunction(object, "some", some, 1, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
@@ -1796,6 +1797,98 @@ pub const ArrayPrototype = struct {
 
         // 9. Return first.
         return first;
+    }
+
+    /// 23.1.3.28 Array.prototype.slice ( start, end )
+    /// https://tc39.es/ecma262/#sec-array.prototype.slice
+    fn slice(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const start = arguments.get(0);
+        const end = arguments.get(1);
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+        const len_f64 = @as(f64, @floatFromInt(len));
+
+        // 3. Let relativeStart be ? ToIntegerOrInfinity(start).
+        const relative_start = try start.toIntegerOrInfinity(agent);
+
+        // 4. If relativeStart = -∞, let k be 0.
+        const k_f64 = if (relative_start == -std.math.inf(f64)) blk: {
+            break :blk 0;
+        }
+        // 5. Else if relativeStart < 0, let k be max(len + relativeStart, 0).
+        else if (relative_start < 0) blk: {
+            break :blk @max(len_f64 + relative_start, 0);
+        }
+        // 6. Else, let k be min(relativeStart, len).
+        else blk: {
+            break :blk @min(relative_start, len_f64);
+        };
+        var k: u53 = @intFromFloat(k_f64);
+
+        // 7. If end is undefined, let relativeEnd be len; else let relativeEnd be
+        //    ? ToIntegerOrInfinity(end).
+        const relative_end = if (end == .undefined)
+            len_f64
+        else
+            try end.toIntegerOrInfinity(agent);
+
+        // 8. If relativeEnd = -∞, let final be 0.
+        const final_f64 = if (relative_end == -std.math.inf(f64)) blk: {
+            break :blk 0;
+        }
+        // 9. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
+        else if (relative_end < 0) blk: {
+            break :blk @max(len_f64 + relative_end, 0);
+        }
+        // 10. Else, let final be min(relativeEnd, len).
+        else blk: {
+            break :blk @min(relative_end, len_f64);
+        };
+        const final: u53 = @intFromFloat(final_f64);
+
+        // 11. Let count be max(final - k, 0).
+        const count: u53 = @intFromFloat(@max(final_f64 - k_f64, 0));
+
+        // 12. Let A be ? ArraySpeciesCreate(O, count).
+        if (len > std.math.maxInt(usize)) return error.OutOfMemory;
+        const array = try arraySpeciesCreate(agent, object, @intCast(count));
+
+        // 13. Let n be 0.
+        var n: u53 = 0;
+
+        // 14. Repeat, while k < final,
+        while (k < final) : ({
+            k += 1;
+            n += 1;
+        }) {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
+
+            // b. Let kPresent be ? HasProperty(O, Pk).
+            const k_present = try object.hasProperty(property_key);
+
+            // c. If kPresent is true, then
+            if (k_present) {
+                // i. Let kValue be ? Get(O, Pk).
+                const k_value = try object.get(property_key);
+
+                // ii. Perform ? CreateDataPropertyOrThrow(A, ! ToString(𝔽(n)), kValue).
+                try array.createDataPropertyOrThrow(PropertyKey.from(n), k_value);
+            }
+
+            // d. Set k to k + 1.
+            // e. Set n to n + 1.
+        }
+
+        // 15. Perform ? Set(A, "length", 𝔽(n), true).
+        try array.set(PropertyKey.from("length"), Value.from(n), .throw);
+
+        // 16. Return A.
+        return Value.from(array);
     }
 
     /// 23.1.3.29 Array.prototype.some ( callbackfn [ , thisArg ] )
