@@ -543,7 +543,10 @@ pub const ArrayConstructor = struct {
                 // i. If k ≥ 2^53 - 1, then
                 if (k == std.math.maxInt(u53)) {
                     // 1. Let error be ThrowCompletion(a newly created TypeError object).
-                    const @"error" = agent.throwException(.type_error, "uhh");
+                    const @"error" = agent.throwException(
+                        .type_error,
+                        "Maximum array length exceeded",
+                    );
 
                     // 2. Return ? IteratorClose(iteratorRecord, error).
                     return iterator.close(@as(Agent.Error!Value, @"error"));
@@ -1408,12 +1411,12 @@ pub const ArrayPrototype = struct {
         var len = try object.lengthOfArrayLike();
 
         // 3. Let argCount be the number of elements in items.
-        const arg_count = arguments.count();
+        const arg_count: u53 = @intCast(arguments.count());
 
         // 4. If len + argCount > 2^53 - 1, throw a TypeError exception.
-        _ = std.math.add(u53, len, @as(u53, @intCast(arg_count))) catch {
-            return agent.throwException(.type_error, "");
-        };
+        if (std.meta.isError(std.math.add(u53, len, arg_count))) {
+            return agent.throwException(.type_error, "Maximum array length exceeded");
+        }
 
         // 5. For each element E of items, do
         for (arguments.values) |element| {
