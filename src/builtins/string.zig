@@ -221,6 +221,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinFunction(object, "charAt", charAt, 1, realm);
         try defineBuiltinFunction(object, "charCodeAt", charCodeAt, 1, realm);
+        try defineBuiltinFunction(object, "repeat", repeat, 1, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
@@ -341,6 +342,48 @@ pub const StringPrototype = struct {
         const code_units = try string.utf16CodeUnits(agent.gc_allocator);
         defer agent.gc_allocator.free(code_units);
         return Value.from(code_units[position]);
+    }
+
+    /// 22.1.3.18 String.prototype.repeat ( count )
+    /// https://tc39.es/ecma262/#sec-string.prototype.repeat
+    fn repeat(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const count = arguments.get(0);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 3. Let n be ? ToIntegerOrInfinity(count).
+        const n = try count.toIntegerOrInfinity(agent);
+
+        // 4. If n < 0 or n = +∞, throw a RangeError exception.
+        if (n < 0 or n == std.math.inf(f64)) {
+            return agent.throwException(
+                .range_error,
+                "Repeat count must be a positive finite number",
+            );
+        }
+
+        // 5. If n = 0, return the empty String.
+        if (n == 0) return Value.from("");
+
+        if (string.utf16Length() == 0) return Value.from("");
+
+        const n_usize = std.math.lossyCast(usize, n);
+        const new_len = std.math.mul(
+            usize,
+            string.utf16Length(),
+            n_usize,
+        ) catch return error.OutOfMemory;
+
+        // 6. Return the String value that is made from n copies of S appended together.
+        var new_string = try std.ArrayList(u8).initCapacity(agent.gc_allocator, new_len);
+        for (0..n_usize) |_| {
+            new_string.appendSliceAssumeCapacity(string.utf8);
+        }
+        return Value.from(try new_string.toOwnedSlice());
     }
 
     /// 22.1.3.22 String.prototype.slice ( start, end )
