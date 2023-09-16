@@ -718,6 +718,7 @@ pub const ArrayPrototype = struct {
         ) catch |err| try noexcept(err);
 
         try defineBuiltinFunction(object, "at", at, 1, realm);
+        try defineBuiltinFunction(object, "concat", concat, 1, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
         try defineBuiltinFunction(object, "every", every, 1, realm);
         try defineBuiltinFunction(object, "filter", filter, 1, realm);
@@ -822,6 +823,110 @@ pub const ArrayPrototype = struct {
 
         // 7. Return ? Get(O, ! ToString(𝔽(k))).
         return object.get(PropertyKey.from(k));
+    }
+
+    /// 23.1.3.2 Array.prototype.concat ( ...items )
+    /// https://tc39.es/ecma262/#sec-array.prototype.concat
+    fn concat(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let A be ? ArraySpeciesCreate(O, 0).
+        const array = try arraySpeciesCreate(agent, object, 0);
+
+        // 3. Let n be 0.
+        var n: u53 = 0;
+
+        // 4. Prepend O to items.
+
+        // 5. For each element E of items, do
+        var index: u53 = 0;
+        while (index <= arguments.count()) : (index += 1) {
+            const element = if (index == 0)
+                Value.from(object)
+            else
+                arguments.values[@as(usize, @intCast(index)) - 1];
+
+            // a. Let spreadable be ? IsConcatSpreadable(E).
+            const spreadable = try isConcatSpreadable(agent, element);
+
+            // b. If spreadable is true, then
+            if (spreadable) {
+                // i. Let len be ? LengthOfArrayLike(E).
+                const len = try element.object.lengthOfArrayLike();
+
+                // ii. If n + len > 2^53 - 1, throw a TypeError exception.
+                if (std.meta.isError(std.math.add(u53, n, len))) {
+                    return agent.throwException(.type_error, "Maximum array length exceeded");
+                }
+
+                // iii. Let k be 0.
+                var k: u53 = 0;
+
+                // iv. Repeat, while k < len,
+                while (k < len) : ({
+                    n += 1;
+                    k += 1;
+                }) {
+                    // 1. Let P be ! ToString(𝔽(k)).
+                    const property_key = PropertyKey.from(k);
+
+                    // 2. Let exists be ? HasProperty(E, P).
+                    const exists = try element.object.hasProperty(property_key);
+
+                    // 3. If exists is true, then
+                    if (exists) {
+                        // a. Let subElement be ? Get(E, P).
+                        const sub_element = try element.object.get(property_key);
+
+                        // b. Perform ? CreateDataPropertyOrThrow(A, ! ToString(𝔽(n)), subElement).
+                        try array.createDataPropertyOrThrow(PropertyKey.from(n), sub_element);
+                    }
+
+                    // 4. Set n to n + 1.
+                    // 5. Set k to k + 1.
+                }
+            }
+            // c. Else,
+            else {
+                // i. NOTE: E is added as a single item rather than spread.
+
+                // ii. If n ≥ 2^53 - 1, throw a TypeError exception.
+                if (n == std.math.maxInt(u53)) {
+                    return agent.throwException(.type_error, "Maximum array length exceeded");
+                }
+
+                // iii. Perform ? CreateDataPropertyOrThrow(A, ! ToString(𝔽(n)), E).
+                try array.createDataPropertyOrThrow(PropertyKey.from(n), element);
+
+                // iv. Set n to n + 1.
+                n += 1;
+            }
+        }
+
+        // 6. Perform ? Set(A, "length", 𝔽(n), true).
+        try array.set(PropertyKey.from("length"), Value.from(n), .throw);
+
+        // 7. Return A.
+        return Value.from(array);
+    }
+
+    /// 23.1.3.2.1 IsConcatSpreadable ( O )
+    /// https://tc39.es/ecma262/#sec-isconcatspreadable
+    fn isConcatSpreadable(agent: *Agent, value: Value) !bool {
+        // 1. If O is not an Object, return false.
+        if (value != .object) return false;
+
+        // 2. Let spreadable be ? Get(O, @@isConcatSpreadable).
+        const spreadable = try value.object.get(
+            PropertyKey.from(agent.well_known_symbols.@"@@isConcatSpreadable"),
+        );
+
+        // 3. If spreadable is not undefined, return ToBoolean(spreadable).
+        if (spreadable != .undefined) return spreadable.toBoolean();
+
+        // 4. Return ? IsArray(O).
+        return value.isArray();
     }
 
     /// 23.1.3.5 Array.prototype.entries ( )
