@@ -221,6 +221,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinFunction(object, "charAt", charAt, 1, realm);
         try defineBuiltinFunction(object, "charCodeAt", charCodeAt, 1, realm);
+        try defineBuiltinFunction(object, "concat", concat, 1, realm);
         try defineBuiltinFunction(object, "repeat", repeat, 1, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
@@ -342,6 +343,32 @@ pub const StringPrototype = struct {
         const code_units = try string.utf16CodeUnits(agent.gc_allocator);
         defer agent.gc_allocator.free(code_units);
         return Value.from(code_units[position]);
+    }
+
+    /// 22.1.3.5 String.prototype.concat ( ...args )
+    /// https://tc39.es/ecma262/#sec-string.prototype.concat
+    fn concat(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 3. Let R be S.
+        var new_string = std.ArrayList(u8).init(agent.gc_allocator);
+        try new_string.appendSlice(string.utf8);
+
+        // 4. For each element next of args, do
+        for (arguments.values) |next| {
+            // a. Let nextString be ? ToString(next).
+            const next_string = try next.toString(agent);
+
+            // b. Set R to the string-concatenation of R and nextString.
+            try new_string.appendSlice(next_string.utf8);
+        }
+
+        // 5. Return R.
+        return Value.from(try new_string.toOwnedSlice());
     }
 
     /// 22.1.3.18 String.prototype.repeat ( count )
