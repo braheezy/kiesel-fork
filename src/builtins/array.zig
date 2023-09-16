@@ -116,11 +116,11 @@ fn defineOwnProperty(
 
 /// 10.4.2.2 ArrayCreate ( length [ , proto ] )
 /// https://tc39.es/ecma262/#sec-arraycreate
-pub fn arrayCreate(agent: *Agent, length: usize, maybe_prototype: ?Object) !Object {
+pub fn arrayCreate(agent: *Agent, length: u64, maybe_prototype: ?Object) !Object {
     const realm = agent.currentRealm();
 
     // 1. If length > 2^32 - 1, throw a RangeError exception.
-    if (length >= @as(usize, std.math.maxInt(u32))) return agent.throwException(
+    if (length >= std.math.maxInt(u32)) return agent.throwException(
         .range_error,
         "Invalid array length",
     );
@@ -155,7 +155,7 @@ pub fn arrayCreate(agent: *Agent, length: usize, maybe_prototype: ?Object) !Obje
 
 /// 10.4.2.3 ArraySpeciesCreate ( originalArray, length )
 /// https://tc39.es/ecma262/#sec-arrayspeciescreate
-pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: usize) !Object {
+pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: u64) !Object {
     // 1. Let isArray be ? IsArray(originalArray).
     const is_array = try Value.from(original_array).isArray();
 
@@ -612,8 +612,7 @@ pub const ArrayConstructor = struct {
         // 10. Else,
         else blk: {
             // a. Let A be ? ArrayCreate(len).
-            if (len > std.math.maxInt(usize)) return error.OutOfMemory;
-            break :blk try arrayCreate(agent, @intCast(len), null);
+            break :blk try arrayCreate(agent, len, null);
         };
 
         // 11. Let k be 0.
@@ -1429,8 +1428,7 @@ pub const ArrayPrototype = struct {
         }
 
         // 4. Let A be ? ArraySpeciesCreate(O, len).
-        if (len > std.math.maxInt(usize)) return error.OutOfMemory;
-        const array = try arraySpeciesCreate(agent, object, @intCast(len));
+        const array = try arraySpeciesCreate(agent, object, len);
 
         // 5. Let k be 0.
         var k: u53 = 0;
@@ -1854,8 +1852,7 @@ pub const ArrayPrototype = struct {
         const count: u53 = @intFromFloat(@max(final_f64 - k_f64, 0));
 
         // 12. Let A be ? ArraySpeciesCreate(O, count).
-        if (len > std.math.maxInt(usize)) return error.OutOfMemory;
-        const array = try arraySpeciesCreate(agent, object, @intCast(count));
+        const array = try arraySpeciesCreate(agent, object, count);
 
         // 13. Let n be 0.
         var n: u53 = 0;
@@ -2127,8 +2124,7 @@ pub const ArrayPrototype = struct {
         const actual_index: u53 = @intFromFloat(actual_index_f64);
 
         // 7. Let A be ? ArrayCreate(len).
-        if (len > std.math.maxInt(usize)) return error.OutOfMemory;
-        const array = try arrayCreate(agent, @intCast(len), null);
+        const array = try arrayCreate(agent, len, null);
 
         // 8. Let k be 0.
         var k: u53 = 0;
