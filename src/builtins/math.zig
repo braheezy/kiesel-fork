@@ -10,6 +10,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const Number = types.Number;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
@@ -125,6 +126,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "log1p", log1p, 1, realm);
         try defineBuiltinFunction(object, "log10", log10, 1, realm);
         try defineBuiltinFunction(object, "log2", log2, 1, realm);
+        try defineBuiltinFunction(object, "max", max, 2, realm);
         try defineBuiltinFunction(object, "pow", pow, 2, realm);
         try defineBuiltinFunction(object, "random", random, 0, realm);
         try defineBuiltinFunction(object, "round", round, 1, realm);
@@ -437,6 +439,44 @@ pub const Math = struct {
         // 6. Return an implementation-approximated Number value representing the result of the
         //    base 2 logarithm of ℝ(n).
         return Value.from(@log2(n.asFloat()));
+    }
+
+    /// 21.3.2.24 Math.max ( ...args )
+    /// https://tc39.es/ecma262/#sec-math.max
+    fn max(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        // 1. Let coerced be a new empty List.
+        var coerced = try std.ArrayList(Number).initCapacity(agent.gc_allocator, arguments.count());
+        defer coerced.deinit();
+
+        // 2. For each element arg of args, do
+        for (arguments.values) |arg| {
+            // a. Let n be ? ToNumber(arg).
+            const n = try arg.toNumber(agent);
+
+            // b. Append n to coerced.
+            coerced.appendAssumeCapacity(n);
+        }
+
+        // 3. Let highest be -∞𝔽.
+        var highest = Number.from(-std.math.inf(f64));
+
+        // 4. For each element number of coerced, do
+        for (coerced.items) |number| {
+            // a. If number is NaN, return NaN.
+            if (number.isNan()) return Value.nan();
+
+            // b. If number is +0𝔽 and highest is -0𝔽, set highest to +0𝔽.
+            if (number.isPositiveZero() and highest.isNegativeZero()) {
+                highest = Number.from(0);
+                continue;
+            }
+
+            // c. If number > highest, set highest to number.
+            if (number.asFloat() > highest.asFloat()) highest = number;
+        }
+
+        // 5. Return highest.
+        return Value.from(highest);
     }
 
     /// 21.3.2.26 Math.pow ( base, exponent )
