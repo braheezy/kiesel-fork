@@ -127,6 +127,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "log10", log10, 1, realm);
         try defineBuiltinFunction(object, "log2", log2, 1, realm);
         try defineBuiltinFunction(object, "max", max, 2, realm);
+        try defineBuiltinFunction(object, "min", min, 2, realm);
         try defineBuiltinFunction(object, "pow", pow, 2, realm);
         try defineBuiltinFunction(object, "random", random, 0, realm);
         try defineBuiltinFunction(object, "round", round, 1, realm);
@@ -477,6 +478,44 @@ pub const Math = struct {
 
         // 5. Return highest.
         return Value.from(highest);
+    }
+
+    /// 21.3.2.25 Math.min ( ...args )
+    /// https://tc39.es/ecma262/#sec-math.min
+    fn min(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        // 1. Let coerced be a new empty List.
+        var coerced = try std.ArrayList(Number).initCapacity(agent.gc_allocator, arguments.count());
+        defer coerced.deinit();
+
+        // 2. For each element arg of args, do
+        for (arguments.values) |arg| {
+            // a. Let n be ? ToNumber(arg).
+            const n = try arg.toNumber(agent);
+
+            // b. Append n to coerced.
+            coerced.appendAssumeCapacity(n);
+        }
+
+        // 3. Let lowest be +∞𝔽.
+        var lowest = Number.from(std.math.inf(f64));
+
+        // 4. For each element number of coerced, do
+        for (coerced.items) |number| {
+            // a. If number is NaN, return NaN.
+            if (number.isNan()) return Value.nan();
+
+            // b. If number is -0𝔽 and lowest is +0𝔽, set lowest to -0𝔽.
+            if (number.isNegativeZero() and lowest.isPositiveZero()) {
+                lowest = Number.from(-0.0);
+                continue;
+            }
+
+            // c. If number < lowest, set lowest to number.
+            if (number.asFloat() < lowest.asFloat()) lowest = number;
+        }
+
+        // 5. Return lowest.
+        return Value.from(lowest);
     }
 
     /// 21.3.2.26 Math.pow ( base, exponent )
