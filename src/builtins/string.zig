@@ -221,6 +221,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinFunction(object, "charAt", charAt, 1, realm);
         try defineBuiltinFunction(object, "charCodeAt", charCodeAt, 1, realm);
+        try defineBuiltinFunction(object, "slice", slice, 2, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
         try defineBuiltinFunction(object, "@@iterator", @"@@iterator", 0, realm);
@@ -340,6 +341,72 @@ pub const StringPrototype = struct {
         const code_units = try string.utf16CodeUnits(agent.gc_allocator);
         defer agent.gc_allocator.free(code_units);
         return Value.from(code_units[position]);
+    }
+
+    /// 22.1.3.22 String.prototype.slice ( start, end )
+    /// https://tc39.es/ecma262/#sec-string.prototype.slice
+    fn slice(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const start = arguments.get(0);
+        const end = arguments.get(1);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 3. Let len be the length of S.
+        const len = string.utf16Length();
+        const len_f64 = @as(f64, @floatFromInt(len));
+
+        // 4. Let intStart be ? ToIntegerOrInfinity(start).
+        var int_start = try start.toIntegerOrInfinity(agent);
+
+        // 5. If intStart = -∞, let from be 0.
+        const from_f64 = if (int_start == -std.math.inf(f64)) blk: {
+            break :blk 0;
+        }
+        // 6. Else if intStart < 0, let from be max(len + intStart, 0).
+        else if (int_start < 0) blk: {
+            break :blk @max(len_f64 + int_start, 0);
+        }
+        // 7. Else, let from be min(intStart, len).
+        else blk: {
+            break :blk @min(int_start, len_f64);
+        };
+        const from: u53 = @intFromFloat(from_f64);
+
+        // 8. If end is undefined, let intEnd be len; else let intEnd be ? ToIntegerOrInfinity(end).
+        const int_end = if (end == .undefined)
+            len_f64
+        else
+            try end.toIntegerOrInfinity(agent);
+
+        // 9. If intEnd = -∞, let to be 0.
+        const to_f64 = if (int_end == -std.math.inf(f64)) blk: {
+            break :blk 0;
+        }
+        // 10. Else if intEnd < 0, let to be max(len + intEnd, 0).
+        else if (int_end < 0) blk: {
+            break :blk @max(len_f64 + int_end, 0);
+        }
+        // 11. Else, let to be min(intEnd, len).
+        else blk: {
+            break :blk @min(int_end, len_f64);
+        };
+        const to: u53 = @intFromFloat(to_f64);
+
+        // 12. If from ≥ to, return the empty String.
+        if (from >= to) return Value.from("");
+
+        // 13. Return the substring of S from from to to.
+        return Value.from(
+            try string.substring(
+                agent.gc_allocator,
+                std.math.lossyCast(usize, from),
+                std.math.lossyCast(usize, to),
+            ),
+        );
     }
 
     /// 22.1.3.29 String.prototype.toString ( )
