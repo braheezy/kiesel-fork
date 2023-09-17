@@ -580,9 +580,10 @@ fn acceptPropertyDefinition(self: *Self) !ast.PropertyDefinition {
     if (self.acceptIdentifierReference()) |identifier_reference| {
         const token = self.core.peek() catch null;
         // IdentifierReference
-        if (token == null or token.?.type != .@":")
+        if (token == null or (token.?.type != .@":" and token.?.type != .@"("))
             return .{ .identifier_reference = identifier_reference };
         // LiteralPropertyName : IdentifierName
+        // MethodDefinition
         const identifier = identifier_reference.identifier;
         property_name = .{ .literal_property_name = .{ .identifier = identifier } };
     } else |_| if (self.acceptIdentifierName()) |identifier|
@@ -597,15 +598,35 @@ fn acceptPropertyDefinition(self: *Self) !ast.PropertyDefinition {
     else |_| if (self.core.accept(RuleSet.is(.@"["))) |_| {
         // ComputedPropertyName
         const computed_property_name = try self.acceptExpression(.{});
-        property_name = ast.PropertyName{
-            .computed_property_name = computed_property_name,
-        };
+        property_name = .{ .computed_property_name = computed_property_name };
         _ = try self.core.accept(RuleSet.is(.@"]"));
     } else |_| return error.UnexpectedToken;
 
-    _ = try self.core.accept(RuleSet.is(.@":"));
-    const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
-    const expression = try self.acceptExpression(ctx);
+    var expression: ast.Expression = undefined;
+    if (self.core.accept(RuleSet.is(.@":"))) |_| {
+        const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
+        expression = try self.acceptExpression(ctx);
+    } else |_| if (self.core.accept(RuleSet.is(.@"("))) |_| {
+        // We need to do this after consuming the '(' token to skip preceeding whitespace.
+        const start_offset = self.core.tokenizer.offset - (comptime "(".len);
+        const formal_parameters = try self.acceptFormalParameters();
+        _ = try self.core.accept(RuleSet.is(.@")"));
+        _ = try self.core.accept(RuleSet.is(.@"{"));
+        const function_body = try self.acceptFunctionBody();
+        _ = try self.core.accept(RuleSet.is(.@"}"));
+        const end_offset = self.core.tokenizer.offset;
+        const source_text = try self.allocator.dupe(
+            u8,
+            self.core.tokenizer.source[start_offset..end_offset],
+        );
+        const function_expression = ast.FunctionExpression{
+            .identifier = null,
+            .formal_parameters = formal_parameters,
+            .function_body = function_body,
+            .source_text = source_text,
+        };
+        expression = .{ .primary_expression = .{ .function_expression = function_expression } };
+    } else |_| return error.UnexpectedToken;
     return .{
         .property_name_and_expression = .{
             .property_name = property_name,
