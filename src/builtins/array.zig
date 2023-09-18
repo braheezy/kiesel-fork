@@ -718,6 +718,7 @@ pub const ArrayPrototype = struct {
 
         try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinFunction(object, "concat", concat, 1, realm);
+        try defineBuiltinFunction(object, "copyWithin", copyWithin, 2, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
         try defineBuiltinFunction(object, "every", every, 1, realm);
         try defineBuiltinFunction(object, "fill", fill, 1, realm);
@@ -928,6 +929,136 @@ pub const ArrayPrototype = struct {
 
         // 4. Return ? IsArray(O).
         return value.isArray();
+    }
+
+    /// 23.1.3.4 Array.prototype.copyWithin ( target, start [ , end ] )
+    /// https://tc39.es/ecma262/#sec-array.prototype.copywithin
+    fn copyWithin(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const target = arguments.get(0);
+        const start = arguments.get(1);
+        const end = arguments.get(2);
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+        const len_f64: f64 = @floatFromInt(len);
+
+        // 3. Let relativeTarget be ? ToIntegerOrInfinity(target).
+        const relative_starget = try target.toIntegerOrInfinity(agent);
+
+        // 4. If relativeTarget = -∞, let to be 0.
+        const to_f64 = if (relative_starget == -std.math.inf(f64)) blk: {
+            break :blk 0;
+        }
+        // 5. Else if relativeTarget < 0, let to be max(len + relativeTarget, 0).
+        else if (relative_starget < 0) blk: {
+            break :blk @max(len_f64 + relative_starget, 0);
+        }
+        // 6. Else, let to be min(relativeTarget, len).
+        else blk: {
+            break :blk @min(relative_starget, len_f64);
+        };
+        var to: u53 = @intFromFloat(to_f64);
+
+        // 7. Let relativeStart be ? ToIntegerOrInfinity(start).
+        const relative_start = try start.toIntegerOrInfinity(agent);
+
+        // 8. If relativeStart = -∞, let from be 0.
+        const from_f64 = if (relative_start == -std.math.inf(f64)) blk: {
+            break :blk 0;
+        }
+        // 9. Else if relativeStart < 0, let from be max(len + relativeStart, 0).
+        else if (relative_start < 0) blk: {
+            break :blk @max(len_f64 + relative_start, 0);
+        }
+        // 10. Else, let from be min(relativeStart, len).
+        else blk: {
+            break :blk @min(relative_start, len_f64);
+        };
+        var from: u53 = @intFromFloat(from_f64);
+
+        // 11. If end is undefined, let relativeEnd be len; else let relativeEnd be
+        //     ? ToIntegerOrInfinity(end).
+        const relative_end = if (end == .undefined)
+            len_f64
+        else
+            try end.toIntegerOrInfinity(agent);
+
+        // 12. If relativeEnd = -∞, let final be 0.
+        const final_f64 = if (relative_end == -std.math.inf(f64)) blk: {
+            break :blk 0;
+        }
+        // 13. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
+        else if (relative_end < 0) blk: {
+            break :blk @max(len_f64 + relative_end, 0);
+        }
+        // 14. Else, let final be min(relativeEnd, len).
+        else blk: {
+            break :blk @min(relative_end, len_f64);
+        };
+        const final: u53 = @intFromFloat(final_f64);
+
+        // 15. Let count be min(final - from, len - to).
+        var count = @min(final -| from, len -| to);
+
+        // 16. If from < to and to < from + count, then
+        const direction: i2 = if (from < to and to < (from + count)) blk: {
+            // b. Set from to from + count - 1.
+            from = from + count - 1;
+
+            // c. Set to to to + count - 1.
+            to = to + count - 1;
+
+            // a. Let direction be -1.
+            break :blk -1;
+        }
+        // 17. Else,
+        else blk: {
+            // a. Let direction be 1.
+            break :blk 1;
+        };
+
+        // 18. Repeat, while count > 0,
+        while (count > 0) : ({
+            if (direction == 1) from += 1 else from -|= 1;
+            if (direction == 1) to += 1 else to -|= 1;
+            count -= 1;
+        }) {
+            // a. Let fromKey be ! ToString(𝔽(from)).
+            const from_key = PropertyKey.from(from);
+
+            // b. Let toKey be ! ToString(𝔽(to)).
+            const to_key = PropertyKey.from(to);
+
+            // c. Let fromPresent be ? HasProperty(O, fromKey).
+            const from_present = try object.hasProperty(from_key);
+
+            // d. If fromPresent is true, then
+            if (from_present) {
+                // i. Let fromVal be ? Get(O, fromKey).
+                const from_value = try object.get(from_key);
+
+                // ii. Perform ? Set(O, toKey, fromVal, true).
+                try object.set(to_key, from_value, .throw);
+            }
+            // e. Else,
+            else {
+                // i. Assert: fromPresent is false.
+                std.debug.assert(!from_present);
+
+                // ii. Perform ? DeletePropertyOrThrow(O, toKey).
+                try object.deletePropertyOrThrow(to_key);
+            }
+
+            // f. Set from to from + direction.
+            // g. Set to to to + direction.
+            // h. Set count to count - 1.
+        }
+
+        // 19. Return O.
+        return Value.from(object);
     }
 
     /// 23.1.3.5 Array.prototype.entries ( )
