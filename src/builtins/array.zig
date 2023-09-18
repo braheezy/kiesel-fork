@@ -25,6 +25,7 @@ const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIteratorFromMethod = types.getIteratorFromMethod;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
+const isLessThan = types.isLessThan;
 const isStrictlyEqual = types.isStrictlyEqual;
 const noexcept = utils.noexcept;
 const ordinaryDefineOwnProperty = ordinary.ordinaryDefineOwnProperty;
@@ -742,6 +743,7 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "shift", shift, 0, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
         try defineBuiltinFunction(object, "some", some, 1, realm);
+        try defineBuiltinFunction(object, "sort", sort, 1, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toReversed", toReversed, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
@@ -2226,6 +2228,77 @@ pub const ArrayPrototype = struct {
         return Value.from(false);
     }
 
+    /// 23.1.3.30 Array.prototype.sort ( comparefn )
+    /// https://tc39.es/ecma262/#sec-array.prototype.sort
+    fn sort(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const compare_fn = arguments.get(0);
+
+        // 1. If comparefn is not undefined and IsCallable(comparefn) is false, throw a TypeError
+        //    exception.
+        if (compare_fn != .undefined and !compare_fn.isCallable()) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{compare_fn}),
+            );
+        }
+
+        // 2. Let obj be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 3. Let len be ? LengthOfArrayLike(obj).
+        const len = try object.lengthOfArrayLike();
+
+        // 4. Let SortCompare be a new Abstract Closure with parameters (x, y) that captures
+        //    comparefn and performs the following steps when called:
+        const sortCompare = struct {
+            fn func(agent_: *Agent, x: Value, y: Value, compare_fn_: ?Object) !std.math.Order {
+                // a. Return ? CompareArrayElements(x, y, comparefn).
+                return compareArrayElements(agent_, x, y, compare_fn_);
+            }
+        }.func;
+
+        // 5. Let sortedList be ? SortIndexedProperties(obj, len, SortCompare, skip-holes).
+        const sorted_list = try sortIndexedProperties(
+            agent,
+            object,
+            len,
+            .{
+                .impl = sortCompare,
+                .compare_fn = if (compare_fn != .undefined) compare_fn.object else null,
+            },
+            .skip_holes,
+        );
+
+        // 6. Let itemCount be the number of elements in sortedList.
+        const item_count: u53 = @intCast(sorted_list.len);
+
+        // 7. Let j be 0.
+        var j: u53 = 0;
+
+        // 8. Repeat, while j < itemCount,
+        while (j < item_count) : (j += 1) {
+            // a. Perform ? Set(obj, ! ToString(𝔽(j)), sortedList[j], true).
+            try object.set(PropertyKey.from(j), sorted_list[@intCast(j)], .throw);
+
+            // b. Set j to j + 1.
+        }
+
+        // 9. NOTE: The call to SortIndexedProperties in step 5 uses skip-holes. The remaining
+        //    indices are deleted to preserve the number of holes that were detected and excluded
+        //    from the sort.
+
+        // 10. Repeat, while j < len,
+        while (j < len) : (j += 1) {
+            // a. Perform ? DeletePropertyOrThrow(obj, ! ToString(𝔽(j))).
+            try object.deletePropertyOrThrow(PropertyKey.from(j));
+
+            // b. Set j to j + 1.
+        }
+
+        // 11. Return obj.
+        return Value.from(object);
+    }
+
     /// 23.1.3.32 Array.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.tolocalestring
     fn toLocaleString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
@@ -2520,6 +2593,153 @@ pub fn findViaPredicate(
 
     // 5. Return the Record { [[Index]]: -1𝔽, [[Value]]: undefined }.
     return .{ .index = Value.from(-1), .value = .undefined };
+}
+
+const SortCompare = struct {
+    impl: *const fn (
+        agent: *Agent,
+        x: Value,
+        y: Value,
+        compare_fn: ?Object,
+    ) Agent.Error!std.math.Order,
+    compare_fn: ?Object,
+};
+
+/// Custom insertion sort implementation, `std.mem` doesn't have fallible sorting functions
+/// https://github.com/Koura/algorithms/blob/main/sorting/insertion_sort.zig
+fn insertionSort(agent: *Agent, items: []Value, sort_compare: SortCompare) !void {
+    const sortCompare = sort_compare.impl;
+    const compare_fn = sort_compare.compare_fn;
+    var i: usize = 1;
+    while (i < items.len) : (i += 1) {
+        var x = items[i];
+        var j = i;
+        while (j > 0) : (j -= 1) {
+            var y = items[j - 1];
+            if (try sortCompare(agent, x, y, compare_fn) != .lt) break;
+            items[j] = y;
+        }
+        items[j] = x;
+    }
+}
+
+/// 23.1.3.30.1 SortIndexedProperties ( obj, len, SortCompare, holes )
+/// https://tc39.es/ecma262/#sec-sortindexedproperties
+pub fn sortIndexedProperties(
+    agent: *Agent,
+    object: Object,
+    len: u53,
+    sort_compare: SortCompare,
+    comptime holes: enum { skip_holes, read_through_holes },
+) ![]const Value {
+    // 1. Let items be a new empty List.
+    var items = std.ArrayList(Value).init(agent.gc_allocator);
+
+    // 2. Let k be 0.
+    var k: u53 = 0;
+
+    // 3. Repeat, while k < len,
+    while (k < len) : (k += 1) {
+        // a. Let Pk be ! ToString(𝔽(k)).
+        const property_key = PropertyKey.from(k);
+
+        const k_read = switch (holes) {
+            // b. If holes is skip-holes, then
+            .skip_holes => blk: {
+                // i. Let kRead be ? HasProperty(obj, Pk).
+                break :blk try object.hasProperty(property_key);
+            },
+            // c. Else,
+            .read_through_holes => blk: {
+                // i. Assert: holes is read-through-holes.
+                // ii. Let kRead be true.
+                break :blk true;
+            },
+        };
+
+        // d. If kRead is true, then
+        if (k_read) {
+            // i. Let kValue be ? Get(obj, Pk).
+            const k_value = try object.get(property_key);
+
+            // ii. Append kValue to items.
+            try items.append(k_value);
+        }
+
+        // e. Set k to k + 1.
+    }
+
+    // 4. Sort items using an implementation-defined sequence of calls to SortCompare. If any such
+    //    call returns an abrupt completion, stop before performing any further calls to
+    //    SortCompare and return that Completion Record.
+    try insertionSort(agent, items.items, sort_compare);
+
+    // 5. Return items.
+    return items.toOwnedSlice();
+}
+
+/// 23.1.3.30.2 CompareArrayElements ( x, y, comparefn )
+/// https://tc39.es/ecma262/#sec-comparearrayelements
+pub fn compareArrayElements(
+    agent: *Agent,
+    x: Value,
+    y: Value,
+    maybe_compare_fn: ?Object,
+) !std.math.Order {
+    // 1. If x and y are both undefined, return +0𝔽.
+    if (x == .undefined and y == .undefined) return .eq;
+
+    // 2. If x is undefined, return 1𝔽.
+    if (x == .undefined) return .gt;
+
+    // 3. If y is undefined, return -1𝔽.
+    if (y == .undefined) return .lt;
+
+    // 4. If comparefn is not undefined, then
+    if (maybe_compare_fn) |compare_fn| {
+        // a. Let v be ? ToNumber(? Call(comparefn, undefined, « x, y »)).
+        const value = try (try Value.from(compare_fn).callAssumeCallable(
+            .undefined,
+            .{ x, y },
+        )).toNumber(agent);
+
+        // b. If v is NaN, return +0𝔽.
+        if (value.isNan()) return .eq;
+
+        // c. Return v.
+        return if (value.isZero()) .eq else if (value.asFloat() < 0) .lt else .gt;
+    }
+
+    // 5. Let xString be ? ToString(x).
+    const x_string = try x.toString(agent);
+
+    // 6. Let yString be ? ToString(y).
+    const y_string = try y.toString(agent);
+
+    // 7. Let xSmaller be ! IsLessThan(xString, yString, true).
+    const x_smaller = isLessThan(
+        agent,
+        Value.from(x_string),
+        Value.from(y_string),
+        .left_first,
+    ) catch unreachable;
+
+    // 8. If xSmaller is true, return -1𝔽.
+    if (x_smaller == true) return .lt;
+
+    // 9. Let ySmaller be ! IsLessThan(yString, xString, true).
+    const y_smaller = isLessThan(
+        agent,
+        Value.from(y_string),
+        Value.from(x_string),
+        .left_first,
+    ) catch unreachable;
+
+    // 10. If ySmaller is true, return 1𝔽.
+    if (y_smaller == true) return .gt;
+
+    // 11. Return +0𝔽.
+    return .eq;
 }
 
 /// 23.1.4 Properties of Array Instances
