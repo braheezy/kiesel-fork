@@ -738,6 +738,7 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "push", push, 1, realm);
         try defineBuiltinFunction(object, "reduce", reduce, 1, realm);
         try defineBuiltinFunction(object, "reduceRight", reduceRight, 1, realm);
+        try defineBuiltinFunction(object, "reverse", reverse, 0, realm);
         try defineBuiltinFunction(object, "shift", shift, 0, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
         try defineBuiltinFunction(object, "some", some, 1, realm);
@@ -1929,6 +1930,90 @@ pub const ArrayPrototype = struct {
 
         // 10. Return accumulator.
         return accumulator;
+    }
+
+    /// 23.1.3.26 Array.prototype.reverse ( )
+    /// https://tc39.es/ecma262/#sec-array.prototype.reverse
+    fn reverse(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+
+        // 3. Let middle be floor(len / 2).
+        const middle = len / 2;
+
+        // 4. Let lower be 0.
+        var lower: u53 = 0;
+
+        // 5. Repeat, while lower ≠ middle,
+        while (lower != middle) : (lower += 1) {
+            // a. Let upper be len - lower - 1.
+            const upper = len - lower - 1;
+
+            // b. Let upperP be ! ToString(𝔽(upper)).
+            const upper_property_key = PropertyKey.from(upper);
+
+            // c. Let lowerP be ! ToString(𝔽(lower)).
+            const lower_property_key = PropertyKey.from(lower);
+
+            // d. Let lowerExists be ? HasProperty(O, lowerP).
+            const lower_exists = try object.hasProperty(lower_property_key);
+
+            // e. If lowerExists is true, then
+            const lower_value = if (lower_exists) blk: {
+                // i. Let lowerValue be ? Get(O, lowerP).
+                break :blk try object.get(lower_property_key);
+            } else undefined;
+
+            // f. Let upperExists be ? HasProperty(O, upperP).
+            const upper_exists = try object.hasProperty(upper_property_key);
+
+            // g. If upperExists is true, then
+            const upper_value = if (upper_exists) blk: {
+                // i. Let upperValue be ? Get(O, upperP).
+                break :blk try object.get(upper_property_key);
+            } else undefined;
+
+            // h. If lowerExists is true and upperExists is true, then
+            if (lower_exists and upper_exists) {
+                // i. Perform ? Set(O, lowerP, upperValue, true).
+                try object.set(lower_property_key, upper_value, .throw);
+
+                // ii. Perform ? Set(O, upperP, lowerValue, true)
+                try object.set(upper_property_key, lower_value, .throw);
+            }
+            // i. Else if lowerExists is false and upperExists is true, then
+            else if (!lower_exists and upper_exists) {
+                // i. Perform ? Set(O, lowerP, upperValue, true).
+                try object.set(lower_property_key, upper_value, .throw);
+
+                // ii. Perform ? DeletePropertyOrThrow(O, upperP).
+                try object.deletePropertyOrThrow(upper_property_key);
+            }
+            // j. Else if lowerExists is true and upperExists is false, then
+            else if (lower_exists and !upper_exists) {
+                // i. Perform ? DeletePropertyOrThrow(O, lowerP).
+                try object.deletePropertyOrThrow(lower_property_key);
+
+                // ii. Perform ? Set(O, upperP, lowerValue, true).
+                try object.set(upper_property_key, lower_value, .throw);
+            }
+            // k. Else,
+            else {
+                // i. Assert: lowerExists and upperExists are both false.
+                std.debug.assert(!lower_exists and !upper_exists);
+
+                // ii. NOTE: No action is required.
+            }
+
+            // l. Set lower to lower + 1.
+        }
+
+        // 6. Return O.
+        return Value.from(object);
     }
 
     /// 23.1.3.27 Array.prototype.shift ( )
