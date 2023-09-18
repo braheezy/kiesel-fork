@@ -720,6 +720,7 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "concat", concat, 1, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
         try defineBuiltinFunction(object, "every", every, 1, realm);
+        try defineBuiltinFunction(object, "fill", fill, 1, realm);
         try defineBuiltinFunction(object, "filter", filter, 1, realm);
         try defineBuiltinFunction(object, "find", find, 1, realm);
         try defineBuiltinFunction(object, "findIndex", findIndex, 1, realm);
@@ -990,6 +991,73 @@ pub const ArrayPrototype = struct {
 
         // 6. Return true.
         return Value.from(true);
+    }
+
+    /// 23.1.3.7 Array.prototype.fill ( value [ , start [ , end ] ] )
+    /// https://tc39.es/ecma262/#sec-array.prototype.fill
+    fn fill(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const value = arguments.get(0);
+        const start = arguments.get(1);
+        const end = arguments.get(2);
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+        const len_f64 = @as(f64, @floatFromInt(len));
+
+        // 3. Let relativeStart be ? ToIntegerOrInfinity(start).
+        const relative_start = try start.toIntegerOrInfinity(agent);
+
+        // 4. If relativeStart = -∞, let k be 0.
+        const k_f64 = if (relative_start == -std.math.inf(f64)) blk: {
+            break :blk 0;
+        }
+        // 5. Else if relativeStart < 0, let k be max(len + relativeStart, 0).
+        else if (relative_start < 0) blk: {
+            break :blk @max(len_f64 + relative_start, 0);
+        }
+        // 6. Else, let k be min(relativeStart, len).
+        else blk: {
+            break :blk @min(relative_start, len_f64);
+        };
+        var k: u53 = @intFromFloat(k_f64);
+
+        // 7. If end is undefined, let relativeEnd be len; else let relativeEnd be
+        //    ? ToIntegerOrInfinity(end).
+        const relative_end = if (end == .undefined)
+            len_f64
+        else
+            try end.toIntegerOrInfinity(agent);
+
+        // 8. If relativeEnd = -∞, let final be 0.
+        const final_f64 = if (relative_end == -std.math.inf(f64)) blk: {
+            break :blk 0;
+        }
+        // 9. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
+        else if (relative_end < 0) blk: {
+            break :blk @max(len_f64 + relative_end, 0);
+        }
+        // 10. Else, let final be min(relativeEnd, len).
+        else blk: {
+            break :blk @min(relative_end, len_f64);
+        };
+        const final: u53 = @intFromFloat(final_f64);
+
+        // 11. Repeat, while k < final,
+        while (k < final) : (k += 1) {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
+
+            // b. Perform ? Set(O, Pk, value, true).
+            try object.set(property_key, value, .throw);
+
+            // c. Set k to k + 1.
+        }
+
+        // 12. Return O.
+        return Value.from(object);
     }
 
     /// 23.1.3.8 Array.prototype.filter ( callbackfn [ , thisArg ] )
