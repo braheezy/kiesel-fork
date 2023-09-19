@@ -373,7 +373,7 @@ pub fn ordinaryFunctionCreate(
 ) !Object {
     // 7. If the source text matched by Body is strict mode code, let Strict be true; else let
     //    Strict be false.
-    const strict = body.functionBodyContainsUseStrict();
+    const strict = body.strict.?;
 
     // 1. Let internalSlotsList be the internal slots listed in Table 30.
     // 2. Let F be OrdinaryObjectCreate(functionPrototype, internalSlotsList).
