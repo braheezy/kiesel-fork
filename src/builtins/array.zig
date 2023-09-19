@@ -728,6 +728,7 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "findIndex", findIndex, 1, realm);
         try defineBuiltinFunction(object, "findLast", findLast, 1, realm);
         try defineBuiltinFunction(object, "findLastIndex", findLastIndex, 1, realm);
+        try defineBuiltinFunction(object, "flat", flat, 0, realm);
         try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
         try defineBuiltinFunction(object, "includes", includes, 1, realm);
         try defineBuiltinFunction(object, "indexOf", indexOf, 1, realm);
@@ -1335,6 +1336,145 @@ pub const ArrayPrototype = struct {
 
         // 4. Return findRec.[[Index]].
         return find_record.index;
+    }
+    /// 23.1.3.13 Array.prototype.flat ( [ depth ] )
+    /// https://tc39.es/ecma262/#sec-array.prototype.flat
+    fn flat(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const depth = arguments.get(0);
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let sourceLen be ? LengthOfArrayLike(O).
+        const source_len = try object.lengthOfArrayLike();
+
+        // 3. Let depthNum be 1.
+        var depth_num: f64 = 1;
+
+        // 4. If depth is not undefined, then
+        if (depth != .undefined) {
+            // a. Set depthNum to ? ToIntegerOrInfinity(depth).
+            depth_num = try depth.toIntegerOrInfinity(agent);
+
+            // b. If depthNum < 0, set depthNum to 0.
+            if (depth_num < 0) depth_num = 0;
+        }
+
+        // 5. Let A be ? ArraySpeciesCreate(O, 0).
+        const array = try arraySpeciesCreate(agent, object, 0);
+
+        // 6. Perform ? FlattenIntoArray(A, O, sourceLen, 0, depthNum).
+        _ = try flattenIntoArray(agent, array, object, source_len, 0, depth_num, null, null);
+
+        // 7. Return A.
+        return Value.from(array);
+    }
+
+    /// 23.1.3.13.1 FlattenIntoArray ( target, source, sourceLen, start, depth [ , mapperFunction [ , thisArg ] ] )
+    /// https://tc39.es/ecma262/#sec-flattenintoarray
+    fn flattenIntoArray(
+        agent: *Agent,
+        target: Object,
+        source: Object,
+        source_len: u53,
+        start: f64,
+        depth: f64,
+        mapper_function: ?Object,
+        this_arg: ?Value,
+    ) !f64 {
+        // 1. Assert: If mapperFunction is present, then IsCallable(mapperFunction) is true,
+        //    thisArg is present, and depth is 1.
+        if (mapper_function != null) {
+            std.debug.assert(Value.from(mapper_function.?).isCallable());
+            std.debug.assert(this_arg != null);
+            std.debug.assert(depth == 1);
+        }
+
+        // 2. Let targetIndex be start.
+        var target_index = start;
+
+        // 3. Let sourceIndex be +0𝔽.
+        var source_index: u53 = 0;
+
+        // 4. Repeat, while ℝ(sourceIndex) < sourceLen,
+        while (source_index < source_len) : (source_index += 1) {
+            // a. Let P be ! ToString(sourceIndex).
+            const property_key = PropertyKey.from(source_index);
+
+            // b. Let exists be ? HasProperty(source, P).
+            const exists = try source.hasProperty(property_key);
+
+            // c. If exists is true, then
+            if (exists) {
+                // i. Let element be ? Get(source, P).
+                var element = try source.get(property_key);
+
+                // ii. If mapperFunction is present, then
+                if (mapper_function != null) {
+                    // 1. Set element to ? Call(mapperFunction, thisArg, « element, sourceIndex, source »).
+                    element = try Value.from(mapper_function.?).callAssumeCallable(
+                        this_arg.?,
+                        .{ element, Value.from(source_index), Value.from(source) },
+                    );
+                }
+
+                // iii. Let shouldFlatten be false.
+                var should_flatten = false;
+
+                // iv. If depth > 0, then
+                if (depth > 0) {
+                    // 1. Set shouldFlatten to ? IsArray(element).
+                    should_flatten = try element.isArray();
+                }
+
+                // v. If shouldFlatten is true, then
+                if (should_flatten) {
+                    // 1. If depth = +∞, let newDepth be +∞.
+                    // 2. Else, let newDepth be depth - 1.
+                    const new_depth = if (std.math.isPositiveInf(depth))
+                        std.math.inf(f64)
+                    else
+                        depth - 1;
+
+                    // 3. Let elementLen be ? LengthOfArrayLike(element).
+                    const element_len = try element.object.lengthOfArrayLike();
+
+                    // 4. Set targetIndex to ? FlattenIntoArray(target, element, elementLen,
+                    //    targetIndex, newDepth).
+                    target_index = try flattenIntoArray(
+                        agent,
+                        target,
+                        element.object,
+                        element_len,
+                        target_index,
+                        new_depth,
+                        null,
+                        null,
+                    );
+                }
+                // vi. Else,
+                else {
+                    // 1. If targetIndex ≥ 2^53 - 1, throw a TypeError exception.
+                    if (target_index >= std.math.maxInt(u53)) {
+                        return agent.throwException(.type_error, "Maximum array length exceeded");
+                    }
+
+                    // 2. Perform ? CreateDataPropertyOrThrow(target, ! ToString(𝔽(targetIndex)), element).
+                    try target.createDataPropertyOrThrow(
+                        PropertyKey.from(@as(PropertyKey.IntegerIndex, @intFromFloat(target_index))),
+                        element,
+                    );
+
+                    // 3. Set targetIndex to targetIndex + 1.
+                    target_index += 1;
+                }
+            }
+
+            // d. Set sourceIndex to sourceIndex + 1𝔽.
+        }
+
+        // 5. Return targetIndex.
+        return target_index;
     }
 
     /// 23.1.3.15 Array.prototype.forEach ( callbackfn [ , thisArg ] )
