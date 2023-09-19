@@ -729,6 +729,7 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "findLast", findLast, 1, realm);
         try defineBuiltinFunction(object, "findLastIndex", findLastIndex, 1, realm);
         try defineBuiltinFunction(object, "flat", flat, 0, realm);
+        try defineBuiltinFunction(object, "flatMap", flatMap, 1, realm);
         try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
         try defineBuiltinFunction(object, "includes", includes, 1, realm);
         try defineBuiltinFunction(object, "indexOf", indexOf, 1, realm);
@@ -1475,6 +1476,45 @@ pub const ArrayPrototype = struct {
 
         // 5. Return targetIndex.
         return target_index;
+    }
+
+    /// 23.1.3.14 Array.prototype.flatMap ( mapperFunction [ , thisArg ] )
+    /// https://tc39.es/ecma262/#sec-array.prototype.flatmap
+    fn flatMap(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const mapper_function = arguments.get(0);
+        const this_arg = arguments.get(1);
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let sourceLen be ? LengthOfArrayLike(O).
+        const source_len = try object.lengthOfArrayLike();
+
+        // 3. If IsCallable(mapperFunction) is false, throw a TypeError exception.
+        if (!mapper_function.isCallable()) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{mapper_function}),
+            );
+        }
+
+        // 4. Let A be ? ArraySpeciesCreate(O, 0).
+        const array = try arraySpeciesCreate(agent, object, 0);
+
+        // 5. Perform ? FlattenIntoArray(A, O, sourceLen, 0, 1, mapperFunction, thisArg).
+        _ = try flattenIntoArray(
+            agent,
+            array,
+            object,
+            source_len,
+            0,
+            1,
+            mapper_function.object,
+            this_arg,
+        );
+
+        // 6. Return A.
+        return Value.from(array);
     }
 
     /// 23.1.3.15 Array.prototype.forEach ( callbackfn [ , thisArg ] )
