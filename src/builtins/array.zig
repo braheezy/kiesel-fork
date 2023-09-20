@@ -120,7 +120,7 @@ fn defineOwnProperty(
 pub fn arrayCreate(agent: *Agent, length: u64, maybe_prototype: ?Object) !Object {
     const realm = agent.currentRealm();
 
-    // 1. If length > 2^32 - 1, throw a RangeError exception.
+    // 1. If length > 2**32 - 1, throw a RangeError exception.
     if (length >= std.math.maxInt(u32)) return agent.throwException(
         .range_error,
         "Invalid array length",
@@ -541,7 +541,7 @@ pub const ArrayConstructor = struct {
 
             // e. Repeat,
             while (true) : (k += 1) {
-                // i. If k ≥ 2^53 - 1, then
+                // i. If k ≥ 2**53 - 1, then
                 if (k == std.math.maxInt(u53)) {
                     // 1. Let error be ThrowCompletion(a newly created TypeError object).
                     const @"error" = agent.throwException(
@@ -864,7 +864,7 @@ pub const ArrayPrototype = struct {
                 // i. Let len be ? LengthOfArrayLike(E).
                 const len = try element.object.lengthOfArrayLike();
 
-                // ii. If n + len > 2^53 - 1, throw a TypeError exception.
+                // ii. If n + len > 2**53 - 1, throw a TypeError exception.
                 if (std.meta.isError(std.math.add(u53, n, len))) {
                     return agent.throwException(.type_error, "Maximum array length exceeded");
                 }
@@ -900,7 +900,7 @@ pub const ArrayPrototype = struct {
             else {
                 // i. NOTE: E is added as a single item rather than spread.
 
-                // ii. If n ≥ 2^53 - 1, throw a TypeError exception.
+                // ii. If n ≥ 2**53 - 1, throw a TypeError exception.
                 if (n == std.math.maxInt(u53)) {
                     return agent.throwException(.type_error, "Maximum array length exceeded");
                 }
@@ -1455,7 +1455,7 @@ pub const ArrayPrototype = struct {
                 }
                 // vi. Else,
                 else {
-                    // 1. If targetIndex ≥ 2^53 - 1, throw a TypeError exception.
+                    // 1. If targetIndex ≥ 2**53 - 1, throw a TypeError exception.
                     if (target_index >= std.math.maxInt(u53)) {
                         return agent.throwException(.type_error, "Maximum array length exceeded");
                     }
@@ -1901,7 +1901,7 @@ pub const ArrayPrototype = struct {
         // 3. Let argCount be the number of elements in items.
         const arg_count: u53 = @intCast(arguments.count());
 
-        // 4. If len + argCount > 2^53 - 1, throw a TypeError exception.
+        // 4. If len + argCount > 2**53 - 1, throw a TypeError exception.
         if (std.meta.isError(std.math.add(u53, len, arg_count))) {
             return agent.throwException(.type_error, "Maximum array length exceeded");
         }
@@ -2660,7 +2660,7 @@ pub const ArrayPrototype = struct {
 
         // 4. If argCount > 0, then
         if (arg_count > 0) {
-            // a. If len + argCount > 2^53 - 1, throw a TypeError exception.
+            // a. If len + argCount > 2**53 - 1, throw a TypeError exception.
             if (std.meta.isError(std.math.add(u53, len, @intCast(arg_count)))) {
                 return agent.throwException(.type_error, "Maximum array length exceeded");
             }

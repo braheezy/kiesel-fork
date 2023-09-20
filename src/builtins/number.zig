@@ -217,7 +217,7 @@ pub const NumberConstructor = struct {
 
         // 1. If IsIntegralNumber(number) is true, then
         if (number.isIntegralNumber()) {
-            // a. If abs(ℝ(number)) ≤ 2^53 - 1, return true.
+            // a. If abs(ℝ(number)) ≤ 2**53 - 1, return true.
             if (std.math.fabs(number.number.asFloat()) <= @as(f64, @floatFromInt(std.math.maxInt(u53)))) {
                 return Value.from(true);
             }

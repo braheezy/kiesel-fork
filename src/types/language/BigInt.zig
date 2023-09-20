@@ -150,7 +150,7 @@ pub fn subtract(x: Self, agent: *Agent, y: Self) !Self {
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-leftShift
 pub fn leftShift(_: Self, agent: *Agent, _: Self) !Self {
     // 1. If y < 0ℤ, then
-    //     a. Return ℤ(floor(ℝ(x) / 2^-ℝ(y))).
+    //     a. Return ℤ(floor(ℝ(x) / 2**(-ℝ(y)))).
     // 2. Return x × 2ℤ^y.
     // TODO: Figure out how to do this with built-in functionality, shiftLeft() only accepts an usize
     return agent.throwException(.internal_error, "Left-shift for BigInts is not implemented");

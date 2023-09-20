@@ -429,10 +429,10 @@ pub const Value = union(enum) {
         // 3. Let int be truncate(ℝ(number)).
         const int = number.truncate().asFloat();
 
-        // 4. Let int32bit be int modulo 2^32.
+        // 4. Let int32bit be int modulo 2**32.
         const int32bit = @mod(int, pow_2_32);
 
-        // 5. If int32bit ≥ 2^31, return 𝔽(int32bit - 2^32); otherwise return 𝔽(int32bit).
+        // 5. If int32bit ≥ 2**31, return 𝔽(int32bit - 2**32); otherwise return 𝔽(int32bit).
         return @intFromFloat(if (int32bit >= pow_2_31) int32bit - pow_2_32 else int32bit);
     }
 
@@ -452,7 +452,7 @@ pub const Value = union(enum) {
         // 3. Let int be truncate(ℝ(number)).
         const int = number.truncate().asFloat();
 
-        // 4. Let int32bit be int modulo 2^32.
+        // 4. Let int32bit be int modulo 2**32.
         const int32bit = @mod(int, pow_2_32);
 
         // 5. Return 𝔽(int32bit).
@@ -471,10 +471,10 @@ pub const Value = union(enum) {
         // 3. Let int be truncate(ℝ(number)).
         const int = number.truncate().asFloat();
 
-        // 4. Let int16bit be int modulo 2^16.
+        // 4. Let int16bit be int modulo 2**16.
         const int16bit = @mod(int, pow_2_16);
 
-        // 5. If int16bit ≥ 2^15, return 𝔽(int16bit - 2^16); otherwise return 𝔽(int16bit).
+        // 5. If int16bit ≥ 2**15, return 𝔽(int16bit - 2**16); otherwise return 𝔽(int16bit).
         return @intFromFloat(if (int16bit >= pow_2_15) int16bit - pow_2_16 else int16bit);
     }
 
@@ -490,7 +490,7 @@ pub const Value = union(enum) {
         // 3. Let int be truncate(ℝ(number)).
         const int = number.truncate().asFloat();
 
-        // 4. Let int16bit be int modulo 2^16.
+        // 4. Let int16bit be int modulo 2**16.
         const int16bit = @mod(int, pow_2_16);
 
         // 5. Return 𝔽(int16bit).
@@ -509,10 +509,10 @@ pub const Value = union(enum) {
         // 3. Let int be truncate(ℝ(number)).
         const int = number.truncate().asFloat();
 
-        // 4. Let int8bit be int modulo 2^8.
+        // 4. Let int8bit be int modulo 2**8.
         const int8bit = @mod(int, pow_2_8);
 
-        // 5. If int8bit ≥ 2^7, return 𝔽(int8bit - 2^8); otherwise return 𝔽(int8bit).
+        // 5. If int8bit ≥ 2**7, return 𝔽(int8bit - 2**8); otherwise return 𝔽(int8bit).
         return @intFromFloat(if (int8bit >= pow_2_7) int8bit - pow_2_8 else int8bit);
     }
 
@@ -528,7 +528,7 @@ pub const Value = union(enum) {
         // 3. Let int be truncate(ℝ(number)).
         const int = number.truncate().asFloat();
 
-        // 4. Let int8bit be int modulo 2^8.
+        // 4. Let int8bit be int modulo 2**8.
         const int8bit = @mod(int, pow_2_8);
 
         // 5. Return 𝔽(int8bit).
@@ -609,12 +609,12 @@ pub const Value = union(enum) {
         // 1. Let n be ? ToBigInt(argument).
         const n = try self.toBigInt(agent);
 
-        // 2. Let int64bit be ℝ(n) modulo 2^64.
+        // 2. Let int64bit be ℝ(n) modulo 2**64.
         var quotient = try BigInt.Value.init(agent.gc_allocator);
         var int64bit = try BigInt.Value.init(agent.gc_allocator);
         try quotient.divTrunc(&int64bit, &n.value, &pow_2_64);
 
-        // 3. If int64bit ≥ 2^63, return ℤ(int64bit - 2^64); otherwise return ℤ(int64bit).
+        // 3. If int64bit ≥ 2**63, return ℤ(int64bit - 2**64); otherwise return ℤ(int64bit).
         if (int64bit.order(pow_2_63) != .lt) {
             var result = try BigInt.Value.init(agent.gc_allocator);
             try result.sub(&int64bit, &pow_2_64);
@@ -632,7 +632,7 @@ pub const Value = union(enum) {
         // 1. Let n be ? ToBigInt(argument).
         const n = try self.toBigInt(agent);
 
-        // 2. Let int64bit be ℝ(n) modulo 2^64.
+        // 2. Let int64bit be ℝ(n) modulo 2**64.
         var quotient = try BigInt.Value.init(agent.gc_allocator);
         var int64bit = try BigInt.Value.init(agent.gc_allocator);
         try quotient.divTrunc(&int64bit, &n.value, &pow_2_64);
@@ -742,7 +742,7 @@ pub const Value = union(enum) {
         // 2. If len ≤ 0, return +0𝔽.
         if (length <= 0) return 0;
 
-        // 3. Return 𝔽(min(len, 2^53 - 1)).
+        // 3. Return 𝔽(min(len, 2**53 - 1)).
         return @intFromFloat(@min(length, std.math.maxInt(u53)));
     }
 
@@ -752,7 +752,7 @@ pub const Value = union(enum) {
         // 1. Let integer be ? ToIntegerOrInfinity(value).
         const integer = try self.toIntegerOrInfinity(agent);
 
-        // 2. If integer is not in the inclusive interval from 0 to 2^53 - 1, throw a RangeError exception.
+        // 2. If integer is not in the inclusive interval from 0 to 2**53 - 1, throw a RangeError exception.
         if (integer < 0 or integer > std.math.maxInt(u53))
             return agent.throwException(.range_error, "Value is not not a valid index");
 
