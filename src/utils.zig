@@ -176,6 +176,32 @@ pub fn defineBuiltinFunction(
     try defineBuiltinProperty(object, name, Value.from(function));
 }
 
+pub fn defineBuiltinFunctionWithAttributes(
+    object: Object,
+    comptime name: []const u8,
+    behaviour: *const Behaviour.RegularFn,
+    length: u32,
+    realm: *Realm,
+    attributes: struct {
+        writable: bool,
+        enumerable: bool,
+        configurable: bool,
+    },
+) !void {
+    const function_name = comptime getFunctionName(name);
+    const function = try createBuiltinFunction(realm.agent, .{ .regular = behaviour }, .{
+        .length = length,
+        .name = function_name,
+        .realm = realm,
+    });
+    try defineBuiltinProperty(object, name, PropertyDescriptor{
+        .value = Value.from(function),
+        .writable = attributes.writable,
+        .enumerable = attributes.enumerable,
+        .configurable = attributes.configurable,
+    });
+}
+
 pub fn defineBuiltinProperty(object: Object, comptime name: []const u8, value: anytype) !void {
     const T = @TypeOf(value);
     const property_key = getPropertyKey(name, object.agent());
