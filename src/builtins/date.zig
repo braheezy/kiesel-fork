@@ -370,7 +370,23 @@ pub const DatePrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
+
         return object;
+    }
+
+    /// 21.4.4.44 Date.prototype.valueOf ( )
+    /// https://tc39.es/ecma262/#sec-date.prototype.valueof
+    fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        if (this_value != .object or !this_value.object.is(Date)) {
+            return agent.throwException(.type_error, "This value must be a Date object");
+        }
+        const date_object = this_value.object.as(Date);
+
+        // 3. Return dateObject.[[DateValue]].
+        return Value.from(date_object.fields.date_value);
     }
 };
 
