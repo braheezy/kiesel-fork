@@ -11,11 +11,14 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
 const Object = types.Object;
+const PreferredType = Value.PreferredType;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
+const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
+const defineBuiltinFunctionWithAttributes = utils.defineBuiltinFunctionWithAttributes;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
@@ -371,6 +374,11 @@ pub const DatePrototype = struct {
         });
 
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
+        try defineBuiltinFunctionWithAttributes(object, "@@toPrimitive", @"@@toPrimitive", 1, realm, .{
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
 
         return object;
     }
@@ -387,6 +395,52 @@ pub const DatePrototype = struct {
 
         // 3. Return dateObject.[[DateValue]].
         return Value.from(date_object.fields.date_value);
+    }
+
+    /// 21.4.4.45 Date.prototype [ @@toPrimitive ] ( hint )
+    /// https://tc39.es/ecma262/#sec-date.prototype-@@toprimitive
+    fn @"@@toPrimitive"(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const hint_value = arguments.get(0);
+
+        // 1. Let O be the this value.
+        // 2. If O is not an Object, throw a TypeError exception.
+        if (this_value != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{this_value}),
+            );
+        }
+        const object = this_value.object;
+
+        if (hint_value != .string) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not a string", .{hint_value}),
+            );
+        }
+        const hint = hint_value.string;
+
+        // 3. If hint is either "string" or "default", then
+        const try_first: PreferredType = if (hint.eql(String.from("string")) or hint.eql(String.from("default"))) blk: {
+            // a. Let tryFirst be string.
+            break :blk .string;
+        }
+        // 4. Else if hint is "number", then
+        else if (hint.eql(String.from("number"))) blk: {
+            // a. Let tryFirst be number.
+            break :blk .number;
+        }
+        // 5. Else,
+        else {
+            // a. Throw a TypeError exception.
+            return agent.throwException(
+                .type_error,
+                "Hint must be one of 'string', 'number', or 'default'",
+            );
+        };
+
+        // 6. Return ? OrdinaryToPrimitive(O, tryFirst).
+        return object.ordinaryToPrimitive(try_first);
     }
 };
 
