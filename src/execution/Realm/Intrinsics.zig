@@ -23,6 +23,8 @@ lazy_intrinsics: struct {
     @"%BigInt.prototype%": ?Object = null,
     @"%Boolean%": ?Object = null,
     @"%Boolean.prototype%": ?Object = null,
+    @"%Date%": ?Object = null,
+    @"%Date.prototype%": ?Object = null,
     @"%Error%": ?Object = null,
     @"%Error.prototype%": ?Object = null,
     @"%eval%": ?Object = null,
@@ -105,6 +107,12 @@ pub fn @"%Boolean%"(self: *Self) error{OutOfMemory}!Object {
 }
 pub fn @"%Boolean.prototype%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Boolean.prototype%", builtins.BooleanPrototype);
+}
+pub fn @"%Date%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%Date%", builtins.DateConstructor);
+}
+pub fn @"%Date.prototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%Date.prototype%", builtins.DatePrototype);
 }
 pub fn @"%Error%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Error%", builtins.ErrorConstructor);
