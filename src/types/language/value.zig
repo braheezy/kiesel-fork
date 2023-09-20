@@ -411,7 +411,9 @@ pub const Value = union(enum) {
         if (number.isNegativeInf()) return -std.math.inf(f64);
 
         // 5. Return truncate(ℝ(number)).
-        return number.truncate().asFloat();
+        const truncated = number.truncate().asFloat();
+        // Normalize negative zero
+        return if (truncated == 0) 0 else truncated;
     }
 
     /// 7.1.6 ToInt32 ( argument )
