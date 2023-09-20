@@ -17,6 +17,7 @@ const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
+const defineBuiltinFunctionWithAttributes = utils.defineBuiltinFunctionWithAttributes;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
@@ -258,7 +259,11 @@ pub const SymbolPrototype = struct {
 
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
-        try defineBuiltinFunction(object, "@@toPrimitive", @"@@toPrimitive", 1, realm);
+        try defineBuiltinFunctionWithAttributes(object, "@@toPrimitive", @"@@toPrimitive", 1, realm, .{
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
 
         // 20.4.3.6 Symbol.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-symbol.prototype-@@tostringtag
