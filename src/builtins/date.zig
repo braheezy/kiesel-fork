@@ -15,6 +15,7 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
@@ -189,6 +190,8 @@ pub const DateConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "UTC", UTC, 7, realm);
+
         // 21.4.3.3 Date.prototype
         // https://tc39.es/ecma262/#sec-date.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -322,6 +325,40 @@ pub const DateConstructor = struct {
 
         // 8. Return O.
         return Value.from(object);
+    }
+
+    /// 21.4.3.4 Date.UTC ( year [ , month [ , date [ , hours [ , minutes [ , seconds [ , ms ] ] ] ] ] ] )
+    /// https://tc39.es/ecma262/#sec-date.utc
+    fn UTC(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        // 1. Let y be ? ToNumber(year).
+        var year = (try arguments.get(0).toNumber(agent)).asFloat();
+
+        // 2. If month is present, let m be ? ToNumber(month); else let m be +0𝔽.
+        const month = if (arguments.getOrNull(1)) |month| (try month.toNumber(agent)).asFloat() else 0;
+
+        // 3. If date is present, let dt be ? ToNumber(date); else let dt be 1𝔽.
+        const date = if (arguments.getOrNull(2)) |date| (try date.toNumber(agent)).asFloat() else 0;
+
+        // 4. If hours is present, let h be ? ToNumber(hours); else let h be +0𝔽.
+        const hour = if (arguments.getOrNull(3)) |hours| (try hours.toNumber(agent)).asFloat() else 0;
+
+        // 5. If minutes is present, let min be ? ToNumber(minutes); else let min be +0𝔽.
+        const minute = if (arguments.getOrNull(4)) |minutes| (try minutes.toNumber(agent)).asFloat() else 0;
+
+        // 6. If seconds is present, let s be ? ToNumber(seconds); else let s be +0𝔽.
+        const second = if (arguments.getOrNull(5)) |seconds| (try seconds.toNumber(agent)).asFloat() else 0;
+
+        // 7. If ms is present, let milli be ? ToNumber(ms); else let milli be +0𝔽.
+        const millisecond = if (arguments.getOrNull(6)) |ms| (try ms.toNumber(agent)).asFloat() else 0;
+
+        // 8. Let yr be MakeFullYear(y).
+        year = makeFullYear(year);
+
+        // 9. Return TimeClip(MakeDate(MakeDay(yr, m, dt), MakeTime(h, min, s, milli))).
+        return Value.from(timeClip(makeDate(
+            makeDay(year, month, date),
+            makeTime(hour, minute, second, millisecond),
+        )));
     }
 };
 
