@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -22,6 +24,25 @@ const defineBuiltinFunctionWithAttributes = utils.defineBuiltinFunctionWithAttri
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
+const hours_per_day = 24;
+const minutes_per_hour = 60;
+
+/// Table 62: Names of days of the week
+/// https://tc39.es/ecma262/#sec-todatestring-day-names
+const week_day_names = [_][]const u8{ "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+
+/// Table 63: Names of months of the year
+/// https://tc39.es/ecma262/#sec-todatestring-month-names
+const month_names = [_][]const u8{ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
+const Year = std.math.IntFittingRange(1970 - 273_790, 1970 + 273_790);
+const Month = std.math.IntFittingRange(0, 366);
+const Day = std.math.IntFittingRange(0, 366);
+const Hour = std.math.IntFittingRange(0, 23);
+const Minute = std.math.IntFittingRange(0, 59);
+const Second = std.math.IntFittingRange(0, 59);
+const WeekDay = std.math.IntFittingRange(0, 6);
+
 /// Simplified infallible variant of `Value.toIntegerOrInfinity()`
 fn toIntegerOrInfinity(x: f64) f64 {
     if (std.math.isNan(x)) return 0;
@@ -29,6 +50,20 @@ fn toIntegerOrInfinity(x: f64) f64 {
     const truncated = @trunc(x);
     // Normalize negative zero
     return if (truncated == 0) 0 else truncated;
+}
+
+/// 22.1.3.17.3 ToZeroPaddedDecimalString ( n, minLength )
+/// https://tc39.es/ecma262/#sec-tozeropaddeddecimalstring
+fn toZeroPaddedDecimalString(buf: []u8, n: anytype, min_length: usize) []const u8 {
+    // NOTE: std.fmt does a weird thing where padded 1 becomes '00+1', so we do this ourselves.
+    var tmp: [100]u8 = undefined;
+    const s = std.fmt.bufPrint(&tmp, "{}", .{std.math.absInt(n) catch unreachable}) catch unreachable;
+
+    @memset(buf[0 .. buf.len - s.len], '0');
+    @memcpy(buf[buf.len - s.len ..], s);
+
+    const start_index = @min(buf.len - s.len, buf.len - min_length);
+    return buf[start_index..];
 }
 
 /// https://howardhinnant.github.io/date_algorithms.html#days_from_civil
@@ -49,17 +84,271 @@ pub fn day(t: f64) f64 {
     return std.math.floor(t / std.time.ms_per_day);
 }
 
+/// 21.4.1.5 DaysInYear ( y )
+/// https://tc39.es/ecma262/#sec-daysinyear
+pub fn daysInYear(year: Year) Day {
+    // 1. Let ry be ℝ(y).
+
+    // 2. If (ry modulo 400) = 0, return 366𝔽.
+    if (@mod(year, 400) == 0) return 366;
+
+    // 3. If (ry modulo 100) = 0, return 365𝔽.
+    if (@mod(year, 100) == 0) return 365;
+
+    // 4. If (ry modulo 4) = 0, return 366𝔽.
+    if (@mod(year, 4) == 0) return 366;
+
+    // 5. Return 365𝔽.
+    return 365;
+}
+
+/// 21.4.1.6 DayFromYear ( y )
+/// https://tc39.es/ecma262/#sec-dayfromyear
+pub fn dayFromYear(year: Year) f64 {
+    // 1. Let ry be ℝ(y).
+    // 2. NOTE: In the following steps, each _numYearsN_ is the number of years divisible by N
+    //    that occur between the epoch and the start of year y. (The number is negative if y is
+    //    before the epoch.)
+
+    // 3. Let numYears1 be (ry - 1970).
+    const num_years_1: f64 = @floatFromInt(year - 1970);
+
+    // 4. Let numYears4 be floor((ry - 1969) / 4).
+    const num_years_4: f64 = @floatFromInt(@divFloor(year - 1969, 4));
+
+    // 5. Let numYears100 be floor((ry - 1901) / 100).
+    const num_years_100: f64 = @floatFromInt(@divFloor(year - 1901, 100));
+
+    // 6. Let numYears400 be floor((ry - 1601) / 400).
+    const num_years_400: f64 = @floatFromInt(@divFloor(year - 1601, 400));
+
+    // 7. Return 𝔽(365 × numYears1 + numYears4 - numYears100 + numYears400).
+    return 365 * num_years_1 + num_years_4 - num_years_100 + num_years_400;
+}
+
+/// 21.4.1.7 TimeFromYear ( y )
+/// https://tc39.es/ecma262/#sec-timefromyear
+pub fn timeFromYear(year: Year) f64 {
+    // 1. Return msPerDay × DayFromYear(y).
+    return std.time.ms_per_day * dayFromYear(year);
+}
+
+/// 21.4.1.8 YearFromTime ( t )
+/// https://tc39.es/ecma262/#sec-yearfromtime
+pub fn yearFromTime(t: f64) Year {
+    // 1. Return the largest integral Number y (closest to +∞) such that TimeFromYear(y) ≤ t.
+    const year: Year = @intFromFloat(t / (365.2425 * std.time.ms_per_day) + 1970);
+    const t2 = timeFromYear(year);
+    if (t2 > t) return year - 1;
+    if (t2 + @as(f64, @floatFromInt(daysInYear(year))) * std.time.ms_per_day <= t) return year + 1;
+    return year;
+}
+
+/// 21.4.1.9 DayWithinYear ( t )
+/// https://tc39.es/ecma262/#sec-daywithinyear
+pub fn dayWithinYear(t: f64) Day {
+    const d = day(t) - dayFromYear(yearFromTime(t));
+    // FIXME: This should not be necessary, but for `new Date(-1111, 0, 0)` this underflows to -1 -
+    //        possible spec issue?
+    if (d < 0) return @intFromFloat(365 + d);
+    return @intFromFloat(d);
+}
+
+/// 21.4.1.10 InLeapYear ( t )
+/// https://tc39.es/ecma262/#sec-inleapyear
+pub fn inLeapYear(t: f64) bool {
+    // 1. If DaysInYear(YearFromTime(t)) is 366𝔽, return 1𝔽; else return +0𝔽.
+    return daysInYear(yearFromTime(t)) == 366;
+}
+
+/// 21.4.1.11 MonthFromTime ( t )
+/// https://tc39.es/ecma262/#sec-monthfromtime
+pub fn monthFromTime(t: f64) Month {
+    // 1. Let inLeapYear be InLeapYear(t).
+    const in_leap_year: Day = @intFromBool(inLeapYear(t));
+
+    // 2. Let dayWithinYear be DayWithinYear(t).
+    const day_within_year = dayWithinYear(t);
+
+    // 3. If dayWithinYear < 31𝔽, return +0𝔽.
+    if (day_within_year < 31) return 0;
+
+    // 4. If dayWithinYear < 59𝔽 + inLeapYear, return 1𝔽.
+    if (day_within_year < 59 + in_leap_year) return 1;
+
+    // 5. If dayWithinYear < 90𝔽 + inLeapYear, return 2𝔽.
+    if (day_within_year < 90 + in_leap_year) return 2;
+
+    // 6. If dayWithinYear < 120𝔽 + inLeapYear, return 3𝔽.
+    if (day_within_year < 120 + in_leap_year) return 3;
+
+    // 7. If dayWithinYear < 151𝔽 + inLeapYear, return 4𝔽.
+    if (day_within_year < 151 + in_leap_year) return 4;
+
+    // 8. If dayWithinYear < 181𝔽 + inLeapYear, return 5𝔽.
+    if (day_within_year < 181 + in_leap_year) return 5;
+
+    // 9. If dayWithinYear < 212𝔽 + inLeapYear, return 6𝔽.
+    if (day_within_year < 212 + in_leap_year) return 6;
+
+    // 10. If dayWithinYear < 243𝔽 + inLeapYear, return 7𝔽.
+    if (day_within_year < 243 + in_leap_year) return 7;
+
+    // 11. If dayWithinYear < 273𝔽 + inLeapYear, return 8𝔽.
+    if (day_within_year < 273 + in_leap_year) return 8;
+
+    // 12. If dayWithinYear < 304𝔽 + inLeapYear, return 9𝔽.
+    if (day_within_year < 304 + in_leap_year) return 9;
+
+    // 13. If dayWithinYear < 334𝔽 + inLeapYear, return 10𝔽.
+    if (day_within_year < 334 + in_leap_year) return 10;
+
+    // 14. Assert: dayWithinYear < 365𝔽 + inLeapYear.
+    std.debug.assert(day_within_year < 365 + in_leap_year);
+
+    // 15. Return 11𝔽.
+    return 11;
+}
+
+/// 21.4.1.12 DateFromTime ( t )
+/// https://tc39.es/ecma262/#sec-datefromtime
+pub fn dateFromTime(t: f64) Day {
+    // 1. Let inLeapYear be InLeapYear(t).
+    const in_leap_year: Day = @intFromBool(inLeapYear(t));
+
+    // 2. Let dayWithinYear be DayWithinYear(t).
+    const day_within_year = dayWithinYear(t);
+
+    // 3. Let month be MonthFromTime(t).
+    const month = monthFromTime(t);
+
+    // 4. If month is +0𝔽, return dayWithinYear + 1𝔽.
+    if (month == 0) return @intCast(day_within_year + 1);
+
+    // 5. If month is 1𝔽, return dayWithinYear - 30𝔽.
+    if (month == 1) return @intCast(day_within_year - 30);
+
+    // 6. If month is 2𝔽, return dayWithinYear - 58𝔽 - inLeapYear.
+    if (month == 2) return @intCast(day_within_year - 58 - in_leap_year);
+
+    // 7. If month is 3𝔽, return dayWithinYear - 89𝔽 - inLeapYear.
+    if (month == 3) return @intCast(day_within_year - 89 - in_leap_year);
+
+    // 8. If month is 4𝔽, return dayWithinYear - 119𝔽 - inLeapYear.
+    if (month == 4) return @intCast(day_within_year - 119 - in_leap_year);
+
+    // 9. If month is 5𝔽, return dayWithinYear - 150𝔽 - inLeapYear.
+    if (month == 5) return @intCast(day_within_year - 150 - in_leap_year);
+
+    // 10. If month is 6𝔽, return dayWithinYear - 180𝔽 - inLeapYear.
+    if (month == 6) return @intCast(day_within_year - 180 - in_leap_year);
+
+    // 11. If month is 7𝔽, return dayWithinYear - 211𝔽 - inLeapYear.
+    if (month == 7) return @intCast(day_within_year - 211 - in_leap_year);
+
+    // 12. If month is 8𝔽, return dayWithinYear - 242𝔽 - inLeapYear.
+    if (month == 8) return @intCast(day_within_year - 242 - in_leap_year);
+
+    // 13. If month is 9𝔽, return dayWithinYear - 272𝔽 - inLeapYear.
+    if (month == 9) return @intCast(day_within_year - 272 - in_leap_year);
+
+    // 14. If month is 10𝔽, return dayWithinYear - 303𝔽 - inLeapYear.
+    if (month == 10) return @intCast(day_within_year - 303 - in_leap_year);
+
+    // 15. Assert: month is 11𝔽.
+    std.debug.assert(month == 11);
+
+    // 16. Return dayWithinYear - 333𝔽 - inLeapYear.
+    return @intCast(day_within_year - 333 - in_leap_year);
+}
+
+/// 21.4.1.13 WeekDay ( t )
+/// https://tc39.es/ecma262/#sec-weekday
+pub fn weekDay(t: f64) WeekDay {
+    // 1. Return 𝔽(ℝ(Day(t) + 4𝔽) modulo 7).
+    return @intFromFloat(@mod(day(t) + 4, 7));
+}
+
+/// 21.4.1.14 HourFromTime ( t )
+/// https://tc39.es/ecma262/#sec-hourfromtime
+pub fn hourFromTime(t: f64) Hour {
+    // 1. Return 𝔽(floor(ℝ(t / msPerHour)) modulo HoursPerDay).
+    return @intFromFloat(@mod(std.math.floor(t / std.time.ms_per_hour), hours_per_day));
+}
+
+/// 21.4.1.15 MinFromTime ( t )
+/// https://tc39.es/ecma262/#sec-minfromtime
+pub fn minFromTime(t: f64) Minute {
+    // 1. Return 𝔽(floor(ℝ(t / msPerMinute)) modulo MinutesPerHour).
+    return @intFromFloat(@mod(std.math.floor(t / std.time.ms_per_min), minutes_per_hour));
+}
+
+/// 21.4.1.16 SecFromTime ( t )
+/// https://tc39.es/ecma262/#sec-secfromtime
+pub fn secFromTime(t: f64) Second {
+    // 1. Return 𝔽(floor(ℝ(t / msPerSecond)) modulo SecondsPerMinute).
+    return @intFromFloat(@mod(std.math.floor(t / std.time.ms_per_s), std.time.s_per_min));
+}
+
+/// 21.4.1.21 GetNamedTimeZoneOffsetNanoseconds ( timeZoneIdentifier, epochNanoseconds )
+/// https://tc39.es/ecma262/#sec-getnamedtimezoneoffsetnanoseconds
+pub fn getNamedTimeZoneOffsetNanoseconds(time_zone_identifier: []const u8, _: f64) i32 {
+    // 1. Assert: timeZoneIdentifier is "UTC".
+    std.debug.assert(std.mem.eql(u8, time_zone_identifier, "UTC"));
+
+    // 2. Return 0.
+    return 0;
+}
+
+/// 21.4.1.24 SystemTimeZoneIdentifier ( )
+/// https://tc39.es/ecma262/#sec-systemtimezoneidentifier
+pub fn systemTimeZoneIdentifier() []const u8 {
+    // 1. If the implementation only supports the UTC time zone, return "UTC".
+    // 2. Let systemTimeZoneString be the String representing the host environment's current time
+    //    zone, either a primary time zone identifier or an offset time zone identifier.
+    // 3. Return systemTimeZoneString.
+    return "UTC";
+}
+
+/// 21.4.1.25 LocalTime ( t )
+/// https://tc39.es/ecma262/#sec-localtime
+pub fn localTime(t: f64) f64 {
+    // 1. Let systemTimeZoneIdentifier be SystemTimeZoneIdentifier().
+    const system_time_zone_identifier = systemTimeZoneIdentifier();
+
+    // 2. If IsTimeZoneOffsetString(systemTimeZoneIdentifier) is true, then
+    const offset_ns = if (false) {
+        // a. Let offsetNs be ParseTimeZoneOffsetString(systemTimeZoneIdentifier).
+        unreachable;
+    }
+    // 3. Else,
+    else blk: {
+        // a. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier, ℤ(ℝ(t) × 10**6)).
+        break :blk getNamedTimeZoneOffsetNanoseconds(system_time_zone_identifier, t * 10e6);
+    };
+
+    // 4. Let offsetMs be truncate(offsetNs / 10**6).
+    const offset_ms = @trunc(@as(f64, @floatFromInt(offset_ns)) / 10e6);
+
+    // 5. Return t + 𝔽(offsetMs).
+    return t + offset_ms;
+}
+
 /// 21.4.1.26 UTC ( t )
 /// https://tc39.es/ecma262/#sec-utc-t
 pub fn utc(t: f64) f64 {
     // 1. If t is not finite, return NaN.
     if (!std.math.isFinite(t)) return std.math.nan(f64);
 
-    // TODO: 2-4.
-    const offset_ns = 0;
+    // 2. Let systemTimeZoneIdentifier be SystemTimeZoneIdentifier().
+    const system_time_zone_identifier = systemTimeZoneIdentifier();
+
+    // TODO: 3-4
+    _ = system_time_zone_identifier;
+    const offset_ns: i32 = 0;
 
     // 5. Let offsetMs be truncate(offsetNs / 10**6).
-    const offset_ms = @trunc(offset_ns / 10e6);
+    const offset_ms = @trunc(@as(f64, @floatFromInt(offset_ns)) / 10e6);
 
     // 6. Return t - 𝔽(offsetMs).
     return t - offset_ms;
@@ -122,7 +411,7 @@ pub fn makeDay(year: f64, month: f64, date: f64) f64 {
     // 8. Find a finite time value t such that YearFromTime(t) is ym, MonthFromTime(t) is mn, and
     //    DateFromTime(t) is 1𝔽; but if this is not possible (because some argument is out of
     //    range), return NaN.
-    if (ym < std.math.minInt(i32) or ym > std.math.maxInt(i32) or (mn + 1) > std.math.maxInt(i32)) {
+    if (ym < std.math.minInt(i64) or ym > std.math.maxInt(i64) or (mn + 1) > std.math.maxInt(i32)) {
         return std.math.nan(f64);
     }
     const t = @as(f64, @floatFromInt(
@@ -182,6 +471,118 @@ pub fn timeClip(time: f64) f64 {
     return toIntegerOrInfinity(time);
 }
 
+/// 21.4.4.41.1 TimeString ( tv )
+/// https://tc39.es/ecma262/#sec-timestring
+pub fn timeString(allocator: Allocator, time_value: f64) ![]const u8 {
+    // 1. Let hour be ToZeroPaddedDecimalString(ℝ(HourFromTime(tv)), 2).
+    // 2. Let minute be ToZeroPaddedDecimalString(ℝ(MinFromTime(tv)), 2).
+    // 3. Let second be ToZeroPaddedDecimalString(ℝ(SecFromTime(tv)), 2).
+    // 4. Return the string-concatenation of hour, ":", minute, ":", second, the code unit 0x0020
+    //    (SPACE), and "GMT".
+    return std.fmt.allocPrint(
+        allocator,
+        "{:0>2}:{:0>2}:{:0>2} GMT",
+        .{ hourFromTime(time_value), minFromTime(time_value), secFromTime(time_value) },
+    );
+}
+
+/// 21.4.4.41.2 DateString ( tv )
+/// https://tc39.es/ecma262/#sec-datestring
+pub fn dateString(allocator: Allocator, time_value: f64) ![]const u8 {
+    // 1. Let weekday be the Name of the entry in Table 62 with the Number WeekDay(tv).
+    const weekday = week_day_names[weekDay(time_value)];
+
+    // 2. Let month be the Name of the entry in Table 63 with the Number MonthFromTime(tv).
+    const month = month_names[monthFromTime(time_value)];
+
+    // 3. Let day be ToZeroPaddedDecimalString(ℝ(DateFromTime(tv)), 2).
+    const day_ = dateFromTime(time_value);
+
+    // 4. Let yv be YearFromTime(tv).
+    const year = yearFromTime(time_value);
+
+    // 5. If yv is +0𝔽 or yv > +0𝔽, let yearSign be the empty String; otherwise, let yearSign be "-".
+    const year_sign = if (year >= 0) "" else "-";
+
+    // 6. Let paddedYear be ToZeroPaddedDecimalString(abs(ℝ(yv)), 4).
+    var buf: [6]u8 = undefined;
+    const padded_year = toZeroPaddedDecimalString(&buf, std.math.absInt(year) catch unreachable, 4);
+
+    // 7. Return the string-concatenation of weekday, the code unit 0x0020 (SPACE), month, the code
+    //    unit 0x0020 (SPACE), day, the code unit 0x0020 (SPACE), yearSign, and paddedYear.
+    return std.fmt.allocPrint(
+        allocator,
+        "{s} {s} {:0>2} {s}{s}",
+        .{ weekday, month, day_, year_sign, padded_year },
+    );
+}
+
+/// 21.4.4.41.3 TimeZoneString ( tv )
+/// https://tc39.es/ecma262/#sec-timezoneestring
+pub fn timeZoneString(allocator: Allocator, time_value: f64) ![]const u8 {
+    // 1. Let systemTimeZoneIdentifier be SystemTimeZoneIdentifier().
+    const system_time_zone_identifier = systemTimeZoneIdentifier();
+
+    // 2. If IsTimeZoneOffsetString(systemTimeZoneIdentifier) is true, then
+    const offset_ns = if (false) {
+        // a. Let offsetNs be ParseTimeZoneOffsetString(systemTimeZoneIdentifier).
+        unreachable;
+    }
+    // 3. Else,
+    else blk: {
+        // a. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier, ℤ(ℝ(tv) × 10**6)).
+        break :blk getNamedTimeZoneOffsetNanoseconds(system_time_zone_identifier, time_value * 10e6);
+    };
+
+    // 4. Let offset be 𝔽(truncate(offsetNs / 10**6)).
+    const offset = @trunc(@as(f64, @floatFromInt(offset_ns)) / 10e6);
+
+    // 5. If offset is +0𝔽 or offset > +0𝔽, then
+    //     a. Let offsetSign be "+".
+    //     b. Let absOffset be offset.
+    // 6. Else,
+    //     a. Let offsetSign be "-".
+    //     b. Let absOffset be -offset.
+    const offset_sign = if (offset >= 0) "+" else "-";
+    const abs_offset = std.math.fabs(offset);
+
+    // 7. Let offsetMin be ToZeroPaddedDecimalString(ℝ(MinFromTime(absOffset)), 2).
+    const offset_min = minFromTime(abs_offset);
+
+    // 8. Let offsetHour be ToZeroPaddedDecimalString(ℝ(HourFromTime(absOffset)), 2).
+    const offset_hour = hourFromTime(abs_offset);
+
+    // 9. Let tzName be an implementation-defined string that is either the empty String or the
+    //    string-concatenation of the code unit 0x0020 (SPACE), the code unit 0x0028 (LEFT
+    //    PARENTHESIS), an implementation-defined timezone name, and the code unit 0x0029 (RIGHT
+    //    PARENTHESIS).
+    const tz_name = " (UTC)";
+
+    // 10. Return the string-concatenation of offsetSign, offsetHour, offsetMin, and tzName.
+    return std.fmt.allocPrint(
+        allocator,
+        "{s}{:0>2}{:0>2}{s}",
+        .{ offset_sign, offset_hour, offset_min, tz_name },
+    );
+}
+
+/// 21.4.4.41.4 ToDateString ( tv )
+/// https://tc39.es/ecma262/#sec-todatestring
+pub fn toDateString(allocator: Allocator, time_value: f64) ![]const u8 {
+    // 1. If tv is NaN, return "Invalid Date".
+    if (std.math.isNan(time_value)) return "Invalid Date";
+
+    // 2. Let t be LocalTime(tv).
+    const t = localTime(time_value);
+
+    // 3. Return the string-concatenation of DateString(t), the code unit 0x0020 (SPACE), TimeString(t), and TimeZoneString(tv).
+    return std.fmt.allocPrint(allocator, "{s} {s}{s}", .{
+        try dateString(allocator, t),
+        try timeString(allocator, t),
+        try timeZoneString(allocator, time_value),
+    });
+}
+
 /// 21.4.3 Properties of the Date Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-date-constructor
 pub const DateConstructor = struct {
@@ -221,14 +622,10 @@ pub const DateConstructor = struct {
         // 1. If NewTarget is undefined, then
         if (new_target == null) {
             // a. Let now be the time value (UTC) identifying the current time.
-            const now = std.time.milliTimestamp();
-            _ = now;
+            const now: f64 = @floatFromInt(std.time.milliTimestamp());
 
-            // TODO: b. Return ToDateString(now).
-            return agent.throwException(
-                .internal_error,
-                "Calling Date() as a function is not implemented",
-            );
+            // b. Return ToDateString(now).
+            return Value.from(try toDateString(agent.gc_allocator, now));
         }
 
         // 2. Let numberOfArgs be the number of elements in values.
@@ -373,6 +770,7 @@ pub const DatePrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
         try defineBuiltinFunctionWithAttributes(object, "@@toPrimitive", @"@@toPrimitive", 1, realm, .{
             .writable = false,
@@ -381,6 +779,23 @@ pub const DatePrototype = struct {
         });
 
         return object;
+    }
+
+    /// 21.4.4.41 Date.prototype.toString ( )
+    /// https://tc39.es/ecma262/#sec-date.prototype.tostring
+    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        if (this_value != .object or !this_value.object.is(Date)) {
+            return agent.throwException(.type_error, "This value must be a Date object");
+        }
+        const date_object = this_value.object.as(Date);
+
+        // 3. Let tv be dateObject.[[DateValue]].
+        const time_value = date_object.fields.date_value;
+
+        // 4. Return ToDateString(tv).
+        return Value.from(try toDateString(agent.gc_allocator, time_value));
     }
 
     /// 21.4.4.44 Date.prototype.valueOf ( )
