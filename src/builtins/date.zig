@@ -779,6 +779,7 @@ pub const DatePrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "toDateString", toDateString_, 0, realm);
         try defineBuiltinFunction(object, "toISOString", toISOString, 0, realm);
         try defineBuiltinFunction(object, "toJSON", toJSON, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
@@ -791,6 +792,29 @@ pub const DatePrototype = struct {
         });
 
         return object;
+    }
+
+    /// 21.4.4.35 Date.prototype.toDateString ( )
+    /// https://tc39.es/ecma262/#sec-date.prototype.todatestring
+    fn toDateString_(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        if (this_value != .object or !this_value.object.is(Date)) {
+            return agent.throwException(.type_error, "This value must be a Date object");
+        }
+        const date_object = this_value.object.as(Date);
+
+        // 3. Let tv be dateObject.[[DateValue]].
+        const time_value = date_object.fields.date_value;
+
+        // 4. If tv is NaN, return "Invalid Date".
+        if (std.math.isNan(time_value)) return Value.from("Invalid Date");
+
+        // 5. Let t be LocalTime(tv).
+        const t = localTime(time_value);
+
+        // 6. Return DateString(t).
+        return Value.from(try dateString(agent.gc_allocator, t));
     }
 
     /// 21.4.4.36 Date.prototype.toISOString ( )
