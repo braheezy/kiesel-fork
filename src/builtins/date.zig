@@ -782,6 +782,7 @@ pub const DatePrototype = struct {
         try defineBuiltinFunction(object, "toISOString", toISOString, 0, realm);
         try defineBuiltinFunction(object, "toJSON", toJSON, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
+        try defineBuiltinFunction(object, "toUTCString", toUTCString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
         try defineBuiltinFunctionWithAttributes(object, "@@toPrimitive", @"@@toPrimitive", 1, realm, .{
             .writable = false,
@@ -870,6 +871,60 @@ pub const DatePrototype = struct {
 
         // 4. Return ToDateString(tv).
         return Value.from(try toDateString(agent.gc_allocator, time_value));
+    }
+
+    /// 21.4.4.43 Date.prototype.toUTCString ( )
+    /// https://tc39.es/ecma262/#sec-date.prototype.toutcstring
+    fn toUTCString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        if (this_value != .object or !this_value.object.is(Date)) {
+            return agent.throwException(.type_error, "This value must be a Date object");
+        }
+        const date_object = this_value.object.as(Date);
+
+        // 3. Let tv be dateObject.[[DateValue]].
+        const time_value = date_object.fields.date_value;
+
+        // 4. If tv is NaN, return "Invalid Date".
+        if (std.math.isNan(time_value)) return Value.from("Invalid Date");
+
+        // 5. Let weekday be the Name of the entry in Table 62 with the Number WeekDay(tv).
+        const weekday = week_day_names[weekDay(time_value)];
+
+        // 6. Let month be the Name of the entry in Table 63 with the Number MonthFromTime(tv).
+        const month = month_names[monthFromTime(time_value)];
+
+        // 7. Let day be ToZeroPaddedDecimalString(ℝ(DateFromTime(tv)), 2).
+        const day_ = dateFromTime(time_value);
+
+        // 8. Let yv be YearFromTime(tv).
+        const year = yearFromTime(time_value);
+
+        // 9. If yv is +0𝔽 or yv > +0𝔽, let yearSign be the empty String; otherwise, let yearSign
+        //    be "-".
+        const year_sign = if (year >= 0) "" else "-";
+
+        // 10. Let paddedYear be ToZeroPaddedDecimalString(abs(ℝ(yv)), 4).
+        // NOTE: std.fmt does a weird thing where padded 1 becomes '00+1', so we do this ourselves.
+        var buf: [6]u8 = undefined;
+        const padded_year = toZeroPaddedDecimalString(&buf, std.math.absInt(year) catch unreachable, 4);
+
+        // 11. Return the string-concatenation of weekday, ",", the code unit 0x0020 (SPACE), day,
+        //     the code unit 0x0020 (SPACE), month, the code unit 0x0020 (SPACE), yearSign,
+        //     paddedYear, the code unit 0x0020 (SPACE), and TimeString(tv).
+        return Value.from(try std.fmt.allocPrint(
+            agent.gc_allocator,
+            "{s}, {:0>2} {s} {s}{s} {s}",
+            .{
+                weekday,
+                day_,
+                month,
+                year_sign,
+                padded_year,
+                try timeString(agent.gc_allocator, time_value),
+            },
+        ));
     }
 
     /// 21.4.4.44 Date.prototype.valueOf ( )
