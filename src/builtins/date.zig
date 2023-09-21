@@ -784,6 +784,7 @@ pub const DatePrototype = struct {
         try defineBuiltinFunction(object, "toJSON", toJSON, 1, realm);
         try defineBuiltinFunction(object, "toLocaleDateString", toLocaleDateString, 0, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
+        try defineBuiltinFunction(object, "toLocaleTimeString", toLocaleTimeString, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "toTimeString", toTimeString, 0, realm);
         try defineBuiltinFunction(object, "toUTCString", toUTCString, 0, realm);
@@ -893,6 +894,12 @@ pub const DatePrototype = struct {
     /// https://tc39.es/ecma262/#sec-date.prototype.tolocalestring
     fn toLocaleString(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
         return toString(agent, this_value, arguments);
+    }
+
+    /// 21.4.4.40 Date.prototype.toLocaleTimeString ( [ reserved1 [ , reserved2 ] ] )
+    /// https://tc39.es/ecma262/#sec-date.prototype.tolocaledatestring
+    fn toLocaleTimeString(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        return toTimeString(agent, this_value, arguments);
     }
 
     /// 21.4.4.41 Date.prototype.toString ( )
