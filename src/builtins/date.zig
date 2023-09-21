@@ -820,6 +820,7 @@ pub const DatePrototype = struct {
         try defineBuiltinFunction(object, "setMinutes", setMinutes, 3, realm);
         try defineBuiltinFunction(object, "setMonth", setMonth, 2, realm);
         try defineBuiltinFunction(object, "setSeconds", setSeconds, 2, realm);
+        try defineBuiltinFunction(object, "setTime", setTime, 1, realm);
         try defineBuiltinFunction(object, "toDateString", toDateString_, 0, realm);
         try defineBuiltinFunction(object, "toISOString", toISOString, 0, realm);
         try defineBuiltinFunction(object, "toJSON", toJSON, 1, realm);
@@ -1482,6 +1483,28 @@ pub const DatePrototype = struct {
 
         // 12. Return u.
         return Value.from(date_value_utc);
+    }
+
+    /// 21.4.4.27 Date.prototype.setTime ( time )
+    /// https://tc39.es/ecma262/#sec-date.prototype.settime
+    fn setTime(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const time = arguments.get(0);
+
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        const date_object = try this_value.requireInternalSlot(agent, Date);
+
+        // 3. Let t be ? ToNumber(time).
+        const time_value = (try time.toNumber(agent)).asFloat();
+
+        // 4. Let v be TimeClip(t).
+        const date_value = timeClip(time_value);
+
+        // 5. Set dateObject.[[DateValue]] to v.
+        date_object.fields.date_value = date_value;
+
+        // 6. Return v.
+        return Value.from(date_value);
     }
 
     /// 21.4.4.35 Date.prototype.toDateString ( )
