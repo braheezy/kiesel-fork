@@ -865,17 +865,20 @@ pub const DatePrototype = struct {
         // 6. Return a String representation of tv in the Date Time String Format on the UTC time
         //    scale, including all format elements and the UTC offset representation "Z".
         const year = yearFromTime(time_value);
-        var buf: [std.fmt.count("{:0>6}", .{999_999})]u8 = undefined;
-        var padded_year = if (year >= 0 and year <= 9999) blk: {
-            const padded_year = std.fmt.bufPrint(&buf, "{:0>4}", .{year}) catch unreachable;
-            break :blk padded_year[1..]; // Remove the sign
-        } else blk: {
-            break :blk std.fmt.bufPrint(&buf, "{:0>6}", .{year}) catch unreachable;
-        };
+        const year_sign = if (year >= 0 and year <= 9999) "" else if (year > 9999) "+" else "-";
+
+        var buf: [6]u8 = undefined;
+        const padded_year = toZeroPaddedDecimalString(
+            &buf,
+            std.math.absInt(year) catch unreachable,
+            if (year >= 0 and year <= 9999) 4 else 6,
+        );
+
         return Value.from(try std.fmt.allocPrint(
             agent.gc_allocator,
-            "{s}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}Z",
+            "{s}{s}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}Z",
             .{
+                year_sign,
                 padded_year,
                 monthFromTime(time_value) + 1,
                 dateFromTime(time_value),
@@ -990,7 +993,6 @@ pub const DatePrototype = struct {
         const year_sign = if (year >= 0) "" else "-";
 
         // 10. Let paddedYear be ToZeroPaddedDecimalString(abs(ℝ(yv)), 4).
-        // NOTE: std.fmt does a weird thing where padded 1 becomes '00+1', so we do this ourselves.
         var buf: [6]u8 = undefined;
         const padded_year = toZeroPaddedDecimalString(&buf, std.math.absInt(year) catch unreachable, 4);
 
