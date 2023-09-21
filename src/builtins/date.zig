@@ -822,6 +822,7 @@ pub const DatePrototype = struct {
         try defineBuiltinFunction(object, "setSeconds", setSeconds, 2, realm);
         try defineBuiltinFunction(object, "setTime", setTime, 1, realm);
         try defineBuiltinFunction(object, "setUTCDate", setDate, 1, realm);
+        try defineBuiltinFunction(object, "setUTCFullYear", setFullYear, 3, realm);
         try defineBuiltinFunction(object, "toDateString", toDateString_, 0, realm);
         try defineBuiltinFunction(object, "toISOString", toISOString, 0, realm);
         try defineBuiltinFunction(object, "toJSON", toJSON, 1, realm);
@@ -1543,6 +1544,51 @@ pub const DatePrototype = struct {
         date_object.fields.date_value = date_value_;
 
         // 9. Return v.
+        return Value.from(date_value_);
+    }
+
+    /// 21.4.4.29 Date.prototype.setUTCFullYear ( year [ , month [ , date ] ] )
+    /// https://tc39.es/ecma262/#sec-date.prototype.setutcfullyear
+    fn setUTCFullYear(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const year_value = arguments.get(0);
+        const month_value = arguments.getOrNull(1);
+        const date_value = arguments.getOrNull(2);
+
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        const date_object = try this_value.requireInternalSlot(agent, Date);
+
+        // 3. Let t be dateObject.[[DateValue]].
+        var time_value = date_object.fields.date_value;
+
+        // 4. If t is NaN, set t to +0𝔽.
+        if (std.math.isNan(time_value)) time_value = 0;
+
+        // 5. Let y be ? ToNumber(year).
+        const year = (try year_value.toNumber(agent)).asFloat();
+
+        // 6. If month is not present, let m be MonthFromTime(t); otherwise, let m be ? ToNumber(month).
+        const month = if (month_value) |month|
+            (try month.toNumber(agent)).asFloat()
+        else
+            @as(f64, @floatFromInt(monthFromTime(time_value)));
+
+        // 7. If date is not present, let dt be DateFromTime(t); otherwise, let dt be ? ToNumber(date).
+        const date = if (date_value) |date|
+            (try date.toNumber(agent)).asFloat()
+        else
+            @as(f64, @floatFromInt(dateFromTime(time_value)));
+
+        // 8. Let newDate be MakeDate(MakeDay(y, m, dt), TimeWithinDay(t)).
+        const new_date = makeDate(makeDay(year, month, date), timeWithinDay(time_value));
+
+        // 9. Let v be TimeClip(newDate).
+        const date_value_ = timeClip(new_date);
+
+        // 10. Set dateObject.[[DateValue]] to v.
+        date_object.fields.date_value = date_value_;
+
+        // 11. Return v.
         return Value.from(date_value_);
     }
 
