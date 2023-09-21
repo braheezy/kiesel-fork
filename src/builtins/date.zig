@@ -41,6 +41,7 @@ const Day = std.math.IntFittingRange(0, 366);
 const Hour = std.math.IntFittingRange(0, 23);
 const Minute = std.math.IntFittingRange(0, 59);
 const Second = std.math.IntFittingRange(0, 59);
+const Millisecond = std.math.IntFittingRange(0, 999);
 const WeekDay = std.math.IntFittingRange(0, 6);
 
 /// Simplified infallible variant of `Value.toIntegerOrInfinity()`
@@ -288,6 +289,13 @@ pub fn minFromTime(t: f64) Minute {
 pub fn secFromTime(t: f64) Second {
     // 1. Return 𝔽(floor(ℝ(t / msPerSecond)) modulo SecondsPerMinute).
     return @intFromFloat(@mod(std.math.floor(t / std.time.ms_per_s), std.time.s_per_min));
+}
+
+/// 21.4.1.17 msFromTime ( t )
+/// https://tc39.es/ecma262/#sec-msfromtime
+pub fn msFromTime(t: f64) Millisecond {
+    // 1. Return 𝔽(ℝ(t) modulo ℝ(msPerSecond)).
+    return @intFromFloat(@mod(t, std.time.ms_per_s));
 }
 
 /// 21.4.1.21 GetNamedTimeZoneOffsetNanoseconds ( timeZoneIdentifier, epochNanoseconds )
@@ -770,6 +778,7 @@ pub const DatePrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "toISOString", toISOString, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
         try defineBuiltinFunctionWithAttributes(object, "@@toPrimitive", @"@@toPrimitive", 1, realm, .{
@@ -779,6 +788,51 @@ pub const DatePrototype = struct {
         });
 
         return object;
+    }
+
+    /// 21.4.4.36 Date.prototype.toISOString ( )
+    /// https://tc39.es/ecma262/#sec-date.prototype.toisostring
+    fn toISOString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        if (this_value != .object or !this_value.object.is(Date)) {
+            return agent.throwException(.type_error, "This value must be a Date object");
+        }
+        const date_object = this_value.object.as(Date);
+
+        // 3. Let tv be dateObject.[[DateValue]].
+        const time_value = date_object.fields.date_value;
+
+        // 4. If tv is not finite, throw a RangeError exception.
+        if (!std.math.isFinite(time_value)) {
+            return agent.throwException(.range_error, "Invalid Date object");
+        }
+
+        // 5. If tv corresponds with a year that cannot be represented in the Date Time String
+        //    Format, throw a RangeError exception.
+        // 6. Return a String representation of tv in the Date Time String Format on the UTC time
+        //    scale, including all format elements and the UTC offset representation "Z".
+        const year = yearFromTime(time_value);
+        var buf: [std.fmt.count("{:0>6}", .{999_999})]u8 = undefined;
+        var padded_year = if (year >= 0 and year <= 9999) blk: {
+            const padded_year = std.fmt.bufPrint(&buf, "{:0>4}", .{year}) catch unreachable;
+            break :blk padded_year[1..]; // Remove the sign
+        } else blk: {
+            break :blk std.fmt.bufPrint(&buf, "{:0>6}", .{year}) catch unreachable;
+        };
+        return Value.from(try std.fmt.allocPrint(
+            agent.gc_allocator,
+            "{s}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}Z",
+            .{
+                padded_year,
+                monthFromTime(time_value) + 1,
+                dateFromTime(time_value),
+                hourFromTime(time_value),
+                minFromTime(time_value),
+                secFromTime(time_value),
+                msFromTime(time_value),
+            },
+        ));
     }
 
     /// 21.4.4.41 Date.prototype.toString ( )
