@@ -15,6 +15,7 @@ const ArgumentsList = builtins.ArgumentsList;
 const Object = types.Object;
 const PreferredType = Value.PreferredType;
 const PropertyDescriptor = types.PropertyDescriptor;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
@@ -779,6 +780,7 @@ pub const DatePrototype = struct {
         });
 
         try defineBuiltinFunction(object, "toISOString", toISOString, 0, realm);
+        try defineBuiltinFunction(object, "toJSON", toJSON, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
         try defineBuiltinFunctionWithAttributes(object, "@@toPrimitive", @"@@toPrimitive", 1, realm, .{
@@ -833,6 +835,24 @@ pub const DatePrototype = struct {
                 msFromTime(time_value),
             },
         ));
+    }
+
+    /// 21.4.4.37 Date.prototype.toJSON ( key )
+    /// https://tc39.es/ecma262/#sec-date.prototype.tojson
+    fn toJSON(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // NOTE: The argument is ignored.
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let tv be ? ToPrimitive(O, number).
+        const time_value = try Value.from(object).toPrimitive(agent, .number);
+
+        // 3. If tv is a Number and tv is not finite, return null.
+        if (time_value == .number and !time_value.number.isFinite()) return .null;
+
+        // 4. Return ? Invoke(O, "toISOString").
+        return Value.from(object).invoke(agent, PropertyKey.from("toISOString"), .{});
     }
 
     /// 21.4.4.41 Date.prototype.toString ( )
