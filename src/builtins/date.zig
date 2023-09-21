@@ -779,6 +779,7 @@ pub const DatePrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "getTimezoneOffset", getTimezoneOffset, 0, realm);
         try defineBuiltinFunction(object, "toDateString", toDateString_, 0, realm);
         try defineBuiltinFunction(object, "toISOString", toISOString, 0, realm);
         try defineBuiltinFunction(object, "toJSON", toJSON, 1, realm);
@@ -796,6 +797,26 @@ pub const DatePrototype = struct {
         });
 
         return object;
+    }
+
+    /// 21.4.4.11 Date.prototype.getTimezoneOffset ( )
+    /// https://tc39.es/ecma262/#sec-date.prototype.gettimezoneoffset
+    fn getTimezoneOffset(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        if (this_value != .object or !this_value.object.is(Date)) {
+            return agent.throwException(.type_error, "This value must be a Date object");
+        }
+        const date_object = this_value.object.as(Date);
+
+        // 3. Let t be dateObject.[[DateValue]].
+        const time_value = date_object.fields.date_value;
+
+        // 4. If t is NaN, return NaN.
+        if (std.math.isNan(time_value)) return Value.nan();
+
+        // 5. Return (t - LocalTime(t)) / msPerMinute.
+        return Value.from((time_value - localTime(time_value)) / std.time.ms_per_min);
     }
 
     /// 21.4.4.35 Date.prototype.toDateString ( )
