@@ -813,10 +813,7 @@ pub const DatePrototype = struct {
     fn getTimezoneOffset(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
-        if (this_value != .object or !this_value.object.is(Date)) {
-            return agent.throwException(.type_error, "This value must be a Date object");
-        }
-        const date_object = this_value.object.as(Date);
+        const date_object = try this_value.requireInternalSlot(agent, Date);
 
         // 3. Let t be dateObject.[[DateValue]].
         const time_value = date_object.fields.date_value;
@@ -833,10 +830,7 @@ pub const DatePrototype = struct {
     fn toDateString_(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
-        if (this_value != .object or !this_value.object.is(Date)) {
-            return agent.throwException(.type_error, "This value must be a Date object");
-        }
-        const date_object = this_value.object.as(Date);
+        const date_object = try this_value.requireInternalSlot(agent, Date);
 
         // 3. Let tv be dateObject.[[DateValue]].
         const time_value = date_object.fields.date_value;
@@ -856,10 +850,7 @@ pub const DatePrototype = struct {
     fn toISOString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
-        if (this_value != .object or !this_value.object.is(Date)) {
-            return agent.throwException(.type_error, "This value must be a Date object");
-        }
-        const date_object = this_value.object.as(Date);
+        const date_object = try this_value.requireInternalSlot(agent, Date);
 
         // 3. Let tv be dateObject.[[DateValue]].
         const time_value = date_object.fields.date_value;
@@ -937,10 +928,7 @@ pub const DatePrototype = struct {
     fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
-        if (this_value != .object or !this_value.object.is(Date)) {
-            return agent.throwException(.type_error, "This value must be a Date object");
-        }
-        const date_object = this_value.object.as(Date);
+        const date_object = try this_value.requireInternalSlot(agent, Date);
 
         // 3. Let tv be dateObject.[[DateValue]].
         const time_value = date_object.fields.date_value;
@@ -954,10 +942,7 @@ pub const DatePrototype = struct {
     fn toTimeString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
-        if (this_value != .object or !this_value.object.is(Date)) {
-            return agent.throwException(.type_error, "This value must be a Date object");
-        }
-        const date_object = this_value.object.as(Date);
+        const date_object = try this_value.requireInternalSlot(agent, Date);
 
         // 3. Let tv be dateObject.[[DateValue]].
         const time_value = date_object.fields.date_value;
@@ -980,10 +965,7 @@ pub const DatePrototype = struct {
     fn toUTCString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
-        if (this_value != .object or !this_value.object.is(Date)) {
-            return agent.throwException(.type_error, "This value must be a Date object");
-        }
-        const date_object = this_value.object.as(Date);
+        const date_object = try this_value.requireInternalSlot(agent, Date);
 
         // 3. Let tv be dateObject.[[DateValue]].
         const time_value = date_object.fields.date_value;
@@ -1034,10 +1016,7 @@ pub const DatePrototype = struct {
     fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
-        if (this_value != .object or !this_value.object.is(Date)) {
-            return agent.throwException(.type_error, "This value must be a Date object");
-        }
-        const date_object = this_value.object.as(Date);
+        const date_object = try this_value.requireInternalSlot(agent, Date);
 
         // 3. Return dateObject.[[DateValue]].
         return Value.from(date_object.fields.date_value);

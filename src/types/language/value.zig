@@ -1013,6 +1013,44 @@ pub const Value = union(enum) {
             if (prototype.object.sameValue(object.?)) return true;
         }
     }
+
+    /// 10.1.15 RequireInternalSlot ( O, internalSlot )
+    /// https://tc39.es/ecma262/#sec-requireinternalslot
+    pub fn requireInternalSlot(self: Self, agent: *Agent, comptime T: type) !*T {
+        const name = comptime blk: {
+            var name: []const u8 = undefined;
+
+            // "builtins.date.Date__struct_12345" -> "Date__struct_12345"
+            var it = std.mem.splitScalar(u8, @typeName(T.Fields), '.');
+            while (it.next()) |part| name = part;
+
+            // "Date__struct_12345" -> "Date"
+            it = std.mem.splitScalar(u8, name, '_');
+            if (it.next()) |part| name = part;
+
+            break :blk name;
+        };
+
+        // 1. If O is not an Object, throw a TypeError exception.
+        if (self != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{self}),
+            );
+        }
+
+        // 2. If O does not have an internalSlot internal slot, throw a TypeError exception.
+        if (!self.object.is(T)) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not a {s} object", .{ self, name }),
+            );
+        }
+
+        // 3. Return unused.
+        // NOTE: Returning the object here allows for direct assignment of the object at the call site.
+        return self.object.as(T);
+    }
 };
 
 /// 7.1.4.1.1 StringToNumber ( str )
