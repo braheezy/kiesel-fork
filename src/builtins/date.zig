@@ -489,6 +489,70 @@ pub fn timeClip(time: f64) f64 {
     return toIntegerOrInfinity(time);
 }
 
+/// 21.4.1.32 Date Time String Format
+/// https://tc39.es/ecma262/#sec-date-time-string-format
+pub fn parseDateTimeString(string: []const u8) f64 {
+    const invalid = std.math.nan(f64);
+    // Yes, this is abuse of the std.fmt.Parser :)
+    var parser = std.fmt.Parser{ .buf = string };
+    const sign = parser.maybe('-') or parser.maybe('+');
+    const year_string = parser.until('-');
+    if (!parser.maybe('-')) return invalid;
+    const month_string = parser.until('-');
+    if (!parser.maybe('-')) return invalid;
+    const date_string = parser.until('T');
+    if (!parser.maybe('T')) return invalid;
+    const hour_string = parser.until(':');
+    if (!parser.maybe(':')) return invalid;
+    const minute_string = parser.until(':');
+    if (!parser.maybe(':')) return invalid;
+    const second_string = parser.until('.');
+    if (!parser.maybe('.')) return invalid;
+    const millisecond_string = parser.until('Z');
+    if (!parser.maybe('Z')) return invalid;
+    if (parser.peek(0) != null) return invalid;
+    if (year_string.len != @as(usize, if (sign) 6 else 4) or
+        month_string.len != 2 or
+        date_string.len != 2 or
+        hour_string.len != 2 or
+        minute_string.len != 2 or
+        second_string.len != 2 or
+        millisecond_string.len != 3)
+    {
+        return invalid;
+    }
+    const year = std.fmt.parseInt(Year, year_string, 10) catch return invalid;
+    const month = std.fmt.parseInt(Month, month_string, 10) catch return invalid;
+    const date = std.fmt.parseInt(Date_, date_string, 10) catch return invalid;
+    const hour = std.fmt.parseInt(Hour, hour_string, 10) catch return invalid;
+    const minute = std.fmt.parseInt(Minute, minute_string, 10) catch return invalid;
+    const second = std.fmt.parseInt(Second, second_string, 10) catch return invalid;
+    const millisecond = std.fmt.parseInt(Millisecond, millisecond_string, 10) catch return invalid;
+    if (month < 1 or month > 12 or
+        date < 1 or date > 31 or
+        hour > 24 or
+        minute > 59 or
+        second > 59 or
+        millisecond > 999)
+    {
+        return invalid;
+    }
+    const time_value = makeDate(
+        makeDay(
+            @floatFromInt(year),
+            @floatFromInt(month - 1),
+            @floatFromInt(date),
+        ),
+        makeTime(
+            @floatFromInt(hour),
+            @floatFromInt(minute),
+            @floatFromInt(second),
+            @floatFromInt(millisecond),
+        ),
+    );
+    return timeClip(time_value);
+}
+
 /// 21.4.4.41.1 TimeString ( tv )
 /// https://tc39.es/ecma262/#sec-timestring
 pub fn timeString(allocator: Allocator, time_value: f64) ![]const u8 {
@@ -613,6 +677,7 @@ pub const DateConstructor = struct {
         });
 
         try defineBuiltinFunction(object, "now", now, 0, realm);
+        try defineBuiltinFunction(object, "parse", parse, 1, realm);
         try defineBuiltinFunction(object, "UTC", UTC, 7, realm);
 
         // 21.4.3.3 Date.prototype
@@ -674,12 +739,9 @@ pub const DateConstructor = struct {
                 if (primitive_value == .string) {
                     // 1. Assert: The next step never returns an abrupt completion because v is a
                     //    String.
-                    // TODO: 2. Let tv be the result of parsing v as a date, in exactly the same manner
+                    // 2. Let tv be the result of parsing v as a date, in exactly the same manner
                     //    as for the parse method (21.4.3.2).
-                    return agent.throwException(
-                        .internal_error,
-                        "Date string parsing is not implemented",
-                    );
+                    break :blk_tv parseDateTimeString(primitive_value.string.utf8);
                 }
                 // iii. Else,
                 else {
@@ -752,6 +814,13 @@ pub const DateConstructor = struct {
         // This function returns the time value designating the UTC date and time of the occurrence
         // of the call to it.
         return Value.from(std.time.milliTimestamp());
+    }
+
+    /// 21.4.3.2 Date.parse ( string )
+    /// https://tc39.es/ecma262/#sec-date.now
+    fn parse(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const string = try arguments.get(0).toString(agent);
+        return Value.from(parseDateTimeString(string.utf8));
     }
 
     /// 21.4.3.4 Date.UTC ( year [ , month [ , date [ , hours [ , minutes [ , seconds [ , ms ] ] ] ] ] ] )
