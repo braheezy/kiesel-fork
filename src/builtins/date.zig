@@ -86,6 +86,13 @@ pub fn day(t: f64) f64 {
     return std.math.floor(t / std.time.ms_per_day);
 }
 
+/// 21.4.1.4 TimeWithinDay ( t )
+/// https://tc39.es/ecma262/#sec-timewithinday
+pub fn timeWithinDay(t: f64) f64 {
+    // 1. Return 𝔽(ℝ(t) modulo ℝ(msPerDay)).
+    return @mod(t, std.time.ms_per_day);
+}
+
 /// 21.4.1.5 DaysInYear ( y )
 /// https://tc39.es/ecma262/#sec-daysinyear
 pub fn daysInYear(year: Year) Day {
@@ -806,6 +813,7 @@ pub const DatePrototype = struct {
         try defineBuiltinFunction(object, "getUTCMinutes", getUTCMinutes, 0, realm);
         try defineBuiltinFunction(object, "getUTCMonth", getUTCMonth, 0, realm);
         try defineBuiltinFunction(object, "getUTCSeconds", getUTCSeconds, 0, realm);
+        try defineBuiltinFunction(object, "setDate", setDate, 1, realm);
         try defineBuiltinFunction(object, "toDateString", toDateString_, 0, realm);
         try defineBuiltinFunction(object, "toISOString", toISOString, 0, realm);
         try defineBuiltinFunction(object, "toJSON", toJSON, 1, realm);
@@ -1123,6 +1131,47 @@ pub const DatePrototype = struct {
 
         // 5. Return SecFromTime(t).
         return Value.from(secFromTime(time_value));
+    }
+
+    /// 21.4.4.20 Date.prototype.setDate ( date )
+    /// https://tc39.es/ecma262/#sec-date.prototype.setdate
+    fn setDate(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const date_value = arguments.get(0);
+
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        const date_object = try this_value.requireInternalSlot(agent, Date);
+
+        // 3. Let t be dateObject.[[DateValue]].
+        var time_value = date_object.fields.date_value;
+
+        // 4. Let dt be ? ToNumber(date).
+        const date = (try date_value.toNumber(agent)).asFloat();
+
+        // 5. If t is NaN, return NaN.
+        if (std.math.isNan(time_value)) return Value.nan();
+
+        // 6. Set t to LocalTime(t).
+        time_value = localTime(time_value);
+
+        // 7. Let newDate be MakeDate(MakeDay(YearFromTime(t), MonthFromTime(t), dt), TimeWithinDay(t)).
+        const new_date = makeDate(
+            makeDay(
+                @floatFromInt(yearFromTime(time_value)),
+                @floatFromInt(monthFromTime(time_value)),
+                date,
+            ),
+            timeWithinDay(time_value),
+        );
+
+        // 8. Let u be TimeClip(UTC(newDate)).
+        const date_value_utc = timeClip(utc(new_date));
+
+        // 9. Set dateObject.[[DateValue]] to u.
+        date_object.fields.date_value = date_value_utc;
+
+        // 10. Return u.
+        return Value.from(date_value_utc);
     }
 
     /// 21.4.4.35 Date.prototype.toDateString ( )
