@@ -37,13 +37,15 @@ const week_day_names = [_][]const u8{ "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", 
 const month_names = [_][]const u8{ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 
 const Year = std.math.IntFittingRange(1970 - 273_790, 1970 + 273_790);
-const Month = std.math.IntFittingRange(0, 366);
-const Day = std.math.IntFittingRange(0, 366);
+const Month = std.math.IntFittingRange(0, 11);
+const Date_ = std.math.IntFittingRange(1, 31);
 const Hour = std.math.IntFittingRange(0, 23);
 const Minute = std.math.IntFittingRange(0, 59);
 const Second = std.math.IntFittingRange(0, 59);
 const Millisecond = std.math.IntFittingRange(0, 999);
 const WeekDay = std.math.IntFittingRange(0, 6);
+const DaysInYear = std.math.IntFittingRange(365, 366);
+const DayWithinYear = std.math.IntFittingRange(0, 365);
 
 /// Simplified infallible variant of `Value.toIntegerOrInfinity()`
 fn toIntegerOrInfinity(x: f64) f64 {
@@ -95,7 +97,7 @@ pub fn timeWithinDay(t: f64) f64 {
 
 /// 21.4.1.5 DaysInYear ( y )
 /// https://tc39.es/ecma262/#sec-daysinyear
-pub fn daysInYear(year: Year) Day {
+pub fn daysInYear(year: Year) DaysInYear {
     // 1. Let ry be ℝ(y).
 
     // 2. If (ry modulo 400) = 0, return 366𝔽.
@@ -155,7 +157,7 @@ pub fn yearFromTime(t: f64) Year {
 
 /// 21.4.1.9 DayWithinYear ( t )
 /// https://tc39.es/ecma262/#sec-daywithinyear
-pub fn dayWithinYear(t: f64) Day {
+pub fn dayWithinYear(t: f64) DayWithinYear {
     const d = day(t) - dayFromYear(yearFromTime(t));
     // FIXME: This should not be necessary, but for `new Date(-1111, 0, 0)` this underflows to -1 -
     //        possible spec issue?
@@ -174,7 +176,7 @@ pub fn inLeapYear(t: f64) bool {
 /// https://tc39.es/ecma262/#sec-monthfromtime
 pub fn monthFromTime(t: f64) Month {
     // 1. Let inLeapYear be InLeapYear(t).
-    const in_leap_year: Day = @intFromBool(inLeapYear(t));
+    const in_leap_year: DayWithinYear = @intFromBool(inLeapYear(t));
 
     // 2. Let dayWithinYear be DayWithinYear(t).
     const day_within_year = dayWithinYear(t);
@@ -221,9 +223,9 @@ pub fn monthFromTime(t: f64) Month {
 
 /// 21.4.1.12 DateFromTime ( t )
 /// https://tc39.es/ecma262/#sec-datefromtime
-pub fn dateFromTime(t: f64) Day {
+pub fn dateFromTime(t: f64) Date_ {
     // 1. Let inLeapYear be InLeapYear(t).
-    const in_leap_year: Day = @intFromBool(inLeapYear(t));
+    const in_leap_year: DayWithinYear = @intFromBool(inLeapYear(t));
 
     // 2. Let dayWithinYear be DayWithinYear(t).
     const day_within_year = dayWithinYear(t);
