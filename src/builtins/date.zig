@@ -824,6 +824,7 @@ pub const DatePrototype = struct {
         try defineBuiltinFunction(object, "setUTCDate", setDate, 1, realm);
         try defineBuiltinFunction(object, "setUTCFullYear", setFullYear, 3, realm);
         try defineBuiltinFunction(object, "setUTCHours", setHours, 4, realm);
+        try defineBuiltinFunction(object, "setUTCMilliseconds", setMilliseconds, 1, realm);
         try defineBuiltinFunction(object, "toDateString", toDateString_, 0, realm);
         try defineBuiltinFunction(object, "toISOString", toISOString, 0, realm);
         try defineBuiltinFunction(object, "toJSON", toJSON, 1, realm);
@@ -1651,6 +1652,42 @@ pub const DatePrototype = struct {
         date_object.fields.date_value = date_value;
 
         // 15. Return v.
+        return Value.from(date_value);
+    }
+
+    /// 21.4.4.31 Date.prototype.setUTCMilliseconds ( ms )
+    /// https://tc39.es/ecma262/#sec-date.prototype.setutcmilliseconds
+    fn setUTCMilliseconds(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const millisecond_value = arguments.get(0);
+
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        const date_object = try this_value.requireInternalSlot(agent, Date);
+
+        // 3. Let t be dateObject.[[DateValue]].
+        const time_value = date_object.fields.date_value;
+
+        // 4. Set ms to ? ToNumber(ms).
+        const millisecond = (try millisecond_value.toNumber(agent)).asFloat();
+
+        // 5. If t is NaN, return NaN.
+        if (std.math.isNan(time_value)) return Value.nan();
+
+        // 6. Let time be MakeTime(HourFromTime(t), MinFromTime(t), SecFromTime(t), ms).
+        const time = makeTime(
+            @floatFromInt(hourFromTime(time_value)),
+            @floatFromInt(minFromTime(time_value)),
+            @floatFromInt(secFromTime(time_value)),
+            millisecond,
+        );
+
+        // 7. Let v be TimeClip(MakeDate(Day(t), time)).
+        const date_value = timeClip(makeDate(day(time_value), time));
+
+        // 8. Set dateObject.[[DateValue]] to v.
+        date_object.fields.date_value = date_value;
+
+        // 9. Return v.
         return Value.from(date_value);
     }
 
