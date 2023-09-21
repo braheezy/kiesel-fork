@@ -783,6 +783,7 @@ pub const DatePrototype = struct {
         try defineBuiltinFunction(object, "toISOString", toISOString, 0, realm);
         try defineBuiltinFunction(object, "toJSON", toJSON, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
+        try defineBuiltinFunction(object, "toTimeString", toTimeString, 0, realm);
         try defineBuiltinFunction(object, "toUTCString", toUTCString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
         try defineBuiltinFunctionWithAttributes(object, "@@toPrimitive", @"@@toPrimitive", 1, realm, .{
@@ -895,6 +896,32 @@ pub const DatePrototype = struct {
 
         // 4. Return ToDateString(tv).
         return Value.from(try toDateString(agent.gc_allocator, time_value));
+    }
+
+    /// 21.4.4.42 Date.prototype.toTimeString ( )
+    /// https://tc39.es/ecma262/#sec-date.prototype.totimestring
+    fn toTimeString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        if (this_value != .object or !this_value.object.is(Date)) {
+            return agent.throwException(.type_error, "This value must be a Date object");
+        }
+        const date_object = this_value.object.as(Date);
+
+        // 3. Let tv be dateObject.[[DateValue]].
+        const time_value = date_object.fields.date_value;
+
+        // 4. If tv is NaN, return "Invalid Date".
+        if (std.math.isNan(time_value)) return Value.from("Invalid Date");
+
+        // 5. Let t be LocalTime(tv).
+        const t = localTime(time_value);
+
+        // 6. Return the string-concatenation of TimeString(t) and TimeZoneString(tv).
+        return Value.from(try std.mem.concat(agent.gc_allocator, u8, &.{
+            try timeString(agent.gc_allocator, t),
+            try timeZoneString(agent.gc_allocator, time_value),
+        }));
     }
 
     /// 21.4.4.43 Date.prototype.toUTCString ( )
