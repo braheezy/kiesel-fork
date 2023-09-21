@@ -792,6 +792,7 @@ pub const DatePrototype = struct {
         try defineBuiltinFunction(object, "getDay", getDay, 0, realm);
         try defineBuiltinFunction(object, "getFullYear", getFullYear, 0, realm);
         try defineBuiltinFunction(object, "getHours", getHours, 0, realm);
+        try defineBuiltinFunction(object, "getMilliseconds", getMilliseconds, 0, realm);
         try defineBuiltinFunction(object, "getTimezoneOffset", getTimezoneOffset, 0, realm);
         try defineBuiltinFunction(object, "toDateString", toDateString_, 0, realm);
         try defineBuiltinFunction(object, "toISOString", toISOString, 0, realm);
@@ -878,6 +879,23 @@ pub const DatePrototype = struct {
 
         // 5. Return HourFromTime(LocalTime(t)).
         return Value.from(hourFromTime(localTime(time_value)));
+    }
+
+    /// 21.4.4.6 Date.prototype.getMilliseconds ( )
+    /// https://tc39.es/ecma262/#sec-date.prototype.getmilliseconds
+    fn getMilliseconds(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        const date_object = try this_value.requireInternalSlot(agent, Date);
+
+        // 3. Let t be dateObject.[[DateValue]].
+        const time_value = date_object.fields.date_value;
+
+        // 4. If t is NaN, return NaN.
+        if (std.math.isNan(time_value)) return Value.nan();
+
+        // 5. Return msFromTime(LocalTime(t)).
+        return Value.from(msFromTime(localTime(time_value)));
     }
 
     /// 21.4.4.11 Date.prototype.getTimezoneOffset ( )
