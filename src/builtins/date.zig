@@ -821,6 +821,7 @@ pub const DatePrototype = struct {
         try defineBuiltinFunction(object, "setMonth", setMonth, 2, realm);
         try defineBuiltinFunction(object, "setSeconds", setSeconds, 2, realm);
         try defineBuiltinFunction(object, "setTime", setTime, 1, realm);
+        try defineBuiltinFunction(object, "setUTCDate", setDate, 1, realm);
         try defineBuiltinFunction(object, "toDateString", toDateString_, 0, realm);
         try defineBuiltinFunction(object, "toISOString", toISOString, 0, realm);
         try defineBuiltinFunction(object, "toJSON", toJSON, 1, realm);
@@ -1505,6 +1506,44 @@ pub const DatePrototype = struct {
 
         // 6. Return v.
         return Value.from(date_value);
+    }
+
+    /// 21.4.4.28 Date.prototype.setUTCDate ( date )
+    /// https://tc39.es/ecma262/#sec-date.prototype.setutcdate
+    fn setUTCDate(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const date_value = arguments.get(0);
+
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        const date_object = try this_value.requireInternalSlot(agent, Date);
+
+        // 3. Let t be dateObject.[[DateValue]].
+        const time_value = date_object.fields.date_value;
+
+        // 4. Let dt be ? ToNumber(date).
+        const date = (try date_value.toNumber(agent)).asFloat();
+
+        // 5. If t is NaN, return NaN.
+        if (std.math.isNan(time_value)) return Value.nan();
+
+        // 6. Let newDate be MakeDate(MakeDay(YearFromTime(t), MonthFromTime(t), dt), TimeWithinDay(t)).
+        const new_date = makeDate(
+            makeDay(
+                @floatFromInt(yearFromTime(time_value)),
+                @floatFromInt(monthFromTime(time_value)),
+                date,
+            ),
+            timeWithinDay(time_value),
+        );
+
+        // 7. Let v be TimeClip(newDate).
+        const date_value_ = timeClip(new_date);
+
+        // 8. Set dateObject.[[DateValue]] to v.
+        date_object.fields.date_value = date_value_;
+
+        // 9. Return v.
+        return Value.from(date_value_);
     }
 
     /// 21.4.4.35 Date.prototype.toDateString ( )
