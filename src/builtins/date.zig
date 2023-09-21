@@ -796,6 +796,7 @@ pub const DatePrototype = struct {
         try defineBuiltinFunction(object, "getMinutes", getMinutes, 0, realm);
         try defineBuiltinFunction(object, "getMonth", getMonth, 0, realm);
         try defineBuiltinFunction(object, "getSeconds", getSeconds, 0, realm);
+        try defineBuiltinFunction(object, "getTime", getTime, 0, realm);
         try defineBuiltinFunction(object, "getTimezoneOffset", getTimezoneOffset, 0, realm);
         try defineBuiltinFunction(object, "toDateString", toDateString_, 0, realm);
         try defineBuiltinFunction(object, "toISOString", toISOString, 0, realm);
@@ -950,6 +951,17 @@ pub const DatePrototype = struct {
 
         // 5. Return SecFromTime(LocalTime(t)).
         return Value.from(secFromTime(localTime(time_value)));
+    }
+
+    /// 21.4.4.10 Date.prototype.getTime ( )
+    /// https://tc39.es/ecma262/#sec-date.prototype.gettime
+    fn getTime(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        const date_object = try this_value.requireInternalSlot(agent, Date);
+
+        // 3. Return dateObject.[[DateValue]].
+        return Value.from(date_object.fields.date_value);
     }
 
     /// 21.4.4.11 Date.prototype.getTimezoneOffset ( )
