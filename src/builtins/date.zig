@@ -815,6 +815,7 @@ pub const DatePrototype = struct {
         try defineBuiltinFunction(object, "getUTCSeconds", getUTCSeconds, 0, realm);
         try defineBuiltinFunction(object, "setDate", setDate, 1, realm);
         try defineBuiltinFunction(object, "setFullYear", setFullYear, 3, realm);
+        try defineBuiltinFunction(object, "setHours", setHours, 4, realm);
         try defineBuiltinFunction(object, "toDateString", toDateString_, 0, realm);
         try defineBuiltinFunction(object, "toISOString", toISOString, 0, realm);
         try defineBuiltinFunction(object, "toJSON", toJSON, 1, realm);
@@ -1217,6 +1218,70 @@ pub const DatePrototype = struct {
         date_object.fields.date_value = date_value_utc;
 
         // 11. Return u.
+        return Value.from(date_value_utc);
+    }
+
+    /// 21.4.4.22 Date.prototype.setHours ( hour [ , min [ , sec [ , ms ] ] ] )
+    /// https://tc39.es/ecma262/#sec-date.prototype.sethours
+    fn setHours(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const hour_value = arguments.get(0);
+        const minute_value = arguments.getOrNull(1);
+        const second_value = arguments.getOrNull(2);
+        const millisecond_value = arguments.getOrNull(3);
+
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        const date_object = try this_value.requireInternalSlot(agent, Date);
+
+        // 3. Let t be dateObject.[[DateValue]].
+        var time_value = date_object.fields.date_value;
+
+        // 4. Let h be ? ToNumber(hour).
+        const hour = (try hour_value.toNumber(agent)).asFloat();
+
+        // 5. If min is present, let m be ? ToNumber(min).
+        var minute = if (minute_value) |minute|
+            (try minute.toNumber(agent)).asFloat()
+        else
+            undefined;
+
+        // 6. If sec is present, let s be ? ToNumber(sec).
+        var second = if (second_value) |second|
+            (try second.toNumber(agent)).asFloat()
+        else
+            undefined;
+
+        // 7. If ms is present, let milli be ? ToNumber(ms).
+        var millisecond = if (millisecond_value) |millisecond|
+            (try millisecond.toNumber(agent)).asFloat()
+        else
+            undefined;
+
+        // 8. If t is NaN, return NaN.
+        if (std.math.isNan(time_value)) return Value.nan();
+
+        // 9. Set t to LocalTime(t).
+        time_value = localTime(time_value);
+
+        // 10. If min is not present, let m be MinFromTime(t).
+        if (minute_value == null) minute = @floatFromInt(minFromTime(time_value));
+
+        // 11. If sec is not present, let s be SecFromTime(t).
+        if (second_value == null) second = @floatFromInt(secFromTime(time_value));
+
+        // 12. If ms is not present, let milli be msFromTime(t).
+        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(time_value));
+
+        // 13. Let date be MakeDate(Day(t), MakeTime(h, m, s, milli)).
+        const date = makeDate(day(time_value), makeTime(hour, minute, second, millisecond));
+
+        // 14. Let u be TimeClip(UTC(date)).
+        const date_value_utc = timeClip(utc(date));
+
+        // 15. Set dateObject.[[DateValue]] to u.
+        date_object.fields.date_value = date_value_utc;
+
+        // 16. Return u.
         return Value.from(date_value_utc);
     }
 
