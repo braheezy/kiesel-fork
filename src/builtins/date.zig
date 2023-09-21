@@ -603,6 +603,7 @@ pub const DateConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "now", now, 0, realm);
         try defineBuiltinFunction(object, "UTC", UTC, 7, realm);
 
         // 21.4.3.3 Date.prototype
@@ -631,10 +632,10 @@ pub const DateConstructor = struct {
         // 1. If NewTarget is undefined, then
         if (new_target == null) {
             // a. Let now be the time value (UTC) identifying the current time.
-            const now: f64 = @floatFromInt(std.time.milliTimestamp());
+            const now_: f64 = @floatFromInt(std.time.milliTimestamp());
 
             // b. Return ToDateString(now).
-            return Value.from(try toDateString(agent.gc_allocator, now));
+            return Value.from(try toDateString(agent.gc_allocator, now_));
         }
 
         // 2. Let numberOfArgs be the number of elements in values.
@@ -734,6 +735,14 @@ pub const DateConstructor = struct {
 
         // 8. Return O.
         return Value.from(object);
+    }
+
+    /// 21.4.3.1 Date.now ( )
+    /// https://tc39.es/ecma262/#sec-date.now
+    fn now(_: *Agent, _: Value, _: ArgumentsList) !Value {
+        // This function returns the time value designating the UTC date and time of the occurrence
+        // of the call to it.
+        return Value.from(std.time.milliTimestamp());
     }
 
     /// 21.4.3.4 Date.UTC ( year [ , month [ , date [ , hours [ , minutes [ , seconds [ , ms ] ] ] ] ] ] )
