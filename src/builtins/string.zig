@@ -386,7 +386,7 @@ pub const StringPrototype = struct {
         const n = try count.toIntegerOrInfinity(agent);
 
         // 4. If n < 0 or n = +∞, throw a RangeError exception.
-        if (n < 0 or n == std.math.inf(f64)) {
+        if (n < 0 or std.math.isPositiveInf(n)) {
             return agent.throwException(
                 .range_error,
                 "Repeat count must be a positive finite number",
@@ -433,7 +433,7 @@ pub const StringPrototype = struct {
         var int_start = try start.toIntegerOrInfinity(agent);
 
         // 5. If intStart = -∞, let from be 0.
-        const from_f64 = if (int_start == -std.math.inf(f64)) blk: {
+        const from_f64 = if (std.math.isNegativeInf(int_start)) blk: {
             break :blk 0;
         }
         // 6. Else if intStart < 0, let from be max(len + intStart, 0).
@@ -453,7 +453,7 @@ pub const StringPrototype = struct {
             try end.toIntegerOrInfinity(agent);
 
         // 9. If intEnd = -∞, let to be 0.
-        const to_f64 = if (int_end == -std.math.inf(f64)) blk: {
+        const to_f64 = if (std.math.isNegativeInf(int_end)) blk: {
             break :blk 0;
         }
         // 10. Else if intEnd < 0, let to be max(len + intEnd, 0).

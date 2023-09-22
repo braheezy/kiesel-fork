@@ -958,7 +958,7 @@ pub const ArrayPrototype = struct {
         const relative_target = try target.toIntegerOrInfinity(agent);
 
         // 4. If relativeTarget = -∞, let to be 0.
-        const to_f64 = if (relative_target == -std.math.inf(f64)) blk: {
+        const to_f64 = if (std.math.isNegativeInf(relative_target)) blk: {
             break :blk 0;
         }
         // 5. Else if relativeTarget < 0, let to be max(len + relativeTarget, 0).
@@ -975,7 +975,7 @@ pub const ArrayPrototype = struct {
         const relative_start = try start.toIntegerOrInfinity(agent);
 
         // 8. If relativeStart = -∞, let from be 0.
-        const from_f64 = if (relative_start == -std.math.inf(f64)) blk: {
+        const from_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
         }
         // 9. Else if relativeStart < 0, let from be max(len + relativeStart, 0).
@@ -996,7 +996,7 @@ pub const ArrayPrototype = struct {
             try end.toIntegerOrInfinity(agent);
 
         // 12. If relativeEnd = -∞, let final be 0.
-        const final_f64 = if (relative_end == -std.math.inf(f64)) blk: {
+        const final_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
             break :blk 0;
         }
         // 13. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
@@ -1151,7 +1151,7 @@ pub const ArrayPrototype = struct {
         const relative_start = try start.toIntegerOrInfinity(agent);
 
         // 4. If relativeStart = -∞, let k be 0.
-        const k_f64 = if (relative_start == -std.math.inf(f64)) blk: {
+        const k_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
         }
         // 5. Else if relativeStart < 0, let k be max(len + relativeStart, 0).
@@ -1172,7 +1172,7 @@ pub const ArrayPrototype = struct {
             try end.toIntegerOrInfinity(agent);
 
         // 8. If relativeEnd = -∞, let final be 0.
-        const final_f64 = if (relative_end == -std.math.inf(f64)) blk: {
+        const final_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
             break :blk 0;
         }
         // 9. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
@@ -1591,10 +1591,10 @@ pub const ArrayPrototype = struct {
         if (from_index == .undefined) std.debug.assert(n == 0);
 
         // 6. If n = +∞, return false.
-        if (n == std.math.inf(f64)) return Value.from(false);
+        if (std.math.isPositiveInf(n)) return Value.from(false);
 
         // 7. Else if n = -∞, set n to 0.
-        if (n == -std.math.inf(f64)) n = 0;
+        if (std.math.isNegativeInf(n)) n = 0;
 
         // 8. If n ≥ 0, then
         //     a. Let k be n.
@@ -1642,10 +1642,10 @@ pub const ArrayPrototype = struct {
         if (from_index == .undefined) std.debug.assert(n == 0);
 
         // 6. If n = +∞, return -1𝔽.
-        if (n == std.math.inf(f64)) return Value.from(-1);
+        if (std.math.isPositiveInf(n)) return Value.from(-1);
 
         // 7. Else if n = -∞, set n to 0.
-        if (n == -std.math.inf(f64)) n = 0;
+        if (std.math.isNegativeInf(n)) n = 0;
 
         // 8. If n ≥ 0, then
         //     a. Let k be n.
@@ -1758,7 +1758,7 @@ pub const ArrayPrototype = struct {
             @as(f64, @floatFromInt(len)) - 1;
 
         // 5. If n = -∞, return -1𝔽.
-        if (n == -std.math.inf(f64)) return Value.from(-1);
+        if (std.math.isNegativeInf(n)) return Value.from(-1);
 
         // 6. If n ≥ 0, then
         //     a. Let k be min(n, len - 1).
@@ -2284,7 +2284,7 @@ pub const ArrayPrototype = struct {
         const relative_start = try start.toIntegerOrInfinity(agent);
 
         // 4. If relativeStart = -∞, let k be 0.
-        const k_f64 = if (relative_start == -std.math.inf(f64)) blk: {
+        const k_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
         }
         // 5. Else if relativeStart < 0, let k be max(len + relativeStart, 0).
@@ -2305,7 +2305,7 @@ pub const ArrayPrototype = struct {
             try end.toIntegerOrInfinity(agent);
 
         // 8. If relativeEnd = -∞, let final be 0.
-        const final_f64 = if (relative_end == -std.math.inf(f64)) blk: {
+        const final_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
             break :blk 0;
         }
         // 9. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
@@ -2500,7 +2500,7 @@ pub const ArrayPrototype = struct {
         const relative_start = if (start) |s| try s.toIntegerOrInfinity(agent) else 0;
 
         // 4. If relativeStart = -∞, let actualStart be 0.
-        const actual_start_f64 = if (relative_start == -std.math.inf(f64)) blk: {
+        const actual_start_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
         }
         // 5. Else if relativeStart < 0, let actualStart be max(len + relativeStart, 0).
@@ -2829,7 +2829,7 @@ pub const ArrayPrototype = struct {
         const relative_start = if (start) |s| try s.toIntegerOrInfinity(agent) else 0;
 
         // 4. If relativeStart is -∞, let actualStart be 0.
-        const actual_start_f64 = if (relative_start == -std.math.inf(f64)) blk: {
+        const actual_start_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
         }
         // 5. Else if relativeStart < 0, let actualStart be max(len + relativeStart, 0).
