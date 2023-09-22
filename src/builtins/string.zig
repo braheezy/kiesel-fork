@@ -427,7 +427,7 @@ pub const StringPrototype = struct {
 
         // 3. Let len be the length of S.
         const len = string.utf16Length();
-        const len_f64 = @as(f64, @floatFromInt(len));
+        const len_f64: f64 = @floatFromInt(len);
 
         // 4. Let intStart be ? ToIntegerOrInfinity(start).
         var int_start = try start.toIntegerOrInfinity(agent);

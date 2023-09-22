@@ -1145,7 +1145,7 @@ pub const ArrayPrototype = struct {
 
         // 2. Let len be ? LengthOfArrayLike(O).
         const len = try object.lengthOfArrayLike();
-        const len_f64 = @as(f64, @floatFromInt(len));
+        const len_f64: f64 = @floatFromInt(len);
 
         // 3. Let relativeStart be ? ToIntegerOrInfinity(start).
         const relative_start = try start.toIntegerOrInfinity(agent);
@@ -2278,7 +2278,7 @@ pub const ArrayPrototype = struct {
 
         // 2. Let len be ? LengthOfArrayLike(O).
         const len = try object.lengthOfArrayLike();
-        const len_f64 = @as(f64, @floatFromInt(len));
+        const len_f64: f64 = @floatFromInt(len);
 
         // 3. Let relativeStart be ? ToIntegerOrInfinity(start).
         const relative_start = try start.toIntegerOrInfinity(agent);
