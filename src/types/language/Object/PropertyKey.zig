@@ -12,14 +12,15 @@ const Value = @import("../value.zig").Value;
 pub const PropertyKey = union(enum) {
     const Self = @This();
 
+    /// An integer index is a property name n such that CanonicalNumericIndexString(n) returns an
+    /// integral Number in the inclusive interval from +0𝔽 to 𝔽(2^53 - 1).
+    /// https://tc39.es/ecma262/#integer-index
     pub const IntegerIndex = u53;
 
     string: String,
     symbol: Symbol,
 
     // OPTIMIZATION: If the string is known to be an integer index, store it as a number.
-    /// An integer index is a property name n such that CanonicalNumericIndexString(n) returns an
-    /// integral Number in the inclusive interval from +0𝔽 to 𝔽(2^53 - 1).
     integer_index: IntegerIndex,
 
     pub inline fn from(value: anytype) Self {
