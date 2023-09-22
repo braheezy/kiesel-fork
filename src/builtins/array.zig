@@ -953,19 +953,19 @@ pub const ArrayPrototype = struct {
         const len_f64: f64 = @floatFromInt(len);
 
         // 3. Let relativeTarget be ? ToIntegerOrInfinity(target).
-        const relative_starget = try target.toIntegerOrInfinity(agent);
+        const relative_target = try target.toIntegerOrInfinity(agent);
 
         // 4. If relativeTarget = -∞, let to be 0.
-        const to_f64 = if (relative_starget == -std.math.inf(f64)) blk: {
+        const to_f64 = if (relative_target == -std.math.inf(f64)) blk: {
             break :blk 0;
         }
         // 5. Else if relativeTarget < 0, let to be max(len + relativeTarget, 0).
-        else if (relative_starget < 0) blk: {
-            break :blk @max(len_f64 + relative_starget, 0);
+        else if (relative_target < 0) blk: {
+            break :blk @max(len_f64 + relative_target, 0);
         }
         // 6. Else, let to be min(relativeTarget, len).
         else blk: {
-            break :blk @min(relative_starget, len_f64);
+            break :blk @min(relative_target, len_f64);
         };
         var to: u53 = @intFromFloat(to_f64);
 
