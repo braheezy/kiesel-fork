@@ -753,7 +753,9 @@ pub const ObjectPrototype = struct {
         // 11. Else if O has a [[StringData]] internal slot, let builtinTag be "String".
         else if (object.is(builtins.String))
             "String"
-        // TODO: 12. Else if O has a [[DateValue]] internal slot, let builtinTag be "Date".
+        // 12. Else if O has a [[DateValue]] internal slot, let builtinTag be "Date".
+        else if (object.is(builtins.Date))
+            "Date"
         // TODO: 13. Else if O has a [[RegExpMatcher]] internal slot, let builtinTag be "RegExp".
         // 14. Else, let builtinTag be "Object".
         else
