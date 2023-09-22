@@ -494,8 +494,10 @@ pub fn timeClip(time: f64) f64 {
 pub fn parseDateTimeString(string: []const u8) f64 {
     const invalid = std.math.nan(f64);
     // Yes, this is abuse of the std.fmt.Parser :)
+    // TODO: Handle short forms (missing month/date/seconds/milliseconds), and probably rewrite
+    //       using parser-toolkit.
     var parser = std.fmt.Parser{ .buf = string };
-    const sign = parser.maybe('-') or parser.maybe('+');
+    const sign: ?u8 = if (parser.maybe('-')) '-' else if (parser.maybe('+')) '+' else null;
     const year_string = parser.until('-');
     if (!parser.maybe('-')) return invalid;
     const month_string = parser.until('-');
@@ -511,7 +513,7 @@ pub fn parseDateTimeString(string: []const u8) f64 {
     const millisecond_string = parser.until('Z');
     if (!parser.maybe('Z')) return invalid;
     if (parser.peek(0) != null) return invalid;
-    if (year_string.len != @as(usize, if (sign) 6 else 4) or
+    if (year_string.len != @as(usize, if (sign != null) 6 else 4) or
         month_string.len != 2 or
         date_string.len != 2 or
         hour_string.len != 2 or
@@ -528,7 +530,8 @@ pub fn parseDateTimeString(string: []const u8) f64 {
     const minute = std.fmt.parseInt(Minute, minute_string, 10) catch return invalid;
     const second = std.fmt.parseInt(Second, second_string, 10) catch return invalid;
     const millisecond = std.fmt.parseInt(Millisecond, millisecond_string, 10) catch return invalid;
-    if (month < 1 or month > 12 or
+    if ((sign == '-' and year == 0) or
+        month < 1 or month > 12 or
         date < 1 or date > 31 or
         hour > 24 or
         minute > 59 or
