@@ -746,6 +746,7 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
         try defineBuiltinFunction(object, "some", some, 1, realm);
         try defineBuiltinFunction(object, "sort", sort, 1, realm);
+        try defineBuiltinFunction(object, "splice", splice, 2, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toReversed", toReversed, 0, realm);
         try defineBuiltinFunction(object, "toSorted", toSorted, 1, realm);
@@ -2478,6 +2479,187 @@ pub const ArrayPrototype = struct {
 
         // 11. Return obj.
         return Value.from(object);
+    }
+
+    /// 23.1.3.31 Array.prototype.splice ( start, deleteCount, ...items )
+    /// https://tc39.es/ecma262/#sec-array.prototype.splice
+    fn splice(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const start = arguments.getOrNull(0);
+        const delete_count = arguments.getOrNull(1);
+        const items = if (arguments.count() <= 2) &.{} else arguments.values[2..];
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+        const len_f64: f64 = @floatFromInt(len);
+
+        // 3. Let relativeStart be ? ToIntegerOrInfinity(start).
+        const relative_start = if (start) |s| try s.toIntegerOrInfinity(agent) else 0;
+
+        // 4. If relativeStart = -∞, let actualStart be 0.
+        const actual_start_f64 = if (relative_start == -std.math.inf(f64)) blk: {
+            break :blk 0;
+        }
+        // 5. Else if relativeStart < 0, let actualStart be max(len + relativeStart, 0).
+        else if (relative_start < 0) blk: {
+            break :blk @max(len_f64 + relative_start, 0);
+        }
+        // 6. Else, let actualStart be min(relativeStart, len).
+        else blk: {
+            break :blk @min(relative_start, len_f64);
+        };
+        var actual_start: u53 = @intFromFloat(actual_start_f64);
+
+        // 7. Let itemCount be the number of elements in items.
+        const item_count: u53 = @intCast(items.len);
+
+        // 8. If start is not present, then
+        const actual_delete_count = if (start == null) blk: {
+            // a. Let actualDeleteCount be 0.
+            break :blk 0;
+        }
+        // 9. Else if deleteCount is not present, then
+        else if (delete_count == null) blk: {
+            // a. Let actualDeleteCount be len - actualStart.
+            break :blk len - actual_start;
+        }
+        // 10. Else,
+        else blk: {
+            // a. Let dc be ? ToIntegerOrInfinity(deleteCount).
+            const delete_count_f64 = try delete_count.?.toIntegerOrInfinity(agent);
+
+            // b. Let actualDeleteCount be the result of clamping dc between 0 and len - actualStart.
+            break :blk @as(u53, @intFromFloat(
+                std.math.clamp(delete_count_f64, 0, len_f64 - actual_start_f64),
+            ));
+        };
+
+        // 11. If len + itemCount - actualDeleteCount > 2**53 - 1, throw a TypeError exception.
+        if (std.meta.isError(std.math.add(u53, len - actual_delete_count, item_count))) {
+            return agent.throwException(.type_error, "Maximum array length exceeded");
+        }
+
+        // 12. Let A be ? ArraySpeciesCreate(O, actualDeleteCount).
+        const array = try arraySpeciesCreate(agent, object, actual_delete_count);
+
+        // 13. Let k be 0.
+        var k: u53 = 0;
+
+        // 14. Repeat, while k < actualDeleteCount,
+        while (k < actual_delete_count) : (k += 1) {
+            // a. Let from be ! ToString(𝔽(actualStart + k)).
+            const from = PropertyKey.from(actual_start + k);
+
+            // b. If ? HasProperty(O, from) is true, then
+            if (try object.hasProperty(from)) {
+                // i. Let fromValue be ? Get(O, from).
+                const from_value = try object.get(from);
+
+                // ii. Perform ? CreateDataPropertyOrThrow(A, ! ToString(𝔽(k)), fromValue).
+                try array.createDataPropertyOrThrow(PropertyKey.from(k), from_value);
+            }
+
+            // c. Set k to k + 1.
+        }
+
+        // 15. Perform ? Set(A, "length", 𝔽(actualDeleteCount), true).
+        try array.set(PropertyKey.from("length"), Value.from(actual_delete_count), .throw);
+
+        // 16. If itemCount < actualDeleteCount, then
+        if (item_count < actual_delete_count) {
+            // a. Set k to actualStart.
+            k = actual_start;
+
+            // b. Repeat, while k < (len - actualDeleteCount),
+            while (k < (len - actual_delete_count)) : (k += 1) {
+                // i. Let from be ! ToString(𝔽(k + actualDeleteCount)).
+                const from = PropertyKey.from(k + actual_delete_count);
+
+                // ii. Let to be ! ToString(𝔽(k + itemCount)).
+                const to = PropertyKey.from(k + item_count);
+
+                // iii. If ? HasProperty(O, from) is true, then
+                if (try object.hasProperty(from)) {
+                    // 1. Let fromValue be ? Get(O, from).
+                    const from_value = try object.get(from);
+
+                    // 2. Perform ? Set(O, to, fromValue, true).
+                    try object.set(to, from_value, .throw);
+                }
+                // iv. Else,
+                else {
+                    // 1. Perform ? DeletePropertyOrThrow(O, to).
+                    try object.deletePropertyOrThrow(to);
+                }
+
+                // v. Set k to k + 1.
+            }
+
+            // c. Set k to len.
+            k = len;
+
+            // d. Repeat, while k > (len - actualDeleteCount + itemCount),
+            while (k > (len - actual_delete_count + item_count)) : (k -= 1) {
+                // i. Perform ? DeletePropertyOrThrow(O, ! ToString(𝔽(k - 1))).
+                try object.deletePropertyOrThrow(PropertyKey.from(k - 1));
+
+                // ii. Set k to k - 1.
+            }
+        }
+        // 17. Else if itemCount > actualDeleteCount, then
+        else if (item_count > actual_delete_count) {
+            // a. Set k to (len - actualDeleteCount).
+            k = len - actual_delete_count;
+
+            // b. Repeat, while k > actualStart,
+            while (k > actual_start) : (k -= 1) {
+                // i. Let from be ! ToString(𝔽(k + actualDeleteCount - 1)).
+                const from = PropertyKey.from(k + actual_delete_count - 1);
+
+                // ii. Let to be ! ToString(𝔽(k + itemCount - 1)).
+                const to = PropertyKey.from(k + item_count - 1);
+
+                // iii. If ? HasProperty(O, from) is true, then
+                if (try object.hasProperty(from)) {
+                    // 1. Let fromValue be ? Get(O, from).
+                    const from_value = try object.get(from);
+
+                    // 2. Perform ? Set(O, to, fromValue, true).
+                    try object.set(to, from_value, .throw);
+                }
+                // iv. Else,
+                else {
+                    // 1. Perform ? DeletePropertyOrThrow(O, to).
+                    try object.deletePropertyOrThrow(to);
+                }
+
+                // v. Set k to k - 1.
+            }
+        }
+
+        // 18. Set k to actualStart.
+        k = actual_start;
+
+        // 19. For each element E of items, do
+        for (items) |element| {
+            // a. Perform ? Set(O, ! ToString(𝔽(k)), E, true).
+            try object.set(PropertyKey.from(k), element, .throw);
+
+            // b. Set k to k + 1.
+            k += 1;
+        }
+
+        // 20. Perform ? Set(O, "length", 𝔽(len - actualDeleteCount + itemCount), true).
+        try object.set(
+            PropertyKey.from("length"),
+            Value.from(len - actual_delete_count + item_count),
+            .throw,
+        );
+
+        // 21. Return A.
+        return Value.from(array);
     }
 
     /// 23.1.3.32 Array.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
