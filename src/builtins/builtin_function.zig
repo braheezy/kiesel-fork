@@ -130,16 +130,18 @@ pub fn builtinCallOrConstruct(
     //     conforms to the specification of F. If thisArgument is uninitialized, the this value is
     //     uninitialized; otherwise, thisArgument provides the this value. argumentsList provides
     //     the named parameters. newTarget provides the NewTarget value.
+    // 11. NOTE: If F is defined in this document, “the specification of F” is the behaviour
+    //     specified for it via algorithm steps or other means.
     const result = switch (function.fields.behaviour) {
         .regular => |regularFn| regularFn(agent, this_argument.?, arguments_list),
         .constructor => |constructorFn| constructorFn(agent, this_argument orelse undefined, arguments_list, new_target),
     };
 
-    // 11. Remove calleeContext from the execution context stack and restore callerContext as the
+    // 12. Remove calleeContext from the execution context stack and restore callerContext as the
     //     running execution context.
     _ = agent.execution_context_stack.pop();
 
-    // 12. Return ? result.
+    // 13. Return ? result.
     return result;
 }
 
