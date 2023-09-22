@@ -750,6 +750,7 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toReversed", toReversed, 0, realm);
         try defineBuiltinFunction(object, "toSorted", toSorted, 1, realm);
+        try defineBuiltinFunction(object, "toSpliced", toSpliced, 2, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "unshift", unshift, 1, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
@@ -2807,6 +2808,127 @@ pub const ArrayPrototype = struct {
         }
 
         // 9. Return A.
+        return Value.from(array);
+    }
+
+    /// 23.1.3.35 Array.prototype.toSpliced ( start, skipCount, ...items )
+    /// https://tc39.es/ecma262/#sec-array.prototype.tospliced
+    fn toSpliced(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const start = arguments.getOrNull(0);
+        const skip_count = arguments.getOrNull(1);
+        const items = if (arguments.count() <= 2) &.{} else arguments.values[2..];
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Let len be ? LengthOfArrayLike(O).
+        const len = try object.lengthOfArrayLike();
+        const len_f64: f64 = @floatFromInt(len);
+
+        // 3. Let relativeStart be ? ToIntegerOrInfinity(start).
+        const relative_start = if (start) |s| try s.toIntegerOrInfinity(agent) else 0;
+
+        // 4. If relativeStart is -∞, let actualStart be 0.
+        const actual_start_f64 = if (relative_start == -std.math.inf(f64)) blk: {
+            break :blk 0;
+        }
+        // 5. Else if relativeStart < 0, let actualStart be max(len + relativeStart, 0).
+        else if (relative_start < 0) blk: {
+            break :blk @max(len_f64 + relative_start, 0);
+        }
+        // 6. Else, let actualStart be min(relativeStart, len).
+        else blk: {
+            break :blk @min(relative_start, len_f64);
+        };
+        var actual_start: u53 = @intFromFloat(actual_start_f64);
+
+        // 7. Let insertCount be the number of elements in items.
+        const insert_count: u53 = @intCast(items.len);
+
+        // 8. If start is not present, then
+        const actual_skip_count = if (start == null) blk: {
+            // a. Let actualSkipCount be 0.
+            break :blk 0;
+        }
+        // 9. Else if skipCount is not present, then
+        else if (skip_count == null) blk: {
+            // a. Let actualSkipCount be len - actualStart.
+            break :blk len - actual_start;
+        }
+        // 10. Else,
+        else blk: {
+            // a. Let sc be ? ToIntegerOrInfinity(skipCount).
+            const skip_count_f64 = try skip_count.?.toIntegerOrInfinity(agent);
+
+            // b. Let actualSkipCount be the result of clamping sc between 0 and len - actualStart.
+            break :blk @as(u53, @intFromFloat(
+                std.math.clamp(skip_count_f64, 0, len_f64 - actual_start_f64),
+            ));
+        };
+
+        // 11. Let newLen be len + insertCount - actualSkipCount.
+        // 12. If newLen > 2**53 - 1, throw a TypeError exception.
+        const new_len = std.math.add(u53, len - actual_skip_count, insert_count) catch {
+            return agent.throwException(.type_error, "Maximum array length exceeded");
+        };
+
+        // 13. Let A be ? ArrayCreate(newLen).
+        const array = try arrayCreate(agent, new_len, null);
+
+        // 14. Let i be 0.
+        var i: u53 = 0;
+
+        // 15. Let r be actualStart + actualSkipCount.
+        var r = actual_start + actual_skip_count;
+
+        // 16. Repeat, while i < actualStart,
+        while (i < actual_start) : (i += 1) {
+            // a. Let Pi be ! ToString(𝔽(i)).
+            const property_key = PropertyKey.from(i);
+
+            // b. Let iValue be ? Get(O, Pi).
+            const i_value = try object.get(property_key);
+
+            // c. Perform ! CreateDataPropertyOrThrow(A, Pi, iValue).
+            array.createDataPropertyOrThrow(property_key, i_value) catch |err| try noexcept(err);
+
+            // d. Set i to i + 1.
+        }
+
+        // 17. For each element E of items, do
+        for (items) |element| {
+            // a. Let Pi be ! ToString(𝔽(i)).
+            const property_key = PropertyKey.from(i);
+
+            // b. Perform ! CreateDataPropertyOrThrow(A, Pi, E).
+            array.createDataPropertyOrThrow(property_key, element) catch |err| try noexcept(err);
+
+            // c. Set i to i + 1.
+            i += 1;
+        }
+
+        // 18. Repeat, while i < newLen,
+        while (i < new_len) : ({
+            i += 1;
+            r += 1;
+        }) {
+            // a. Let Pi be ! ToString(𝔽(i)).
+            const property_key = PropertyKey.from(i);
+
+            // b. Let from be ! ToString(𝔽(r)).
+            const from = PropertyKey.from(r);
+
+            // c. Let fromValue be ? Get(O, from).
+            const from_value = try object.get(from);
+
+            // d. Perform ! CreateDataPropertyOrThrow(A, Pi, fromValue).
+            array.createDataPropertyOrThrow(property_key, from_value) catch |err| try noexcept(err);
+
+            // e. Set i to i + 1.
+            // f. Set r to r + 1.
+        }
+
+        // 19. Return A.
         return Value.from(array);
     }
 
