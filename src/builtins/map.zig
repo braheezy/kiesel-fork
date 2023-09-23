@@ -19,6 +19,7 @@ const Value = types.Value;
 const ValueHashMap = types.ValueHashMap;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -160,6 +161,8 @@ pub const MapPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "clear", clear, 0, realm);
+
         // 24.1.3.13 Map.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-map.prototype-@@tostringtag
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
@@ -170,6 +173,22 @@ pub const MapPrototype = struct {
         });
 
         return object;
+    }
+
+    /// 24.1.3.1 Map.prototype.clear ( )
+    /// https://tc39.es/ecma262/#sec-map.prototype.clear
+    fn clear(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let M be the this value.
+        // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
+        const map = try this_value.requireInternalSlot(agent, Map);
+
+        // 3. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
+        //     a. Set p.[[Key]] to empty.
+        //     b. Set p.[[Value]] to empty.
+        map.fields.map_data.clearAndFree();
+
+        // 4. Return undefined.
+        return .undefined;
     }
 };
 
