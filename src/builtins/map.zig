@@ -166,6 +166,7 @@ pub const MapPrototype = struct {
         try defineBuiltinFunction(object, "get", get, 1, realm);
         try defineBuiltinFunction(object, "has", has, 1, realm);
         try defineBuiltinFunction(object, "set", set, 2, realm);
+        try defineBuiltinAccessor(object, "size", size, null, realm);
 
         // 24.1.3.13 Map.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-map.prototype-@@tostringtag
@@ -269,6 +270,20 @@ pub const MapPrototype = struct {
 
         // 7. Return M.
         return Value.from(map.object());
+    }
+
+    /// 24.1.3.10 get Map.prototype.size
+    /// https://tc39.es/ecma262/#sec-get-map.prototype.size
+    fn size(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let M be the this value.
+        // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
+        const map = try this_value.requireInternalSlot(agent, Map);
+
+        // 3. Let count be 0.
+        // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
+        //     a. If p.[[Key]] is not empty, set count to count + 1.
+        // 5. Return 𝔽(count).
+        return Value.from(map.fields.map_data.count());
     }
 };
 
