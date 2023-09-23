@@ -13,6 +13,7 @@ pub const Reference = spec.Reference;
 pub const String = language.String;
 pub const Symbol = language.Symbol;
 pub const Value = language.Value;
+pub const ValueHashMap = language.ValueHashMap;
 pub const coerceOptionsToObject = language.coerceOptionsToObject;
 pub const createArrayFromList = language.createArrayFromList;
 pub const createArrayFromListMapToValue = language.createArrayFromListMapToValue;

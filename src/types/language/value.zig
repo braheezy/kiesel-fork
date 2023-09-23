@@ -1545,6 +1545,33 @@ pub fn getOption(
     return coerced_value;
 }
 
+pub fn ValueHashMap(comptime V: type) type {
+    return std.ArrayHashMap(Value, V, struct {
+        const Self = @This();
+
+        pub fn hash(_: Self, key: Value) u32 {
+            const value_hash = switch (key) {
+                .string => |string| std.array_hash_map.hashString(string.utf8),
+                .number => |number| switch (number) {
+                    .i32 => |n| std.array_hash_map.getAutoHashFn(i32, struct {})(.{}, n),
+                    .f64 => |n| std.array_hash_map.getAutoHashFn(i64, struct {})(.{}, @bitCast(n)),
+                },
+                inline else => |value| blk: {
+                    const T = @TypeOf(value);
+                    if (T == void) return @intFromEnum(key);
+                    break :blk std.array_hash_map.getAutoHashStratFn(T, struct {}, .Shallow)(.{}, value);
+                },
+            };
+            const tag: u32 = @intFromEnum(key);
+            return tag ^ value_hash;
+        }
+
+        pub fn eql(_: Self, a: Value, b: Value, _: usize) bool {
+            return sameValueZero(a, b);
+        }
+    }, false);
+}
+
 test "format" {
     const gc = @import("gc");
     var agent = try Agent.init(gc.allocator(), .{});
