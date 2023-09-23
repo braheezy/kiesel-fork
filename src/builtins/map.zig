@@ -160,6 +160,15 @@ pub const MapPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        // 24.1.3.13 Map.prototype [ @@toStringTag ]
+        // https://tc39.es/ecma262/#sec-map.prototype-@@tostringtag
+        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+            .value = Value.from("Map"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
         return object;
     }
 };
