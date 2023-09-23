@@ -165,6 +165,7 @@ pub const MapPrototype = struct {
         try defineBuiltinFunction(object, "delete", delete, 1, realm);
         try defineBuiltinFunction(object, "get", get, 1, realm);
         try defineBuiltinFunction(object, "has", has, 1, realm);
+        try defineBuiltinFunction(object, "set", set, 2, realm);
 
         // 24.1.3.13 Map.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-map.prototype-@@tostringtag
@@ -242,6 +243,32 @@ pub const MapPrototype = struct {
         //     a. If p.[[Key]] is not empty and SameValueZero(p.[[Key]], key) is true, return true.
         // 4. Return false.
         return Value.from(map.fields.map_data.contains(key));
+    }
+
+    /// 24.1.3.9 Map.prototype.set ( key, value )
+    /// https://tc39.es/ecma262/#sec-map.prototype.set
+    fn set(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        var key = arguments.get(0);
+        const value = arguments.get(1);
+
+        // 1. Let M be the this value.
+        // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
+        const map = try this_value.requireInternalSlot(agent, Map);
+
+        // 3. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
+        //     a. If p.[[Key]] is not empty and SameValueZero(p.[[Key]], key) is true, then
+        //         i. Set p.[[Value]] to value.
+        //         ii. Return M.
+
+        // 4. If key is -0𝔽, set key to +0𝔽.
+        if (key == .number and key.number.isNegativeZero()) key = Value.from(0);
+
+        // 5. Let p be the Record { [[Key]]: key, [[Value]]: value }.
+        // 6. Append p to M.[[MapData]].
+        try map.fields.map_data.put(key, value);
+
+        // 7. Return M.
+        return Value.from(map.object());
     }
 };
 
