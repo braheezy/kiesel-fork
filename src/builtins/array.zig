@@ -2487,7 +2487,7 @@ pub const ArrayPrototype = struct {
     fn splice(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
         const start = arguments.getOrNull(0);
         const delete_count = arguments.getOrNull(1);
-        const items = if (arguments.count() <= 2) &.{} else arguments.values[2..];
+        const items = if (arguments.count() <= 2) &[_]Value{} else arguments.values[2..];
 
         // 1. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
@@ -2816,7 +2816,7 @@ pub const ArrayPrototype = struct {
     fn toSpliced(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
         const start = arguments.getOrNull(0);
         const skip_count = arguments.getOrNull(1);
-        const items = if (arguments.count() <= 2) &.{} else arguments.values[2..];
+        const items = if (arguments.count() <= 2) &[_]Value{} else arguments.values[2..];
 
         // 1. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
