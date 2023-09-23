@@ -162,6 +162,7 @@ pub const MapPrototype = struct {
         });
 
         try defineBuiltinFunction(object, "clear", clear, 0, realm);
+        try defineBuiltinFunction(object, "delete", delete, 1, realm);
 
         // 24.1.3.13 Map.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-map.prototype-@@tostringtag
@@ -189,6 +190,24 @@ pub const MapPrototype = struct {
 
         // 4. Return undefined.
         return .undefined;
+    }
+
+    /// 24.1.3.3 Map.prototype.delete ( key )
+    /// https://tc39.es/ecma262/#sec-map.prototype.delete
+    fn delete(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const key = arguments.get(0);
+
+        // 1. Let M be the this value.
+        // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
+        const map = try this_value.requireInternalSlot(agent, Map);
+
+        // 3. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
+        //     a. If p.[[Key]] is not empty and SameValueZero(p.[[Key]], key) is true, then
+        //         i. Set p.[[Key]] to empty.
+        //         ii. Set p.[[Value]] to empty.
+        //         iii. Return true.
+        // 4. Return false.
+        return Value.from(map.fields.map_data.orderedRemove(key));
     }
 };
 
