@@ -92,6 +92,8 @@ pub const Iterator = struct {
     pub fn close(self: Self, completion: anytype) @TypeOf(completion) {
         const agent = self.iterator.agent();
 
+        const completion_exception = agent.exception;
+
         // 1. Assert: iteratorRecord.[[Iterator]] is an Object.
         // 2. Let iterator be iteratorRecord.[[Iterator]].
         const iterator = self.iterator;
@@ -113,7 +115,10 @@ pub const Iterator = struct {
         } else |err| err;
 
         // 5. If completion.[[Type]] is throw, return ? completion.
-        _ = completion catch |err| return err;
+        _ = completion catch |err| {
+            agent.exception = completion_exception;
+            return err;
+        };
 
         // 6. If innerResult.[[Type]] is throw, return ? innerResult.
         _ = inner_result catch |err| return err;
