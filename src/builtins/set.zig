@@ -125,6 +125,7 @@ pub const SetPrototype = struct {
         });
 
         try defineBuiltinFunction(object, "add", add, 1, realm);
+        try defineBuiltinFunction(object, "clear", clear, 0, realm);
 
         // 24.2.3.12 Set.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-set.prototype-@@tostringtag
@@ -159,6 +160,22 @@ pub const SetPrototype = struct {
 
         // 6. Return S.
         return Value.from(set.object());
+    }
+
+    /// 24.2.3.2 Set.prototype.clear ( )
+    /// https://tc39.es/ecma262/#sec-set.prototype.clear
+    fn clear(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let S be the this value.
+        // 2. Perform ? RequireInternalSlot(S, [[SetData]]).
+        const set = try this_value.requireInternalSlot(agent, Set);
+
+        // 3. For each element e of S.[[SetData]], do
+        //     a. Replace the element of S.[[SetData]] whose value is e with an element whose value
+        //        is empty.
+        set.fields.set_data.clearAndFree();
+
+        // 4. Return undefined.
+        return .undefined;
     }
 };
 
