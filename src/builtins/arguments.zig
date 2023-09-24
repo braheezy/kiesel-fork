@@ -50,9 +50,15 @@ pub fn createUnmappedArgumentsObject(agent: *Agent, arguments_list: []const Valu
         // c. Set index to index + 1.
     }
 
-    // TODO: 7. Perform ! DefinePropertyOrThrow(obj, @@iterator, PropertyDescriptor {
+    // 7. Perform ! DefinePropertyOrThrow(obj, @@iterator, PropertyDescriptor {
     //      [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
+    object.definePropertyOrThrow(PropertyKey.from(agent.well_known_symbols.@"@@iterator"), .{
+        .value = Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
+        .writable = true,
+        .enumerable = false,
+        .configurable = true,
+    }) catch |err| try noexcept(err);
 
     // 8. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor {
     //      [[Get]]: %ThrowTypeError%, [[Set]]: %ThrowTypeError%, [[Enumerable]]: false, [[Configurable]]: false

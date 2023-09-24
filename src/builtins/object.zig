@@ -78,6 +78,9 @@ pub const ObjectConstructor = struct {
             Value.from(object),
         );
 
+        // Ensure prototype function intrinsics
+        _ = try realm.intrinsics.@"%Object.prototype.toString%"();
+
         return object;
     }
 

@@ -392,6 +392,9 @@ pub const ArrayConstructor = struct {
             Value.from(object),
         );
 
+        // Ensure prototype function intrinsics
+        _ = try realm.intrinsics.@"%Array.prototype.values%"();
+
         return object;
     }
 
@@ -758,6 +761,8 @@ pub const ArrayPrototype = struct {
 
         // 23.1.3.40 Array.prototype [ @@iterator ] ( )
         // https://tc39.es/ecma262/#sec-array.prototype-@@iterator
+        // NOTE: We can't use the intrinsic getter for this while creating the underlying prototype
+        //       object, as it hasn't been finalized yet.
         const @"%Array.prototype.values%" = object.propertyStorage().get(PropertyKey.from("values")).?;
         try defineBuiltinProperty(object, "@@iterator", @"%Array.prototype.values%");
 
