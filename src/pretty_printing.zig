@@ -128,6 +128,27 @@ fn prettyPrintMap(map: Object, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintMapIterator(map_iterator: Object, writer: anytype) !void {
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("%MapIterator%(");
+    try tty_config.setColor(writer, .reset);
+    switch (map_iterator.as(builtins.MapIterator).fields) {
+        .state => |state_| {
+            try writer.print("{pretty}", .{Value.from(state_.map.object())});
+        },
+        .completed => {
+            try tty_config.setColor(writer, .dim);
+            try writer.writeAll("<completed>");
+            try tty_config.setColor(writer, .reset);
+        },
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintProxy(proxy: Object, writer: anytype) !void {
     const proxy_target = proxy.as(builtins.Proxy).fields.proxy_target;
     const proxy_handler = proxy.as(builtins.Proxy).fields.proxy_handler;
@@ -298,6 +319,8 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
             return prettyPrintError(object, writer);
         if (object.is(builtins.Map))
             return prettyPrintMap(object, writer);
+        if (object.is(builtins.MapIterator))
+            return prettyPrintMapIterator(object, writer);
         if (object.is(builtins.BigInt) or
             object.is(builtins.Boolean) or
             object.is(builtins.Number) or

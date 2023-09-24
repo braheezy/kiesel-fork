@@ -191,6 +191,9 @@ pub const MapPrototype = struct {
         //     a. Set p.[[Key]] to empty.
         //     b. Set p.[[Value]] to empty.
         map.fields.map_data.clearAndFree();
+        if (map.fields.iterable_keys) |*iterable_keys| {
+            iterable_keys.clearAndFree();
+        }
 
         // 4. Return undefined.
         return .undefined;
@@ -210,8 +213,16 @@ pub const MapPrototype = struct {
         //         i. Set p.[[Key]] to empty.
         //         ii. Set p.[[Value]] to empty.
         //         iii. Return true.
+        if (map.fields.map_data.getIndex(key)) |index| {
+            map.fields.map_data.orderedRemoveAt(index);
+            if (map.fields.iterable_keys) |*iterable_keys| {
+                iterable_keys.items[index] = null;
+            }
+            return Value.from(true);
+        }
+
         // 4. Return false.
-        return Value.from(map.fields.map_data.orderedRemove(key));
+        return Value.from(false);
     }
 
     /// 24.1.3.6 Map.prototype.get ( key )
@@ -266,7 +277,13 @@ pub const MapPrototype = struct {
 
         // 5. Let p be the Record { [[Key]]: key, [[Value]]: value }.
         // 6. Append p to M.[[MapData]].
-        try map.fields.map_data.put(key, value);
+        const result = try map.fields.map_data.getOrPut(key);
+        result.value_ptr.* = value;
+        if (!result.found_existing) {
+            if (map.fields.iterable_keys) |*iterable_keys| {
+                try iterable_keys.append(key);
+            }
+        }
 
         // 7. Return M.
         return Value.from(map.object());
@@ -287,14 +304,43 @@ pub const MapPrototype = struct {
     }
 };
 
-pub const MapData = ValueHashMap(Value);
+const MapData = ValueHashMap(Value);
+const IterableKeys = std.ArrayList(?Value);
 
 /// 24.1.4 Properties of Map Instances
 /// https://tc39.es/ecma262/#sec-properties-of-map-instances
 pub const Map = Object.Factory(.{
     .Fields = struct {
+        const Self = @This();
+
         /// [[MapData]]
         map_data: MapData,
+
+        /// List of keys and their deletion status for MapIterator and Map.prototype.forEach(),
+        /// created and destroyed on demand.
+        iterable_keys: ?IterableKeys = null,
+        active_iterators: usize = 0,
+
+        pub fn registerIterator(self: *Self) !*IterableKeys {
+            if (self.active_iterators == 0) {
+                std.debug.assert(self.iterable_keys == null);
+                self.iterable_keys = try IterableKeys.initCapacity(self.map_data.allocator, self.map_data.count());
+                for (self.map_data.keys()) |key| {
+                    self.iterable_keys.?.appendAssumeCapacity(key);
+                }
+            }
+            self.active_iterators += 1;
+            return &self.iterable_keys.?;
+        }
+
+        pub fn unregisterIterator(self: *Self) void {
+            self.active_iterators -= 1;
+            if (self.active_iterators == 0) {
+                std.debug.assert(self.iterable_keys != null);
+                self.iterable_keys.?.deinit();
+                self.iterable_keys = null;
+            }
+        }
     },
     .tag = .map,
 });

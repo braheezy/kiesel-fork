@@ -37,6 +37,7 @@ lazy_intrinsics: struct {
     @"%IteratorPrototype%": ?Object = null,
     @"%Map%": ?Object = null,
     @"%Map.prototype%": ?Object = null,
+    @"%MapIteratorPrototype%": ?Object = null,
     @"%Math%": ?Object = null,
     @"%Number%": ?Object = null,
     @"%Number.prototype%": ?Object = null,
@@ -151,6 +152,9 @@ pub fn @"%Map%"(self: *Self) error{OutOfMemory}!Object {
 }
 pub fn @"%Map.prototype%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Map.prototype%", builtins.MapPrototype);
+}
+pub fn @"%MapIteratorPrototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%MapIteratorPrototype%", builtins.MapIteratorPrototype);
 }
 pub fn @"%Math%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Math%", builtins.Math);
