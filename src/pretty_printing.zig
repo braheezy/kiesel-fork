@@ -114,13 +114,11 @@ fn prettyPrintMap(map: Object, writer: anytype) !void {
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Map(");
     try tty_config.setColor(writer, .reset);
-    if (map_data.count() != 0) {
-        var it = map_data.iterator();
-        while (it.next()) |entry| {
-            try writer.print("{pretty} → {pretty}", .{ entry.key_ptr.*, entry.value_ptr.* });
-            if (it.index < map_data.count()) {
-                try writer.writeAll(", ");
-            }
+    var it = map_data.iterator();
+    while (it.next()) |entry| {
+        try writer.print("{pretty} → {pretty}", .{ entry.key_ptr.*, entry.value_ptr.* });
+        if (it.index < map_data.count()) {
+            try writer.writeAll(", ");
         }
     }
     try tty_config.setColor(writer, .white);
@@ -165,6 +163,25 @@ fn prettyPrintProxy(proxy: Object, writer: anytype) !void {
         try tty_config.setColor(writer, .dim);
         try writer.writeAll("<revoked>");
         try tty_config.setColor(writer, .reset);
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
+fn prettyPrintSet(set: Object, writer: anytype) !void {
+    const set_data = set.as(builtins.Set).fields.set_data;
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Set(");
+    try tty_config.setColor(writer, .reset);
+    var it = set_data.iterator();
+    while (it.next()) |entry| {
+        try writer.print("{pretty}", .{entry.key_ptr.*});
+        if (it.index < set_data.count()) {
+            try writer.writeAll(", ");
+        }
     }
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -329,6 +346,8 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
             return prettyPrintPrimitiveWrapper(object, writer);
         if (object.is(builtins.Proxy))
             return prettyPrintProxy(object, writer);
+        if (object.is(builtins.Set))
+            return prettyPrintSet(object, writer);
         if (object.is(builtins.StringIterator))
             return prettyPrintStringIterator(object, writer);
         if (object.internalMethods().call != null)
