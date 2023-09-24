@@ -170,6 +170,7 @@ pub const MapPrototype = struct {
         try defineBuiltinFunction(object, "keys", keys, 0, realm);
         try defineBuiltinFunction(object, "set", set, 2, realm);
         try defineBuiltinAccessor(object, "size", size, null, realm);
+        try defineBuiltinFunction(object, "values", values, 0, realm);
 
         // 24.1.3.13 Map.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-map.prototype-@@tostringtag
@@ -324,6 +325,16 @@ pub const MapPrototype = struct {
         //     a. If p.[[Key]] is not empty, set count to count + 1.
         // 5. Return 𝔽(count).
         return Value.from(map.fields.map_data.count());
+    }
+
+    /// 24.1.3.11 Map.prototype.values ( )
+    /// https://tc39.es/ecma262/#sec-map.prototype.values
+    fn values(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let M be the this value.
+        const map = this_value;
+
+        // 2. Return ? CreateMapIterator(M, value).
+        return Value.from(try createMapIterator(agent, map, .value));
     }
 };
 
