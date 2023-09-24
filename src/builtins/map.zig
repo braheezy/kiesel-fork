@@ -172,6 +172,11 @@ pub const MapPrototype = struct {
         try defineBuiltinAccessor(object, "size", size, null, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
 
+        // 24.1.3.12 Map.prototype [ @@iterator ] ( )
+        // https://tc39.es/ecma262/#sec-map.prototype-@@iterator
+        const @"%Map.prototype.entries%" = object.propertyStorage().get(PropertyKey.from("entries")).?;
+        try defineBuiltinProperty(object, "@@iterator", @"%Map.prototype.entries%");
+
         // 24.1.3.13 Map.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-map.prototype-@@tostringtag
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
