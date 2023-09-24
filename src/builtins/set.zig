@@ -18,6 +18,7 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const ValueHashMap = types.ValueHashMap;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const createSetIterator = builtins.createSetIterator;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
@@ -127,6 +128,7 @@ pub const SetPrototype = struct {
         try defineBuiltinFunction(object, "add", add, 1, realm);
         try defineBuiltinFunction(object, "clear", clear, 0, realm);
         try defineBuiltinFunction(object, "delete", delete, 1, realm);
+        try defineBuiltinFunction(object, "entries", entries, 0, realm);
         try defineBuiltinFunction(object, "has", has, 1, realm);
         try defineBuiltinAccessor(object, "size", size, null, realm);
 
@@ -213,6 +215,16 @@ pub const SetPrototype = struct {
 
         // 4. Return false.
         return Value.from(false);
+    }
+
+    /// 24.2.3.5 Set.prototype.entries ( )
+    /// https://tc39.es/ecma262/#sec-set.prototype.entries
+    fn entries(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let M be the this value.
+        const map = this_value;
+
+        // 2. Return ? CreateSetIterator(S, key+value).
+        return Value.from(try createSetIterator(agent, map, .@"key+value"));
     }
 
     /// 24.2.3.7 Set.prototype.has ( value )
