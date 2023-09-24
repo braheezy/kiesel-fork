@@ -138,6 +138,10 @@ pub const SetPrototype = struct {
         const @"%Set.prototype.values%" = object.propertyStorage().get(PropertyKey.from("values")).?;
         try defineBuiltinProperty(object, "keys", @"%Set.prototype.values%");
 
+        // 24.2.3.11 Set.prototype [ @@iterator ] ( )
+        // https://tc39.es/ecma262/#sec-set.prototype-@@iterator
+        try defineBuiltinProperty(object, "@@iterator", @"%Set.prototype.values%");
+
         // 24.2.3.12 Set.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-set.prototype-@@tostringtag
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
