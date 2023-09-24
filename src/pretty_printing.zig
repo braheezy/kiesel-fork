@@ -230,23 +230,24 @@ fn prettyPrintStringIterator(string_iterator: *const builtins.StringIterator, wr
     try tty_config.setColor(writer, .reset);
 }
 
-fn prettyPrintPrimitiveWrapper(object: Object, writer: anytype) !void {
+fn prettyPrintPrimitiveWrapper(object: anytype, writer: anytype) !void {
     const tty_config = getTtyConfigForWriter(writer);
 
+    const T = std.meta.Child(@TypeOf(object));
     const name = blk: {
-        if (object.is(builtins.BigInt)) break :blk "BigInt";
-        if (object.is(builtins.Boolean)) break :blk "Boolean";
-        if (object.is(builtins.Number)) break :blk "Number";
-        if (object.is(builtins.String)) break :blk "String";
-        if (object.is(builtins.Symbol)) break :blk "Symbol";
+        if (T == builtins.BigInt) break :blk "BigInt";
+        if (T == builtins.Boolean) break :blk "Boolean";
+        if (T == builtins.Number) break :blk "Number";
+        if (T == builtins.String) break :blk "String";
+        if (T == builtins.Symbol) break :blk "Symbol";
         @panic("Unhandled object type in prettyPrintPrimitiveWrapper()");
     };
     const value = blk: {
-        if (object.is(builtins.BigInt)) break :blk Value.from(object.as(builtins.BigInt).fields.big_int_data);
-        if (object.is(builtins.Boolean)) break :blk Value.from(object.as(builtins.Boolean).fields.boolean_data);
-        if (object.is(builtins.Number)) break :blk Value.from(object.as(builtins.Number).fields.number_data);
-        if (object.is(builtins.String)) break :blk Value.from(object.as(builtins.String).fields.string_data);
-        if (object.is(builtins.Symbol)) break :blk Value.from(object.as(builtins.Symbol).fields.symbol_data);
+        if (T == builtins.BigInt) break :blk Value.from(object.fields.big_int_data);
+        if (T == builtins.Boolean) break :blk Value.from(object.fields.boolean_data);
+        if (T == builtins.Number) break :blk Value.from(object.fields.number_data);
+        if (T == builtins.String) break :blk Value.from(object.fields.string_data);
+        if (T == builtins.Symbol) break :blk Value.from(object.fields.symbol_data);
         @panic("Unhandled object type in prettyPrintPrimitiveWrapper()");
     };
 
@@ -347,32 +348,27 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
         }
         state.seen_objects.putNoClobber(object.ptr, state.seen_objects.count()) catch return;
 
-        if (object.is(builtins.Array))
-            return prettyPrintArray(object.as(builtins.Array), writer);
-        if (object.is(builtins.ArrayIterator))
-            return prettyPrintArrayIterator(object.as(builtins.ArrayIterator), writer);
-        if (object.is(builtins.Date))
-            return prettyPrintDate(object.as(builtins.Date), writer);
-        if (object.is(builtins.Error))
-            return prettyPrintError(object.as(builtins.Error), writer);
-        if (object.is(builtins.Map))
-            return prettyPrintMap(object.as(builtins.Map), writer);
-        if (object.is(builtins.MapIterator))
-            return prettyPrintMapIterator(object.as(builtins.MapIterator), writer);
-        if (object.is(builtins.BigInt) or
-            object.is(builtins.Boolean) or
-            object.is(builtins.Number) or
-            object.is(builtins.String) or
-            object.is(builtins.Symbol))
-            return prettyPrintPrimitiveWrapper(object, writer);
-        if (object.is(builtins.Proxy))
-            return prettyPrintProxy(object.as(builtins.Proxy), writer);
-        if (object.is(builtins.Set))
-            return prettyPrintSet(object.as(builtins.Set), writer);
-        if (object.is(builtins.SetIterator))
-            return prettyPrintSetIterator(object.as(builtins.SetIterator), writer);
-        if (object.is(builtins.StringIterator))
-            return prettyPrintStringIterator(object.as(builtins.StringIterator), writer);
+        inline for (.{
+            .{ builtins.Array, prettyPrintArray },
+            .{ builtins.ArrayIterator, prettyPrintArrayIterator },
+            .{ builtins.BigInt, prettyPrintPrimitiveWrapper },
+            .{ builtins.Boolean, prettyPrintPrimitiveWrapper },
+            .{ builtins.Date, prettyPrintDate },
+            .{ builtins.Error, prettyPrintError },
+            .{ builtins.Map, prettyPrintMap },
+            .{ builtins.MapIterator, prettyPrintMapIterator },
+            .{ builtins.Number, prettyPrintPrimitiveWrapper },
+            .{ builtins.Proxy, prettyPrintProxy },
+            .{ builtins.Set, prettyPrintSet },
+            .{ builtins.SetIterator, prettyPrintSetIterator },
+            .{ builtins.String, prettyPrintPrimitiveWrapper },
+            .{ builtins.StringIterator, prettyPrintStringIterator },
+            .{ builtins.Symbol, prettyPrintPrimitiveWrapper },
+        }) |entry| {
+            const T = entry[0];
+            const prettyPrintFn = entry[1];
+            if (object.is(T)) return prettyPrintFn(object.as(T), writer);
+        }
         if (object.internalMethods().call != null)
             return prettyPrintFunction(object, writer);
         return prettyPrintObject(object, writer);
