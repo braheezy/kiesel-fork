@@ -159,7 +159,13 @@ pub const SetPrototype = struct {
         if (value == .number and value.number.isNegativeZero()) value = Value.from(0);
 
         // 5. Append value to S.[[SetData]].
-        try set.fields.set_data.put(value, {});
+        const result = try set.fields.set_data.getOrPut(value);
+        if (!result.found_existing) {
+            result.value_ptr.* = {};
+            if (set.fields.iterable_values) |*iterable_values| {
+                try iterable_values.append(value);
+            }
+        }
 
         // 6. Return S.
         return Value.from(set.object());
@@ -176,6 +182,9 @@ pub const SetPrototype = struct {
         //     a. Replace the element of S.[[SetData]] whose value is e with an element whose value
         //        is empty.
         set.fields.set_data.clearAndFree();
+        if (set.fields.iterable_values) |*iterable_values| {
+            iterable_values.clearAndFree();
+        }
 
         // 4. Return undefined.
         return .undefined;
@@ -194,8 +203,16 @@ pub const SetPrototype = struct {
         //     a. If e is not empty and SameValueZero(e, value) is true, then
         //         i. Replace the element of S.[[SetData]] whose value is e with an element whose value is empty.
         //         ii. Return true.
+        if (set.fields.set_data.getIndex(value)) |index| {
+            set.fields.set_data.orderedRemoveAt(index);
+            if (set.fields.iterable_values) |*iterable_values| {
+                iterable_values.items[index] = null;
+            }
+            return Value.from(true);
+        }
+
         // 4. Return false.
-        return Value.from(set.fields.set_data.orderedRemove(value));
+        return Value.from(false);
     }
 
     /// 24.2.3.7 Set.prototype.has ( value )
@@ -229,13 +246,45 @@ pub const SetPrototype = struct {
 };
 
 const SetData = ValueHashMap(void);
+const IterableValues = std.ArrayList(?Value);
 
 /// 24.2.4 Properties of Set Instances
 /// https://tc39.es/ecma262/#sec-properties-of-set-instances
 pub const Set = Object.Factory(.{
     .Fields = struct {
+        const Self = @This();
+
         /// [[SetData]]
         set_data: SetData,
+
+        /// List of values and their deletion status for SetIterator and Set.prototype.forEach(),
+        /// created and destroyed on demand.
+        iterable_values: ?IterableValues = null,
+        active_iterators: usize = 0,
+
+        pub fn registerIterator(self: *Self) !*IterableValues {
+            if (self.active_iterators == 0) {
+                std.debug.assert(self.iterable_values == null);
+                self.iterable_values = try IterableValues.initCapacity(
+                    self.set_data.allocator,
+                    self.set_data.count(),
+                );
+                for (self.set_data.keys()) |value| {
+                    self.iterable_values.?.appendAssumeCapacity(value);
+                }
+            }
+            self.active_iterators += 1;
+            return &self.iterable_values.?;
+        }
+
+        pub fn unregisterIterator(self: *Self) void {
+            self.active_iterators -= 1;
+            if (self.active_iterators == 0) {
+                std.debug.assert(self.iterable_values != null);
+                self.iterable_values.?.deinit();
+                self.iterable_values = null;
+            }
+        }
     },
     .tag = .set,
 });
