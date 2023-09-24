@@ -128,6 +128,7 @@ pub const SetPrototype = struct {
         try defineBuiltinFunction(object, "clear", clear, 0, realm);
         try defineBuiltinFunction(object, "delete", delete, 1, realm);
         try defineBuiltinFunction(object, "has", has, 1, realm);
+        try defineBuiltinAccessor(object, "size", size, null, realm);
 
         // 24.2.3.12 Set.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-set.prototype-@@tostringtag
@@ -210,6 +211,20 @@ pub const SetPrototype = struct {
         //     a. If e is not empty and SameValueZero(e, value) is true, return true.
         // 4. Return false.
         return Value.from(set.fields.set_data.contains(value));
+    }
+
+    /// 24.2.3.9 get Set.prototype.size
+    /// https://tc39.es/ecma262/#sec-get-set.prototype.size
+    fn size(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let S be the this value.
+        // 2. Perform ? RequireInternalSlot(S, [[SetData]]).
+        const set = try this_value.requireInternalSlot(agent, Set);
+
+        // 3. Let count be 0.
+        // 4. For each element e of S.[[SetData]], do
+        //     a. If e is not empty, set count to count + 1.
+        // 5. Return 𝔽(count).
+        return Value.from(set.fields.set_data.count());
     }
 };
 
