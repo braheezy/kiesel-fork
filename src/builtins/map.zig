@@ -18,6 +18,7 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const ValueHashMap = types.ValueHashMap;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const createMapIterator = builtins.createMapIterator;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
@@ -163,6 +164,7 @@ pub const MapPrototype = struct {
 
         try defineBuiltinFunction(object, "clear", clear, 0, realm);
         try defineBuiltinFunction(object, "delete", delete, 1, realm);
+        try defineBuiltinFunction(object, "entries", entries, 0, realm);
         try defineBuiltinFunction(object, "get", get, 1, realm);
         try defineBuiltinFunction(object, "has", has, 1, realm);
         try defineBuiltinFunction(object, "set", set, 2, realm);
@@ -223,6 +225,16 @@ pub const MapPrototype = struct {
 
         // 4. Return false.
         return Value.from(false);
+    }
+
+    /// 24.1.3.4 Map.prototype.entries ( )
+    /// https://tc39.es/ecma262/#sec-map.prototype.entries
+    fn entries(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let M be the this value.
+        const map = this_value;
+
+        // 2. Return ? CreateMapIterator(M, key+value).
+        return Value.from(try createMapIterator(agent, map, .@"key+value"));
     }
 
     /// 24.1.3.6 Map.prototype.get ( key )
