@@ -165,6 +165,7 @@ pub const MapPrototype = struct {
         try defineBuiltinFunction(object, "clear", clear, 0, realm);
         try defineBuiltinFunction(object, "delete", delete, 1, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
+        try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
         try defineBuiltinFunction(object, "get", get, 1, realm);
         try defineBuiltinFunction(object, "has", has, 1, realm);
         try defineBuiltinFunction(object, "keys", keys, 0, realm);
@@ -242,6 +243,61 @@ pub const MapPrototype = struct {
 
         // 2. Return ? CreateMapIterator(M, key+value).
         return Value.from(try createMapIterator(agent, map, .@"key+value"));
+    }
+
+    /// 24.1.3.5 Map.prototype.forEach ( callbackfn [ , thisArg ] )
+    /// https://tc39.es/ecma262/#sec-map.prototype.foreach
+    fn forEach(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const callback_fn = arguments.get(0);
+        const this_arg = arguments.get(1);
+
+        // 1. Let M be the this value.
+        // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
+        const map = try this_value.requireInternalSlot(agent, Map);
+
+        // 3. If IsCallable(callbackfn) is false, throw a TypeError exception.
+        if (!callback_fn.isCallable()) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{callback_fn}),
+            );
+        }
+
+        const iterable_keys = try map.fields.registerIterator();
+        defer map.fields.unregisterIterator();
+
+        // 4. Let entries be M.[[MapData]].
+        const entries_ = &map.fields.map_data;
+
+        // 5. Let numEntries be the number of elements in entries.
+        var num_entries = iterable_keys.items.len;
+
+        // 6. Let index be 0.
+        var index: usize = 0;
+
+        // 7. Repeat, while index < numEntries,
+        while (index < num_entries) : (index += 1) {
+            // a. Let e be entries[index].
+            // b. Set index to index + 1.
+            // c. If e.[[Key]] is not empty, then
+            if (iterable_keys.items[index]) |key| {
+                const value = entries_.get(key).?;
+
+                // i. Perform ? Call(callbackfn, thisArg, « e.[[Value]], e.[[Key]], M »).
+                _ = try callback_fn.callAssumeCallable(
+                    this_arg,
+                    .{ value, key, Value.from(map.object()) },
+                );
+
+                // ii. NOTE: The number of elements in entries may have increased during execution
+                //     of callbackfn.
+                // iii. Set numEntries to the number of elements in entries.
+                num_entries = iterable_keys.items.len;
+            }
+        }
+
+        // 8. Return undefined.
+        return .undefined;
     }
 
     /// 24.1.3.6 Map.prototype.get ( key )
