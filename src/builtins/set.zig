@@ -127,6 +127,7 @@ pub const SetPrototype = struct {
         try defineBuiltinFunction(object, "add", add, 1, realm);
         try defineBuiltinFunction(object, "clear", clear, 0, realm);
         try defineBuiltinFunction(object, "delete", delete, 1, realm);
+        try defineBuiltinFunction(object, "has", has, 1, realm);
 
         // 24.2.3.12 Set.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-set.prototype-@@tostringtag
@@ -194,6 +195,21 @@ pub const SetPrototype = struct {
         //         ii. Return true.
         // 4. Return false.
         return Value.from(set.fields.set_data.orderedRemove(value));
+    }
+
+    /// 24.2.3.7 Set.prototype.has ( value )
+    /// https://tc39.es/ecma262/#sec-set.prototype.has
+    fn has(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const value = arguments.get(0);
+
+        // 1. Let S be the this value.
+        // 2. Perform ? RequireInternalSlot(S, [[SetData]]).
+        const set = try this_value.requireInternalSlot(agent, Set);
+
+        // 3. For each element e of S.[[SetData]], do
+        //     a. If e is not empty and SameValueZero(e, value) is true, return true.
+        // 4. Return false.
+        return Value.from(set.fields.set_data.contains(value));
     }
 };
 
