@@ -129,6 +129,7 @@ pub const SetPrototype = struct {
         try defineBuiltinFunction(object, "clear", clear, 0, realm);
         try defineBuiltinFunction(object, "delete", delete, 1, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
+        try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
         try defineBuiltinFunction(object, "has", has, 1, realm);
         try defineBuiltinAccessor(object, "size", size, null, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
@@ -235,6 +236,57 @@ pub const SetPrototype = struct {
 
         // 2. Return ? CreateSetIterator(S, key+value).
         return Value.from(try createSetIterator(agent, map, .@"key+value"));
+    }
+
+    /// 24.2.3.6 Set.prototype.forEach ( callbackfn [ , thisArg ] )
+    /// https://tc39.es/ecma262/#sec-set.prototype.foreach
+    fn forEach(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const callback_fn = arguments.get(0);
+        const this_arg = arguments.get(1);
+
+        // 1. Let S be the this value.
+        // 2. Perform ? RequireInternalSlot(S, [[SetData]]).
+        const set = try this_value.requireInternalSlot(agent, Set);
+
+        // 3. If IsCallable(callbackfn) is false, throw a TypeError exception.
+        if (!callback_fn.isCallable()) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{callback_fn}),
+            );
+        }
+
+        // 4. Let entries be S.[[SetData]].
+        const iterable_values = try set.fields.registerIterator();
+        defer set.fields.unregisterIterator();
+
+        // 5. Let numEntries be the number of elements in entries.
+        var num_entries = iterable_values.items.len;
+
+        // 6. Let index be 0.
+        var index: usize = 0;
+
+        // 7. Repeat, while index < numEntries,
+        while (index < num_entries) : (index += 1) {
+            // a. Let e be entries[index].
+            // b. Set index to index + 1.
+            // c. If e is not empty, then
+            if (iterable_values.items[index]) |value| {
+                // i. Perform ? Call(callbackfn, thisArg, « e, e, S »).
+                _ = try callback_fn.callAssumeCallable(
+                    this_arg,
+                    .{ value, value, Value.from(set.object()) },
+                );
+
+                // ii. NOTE: The number of elements in entries may have increased during execution
+                //     of callbackfn.
+                // iii. Set numEntries to the number of elements in entries.
+                num_entries = iterable_values.items.len;
+            }
+        }
+
+        // 8. Return undefined.
+        return .undefined;
     }
 
     /// 24.2.3.7 Set.prototype.has ( value )
