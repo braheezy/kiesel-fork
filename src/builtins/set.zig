@@ -19,6 +19,7 @@ const Value = types.Value;
 const ValueHashMap = types.ValueHashMap;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -123,6 +124,8 @@ pub const SetPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "add", add, 1, realm);
+
         // 24.2.3.12 Set.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-set.prototype-@@tostringtag
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
@@ -133,6 +136,29 @@ pub const SetPrototype = struct {
         });
 
         return object;
+    }
+
+    /// 24.2.3.1 Set.prototype.add ( value )
+    /// https://tc39.es/ecma262/#sec-set.prototype.add
+    fn add(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        var value = arguments.get(0);
+
+        // 1. Let S be the this value.
+        // 2. Perform ? RequireInternalSlot(S, [[SetData]]).
+        const set = try this_value.requireInternalSlot(agent, Set);
+
+        // 3. For each element e of S.[[SetData]], do
+        //     a. If e is not empty and SameValueZero(e, value) is true, then
+        //         i. Return S.
+
+        // 4. If value is -0𝔽, set value to +0𝔽.
+        if (value == .number and value.number.isNegativeZero()) value = Value.from(0);
+
+        // 5. Append value to S.[[SetData]].
+        try set.fields.set_data.put(value, {});
+
+        // 6. Return S.
+        return Value.from(set.object());
     }
 };
 
