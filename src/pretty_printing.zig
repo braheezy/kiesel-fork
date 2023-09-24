@@ -35,9 +35,9 @@ fn getTtyConfigForWriter(writer: anytype) std.io.tty.Config {
     return std.io.tty.detectConfig(file);
 }
 
-fn prettyPrintArray(array: Object, writer: anytype) !void {
+fn prettyPrintArray(array: *const builtins.Array, writer: anytype) !void {
     const property_storage = array.data.property_storage;
-    const length = getArrayLength(array);
+    const length = getArrayLength(@constCast(array).object());
     const tty_config = getTtyConfigForWriter(writer);
 
     try tty_config.setColor(writer, .white);
@@ -61,13 +61,13 @@ fn prettyPrintArray(array: Object, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
-fn prettyPrintArrayIterator(array_iterator: Object, writer: anytype) !void {
+fn prettyPrintArrayIterator(array_iterator: *const builtins.ArrayIterator, writer: anytype) !void {
     const tty_config = getTtyConfigForWriter(writer);
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("%ArrayIterator%(");
     try tty_config.setColor(writer, .reset);
-    switch (array_iterator.as(builtins.ArrayIterator).fields) {
+    switch (array_iterator.fields) {
         .state => |state_| {
             try writer.print("{pretty}", .{Value.from(state_.array)});
         },
@@ -82,8 +82,8 @@ fn prettyPrintArrayIterator(array_iterator: Object, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
-fn prettyPrintDate(date: Object, writer: anytype) !void {
-    const date_value = date.as(builtins.Date).fields.date_value;
+fn prettyPrintDate(date: *const builtins.Date, writer: anytype) !void {
+    const date_value = date.fields.date_value;
     const tty_config = getTtyConfigForWriter(writer);
 
     try tty_config.setColor(writer, .white);
@@ -94,8 +94,8 @@ fn prettyPrintDate(date: Object, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
-fn prettyPrintError(@"error": Object, writer: anytype) !void {
-    const error_data = @"error".as(builtins.Error).fields.error_data;
+fn prettyPrintError(@"error": *const builtins.Error, writer: anytype) !void {
+    const error_data = @"error".fields.error_data;
     const tty_config = getTtyConfigForWriter(writer);
 
     try tty_config.setColor(writer, .red);
@@ -107,8 +107,8 @@ fn prettyPrintError(@"error": Object, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
-fn prettyPrintMap(map: Object, writer: anytype) !void {
-    const map_data = map.as(builtins.Map).fields.map_data;
+fn prettyPrintMap(map: *const builtins.Map, writer: anytype) !void {
+    const map_data = map.fields.map_data;
     const tty_config = getTtyConfigForWriter(writer);
 
     try tty_config.setColor(writer, .white);
@@ -126,13 +126,13 @@ fn prettyPrintMap(map: Object, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
-fn prettyPrintMapIterator(map_iterator: Object, writer: anytype) !void {
+fn prettyPrintMapIterator(map_iterator: *const builtins.MapIterator, writer: anytype) !void {
     const tty_config = getTtyConfigForWriter(writer);
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("%MapIterator%(");
     try tty_config.setColor(writer, .reset);
-    switch (map_iterator.as(builtins.MapIterator).fields) {
+    switch (map_iterator.fields) {
         .state => |state_| {
             try writer.print("{pretty}", .{Value.from(state_.map.object())});
         },
@@ -147,9 +147,9 @@ fn prettyPrintMapIterator(map_iterator: Object, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
-fn prettyPrintProxy(proxy: Object, writer: anytype) !void {
-    const proxy_target = proxy.as(builtins.Proxy).fields.proxy_target;
-    const proxy_handler = proxy.as(builtins.Proxy).fields.proxy_handler;
+fn prettyPrintProxy(proxy: *const builtins.Proxy, writer: anytype) !void {
+    const proxy_target = proxy.fields.proxy_target;
+    const proxy_handler = proxy.fields.proxy_handler;
     const tty_config = getTtyConfigForWriter(writer);
 
     try tty_config.setColor(writer, .white);
@@ -169,8 +169,8 @@ fn prettyPrintProxy(proxy: Object, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
-fn prettyPrintSet(set: Object, writer: anytype) !void {
-    const set_data = set.as(builtins.Set).fields.set_data;
+fn prettyPrintSet(set: *const builtins.Set, writer: anytype) !void {
+    const set_data = set.fields.set_data;
     const tty_config = getTtyConfigForWriter(writer);
 
     try tty_config.setColor(writer, .white);
@@ -188,13 +188,13 @@ fn prettyPrintSet(set: Object, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
-fn prettyPrintSetIterator(set_iterator: Object, writer: anytype) !void {
+fn prettyPrintSetIterator(set_iterator: *const builtins.SetIterator, writer: anytype) !void {
     const tty_config = getTtyConfigForWriter(writer);
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("%SetIterator%(");
     try tty_config.setColor(writer, .reset);
-    switch (set_iterator.as(builtins.SetIterator).fields) {
+    switch (set_iterator.fields) {
         .state => |state_| {
             try writer.print("{pretty}", .{Value.from(state_.set.object())});
         },
@@ -209,13 +209,13 @@ fn prettyPrintSetIterator(set_iterator: Object, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
-fn prettyPrintStringIterator(string_iterator: Object, writer: anytype) !void {
+fn prettyPrintStringIterator(string_iterator: *const builtins.StringIterator, writer: anytype) !void {
     const tty_config = getTtyConfigForWriter(writer);
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("%StringIterator%(");
     try tty_config.setColor(writer, .reset);
-    switch (string_iterator.as(builtins.StringIterator).fields) {
+    switch (string_iterator.fields) {
         .state => |state_| {
             try writer.print("{pretty}", .{Value.from(state_.it.bytes)});
         },
@@ -348,17 +348,17 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
         state.seen_objects.putNoClobber(object.ptr, state.seen_objects.count()) catch return;
 
         if (object.is(builtins.Array))
-            return prettyPrintArray(object, writer);
+            return prettyPrintArray(object.as(builtins.Array), writer);
         if (object.is(builtins.ArrayIterator))
-            return prettyPrintArrayIterator(object, writer);
+            return prettyPrintArrayIterator(object.as(builtins.ArrayIterator), writer);
         if (object.is(builtins.Date))
-            return prettyPrintDate(object, writer);
+            return prettyPrintDate(object.as(builtins.Date), writer);
         if (object.is(builtins.Error))
-            return prettyPrintError(object, writer);
+            return prettyPrintError(object.as(builtins.Error), writer);
         if (object.is(builtins.Map))
-            return prettyPrintMap(object, writer);
+            return prettyPrintMap(object.as(builtins.Map), writer);
         if (object.is(builtins.MapIterator))
-            return prettyPrintMapIterator(object, writer);
+            return prettyPrintMapIterator(object.as(builtins.MapIterator), writer);
         if (object.is(builtins.BigInt) or
             object.is(builtins.Boolean) or
             object.is(builtins.Number) or
@@ -366,13 +366,13 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
             object.is(builtins.Symbol))
             return prettyPrintPrimitiveWrapper(object, writer);
         if (object.is(builtins.Proxy))
-            return prettyPrintProxy(object, writer);
+            return prettyPrintProxy(object.as(builtins.Proxy), writer);
         if (object.is(builtins.Set))
-            return prettyPrintSet(object, writer);
+            return prettyPrintSet(object.as(builtins.Set), writer);
         if (object.is(builtins.SetIterator))
-            return prettyPrintSetIterator(object, writer);
+            return prettyPrintSetIterator(object.as(builtins.SetIterator), writer);
         if (object.is(builtins.StringIterator))
-            return prettyPrintStringIterator(object, writer);
+            return prettyPrintStringIterator(object.as(builtins.StringIterator), writer);
         if (object.internalMethods().call != null)
             return prettyPrintFunction(object, writer);
         return prettyPrintObject(object, writer);
