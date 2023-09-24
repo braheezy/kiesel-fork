@@ -18,6 +18,7 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const ValueHashMap = types.ValueHashMap;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -41,6 +42,15 @@ pub const SetConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
+
+        // 24.2.2.2 get Set [ @@species ]
+        // https://tc39.es/ecma262/#sec-get-set-@@species
+        try defineBuiltinAccessor(object, "@@species", struct {
+            fn getter(_: *Agent, this_value: Value, _: ArgumentsList) !Value {
+                // 1. Return the this value.
+                return this_value;
+            }
+        }.getter, null, realm);
 
         // 24.2.3.3 Set.prototype.constructor
         // https://tc39.es/ecma262/#sec-set.prototype.constructor
