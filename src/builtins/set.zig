@@ -133,6 +133,11 @@ pub const SetPrototype = struct {
         try defineBuiltinAccessor(object, "size", size, null, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
 
+        // 24.2.3.8 Set.prototype.keys ( )
+        // https://tc39.es/ecma262/#sec-set.prototype.keys
+        const @"%Set.prototype.values%" = object.propertyStorage().get(PropertyKey.from("values")).?;
+        try defineBuiltinProperty(object, "keys", @"%Set.prototype.values%");
+
         // 24.2.3.12 Set.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-set.prototype-@@tostringtag
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
