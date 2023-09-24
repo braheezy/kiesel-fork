@@ -123,6 +123,15 @@ pub const SetPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        // 24.2.3.12 Set.prototype [ @@toStringTag ]
+        // https://tc39.es/ecma262/#sec-set.prototype-@@tostringtag
+        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+            .value = Value.from("Set"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
         return object;
     }
 };
