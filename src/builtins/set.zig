@@ -131,6 +131,7 @@ pub const SetPrototype = struct {
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
         try defineBuiltinFunction(object, "has", has, 1, realm);
         try defineBuiltinAccessor(object, "size", size, null, realm);
+        try defineBuiltinFunction(object, "values", values, 0, realm);
 
         // 24.2.3.12 Set.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-set.prototype-@@tostringtag
@@ -254,6 +255,16 @@ pub const SetPrototype = struct {
         //     a. If e is not empty, set count to count + 1.
         // 5. Return 𝔽(count).
         return Value.from(set.fields.set_data.count());
+    }
+
+    /// 24.2.3.10 Set.prototype.values ( )
+    /// https://tc39.es/ecma262/#sec-set.prototype.values
+    fn values(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let M be the this value.
+        const map = this_value;
+
+        // 2. Return ? CreateSetIterator(S, value).
+        return Value.from(try createSetIterator(agent, map, .value));
     }
 };
 
