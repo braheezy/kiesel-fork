@@ -167,6 +167,7 @@ pub const MapPrototype = struct {
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
         try defineBuiltinFunction(object, "get", get, 1, realm);
         try defineBuiltinFunction(object, "has", has, 1, realm);
+        try defineBuiltinFunction(object, "keys", keys, 0, realm);
         try defineBuiltinFunction(object, "set", set, 2, realm);
         try defineBuiltinAccessor(object, "size", size, null, realm);
 
@@ -267,6 +268,16 @@ pub const MapPrototype = struct {
         //     a. If p.[[Key]] is not empty and SameValueZero(p.[[Key]], key) is true, return true.
         // 4. Return false.
         return Value.from(map.fields.map_data.contains(key));
+    }
+
+    /// 24.1.3.8 Map.prototype.keys ( )
+    /// https://tc39.es/ecma262/#sec-map.prototype.keys
+    fn keys(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let M be the this value.
+        const map = this_value;
+
+        // 2. Return ? CreateMapIterator(M, key).
+        return Value.from(try createMapIterator(agent, map, .key));
     }
 
     /// 24.1.3.9 Map.prototype.set ( key, value )
