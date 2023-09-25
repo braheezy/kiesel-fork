@@ -288,7 +288,7 @@ fn acceptIdentifierName(self: *Self) !ast.Identifier {
     errdefer self.core.restoreState(state);
 
     const reserved_word_token_types = comptime blk: {
-        var reserved_word_token_types: [reserved_words.len]Tokenizer.TokenType = .{};
+        var reserved_word_token_types: [reserved_words.len]Tokenizer.TokenType = undefined;
         for (reserved_words, 0..) |reserved_word, i| {
             reserved_word_token_types[i] = @field(Tokenizer.TokenType, reserved_word);
         }
