@@ -542,6 +542,54 @@ pub fn makeConstructor(
     // 7. Return unused.
 }
 
+/// 10.2.7 MakeMethod ( F, homeObject )
+/// https://tc39.es/ecma262/#sec-makemethod
+pub fn makeMethod(
+    function: *ECMAScriptFunction,
+    home_object: Object,
+) void {
+    // 1. Set F.[[HomeObject]] to homeObject.
+    function.fields.home_object = home_object;
+
+    // 2. Return unused.
+}
+
+/// 10.2.8 DefineMethodProperty ( homeObject, key, closure, enumerable )
+/// https://tc39.es/ecma262/#sec-definemethodproperty
+pub fn defineMethodProperty(
+    home_object: Object,
+    property_key: PropertyKey,
+    closure: Object,
+    enumerable: bool,
+) !void {
+    // 1. Assert: homeObject is an ordinary, extensible object with no non-configurable properties.
+
+    // TODO: 2. If key is a Private Name, then
+    if (false) {
+        // a. Return PrivateElement { [[Key]]: key, [[Kind]]: method, [[Value]]: closure }.
+    }
+    // 3. Else,
+    else {
+        // a. Let desc be the PropertyDescriptor {
+        //      [[Value]]: closure, [[Writable]]: true, [[Enumerable]]: enumerable, [[Configurable]]: true
+        //    }.
+        const property_descriptor = PropertyDescriptor{
+            .value = Value.from(closure),
+            .writable = true,
+            .enumerable = enumerable,
+            .configurable = true,
+        };
+
+        // b. Perform ! DefinePropertyOrThrow(homeObject, key, desc).
+        home_object.definePropertyOrThrow(
+            property_key,
+            property_descriptor,
+        ) catch |err| try noexcept(err);
+
+        // c. Return unused.
+    }
+}
+
 /// 10.2.9 SetFunctionName ( F, name [ , prefix ] )
 /// https://tc39.es/ecma262/#sec-setfunctionname
 pub fn setFunctionName(

@@ -20,10 +20,12 @@ const Reference = types.Reference;
 const String = types.String;
 const Value = types.Value;
 const arrayCreate = builtins.arrayCreate;
+const defineMethodProperty = builtins.defineMethodProperty;
 const isLessThan = types.isLessThan;
 const isLooselyEqual = types.isLooselyEqual;
 const isStrictlyEqual = types.isStrictlyEqual;
 const makeConstructor = builtins.makeConstructor;
+const makeMethod = builtins.makeMethod;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const noexcept = utils.noexcept;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
@@ -483,6 +485,55 @@ fn instantiateArrowFunctionExpression(
     return closure;
 }
 
+/// 15.4.4 Runtime Semantics: DefineMethod
+/// https://tc39.es/ecma262/#sec-runtime-semantics-definemethod
+fn defineMethod(
+    agent: *Agent,
+    function_expression: ast.FunctionExpression,
+    property_name: Value,
+    object: Object,
+    function_prototype: ?Object,
+) !struct { key: PropertyKey, closure: Object } {
+    const realm = agent.currentRealm();
+
+    // 1. Let propKey be ? Evaluation of ClassElementName.
+    const property_key = try property_name.toPropertyKey(agent);
+
+    // 2. Let env be the running execution context's LexicalEnvironment.
+    const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+    // 3. Let privateEnv be the running execution context's PrivateEnvironment.
+    const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+
+    // 4. If functionPrototype is present, then
+    //     a. Let prototype be functionPrototype.
+    // 5. Else,
+    //     a. Let prototype be %Function.prototype%.
+    const prototype = function_prototype orelse try realm.intrinsics.@"%Function.prototype%"();
+
+    // 6. Let sourceText be the source text matched by MethodDefinition.
+    const source_text = function_expression.source_text;
+
+    // 7. Let closure be OrdinaryFunctionCreate(prototype, sourceText, UniqueFormalParameters,
+    //    FunctionBody, non-lexical-this, env, privateEnv).
+    const closure = try ordinaryFunctionCreate(
+        agent,
+        prototype,
+        source_text,
+        function_expression.formal_parameters,
+        function_expression.function_body,
+        .non_lexical_this,
+        env,
+        private_env,
+    );
+
+    // 8. Perform MakeMethod(closure, object).
+    makeMethod(closure.as(builtins.ECMAScriptFunction), object);
+
+    // 9. Return the Record { [[Key]]: propKey, [[Closure]]: closure }.
+    return .{ .key = property_key, .closure = closure };
+}
+
 pub fn executeInstruction(self: *Self, executable: Executable, instruction: Instruction) !void {
     switch (instruction) {
         .apply_string_or_numeric_binary_operator => {
@@ -846,6 +897,40 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
                 self.agent,
                 try self.agent.currentRealm().intrinsics.@"%Object.prototype%"(),
             );
+            self.result = Value.from(object);
+        },
+        // 15.4.5 Runtime Semantics: MethodDefinitionEvaluation
+        // https://tc39.es/ecma262/#sec-runtime-semantics-methoddefinitionevaluation
+        .object_define_method => {
+            const function_expression = self.fetchFunctionExpression(executable);
+            const method_type_raw = self.fetchIndex(executable);
+            const method_type: ast.PropertyDefinition.MethodDefinition.Type = @enumFromInt(method_type_raw);
+            const property_name = self.stack.pop();
+            const object = self.stack.pop().object;
+            const enumerable = true;
+
+            switch (method_type) {
+                // MethodDefinition : ClassElementName ( UniqueFormalParameters ) { FunctionBody }
+                .method => {
+                    // 1. Let methodDef be ? DefineMethod of MethodDefinition with argument object.
+                    const method_def = try defineMethod(
+                        self.agent,
+                        function_expression.function_expression,
+                        property_name,
+                        object,
+                        null,
+                    );
+
+                    // 2. Perform SetFunctionName(methodDef.[[Closure]], methodDef.[[Key]]).
+                    try setFunctionName(method_def.closure, method_def.key, null);
+
+                    // 3. Return DefineMethodProperty(object, methodDef.[[Key]], methodDef.[[Closure]], enumerable).
+                    try defineMethodProperty(object, method_def.key, method_def.closure, enumerable);
+                },
+
+                else => unreachable,
+            }
+
             self.result = Value.from(object);
         },
         .object_set_property => {

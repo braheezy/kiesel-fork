@@ -602,10 +602,15 @@ fn acceptPropertyDefinition(self: *Self) !ast.PropertyDefinition {
         _ = try self.core.accept(RuleSet.is(.@"]"));
     } else |_| return error.UnexpectedToken;
 
-    var expression: ast.Expression = undefined;
     if (self.core.accept(RuleSet.is(.@":"))) |_| {
         const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
-        expression = try self.acceptExpression(ctx);
+        const expression = try self.acceptExpression(ctx);
+        return .{
+            .property_name_and_expression = .{
+                .property_name = property_name,
+                .expression = expression,
+            },
+        };
     } else |_| if (self.core.accept(RuleSet.is(.@"("))) |_| {
         // We need to do this after consuming the '(' token to skip preceeding whitespace.
         const start_offset = self.core.tokenizer.offset - (comptime "(".len);
@@ -625,14 +630,14 @@ fn acceptPropertyDefinition(self: *Self) !ast.PropertyDefinition {
             .function_body = function_body,
             .source_text = source_text,
         };
-        expression = .{ .primary_expression = .{ .function_expression = function_expression } };
+        return .{
+            .method_definition = .{
+                .property_name = property_name,
+                .function_expression = function_expression,
+                .type = .method,
+            },
+        };
     } else |_| return error.UnexpectedToken;
-    return .{
-        .property_name_and_expression = .{
-            .property_name = property_name,
-            .expression = expression,
-        },
-    };
 }
 
 fn acceptUnaryExpression(self: *Self) !ast.UnaryExpression {

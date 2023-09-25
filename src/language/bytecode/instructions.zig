@@ -75,6 +75,8 @@ pub const Instruction = enum(u8) {
     logical_not,
     /// Store OrdinaryObjectCreate(%Object.prototype%) as the result value.
     object_create,
+    /// Set an object's property to the given function expression.
+    object_define_method,
     /// Set an object's property to the key/value pair from the last two values on the stack.
     object_set_property,
     /// Pop a jump target for uncaught exceptions
@@ -117,6 +119,7 @@ pub const Instruction = enum(u8) {
             .evaluate_call,
             .evaluate_property_access_with_identifier_key,
             .jump_conditional,
+            .object_define_method,
             .resolve_binding,
             => 2,
             .apply_string_or_numeric_binary_operator,
@@ -157,6 +160,7 @@ pub const Instruction = enum(u8) {
         return switch (self) {
             .instantiate_arrow_function_expression,
             .instantiate_ordinary_function_expression,
+            .object_define_method,
             => true,
             else => false,
         };

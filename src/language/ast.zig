@@ -565,13 +565,11 @@ pub const ObjectLiteral = struct {
         //     { PropertyDefinitionList , }
         // 1. Let obj be OrdinaryObjectCreate(%Object.prototype%).
         try executable.addInstruction(.object_create);
-        try executable.addInstruction(.load);
 
         // 2. Perform ? PropertyDefinitionEvaluation of PropertyDefinitionList with argument obj.
         try self.property_definition_list.generateBytecode(executable, ctx);
 
         // 3. Return obj.
-        try executable.addInstruction(.store);
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
@@ -593,6 +591,8 @@ pub const PropertyDefinitionList = struct {
         // 1. Perform ? PropertyDefinitionEvaluation of PropertyDefinitionList with argument object.
         // 2. Perform ? PropertyDefinitionEvaluation of PropertyDefinition with argument object.
         for (self.items) |property_definition| {
+            // Load object onto the stack again before each property definition is evaluated
+            try executable.addInstruction(.load);
             try property_definition.generateBytecode(executable, ctx);
         }
 
@@ -611,12 +611,27 @@ pub const PropertyDefinitionList = struct {
 pub const PropertyDefinition = union(enum) {
     const Self = @This();
 
-    identifier_reference: IdentifierReference,
-    property_name_and_expression: struct {
+    pub const PropertyNameAndExpression = struct {
         property_name: PropertyName,
         expression: Expression,
-    },
-    // TODO: MethodDefinition, ...Expression
+    };
+
+    pub const MethodDefinition = struct {
+        pub const Type = enum {
+            method,
+            get,
+            set,
+        };
+
+        property_name: PropertyName,
+        function_expression: FunctionExpression,
+        type: Type,
+    };
+
+    identifier_reference: IdentifierReference,
+    property_name_and_expression: PropertyNameAndExpression,
+    method_definition: MethodDefinition,
+    // TODO: ...Expression
 
     /// 13.2.5.5 Runtime Semantics: PropertyDefinitionEvaluation
     /// https://tc39.es/ecma262/#sec-runtime-semantics-propertydefinitionevaluation
@@ -638,7 +653,6 @@ pub const PropertyDefinition = union(enum) {
                 // 4. Assert: object is an ordinary, extensible object with no non-configurable properties.
                 // 5. Perform ! CreateDataPropertyOrThrow(object, propName, propValue).
                 try executable.addInstruction(.object_set_property);
-                try executable.addInstruction(.load);
 
                 // 6. Return unused.
             },
@@ -666,9 +680,33 @@ pub const PropertyDefinition = union(enum) {
                 // 8. Assert: object is an ordinary, extensible object with no non-configurable properties.
                 // 9. Perform ! CreateDataPropertyOrThrow(object, propKey, propValue).
                 try executable.addInstruction(.object_set_property);
-                try executable.addInstruction(.load);
 
                 // 10. Return unused.
+            },
+
+            // PropertyDefinition : MethodDefinition
+            .method_definition => |method_definition| {
+                // 1. Perform ? MethodDefinitionEvaluation of MethodDefinition with arguments object and true.
+                // 2. Return unused.
+
+                // 15.4.5 Runtime Semantics: MethodDefinitionEvaluation
+                // https://tc39.es/ecma262/#sec-runtime-semantics-methoddefinitionevaluation
+                const strict = ctx.contained_in_strict_mode_code or method_definition.function_expression.function_body.functionBodyContainsUseStrict();
+
+                // Copy `function_expression` so that we can assign the function body's
+                // strictness, which is needed for the deferred bytecode generation.
+                // FIXME: This should ideally happen at parse time.
+                var function_expression = method_definition.function_expression;
+                function_expression.function_body.strict = strict;
+
+                try method_definition.property_name.generateBytecode(executable, ctx);
+                try executable.addInstruction(.load);
+
+                try executable.addInstructionWithFunctionExpression(
+                    .object_define_method,
+                    .{ .function_expression = function_expression },
+                );
+                try executable.addIndex(@intFromEnum(method_definition.type));
             },
         }
     }
@@ -677,13 +715,20 @@ pub const PropertyDefinition = union(enum) {
         // Omit printing 'PropertyDefinition' here, it's implied and only adds nesting.
         switch (self) {
             .identifier_reference => |identifier_reference| {
-                try printString("[identifier_reference]", writer, indentation);
+                try printString("identifier_reference:", writer, indentation);
                 try identifier_reference.print(writer, indentation + 1);
             },
             .property_name_and_expression => |property_name_and_expression| {
-                try printString("[property_name_and_expression]", writer, indentation);
+                try printString("property_name_and_expression:", writer, indentation);
                 try property_name_and_expression.property_name.print(writer, indentation + 1);
                 try property_name_and_expression.expression.print(writer, indentation + 1);
+            },
+            .method_definition => |method_definition| {
+                try printString("method_definition:", writer, indentation);
+                try printString("type:", writer, indentation + 1);
+                try printString(@tagName(method_definition.type), writer, indentation + 2);
+                try method_definition.property_name.print(writer, indentation + 1);
+                try method_definition.function_expression.print(writer, indentation + 1);
             },
         }
     }
@@ -749,7 +794,7 @@ pub const PropertyName = union(enum) {
         // Omit printing 'PropertyName' here, it's implied and only adds nesting.
         switch (self) {
             .literal_property_name => |literal| {
-                try printString("[literal_property_name]", writer, indentation);
+                try printString("literal_property_name:", writer, indentation);
                 switch (literal) {
                     .identifier => |identifier| try printString(identifier, writer, indentation + 1),
                     .string_literal => |string_literal| try printString(string_literal.text, writer, indentation + 1),
@@ -757,7 +802,7 @@ pub const PropertyName = union(enum) {
                 }
             },
             .computed_property_name => |expression| {
-                try printString("[computed_property_name]", writer, indentation);
+                try printString("computed_property_name:", writer, indentation);
                 try expression.print(writer, indentation + 1);
             },
         }
