@@ -646,27 +646,8 @@ pub const PropertyDefinition = union(enum) {
             // PropertyDefinition : PropertyName : AssignmentExpression
             .property_name_and_expression => |property_name_and_expression| {
                 // 1. Let propKey be ? Evaluation of PropertyName.
-                switch (property_name_and_expression.property_name) {
-                    .literal_property_name => |literal| switch (literal) {
-                        .identifier => |identifier| try executable.addInstructionWithConstant(
-                            .load_constant,
-                            Value.from(identifier),
-                        ),
-                        .string_literal => |string_literal| try executable.addInstructionWithConstant(
-                            .load_constant,
-                            try string_literal.stringValue(executable.allocator),
-                        ),
-                        .numeric_literal => |numeric_literal| try executable.addInstructionWithConstant(
-                            .load_constant,
-                            try numeric_literal.numericValue(executable.allocator),
-                        ),
-                    },
-                    .computed_property_name => |expression| {
-                        try expression.generateBytecode(executable, ctx);
-                        if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                        try executable.addInstruction(.load);
-                    },
-                }
+                try property_name_and_expression.property_name.generateBytecode(executable, ctx);
+                try executable.addInstruction(.load);
 
                 // TODO: 2-4.
 
@@ -718,6 +699,51 @@ pub const PropertyName = union(enum) {
         numeric_literal: NumericLiteral,
     },
     computed_property_name: Expression,
+
+    /// 13.2.5.4 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-object-initializer-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
+        switch (self) {
+            .literal_property_name => |literal| switch (literal) {
+                // LiteralPropertyName : IdentifierName
+                .identifier => |identifier| {
+                    // 1. Return StringValue of IdentifierName.
+                    try executable.addInstructionWithConstant(.store_constant, Value.from(identifier));
+                },
+
+                // LiteralPropertyName : StringLiteral
+                .string_literal => |string_literal| {
+                    // 1. Return the SV of StringLiteral.
+                    try executable.addInstructionWithConstant(
+                        .store_constant,
+                        try string_literal.stringValue(executable.allocator),
+                    );
+                },
+
+                // LiteralPropertyName : NumericLiteral
+                .numeric_literal => |numeric_literal| {
+                    // 1. Let nbr be the NumericValue of NumericLiteral.
+                    // 2. Return ! ToString(nbr).
+                    try executable.addInstructionWithConstant(
+                        .store_constant,
+                        try numeric_literal.numericValue(executable.allocator),
+                    );
+                },
+            },
+
+            // ComputedPropertyName : [ AssignmentExpression ]
+            .computed_property_name => |expression| {
+                // 1. Let exprValue be ? Evaluation of AssignmentExpression.
+                try expression.generateBytecode(executable, ctx);
+
+                // 2. Let propName be ? GetValue(exprValue).
+                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+                // 3. Return ? ToPropertyKey(propName).
+                // NOTE: This is done in object_set_property
+            },
+        }
+    }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         // Omit printing 'PropertyName' here, it's implied and only adds nesting.
