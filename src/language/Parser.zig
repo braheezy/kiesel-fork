@@ -564,7 +564,7 @@ fn acceptPropertyDefinitionList(self: *Self) !ast.PropertyDefinitionList {
     var property_definitions = std.ArrayList(ast.PropertyDefinition).init(self.allocator);
     defer property_definitions.deinit();
     while (true) {
-        if (self.acceptPropertyDefinition()) |property_definition| {
+        if (self.acceptPropertyDefinition(null)) |property_definition| {
             try property_definitions.append(property_definition);
             _ = self.core.accept(RuleSet.is(.@",")) catch break;
         } else |_| break;
@@ -572,16 +572,40 @@ fn acceptPropertyDefinitionList(self: *Self) !ast.PropertyDefinitionList {
     return .{ .items = try property_definitions.toOwnedSlice() };
 }
 
-fn acceptPropertyDefinition(self: *Self) !ast.PropertyDefinition {
+fn acceptPropertyDefinition(
+    self: *Self,
+    method_type: ?ast.PropertyDefinition.MethodDefinition.Type,
+) !ast.PropertyDefinition {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
     var property_name: ast.PropertyName = undefined;
     if (self.acceptIdentifierReference()) |identifier_reference| {
-        const token = self.core.peek() catch null;
-        // IdentifierReference
-        if (token == null or (token.?.type != .@":" and token.?.type != .@"("))
-            return .{ .identifier_reference = identifier_reference };
+        if (method_type == null) {
+            const get = std.mem.eql(u8, identifier_reference.identifier, "get");
+            const set = std.mem.eql(u8, identifier_reference.identifier, "set");
+            if (get or set) {
+                if (acceptPropertyDefinition(self, if (get) .get else .set)) |property_definition|
+                    return property_definition
+                else |_| {}
+            }
+
+            const token = try self.core.peek();
+            const followed_by_valid_punctuation = switch (token.?.type) {
+                .@":", .@"(" => true,
+                else => false,
+            };
+            const followed_by_identifier_reference = switch (token.?.type) {
+                .identifier, .yield, .@"await" => true,
+                else => false,
+            };
+
+            // IdentifierReference
+            if (!followed_by_valid_punctuation and !followed_by_identifier_reference) {
+                return .{ .identifier_reference = identifier_reference };
+            }
+        }
+
         // LiteralPropertyName : IdentifierName
         // MethodDefinition
         const identifier = identifier_reference.identifier;
@@ -634,7 +658,7 @@ fn acceptPropertyDefinition(self: *Self) !ast.PropertyDefinition {
             .method_definition = .{
                 .property_name = property_name,
                 .function_expression = function_expression,
-                .type = .method,
+                .type = method_type orelse .method,
             },
         };
     } else |_| return error.UnexpectedToken;

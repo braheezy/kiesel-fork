@@ -15,6 +15,7 @@ const Completion = types.Completion;
 const Executable = @import("Executable.zig");
 const Instruction = instructions_.Instruction;
 const Object = types.Object;
+const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Reference = types.Reference;
 const String = types.String;
@@ -902,7 +903,9 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
         // 15.4.5 Runtime Semantics: MethodDefinitionEvaluation
         // https://tc39.es/ecma262/#sec-runtime-semantics-methoddefinitionevaluation
         .object_define_method => {
+            const realm = self.agent.currentRealm();
             const function_expression = self.fetchFunctionExpression(executable);
+            const method_definition = function_expression.function_expression;
             const method_type_raw = self.fetchIndex(executable);
             const method_type: ast.PropertyDefinition.MethodDefinition.Type = @enumFromInt(method_type_raw);
             const property_name = self.stack.pop();
@@ -915,7 +918,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
                     // 1. Let methodDef be ? DefineMethod of MethodDefinition with argument object.
                     const method_def = try defineMethod(
                         self.agent,
-                        function_expression.function_expression,
+                        method_definition,
                         property_name,
                         object,
                         null,
@@ -928,7 +931,118 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
                     try defineMethodProperty(object, method_def.key, method_def.closure, enumerable);
                 },
 
-                else => unreachable,
+                // MethodDefinition : get ClassElementName ( ) { FunctionBody }
+                .get => {
+                    // 1. Let propKey be ? Evaluation of ClassElementName.
+                    const property_key = try property_name.toPropertyKey(self.agent);
+
+                    // 2. Let env be the running execution context's LexicalEnvironment.
+                    const env = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+                    // 3. Let privateEnv be the running execution context's PrivateEnvironment.
+                    const private_env = self.agent.runningExecutionContext().ecmascript_code.?.private_environment;
+
+                    // 4. Let sourceText be the source text matched by MethodDefinition.
+                    const source_text = method_definition.source_text;
+
+                    // 5. Let formalParameterList be an instance of the production FormalParameters : [empty] .
+                    const formal_parameter_list = ast.FormalParameters{ .items = &.{} };
+
+                    // 6. Let closure be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
+                    //    formalParameterList, FunctionBody, non-lexical-this, env, privateEnv).
+                    const closure = try ordinaryFunctionCreate(
+                        self.agent,
+                        try realm.intrinsics.@"%Function.prototype%"(),
+                        source_text,
+                        formal_parameter_list,
+                        method_definition.function_body,
+                        .non_lexical_this,
+                        env,
+                        private_env,
+                    );
+
+                    // 7. Perform MakeMethod(closure, object).
+                    makeMethod(closure.as(builtins.ECMAScriptFunction), object);
+
+                    // 8. Perform SetFunctionName(closure, propKey, "get").
+                    try setFunctionName(closure, property_key, "get");
+
+                    // TODO: 9. If propKey is a Private Name, then
+                    if (false) {
+                        // a. Return PrivateElement { [[Key]]: propKey, [[Kind]]: accessor, [[Get]]: closure, [[Set]]: undefined }.
+                    }
+                    // 10. Else,
+                    else {
+                        // a. Let desc be the PropertyDescriptor {
+                        //      [[Get]]: closure, [[Enumerable]]: enumerable, [[Configurable]]: true
+                        //    }.
+                        const property_descriptor = PropertyDescriptor{
+                            .get = closure,
+                            .enumerable = enumerable,
+                            .configurable = true,
+                        };
+
+                        // b. Perform ? DefinePropertyOrThrow(object, propKey, desc).
+                        try object.definePropertyOrThrow(property_key, property_descriptor);
+
+                        // c. Return unused.
+                    }
+                },
+
+                // MethodDefinition : set ClassElementName ( PropertySetParameterList ) { FunctionBody }
+                .set => {
+                    // 1. Let propKey be ? Evaluation of ClassElementName.
+                    const property_key = try property_name.toPropertyKey(self.agent);
+
+                    // 2. Let env be the running execution context's LexicalEnvironment.
+                    const env = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+                    // 3. Let privateEnv be the running execution context's PrivateEnvironment.
+                    const private_env = self.agent.runningExecutionContext().ecmascript_code.?.private_environment;
+
+                    // 4. Let sourceText be the source text matched by MethodDefinition.
+                    const source_text = method_definition.source_text;
+
+                    // 5. Let closure be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
+                    //    PropertySetParameterList, FunctionBody, non-lexical-this, env, privateEnv).
+                    const closure = try ordinaryFunctionCreate(
+                        self.agent,
+                        try realm.intrinsics.@"%Function.prototype%"(),
+                        source_text,
+                        method_definition.formal_parameters,
+                        method_definition.function_body,
+                        .non_lexical_this,
+                        env,
+                        private_env,
+                    );
+
+                    // 6. Perform MakeMethod(closure, object).
+                    makeMethod(closure.as(builtins.ECMAScriptFunction), object);
+
+                    // 7. Perform SetFunctionName(closure, propKey, "set").
+                    try setFunctionName(closure, property_key, "set");
+
+                    // TODO: 8. If propKey is a Private Name, then
+                    if (false) {
+                        // a. Return PrivateElement { [[Key]]: propKey, [[Kind]]: accessor, [[Get]]: undefined, [[Set]]: closure }.
+                    }
+                    // 9. Else,
+                    else {
+                        // a. Let desc be the PropertyDescriptor {
+                        //      [[Set]]: closure, [[Enumerable]]: enumerable, [[Configurable]]: true
+                        //    }.
+                        const property_descriptor = PropertyDescriptor{
+                            .set = closure,
+                            .enumerable = enumerable,
+                            .configurable = true,
+                        };
+
+                        // b. Perform ? DefinePropertyOrThrow(object, propKey, desc).
+                        try object.definePropertyOrThrow(property_key, property_descriptor);
+
+                        // c. Return unused.
+                    }
+                },
             }
 
             self.result = Value.from(object);
