@@ -197,6 +197,12 @@ pub fn print(self: Self, writer: anytype) !void {
                 const constant = self.constants.items[constant_index];
                 try writer.print("{pretty} [{}]", .{ constant, constant_index });
             },
+            .object_define_method => {
+                const function_expression_index = iterator.instruction_args[0].?;
+                const method_type_raw = iterator.instruction_args[1].?;
+                const method_type: ast.PropertyDefinition.MethodDefinition.Type = @enumFromInt(method_type_raw);
+                try writer.print("[{}] (type: {s})", .{ function_expression_index, @tagName(method_type) });
+            },
             .resolve_binding => {
                 const identifier_index = iterator.instruction_args[0].?;
                 const strict = iterator.instruction_args[1].? == 1;
