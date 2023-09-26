@@ -80,29 +80,9 @@ pub fn format(
 }
 
 pub inline fn is(self: Self, comptime T: type) bool {
-    inline for ([_]struct { type, Tag }{
-        .{ builtins.Arguments, .arguments },
-        .{ builtins.Array, .array },
-        .{ builtins.ArrayIterator, .array_iterator },
-        .{ builtins.BigInt, .big_int },
-        .{ builtins.Boolean, .boolean },
-        .{ builtins.BuiltinFunction, .builtin_function },
-        .{ builtins.Date, .date },
-        .{ builtins.ECMAScriptFunction, .ecmascript_function },
-        .{ builtins.Error, .@"error" },
-        .{ builtins.Map, .map },
-        .{ builtins.MapIterator, .map_iterator },
-        .{ builtins.Number, .number },
-        .{ builtins.Proxy, .proxy },
-        .{ builtins.Set, .set },
-        .{ builtins.SetIterator, .set_iterator },
-        .{ builtins.String, .string },
-        .{ builtins.StringIterator, .string_iterator },
-        .{ builtins.Symbol, .symbol },
-    }) |entry| if (T == entry[0]) {
-        return if (self.tag) |tag| tag == entry[1] else false;
-    };
-    @compileError("Object.is() called with unsupported type " ++ @typeName(T));
+    comptime std.debug.assert(T.tag != null);
+    if (self.tag == null) return false;
+    return T.tag.? == self.tag.?;
 }
 
 pub inline fn as(self: Self, comptime T: type) *T {

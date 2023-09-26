@@ -31,6 +31,7 @@ pub fn Factory(
         const Self = @This();
 
         pub const Fields = options.Fields;
+        pub const tag = options.tag;
 
         fields: Fields,
         data: Data,
