@@ -123,6 +123,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "exp", exp, 1, realm);
         try defineBuiltinFunction(object, "expm1", expm1, 1, realm);
         try defineBuiltinFunction(object, "floor", floor, 1, realm);
+        try defineBuiltinFunction(object, "fround", fround, 1, realm);
         try defineBuiltinFunction(object, "log", log, 1, realm);
         try defineBuiltinFunction(object, "log1p", log1p, 1, realm);
         try defineBuiltinFunction(object, "log10", log10, 1, realm);
@@ -417,6 +418,28 @@ pub const Math = struct {
         // 4. If n is an integral Number, return n.
         // 5. Return the greatest (closest to +∞) integral Number value that is not greater than n.
         return Value.from(n.floor());
+    }
+
+    /// 21.3.2.17 Math.fround ( x )
+    /// https://tc39.es/ecma262/#sec-math.fround
+    fn fround(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const x = arguments.get(0);
+
+        // 1. Let n be ? ToNumber(x).
+        const n = try x.toNumber(agent);
+
+        // 2. If n is NaN, return NaN.
+        // 3. If n is one of +0𝔽, -0𝔽, +∞𝔽, or -∞𝔽, return n.
+        if (n.isZero() or !n.isFinite()) return Value.from(n);
+
+        // 4. Let n32 be the result of converting n to IEEE 754-2019 binary32 format using roundTiesToEven mode.
+        const n32: f32 = @floatCast(n.asFloat());
+
+        // 5. Let n64 be the result of converting n32 to IEEE 754-2019 binary64 format.
+        const n64: f64 = @floatCast(n32);
+
+        // 6. Return the ECMAScript Number value corresponding to n64.
+        return Value.from(n64);
     }
 
     /// 21.3.2.20 Math.log ( x )
