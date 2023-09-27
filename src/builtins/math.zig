@@ -124,6 +124,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "expm1", expm1, 1, realm);
         try defineBuiltinFunction(object, "floor", floor, 1, realm);
         try defineBuiltinFunction(object, "fround", fround, 1, realm);
+        try defineBuiltinFunction(object, "imul", imul, 2, realm);
         try defineBuiltinFunction(object, "log", log, 1, realm);
         try defineBuiltinFunction(object, "log1p", log1p, 1, realm);
         try defineBuiltinFunction(object, "log10", log10, 1, realm);
@@ -440,6 +441,25 @@ pub const Math = struct {
 
         // 6. Return the ECMAScript Number value corresponding to n64.
         return Value.from(n64);
+    }
+
+    /// 21.3.2.19 Math.imul ( x, y )
+    /// https://tc39.es/ecma262/#sec-math.imul
+    fn imul(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const x = arguments.get(0);
+        const y = arguments.get(1);
+
+        // 1. Let a be ℝ(? ToUint32(x)).
+        const a = try x.toUint32(agent);
+
+        // 2. Let b be ℝ(? ToUint32(y)).
+        const b = try y.toUint32(agent);
+
+        // 3. Let product be (a × b) modulo 2**32.
+        const product = a *% b;
+
+        // 4. If product ≥ 2**31, return 𝔽(product - 2**32); otherwise return 𝔽(product).
+        return Value.from(@as(i32, @bitCast(product)));
     }
 
     /// 21.3.2.20 Math.log ( x )
