@@ -6,7 +6,7 @@ pub fn build(b: *std.Build) void {
 
     // Copied from zig-libgc's build.zig
     const libgc = b.addStaticLibrary(.{
-        .name = "libgc",
+        .name = "gc",
         .target = target,
         .optimize = optimize,
     });
