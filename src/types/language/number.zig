@@ -398,7 +398,7 @@ pub const Number = union(enum) {
         const lnum = x.toInt32();
 
         // 2. Let rnum be ! ToUint32(y).
-        const rnum = y.toInt32();
+        const rnum = y.toUint32();
 
         // 3. Let shiftCount be ℝ(rnum) modulo 32.
         const shift_count: u5 = @intCast(@mod(rnum, 32));
