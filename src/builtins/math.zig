@@ -114,6 +114,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "asinh", asinh, 1, realm);
         try defineBuiltinFunction(object, "atan", atan, 1, realm);
         try defineBuiltinFunction(object, "atanh", atanh, 1, realm);
+        try defineBuiltinFunction(object, "atan2", atan2, 2, realm);
         try defineBuiltinFunction(object, "cbrt", cbrt, 1, realm);
         try defineBuiltinFunction(object, "ceil", ceil, 1, realm);
         try defineBuiltinFunction(object, "clz32", clz32, 1, realm);
@@ -250,6 +251,50 @@ pub const Math = struct {
         // 6. Return an implementation-approximated Number value representing the result of the
         //    inverse hyperbolic tangent of ℝ(n).
         return Value.from(std.math.atanh(n.asFloat()));
+    }
+
+    /// 21.3.2.8 Math.atan2 ( y, x )
+    /// https://tc39.es/ecma262/#sec-math.atan2
+    fn atan2(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const y = arguments.get(0);
+        const x = arguments.get(1);
+
+        // 1. Let ny be ? ToNumber(y).
+        const ny = try y.toNumber(agent);
+
+        // 2. Let nx be ? ToNumber(x).
+        const nx = try x.toNumber(agent);
+
+        // 3. If ny is NaN or nx is NaN, return NaN.
+        // 4. If ny is +∞𝔽, then
+        //     a. If nx is +∞𝔽, return an implementation-approximated Number value representing π / 4.
+        //     b. If nx is -∞𝔽, return an implementation-approximated Number value representing 3π / 4.
+        //     c. Return an implementation-approximated Number value representing π / 2.
+        // 5. If ny is -∞𝔽, then
+        //     a. If nx is +∞𝔽, return an implementation-approximated Number value representing -π / 4.
+        //     b. If nx is -∞𝔽, return an implementation-approximated Number value representing -3π / 4.
+        //     c. Return an implementation-approximated Number value representing -π / 2.
+        // 6. If ny is +0𝔽, then
+        //     a. If nx > +0𝔽 or nx is +0𝔽, return +0𝔽.
+        //     b. Return an implementation-approximated Number value representing π.
+        // 7. If ny is -0𝔽, then
+        //     a. If nx > +0𝔽 or nx is +0𝔽, return -0𝔽.
+        //     b. Return an implementation-approximated Number value representing -π.
+        // 8. Assert: ny is finite and is neither +0𝔽 nor -0𝔽.
+        // 9. If ny > +0𝔽, then
+        //     a. If nx is +∞𝔽, return +0𝔽.
+        //     b. If nx is -∞𝔽, return an implementation-approximated Number value representing π.
+        //     c. If nx is either +0𝔽 or -0𝔽, return an implementation-approximated Number value
+        //        representing π / 2.
+        // 10. If ny < -0𝔽, then
+        //     a. If nx is +∞𝔽, return -0𝔽.
+        //     b. If nx is -∞𝔽, return an implementation-approximated Number value representing -π.
+        //     c. If nx is either +0𝔽 or -0𝔽, return an implementation-approximated Number value
+        //        representing -π / 2.
+        // 11. Assert: nx is finite and is neither +0𝔽 nor -0𝔽.
+        // 12. Return an implementation-approximated Number value representing the result of the
+        //     inverse tangent of the quotient ℝ(ny) / ℝ(nx).
+        return Value.from(std.math.atan2(f64, ny.asFloat(), nx.asFloat()));
     }
 
     /// 21.3.2.9 Math.cbrt ( x )
