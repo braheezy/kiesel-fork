@@ -27,11 +27,8 @@ const validateNonRevokedProxy = builtins.validateNonRevokedProxy;
 const line_terminators = tokenizer.line_terminators;
 const whitespace = tokenizer.whitespace;
 
-const pow_2_7 = std.math.pow(f64, 2, 7);
 const pow_2_8 = std.math.pow(f64, 2, 8);
-const pow_2_15 = std.math.pow(f64, 2, 15);
 const pow_2_16 = std.math.pow(f64, 2, 16);
-const pow_2_31 = std.math.pow(f64, 2, 31);
 const pow_2_32 = std.math.pow(f64, 2, 32);
 
 /// 6.1 ECMAScript Language Types
@@ -432,10 +429,10 @@ pub const Value = union(enum) {
         const int = number.truncate().asFloat();
 
         // 4. Let int32bit be int modulo 2**32.
-        const int32bit = @mod(int, pow_2_32);
+        const int32bit: u32 = @intFromFloat(@mod(int, pow_2_32));
 
         // 5. If int32bit ≥ 2**31, return 𝔽(int32bit - 2**32); otherwise return 𝔽(int32bit).
-        return @intFromFloat(if (int32bit >= pow_2_31) int32bit - pow_2_32 else int32bit);
+        return @bitCast(int32bit);
     }
 
     /// 7.1.7 ToUint32 ( argument )
@@ -474,10 +471,10 @@ pub const Value = union(enum) {
         const int = number.truncate().asFloat();
 
         // 4. Let int16bit be int modulo 2**16.
-        const int16bit = @mod(int, pow_2_16);
+        const int16bit: u16 = @intFromFloat(@mod(int, pow_2_16));
 
         // 5. If int16bit ≥ 2**15, return 𝔽(int16bit - 2**16); otherwise return 𝔽(int16bit).
-        return @intFromFloat(if (int16bit >= pow_2_15) int16bit - pow_2_16 else int16bit);
+        return @bitCast(int16bit);
     }
 
     /// 7.1.9 ToUint16 ( argument )
@@ -493,10 +490,10 @@ pub const Value = union(enum) {
         const int = number.truncate().asFloat();
 
         // 4. Let int16bit be int modulo 2**16.
-        const int16bit = @mod(int, pow_2_16);
+        const int16bit: u16 = @intFromFloat(@mod(int, pow_2_16));
 
         // 5. Return 𝔽(int16bit).
-        return @intFromFloat(int16bit);
+        return int16bit;
     }
 
     /// 7.1.10 ToInt8 ( argument )
@@ -512,10 +509,10 @@ pub const Value = union(enum) {
         const int = number.truncate().asFloat();
 
         // 4. Let int8bit be int modulo 2**8.
-        const int8bit = @mod(int, pow_2_8);
+        const int8bit: u8 = @intFromFloat(@mod(int, pow_2_8));
 
         // 5. If int8bit ≥ 2**7, return 𝔽(int8bit - 2**8); otherwise return 𝔽(int8bit).
-        return @intFromFloat(if (int8bit >= pow_2_7) int8bit - pow_2_8 else int8bit);
+        return @bitCast(int8bit);
     }
 
     /// 7.1.11 ToUint8 ( argument )
@@ -531,10 +528,10 @@ pub const Value = union(enum) {
         const int = number.truncate().asFloat();
 
         // 4. Let int8bit be int modulo 2**8.
-        const int8bit = @mod(int, pow_2_8);
+        const int8bit: u8 = @intFromFloat(@mod(int, pow_2_8));
 
         // 5. Return 𝔽(int8bit).
-        return @intFromFloat(int8bit);
+        return int8bit;
     }
 
     /// 7.1.12 ToUint8Clamp ( argument )
