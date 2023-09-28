@@ -286,25 +286,25 @@ pub const Number = union(enum) {
         // 9. If exponent is +∞𝔽, then
         if (exponent.isPositiveInf()) {
             // a. If abs(ℝ(base)) > 1, return +∞𝔽.
-            if (std.math.fabs(base.asFloat()) > 1) return .{ .f64 = std.math.inf(f64) };
+            if (@abs(base.asFloat()) > 1) return .{ .f64 = std.math.inf(f64) };
 
             // b. If abs(ℝ(base)) = 1, return NaN.
-            if (std.math.fabs(base.asFloat()) == 1) return .{ .f64 = std.math.nan(f64) };
+            if (@abs(base.asFloat()) == 1) return .{ .f64 = std.math.nan(f64) };
 
             // c. If abs(ℝ(base)) < 1, return +0𝔽.
-            if (std.math.fabs(base.asFloat()) < 1) return .{ .i32 = 0 };
+            if (@abs(base.asFloat()) < 1) return .{ .i32 = 0 };
         }
 
         // 10. If exponent is -∞𝔽, then
         if (exponent.isNegativeInf()) {
             // a. If abs(ℝ(base)) > 1, return +0𝔽.
-            if (std.math.fabs(base.asFloat()) > 1) return .{ .i32 = 0 };
+            if (@abs(base.asFloat()) > 1) return .{ .i32 = 0 };
 
             // b. If abs(ℝ(base)) = 1, return NaN.
-            if (std.math.fabs(base.asFloat()) == 1) return .{ .f64 = std.math.nan(f64) };
+            if (@abs(base.asFloat()) == 1) return .{ .f64 = std.math.nan(f64) };
 
             // c. If abs(ℝ(base)) < 1, return +∞𝔽.
-            if (std.math.fabs(base.asFloat()) < 1) return .{ .f64 = std.math.inf(f64) };
+            if (@abs(base.asFloat()) < 1) return .{ .f64 = std.math.inf(f64) };
         }
 
         // 11. Assert: exponent is finite and is neither +0𝔽 nor -0𝔽.

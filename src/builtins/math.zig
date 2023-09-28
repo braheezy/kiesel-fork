@@ -158,7 +158,7 @@ pub const Math = struct {
         // 4. If n is -∞𝔽, return +∞𝔽.
         // 5. If n < -0𝔽, return -n.
         // 6. Return n.
-        return Value.from(@fabs(n.asFloat()));
+        return Value.from(@abs(n.asFloat()));
     }
 
     /// 21.3.2.2 Math.acos ( x )

@@ -61,7 +61,7 @@ fn toIntegerOrInfinity(x: f64) f64 {
 fn toZeroPaddedDecimalString(buf: []u8, n: anytype, min_length: usize) []const u8 {
     // NOTE: std.fmt does a weird thing where padded 1 becomes '00+1', so we do this ourselves.
     var tmp: [100]u8 = undefined;
-    const s = std.fmt.bufPrint(&tmp, "{}", .{std.math.absInt(n) catch unreachable}) catch unreachable;
+    const s = std.fmt.bufPrint(&tmp, "{}", .{@abs(n)}) catch unreachable;
 
     @memset(buf[0 .. buf.len - s.len], '0');
     @memcpy(buf[buf.len - s.len ..], s);
@@ -483,7 +483,7 @@ pub fn timeClip(time: f64) f64 {
     if (!std.math.isFinite(time)) return std.math.nan(f64);
 
     // 2. If abs(ℝ(time)) > 8.64 × 10**15, return NaN.
-    if (std.math.fabs(time) > 8.64e15) return std.math.nan(f64);
+    if (@abs(time) > 8.64e15) return std.math.nan(f64);
 
     // 3. Return 𝔽(! ToIntegerOrInfinity(time)).
     return toIntegerOrInfinity(time);
@@ -591,7 +591,7 @@ pub fn dateString(allocator: Allocator, time_value: f64) ![]const u8 {
 
     // 6. Let paddedYear be ToZeroPaddedDecimalString(abs(ℝ(yv)), 4).
     var buf: [6]u8 = undefined;
-    const padded_year = toZeroPaddedDecimalString(&buf, std.math.absInt(year) catch unreachable, 4);
+    const padded_year = toZeroPaddedDecimalString(&buf, @abs(year), 4);
 
     // 7. Return the string-concatenation of weekday, the code unit 0x0020 (SPACE), month, the code
     //    unit 0x0020 (SPACE), day, the code unit 0x0020 (SPACE), yearSign, and paddedYear.
@@ -629,7 +629,7 @@ pub fn timeZoneString(allocator: Allocator, time_value: f64) ![]const u8 {
     //     a. Let offsetSign be "-".
     //     b. Let absOffset be -offset.
     const offset_sign = if (offset >= 0) "+" else "-";
-    const abs_offset = std.math.fabs(offset);
+    const abs_offset = @abs(offset);
 
     // 7. Let offsetMin be ToZeroPaddedDecimalString(ℝ(MinFromTime(absOffset)), 2).
     const offset_min = minFromTime(abs_offset);
@@ -1960,7 +1960,7 @@ pub const DatePrototype = struct {
         var buf: [6]u8 = undefined;
         const padded_year = toZeroPaddedDecimalString(
             &buf,
-            std.math.absInt(year) catch unreachable,
+            @abs(year),
             if (year >= 0 and year <= 9999) 4 else 6,
         );
 
@@ -2084,7 +2084,7 @@ pub const DatePrototype = struct {
 
         // 10. Let paddedYear be ToZeroPaddedDecimalString(abs(ℝ(yv)), 4).
         var buf: [6]u8 = undefined;
-        const padded_year = toZeroPaddedDecimalString(&buf, std.math.absInt(year) catch unreachable, 4);
+        const padded_year = toZeroPaddedDecimalString(&buf, @abs(year), 4);
 
         // 11. Return the string-concatenation of weekday, ",", the code unit 0x0020 (SPACE), day,
         //     the code unit 0x0020 (SPACE), month, the code unit 0x0020 (SPACE), yearSign,
