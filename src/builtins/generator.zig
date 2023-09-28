@@ -41,3 +41,9 @@ pub const GeneratorPrototype = struct {
         return object;
     }
 };
+
+/// 27.5.2 Properties of Generator Instances
+/// https://tc39.es/ecma262/#sec-properties-of-generator-instances
+pub const Generator = Object.Factory(.{
+    .tag = .generator,
+});

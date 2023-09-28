@@ -39,6 +39,7 @@ pub const Tag = enum(u32) {
     date,
     ecmascript_function,
     @"error",
+    generator,
     map,
     map_iterator,
     number,

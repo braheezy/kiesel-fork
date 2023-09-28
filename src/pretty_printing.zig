@@ -107,6 +107,14 @@ fn prettyPrintError(@"error": *const builtins.Error, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintGenerator(_: *const builtins.Generator, writer: anytype) !void {
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Generator()");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintMap(map: *const builtins.Map, writer: anytype) !void {
     const map_data = map.fields.map_data;
     const tty_config = getTtyConfigForWriter(writer);
@@ -355,6 +363,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
             .{ builtins.Boolean, prettyPrintPrimitiveWrapper },
             .{ builtins.Date, prettyPrintDate },
             .{ builtins.Error, prettyPrintError },
+            .{ builtins.Generator, prettyPrintGenerator },
             .{ builtins.Map, prettyPrintMap },
             .{ builtins.MapIterator, prettyPrintMapIterator },
             .{ builtins.Number, prettyPrintPrimitiveWrapper },

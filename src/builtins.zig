@@ -61,6 +61,7 @@ pub const EvalErrorConstructor = @"error".EvalErrorConstructor;
 pub const EvalErrorPrototype = @"error".EvalErrorPrototype;
 pub const FunctionConstructor = function.FunctionConstructor;
 pub const FunctionPrototype = function.FunctionPrototype;
+pub const Generator = generator.Generator;
 pub const GeneratorFunctionConstructor = generator_function.GeneratorFunctionConstructor;
 pub const GeneratorFunctionPrototype = generator_function.GeneratorFunctionPrototype;
 pub const GeneratorPrototype = generator.GeneratorPrototype;
