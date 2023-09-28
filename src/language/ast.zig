@@ -616,18 +616,6 @@ pub const PropertyDefinition = union(enum) {
         expression: Expression,
     };
 
-    pub const MethodDefinition = struct {
-        pub const Type = enum {
-            method,
-            get,
-            set,
-        };
-
-        property_name: PropertyName,
-        function_expression: FunctionExpression,
-        type: Type,
-    };
-
     identifier_reference: IdentifierReference,
     property_name_and_expression: PropertyNameAndExpression,
     method_definition: MethodDefinition,
@@ -687,26 +675,9 @@ pub const PropertyDefinition = union(enum) {
             // PropertyDefinition : MethodDefinition
             .method_definition => |method_definition| {
                 // 1. Perform ? MethodDefinitionEvaluation of MethodDefinition with arguments object and true.
+                try method_definition.generateBytecode(executable, ctx);
+
                 // 2. Return unused.
-
-                // 15.4.5 Runtime Semantics: MethodDefinitionEvaluation
-                // https://tc39.es/ecma262/#sec-runtime-semantics-methoddefinitionevaluation
-                const strict = ctx.contained_in_strict_mode_code or method_definition.function_expression.function_body.functionBodyContainsUseStrict();
-
-                // Copy `function_expression` so that we can assign the function body's
-                // strictness, which is needed for the deferred bytecode generation.
-                // FIXME: This should ideally happen at parse time.
-                var function_expression = method_definition.function_expression;
-                function_expression.function_body.strict = strict;
-
-                try method_definition.property_name.generateBytecode(executable, ctx);
-                try executable.addInstruction(.load);
-
-                try executable.addInstructionWithFunctionExpression(
-                    .object_define_method,
-                    .{ .function_expression = function_expression },
-                );
-                try executable.addIndex(@intFromEnum(method_definition.type));
             },
         }
     }
@@ -725,10 +696,7 @@ pub const PropertyDefinition = union(enum) {
             },
             .method_definition => |method_definition| {
                 try printString("method_definition:", writer, indentation);
-                try printString("type:", writer, indentation + 1);
-                try printString(@tagName(method_definition.type), writer, indentation + 2);
-                try method_definition.property_name.print(writer, indentation + 1);
-                try method_definition.function_expression.print(writer, indentation + 1);
+                try method_definition.print(writer, indentation + 1);
             },
         }
     }
@@ -3179,6 +3147,50 @@ pub const ArrowFunction = struct {
         try self.arrow_parameters.print(writer, indentation + 2);
         try printString("function_body:", writer, indentation + 1);
         try self.function_body.print(writer, indentation + 2);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-MethodDefinition
+pub const MethodDefinition = struct {
+    const Self = @This();
+
+    pub const Type = enum {
+        method,
+        get,
+        set,
+    };
+
+    property_name: PropertyName,
+    function_expression: FunctionExpression,
+    type: Type,
+
+    // 15.4.5 Runtime Semantics: MethodDefinitionEvaluation
+    // https://tc39.es/ecma262/#sec-runtime-semantics-methoddefinitionevaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        const strict = ctx.contained_in_strict_mode_code or self.function_expression.function_body.functionBodyContainsUseStrict();
+
+        // Copy `function_expression` so that we can assign the function body's
+        // strictness, which is needed for the deferred bytecode generation.
+        // FIXME: This should ideally happen at parse time.
+        var function_expression = self.function_expression;
+        function_expression.function_body.strict = strict;
+
+        try self.property_name.generateBytecode(executable, ctx);
+        try executable.addInstruction(.load);
+
+        try executable.addInstructionWithFunctionExpression(
+            .object_define_method,
+            .{ .function_expression = function_expression },
+        );
+        try executable.addIndex(@intFromEnum(self.type));
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'MethodDefinition' here, it's implied and only adds nesting.
+        try printString("type:", writer, indentation);
+        try printString(@tagName(self.type), writer, indentation + 1);
+        try self.property_name.print(writer, indentation);
+        try self.function_expression.print(writer, indentation);
     }
 };
 

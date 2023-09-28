@@ -574,7 +574,7 @@ fn acceptPropertyDefinitionList(self: *Self) !ast.PropertyDefinitionList {
 
 fn acceptPropertyDefinition(
     self: *Self,
-    method_type: ?ast.PropertyDefinition.MethodDefinition.Type,
+    method_type: ?ast.MethodDefinition.Type,
 ) !ast.PropertyDefinition {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);

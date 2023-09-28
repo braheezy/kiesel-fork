@@ -907,7 +907,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             const function_expression = self.fetchFunctionExpression(executable);
             const method_definition = function_expression.function_expression;
             const method_type_raw = self.fetchIndex(executable);
-            const method_type: ast.PropertyDefinition.MethodDefinition.Type = @enumFromInt(method_type_raw);
+            const method_type: ast.MethodDefinition.Type = @enumFromInt(method_type_raw);
             const property_name = self.stack.pop();
             const object = self.stack.pop().object;
             const enumerable = true;

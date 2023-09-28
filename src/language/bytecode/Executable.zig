@@ -200,7 +200,7 @@ pub fn print(self: Self, writer: anytype) !void {
             .object_define_method => {
                 const function_expression_index = iterator.instruction_args[0].?;
                 const method_type_raw = iterator.instruction_args[1].?;
-                const method_type: ast.PropertyDefinition.MethodDefinition.Type = @enumFromInt(method_type_raw);
+                const method_type: ast.MethodDefinition.Type = @enumFromInt(method_type_raw);
                 try writer.print("[{}] (type: {s})", .{ function_expression_index, @tagName(method_type) });
             },
             .resolve_binding => {
