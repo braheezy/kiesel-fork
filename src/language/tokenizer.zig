@@ -106,7 +106,6 @@ const TokenType = enum {
     whitespace,
     with,
     yield,
-    @"yield*",
 };
 
 const Pattern = ptk.Pattern(TokenType);
@@ -215,7 +214,6 @@ const patterns = .{
     Pattern.create(.void, ptk.matchers.literal("void")),
     Pattern.create(.@"while", ptk.matchers.literal("while")),
     Pattern.create(.with, ptk.matchers.literal("with")),
-    Pattern.create(.@"yield*", ptk.matchers.literal("yield*")),
     Pattern.create(.yield, ptk.matchers.literal("yield")),
 };
 

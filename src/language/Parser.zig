@@ -125,7 +125,6 @@ fn getPrecedenceAndAssociativity(token_type: Tokenizer.TokenType) struct { Prece
         .@"?" => .{ 2, .right_to_left },
         .@"=>" => .{ 2, .right_to_left },
         .yield,
-        .@"yield*",
         .@"...",
         => .{ 2, null },
         .@"," => .{ 1, .left_to_right },
