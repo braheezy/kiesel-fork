@@ -273,7 +273,16 @@ fn prettyPrintFunction(object: Object, writer: anytype) !void {
     const name = getFunctionName(object);
     const tty_config = getTtyConfigForWriter(writer);
 
-    try writer.writeAll("fn ");
+    if (object.is(builtins.ECMAScriptFunction)) {
+        const function_body = object.as(builtins.ECMAScriptFunction).fields.ecmascript_code;
+        switch (function_body.type) {
+            .normal => try writer.writeAll("fn "),
+            .generator => try writer.writeAll("fn* "),
+            else => @panic("Not implemented"),
+        }
+    } else {
+        try writer.writeAll("fn ");
+    }
     if (name.len != 0) {
         try tty_config.setColor(writer, .red);
         try writer.writeAll(name);
