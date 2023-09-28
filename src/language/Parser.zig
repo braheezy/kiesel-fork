@@ -28,6 +28,8 @@ state: struct {
 const RuleSet = ptk.RuleSet(Tokenizer.TokenType);
 const ParserCore = ptk.ParserCore(Tokenizer, .{ .whitespace, .comment });
 
+pub const AcceptError = error{OutOfMemory} || ParserCore.AcceptError;
+
 pub const Error = error{
     ParseError,
     OutOfMemory,
@@ -167,7 +169,11 @@ pub fn parse(
     return ast.Script{
         .statement_list = try parseNode(
             ast.StatementList,
-            "acceptStatementList",
+            struct {
+                fn accept(parser: *Self) error{OutOfMemory}!ast.StatementList {
+                    return parser.acceptStatementList();
+                }
+            }.accept,
             allocator,
             source_text,
             ctx,
@@ -177,7 +183,7 @@ pub fn parse(
 
 pub fn parseNode(
     comptime T: type,
-    comptime accept_function_name: []const u8,
+    comptime acceptFn: fn (*Self) anyerror!T,
     allocator: Allocator,
     source_text: []const u8,
     ctx: ParseContext,
@@ -189,9 +195,9 @@ pub fn parseNode(
         .core = core,
         .diagnostics = ctx.diagnostics,
     };
-    const ast_node = @field(Self, accept_function_name)(&parser) catch |err| blk: {
-        if (err == error.OutOfMemory) return error.OutOfMemory;
-        break :blk null;
+    const ast_node: ?T = acceptFn(&parser) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        else => null,
     };
     if (parser.diagnostics.hasErrors()) {
         return error.ParseError;

@@ -31,6 +31,13 @@ const makeConstructor = builtins.makeConstructor;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
 const setFunctionName = builtins.setFunctionName;
 
+fn GrammarSymbol(comptime T: type) type {
+    return struct {
+        type: type = T,
+        acceptFn: fn (*Parser) Parser.AcceptError!T = undefined,
+    };
+}
+
 /// 20.2.2 Properties of the Function Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-constructor
 pub const FunctionConstructor = struct {
@@ -114,13 +121,14 @@ pub fn createDynamicFunction(
     // 3. If newTarget is undefined, set newTarget to constructor.
     const new_target = maybe_new_target orelse constructor;
 
-    const GrammarSymbol = struct { type: type, function_name: []const u8 };
-
     comptime var prefix: []const u8 = undefined;
     comptime var fallback_prototype: []const u8 = undefined;
-    comptime var expr_sym: GrammarSymbol = undefined;
-    comptime var body_sym: GrammarSymbol = undefined;
-    comptime var parameter_sym: GrammarSymbol = undefined;
+    comptime var expr_sym: GrammarSymbol(switch (kind) {
+        .normal => ast.FunctionExpression,
+        else => @compileError("Not implemented"),
+    }) = .{};
+    comptime var body_sym: GrammarSymbol(ast.FunctionBody) = .{};
+    comptime var parameter_sym: GrammarSymbol(ast.FormalParameters) = .{};
 
     switch (kind) {
         // 4. If kind is normal, then
@@ -129,22 +137,25 @@ pub fn createDynamicFunction(
             prefix = "function";
 
             // b. Let exprSym be the grammar symbol FunctionExpression.
-            expr_sym = .{
-                .type = ast.FunctionExpression,
-                .function_name = "acceptFunctionExpression",
-            };
+            expr_sym.acceptFn = struct {
+                fn accept(parser: *Parser) Parser.AcceptError!ast.FunctionExpression {
+                    return parser.acceptFunctionExpression();
+                }
+            }.accept;
 
             // c. Let bodySym be the grammar symbol FunctionBody[~Yield, ~Await].
-            body_sym = .{
-                .type = ast.FunctionBody,
-                .function_name = "acceptFunctionBody",
-            };
+            body_sym.acceptFn = struct {
+                fn accept(parser: *Parser) Parser.AcceptError!ast.FunctionBody {
+                    return parser.acceptFunctionBody();
+                }
+            }.accept;
 
             // d. Let parameterSym be the grammar symbol FormalParameters[~Yield, ~Await].
-            parameter_sym = .{
-                .type = ast.FormalParameters,
-                .function_name = "acceptFormalParameters",
-            };
+            parameter_sym.acceptFn = struct {
+                fn accept(parser: *Parser) Parser.AcceptError!ast.FormalParameters {
+                    return parser.acceptFormalParameters();
+                }
+            }.accept;
 
             // e. Let fallbackProto be "%Function.prototype%".
             fallback_prototype = "%Function.prototype%";
@@ -211,7 +222,7 @@ pub fn createDynamicFunction(
     defer diagnostics.deinit();
 
     // 14. Let parameters be ParseText(StringToCodePoints(P), parameterSym).
-    const parameters = Parser.parseNode(parameter_sym.type, parameter_sym.function_name, agent.gc_allocator, parameters_string, .{
+    const parameters = Parser.parseNode(parameter_sym.type, parameter_sym.acceptFn, agent.gc_allocator, parameters_string, .{
         .diagnostics = &diagnostics,
         .file_name = "Function",
     }) catch |err| switch (err) {
@@ -227,7 +238,7 @@ pub fn createDynamicFunction(
     };
 
     // 16. Let body be ParseText(StringToCodePoints(bodyString), bodySym).
-    var body = Parser.parseNode(body_sym.type, body_sym.function_name, agent.gc_allocator, body_string, .{
+    var body = Parser.parseNode(body_sym.type, body_sym.acceptFn, agent.gc_allocator, body_string, .{
         .diagnostics = &diagnostics,
         .file_name = "Function",
     }) catch |err| switch (err) {
@@ -251,7 +262,7 @@ pub fn createDynamicFunction(
     //           enforce any Early Error rules which apply to exprSym directly.
 
     // 20. Let expr be ParseText(sourceText, exprSym).
-    _ = Parser.parseNode(expr_sym.type, expr_sym.function_name, agent.gc_allocator, source_text, .{
+    _ = Parser.parseNode(expr_sym.type, expr_sym.acceptFn, agent.gc_allocator, source_text, .{
         .diagnostics = &diagnostics,
         .file_name = "Function",
     }) catch |err| switch (err) {
