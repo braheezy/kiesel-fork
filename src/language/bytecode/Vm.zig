@@ -618,7 +618,8 @@ fn instantiateGeneratorFunctionExpression(
         // 4. Let sourceText be the source text matched by GeneratorExpression.
         const source_text = generator_expression.source_text;
 
-        // 5. Let closure be OrdinaryFunctionCreate(%GeneratorFunction.prototype%, sourceText, FormalParameters, GeneratorBody, non-lexical-this, env, privateEnv).
+        // 5. Let closure be OrdinaryFunctionCreate(%GeneratorFunction.prototype%, sourceText,
+        //    FormalParameters, GeneratorBody, non-lexical-this, env, privateEnv).
         const closure = try ordinaryFunctionCreate(
             agent,
             try realm.intrinsics.@"%GeneratorFunction.prototype%"(),
@@ -637,6 +638,127 @@ fn instantiateGeneratorFunctionExpression(
         const prototype = try ordinaryObjectCreate(
             agent,
             try realm.intrinsics.@"%GeneratorFunction.prototype.prototype%"(),
+        );
+
+        // 8. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
+        //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
+        //    }).
+        closure.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+            .value = Value.from(prototype),
+            .writable = true,
+            .enumerable = false,
+            .configurable = false,
+        }) catch |err| try noexcept(err);
+
+        // 9. Return closure.
+        return closure;
+    }
+}
+
+/// 15.6.4 Runtime Semantics: InstantiateAsyncGeneratorFunctionExpression
+/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncgeneratorfunctionexpression
+fn instantiateAsyncGeneratorFunctionExpression(
+    agent: *Agent,
+    async_generator_expression: ast.AsyncGeneratorExpression,
+    default_name: ?[]const u8,
+) !Object {
+    const realm = agent.currentRealm();
+
+    // GeneratorExpression : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
+    if (async_generator_expression.identifier) |identifier| {
+        // 1. Assert: name is not present.
+        std.debug.assert(default_name == null);
+
+        // 2. Set name to StringValue of BindingIdentifier.
+        const name = identifier;
+
+        // 3. Let outerEnv be the running execution context's LexicalEnvironment.
+        const outer_env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+        // 4. Let funcEnv be NewDeclarativeEnvironment(outerEnv).
+        const func_env = try newDeclarativeEnvironment(agent.gc_allocator, outer_env);
+
+        // 5. Perform ! funcEnv.CreateImmutableBinding(name, false).
+        try func_env.createImmutableBinding(agent, name, false);
+
+        // 6. Let privateEnv be the running execution context's PrivateEnvironment.
+        const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+
+        // 7. Let sourceText be the source text matched by AsyncGeneratorExpression.
+        const source_text = async_generator_expression.source_text;
+
+        // 8. Let closure be OrdinaryFunctionCreate(%AsyncGeneratorFunction.prototype%, sourceText,
+        //    FormalParameters, AsyncGeneratorBody, non-lexical-this, funcEnv, privateEnv).
+        const closure = try ordinaryFunctionCreate(
+            agent,
+            try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"(),
+            source_text,
+            async_generator_expression.formal_parameters,
+            async_generator_expression.function_body,
+            .non_lexical_this,
+            .{ .declarative_environment = func_env },
+            private_env,
+        );
+
+        // 9. Perform SetFunctionName(closure, name).
+        try setFunctionName(closure, PropertyKey.from(name), null);
+
+        // 10. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
+        const prototype = try ordinaryObjectCreate(
+            agent,
+            try realm.intrinsics.@"%AsyncGeneratorFunction.prototype.prototype%"(),
+        );
+
+        // 11. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
+        //       [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
+        //     }).
+        closure.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+            .value = Value.from(prototype),
+            .writable = true,
+            .enumerable = false,
+            .configurable = false,
+        }) catch |err| try noexcept(err);
+
+        // 12. Perform ! funcEnv.InitializeBinding(name, closure).
+        func_env.initializeBinding(agent, name, Value.from(closure));
+
+        // 13. Return closure.
+        return closure;
+    }
+    // AsyncGeneratorExpression : async function * ( FormalParameters ) { AsyncGeneratorBody }
+    else {
+        // 1. If name is not present, set name to "".
+        const name = default_name orelse "";
+
+        // 2. Let env be the LexicalEnvironment of the running execution context.
+        const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+        // 3. Let privateEnv be the running execution context's PrivateEnvironment.
+        const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+
+        // 4. Let sourceText be the source text matched by AsyncGeneratorExpression.
+        const source_text = async_generator_expression.source_text;
+
+        // 5. Let closure be OrdinaryFunctionCreate(%AsyncGeneratorFunction.prototype%, sourceText,
+        //    FormalParameters, AsyncGeneratorBody, non-lexical-this, env, privateEnv).
+        const closure = try ordinaryFunctionCreate(
+            agent,
+            try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"(),
+            source_text,
+            async_generator_expression.formal_parameters,
+            async_generator_expression.function_body,
+            .non_lexical_this,
+            env,
+            private_env,
+        );
+
+        // 6. Perform SetFunctionName(closure, name).
+        try setFunctionName(closure, PropertyKey.from(name), null);
+
+        // 7. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
+        const prototype = try ordinaryObjectCreate(
+            agent,
+            try realm.intrinsics.@"%AsyncGeneratorFunction.prototype.prototype%"(),
         );
 
         // 8. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
@@ -941,6 +1063,15 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             const closure = try instantiateArrowFunctionExpression(
                 self.agent,
                 function_expression.arrow_function,
+                null,
+            );
+            self.result = Value.from(closure);
+        },
+        .instantiate_async_generator_function_expression => {
+            const function_expression = self.fetchFunctionExpression(executable);
+            const closure = try instantiateAsyncGeneratorFunctionExpression(
+                self.agent,
+                function_expression.async_generator_expression,
                 null,
             );
             self.result = Value.from(closure);

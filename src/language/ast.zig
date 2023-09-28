@@ -109,6 +109,7 @@ pub const PrimaryExpression = union(enum) {
     object_literal: ObjectLiteral,
     function_expression: FunctionExpression,
     generator_expression: GeneratorExpression,
+    async_generator_expression: AsyncGeneratorExpression,
     arrow_function: ArrowFunction,
     parenthesized_expression: ParenthesizedExpression,
 
@@ -3479,6 +3480,44 @@ pub const AsyncGeneratorDeclaration = struct {
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("AsyncGeneratorDeclaration", writer, indentation);
+        try printString("identifier:", writer, indentation + 1);
+        if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
+        try printString("formal_parameters:", writer, indentation + 1);
+        try self.formal_parameters.print(writer, indentation + 2);
+        try printString("function_body:", writer, indentation + 1);
+        try self.function_body.print(writer, indentation + 2);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-AsyncGeneratorExpression
+pub const AsyncGeneratorExpression = struct {
+    const Self = @This();
+
+    identifier: ?Identifier,
+    formal_parameters: FormalParameters,
+    function_body: FunctionBody,
+    source_text: []const u8,
+
+    /// 15.6.5 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-asyncgenerator-definitions-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
+
+        // Copy `self` so that we can assign the function body's strictness, which is needed for
+        // the deferred bytecode generation.
+        // FIXME: This should ideally happen at parse time.
+        var async_generator_expression = self;
+        async_generator_expression.function_body.strict = strict;
+
+        // 1. Return InstantiateAsyncGeneratorFunctionExpression of AsyncGeneratorExpression.
+        try executable.addInstructionWithFunctionExpression(
+            .instantiate_async_generator_function_expression,
+            .{ .async_generator_expression = async_generator_expression },
+        );
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("AsyncGeneratorExpression", writer, indentation);
         try printString("identifier:", writer, indentation + 1);
         if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
         try printString("formal_parameters:", writer, indentation + 1);

@@ -129,7 +129,7 @@ pub fn createDynamicFunction(
         .normal => ast.FunctionExpression,
         .generator => ast.GeneratorExpression,
         .@"async" => @compileError("Not implemented"),
-        .async_generator => ast.GeneratorExpression,
+        .async_generator => ast.AsyncGeneratorExpression,
     }) = .{};
     comptime var body_sym: GrammarSymbol(ast.FunctionBody) = .{};
     comptime var parameter_sym: GrammarSymbol(ast.FormalParameters) = .{};
@@ -205,10 +205,10 @@ pub fn createDynamicFunction(
             // b. Let prefix be "async function*".
             prefix = "async function*";
 
-            // TODO: c. Let exprSym be the grammar symbol AsyncGeneratorExpression.
+            // c. Let exprSym be the grammar symbol AsyncGeneratorExpression.
             expr_sym.acceptFn = struct {
-                fn accept(parser: *Parser) Parser.AcceptError!ast.GeneratorExpression {
-                    return parser.acceptGeneratorExpression();
+                fn accept(parser: *Parser) Parser.AcceptError!ast.AsyncGeneratorExpression {
+                    return parser.acceptAsyncGeneratorExpression();
                 }
             }.accept;
 

@@ -310,6 +310,11 @@ pub fn acceptIdentifierReference(self: *Self) !ast.IdentifierReference {
     const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .@"await" }));
     if (self.core.peek() catch null) |next_token| {
         if (next_token.type == .@"=>") return error.AcceptError;
+        if (std.mem.eql(u8, token.text, "async")) {
+            if (self.noLineTerminatorHere()) {
+                if (next_token.type == .function) return error.AcceptError;
+            } else |_| {}
+        }
     }
     return .{ .identifier = try self.allocator.dupe(u8, token.text) };
 }
@@ -340,6 +345,8 @@ pub fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
         return .{ .function_expression = function_expression }
     else |_| if (self.acceptGeneratorExpression()) |generator_expression|
         return .{ .generator_expression = generator_expression }
+    else |_| if (self.acceptAsyncGeneratorExpression()) |async_generator_expression|
+        return .{ .async_generator_expression = async_generator_expression }
     else |_| if (self.acceptArrowFunction()) |arrow_function|
         return .{ .arrow_function = arrow_function }
     else |_| if (self.acceptParenthesizedExpression()) |parenthesized_expression|
@@ -1562,6 +1569,37 @@ fn acceptAsyncGeneratorDeclaration(self: *Self) !ast.AsyncGeneratorDeclaration {
         );
         return err;
     };
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    const formal_parameters = try self.acceptFormalParameters();
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    _ = try self.core.accept(RuleSet.is(.@"{"));
+    const function_body = try self.acceptFunctionBody(.async_generator);
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+    const end_offset = self.core.tokenizer.offset;
+    const source_text = try self.allocator.dupe(
+        u8,
+        self.core.tokenizer.source[start_offset..end_offset],
+    );
+    return .{
+        .identifier = identifier,
+        .formal_parameters = formal_parameters,
+        .function_body = function_body,
+        .source_text = source_text,
+    };
+}
+
+pub fn acceptAsyncGeneratorExpression(self: *Self) !ast.AsyncGeneratorExpression {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.is(.identifier));
+    if (!std.mem.eql(u8, token.text, "async")) return error.UnexpectedToken;
+    // We need to do this after consuming the 'async' token to skip preceeding whitespace.
+    const start_offset = self.core.tokenizer.offset - (comptime "async".len);
+    try self.noLineTerminatorHere();
+    _ = try self.core.accept(RuleSet.is(.function));
+    _ = try self.core.accept(RuleSet.is(.@"*"));
+    const identifier = self.acceptBindingIdentifier() catch null;
     _ = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
