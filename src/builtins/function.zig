@@ -128,7 +128,8 @@ pub fn createDynamicFunction(
     comptime var expr_sym: GrammarSymbol(switch (kind) {
         .normal => ast.FunctionExpression,
         .generator => ast.GeneratorExpression,
-        else => @compileError("Not implemented"),
+        .@"async" => @compileError("Not implemented"),
+        .async_generator => ast.GeneratorExpression,
     }) = .{};
     comptime var body_sym: GrammarSymbol(ast.FunctionBody) = .{};
     comptime var parameter_sym: GrammarSymbol(ast.FormalParameters) = .{};
@@ -198,8 +199,36 @@ pub fn createDynamicFunction(
         .@"async" => @compileError("Not implemented"),
 
         // 7. Else,
-        // TODO: a. Assert: kind is async-generator.
-        .async_generator => @compileError("Not implemented"),
+        .async_generator => {
+            // a. Assert: kind is async-generator.
+
+            // b. Let prefix be "async function*".
+            prefix = "async function*";
+
+            // TODO: c. Let exprSym be the grammar symbol AsyncGeneratorExpression.
+            expr_sym.acceptFn = struct {
+                fn accept(parser: *Parser) Parser.AcceptError!ast.GeneratorExpression {
+                    return parser.acceptGeneratorExpression();
+                }
+            }.accept;
+
+            // d. Let bodySym be the grammar symbol AsyncGeneratorBody.
+            body_sym.acceptFn = struct {
+                fn accept(parser: *Parser) Parser.AcceptError!ast.FunctionBody {
+                    return parser.acceptFunctionBody(.async_generator);
+                }
+            }.accept;
+
+            // e. Let parameterSym be the grammar symbol FormalParameters[+Yield, +Await].
+            parameter_sym.acceptFn = struct {
+                fn accept(parser: *Parser) Parser.AcceptError!ast.FormalParameters {
+                    return parser.acceptFormalParameters();
+                }
+            }.accept;
+
+            // f. Let fallbackProto be "%AsyncGeneratorFunction.prototype%".
+            fallback_prototype = "%AsyncGeneratorFunction.prototype%";
+        },
     }
 
     // 8. Let argCount be the number of elements in parameterArgs.
@@ -352,8 +381,24 @@ pub fn createDynamicFunction(
             }) catch |err| try noexcept(err);
         },
 
-        // TODO: 29. Else if kind is async-generator, then
-        .async_generator => @compileError("Not implemented"),
+        // 29. Else if kind is async-generator, then
+        .async_generator => {
+            // a. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
+            const prototype = try ordinaryObjectCreate(
+                agent,
+                try realm.intrinsics.@"%AsyncGeneratorFunction.prototype.prototype%"(),
+            );
+
+            // b. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
+            //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
+            //    }).
+            function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+                .value = Value.from(prototype),
+                .writable = true,
+                .enumerable = false,
+                .configurable = false,
+            }) catch |err| try noexcept(err);
+        },
 
         // 30. Else if kind is normal, then
         .normal => {
