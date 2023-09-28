@@ -17,11 +17,12 @@ allocator: Allocator,
 instructions: std.ArrayList(Instruction),
 constants: std.ArrayList(Value),
 identifiers: std.ArrayList(ast.Identifier),
-function_expressions: std.ArrayList(ArrowOrOrdinaryFunctionExpression),
+function_expressions: std.ArrayList(FunctionExpression),
 
-pub const ArrowOrOrdinaryFunctionExpression = union(enum) {
+pub const FunctionExpression = union(enum) {
     arrow_function: ast.ArrowFunction,
     function_expression: ast.FunctionExpression,
+    generator_expression: ast.GeneratorExpression,
 };
 
 pub const IndexType = u16;
@@ -32,7 +33,7 @@ pub fn init(allocator: Allocator) Self {
         .instructions = std.ArrayList(Instruction).init(allocator),
         .constants = std.ArrayList(Value).init(allocator),
         .identifiers = std.ArrayList(ast.Identifier).init(allocator),
-        .function_expressions = std.ArrayList(ArrowOrOrdinaryFunctionExpression).init(allocator),
+        .function_expressions = std.ArrayList(FunctionExpression).init(allocator),
     };
 }
 
@@ -55,10 +56,7 @@ pub fn addIdentifier(self: *Self, identifier: ast.Identifier) !void {
     try self.identifiers.append(identifier);
 }
 
-pub fn addFunctionExpression(
-    self: *Self,
-    function_expression: ArrowOrOrdinaryFunctionExpression,
-) !void {
+pub fn addFunctionExpression(self: *Self, function_expression: FunctionExpression) !void {
     try self.function_expressions.append(function_expression);
 }
 
@@ -87,7 +85,7 @@ pub fn addInstructionWithIdentifier(
 pub fn addInstructionWithFunctionExpression(
     self: *Self,
     instruction: Instruction,
-    function_expression: ArrowOrOrdinaryFunctionExpression,
+    function_expression: FunctionExpression,
 ) !void {
     std.debug.assert(instruction.hasFunctionExpressionIndex());
     try self.addInstruction(instruction);
@@ -180,6 +178,7 @@ pub fn print(self: Self, writer: anytype) !void {
             .array_set_length,
             .array_set_value,
             .instantiate_arrow_function_expression,
+            .instantiate_generator_function_expression,
             .instantiate_ordinary_function_expression,
             .jump,
             .push_exception_jump_target,

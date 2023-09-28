@@ -108,6 +108,7 @@ pub const PrimaryExpression = union(enum) {
     array_literal: ArrayLiteral,
     object_literal: ObjectLiteral,
     function_expression: FunctionExpression,
+    generator_expression: GeneratorExpression,
     arrow_function: ArrowFunction,
     parenthesized_expression: ParenthesizedExpression,
 
@@ -3301,6 +3302,44 @@ pub const GeneratorDeclaration = struct {
         try printString("GeneratorDeclaration", writer, indentation);
         try printString("identifier:", writer, indentation + 1);
         try printString(self.identifier, writer, indentation + 2);
+        try printString("formal_parameters:", writer, indentation + 1);
+        try self.formal_parameters.print(writer, indentation + 2);
+        try printString("function_body:", writer, indentation + 1);
+        try self.function_body.print(writer, indentation + 2);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-GeneratorExpression
+pub const GeneratorExpression = struct {
+    const Self = @This();
+
+    identifier: ?Identifier,
+    formal_parameters: FormalParameters,
+    function_body: FunctionBody,
+    source_text: []const u8,
+
+    /// 15.5.5 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-generator-function-definitions-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
+
+        // Copy `self` so that we can assign the function body's strictness, which is needed for
+        // the deferred bytecode generation.
+        // FIXME: This should ideally happen at parse time.
+        var generator_expression = self;
+        generator_expression.function_body.strict = strict;
+
+        // 1. Return InstantiateGeneratorFunctionExpression of GeneratorExpression.
+        try executable.addInstructionWithFunctionExpression(
+            .instantiate_generator_function_expression,
+            .{ .generator_expression = generator_expression },
+        );
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("GeneratorExpression", writer, indentation);
+        try printString("identifier:", writer, indentation + 1);
+        if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
         try printString("formal_parameters:", writer, indentation + 1);
         try self.formal_parameters.print(writer, indentation + 2);
         try printString("function_body:", writer, indentation + 1);

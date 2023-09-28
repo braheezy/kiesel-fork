@@ -50,6 +50,8 @@ pub const Instruction = enum(u8) {
     instanceof_operator,
     /// Store InstantiateArrowFunctionExpression() as the result value.
     instantiate_arrow_function_expression,
+    /// Store InstantiateGeneratorFunctionExpression() as the result value.
+    instantiate_generator_function_expression,
     /// Store InstantiateOrdinaryFunctionExpression() as the result value.
     instantiate_ordinary_function_expression,
     /// Store IsLooselyEqual() as the result value.
@@ -129,6 +131,7 @@ pub const Instruction = enum(u8) {
             .evaluate_new,
             .evaluate_property_access_with_expression_key,
             .instantiate_arrow_function_expression,
+            .instantiate_generator_function_expression,
             .instantiate_ordinary_function_expression,
             .jump,
             .load_constant,
@@ -159,6 +162,7 @@ pub const Instruction = enum(u8) {
     pub fn hasFunctionExpressionIndex(self: Self) bool {
         return switch (self) {
             .instantiate_arrow_function_expression,
+            .instantiate_generator_function_expression,
             .instantiate_ordinary_function_expression,
             .object_define_method,
             => true,

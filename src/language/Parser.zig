@@ -338,6 +338,8 @@ pub fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
         return .{ .object_literal = object_literal }
     else |_| if (self.acceptFunctionExpression()) |function_expression|
         return .{ .function_expression = function_expression }
+    else |_| if (self.acceptGeneratorExpression()) |generator_expression|
+        return .{ .generator_expression = generator_expression }
     else |_| if (self.acceptArrowFunction()) |arrow_function|
         return .{ .arrow_function = arrow_function }
     else |_| if (self.acceptParenthesizedExpression()) |parenthesized_expression|
@@ -1491,6 +1493,34 @@ fn acceptGeneratorDeclaration(self: *Self) !ast.GeneratorDeclaration {
         );
         return err;
     };
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    const formal_parameters = try self.acceptFormalParameters();
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    _ = try self.core.accept(RuleSet.is(.@"{"));
+    const function_body = try self.acceptFunctionBody(.generator);
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+    const end_offset = self.core.tokenizer.offset;
+    const source_text = try self.allocator.dupe(
+        u8,
+        self.core.tokenizer.source[start_offset..end_offset],
+    );
+    return .{
+        .identifier = identifier,
+        .formal_parameters = formal_parameters,
+        .function_body = function_body,
+        .source_text = source_text,
+    };
+}
+
+pub fn acceptGeneratorExpression(self: *Self) !ast.GeneratorExpression {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.function));
+    // We need to do this after consuming the 'function' token to skip preceeding whitespace.
+    const start_offset = self.core.tokenizer.offset - (comptime "function".len);
+    _ = try self.core.accept(RuleSet.is(.@"*"));
+    const identifier = self.acceptBindingIdentifier() catch null;
     _ = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));

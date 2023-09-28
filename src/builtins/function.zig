@@ -127,7 +127,7 @@ pub fn createDynamicFunction(
     comptime var fallback_prototype: []const u8 = undefined;
     comptime var expr_sym: GrammarSymbol(switch (kind) {
         .normal => ast.FunctionExpression,
-        .generator => ast.FunctionExpression,
+        .generator => ast.GeneratorExpression,
         else => @compileError("Not implemented"),
     }) = .{};
     comptime var body_sym: GrammarSymbol(ast.FunctionBody) = .{};
@@ -169,10 +169,10 @@ pub fn createDynamicFunction(
             // a. Let prefix be "function*".
             prefix = "function*";
 
-            // TODO: b. Let exprSym be the grammar symbol GeneratorExpression.
+            // b. Let exprSym be the grammar symbol GeneratorExpression.
             expr_sym.acceptFn = struct {
-                fn accept(parser: *Parser) Parser.AcceptError!ast.FunctionExpression {
-                    return parser.acceptFunctionExpression();
+                fn accept(parser: *Parser) Parser.AcceptError!ast.GeneratorExpression {
+                    return parser.acceptGeneratorExpression();
                 }
             }.accept;
 
