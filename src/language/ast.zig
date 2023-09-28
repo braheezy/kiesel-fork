@@ -21,6 +21,7 @@ const Value = types.Value;
 const makeConstructor = builtins.makeConstructor;
 const noexcept = utils.noexcept;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const setFunctionName = builtins.setFunctionName;
 const temporaryChange = utils.temporaryChange;
 
@@ -1884,20 +1885,29 @@ pub const HoistableDeclaration = union(enum) {
     const Self = @This();
 
     function_declaration: FunctionDeclaration,
+    generator_declaration: GeneratorDeclaration,
 
+    /// 14.1.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-statement-semantics-runtime-semantics-evaluation
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // HoistableDeclaration :
+        //     GeneratorDeclaration
+        //     AsyncFunctionDeclaration
+        //     AsyncGeneratorDeclaration
+        // 1. Return empty.
+        // NOTE: Until the FooDeclarationInstantiation are fully implemented these also involve
+        //       bytecode generation.
+        // HoistableDeclaration : FunctionDeclaration
+        // 1. Return ? Evaluation of FunctionDeclaration.
         switch (self) {
-            .function_declaration => |function_declaration| try function_declaration.generateBytecode(executable, ctx),
+            inline else => |node| try node.generateBytecode(executable, ctx),
         }
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
         // Omit printing 'HoistableDeclaration' here, it's implied and only adds nesting.
         switch (self) {
-            .function_declaration => |function_declaration| try function_declaration.print(
-                writer,
-                indentation,
-            ),
+            inline else => |node| try node.print(writer, indentation),
         }
     }
 };
@@ -3081,6 +3091,14 @@ pub const FunctionExpression = struct {
 pub const FunctionBody = struct {
     const Self = @This();
 
+    pub const Type = enum {
+        normal,
+        generator,
+        @"async",
+        async_generator,
+    };
+
+    type: Type,
     statement_list: StatementList,
     strict: ?bool = null, // Unassigned until bytecode generation
 
@@ -3191,6 +3209,102 @@ pub const MethodDefinition = struct {
         try printString(@tagName(self.type), writer, indentation + 1);
         try self.property_name.print(writer, indentation);
         try self.function_expression.print(writer, indentation);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-GeneratorDeclaration
+pub const GeneratorDeclaration = struct {
+    const Self = @This();
+
+    identifier: Identifier,
+    formal_parameters: FormalParameters,
+    function_body: FunctionBody,
+    source_text: []const u8,
+
+    /// 15.5.3 Runtime Semantics: InstantiateGeneratorFunctionObject
+    /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiategeneratorfunctionobject
+    fn instantiateGeneratorFunctionObject(
+        self: Self,
+        agent: *Agent,
+        env: Environment,
+        private_env: ?*PrivateEnvironment,
+    ) !Object {
+        const realm = agent.currentRealm();
+
+        // 1. Let name be StringValue of BindingIdentifier.
+        const name = self.identifier;
+
+        // 2. Let sourceText be the source text matched by GeneratorDeclaration.
+        const source_text = self.source_text;
+
+        // 3. Let F be OrdinaryFunctionCreate(%GeneratorFunction.prototype%, sourceText,
+        //    FormalParameters, GeneratorBody, non-lexical-this, env, privateEnv).
+        const function = try ordinaryFunctionCreate(
+            agent,
+            try realm.intrinsics.@"%GeneratorFunction.prototype%"(),
+            source_text,
+            self.formal_parameters,
+            self.function_body,
+            .non_lexical_this,
+            env,
+            private_env,
+        );
+
+        // 4. Perform SetFunctionName(F, name).
+        try setFunctionName(function, PropertyKey.from(name), null);
+
+        // 5. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
+        const prototype = try ordinaryObjectCreate(
+            agent,
+            try realm.intrinsics.@"%GeneratorFunction.prototype.prototype%"(),
+        );
+
+        // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
+        //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
+        //    }).
+        function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+            .value = Value.from(prototype),
+            .writable = true,
+            .enumerable = false,
+            .configurable = false,
+        }) catch |err| try noexcept(err);
+
+        // 7. Return F.
+        return function;
+    }
+
+    pub fn generateBytecode(self: Self, _: *Executable, ctx: *BytecodeContext) !void {
+        // FIXME: This should be called in the various FooDeclarationInstantiation AOs instead.
+        const realm = ctx.agent.currentRealm();
+        const env = Environment{ .global_environment = realm.global_env };
+        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
+
+        // Copy `self` so that we can assign the function body's strictness, which is needed for
+        // the deferred bytecode generation.
+        // FIXME: This should ideally happen at parse time.
+        var generator_declaration = self;
+        generator_declaration.function_body.strict = strict;
+
+        const function = try generator_declaration.instantiateGeneratorFunctionObject(
+            ctx.agent,
+            env,
+            null,
+        );
+        realm.global_env.object_record.binding_object.set(
+            PropertyKey.from(self.identifier),
+            Value.from(function),
+            .ignore,
+        ) catch |err| try noexcept(err);
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("GeneratorDeclaration", writer, indentation);
+        try printString("identifier:", writer, indentation + 1);
+        try printString(self.identifier, writer, indentation + 2);
+        try printString("formal_parameters:", writer, indentation + 1);
+        try self.formal_parameters.print(writer, indentation + 2);
+        try printString("function_body:", writer, indentation + 1);
+        try self.function_body.print(writer, indentation + 2);
     }
 };
 

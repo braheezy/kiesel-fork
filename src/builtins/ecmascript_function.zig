@@ -256,20 +256,70 @@ pub fn ordinaryCallEvaluateBody(
     arguments_list: ArgumentsList,
 ) !Completion {
     // 1. Return ? EvaluateBody of F.[[ECMAScriptCode]] with arguments F and argumentsList.
+    const function_body = function.fields.ecmascript_code;
 
     // 10.2.1.3 Runtime Semantics: EvaluateBody
     // https://tc39.es/ecma262/#sec-runtime-semantics-evaluatebody
-    // FunctionBody : FunctionStatementList
-    // 1. Return ? EvaluateFunctionBody of FunctionBody with arguments functionObject and argumentsList.
+    return switch (function_body.type) {
+        // FunctionBody : FunctionStatementList
+        // 1. Return ? EvaluateFunctionBody of FunctionBody with arguments functionObject and argumentsList.
+        // ConciseBody : ExpressionBody
+        // 1. Return ? EvaluateConciseBody of ConciseBody with arguments functionObject and argumentsList.
+        .normal => evaluateFunctionBody(agent, function, arguments_list),
 
-    // 15.2.3 Runtime Semantics: EvaluateFunctionBody
-    // https://tc39.es/ecma262/#sec-runtime-semantics-evaluatefunctionbody
+        // GeneratorBody : FunctionBody
+        // 1. Return ? EvaluateGeneratorBody of GeneratorBody with arguments functionObject and argumentsList.
+        .generator => evaluateGeneratorBody(agent, function, arguments_list),
+
+        else => @panic("Not implemented"),
+    };
+}
+
+// 15.2.3 Runtime Semantics: EvaluateFunctionBody
+// https://tc39.es/ecma262/#sec-runtime-semantics-evaluatefunctionbody
+fn evaluateFunctionBody(
+    agent: *Agent,
+    function: *ECMAScriptFunction,
+    arguments_list: ArgumentsList,
+) !Completion {
     // FunctionBody : FunctionStatementList
+    const function_body = function.fields.ecmascript_code;
+
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
     try functionDeclarationInstantiation(agent, function, arguments_list);
 
     // 2. Return ? Evaluation of FunctionStatementList.
-    return generateAndRunBytecode(agent, function.fields.ecmascript_code);
+    return generateAndRunBytecode(agent, function_body);
+}
+
+// 15.5.2 Runtime Semantics: EvaluateGeneratorBody
+// https://tc39.es/ecma262/#sec-runtime-semantics-evaluategeneratorbody
+fn evaluateGeneratorBody(
+    agent: *Agent,
+    function: *ECMAScriptFunction,
+    arguments_list: ArgumentsList,
+) !Completion {
+    // GeneratorBody : FunctionBody
+    const function_body = function.fields.ecmascript_code;
+    _ = function_body;
+
+    // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
+    try functionDeclarationInstantiation(agent, function, arguments_list);
+
+    // 2. Let G be ? OrdinaryCreateFromConstructor(functionObject, "%GeneratorFunction.prototype.prototype%",
+    //    « [[GeneratorState]], [[GeneratorContext]], [[GeneratorBrand]] »).
+    // 3. Set G.[[GeneratorBrand]] to empty.
+    const generator = try ordinaryCreateFromConstructor(
+        builtins.Generator,
+        agent,
+        function.object(),
+        "%GeneratorFunction.prototype.prototype%",
+    );
+
+    // TODO: 4. Perform GeneratorStart(G, FunctionBody).
+
+    // 5. Return Completion Record { [[Type]]: return, [[Value]]: G, [[Target]]: empty }.
+    return .{ .type = .@"return", .value = Value.from(generator), .target = null };
 }
 
 /// 10.2.2 [[Construct]] ( argumentsList, newTarget )

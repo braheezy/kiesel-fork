@@ -646,7 +646,7 @@ pub fn acceptPropertyDefinition(
         const formal_parameters = try self.acceptFormalParameters();
         _ = try self.core.accept(RuleSet.is(.@")"));
         _ = try self.core.accept(RuleSet.is(.@"{"));
-        const function_body = try self.acceptFunctionBody();
+        const function_body = try self.acceptFunctionBody(.normal);
         _ = try self.core.accept(RuleSet.is(.@"}"));
         const end_offset = self.core.tokenizer.offset;
         const source_text = try self.allocator.dupe(
@@ -1001,6 +1001,8 @@ pub fn acceptHoistableDeclaration(self: *Self) !ast.HoistableDeclaration {
 
     if (self.acceptFunctionDeclaration()) |function_declaration|
         return .{ .function_declaration = function_declaration }
+    else |_| if (self.acceptGeneratorDeclaration()) |generator_declaration|
+        return .{ .generator_declaration = generator_declaration }
     else |_|
         return error.UnexpectedToken;
 }
@@ -1350,19 +1352,21 @@ pub fn acceptFunctionDeclaration(self: *Self) !ast.FunctionDeclaration {
     // We need to do this after consuming the 'function' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     const identifier = self.acceptBindingIdentifier() catch |err| {
-        try self.diagnostics.emit(
-            self.core.tokenizer.current_location,
-            .@"error",
-            "Function declaration must have a binding identifier",
-            .{},
-        );
+        if (self.core.peek() catch null) |token| if (token.type == .@"(") {
+            try self.diagnostics.emit(
+                self.core.tokenizer.current_location,
+                .@"error",
+                "Function declaration must have a binding identifier",
+                .{},
+            );
+        };
         return err;
     };
     _ = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
-    const function_body = try self.acceptFunctionBody();
+    const function_body = try self.acceptFunctionBody(.normal);
     _ = try self.core.accept(RuleSet.is(.@"}"));
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
@@ -1389,7 +1393,7 @@ pub fn acceptFunctionExpression(self: *Self) !ast.FunctionExpression {
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
-    const function_body = try self.acceptFunctionBody();
+    const function_body = try self.acceptFunctionBody(.normal);
     _ = try self.core.accept(RuleSet.is(.@"}"));
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
@@ -1404,7 +1408,7 @@ pub fn acceptFunctionExpression(self: *Self) !ast.FunctionExpression {
     };
 }
 
-pub fn acceptFunctionBody(self: *Self) !ast.FunctionBody {
+pub fn acceptFunctionBody(self: *Self, @"type": ast.FunctionBody.Type) !ast.FunctionBody {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1412,7 +1416,7 @@ pub fn acceptFunctionBody(self: *Self) !ast.FunctionBody {
     defer tmp.restore();
 
     const statement_list = try self.acceptStatementList();
-    return .{ .statement_list = statement_list };
+    return .{ .type = @"type", .statement_list = statement_list };
 }
 
 pub fn acceptArrowFunction(self: *Self) !ast.ArrowFunction {
@@ -1443,7 +1447,7 @@ pub fn acceptArrowFunction(self: *Self) !ast.ArrowFunction {
     try self.noLineTerminatorHere();
     const function_body = blk: {
         if (self.core.accept(RuleSet.is(.@"{"))) |_| {
-            const function_body = try self.acceptFunctionBody();
+            const function_body = try self.acceptFunctionBody(.normal);
             _ = try self.core.accept(RuleSet.is(.@"}"));
             break :blk function_body;
         } else |_| {
@@ -1454,7 +1458,8 @@ pub fn acceptArrowFunction(self: *Self) !ast.ArrowFunction {
             statement.* = ast.Statement{ .return_statement = .{ .expression = expression_body } };
             const items = try self.allocator.alloc(ast.StatementListItem, 1);
             items[0] = .{ .statement = statement };
-            break :blk ast.FunctionBody{ .statement_list = ast.StatementList{ .items = items } };
+            const statement_list = ast.StatementList{ .items = items };
+            break :blk ast.FunctionBody{ .type = .normal, .statement_list = statement_list };
         }
     };
     const end_offset = self.core.tokenizer.offset;
@@ -1464,6 +1469,42 @@ pub fn acceptArrowFunction(self: *Self) !ast.ArrowFunction {
     );
     return .{
         .arrow_parameters = formal_parameters,
+        .function_body = function_body,
+        .source_text = source_text,
+    };
+}
+
+fn acceptGeneratorDeclaration(self: *Self) !ast.GeneratorDeclaration {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.function));
+    // We need to do this after consuming the 'function' token to skip preceeding whitespace.
+    const start_offset = self.core.tokenizer.offset - (comptime "function".len);
+    _ = try self.core.accept(RuleSet.is(.@"*"));
+    const identifier = self.acceptBindingIdentifier() catch |err| {
+        try self.diagnostics.emit(
+            self.core.tokenizer.current_location,
+            .@"error",
+            "Generator declaration must have a binding identifier",
+            .{},
+        );
+        return err;
+    };
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    const formal_parameters = try self.acceptFormalParameters();
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    _ = try self.core.accept(RuleSet.is(.@"{"));
+    const function_body = try self.acceptFunctionBody(.generator);
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+    const end_offset = self.core.tokenizer.offset;
+    const source_text = try self.allocator.dupe(
+        u8,
+        self.core.tokenizer.source[start_offset..end_offset],
+    );
+    return .{
+        .identifier = identifier,
+        .formal_parameters = formal_parameters,
         .function_body = function_body,
         .source_text = source_text,
     };
