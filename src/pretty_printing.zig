@@ -238,6 +238,14 @@ fn prettyPrintStringIterator(string_iterator: *const builtins.StringIterator, wr
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintAsyncGenerator(_: *const builtins.AsyncGenerator, writer: anytype) !void {
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("AsyncGenerator()");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintPrimitiveWrapper(object: anytype, writer: anytype) !void {
     const tty_config = getTtyConfigForWriter(writer);
 
@@ -368,6 +376,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
         inline for (.{
             .{ builtins.Array, prettyPrintArray },
             .{ builtins.ArrayIterator, prettyPrintArrayIterator },
+            .{ builtins.AsyncGenerator, prettyPrintAsyncGenerator },
             .{ builtins.BigInt, prettyPrintPrimitiveWrapper },
             .{ builtins.Boolean, prettyPrintPrimitiveWrapper },
             .{ builtins.Date, prettyPrintDate },

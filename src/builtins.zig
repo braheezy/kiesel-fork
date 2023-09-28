@@ -43,6 +43,7 @@ pub const ArrayConstructor = array.ArrayConstructor;
 pub const ArrayIterator = array_iterator.ArrayIterator;
 pub const ArrayIteratorPrototype = array_iterator.ArrayIteratorPrototype;
 pub const ArrayPrototype = array.ArrayPrototype;
+pub const AsyncGenerator = async_generator.AsyncGenerator;
 pub const AsyncGeneratorFunctionConstructor = async_generator_function.AsyncGeneratorFunctionConstructor;
 pub const AsyncGeneratorFunctionPrototype = async_generator_function.AsyncGeneratorFunctionPrototype;
 pub const AsyncGeneratorPrototype = async_generator.AsyncGeneratorPrototype;

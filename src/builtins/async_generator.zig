@@ -41,3 +41,9 @@ pub const AsyncGeneratorPrototype = struct {
         return object;
     }
 };
+
+/// 27.6.2 Properties of AsyncGenerator Instances
+/// https://tc39.es/ecma262/#sec-properties-of-asyncgenerator-intances
+pub const AsyncGenerator = Object.Factory(.{
+    .tag = .async_generator,
+});

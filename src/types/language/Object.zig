@@ -33,6 +33,7 @@ pub const Tag = enum(u32) {
     arguments,
     array,
     array_iterator,
+    async_generator,
     big_int,
     boolean,
     builtin_function,
