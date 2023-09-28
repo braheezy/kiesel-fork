@@ -28,7 +28,9 @@ const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const formatParseError = utils.formatParseError;
 const makeConstructor = builtins.makeConstructor;
+const noexcept = utils.noexcept;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const setFunctionName = builtins.setFunctionName;
 
 fn GrammarSymbol(comptime T: type) type {
@@ -125,6 +127,7 @@ pub fn createDynamicFunction(
     comptime var fallback_prototype: []const u8 = undefined;
     comptime var expr_sym: GrammarSymbol(switch (kind) {
         .normal => ast.FunctionExpression,
+        .generator => ast.FunctionExpression,
         else => @compileError("Not implemented"),
     }) = .{};
     comptime var body_sym: GrammarSymbol(ast.FunctionBody) = .{};
@@ -146,7 +149,7 @@ pub fn createDynamicFunction(
             // c. Let bodySym be the grammar symbol FunctionBody[~Yield, ~Await].
             body_sym.acceptFn = struct {
                 fn accept(parser: *Parser) Parser.AcceptError!ast.FunctionBody {
-                    return parser.acceptFunctionBody();
+                    return parser.acceptFunctionBody(.normal);
                 }
             }.accept;
 
@@ -161,8 +164,35 @@ pub fn createDynamicFunction(
             fallback_prototype = "%Function.prototype%";
         },
 
-        // TODO: 5. Else if kind is generator, then
-        .generator => @compileError("Not implemented"),
+        // 5. Else if kind is generator, then
+        .generator => {
+            // a. Let prefix be "function*".
+            prefix = "function*";
+
+            // TODO: b. Let exprSym be the grammar symbol GeneratorExpression.
+            expr_sym.acceptFn = struct {
+                fn accept(parser: *Parser) Parser.AcceptError!ast.FunctionExpression {
+                    return parser.acceptFunctionExpression();
+                }
+            }.accept;
+
+            // c. Let bodySym be the grammar symbol GeneratorBody.
+            body_sym.acceptFn = struct {
+                fn accept(parser: *Parser) Parser.AcceptError!ast.FunctionBody {
+                    return parser.acceptFunctionBody(.generator);
+                }
+            }.accept;
+
+            // d. Let parameterSym be the grammar symbol FormalParameters[+Yield, ~Await].
+            parameter_sym.acceptFn = struct {
+                fn accept(parser: *Parser) Parser.AcceptError!ast.FormalParameters {
+                    return parser.acceptFormalParameters();
+                }
+            }.accept;
+
+            // e. Let fallbackProto be "%GeneratorFunction.prototype%".
+            fallback_prototype = "%GeneratorFunction.prototype%";
+        },
 
         // TODO: 6. Else if kind is async, then
         .@"async" => @compileError("Not implemented"),
@@ -278,7 +308,7 @@ pub fn createDynamicFunction(
     };
 
     // 22. Let proto be ? GetPrototypeFromConstructor(newTarget, fallbackProto).
-    const prototype = try getPrototypeFromConstructor(new_target, fallback_prototype);
+    const proto = try getPrototypeFromConstructor(new_target, fallback_prototype);
 
     // 23. Let realmF be the current Realm Record.
     // 24. Let env be realmF.[[GlobalEnv]].
@@ -290,7 +320,7 @@ pub fn createDynamicFunction(
     // 26. Let F be OrdinaryFunctionCreate(proto, sourceText, parameters, body, non-lexical-this, env, privateEnv).
     const function = try ordinaryFunctionCreate(
         agent,
-        prototype,
+        proto,
         source_text,
         parameters,
         body,
@@ -303,8 +333,24 @@ pub fn createDynamicFunction(
     try setFunctionName(function, PropertyKey.from("anonymous"), null);
 
     switch (kind) {
-        // TODO: 28. If kind is generator, then
-        .generator => @compileError("Not implemented"),
+        // 28. If kind is generator, then
+        .generator => {
+            // a. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
+            const prototype = try ordinaryObjectCreate(
+                agent,
+                try realm.intrinsics.@"%GeneratorFunction.prototype.prototype%"(),
+            );
+
+            // b. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
+            //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
+            //    }).
+            function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+                .value = Value.from(prototype),
+                .writable = true,
+                .enumerable = false,
+                .configurable = false,
+            }) catch |err| try noexcept(err);
+        },
 
         // TODO: 29. Else if kind is async-generator, then
         .async_generator => @compileError("Not implemented"),

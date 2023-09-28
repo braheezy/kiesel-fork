@@ -33,6 +33,9 @@ lazy_intrinsics: struct {
     @"%EvalError.prototype%": ?Object = null,
     @"%Function%": ?Object = null,
     @"%Function.prototype%": ?Object = null,
+    @"%GeneratorFunction%": ?Object = null,
+    @"%GeneratorFunction.prototype%": ?Object = null,
+    @"%GeneratorFunction.prototype.prototype%": ?Object = null,
     @"%isFinite%": ?Object = null,
     @"%isNaN%": ?Object = null,
     @"%IteratorPrototype%": ?Object = null,
@@ -150,6 +153,15 @@ pub fn @"%Function%"(self: *Self) error{OutOfMemory}!Object {
 }
 pub fn @"%Function.prototype%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Function.prototype%", builtins.FunctionPrototype);
+}
+pub fn @"%GeneratorFunction%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%GeneratorFunction%", builtins.GeneratorFunctionConstructor);
+}
+pub fn @"%GeneratorFunction.prototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%GeneratorFunction.prototype%", builtins.GeneratorFunctionPrototype);
+}
+pub fn @"%GeneratorFunction.prototype.prototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%GeneratorFunction.prototype.prototype%", builtins.GeneratorPrototype);
 }
 pub fn @"%isFinite%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%isFinite%", builtins.global_functions.IsFinite);
