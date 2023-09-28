@@ -1005,6 +1005,8 @@ pub fn acceptHoistableDeclaration(self: *Self) !ast.HoistableDeclaration {
         return .{ .function_declaration = function_declaration }
     else |_| if (self.acceptGeneratorDeclaration()) |generator_declaration|
         return .{ .generator_declaration = generator_declaration }
+    else |_| if (self.acceptAsyncGeneratorDeclaration()) |async_generator_declaration|
+        return .{ .async_generator_declaration = async_generator_declaration }
     else |_|
         return error.UnexpectedToken;
 }
@@ -1526,6 +1528,45 @@ pub fn acceptGeneratorExpression(self: *Self) !ast.GeneratorExpression {
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
     const function_body = try self.acceptFunctionBody(.generator);
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+    const end_offset = self.core.tokenizer.offset;
+    const source_text = try self.allocator.dupe(
+        u8,
+        self.core.tokenizer.source[start_offset..end_offset],
+    );
+    return .{
+        .identifier = identifier,
+        .formal_parameters = formal_parameters,
+        .function_body = function_body,
+        .source_text = source_text,
+    };
+}
+
+fn acceptAsyncGeneratorDeclaration(self: *Self) !ast.AsyncGeneratorDeclaration {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.is(.identifier));
+    if (!std.mem.eql(u8, token.text, "async")) return error.AcceptError;
+    // We need to do this after consuming the 'async' token to skip preceeding whitespace.
+    const start_offset = self.core.tokenizer.offset - (comptime "async".len);
+    try self.noLineTerminatorHere();
+    _ = try self.core.accept(RuleSet.is(.function));
+    _ = try self.core.accept(RuleSet.is(.@"*"));
+    const identifier = self.acceptBindingIdentifier() catch |err| {
+        try self.diagnostics.emit(
+            self.core.tokenizer.current_location,
+            .@"error",
+            "Async generator declaration must have a binding identifier",
+            .{},
+        );
+        return err;
+    };
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    const formal_parameters = try self.acceptFormalParameters();
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    _ = try self.core.accept(RuleSet.is(.@"{"));
+    const function_body = try self.acceptFunctionBody(.async_generator);
     _ = try self.core.accept(RuleSet.is(.@"}"));
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(

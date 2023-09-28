@@ -271,7 +271,11 @@ pub fn ordinaryCallEvaluateBody(
         // 1. Return ? EvaluateGeneratorBody of GeneratorBody with arguments functionObject and argumentsList.
         .generator => evaluateGeneratorBody(agent, function, arguments_list),
 
-        else => @panic("Not implemented"),
+        // AsyncGeneratorBody : FunctionBody
+        // 1. Return ? EvaluateAsyncGeneratorBody of AsyncGeneratorBody with arguments functionObject and argumentsList.
+        .async_generator => evaluateAsyncGeneratorBody(agent, function, arguments_list),
+
+        .@"async" => @panic("Not implemented"),
     };
 }
 
@@ -300,9 +304,6 @@ fn evaluateGeneratorBody(
     arguments_list: ArgumentsList,
 ) !Completion {
     // GeneratorBody : FunctionBody
-    const function_body = function.fields.ecmascript_code;
-    _ = function_body;
-
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
     try functionDeclarationInstantiation(agent, function, arguments_list);
 
@@ -319,6 +320,33 @@ fn evaluateGeneratorBody(
     // TODO: 4. Perform GeneratorStart(G, FunctionBody).
 
     // 5. Return Completion Record { [[Type]]: return, [[Value]]: G, [[Target]]: empty }.
+    return .{ .type = .@"return", .value = Value.from(generator), .target = null };
+}
+
+/// 15.6.2 Runtime Semantics: EvaluateAsyncGeneratorBody
+/// https://tc39.es/ecma262/#sec-runtime-semantics-evaluateasyncgeneratorbody
+fn evaluateAsyncGeneratorBody(
+    agent: *Agent,
+    function: *ECMAScriptFunction,
+    arguments_list: ArgumentsList,
+) !Completion {
+    // AsyncGeneratorBody : FunctionBody
+    // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
+    try functionDeclarationInstantiation(agent, function, arguments_list);
+
+    // 2. Let generator be ? OrdinaryCreateFromConstructor(functionObject, "%AsyncGeneratorFunction.prototype.prototype%",
+    //    « [[AsyncGeneratorState]], [[AsyncGeneratorContext]], [[AsyncGeneratorQueue]], [[GeneratorBrand]] »).
+    // 3. Set generator.[[GeneratorBrand]] to empty.
+    const generator = try ordinaryCreateFromConstructor(
+        builtins.AsyncGenerator,
+        agent,
+        function.object(),
+        "%AsyncGeneratorFunction.prototype.prototype%",
+    );
+
+    // TODO: 4. Perform AsyncGeneratorStart(generator, FunctionBody).
+
+    // 5. Return Completion Record { [[Type]]: return, [[Value]]: generator, [[Target]]: empty }.
     return .{ .type = .@"return", .value = Value.from(generator), .target = null };
 }
 

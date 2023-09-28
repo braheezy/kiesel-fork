@@ -1887,6 +1887,7 @@ pub const HoistableDeclaration = union(enum) {
 
     function_declaration: FunctionDeclaration,
     generator_declaration: GeneratorDeclaration,
+    async_generator_declaration: AsyncGeneratorDeclaration,
 
     /// 14.1.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-statement-semantics-runtime-semantics-evaluation
@@ -3338,6 +3339,146 @@ pub const GeneratorExpression = struct {
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("GeneratorExpression", writer, indentation);
+        try printString("identifier:", writer, indentation + 1);
+        if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
+        try printString("formal_parameters:", writer, indentation + 1);
+        try self.formal_parameters.print(writer, indentation + 2);
+        try printString("function_body:", writer, indentation + 1);
+        try self.function_body.print(writer, indentation + 2);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-AsyncGeneratorDeclaration
+pub const AsyncGeneratorDeclaration = struct {
+    const Self = @This();
+
+    identifier: ?Identifier,
+    formal_parameters: FormalParameters,
+    function_body: FunctionBody,
+    source_text: []const u8,
+
+    /// 15.6.3 Runtime Semantics: InstantiateAsyncGeneratorFunctionObject
+    /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncgeneratorfunctionobject
+    fn instantiateAsyncGeneratorFunctionObject(
+        self: Self,
+        agent: *Agent,
+        env: Environment,
+        private_env: ?*PrivateEnvironment,
+    ) !Object {
+        const realm = agent.currentRealm();
+
+        // AsyncGeneratorDeclaration : async function * BindingIdentifier ( FormalParameters ) { AsyncGeneratorBody }
+        if (self.identifier) |identifier| {
+            // 1. Let name be StringValue of BindingIdentifier.
+            const name = identifier;
+
+            // 2. Let sourceText be the source text matched by AsyncGeneratorDeclaration.
+            const source_text = self.source_text;
+
+            // 3. Let F be OrdinaryFunctionCreate(%AsyncGeneratorFunction.prototype%, sourceText,
+            //    FormalParameters, AsyncGeneratorBody, non-lexical-this, env, privateEnv).
+            const function = try ordinaryFunctionCreate(
+                agent,
+                try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"(),
+                source_text,
+                self.formal_parameters,
+                self.function_body,
+                .non_lexical_this,
+                env,
+                private_env,
+            );
+
+            // 4. Perform SetFunctionName(F, name).
+            try setFunctionName(function, PropertyKey.from(name), null);
+
+            // 5. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
+            const prototype = try ordinaryObjectCreate(
+                agent,
+                try realm.intrinsics.@"%AsyncGeneratorFunction.prototype.prototype%"(),
+            );
+
+            // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
+            //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
+            //    }).
+            function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+                .value = Value.from(prototype),
+                .writable = true,
+                .enumerable = false,
+                .configurable = false,
+            }) catch |err| try noexcept(err);
+
+            // 7. Return F.
+            return function;
+        }
+        // AsyncGeneratorDeclaration : async function * ( FormalParameters ) { AsyncGeneratorBody }
+        // NOTE: An anonymous AsyncGeneratorDeclaration can only occur as part of an `export default` declaration.
+        else {
+            // 1. Let sourceText be the source text matched by AsyncGeneratorDeclaration.
+            const source_text = self.source_text;
+
+            // 2. Let F be OrdinaryFunctionCreate(%AsyncGeneratorFunction.prototype%, sourceText,
+            //    FormalParameters, AsyncGeneratorBody, non-lexical-this, env, privateEnv).
+            const function = try ordinaryFunctionCreate(
+                agent,
+                try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"(),
+                source_text,
+                self.formal_parameters,
+                self.function_body,
+                .non_lexical_this,
+                env,
+                private_env,
+            );
+
+            // 3. Perform SetFunctionName(F, "default").
+            try setFunctionName(function, PropertyKey.from("default"), null);
+
+            // 4. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
+            const prototype = try ordinaryObjectCreate(
+                agent,
+                try realm.intrinsics.@"%AsyncGeneratorFunction.prototype.prototype%"(),
+            );
+
+            // 5. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
+            //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
+            //    }).
+            function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+                .value = Value.from(prototype),
+                .writable = true,
+                .enumerable = false,
+                .configurable = false,
+            }) catch |err| try noexcept(err);
+
+            // 6. Return F.
+            return function;
+        }
+    }
+
+    pub fn generateBytecode(self: Self, _: *Executable, ctx: *BytecodeContext) !void {
+        // FIXME: This should be called in the various FooDeclarationInstantiation AOs instead.
+        const realm = ctx.agent.currentRealm();
+        const env = Environment{ .global_environment = realm.global_env };
+        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
+
+        // Copy `self` so that we can assign the function body's strictness, which is needed for
+        // the deferred bytecode generation.
+        // FIXME: This should ideally happen at parse time.
+        var async_generator_declaration = self;
+        async_generator_declaration.function_body.strict = strict;
+
+        const function = try async_generator_declaration.instantiateAsyncGeneratorFunctionObject(
+            ctx.agent,
+            env,
+            null,
+        );
+        realm.global_env.object_record.binding_object.set(
+            PropertyKey.from(self.identifier.?),
+            Value.from(function),
+            .ignore,
+        ) catch |err| try noexcept(err);
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("AsyncGeneratorDeclaration", writer, indentation);
         try printString("identifier:", writer, indentation + 1);
         if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
         try printString("formal_parameters:", writer, indentation + 1);
