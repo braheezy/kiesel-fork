@@ -241,7 +241,7 @@ fn noLineTerminatorHere(self: *Self) !void {
 
 /// 12.10 Automatic Semicolon Insertion
 /// https://tc39.es/ecma262/#sec-automatic-semicolon-insertion
-fn acceptOrInsertSemicolon(self: *Self) !void {
+pub fn acceptOrInsertSemicolon(self: *Self) !void {
     // Next token is ';', consume semicolon
     if (self.core.accept(RuleSet.is(.@";"))) |_|
         return
@@ -271,7 +271,7 @@ fn acceptOrInsertSemicolon(self: *Self) !void {
     return error.UnexpectedToken;
 }
 
-fn acceptParenthesizedExpression(self: *Self) !ast.ParenthesizedExpression {
+pub fn acceptParenthesizedExpression(self: *Self) !ast.ParenthesizedExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -282,7 +282,7 @@ fn acceptParenthesizedExpression(self: *Self) !ast.ParenthesizedExpression {
     return .{ .expression = expression };
 }
 
-fn acceptIdentifierName(self: *Self) !ast.Identifier {
+pub fn acceptIdentifierName(self: *Self) !ast.Identifier {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -297,7 +297,7 @@ fn acceptIdentifierName(self: *Self) !ast.Identifier {
     return self.allocator.dupe(u8, token.text);
 }
 
-fn acceptIdentifierReference(self: *Self) !ast.IdentifierReference {
+pub fn acceptIdentifierReference(self: *Self) !ast.IdentifierReference {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -308,7 +308,7 @@ fn acceptIdentifierReference(self: *Self) !ast.IdentifierReference {
     return .{ .identifier = try self.allocator.dupe(u8, token.text) };
 }
 
-fn acceptBindingIdentifier(self: *Self) !ast.Identifier {
+pub fn acceptBindingIdentifier(self: *Self) !ast.Identifier {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -316,7 +316,7 @@ fn acceptBindingIdentifier(self: *Self) !ast.Identifier {
     return self.allocator.dupe(u8, token.text);
 }
 
-fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
+pub fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -340,7 +340,7 @@ fn acceptPrimaryExpression(self: *Self) !ast.PrimaryExpression {
         return error.UnexpectedToken;
 }
 
-fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.Expression {
+pub fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.Expression {
     if (self.acceptMemberExpression(primary_expression)) |member_expression|
         return .{ .member_expression = member_expression }
     else |_| if (self.acceptCallExpression(primary_expression)) |call_expression|
@@ -365,7 +365,7 @@ fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression, ct
         return error.UnexpectedToken;
 }
 
-fn acceptMemberExpression(self: *Self, primary_expression: ast.Expression) !ast.MemberExpression {
+pub fn acceptMemberExpression(self: *Self, primary_expression: ast.Expression) !ast.MemberExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -386,7 +386,7 @@ fn acceptMemberExpression(self: *Self, primary_expression: ast.Expression) !ast.
     return .{ .expression = expression, .property = property };
 }
 
-fn acceptNewExpression(self: *Self) !ast.NewExpression {
+pub fn acceptNewExpression(self: *Self) !ast.NewExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -402,7 +402,7 @@ fn acceptNewExpression(self: *Self) !ast.NewExpression {
     return .{ .expression = expression, .arguments = arguments };
 }
 
-fn acceptCallExpression(self: *Self, primary_expression: ast.Expression) !ast.CallExpression {
+pub fn acceptCallExpression(self: *Self, primary_expression: ast.Expression) !ast.CallExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -415,7 +415,7 @@ fn acceptCallExpression(self: *Self, primary_expression: ast.Expression) !ast.Ca
     return .{ .expression = expression, .arguments = arguments };
 }
 
-fn acceptArguments(self: *Self) !ast.Arguments {
+pub fn acceptArguments(self: *Self) !ast.Arguments {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -431,7 +431,7 @@ fn acceptArguments(self: *Self) !ast.Arguments {
     return arguments.toOwnedSlice();
 }
 
-fn acceptUpdateExpression(self: *Self, primary_expression: ?ast.Expression) !ast.UpdateExpression {
+pub fn acceptUpdateExpression(self: *Self, primary_expression: ?ast.Expression) !ast.UpdateExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -488,7 +488,7 @@ fn acceptUpdateExpression(self: *Self, primary_expression: ?ast.Expression) !ast
     };
 }
 
-fn acceptLiteral(self: *Self) !ast.Literal {
+pub fn acceptLiteral(self: *Self) !ast.Literal {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -506,7 +506,7 @@ fn acceptLiteral(self: *Self) !ast.Literal {
         return error.UnexpectedToken;
 }
 
-fn acceptNumericLiteral(self: *Self) !ast.NumericLiteral {
+pub fn acceptNumericLiteral(self: *Self) !ast.NumericLiteral {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -516,7 +516,7 @@ fn acceptNumericLiteral(self: *Self) !ast.NumericLiteral {
     return numeric_literal;
 }
 
-fn acceptStringLiteral(self: *Self) !ast.StringLiteral {
+pub fn acceptStringLiteral(self: *Self) !ast.StringLiteral {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -526,7 +526,7 @@ fn acceptStringLiteral(self: *Self) !ast.StringLiteral {
     return string_literal;
 }
 
-fn acceptArrayLiteral(self: *Self) !ast.ArrayLiteral {
+pub fn acceptArrayLiteral(self: *Self) !ast.ArrayLiteral {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -546,7 +546,7 @@ fn acceptArrayLiteral(self: *Self) !ast.ArrayLiteral {
     return .{ .element_list = try elements.toOwnedSlice() };
 }
 
-fn acceptObjectLiteral(self: *Self) !ast.ObjectLiteral {
+pub fn acceptObjectLiteral(self: *Self) !ast.ObjectLiteral {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -556,7 +556,7 @@ fn acceptObjectLiteral(self: *Self) !ast.ObjectLiteral {
     return .{ .property_definition_list = property_definition_list };
 }
 
-fn acceptPropertyDefinitionList(self: *Self) !ast.PropertyDefinitionList {
+pub fn acceptPropertyDefinitionList(self: *Self) !ast.PropertyDefinitionList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -571,7 +571,7 @@ fn acceptPropertyDefinitionList(self: *Self) !ast.PropertyDefinitionList {
     return .{ .items = try property_definitions.toOwnedSlice() };
 }
 
-fn acceptPropertyDefinition(
+pub fn acceptPropertyDefinition(
     self: *Self,
     method_type: ?ast.MethodDefinition.Type,
 ) !ast.PropertyDefinition {
@@ -663,7 +663,7 @@ fn acceptPropertyDefinition(
     } else |_| return error.UnexpectedToken;
 }
 
-fn acceptUnaryExpression(self: *Self) !ast.UnaryExpression {
+pub fn acceptUnaryExpression(self: *Self) !ast.UnaryExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -696,7 +696,7 @@ fn acceptUnaryExpression(self: *Self) !ast.UnaryExpression {
     return .{ .operator = operator, .expression = expression };
 }
 
-fn acceptBinaryExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.BinaryExpression {
+pub fn acceptBinaryExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.BinaryExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -741,7 +741,7 @@ fn acceptBinaryExpression(self: *Self, primary_expression: ast.Expression, ctx: 
     };
 }
 
-fn acceptRelationalExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.RelationalExpression {
+pub fn acceptRelationalExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.RelationalExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -767,7 +767,7 @@ fn acceptRelationalExpression(self: *Self, primary_expression: ast.Expression, c
     };
 }
 
-fn acceptEqualityExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.EqualityExpression {
+pub fn acceptEqualityExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.EqualityExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -791,7 +791,7 @@ fn acceptEqualityExpression(self: *Self, primary_expression: ast.Expression, ctx
     };
 }
 
-fn acceptLogicalExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.LogicalExpression {
+pub fn acceptLogicalExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.LogicalExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -814,7 +814,7 @@ fn acceptLogicalExpression(self: *Self, primary_expression: ast.Expression, ctx:
     };
 }
 
-fn acceptConditionalExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.ConditionalExpression {
+pub fn acceptConditionalExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.ConditionalExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -834,7 +834,7 @@ fn acceptConditionalExpression(self: *Self, primary_expression: ast.Expression, 
     };
 }
 
-fn acceptAssignmentExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.AssignmentExpression {
+pub fn acceptAssignmentExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) !ast.AssignmentExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -899,7 +899,7 @@ fn acceptAssignmentExpression(self: *Self, primary_expression: ast.Expression, c
     };
 }
 
-fn acceptSequenceExpression(self: *Self, primary_expression: ast.Expression) !ast.SequenceExpression {
+pub fn acceptSequenceExpression(self: *Self, primary_expression: ast.Expression) !ast.SequenceExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -913,7 +913,7 @@ fn acceptSequenceExpression(self: *Self, primary_expression: ast.Expression) !as
     return .{ .expressions = try expressions.toOwnedSlice() };
 }
 
-fn acceptExpression(self: *Self, ctx: AcceptContext) (ParserCore.AcceptError || error{OutOfMemory})!ast.Expression {
+pub fn acceptExpression(self: *Self, ctx: AcceptContext) (ParserCore.AcceptError || error{OutOfMemory})!ast.Expression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -943,7 +943,7 @@ fn acceptExpression(self: *Self, ctx: AcceptContext) (ParserCore.AcceptError || 
     return expression;
 }
 
-fn acceptStatement(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!*ast.Statement {
+pub fn acceptStatement(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!*ast.Statement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -974,7 +974,7 @@ fn acceptStatement(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!*
     return statement;
 }
 
-fn acceptDeclaration(self: *Self) !*ast.Declaration {
+pub fn acceptDeclaration(self: *Self) !*ast.Declaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -989,7 +989,7 @@ fn acceptDeclaration(self: *Self) !*ast.Declaration {
     return declaration;
 }
 
-fn acceptHoistableDeclaration(self: *Self) !ast.HoistableDeclaration {
+pub fn acceptHoistableDeclaration(self: *Self) !ast.HoistableDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -999,7 +999,7 @@ fn acceptHoistableDeclaration(self: *Self) !ast.HoistableDeclaration {
         return error.UnexpectedToken;
 }
 
-fn acceptBreakableStatement(self: *Self) !ast.BreakableStatement {
+pub fn acceptBreakableStatement(self: *Self) !ast.BreakableStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1009,14 +1009,14 @@ fn acceptBreakableStatement(self: *Self) !ast.BreakableStatement {
         return error.UnexpectedToken;
 }
 
-fn acceptBlockStatement(self: *Self) !ast.BlockStatement {
+pub fn acceptBlockStatement(self: *Self) !ast.BlockStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
     return .{ .block = try self.acceptBlock() };
 }
 
-fn acceptBlock(self: *Self) !ast.Block {
+pub fn acceptBlock(self: *Self) !ast.Block {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1026,7 +1026,7 @@ fn acceptBlock(self: *Self) !ast.Block {
     return block;
 }
 
-fn acceptStatementList(self: *Self) error{OutOfMemory}!ast.StatementList {
+pub fn acceptStatementList(self: *Self) error{OutOfMemory}!ast.StatementList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1038,7 +1038,7 @@ fn acceptStatementList(self: *Self) error{OutOfMemory}!ast.StatementList {
     return .{ .items = try statement_list_items.toOwnedSlice() };
 }
 
-fn acceptStatementListItem(self: *Self) !ast.StatementListItem {
+pub fn acceptStatementListItem(self: *Self) !ast.StatementListItem {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1054,7 +1054,7 @@ fn acceptStatementListItem(self: *Self) !ast.StatementListItem {
     return statement_list_item;
 }
 
-fn acceptLexicalDeclaration(self: *Self, for_initializer: bool) !ast.LexicalDeclaration {
+pub fn acceptLexicalDeclaration(self: *Self, for_initializer: bool) !ast.LexicalDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1073,7 +1073,7 @@ fn acceptLexicalDeclaration(self: *Self, for_initializer: bool) !ast.LexicalDecl
     return .{ .type = @"type", .binding_list = binding_list };
 }
 
-fn acceptBindingList(self: *Self) !ast.BindingList {
+pub fn acceptBindingList(self: *Self) !ast.BindingList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1085,7 +1085,7 @@ fn acceptBindingList(self: *Self) !ast.BindingList {
     return .{ .items = try lexical_bindings.toOwnedSlice() };
 }
 
-fn acceptLexicalBinding(self: *Self) !ast.LexicalBinding {
+pub fn acceptLexicalBinding(self: *Self) !ast.LexicalBinding {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1098,7 +1098,7 @@ fn acceptLexicalBinding(self: *Self) !ast.LexicalBinding {
     return .{ .binding_identifier = binding_identifier, .initializer = initializer };
 }
 
-fn acceptVariableStatement(self: *Self, for_initializer: bool) !ast.VariableStatement {
+pub fn acceptVariableStatement(self: *Self, for_initializer: bool) !ast.VariableStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1108,7 +1108,7 @@ fn acceptVariableStatement(self: *Self, for_initializer: bool) !ast.VariableStat
     return .{ .variable_declaration_list = variable_declaration_list };
 }
 
-fn acceptVariableDeclarationList(self: *Self) !ast.VariableDeclarationList {
+pub fn acceptVariableDeclarationList(self: *Self) !ast.VariableDeclarationList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1121,7 +1121,7 @@ fn acceptVariableDeclarationList(self: *Self) !ast.VariableDeclarationList {
     return .{ .items = try variable_declarations.toOwnedSlice() };
 }
 
-fn acceptVariableDeclaration(self: *Self) !ast.VariableDeclaration {
+pub fn acceptVariableDeclaration(self: *Self) !ast.VariableDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1134,7 +1134,7 @@ fn acceptVariableDeclaration(self: *Self) !ast.VariableDeclaration {
     return .{ .binding_identifier = binding_identifier, .initializer = initializer };
 }
 
-fn acceptExpressionStatement(self: *Self) !ast.ExpressionStatement {
+pub fn acceptExpressionStatement(self: *Self) !ast.ExpressionStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1143,7 +1143,7 @@ fn acceptExpressionStatement(self: *Self) !ast.ExpressionStatement {
     return .{ .expression = expression };
 }
 
-fn acceptIfStatement(self: *Self) !ast.IfStatement {
+pub fn acceptIfStatement(self: *Self) !ast.IfStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1163,7 +1163,7 @@ fn acceptIfStatement(self: *Self) !ast.IfStatement {
     };
 }
 
-fn acceptIterationStatement(self: *Self) !ast.IterationStatement {
+pub fn acceptIterationStatement(self: *Self) !ast.IterationStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1177,7 +1177,7 @@ fn acceptIterationStatement(self: *Self) !ast.IterationStatement {
         return error.UnexpectedToken;
 }
 
-fn acceptDoWhileStatement(self: *Self) !ast.DoWhileStatement {
+pub fn acceptDoWhileStatement(self: *Self) !ast.DoWhileStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1193,7 +1193,7 @@ fn acceptDoWhileStatement(self: *Self) !ast.DoWhileStatement {
     };
 }
 
-fn acceptWhileStatement(self: *Self) !ast.WhileStatement {
+pub fn acceptWhileStatement(self: *Self) !ast.WhileStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1208,7 +1208,7 @@ fn acceptWhileStatement(self: *Self) !ast.WhileStatement {
     };
 }
 
-fn acceptForStatement(self: *Self) !ast.ForStatement {
+pub fn acceptForStatement(self: *Self) !ast.ForStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1236,7 +1236,7 @@ fn acceptForStatement(self: *Self) !ast.ForStatement {
     };
 }
 
-fn acceptReturnStatement(self: *Self) !ast.ReturnStatement {
+pub fn acceptReturnStatement(self: *Self) !ast.ReturnStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1266,7 +1266,7 @@ fn acceptReturnStatement(self: *Self) !ast.ReturnStatement {
     return .{ .expression = null };
 }
 
-fn acceptThrowStatement(self: *Self) !ast.ThrowStatement {
+pub fn acceptThrowStatement(self: *Self) !ast.ThrowStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1277,7 +1277,7 @@ fn acceptThrowStatement(self: *Self) !ast.ThrowStatement {
     return .{ .expression = expression };
 }
 
-fn acceptTryStatement(self: *Self) !ast.TryStatement {
+pub fn acceptTryStatement(self: *Self) !ast.TryStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1312,7 +1312,7 @@ fn acceptTryStatement(self: *Self) !ast.TryStatement {
     };
 }
 
-fn acceptDebuggerStatement(self: *Self) !void {
+pub fn acceptDebuggerStatement(self: *Self) !void {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1320,7 +1320,7 @@ fn acceptDebuggerStatement(self: *Self) !void {
     try self.acceptOrInsertSemicolon();
 }
 
-fn acceptFormalParameters(self: *Self) !ast.FormalParameters {
+pub fn acceptFormalParameters(self: *Self) !ast.FormalParameters {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1336,7 +1336,7 @@ fn acceptFormalParameters(self: *Self) !ast.FormalParameters {
     return .{ .items = try formal_parameters_items.toOwnedSlice() };
 }
 
-fn acceptFunctionDeclaration(self: *Self) !ast.FunctionDeclaration {
+pub fn acceptFunctionDeclaration(self: *Self) !ast.FunctionDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1371,7 +1371,7 @@ fn acceptFunctionDeclaration(self: *Self) !ast.FunctionDeclaration {
     };
 }
 
-fn acceptFunctionExpression(self: *Self) !ast.FunctionExpression {
+pub fn acceptFunctionExpression(self: *Self) !ast.FunctionExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1398,7 +1398,7 @@ fn acceptFunctionExpression(self: *Self) !ast.FunctionExpression {
     };
 }
 
-fn acceptFunctionBody(self: *Self) !ast.FunctionBody {
+pub fn acceptFunctionBody(self: *Self) !ast.FunctionBody {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1409,7 +1409,7 @@ fn acceptFunctionBody(self: *Self) !ast.FunctionBody {
     return .{ .statement_list = statement_list };
 }
 
-fn acceptArrowFunction(self: *Self) !ast.ArrowFunction {
+pub fn acceptArrowFunction(self: *Self) !ast.ArrowFunction {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
