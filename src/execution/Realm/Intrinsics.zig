@@ -120,13 +120,13 @@ pub fn @"%ArrayIteratorPrototype%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%ArrayIteratorPrototype%", builtins.ArrayIteratorPrototype);
 }
 pub fn @"%AsyncGeneratorFunction%"(self: *Self) error{OutOfMemory}!Object {
-    return self.lazyIntrinsic("%GeneratorFunction%", builtins.AsyncGeneratorFunctionConstructor);
+    return self.lazyIntrinsic("%AsyncGeneratorFunction%", builtins.AsyncGeneratorFunctionConstructor);
 }
 pub fn @"%AsyncGeneratorFunction.prototype%"(self: *Self) error{OutOfMemory}!Object {
-    return self.lazyIntrinsic("%GeneratorFunction.prototype%", builtins.AsyncGeneratorFunctionPrototype);
+    return self.lazyIntrinsic("%AsyncGeneratorFunction.prototype%", builtins.AsyncGeneratorFunctionPrototype);
 }
 pub fn @"%AsyncGeneratorFunction.prototype.prototype%"(self: *Self) error{OutOfMemory}!Object {
-    return self.lazyIntrinsic("%GeneratorFunction.prototype.prototype%", builtins.AsyncGeneratorPrototype);
+    return self.lazyIntrinsic("%AsyncGeneratorFunction.prototype.prototype%", builtins.AsyncGeneratorPrototype);
 }
 pub fn @"%AsyncIteratorPrototype%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%AsyncIteratorPrototype%", builtins.AsyncIteratorPrototype);
