@@ -203,12 +203,7 @@ pub fn parseNode(
         return error.ParseError;
     } else if (parser.core.peek()) |maybe_next_token| {
         if (maybe_next_token) |next_token| {
-            try parser.diagnostics.emit(
-                tokenizer.current_location,
-                .@"error",
-                "Unexpected token '{s}'",
-                .{@tagName(next_token.type)},
-            );
+            try parser.emitError("Unexpected token '{s}'", .{@tagName(next_token.type)});
             return error.ParseError;
         }
     } else |_| {
@@ -219,15 +214,18 @@ pub fn parseNode(
         const source = parser.core.tokenizer.source;
         const offset = parser.core.tokenizer.offset;
         std.debug.assert(offset < source.len);
-        try parser.diagnostics.emit(
-            tokenizer.current_location,
-            .@"error",
-            "Invalid character '{s}'",
-            .{source[offset .. offset + 1]},
-        );
+        try parser.emitError("Invalid character '{s}'", .{source[offset .. offset + 1]});
         return error.ParseError;
     }
     return ast_node.?;
+}
+
+fn emitError(self: *Self, comptime fmt: []const u8, args: anytype) !void {
+    try self.diagnostics.emit(self.core.tokenizer.current_location, .@"error", fmt, args);
+}
+
+fn emitErrorAt(self: *Self, location: ptk.Location, comptime fmt: []const u8, args: anytype) !void {
+    try self.diagnostics.emit(location, .@"error", fmt, args);
 }
 
 /// 5.1.5.8 [no LineTerminator here]
@@ -243,7 +241,7 @@ fn noLineTerminatorHere(self: *Self) !void {
         const whitespace_and_comments = self.core.tokenizer.source[start_offset..end_offset];
 
         if (containsLineTerminator(whitespace_and_comments)) {
-            try self.diagnostics.emit(state.location, .@"error", "Unexpected newline", .{});
+            try self.emitErrorAt(state.location, "Unexpected newline", .{});
             return error.UnexpectedToken;
         }
     }
@@ -482,23 +480,13 @@ pub fn acceptUpdateExpression(self: *Self, primary_expression: ?ast.Expression) 
 
     // It is an early Syntax Error if AssignmentTargetType of LeftHandSideExpression is not simple.
     if (@"type" == .prefix and expression.assignmentTargetType() != .simple) {
-        try self.diagnostics.emit(
-            state.location,
-            .@"error",
-            "Invalid left-hand side in update expression",
-            .{},
-        );
+        try self.emitErrorAt(state.location, "Invalid left-hand side in update expression", .{});
         return error.UnexpectedToken;
     }
 
     // It is an early Syntax Error if AssignmentTargetType of UnaryExpression is not simple.
     if (@"type" == .postfix and expression.assignmentTargetType() != .simple) {
-        try self.diagnostics.emit(
-            state.location,
-            .@"error",
-            "Invalid right-hand side in update expression",
-            .{},
-        );
+        try self.emitErrorAt(state.location, "Invalid right-hand side in update expression", .{});
         return error.UnexpectedToken;
     }
 
@@ -902,12 +890,7 @@ pub fn acceptAssignmentExpression(self: *Self, primary_expression: ast.Expressio
 
     // It is a Syntax Error if AssignmentTargetType of LeftHandSideExpression is not simple.
     if (primary_expression.assignmentTargetType() != .simple) {
-        try self.diagnostics.emit(
-            state.location,
-            .@"error",
-            "Invalid left-hand side in assignment expression",
-            .{},
-        );
+        try self.emitErrorAt(state.location, "Invalid left-hand side in assignment expression", .{});
         return error.UnexpectedToken;
     }
 
@@ -1273,12 +1256,7 @@ pub fn acceptReturnStatement(self: *Self) AcceptError!ast.ReturnStatement {
     _ = try self.core.accept(RuleSet.is(.@"return"));
 
     if (!self.state.in_function_body) {
-        try self.diagnostics.emit(
-            state.location,
-            .@"error",
-            "Return statement is only allowed in functions",
-            .{},
-        );
+        try self.emitErrorAt(state.location, "Return statement is only allowed in functions", .{});
         return error.UnexpectedToken;
     }
 
@@ -1326,12 +1304,7 @@ pub fn acceptTryStatement(self: *Self) AcceptError!ast.TryStatement {
     else |_|
         null;
     if (catch_block == null and finally_block == null) {
-        try self.diagnostics.emit(
-            self.core.tokenizer.current_location,
-            .@"error",
-            "Try statement requires catch or finally block",
-            .{},
-        );
+        try self.emitError("Try statement requires catch or finally block", .{});
         return error.UnexpectedToken;
     }
     return .{
@@ -1375,12 +1348,7 @@ pub fn acceptFunctionDeclaration(self: *Self) AcceptError!ast.FunctionDeclaratio
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     const identifier = self.acceptBindingIdentifier() catch |err| {
         if (self.core.peek() catch null) |next_token| if (next_token.type == .@"(") {
-            try self.diagnostics.emit(
-                self.core.tokenizer.current_location,
-                .@"error",
-                "Function declaration must have a binding identifier",
-                .{},
-            );
+            try self.emitError("Function declaration must have a binding identifier", .{});
         };
         return err;
     };
@@ -1505,12 +1473,7 @@ fn acceptGeneratorDeclaration(self: *Self) AcceptError!ast.GeneratorDeclaration 
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     _ = try self.core.accept(RuleSet.is(.@"*"));
     const identifier = self.acceptBindingIdentifier() catch |err| {
-        try self.diagnostics.emit(
-            self.core.tokenizer.current_location,
-            .@"error",
-            "Generator declaration must have a binding identifier",
-            .{},
-        );
+        try self.emitError("Generator declaration must have a binding identifier", .{});
         return err;
     };
     _ = try self.core.accept(RuleSet.is(.@"("));
@@ -1572,12 +1535,7 @@ fn acceptAsyncGeneratorDeclaration(self: *Self) AcceptError!ast.AsyncGeneratorDe
     _ = try self.core.accept(RuleSet.is(.function));
     _ = try self.core.accept(RuleSet.is(.@"*"));
     const identifier = self.acceptBindingIdentifier() catch |err| {
-        try self.diagnostics.emit(
-            self.core.tokenizer.current_location,
-            .@"error",
-            "Async generator declaration must have a binding identifier",
-            .{},
-        );
+        try self.emitError("Async generator declaration must have a binding identifier", .{});
         return err;
     };
     _ = try self.core.accept(RuleSet.is(.@"("));
@@ -1642,12 +1600,7 @@ fn acceptAsyncFunctionDeclaration(self: *Self) AcceptError!ast.AsyncFunctionDecl
     _ = try self.core.accept(RuleSet.is(.function));
     const identifier = self.acceptBindingIdentifier() catch |err| {
         if (self.core.peek() catch null) |next_token| if (next_token.type == .@"(") {
-            try self.diagnostics.emit(
-                self.core.tokenizer.current_location,
-                .@"error",
-                "Async function declaration must have a binding identifier",
-                .{},
-            );
+            try self.emitError("Async function declaration must have a binding identifier", .{});
         };
         return err;
     };
