@@ -1,6 +1,7 @@
 const arguments = @import("builtins/arguments.zig");
 const array = @import("builtins/array.zig");
 const array_iterator = @import("builtins/array_iterator.zig");
+const async_function = @import("builtins/async_function.zig");
 const async_generator = @import("builtins/async_generator.zig");
 const async_generator_function = @import("builtins/async_generator_function.zig");
 const async_iterator = @import("builtins/async_iterator.zig");
@@ -44,6 +45,8 @@ pub const ArrayConstructor = array.ArrayConstructor;
 pub const ArrayIterator = array_iterator.ArrayIterator;
 pub const ArrayIteratorPrototype = array_iterator.ArrayIteratorPrototype;
 pub const ArrayPrototype = array.ArrayPrototype;
+pub const AsyncFunctionConstructor = async_function.AsyncFunctionConstructor;
+pub const AsyncFunctionPrototype = async_function.AsyncFunctionPrototype;
 pub const AsyncGenerator = async_generator.AsyncGenerator;
 pub const AsyncGeneratorFunctionConstructor = async_generator_function.AsyncGeneratorFunctionConstructor;
 pub const AsyncGeneratorFunctionPrototype = async_generator_function.AsyncGeneratorFunctionPrototype;

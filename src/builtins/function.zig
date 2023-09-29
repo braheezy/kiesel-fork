@@ -128,7 +128,7 @@ pub fn createDynamicFunction(
     comptime var expr_sym: GrammarSymbol(switch (kind) {
         .normal => ast.FunctionExpression,
         .generator => ast.GeneratorExpression,
-        .@"async" => @compileError("Not implemented"),
+        .@"async" => ast.FunctionExpression,
         .async_generator => ast.AsyncGeneratorExpression,
     }) = .{};
     comptime var body_sym: GrammarSymbol(ast.FunctionBody) = .{};
@@ -195,8 +195,35 @@ pub fn createDynamicFunction(
             fallback_prototype = "%GeneratorFunction.prototype%";
         },
 
-        // TODO: 6. Else if kind is async, then
-        .@"async" => @compileError("Not implemented"),
+        // 6. Else if kind is async, then
+        .@"async" => {
+            // a. Let prefix be "async function".
+            prefix = "async function";
+
+            // TODO: b. Let exprSym be the grammar symbol AsyncFunctionExpression.
+            expr_sym.acceptFn = struct {
+                fn accept(parser: *Parser) Parser.AcceptError!ast.FunctionExpression {
+                    return parser.acceptFunctionExpression();
+                }
+            }.accept;
+
+            // c. Let bodySym be the grammar symbol AsyncFunctionBody.
+            body_sym.acceptFn = struct {
+                fn accept(parser: *Parser) Parser.AcceptError!ast.FunctionBody {
+                    return parser.acceptFunctionBody(.@"async");
+                }
+            }.accept;
+
+            // d. Let parameterSym be the grammar symbol FormalParameters[~Yield, +Await].
+            parameter_sym.acceptFn = struct {
+                fn accept(parser: *Parser) Parser.AcceptError!ast.FormalParameters {
+                    return parser.acceptFormalParameters();
+                }
+            }.accept;
+
+            // e. Let fallbackProto be "%AsyncFunction.prototype%".
+            fallback_prototype = "%AsyncFunction.prototype%";
+        },
 
         // 7. Else,
         .async_generator => {

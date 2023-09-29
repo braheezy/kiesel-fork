@@ -20,6 +20,8 @@ lazy_intrinsics: struct {
     @"%Array.prototype%": ?Object = null,
     @"%Array.prototype.values%": ?Object = null,
     @"%ArrayIteratorPrototype%": ?Object = null,
+    @"%AsyncFunction%": ?Object = null,
+    @"%AsyncFunction.prototype%": ?Object = null,
     @"%AsyncGeneratorFunction%": ?Object = null,
     @"%AsyncGeneratorFunction.prototype%": ?Object = null,
     @"%AsyncGeneratorFunction.prototype.prototype%": ?Object = null,
@@ -118,6 +120,12 @@ pub fn @"%Array.prototype.values%"(self: *Self) error{OutOfMemory}!Object {
 }
 pub fn @"%ArrayIteratorPrototype%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%ArrayIteratorPrototype%", builtins.ArrayIteratorPrototype);
+}
+pub fn @"%AsyncFunction%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%AsyncFunction%", builtins.AsyncFunctionConstructor);
+}
+pub fn @"%AsyncFunction.prototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%AsyncFunction.prototype%", builtins.AsyncFunctionPrototype);
 }
 pub fn @"%AsyncGeneratorFunction%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%AsyncGeneratorFunction%", builtins.AsyncGeneratorFunctionConstructor);
