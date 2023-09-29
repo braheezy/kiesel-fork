@@ -604,15 +604,18 @@ pub fn acceptPropertyDefinition(
                 else |_| {}
             }
 
-            const token = try self.core.peek();
-            const followed_by_valid_punctuation = switch (token.?.type) {
-                .@":", .@"(" => true,
-                else => false,
-            };
-            const followed_by_identifier_reference = switch (token.?.type) {
-                .identifier, .yield, .@"await" => true,
-                else => false,
-            };
+            var followed_by_valid_punctuation = false;
+            var followed_by_identifier_reference = false;
+            if (try self.core.peek()) |next_token| {
+                followed_by_valid_punctuation = switch (next_token.type) {
+                    .@":", .@"(" => true,
+                    else => false,
+                };
+                followed_by_identifier_reference = switch (next_token.type) {
+                    .identifier, .yield, .@"await" => true,
+                    else => false,
+                };
+            }
 
             // IdentifierReference
             if (!followed_by_valid_punctuation and !followed_by_identifier_reference) {
@@ -1363,7 +1366,7 @@ pub fn acceptFunctionDeclaration(self: *Self) AcceptError!ast.FunctionDeclaratio
     // We need to do this after consuming the 'function' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     const identifier = self.acceptBindingIdentifier() catch |err| {
-        if (self.core.peek() catch null) |token| if (token.type == .@"(") {
+        if (self.core.peek() catch null) |next_token| if (next_token.type == .@"(") {
             try self.diagnostics.emit(
                 self.core.tokenizer.current_location,
                 .@"error",
