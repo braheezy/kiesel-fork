@@ -81,11 +81,12 @@ pub const GeneratorFunctionPrototype = struct {
     pub fn init(realm: *Realm, object: Object) !void {
         // 27.3.3.1 GeneratorFunction.prototype.constructor
         // https://tc39.es/ecma262/#sec-generatorfunction.prototype.constructor
-        try defineBuiltinProperty(
-            object,
-            "constructor",
-            Value.from(try realm.intrinsics.@"%GeneratorFunction%"()),
-        );
+        try defineBuiltinProperty(object, "constructor", PropertyDescriptor{
+            .value = Value.from(try realm.intrinsics.@"%GeneratorFunction%"()),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
 
         // 27.3.3.2 GeneratorFunction.prototype.prototype
         // https://tc39.es/ecma262/#sec-generatorfunction.prototype.prototype
