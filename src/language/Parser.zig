@@ -1015,6 +1015,8 @@ pub fn acceptHoistableDeclaration(self: *Self) AcceptError!ast.HoistableDeclarat
         return .{ .function_declaration = function_declaration }
     else |_| if (self.acceptGeneratorDeclaration()) |generator_declaration|
         return .{ .generator_declaration = generator_declaration }
+    else |_| if (self.acceptAsyncFunctionDeclaration()) |async_function_declaration|
+        return .{ .async_function_declaration = async_function_declaration }
     else |_| if (self.acceptAsyncGeneratorDeclaration()) |async_generator_declaration|
         return .{ .async_generator_declaration = async_generator_declaration }
     else |_|
@@ -1608,6 +1610,46 @@ pub fn acceptAsyncGeneratorExpression(self: *Self) AcceptError!ast.AsyncGenerato
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
     const function_body = try self.acceptFunctionBody(.async_generator);
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+    const end_offset = self.core.tokenizer.offset;
+    const source_text = try self.allocator.dupe(
+        u8,
+        self.core.tokenizer.source[start_offset..end_offset],
+    );
+    return .{
+        .identifier = identifier,
+        .formal_parameters = formal_parameters,
+        .function_body = function_body,
+        .source_text = source_text,
+    };
+}
+
+fn acceptAsyncFunctionDeclaration(self: *Self) AcceptError!ast.AsyncFunctionDeclaration {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.is(.identifier));
+    if (!std.mem.eql(u8, token.text, "async")) return error.UnexpectedToken;
+    // We need to do this after consuming the 'async' token to skip preceeding whitespace.
+    const start_offset = self.core.tokenizer.offset - (comptime "async".len);
+    try self.noLineTerminatorHere();
+    _ = try self.core.accept(RuleSet.is(.function));
+    const identifier = self.acceptBindingIdentifier() catch |err| {
+        if (self.core.peek() catch null) |next_token| if (next_token.type == .@"(") {
+            try self.diagnostics.emit(
+                self.core.tokenizer.current_location,
+                .@"error",
+                "Async function declaration must have a binding identifier",
+                .{},
+            );
+        };
+        return err;
+    };
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    const formal_parameters = try self.acceptFormalParameters();
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    _ = try self.core.accept(RuleSet.is(.@"{"));
+    const function_body = try self.acceptFunctionBody(.@"async");
     _ = try self.core.accept(RuleSet.is(.@"}"));
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(

@@ -275,7 +275,11 @@ pub fn ordinaryCallEvaluateBody(
         // 1. Return ? EvaluateAsyncGeneratorBody of AsyncGeneratorBody with arguments functionObject and argumentsList.
         .async_generator => evaluateAsyncGeneratorBody(agent, function, arguments_list),
 
-        .@"async" => @panic("Not implemented"),
+        // AsyncFunctionBody : FunctionBody
+        // 1. Return ? EvaluateAsyncFunctionBody of AsyncFunctionBody with arguments functionObject and argumentsList.
+        // AsyncConciseBody : ExpressionBody
+        // 1. Return ? EvaluateAsyncConciseBody of AsyncConciseBody with arguments functionObject and argumentsList.
+        .@"async" => evaluateAsyncFunctionBody(agent, function, arguments_list),
     };
 }
 
@@ -348,6 +352,33 @@ fn evaluateAsyncGeneratorBody(
 
     // 5. Return Completion Record { [[Type]]: return, [[Value]]: generator, [[Target]]: empty }.
     return .{ .type = .@"return", .value = Value.from(generator), .target = null };
+}
+
+/// 15.8.4 Runtime Semantics: EvaluateAsyncFunctionBody
+/// https://tc39.es/ecma262/#sec-runtime-semantics-evaluateasyncfunctionbody
+fn evaluateAsyncFunctionBody(
+    agent: *Agent,
+    function: *ECMAScriptFunction,
+    arguments_list: ArgumentsList,
+) !Completion {
+    // AsyncFunctionBody : FunctionBody
+    // TODO: 1. Let promiseCapability be ! NewPromiseCapability(%Promise%).
+    const promise_capability = .{ .promise = try ordinaryObjectCreate(agent, null) };
+
+    // 2. Let declResult be Completion(FunctionDeclarationInstantiation(functionObject, argumentsList)).
+    const decl_result = functionDeclarationInstantiation(agent, function, arguments_list);
+
+    // 3. If declResult is an abrupt completion, then
+    if (std.meta.isError(decl_result)) {
+        // TODO: a. Perform ! Call(promiseCapability.[[Reject]], undefined, « declResult.[[Value]] »).
+    }
+    // 4. Else,
+    else {
+        // TODO: a. Perform AsyncFunctionStart(promiseCapability, FunctionBody).
+    }
+
+    // 5. Return Completion Record { [[Type]]: return, [[Value]]: promiseCapability.[[Promise]], [[Target]]: empty }.
+    return .{ .type = .@"return", .value = Value.from(promise_capability.promise), .target = null };
 }
 
 /// 10.2.2 [[Construct]] ( argumentsList, newTarget )

@@ -286,7 +286,7 @@ fn prettyPrintFunction(object: Object, writer: anytype) !void {
         switch (function_body.type) {
             .normal => try writer.writeAll("fn "),
             .generator => try writer.writeAll("fn* "),
-            .@"async" => @panic("Not implemented"),
+            .@"async" => try writer.writeAll("async fn "),
             .async_generator => try writer.writeAll("async fn* "),
         }
     } else {
