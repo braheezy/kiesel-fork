@@ -345,6 +345,8 @@ pub fn acceptPrimaryExpression(self: *Self) AcceptError!ast.PrimaryExpression {
         return .{ .function_expression = function_expression }
     else |_| if (self.acceptGeneratorExpression()) |generator_expression|
         return .{ .generator_expression = generator_expression }
+    else |_| if (self.acceptAsyncFunctionExpression()) |async_function_expression|
+        return .{ .async_function_expression = async_function_expression }
     else |_| if (self.acceptAsyncGeneratorExpression()) |async_generator_expression|
         return .{ .async_generator_expression = async_generator_expression }
     else |_| if (self.acceptArrowFunction()) |arrow_function|
@@ -1645,6 +1647,36 @@ fn acceptAsyncFunctionDeclaration(self: *Self) AcceptError!ast.AsyncFunctionDecl
         };
         return err;
     };
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    const formal_parameters = try self.acceptFormalParameters();
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    _ = try self.core.accept(RuleSet.is(.@"{"));
+    const function_body = try self.acceptFunctionBody(.@"async");
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+    const end_offset = self.core.tokenizer.offset;
+    const source_text = try self.allocator.dupe(
+        u8,
+        self.core.tokenizer.source[start_offset..end_offset],
+    );
+    return .{
+        .identifier = identifier,
+        .formal_parameters = formal_parameters,
+        .function_body = function_body,
+        .source_text = source_text,
+    };
+}
+
+pub fn acceptAsyncFunctionExpression(self: *Self) AcceptError!ast.AsyncFunctionExpression {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.is(.identifier));
+    if (!std.mem.eql(u8, token.text, "async")) return error.UnexpectedToken;
+    // We need to do this after consuming the 'async' token to skip preceeding whitespace.
+    const start_offset = self.core.tokenizer.offset - (comptime "async".len);
+    try self.noLineTerminatorHere();
+    _ = try self.core.accept(RuleSet.is(.function));
+    const identifier = self.acceptBindingIdentifier() catch null;
     _ = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));

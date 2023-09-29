@@ -21,6 +21,7 @@ function_expressions: std.ArrayList(FunctionExpression),
 
 pub const FunctionExpression = union(enum) {
     arrow_function: ast.ArrowFunction,
+    async_function_expression: ast.AsyncFunctionExpression,
     async_generator_expression: ast.AsyncGeneratorExpression,
     function_expression: ast.FunctionExpression,
     generator_expression: ast.GeneratorExpression,
@@ -179,6 +180,7 @@ pub fn print(self: Self, writer: anytype) !void {
             .array_set_length,
             .array_set_value,
             .instantiate_arrow_function_expression,
+            .instantiate_async_function_expression,
             .instantiate_async_generator_function_expression,
             .instantiate_generator_function_expression,
             .instantiate_ordinary_function_expression,

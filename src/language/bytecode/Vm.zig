@@ -776,6 +776,95 @@ fn instantiateAsyncGeneratorFunctionExpression(
     }
 }
 
+/// 15.8.3 Runtime Semantics: InstantiateAsyncFunctionExpression
+/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncfunctionexpression
+fn instantiateAsyncFunctionExpression(
+    agent: *Agent,
+    async_function_expression: ast.AsyncFunctionExpression,
+    default_name: ?[]const u8,
+) !Object {
+    const realm = agent.currentRealm();
+
+    // AsyncFunctionExpression : async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
+    if (async_function_expression.identifier) |identifier| {
+        // 1. Assert: name is not present.
+        std.debug.assert(default_name == null);
+
+        // 2. Set name to StringValue of BindingIdentifier.
+        const name = identifier;
+
+        // 3. Let outerEnv be the running execution context's LexicalEnvironment.
+        const outer_env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+        // 4. Let funcEnv be NewDeclarativeEnvironment(outerEnv).
+        const func_env = try newDeclarativeEnvironment(agent.gc_allocator, outer_env);
+
+        // 5. Perform ! funcEnv.CreateImmutableBinding(name, false).
+        try func_env.createImmutableBinding(agent, name, false);
+
+        // 6. Let privateEnv be the running execution context's PrivateEnvironment.
+        const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+
+        // 7. Let sourceText be the source text matched by AsyncFunctionExpression.
+        const source_text = async_function_expression.source_text;
+
+        // 8. Let closure be OrdinaryFunctionCreate(%AsyncFunction.prototype%, sourceText,
+        //    FormalParameters, AsyncFunctionBody, non-lexical-this, funcEnv, privateEnv).
+        const closure = try ordinaryFunctionCreate(
+            agent,
+            try realm.intrinsics.@"%AsyncFunction.prototype%"(),
+            source_text,
+            async_function_expression.formal_parameters,
+            async_function_expression.function_body,
+            .non_lexical_this,
+            .{ .declarative_environment = func_env },
+            private_env,
+        );
+
+        // 9. Perform SetFunctionName(closure, name).
+        try setFunctionName(closure, PropertyKey.from(name), null);
+
+        // 10. Perform ! funcEnv.InitializeBinding(name, closure).
+        func_env.initializeBinding(agent, name, Value.from(closure));
+
+        // 11. Return closure.
+        return closure;
+    }
+    // AsyncFunctionExpression : async function ( FormalParameters ) { AsyncFunctionBody }
+    else {
+        // 1. If name is not present, set name to "".
+        const name = default_name orelse "";
+
+        // 2. Let env be the LexicalEnvironment of the running execution context.
+        const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+        // 3. Let privateEnv be the running execution context's PrivateEnvironment.
+        const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+
+        // 4. Let sourceText be the source text matched by AsyncFunctionExpression.
+        const source_text = async_function_expression.source_text;
+
+        // 5. Let closure be OrdinaryFunctionCreate(%AsyncFunction.prototype%, sourceText,
+        //    FormalParameters, AsyncFunctionBody, non-lexical-this, env, privateEnv).
+        const closure = try ordinaryFunctionCreate(
+            agent,
+            try realm.intrinsics.@"%AsyncFunction.prototype%"(),
+            source_text,
+            async_function_expression.formal_parameters,
+            async_function_expression.function_body,
+            .non_lexical_this,
+            env,
+            private_env,
+        );
+
+        // 6. Perform SetFunctionName(closure, name).
+        try setFunctionName(closure, PropertyKey.from(name), null);
+
+        // 7. Return closure.
+        return closure;
+    }
+}
+
 pub fn executeInstruction(self: *Self, executable: Executable, instruction: Instruction) !void {
     switch (instruction) {
         .apply_string_or_numeric_binary_operator => {
@@ -1063,6 +1152,15 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             const closure = try instantiateArrowFunctionExpression(
                 self.agent,
                 function_expression.arrow_function,
+                null,
+            );
+            self.result = Value.from(closure);
+        },
+        .instantiate_async_function_expression => {
+            const function_expression = self.fetchFunctionExpression(executable);
+            const closure = try instantiateAsyncFunctionExpression(
+                self.agent,
+                function_expression.async_function_expression,
                 null,
             );
             self.result = Value.from(closure);
