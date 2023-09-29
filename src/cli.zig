@@ -25,6 +25,7 @@ const coerceOptionsToObject = kiesel.types.coerceOptionsToObject;
 const defineBuiltinFunction = kiesel.utils.defineBuiltinFunction;
 const defineBuiltinProperty = kiesel.utils.defineBuiltinProperty;
 const formatParseError = kiesel.utils.formatParseError;
+const formatParseErrorHint = kiesel.utils.formatParseErrorHint;
 const getOption = kiesel.types.getOption;
 const ordinaryObjectCreate = kiesel.builtins.ordinaryObjectCreate;
 
@@ -141,6 +142,9 @@ fn run(
     }) catch |err| switch (err) {
         error.ParseError => {
             const parse_error = diagnostics.errors.items[0];
+            const parse_error_hint = try formatParseErrorHint(allocator, parse_error, source_text);
+            defer allocator.free(parse_error_hint);
+            try stderr.print("{s}\n", .{parse_error_hint});
             agent.throwException(
                 .syntax_error,
                 try formatParseError(agent.gc_allocator, parse_error),
