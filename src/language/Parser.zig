@@ -212,6 +212,10 @@ pub fn parseNode(
             return error.ParseError;
         }
     } else |_| {
+        // If peek() returned UnexpectedCharacter, the tokenizer state is restored to the last
+        // 'good' position, which means we also have to re-consume any whitespace and other ignored
+        // tokens preceding the invalid character.
+        while (parser.core.tokenizer.next() catch null) |_| {}
         const source = parser.core.tokenizer.source;
         const offset = parser.core.tokenizer.offset;
         std.debug.assert(offset < source.len);
