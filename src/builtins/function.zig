@@ -22,6 +22,7 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
+const boundFunctionCreate = builtins.boundFunctionCreate;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
@@ -31,6 +32,7 @@ const makeConstructor = builtins.makeConstructor;
 const noexcept = utils.noexcept;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+const setFunctionLength = builtins.setFunctionLength;
 const setFunctionName = builtins.setFunctionName;
 
 fn GrammarSymbol(comptime T: type) type {
@@ -462,6 +464,7 @@ pub const FunctionPrototype = struct {
 
     pub fn init(realm: *Realm, object: Object) !void {
         try defineBuiltinFunction(object, "apply", apply, 2, realm);
+        try defineBuiltinFunction(object, "bind", bind, 1, realm);
         try defineBuiltinFunction(object, "call", call, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
     }
@@ -502,6 +505,82 @@ pub const FunctionPrototype = struct {
 
         // 6. Return ? Call(func, thisArg, argList).
         return func.callAssumeCallable(this_arg, arg_list);
+    }
+
+    /// 20.2.3.2 Function.prototype.bind ( thisArg, ...args )
+    /// https://tc39.es/ecma262/#sec-function.prototype.bind
+    fn bind(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const this_arg = arguments.get(0);
+        const args = if (arguments.count() <= 1) &[_]Value{} else arguments.values[1..];
+
+        // 1. Let Target be the this value.
+        const target = this_value;
+
+        // 2. If IsCallable(Target) is false, throw a TypeError exception.
+        if (!target.isCallable()) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not a function", .{target}),
+            );
+        }
+
+        // 3. Let F be ? BoundFunctionCreate(Target, thisArg, args).
+        const function = try boundFunctionCreate(agent, target.object, this_arg, args);
+
+        // 4. Let L be 0.
+        var length: f64 = 0;
+
+        // 5. Let targetHasLength be ? HasOwnProperty(Target, "length").
+        const target_has_length = try target.object.hasOwnProperty(PropertyKey.from("length"));
+
+        // 6. If targetHasLength is true, then
+        if (target_has_length) {
+            // a. Let targetLen be ? Get(Target, "length").
+            const target_length = try target.object.get(PropertyKey.from("length"));
+
+            // b. If targetLen is a Number, then
+            if (target_length == .number) {
+                // i. If targetLen is +∞𝔽, then
+                if (target_length.number.isPositiveInf()) {
+                    // 1. Set L to +∞.
+                    length = std.math.inf(f64);
+                }
+                // ii. Else if targetLen is -∞𝔽, then
+                else if (target_length.number.isNegativeInf()) {
+                    // 1. Set L to 0.
+                    length = 0;
+                }
+                // iii. Else,
+                else {
+                    // 1. Let targetLenAsInt be ! ToIntegerOrInfinity(targetLen).
+                    const target_length_as_int = target_length.toIntegerOrInfinity(agent) catch unreachable;
+
+                    // 2. Assert: targetLenAsInt is finite.
+                    std.debug.assert(std.math.isFinite(target_length_as_int));
+
+                    // 3. Let argCount be the number of elements in args.
+                    const arg_count = args.len;
+
+                    // 4. Set L to max(targetLenAsInt - argCount, 0).
+                    length = @max(target_length_as_int - @as(f64, @floatFromInt(arg_count)), 0);
+                }
+            }
+        }
+
+        // 7. Perform SetFunctionLength(F, L).
+        try setFunctionLength(function, length);
+
+        // 8. Let targetName be ? Get(Target, "name").
+        var target_name = try target.object.get(PropertyKey.from("name"));
+
+        // 9. If targetName is not a String, set targetName to the empty String.
+        if (target_name != .string) target_name = Value.from("");
+
+        // 10. Perform SetFunctionName(F, targetName, "bound").
+        try setFunctionName(function, PropertyKey.from(target_name.string), "bound");
+
+        // 11. Return F.
+        return Value.from(function);
     }
 
     /// 20.2.3.3 Function.prototype.call ( thisArg, ...args )
