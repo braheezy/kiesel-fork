@@ -36,6 +36,7 @@ pub const Tag = enum(u32) {
     async_generator,
     big_int,
     boolean,
+    bound_function,
     builtin_function,
     date,
     ecmascript_function,
@@ -528,14 +529,19 @@ pub fn getFunctionRealm(self: Self) !*Realm {
             return self.as(builtins.BuiltinFunction).fields.realm;
         } else if (self.is(builtins.ECMAScriptFunction)) {
             return self.as(builtins.ECMAScriptFunction).fields.realm;
-        } else if (!self.is(builtins.Proxy)) {
+        } else if (!(self.is(builtins.BoundFunction) or self.is(builtins.Proxy))) {
             @panic("Unhandled function type in getFunctionRealm()");
         }
     }
 
-    // TODO: 2. If obj is a bound function exotic object, then
-    //     a. Let boundTargetFunction be obj.[[BoundTargetFunction]].
-    //     b. Return ? GetFunctionRealm(boundTargetFunction).
+    // 2. If obj is a bound function exotic object, then
+    if (self.is(builtins.BoundFunction)) {
+        // a. Let boundTargetFunction be obj.[[BoundTargetFunction]].
+        const bound_target_function = self.as(builtins.BoundFunction).fields.bound_target_function;
+
+        // b. Return ? GetFunctionRealm(boundTargetFunction).
+        return bound_target_function.getFunctionRealm();
+    }
 
     // 3. If obj is a Proxy exotic object, then
     if (self.is(builtins.Proxy)) {
