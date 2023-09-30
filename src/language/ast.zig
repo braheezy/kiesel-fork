@@ -209,6 +209,32 @@ pub const MemberExpression = struct {
     }
 };
 
+/// https://tc39.es/ecma262/#prod-MetaProperty
+pub const MetaProperty = union(enum) {
+    const Self = @This();
+
+    new_target,
+
+    /// 13.3.12.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-meta-properties-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, _: *BytecodeContext) !void {
+        switch (self) {
+            // NewTarget : new . target
+            .new_target => {
+                // 1. Return GetNewTarget().
+                try executable.addInstruction(.get_new_target);
+            },
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("MetaProperty", writer, indentation);
+        switch (self) {
+            .new_target => try printString("new.target", writer, indentation + 1),
+        }
+    }
+};
+
 /// https://tc39.es/ecma262/#prod-NewExpression
 pub const NewExpression = struct {
     const Self = @This();
@@ -1690,6 +1716,7 @@ pub const Expression = union(enum) {
 
     primary_expression: PrimaryExpression,
     member_expression: MemberExpression,
+    meta_property: MetaProperty,
     new_expression: NewExpression,
     call_expression: CallExpression,
     update_expression: UpdateExpression,

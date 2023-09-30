@@ -405,6 +405,31 @@ pub fn acceptMemberExpression(self: *Self, primary_expression: ast.Expression) A
     return .{ .expression = expression, .property = property };
 }
 
+pub fn acceptMetaProperty(self: *Self) AcceptError!ast.MetaProperty {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    if (self.acceptNewTarget())
+        return .new_target
+    else |_|
+        return error.UnexpectedToken;
+}
+
+pub fn acceptNewTarget(self: *Self) AcceptError!void {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.is(.new));
+    _ = try self.core.accept(RuleSet.is(.@"."));
+    const identifier = try self.core.accept(RuleSet.is(.identifier));
+    if (!std.mem.eql(u8, identifier.text, "target")) return error.UnexpectedToken;
+
+    if (!self.state.in_function_body) {
+        try self.emitErrorAt(token.location, "new.target is only allowed in functions", .{});
+        return error.UnexpectedToken;
+    }
+}
+
 pub fn acceptNewExpression(self: *Self) AcceptError!ast.NewExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
@@ -928,6 +953,8 @@ pub fn acceptExpression(self: *Self, ctx: AcceptContext) (ParserCore.AcceptError
         .{ .unary_expression = unary_expression }
     else |_| if (self.acceptUpdateExpression(null)) |update_expression|
         .{ .update_expression = update_expression }
+    else |_| if (self.acceptMetaProperty()) |meta_property|
+        .{ .meta_property = meta_property }
     else |_| if (self.acceptNewExpression()) |new_expression|
         .{ .new_expression = new_expression }
     else |_| if (self.acceptPrimaryExpression()) |primary_expression|

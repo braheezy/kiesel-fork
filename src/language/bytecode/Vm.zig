@@ -1091,6 +1091,12 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
                 .this_value = null,
             };
         },
+        .get_new_target => {
+            self.result = if (self.agent.getNewTarget()) |new_target|
+                Value.from(new_target)
+            else
+                .undefined;
+        },
         .get_value => {
             if (self.reference) |reference| self.result = try reference.getValue(self.agent);
             self.reference = null;

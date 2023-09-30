@@ -36,6 +36,8 @@ pub const Instruction = enum(u8) {
     evaluate_property_access_with_expression_key,
     /// Store EvaluatePropertyAccessWithIdentifierKey() as the result value.
     evaluate_property_access_with_identifier_key,
+    /// Store GetNewTarget() as the result value.
+    get_new_target,
     /// Store GetValue() as the result value.
     get_value,
     /// Compare the last two values on the stack using the '>' operator rules.
