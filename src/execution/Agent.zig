@@ -280,6 +280,19 @@ pub fn resolveThisBinding(self: *Self) Error!Value {
     return env.getThisBinding();
 }
 
+/// 9.4.5 GetNewTarget ( )
+/// https://tc39.es/ecma262/#sec-getnewtarget
+pub fn getNewTarget(self: *Self) ?Object {
+    // 1. Let envRec be GetThisEnvironment().
+    const env = self.getThisEnvironment();
+
+    // 2. Assert: envRec has a [[NewTarget]] field.
+    std.debug.assert(env == .function_environment);
+
+    // 3. Return envRec.[[NewTarget]].
+    return env.function_environment.new_target;
+}
+
 /// 9.4.6 GetGlobalObject ( )
 /// https://tc39.es/ecma262/#sec-getglobalobject
 pub fn getGlobalObject(self: Self) Object {
