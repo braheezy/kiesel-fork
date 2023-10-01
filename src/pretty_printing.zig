@@ -155,6 +155,37 @@ fn prettyPrintMapIterator(map_iterator: *const builtins.MapIterator, writer: any
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintPromise(promise: *const builtins.Promise, writer: anytype) !void {
+    const promise_state = promise.fields.promise_state;
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Promise(");
+    try tty_config.setColor(writer, .reset);
+    switch (promise_state) {
+        .pending => {
+            try tty_config.setColor(writer, .dim);
+            try writer.writeAll("<pending>");
+            try tty_config.setColor(writer, .reset);
+        },
+        .fulfilled => {
+            try tty_config.setColor(writer, .green);
+            try writer.writeAll("<fulfilled>");
+            try tty_config.setColor(writer, .reset);
+            try writer.print(", {pretty}", .{promise.fields.promise_result});
+        },
+        .rejected => {
+            try tty_config.setColor(writer, .red);
+            try writer.writeAll("<rejected>");
+            try tty_config.setColor(writer, .reset);
+            try writer.print(", {pretty}", .{promise.fields.promise_result});
+        },
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintProxy(proxy: *const builtins.Proxy, writer: anytype) !void {
     const proxy_target = proxy.fields.proxy_target;
     const proxy_handler = proxy.fields.proxy_handler;
@@ -386,6 +417,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
             .{ builtins.Map, prettyPrintMap },
             .{ builtins.MapIterator, prettyPrintMapIterator },
             .{ builtins.Number, prettyPrintPrimitiveWrapper },
+            .{ builtins.Promise, prettyPrintPromise },
             .{ builtins.Proxy, prettyPrintProxy },
             .{ builtins.Set, prettyPrintSet },
             .{ builtins.SetIterator, prettyPrintSetIterator },

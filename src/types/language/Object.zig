@@ -45,6 +45,7 @@ pub const Tag = enum(u32) {
     map,
     map_iterator,
     number,
+    promise,
     proxy,
     set,
     set_iterator,

@@ -54,6 +54,8 @@ lazy_intrinsics: struct {
     @"%Object%": ?Object = null,
     @"%Object.prototype%": ?Object = null,
     @"%Object.prototype.toString%": ?Object = null,
+    @"%Promise%": ?Object = null,
+    @"%Promise.prototype%": ?Object = null,
     @"%Proxy%": ?Object = null,
     @"%RangeError%": ?Object = null,
     @"%RangeError.prototype%": ?Object = null,
@@ -228,6 +230,12 @@ pub fn @"%Object.prototype.toString%"(self: *Self) error{OutOfMemory}!Object {
         intrinsic.* = property_descriptor.?.value.?.object;
     }
     return intrinsic.*.?;
+}
+pub fn @"%Promise%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%Promise%", builtins.PromiseConstructor);
+}
+pub fn @"%Promise.prototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%Promise.prototype%", builtins.PromisePrototype);
 }
 pub fn @"%Proxy%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Proxy%", builtins.ProxyConstructor);

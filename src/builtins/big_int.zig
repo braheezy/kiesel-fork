@@ -16,7 +16,6 @@ const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
-const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 21.2.2 Properties of the BigInt Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-bigint-constructor
