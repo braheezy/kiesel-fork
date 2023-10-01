@@ -663,6 +663,7 @@ pub const PromisePrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "catch", @"catch", 1, realm);
         try defineBuiltinFunction(object, "then", then, 2, realm);
 
         // 27.2.5.5 Promise.prototype [ @@toStringTag ]
@@ -675,6 +676,18 @@ pub const PromisePrototype = struct {
         });
 
         return object;
+    }
+
+    /// 27.2.5.1 Promise.prototype.catch ( onRejected )
+    /// https://tc39.es/ecma262/#sec-promise.prototype.catch
+    fn @"catch"(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const on_rejected = arguments.get(0);
+
+        // 1. Let promise be the this value.
+        const promise = this_value;
+
+        // 2. Return ? Invoke(promise, "then", « undefined, onRejected »).
+        return promise.invoke(agent, PropertyKey.from("then"), .{ .undefined, on_rejected });
     }
 
     /// 27.2.5.4 Promise.prototype.then ( onFulfilled, onRejected )
