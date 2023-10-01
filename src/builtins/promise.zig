@@ -18,6 +18,7 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -397,6 +398,15 @@ pub const PromiseConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
+
+        // 27.2.4.8 get Promise [ @@species ]
+        // https://tc39.es/ecma262/#sec-get-promise-@@species
+        try defineBuiltinAccessor(object, "@@species", struct {
+            fn getter(_: *Agent, this_value: Value, _: ArgumentsList) !Value {
+                // 1. Return the this value.
+                return this_value;
+            }
+        }.getter, null, realm);
 
         // 27.2.5.2 Promise.prototype.constructor
         try defineBuiltinProperty(
