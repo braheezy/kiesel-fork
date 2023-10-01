@@ -37,6 +37,22 @@ const PromiseCapability = struct {
     reject: Object,
 };
 
+/// 27.2.1.2 PromiseReaction Records
+/// https://tc39.es/ecma262/#sec-promisereaction-records
+const PromiseReaction = struct {
+    /// [[Capability]]
+    capability: ?PromiseCapability,
+
+    /// [[Type]]
+    type: enum { fulfill, reject },
+
+    /// [[Handler]]
+    handler: ?JobCallback,
+};
+
+// TODO: Implement JobCallback records
+const JobCallback = struct {};
+
 const ResolvingFunctions = struct {
     resolve: Object,
     reject: Object,
@@ -222,18 +238,23 @@ pub fn fulfillPromise(promise: *Promise, value: Value) void {
     // 1. Assert: The value of promise.[[PromiseState]] is pending.
     std.debug.assert(promise.fields.promise_state == .pending);
 
-    // TODO: 2. Let reactions be promise.[[PromiseFulfillReactions]].
+    // 2. Let reactions be promise.[[PromiseFulfillReactions]].
+    const reactions = promise.fields.promise_fulfill_reactions;
 
     // 3. Set promise.[[PromiseResult]] to value.
     promise.fields.promise_result = value;
 
-    // TODO: 4. Set promise.[[PromiseFulfillReactions]] to undefined.
-    // TODO: 5. Set promise.[[PromiseRejectReactions]] to undefined.
+    // 4. Set promise.[[PromiseFulfillReactions]] to undefined.
+    defer promise.fields.promise_fulfill_reactions.deinit();
+
+    // 5. Set promise.[[PromiseRejectReactions]] to undefined.
+    defer promise.fields.promise_reject_reactions.deinit();
 
     // 6. Set promise.[[PromiseState]] to fulfilled.
     promise.fields.promise_state = .fulfilled;
 
     // TODO: 7. Perform TriggerPromiseReactions(reactions, value).
+    _ = reactions;
 
     // 8. Return unused.
 }
@@ -337,19 +358,24 @@ pub fn rejectPromise(promise: *Promise, reason: Value) void {
     // 1. Assert: The value of promise.[[PromiseState]] is pending.
     std.debug.assert(promise.fields.promise_state == .pending);
 
-    // TODO: 2. Let reactions be promise.[[PromiseRejectReactions]].
+    // 2. Let reactions be promise.[[PromiseRejectReactions]].
+    const reactions = promise.fields.promise_reject_reactions;
 
     // 3. Set promise.[[PromiseResult]] to reason.
     promise.fields.promise_result = reason;
 
-    // TODO: 4. Set promise.[[PromiseFulfillReactions]] to undefined.
-    // TODO: 5. Set promise.[[PromiseRejectReactions]] to undefined.
+    // 4. Set promise.[[PromiseFulfillReactions]] to undefined.
+    defer promise.fields.promise_fulfill_reactions.deinit();
+
+    // 5. Set promise.[[PromiseRejectReactions]] to undefined.
+    defer promise.fields.promise_reject_reactions.deinit();
 
     // 6. Set promise.[[PromiseState]] to rejected.
     promise.fields.promise_state = .rejected;
 
     // TODO: 7. If promise.[[PromiseIsHandled]] is false, perform HostPromiseRejectionTracker(promise, "reject").
     // TODO: 8. Perform TriggerPromiseReactions(reactions, reason).
+    _ = reactions;
 
     // 9. Return unused.
 }
@@ -447,8 +473,11 @@ pub const PromiseConstructor = struct {
             // 4. Set promise.[[PromiseState]] to pending.
             .promise_state = .pending,
 
-            // TODO: 5. Set promise.[[PromiseFulfillReactions]] to a new empty List.
-            // TODO: 6. Set promise.[[PromiseRejectReactions]] to a new empty List.
+            // 5. Set promise.[[PromiseFulfillReactions]] to a new empty List.
+            .promise_fulfill_reactions = std.ArrayList(PromiseReaction).init(agent.gc_allocator),
+
+            // 6. Set promise.[[PromiseRejectReactions]] to a new empty List.
+            .promise_reject_reactions = std.ArrayList(PromiseReaction).init(agent.gc_allocator),
 
             // 7. Set promise.[[PromiseIsHandled]] to false.
             .promise_is_handled = false,
@@ -556,7 +585,11 @@ pub const Promise = Object.Factory(.{
         /// [[PromiseResult]]
         promise_result: Value,
 
-        // TODO: [[PromiseFulfillReactions]], [[PromiseRejectReactions]]
+        /// [[PromiseFulfillReactions]]
+        promise_fulfill_reactions: std.ArrayList(PromiseReaction),
+
+        /// [[PromiseRejectReactions]]
+        promise_reject_reactions: std.ArrayList(PromiseReaction),
 
         /// [[PromiseIsHandled]]
         promise_is_handled: bool,
