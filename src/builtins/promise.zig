@@ -18,6 +18,7 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const sameValue = types.sameValue;
@@ -363,6 +364,8 @@ pub const PromiseConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "reject", reject, 1, realm);
+
         // 27.2.4.4 Promise.prototype
         // https://tc39.es/ecma262/#sec-promise.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -444,6 +447,24 @@ pub const PromiseConstructor = struct {
 
         // 11. Return promise.
         return Value.from(promise);
+    }
+
+    /// 27.2.4.6 Promise.reject ( r )
+    /// https://tc39.es/ecma262/#sec-promise.reject
+    fn reject(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const reason = arguments.get(0);
+
+        // 1. Let C be the this value.
+        const constructor = this_value;
+
+        // 2. Let promiseCapability be ? NewPromiseCapability(C).
+        const promise_capability = try newPromiseCapability(agent, constructor);
+
+        // 3. Perform ? Call(promiseCapability.[[Reject]], undefined, « r »).
+        _ = try Value.from(promise_capability.reject).call(agent, undefined, .{reason});
+
+        // 4. Return promiseCapability.[[Promise]].
+        return Value.from(promise_capability.promise);
     }
 };
 
