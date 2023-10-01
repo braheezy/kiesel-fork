@@ -460,6 +460,45 @@ pub fn lengthOfArrayLike(self: Self) !u53 {
     return (try self.get(PropertyKey.from("length"))).toLength(self.agent());
 }
 
+/// 7.3.23 SpeciesConstructor ( O, defaultConstructor )
+/// https://tc39.es/ecma262/#sec-speciesconstructor
+pub fn speciesConstructor(self: Self, default_constructor: Self) !Self {
+    // 1. Let C be ? Get(O, "constructor").
+    const constructor = try self.get(PropertyKey.from("constructor"));
+
+    // 2. If C is undefined, return defaultConstructor.
+    if (constructor == .undefined) return default_constructor;
+
+    // 3. If C is not an Object, throw a TypeError exception.
+    if (constructor != .object) {
+        return self.agent().throwException(
+            .type_error,
+            try std.fmt.allocPrint(
+                self.agent().gc_allocator,
+                "{} is not an Object",
+                .{constructor},
+            ),
+        );
+    }
+
+    // 4. Let S be ? Get(C, @@species).
+    const species = try constructor.object.get(
+        PropertyKey.from(self.agent().well_known_symbols.@"@@species"),
+    );
+
+    // 5. If S is either undefined or null, return defaultConstructor.
+    if (species == .undefined or species == .null) return default_constructor;
+
+    // 6. If IsConstructor(S) is true, return S.
+    if (species.isConstructor()) return species.object;
+
+    // 7. Throw a TypeError exception.
+    return self.agent().throwException(
+        .type_error,
+        "Object's [Symbol.species] property must be a constructor",
+    );
+}
+
 /// 7.3.24 EnumerableOwnProperties ( O, kind )
 /// https://tc39.es/ecma262/#sec-enumerableownproperties
 pub fn enumerableOwnProperties(
