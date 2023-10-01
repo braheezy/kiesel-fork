@@ -348,6 +348,16 @@ pub const PromisePrototype = struct {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+
+        // 27.2.5.5 Promise.prototype [ @@toStringTag ]
+        // https://tc39.es/ecma262/#sec-promise.prototype-@@tostringtag
+        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+            .value = Value.from("Promise"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
         return object;
     }
 };
