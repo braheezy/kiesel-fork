@@ -353,6 +353,28 @@ pub fn rejectPromise(promise: *Promise, reason: Value) void {
     // 9. Return unused.
 }
 
+/// 27.2.4.7.1 PromiseResolve ( C, x )
+/// https://tc39.es/ecma262/#sec-promise-resolve
+pub fn promiseResolve(agent: *Agent, constructor: Object, x: Value) !Object {
+    // 1. If IsPromise(x) is true, then
+    if (x.isPromise()) {
+        // a. Let xConstructor be ? Get(x, "constructor").
+        const x_constructor = try x.object.get(PropertyKey.from("constructor"));
+
+        // b. If SameValue(xConstructor, C) is true, return x.
+        if (sameValue(x_constructor, Value.from(constructor))) return x.object;
+    }
+
+    // 2. Let promiseCapability be ? NewPromiseCapability(C).
+    const promise_capability = try newPromiseCapability(agent, Value.from(constructor));
+
+    // 3. Perform ? Call(promiseCapability.[[Resolve]], undefined, « x »).
+    _ = try Value.from(promise_capability.resolve).callAssumeCallable(.undefined, .{x});
+
+    // 4. Return promiseCapability.[[Promise]].
+    return promise_capability.promise;
+}
+
 /// 27.2.4 Properties of the Promise Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-constructor
 pub const PromiseConstructor = struct {
@@ -365,6 +387,7 @@ pub const PromiseConstructor = struct {
         });
 
         try defineBuiltinFunction(object, "reject", reject, 1, realm);
+        try defineBuiltinFunction(object, "resolve", resolve, 1, realm);
 
         // 27.2.4.4 Promise.prototype
         // https://tc39.es/ecma262/#sec-promise.prototype
@@ -432,16 +455,16 @@ pub const PromiseConstructor = struct {
         ) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
 
-        // 10. If completion is an abrupt completion, then
+            // 10. If completion is an abrupt completion, then
             error.ExceptionThrown => {
                 const exception = agent.exception.?;
                 agent.exception = null;
 
-            // a. Perform ? Call(resolvingFunctions.[[Reject]], undefined, « completion.[[Value]] »).
-            _ = try Value.from(resolving_functions.reject).callAssumeCallable(
-                .undefined,
+                // a. Perform ? Call(resolvingFunctions.[[Reject]], undefined, « completion.[[Value]] »).
+                _ = try Value.from(resolving_functions.reject).callAssumeCallable(
+                    .undefined,
                     .{exception},
-            );
+                );
             },
         };
 
@@ -465,6 +488,26 @@ pub const PromiseConstructor = struct {
 
         // 4. Return promiseCapability.[[Promise]].
         return Value.from(promise_capability.promise);
+    }
+
+    /// 27.2.4.7 Promise.resolve ( x )
+    /// https://tc39.es/ecma262/#sec-promise.resolve
+    fn resolve(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const resolution = arguments.get(0);
+
+        // 1. Let C be the this value.
+        const constructor = this_value;
+
+        // 2. If C is not an Object, throw a TypeError exception.
+        if (constructor != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{constructor}),
+            );
+        }
+
+        // 3. Return ? PromiseResolve(C, x).
+        return Value.from(try promiseResolve(agent, constructor.object, resolution));
     }
 };
 

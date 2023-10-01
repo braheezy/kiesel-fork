@@ -1048,6 +1048,19 @@ pub const Value = union(enum) {
         // NOTE: Returning the object here allows for direct assignment of the object at the call site.
         return self.object.as(T);
     }
+
+    /// 27.2.1.6 IsPromise ( x )
+    /// https://tc39.es/ecma262/#sec-ispromise
+    pub fn isPromise(self: Self) bool {
+        // 1. If x is not an Object, return false.
+        if (self != .object) return false;
+
+        // 2. If x does not have a [[PromiseState]] internal slot, return false.
+        if (!self.object.is(builtins.Promise)) return false;
+
+        // 3. Return true.
+        return true;
+    }
 };
 
 /// 7.1.4.1.1 StringToNumber ( str )

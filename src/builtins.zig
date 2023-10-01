@@ -165,6 +165,7 @@ pub const ordinarySet = ordinary.ordinarySet;
 pub const ordinarySetPrototypeOf = ordinary.ordinarySetPrototypeOf;
 pub const ordinarySetWithOwnDescriptor = ordinary.ordinarySetWithOwnDescriptor;
 pub const performEval = eval.performEval;
+pub const promiseResolve = promise.promiseResolve;
 pub const rejectPromise = promise.rejectPromise;
 pub const setFunctionLength = ecmascript_function.setFunctionLength;
 pub const setFunctionName = ecmascript_function.setFunctionName;
