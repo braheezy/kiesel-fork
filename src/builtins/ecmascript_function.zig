@@ -30,6 +30,7 @@ const createUnmappedArgumentsObject = builtins.createUnmappedArgumentsObject;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const newFunctionEnvironment = execution.newFunctionEnvironment;
+const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
@@ -362,15 +363,27 @@ fn evaluateAsyncFunctionBody(
     arguments_list: ArgumentsList,
 ) !Completion {
     // AsyncFunctionBody : FunctionBody
-    // TODO: 1. Let promiseCapability be ! NewPromiseCapability(%Promise%).
-    const promise_capability = .{ .promise = try ordinaryObjectCreate(agent, null) };
+    const realm = agent.currentRealm();
+
+    // 1. Let promiseCapability be ! NewPromiseCapability(%Promise%).
+    const promise_capability = newPromiseCapability(
+        agent,
+        Value.from(try realm.intrinsics.@"%Promise%"()),
+    ) catch |err| try noexcept(err);
 
     // 2. Let declResult be Completion(FunctionDeclarationInstantiation(functionObject, argumentsList)).
     const decl_result = functionDeclarationInstantiation(agent, function, arguments_list);
 
     // 3. If declResult is an abrupt completion, then
     if (std.meta.isError(decl_result)) {
-        // TODO: a. Perform ! Call(promiseCapability.[[Reject]], undefined, « declResult.[[Value]] »).
+        const exception = agent.exception.?;
+        agent.exception = null;
+
+        // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « declResult.[[Value]] »).
+        _ = Value.from(promise_capability.reject).callAssumeCallable(
+            .undefined,
+            .{exception},
+        ) catch |err| try noexcept(err);
     }
     // 4. Else,
     else {

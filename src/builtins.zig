@@ -147,6 +147,7 @@ pub const globalObjectProperties = global.globalObjectProperties;
 pub const isCompatiblePropertyDescriptor = ordinary.isCompatiblePropertyDescriptor;
 pub const makeConstructor = ecmascript_function.makeConstructor;
 pub const makeMethod = ecmascript_function.makeMethod;
+pub const newPromiseCapability = promise.newPromiseCapability;
 pub const ordinaryCreateFromConstructor = ordinary.ordinaryCreateFromConstructor;
 pub const ordinaryDefineOwnProperty = ordinary.ordinaryDefineOwnProperty;
 pub const ordinaryDelete = ordinary.ordinaryDelete;

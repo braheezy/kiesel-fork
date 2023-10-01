@@ -22,6 +22,19 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const sameValue = types.sameValue;
 
+/// 27.2.1.1 PromiseCapability Records
+/// https://tc39.es/ecma262/#sec-promisecapability-records
+const PromiseCapability = struct {
+    /// [[Promise]]
+    promise: Object,
+
+    /// [[Resolve]]
+    resolve: Object,
+
+    /// [[Reject]]
+    reject: Object,
+};
+
 const ResolvingFunctions = struct {
     resolve: Object,
     reject: Object,
@@ -221,6 +234,99 @@ pub fn fulfillPromise(promise: *Promise, value: Value) void {
     // TODO: 7. Perform TriggerPromiseReactions(reactions, value).
 
     // 8. Return unused.
+}
+
+/// 27.2.1.5 NewPromiseCapability ( C )
+/// https://tc39.es/ecma262/#sec-newpromisecapability
+pub fn newPromiseCapability(agent: *Agent, constructor: Value) !PromiseCapability {
+    // 1. If IsConstructor(C) is false, throw a TypeError exception.
+    if (!constructor.isConstructor()) {
+        return agent.throwException(
+            .type_error,
+            try std.fmt.allocPrint(agent.gc_allocator, "{} is not a constructor", .{constructor}),
+        );
+    }
+
+    // 2. NOTE: C is assumed to be a constructor function that supports the parameter conventions
+    //    of the Promise constructor (see 27.2.3.1).
+
+    // 3. Let resolvingFunctions be the Record { [[Resolve]]: undefined, [[Reject]]: undefined }.
+    // NOTE: This is created later.
+
+    const AdditionalFields = struct {
+        resolving_functions: struct {
+            resolve: Value,
+            reject: Value,
+        },
+    };
+
+    // 4. Let executorClosure be a new Abstract Closure with parameters (resolve, reject) that
+    //    captures resolvingFunctions and performs the following steps when called:
+    const executor_closure = struct {
+        fn func(agent_: *Agent, _: Value, arguments: ArgumentsList) !Value {
+            const resolve = arguments.get(0);
+            const reject = arguments.get(1);
+            const function = agent_.activeFunctionObject();
+            const additional_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
+            const resolving_functions_ = &additional_fields.resolving_functions;
+
+            // a. If resolvingFunctions.[[Resolve]] is not undefined, throw a TypeError exception.
+            if (resolving_functions_.resolve != .undefined) return agent_.throwException(.type_error, "TODO");
+
+            // b. If resolvingFunctions.[[Reject]] is not undefined, throw a TypeError exception.
+            if (resolving_functions_.reject != .undefined) return agent_.throwException(.type_error, "TODO");
+
+            // c. Set resolvingFunctions.[[Resolve]] to resolve.
+            resolving_functions_.resolve = resolve;
+
+            // d. Set resolvingFunctions.[[Reject]] to reject.
+            resolving_functions_.reject = reject;
+
+            // e. Return undefined.
+            return .undefined;
+        }
+    }.func;
+
+    // 5. Let executor be CreateBuiltinFunction(executorClosure, 2, "", « »).
+    const additional_fields = try agent.gc_allocator.create(AdditionalFields);
+    const executor = try createBuiltinFunction(agent, .{ .regular = executor_closure }, .{
+        .length = 2,
+        .name = "",
+        .additional_fields = SafePointer.make(*AdditionalFields, additional_fields),
+    });
+
+    // NOTE: This struct can outlive the function scope if anything holds on to the callback above.
+    additional_fields.* = .{
+        .resolving_functions = .{ .resolve = .undefined, .reject = .undefined },
+    };
+    const resolving_functions = &additional_fields.resolving_functions;
+
+    // 6. Let promise be ? Construct(C, « executor »).
+    const promise = try constructor.object.construct(.{Value.from(executor)}, null);
+
+    // 7. If IsCallable(resolvingFunctions.[[Resolve]]) is false, throw a TypeError exception.
+    if (!resolving_functions.resolve.isCallable()) {
+        return agent.throwException(
+            .type_error,
+            try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{resolving_functions.resolve}),
+        );
+    }
+
+    // 8. If IsCallable(resolvingFunctions.[[Reject]]) is false, throw a TypeError exception.
+    if (!resolving_functions.reject.isCallable()) {
+        return agent.throwException(
+            .type_error,
+            try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{resolving_functions.reject}),
+        );
+    }
+
+    // 9. Return the PromiseCapability Record { [[Promise]]: promise, [[Resolve]]:
+    //    resolvingFunctions.[[Resolve]], [[Reject]]: resolvingFunctions.[[Reject]] }.
+    return .{
+        .promise = promise,
+        .resolve = resolving_functions.resolve.object,
+        .reject = resolving_functions.reject.object,
+    };
 }
 
 /// 27.2.1.7 RejectPromise ( promise, reason )
