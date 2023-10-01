@@ -402,6 +402,111 @@ pub fn promiseResolve(agent: *Agent, constructor: Object, x: Value) !Object {
     return promise_capability.promise;
 }
 
+/// 27.2.5.4.1 PerformPromiseThen ( promise, onFulfilled, onRejected [ , resultCapability ] )
+/// https://tc39.es/ecma262/#sec-performpromisethen
+pub fn performPromiseThen(
+    agent: *Agent,
+    promise: *Promise,
+    on_fulfilled: Value,
+    on_rejected: Value,
+    result_capability: ?PromiseCapability,
+) !?Object {
+    _ = agent;
+    // 1. Assert: IsPromise(promise) is true.
+    // 2. If resultCapability is not present, then
+    //     a. Set resultCapability to undefined.
+    // NOTE: These are enforced through the parameter types.
+
+    // 3. If IsCallable(onFulfilled) is false, then
+    const on_fulfilled_job_callback = if (!on_fulfilled.isCallable()) blk: {
+        // a. Let onFulfilledJobCallback be empty.
+        break :blk null;
+    }
+    // 4. Else,
+    else blk: {
+        // TODO: a. Let onFulfilledJobCallback be HostMakeJobCallback(onFulfilled).
+        break :blk JobCallback{};
+    };
+
+    // 5. If IsCallable(onRejected) is false, then
+    const on_rejected_job_callback = if (!on_rejected.isCallable()) blk: {
+        // a. Let onRejectedJobCallback be empty.
+        break :blk null;
+    }
+    // 6. Else,
+    else blk: {
+        // TODO: a. Let onRejectedJobCallback be HostMakeJobCallback(onRejected).
+        break :blk JobCallback{};
+    };
+
+    // 7. Let fulfillReaction be the PromiseReaction {
+    //      [[Capability]]: resultCapability, [[Type]]: fulfill, [[Handler]]: onFulfilledJobCallback
+    //    }.
+    const fulfill_reaction = PromiseReaction{
+        .capability = result_capability,
+        .type = .fulfill,
+        .handler = on_fulfilled_job_callback,
+    };
+
+    // 8. Let rejectReaction be the PromiseReaction {
+    //      [[Capability]]: resultCapability, [[Type]]: reject, [[Handler]]: onRejectedJobCallback
+    //    }.
+    const reject_reaction = PromiseReaction{
+        .capability = result_capability,
+        .type = .reject,
+        .handler = on_rejected_job_callback,
+    };
+
+    switch (promise.fields.promise_state) {
+        // 9. If promise.[[PromiseState]] is pending, then
+        .pending => {
+            // a. Append fulfillReaction to promise.[[PromiseFulfillReactions]].
+            try promise.fields.promise_fulfill_reactions.append(fulfill_reaction);
+
+            // b. Append rejectReaction to promise.[[PromiseRejectReactions]].
+            try promise.fields.promise_reject_reactions.append(reject_reaction);
+        },
+
+        // 10. Else if promise.[[PromiseState]] is fulfilled, then
+        .fulfilled => {
+            // a. Let value be promise.[[PromiseResult]].
+            const value = promise.fields.promise_result;
+
+            // TODO: b. Let fulfillJob be NewPromiseReactionJob(fulfillReaction, value).
+            _ = value;
+
+            // TODO: c. Perform HostEnqueuePromiseJob(fulfillJob.[[Job]], fulfillJob.[[Realm]]).
+        },
+
+        // 11. Else,
+        //     a. Assert: The value of promise.[[PromiseState]] is rejected.
+        .rejected => {
+            // b. Let reason be promise.[[PromiseResult]].
+            const reason = promise.fields.promise_result;
+
+            // TODO: c. If promise.[[PromiseIsHandled]] is false, perform HostPromiseRejectionTracker(promise, "handle").
+            // TODO: d. Let rejectJob be NewPromiseReactionJob(rejectReaction, reason).
+            _ = reason;
+
+            // TODO: e. Perform HostEnqueuePromiseJob(rejectJob.[[Job]], rejectJob.[[Realm]]).
+        },
+    }
+
+    // 12. Set promise.[[PromiseIsHandled]] to true.
+    promise.fields.promise_is_handled = true;
+
+    // 13. If resultCapability is undefined, then
+    if (result_capability == null) {
+        // a. Return undefined.
+        return null;
+    }
+    // 14. Else,
+    else {
+        // a. Return resultCapability.[[Promise]].
+        return result_capability.?.promise;
+    }
+}
+
 /// 27.2.4 Properties of the Promise Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-constructor
 pub const PromiseConstructor = struct {
@@ -558,6 +663,8 @@ pub const PromisePrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "then", then, 2, realm);
+
         // 27.2.5.5 Promise.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-promise.prototype-@@tostringtag
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
@@ -568,6 +675,44 @@ pub const PromisePrototype = struct {
         });
 
         return object;
+    }
+
+    /// 27.2.5.4 Promise.prototype.then ( onFulfilled, onRejected )
+    /// https://tc39.es/ecma262/#sec-promise.prototype.then
+    fn then(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const realm = agent.currentRealm();
+        const on_fulfilled = arguments.get(0);
+        const on_rejected = arguments.get(1);
+
+        // 1. Let promise be the this value.
+        const promise = this_value;
+
+        // 2. If IsPromise(promise) is false, throw a TypeError exception.
+        if (!promise.isPromise()) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not a Promise", .{promise}),
+            );
+        }
+
+        // 3. Let C be ? SpeciesConstructor(promise, %Promise%).
+        const constructor = try promise.object.speciesConstructor(
+            try realm.intrinsics.@"%Promise%"(),
+        );
+
+        // 4. Let resultCapability be ? NewPromiseCapability(C).
+        const result_capability = try newPromiseCapability(agent, Value.from(constructor));
+
+        // 5. Return PerformPromiseThen(promise, onFulfilled, onRejected, resultCapability).
+        return Value.from(
+            try performPromiseThen(
+                agent,
+                promise.object.as(Promise),
+                on_fulfilled,
+                on_rejected,
+                result_capability,
+            ) orelse return .undefined,
+        );
     }
 };
 
