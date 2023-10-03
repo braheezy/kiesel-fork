@@ -20,6 +20,7 @@ const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const sameValue = types.sameValue;
 
 /// 25.1.2.1 AllocateArrayBuffer ( constructor, byteLength )
 /// https://tc39.es/ecma262/#sec-allocatearraybuffer
@@ -52,6 +53,29 @@ pub fn isDetachedBuffer(array_buffer: *const ArrayBuffer) bool {
     // 1. If arrayBuffer.[[ArrayBufferData]] is null, return true.
     // 2. Return false.
     return array_buffer.fields.array_buffer_data == null;
+}
+
+/// 25.1.2.3 DetachArrayBuffer ( arrayBuffer [ , key ] )
+/// https://tc39.es/ecma262/#sec-detacharraybuffer
+pub fn detachArrayBuffer(agent: *Agent, array_buffer: *ArrayBuffer, maybe_key: ?Value) !void {
+    // TODO: 1. Assert: IsSharedArrayBuffer(arrayBuffer) is false.
+
+    // 2. If key is not present, set key to undefined.
+    const key = maybe_key orelse .undefined;
+
+    // 3. If arrayBuffer.[[ArrayBufferDetachKey]] is not key, throw a TypeError exception.
+    if (!sameValue(array_buffer.fields.array_buffer_detach_key, key)) {
+        return agent.throwException(.type_error, "ArrayBuffer detach key does not match");
+    }
+
+    // 4. Set arrayBuffer.[[ArrayBufferData]] to null.
+    // 5. Set arrayBuffer.[[ArrayBufferByteLength]] to 0.
+    if (array_buffer.fields.array_buffer_data) |*data| {
+        data.deinit();
+        array_buffer.fields.array_buffer_data = null;
+    }
+
+    // 6. Return unused.
 }
 
 /// 25.1.4 Properties of the ArrayBuffer Constructor

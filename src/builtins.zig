@@ -146,6 +146,7 @@ pub const createResolvingFunctions = promise.createResolvingFunctions;
 pub const createSetIterator = set_iterator.createSetIterator;
 pub const createUnmappedArgumentsObject = arguments.createUnmappedArgumentsObject;
 pub const defineMethodProperty = ecmascript_function.defineMethodProperty;
+pub const detachArrayBuffer = array_buffer.detachArrayBuffer;
 pub const fulfillPromise = promise.fulfillPromise;
 pub const getPrototypeFromConstructor = ordinary.getPrototypeFromConstructor;
 pub const globalObjectProperties = global.globalObjectProperties;
