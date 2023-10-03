@@ -164,21 +164,24 @@ fn prettyPrintPromise(promise: *const builtins.Promise, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
     switch (promise_state) {
         .pending => {
+            try writer.writeAll("state: ");
             try tty_config.setColor(writer, .dim);
             try writer.writeAll("<pending>");
             try tty_config.setColor(writer, .reset);
         },
         .fulfilled => {
+            try writer.writeAll("state: ");
             try tty_config.setColor(writer, .green);
             try writer.writeAll("<fulfilled>");
             try tty_config.setColor(writer, .reset);
-            try writer.print(", {pretty}", .{promise.fields.promise_result});
+            try writer.print(", result: {pretty}", .{promise.fields.promise_result});
         },
         .rejected => {
+            try writer.writeAll("state: ");
             try tty_config.setColor(writer, .red);
             try writer.writeAll("<rejected>");
             try tty_config.setColor(writer, .reset);
-            try writer.print(", {pretty}", .{promise.fields.promise_result});
+            try writer.print(", result: {pretty}", .{promise.fields.promise_result});
         },
     }
     try tty_config.setColor(writer, .white);
@@ -195,9 +198,10 @@ fn prettyPrintProxy(proxy: *const builtins.Proxy, writer: anytype) !void {
     try writer.writeAll("Proxy(");
     try tty_config.setColor(writer, .reset);
     if (proxy_target != null and proxy_handler != null) {
-        try writer.print("{pretty}", .{Value.from(proxy_target.?)});
-        try writer.writeAll(", ");
-        try writer.print("{pretty}", .{Value.from(proxy_handler.?)});
+        try writer.print(
+            "target: {pretty}, handler: {pretty}",
+            .{ Value.from(proxy_target.?), Value.from(proxy_handler.?) },
+        );
     } else {
         try tty_config.setColor(writer, .dim);
         try writer.writeAll("<revoked>");
