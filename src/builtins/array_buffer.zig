@@ -16,6 +16,7 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createByteDataBlock = types.createByteDataBlock;
+const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
@@ -71,6 +72,15 @@ pub const ArrayBufferConstructor = struct {
             "constructor",
             Value.from(object),
         );
+
+        // 25.1.4.3 get ArrayBuffer [ @@species ]
+        // https://tc39.es/ecma262/#sec-get-arraybuffer-@@species
+        try defineBuiltinAccessor(object, "@@species", struct {
+            fn getter(_: *Agent, this_value: Value, _: ArgumentsList) !Value {
+                // 1. Return the this value.
+                return this_value;
+            }
+        }.getter, null, realm);
 
         return object;
     }
