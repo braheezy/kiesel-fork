@@ -3,6 +3,7 @@ pub const spec = @import("types/spec.zig");
 
 pub const BigInt = language.BigInt;
 pub const Completion = spec.Completion;
+pub const DataBlock = spec.DataBlock;
 pub const Iterator = spec.Iterator;
 pub const Number = language.Number;
 pub const Object = language.Object;
@@ -17,6 +18,7 @@ pub const ValueHashMap = language.ValueHashMap;
 pub const coerceOptionsToObject = language.coerceOptionsToObject;
 pub const createArrayFromList = language.createArrayFromList;
 pub const createArrayFromListMapToValue = language.createArrayFromListMapToValue;
+pub const createByteDataBlock = spec.createByteDataBlock;
 pub const createIterResultObject = spec.createIterResultObject;
 pub const getIterator = spec.getIterator;
 pub const getIteratorFromMethod = spec.getIteratorFromMethod;
