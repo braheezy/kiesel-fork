@@ -46,6 +46,14 @@ pub fn allocateArrayBuffer(agent: *Agent, constructor: Object, byte_length: u64)
     return object;
 }
 
+/// 25.1.2.2 IsDetachedBuffer ( arrayBuffer )
+/// https://tc39.es/ecma262/#sec-isdetachedbuffer
+pub fn isDetachedBuffer(array_buffer: *const ArrayBuffer) bool {
+    // 1. If arrayBuffer.[[ArrayBufferData]] is null, return true.
+    // 2. Return false.
+    return array_buffer.fields.array_buffer_data == null;
+}
+
 /// 25.1.4 Properties of the ArrayBuffer Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-constructor
 pub const ArrayBufferConstructor = struct {
@@ -128,7 +136,26 @@ pub const ArrayBufferPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
+
         return object;
+    }
+
+    fn byteLength(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
+
+        // TODO: 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
+
+        // 4. If IsDetachedBuffer(O) is true, return +0𝔽.
+        if (isDetachedBuffer(object)) return Value.from(0);
+
+        // 5. Let length be O.[[ArrayBufferByteLength]].
+        const length = object.fields.array_buffer_data.?.items.len;
+
+        // 6. Return 𝔽(length).
+        return Value.from(length);
     }
 };
 

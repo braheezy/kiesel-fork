@@ -150,6 +150,7 @@ pub const fulfillPromise = promise.fulfillPromise;
 pub const getPrototypeFromConstructor = ordinary.getPrototypeFromConstructor;
 pub const globalObjectProperties = global.globalObjectProperties;
 pub const isCompatiblePropertyDescriptor = ordinary.isCompatiblePropertyDescriptor;
+pub const isDetachedBuffer = array_buffer.isDetachedBuffer;
 pub const makeConstructor = ecmascript_function.makeConstructor;
 pub const makeMethod = ecmascript_function.makeMethod;
 pub const newPromiseCapability = promise.newPromiseCapability;
