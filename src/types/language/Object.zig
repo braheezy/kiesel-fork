@@ -32,6 +32,7 @@ const Self = @This();
 pub const Tag = enum(u32) {
     arguments,
     array,
+    array_buffer,
     array_iterator,
     async_generator,
     big_int,

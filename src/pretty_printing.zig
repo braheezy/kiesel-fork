@@ -20,8 +20,8 @@ const State = struct {
     print_in_progress: bool,
 };
 
-var buf: [@sizeOf(*anyopaque) * 1024]u8 = undefined;
-var fba = std.heap.FixedBufferAllocator.init(&buf);
+var fba_buf: [@sizeOf(*anyopaque) * 1024]u8 = undefined;
+var fba = std.heap.FixedBufferAllocator.init(&fba_buf);
 var state = State{
     .seen_objects = SeenObjects.init(fba.allocator()),
     .print_in_progress = false,
@@ -58,6 +58,38 @@ fn prettyPrintArray(array: *const builtins.Array, writer: anytype) !void {
     if (length != 0) try writer.writeAll(" ");
     try tty_config.setColor(writer, .white);
     try writer.writeAll("]");
+    try tty_config.setColor(writer, .reset);
+}
+
+fn prettyPrintArrayBuffer(array_buffer: *const builtins.ArrayBuffer, writer: anytype) !void {
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("ArrayBuffer(");
+    try tty_config.setColor(writer, .reset);
+    if (array_buffer.fields.array_buffer_data) |data| {
+        try writer.print("byteLength: {pretty}", .{Value.from(data.items.len)});
+        if (data.items.len != 0) {
+            try writer.writeAll(", data: ");
+            try tty_config.setColor(writer, .dim);
+            // Like std.fmt.fmtSliceHexLower() but with a space between each bytes
+            const charset = "0123456789abcdef";
+            var buf: [2]u8 = undefined;
+            for (data.items, 0..) |c, i| {
+                if (i != 0) try writer.writeAll(" ");
+                buf[0] = charset[c >> 4];
+                buf[1] = charset[c & 15];
+                try writer.writeAll(&buf);
+            }
+            try tty_config.setColor(writer, .reset);
+        }
+    } else {
+        try tty_config.setColor(writer, .dim);
+        try writer.writeAll("<detached>");
+        try tty_config.setColor(writer, .reset);
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
 }
 
@@ -411,6 +443,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
 
         inline for (.{
             .{ builtins.Array, prettyPrintArray },
+            .{ builtins.ArrayBuffer, prettyPrintArrayBuffer },
             .{ builtins.ArrayIterator, prettyPrintArrayIterator },
             .{ builtins.AsyncGenerator, prettyPrintAsyncGenerator },
             .{ builtins.BigInt, prettyPrintPrimitiveWrapper },
