@@ -17,6 +17,7 @@ const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createByteDataBlock = types.createByteDataBlock;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
@@ -55,6 +56,8 @@ pub const ArrayBufferConstructor = struct {
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+
+        try defineBuiltinFunction(object, "isView", isView, 1, realm);
 
         // 25.1.4.2 ArrayBuffer.prototype
         // https://tc39.es/ecma262/#sec-arraybuffer.prototype
@@ -100,6 +103,20 @@ pub const ArrayBufferConstructor = struct {
 
         // 3. Return ? AllocateArrayBuffer(NewTarget, byteLength).
         return Value.from(try allocateArrayBuffer(agent, new_target.?, @intCast(byte_length)));
+    }
+
+    /// 25.1.4.1 ArrayBuffer.isView ( arg )
+    /// https://tc39.es/ecma262/#sec-arraybuffer.isview
+    fn isView(_: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const arg = arguments.get(0);
+
+        // 1. If arg is not an Object, return false.
+        if (arg != .object) return Value.from(false);
+
+        // TODO: 2. If arg has a [[ViewedArrayBuffer]] internal slot, return true.
+
+        // 3. Return false.
+        return Value.from(false);
     }
 };
 
