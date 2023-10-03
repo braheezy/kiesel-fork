@@ -55,6 +55,7 @@ pub const Kiesel = struct {
         const gc_object = try ordinaryObjectCreate(realm.agent, try realm.intrinsics.@"%Object.prototype%"());
         try defineBuiltinFunction(gc_object, "collect", collect, 0, realm);
         try defineBuiltinFunction(kiesel_object, "createRealm", createRealm, 0, realm);
+        try defineBuiltinFunction(kiesel_object, "detachArrayBuffer", detachArrayBuffer, 1, realm);
         try defineBuiltinFunction(kiesel_object, "evalScript", evalScript, 1, realm);
         try defineBuiltinProperty(kiesel_object, "gc", Value.from(gc_object));
         try defineBuiltinFunction(kiesel_object, "print", print, 1, realm);
@@ -71,6 +72,19 @@ pub const Kiesel = struct {
         try realm.setRealmGlobalObject(null, null);
         const global = try realm.setDefaultGlobalBindings();
         return Value.from(global);
+    }
+
+    fn detachArrayBuffer(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const array_buffer = arguments.get(0);
+        if (array_buffer != .object or !array_buffer.object.is(kiesel.builtins.ArrayBuffer)) {
+            return agent.throwException(.type_error, "Argument must be an ArrayBuffer");
+        }
+        try kiesel.builtins.detachArrayBuffer(
+            agent,
+            array_buffer.object.as(kiesel.builtins.ArrayBuffer),
+            null,
+        );
+        return .undefined;
     }
 
     /// Algorithm from https://github.com/tc39/test262/blob/main/INTERPRETING.md
