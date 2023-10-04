@@ -898,7 +898,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             const value = self.result.?;
             self.result = switch (value) {
                 .number => |number| Value.from(number.bitwiseNOT()),
-                .big_int => |big_int| Value.from(try big_int.bitwiseNOT()),
+                .big_int => |big_int| Value.from(try big_int.bitwiseNOT(self.agent)),
                 else => unreachable,
             };
         },
@@ -915,9 +915,9 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             const value = self.result.?;
             self.result = switch (value) {
                 .number => |number| Value.from(number.subtract(.{ .i32 = 1 })),
-                .big_int => |big_int| Value.from(try big_int.subtract(self.agent, .{
-                    .value = try BigInt.Value.initSet(self.agent.gc_allocator, 1),
-                })),
+                .big_int => |big_int| Value.from(
+                    try big_int.subtract(self.agent, self.agent.pre_allocated.one),
+                ),
                 else => @panic("decrement instruction must only be used with numeric value"),
             };
         },
@@ -1140,9 +1140,9 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             const value = self.result.?;
             self.result = switch (value) {
                 .number => |number| Value.from(number.add(.{ .i32 = 1 })),
-                .big_int => |big_int| Value.from(try big_int.add(self.agent, .{
-                    .value = try BigInt.Value.initSet(self.agent.gc_allocator, 1),
-                })),
+                .big_int => |big_int| Value.from(
+                    try big_int.add(self.agent, self.agent.pre_allocated.one),
+                ),
                 else => @panic("increment instruction must only be used with numeric value"),
             };
         },

@@ -79,12 +79,12 @@ fn numberToBigInt(agent: *Agent, number: Number) !types.BigInt {
 
     // 2. Return ℤ(ℝ(number)).
     const string = try number.toString(agent.gc_allocator, 10);
-    var value = try types.BigInt.Value.init(agent.gc_allocator);
-    value.setString(10, string.utf8) catch |err| switch (err) {
+    var big_int = try types.BigInt.from(agent.gc_allocator, 0);
+    big_int.value.setString(10, string.utf8) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.InvalidBase, error.InvalidCharacter => unreachable,
     };
-    return .{ .value = value };
+    return big_int;
 }
 
 /// 21.2.3 Properties of the BigInt Prototype Object

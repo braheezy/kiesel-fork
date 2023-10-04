@@ -576,9 +576,10 @@ pub const Value = union(enum) {
             .symbol => agent.throwException(.type_error, "Cannot convert symbol to BigInt"),
 
             // Return 1n if prim is true and 0n if prim is false.
-            .boolean => |boolean| BigInt{
-                .value = try BigInt.Value.initSet(agent.gc_allocator, @intFromBool(boolean)),
-            },
+            .boolean => |boolean| if (boolean)
+                agent.pre_allocated.one
+            else
+                agent.pre_allocated.zero,
 
             // Return prim.
             .big_int => |big_int| big_int,
@@ -609,17 +610,17 @@ pub const Value = union(enum) {
         const n = try self.toBigInt(agent);
 
         // 2. Let int64bit be ℝ(n) modulo 2**64.
-        var quotient = try BigInt.Value.init(agent.gc_allocator);
-        var int64bit = try BigInt.Value.init(agent.gc_allocator);
-        try quotient.divTrunc(&int64bit, &n.value, &pow_2_64);
+        var quotient = try BigInt.from(agent.gc_allocator, 0);
+        var int64bit = try BigInt.from(agent.gc_allocator, 0);
+        try quotient.value.divTrunc(&int64bit.value, &n.value, &pow_2_64.value);
 
         // 3. If int64bit ≥ 2**63, return ℤ(int64bit - 2**64); otherwise return ℤ(int64bit).
-        if (int64bit.order(pow_2_63) != .lt) {
-            var result = try BigInt.Value.init(agent.gc_allocator);
-            try result.sub(&int64bit, &pow_2_64);
-            return result.to(i64) catch unreachable;
+        if (int64bit.value.order(pow_2_63.value) != .lt) {
+            var result = try BigInt.from(agent.gc_allocator, 0);
+            try result.value.sub(&int64bit.value, &pow_2_64.value);
+            return result.value.to(i64) catch unreachable;
         } else {
-            return int64bit.to(i64) catch unreachable;
+            return int64bit.value.to(i64) catch unreachable;
         }
     }
 
@@ -632,12 +633,12 @@ pub const Value = union(enum) {
         const n = try self.toBigInt(agent);
 
         // 2. Let int64bit be ℝ(n) modulo 2**64.
-        var quotient = try BigInt.Value.init(agent.gc_allocator);
-        var int64bit = try BigInt.Value.init(agent.gc_allocator);
-        try quotient.divTrunc(&int64bit, &n.value, &pow_2_64);
+        var quotient = try BigInt.from(agent.gc_allocator, 0);
+        var int64bit = try BigInt.from(agent.gc_allocator, 0);
+        try quotient.value.divTrunc(&int64bit.value, &n.value, &pow_2_64.value);
 
         // 3. Return ℤ(int64bit).
-        return int64bit.to(u64) catch unreachable;
+        return int64bit.value.to(u64) catch unreachable;
     }
 
     /// 7.1.17 ToString ( argument )

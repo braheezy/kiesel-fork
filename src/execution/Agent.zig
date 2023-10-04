@@ -27,9 +27,10 @@ const Self = @This();
 gc_allocator: Allocator,
 options: Options,
 pre_allocated: struct {
-    one: BigInt.Value,
-    pow_2_63: BigInt.Value,
-    pow_2_64: BigInt.Value,
+    zero: BigInt,
+    one: BigInt,
+    pow_2_63: BigInt,
+    pow_2_64: BigInt,
 },
 exception: ?Value = null,
 symbol_id: usize = 0,
@@ -84,9 +85,10 @@ pub fn init(gc_allocator: Allocator, options: Options) !Self {
         .execution_context_stack = undefined,
     };
     self.pre_allocated = .{
-        .one = try BigInt.Value.initSet(self.gc_allocator, 1),
-        .pow_2_63 = try BigInt.Value.initSet(self.gc_allocator, std.math.pow(u64, 2, 63)),
-        .pow_2_64 = try BigInt.Value.initSet(self.gc_allocator, std.math.pow(u128, 2, 64)),
+        .zero = try BigInt.from(self.gc_allocator, 0),
+        .one = try BigInt.from(self.gc_allocator, 1),
+        .pow_2_63 = try BigInt.from(self.gc_allocator, std.math.pow(u64, 2, 63)),
+        .pow_2_64 = try BigInt.from(self.gc_allocator, std.math.pow(u128, 2, 64)),
     };
     self.well_known_symbols = .{
         .@"@@asyncIterator" = self.createSymbol(String.from("Symbol.asyncIterator")) catch unreachable,
@@ -113,9 +115,10 @@ pub fn init(gc_allocator: Allocator, options: Options) !Self {
 }
 
 pub fn deinit(self: *Self) void {
-    self.pre_allocated.one.deinit();
-    self.pre_allocated.pow_2_63.deinit();
-    self.pre_allocated.pow_2_64.deinit();
+    self.pre_allocated.zero.value.deinit();
+    self.pre_allocated.one.value.deinit();
+    self.pre_allocated.pow_2_63.value.deinit();
+    self.pre_allocated.pow_2_64.value.deinit();
     self.global_symbol_registry.deinit();
     self.execution_context_stack.deinit();
 }
