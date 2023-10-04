@@ -28,7 +28,7 @@ const NameAndPropertyDescriptor = struct {
     PropertyDescriptor,
 };
 
-pub fn globalObjectProperties(realm: *Realm) ![32]NameAndPropertyDescriptor {
+pub fn globalObjectProperties(realm: *Realm) ![33]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
     return [_]NameAndPropertyDescriptor{
         // 19.1.1 globalThis
@@ -58,6 +58,10 @@ pub fn globalObjectProperties(realm: *Realm) ![32]NameAndPropertyDescriptor {
         // 19.2.3 isNaN ( number )
         // https://tc39.es/ecma262/#sec-isnan-number
         .{ "isNaN", .{ .value = Value.from(try realm.intrinsics.@"%isNaN%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.2.4 parseFloat ( string )
+        // https://tc39.es/ecma262/#sec-parsefloat-string
+        .{ "parseFloat", .{ .value = Value.from(try realm.intrinsics.@"%parseFloat%"()), .writable = true, .enumerable = false, .configurable = true } },
 
         // 19.2.5 parseInt ( string, radix )
         // https://tc39.es/ecma262/#sec-parseint-string-radix
@@ -177,6 +181,7 @@ pub const global_functions = struct {
     pub const Eval = GlobalFunction(.{ .name = "eval", .length = 1 });
     pub const IsFinite = GlobalFunction(.{ .name = "isFinite", .length = 1 });
     pub const IsNaN = GlobalFunction(.{ .name = "isNaN", .length = 1 });
+    pub const ParseFloat = GlobalFunction(.{ .name = "parseFloat", .length = 1 });
     pub const ParseInt = GlobalFunction(.{ .name = "parseInt", .length = 2 });
 };
 
@@ -213,6 +218,35 @@ fn isNaN(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
     // 2. If num is NaN, return true.
     // 3. Otherwise, return false.
     return Value.from(num.isNan());
+}
+
+/// 19.2.4 parseFloat ( string )
+/// https://tc39.es/ecma262/#sec-parsefloat-string
+fn parseFloat(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    const string_value = arguments.get(0);
+
+    // 1. Let inputString be ? ToString(string).
+    const input_string = try string_value.toString(agent);
+
+    // 2. Let trimmedString be ! TrimString(inputString, start).
+    const trimmed_string = trimLeft(input_string.utf8, &(whitespace ++ line_terminators));
+
+    // 3. Let trimmed be StringToCodePoints(trimmedString).
+    // 4. Let trimmedPrefix be the longest prefix of trimmed that satisfies the syntax of a
+    //    StrDecimalLiteral, which might be trimmed itself. If there is no such prefix, return NaN.
+    // 5. Let parsedNumber be ParseText(trimmedPrefix, StrDecimalLiteral).
+    // 6. Assert: parsedNumber is a Parse Node.
+    // 7. Return StringNumericValue of parsedNumber.
+    if (std.mem.startsWith(u8, trimmed_string, "-Infinity")) return Value.negativeInfinity();
+    if (std.mem.startsWith(u8, trimmed_string, "+Infinity")) return Value.infinity();
+    if (std.mem.startsWith(u8, trimmed_string, "Infinity")) return Value.infinity();
+    // FIXME: This is very much not correct :)
+    // Slice at a few chars that parseFloat() would accept but which are not part of StrDecimalLiteral
+    const string = trimmed_string[0 .. std.mem.indexOfAny(u8, trimmed_string, "_x") orelse trimmed_string.len];
+    const parsed = std.fmt.parseFloat(f64, string) catch return Value.nan();
+    // Ignore valid result of "inf"/"nan"
+    if (!std.math.isFinite(parsed)) return Value.nan();
+    return Value.from(parsed);
 }
 
 /// 19.2.5 parseInt ( string, radix )

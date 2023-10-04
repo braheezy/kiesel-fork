@@ -56,6 +56,7 @@ lazy_intrinsics: struct {
     @"%Object%": ?Object = null,
     @"%Object.prototype%": ?Object = null,
     @"%Object.prototype.toString%": ?Object = null,
+    @"%parseFloat%": ?Object = null,
     @"%parseInt%": ?Object = null,
     @"%Promise%": ?Object = null,
     @"%Promise.prototype%": ?Object = null,
@@ -239,6 +240,9 @@ pub fn @"%Object.prototype.toString%"(self: *Self) error{OutOfMemory}!Object {
         intrinsic.* = property_descriptor.?.value.?.object;
     }
     return intrinsic.*.?;
+}
+pub fn @"%parseFloat%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%parseFloat%", builtins.global_functions.ParseFloat);
 }
 pub fn @"%parseInt%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%parseInt%", builtins.global_functions.ParseInt);
