@@ -11,9 +11,10 @@ const environments = @import("environments.zig");
 const types = @import("../types.zig");
 
 const ArgumentsList = builtins.ArgumentsList;
-const Environment = environments.Environment;
 const BigInt = types.BigInt;
+const Environment = environments.Environment;
 const ExecutionContext = @import("ExecutionContext.zig");
+const JobCallback = @import("job.zig").JobCallback;
 const Object = types.Object;
 const Realm = @import("Realm.zig");
 const Reference = types.Reference;
@@ -70,6 +71,7 @@ pub const WellKnownSymbols = struct {
 };
 
 pub const HostHooks = struct {
+    hostMakeJobCallback: *const fn (callback: Object) JobCallback,
     hostEnsureCanCompileStrings: *const fn (callee_realm: *Realm) Error!void,
     hostHasSourceTextAvailable: *const fn (func: Object) bool,
 };
@@ -107,6 +109,7 @@ pub fn init(gc_allocator: Allocator, options: Options) !Self {
     };
     self.global_symbol_registry = std.StringArrayHashMap(Symbol).init(self.gc_allocator);
     self.host_hooks = .{
+        .hostMakeJobCallback = default_host_hooks.hostMakeJobCallback,
         .hostEnsureCanCompileStrings = default_host_hooks.hostEnsureCanCompileStrings,
         .hostHasSourceTextAvailable = default_host_hooks.hostHasSourceTextAvailable,
     };

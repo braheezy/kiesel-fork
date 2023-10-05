@@ -12,6 +12,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const JobCallback = execution.JobCallback;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
@@ -49,9 +50,6 @@ const PromiseReaction = struct {
     /// [[Handler]]
     handler: ?JobCallback,
 };
-
-// TODO: Implement JobCallback records
-const JobCallback = struct {};
 
 const ResolvingFunctions = struct {
     resolve: Object,
@@ -144,9 +142,12 @@ pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunc
                 return .undefined;
             }
 
-            // TODO: 13. Let thenJobCallback be HostMakeJobCallback(thenAction).
+            // 13. Let thenJobCallback be HostMakeJobCallback(thenAction).
+            const then_job_callback = agent_.host_hooks.hostMakeJobCallback(then_action.object);
+
             // TODO: 14. Let job be NewPromiseResolveThenableJob(promise, resolution, thenJobCallback).
             // TODO: 15. Perform HostEnqueuePromiseJob(job.[[Job]], job.[[Realm]]).
+            _ = then_job_callback;
 
             // 16. Return undefined.
             return .undefined;
@@ -414,7 +415,6 @@ pub fn performPromiseThen(
     on_rejected: Value,
     result_capability: ?PromiseCapability,
 ) !?Object {
-    _ = agent;
     // 1. Assert: IsPromise(promise) is true.
     // 2. If resultCapability is not present, then
     //     a. Set resultCapability to undefined.
@@ -427,8 +427,8 @@ pub fn performPromiseThen(
     }
     // 4. Else,
     else blk: {
-        // TODO: a. Let onFulfilledJobCallback be HostMakeJobCallback(onFulfilled).
-        break :blk JobCallback{};
+        // a. Let onFulfilledJobCallback be HostMakeJobCallback(onFulfilled).
+        break :blk agent.host_hooks.hostMakeJobCallback(on_fulfilled.object);
     };
 
     // 5. If IsCallable(onRejected) is false, then
@@ -438,8 +438,8 @@ pub fn performPromiseThen(
     }
     // 6. Else,
     else blk: {
-        // TODO: a. Let onRejectedJobCallback be HostMakeJobCallback(onRejected).
-        break :blk JobCallback{};
+        // a. Let onRejectedJobCallback be HostMakeJobCallback(onRejected).
+        break :blk agent.host_hooks.hostMakeJobCallback(on_rejected.object);
     };
 
     // 7. Let fulfillReaction be the PromiseReaction {

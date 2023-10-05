@@ -1,8 +1,18 @@
+const SafePointer = @import("any-pointer").SafePointer;
+
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
+const JobCallback = execution.JobCallback;
 const Object = types.Object;
 const Realm = execution.Realm;
+
+/// 9.5.2 HostMakeJobCallback ( callback )
+/// https://tc39.es/ecma262/#sec-hostmakejobcallback
+pub fn hostMakeJobCallback(callback: Object) JobCallback {
+    // 1. Return the JobCallback Record { [[Callback]]: callback, [[HostDefined]]: empty }.
+    return .{ .callback = callback, .host_defined = SafePointer.null_pointer };
+}
 
 /// 19.2.1.2 HostEnsureCanCompileStrings ( calleeRealm )
 /// https://tc39.es/ecma262/#sec-hostensurecancompilestrings
