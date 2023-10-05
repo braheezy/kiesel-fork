@@ -6,6 +6,7 @@ const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
+const Job = execution.Job;
 const JobCallback = execution.JobCallback;
 const Object = types.Object;
 const Realm = execution.Realm;
@@ -30,6 +31,12 @@ pub fn hostCallJobCallback(
 
     // 2. Return ? Call(jobCallback.[[Callback]], V, argumentsList).
     return Value.from(job_callback.callback).callAssumeCallable(this_value, arguments_list);
+}
+
+/// 9.5.5 HostEnqueuePromiseJob ( job, realm )
+/// https://tc39.es/ecma262/#sec-hostenqueuepromisejob
+pub fn hostEnqueuePromiseJob(agent: *Agent, job: Job, realm: ?*Realm) !void {
+    try agent.queued_promise_jobs.append(.{ .job = job, .realm = realm });
 }
 
 /// 19.2.1.2 HostEnsureCanCompileStrings ( calleeRealm )

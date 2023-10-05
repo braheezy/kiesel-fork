@@ -6,6 +6,7 @@ pub const DeclarativeEnvironment = environments.DeclarativeEnvironment;
 pub const Environment = environments.Environment;
 pub const ExecutionContext = @import("execution/ExecutionContext.zig");
 pub const GlobalEnvironment = environments.GlobalEnvironment;
+pub const Job = job.Job;
 pub const JobCallback = job.JobCallback;
 pub const ObjectEnvironment = environments.ObjectEnvironment;
 pub const PrivateEnvironment = environments.PrivateEnvironment;

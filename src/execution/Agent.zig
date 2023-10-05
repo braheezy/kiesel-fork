@@ -14,6 +14,7 @@ const ArgumentsList = builtins.ArgumentsList;
 const BigInt = types.BigInt;
 const Environment = environments.Environment;
 const ExecutionContext = @import("ExecutionContext.zig");
+const Job = @import("job.zig").Job;
 const JobCallback = @import("job.zig").JobCallback;
 const Object = types.Object;
 const Realm = @import("Realm.zig");
@@ -39,6 +40,7 @@ well_known_symbols: WellKnownSymbols,
 global_symbol_registry: std.StringArrayHashMap(Symbol),
 host_hooks: HostHooks,
 execution_context_stack: std.ArrayList(ExecutionContext),
+queued_promise_jobs: std.ArrayList(QueuedPromiseJob),
 
 pub const Options = struct {
     debug: struct {
@@ -77,8 +79,18 @@ pub const HostHooks = struct {
         this_value: Value,
         arguments_list: []const Value,
     ) Error!Value,
+    hostEnqueuePromiseJob: *const fn (
+        agent: *Self,
+        job: Job,
+        realm: ?*Realm,
+    ) error{OutOfMemory}!void,
     hostEnsureCanCompileStrings: *const fn (callee_realm: *Realm) Error!void,
     hostHasSourceTextAvailable: *const fn (func: Object) bool,
+};
+
+pub const QueuedPromiseJob = struct {
+    job: Job,
+    realm: ?*Realm,
 };
 
 pub fn init(gc_allocator: Allocator, options: Options) !Self {
@@ -90,6 +102,7 @@ pub fn init(gc_allocator: Allocator, options: Options) !Self {
         .global_symbol_registry = undefined,
         .host_hooks = undefined,
         .execution_context_stack = undefined,
+        .queued_promise_jobs = undefined,
     };
     self.pre_allocated = .{
         .zero = try BigInt.from(self.gc_allocator, 0),
@@ -116,10 +129,12 @@ pub fn init(gc_allocator: Allocator, options: Options) !Self {
     self.host_hooks = .{
         .hostMakeJobCallback = default_host_hooks.hostMakeJobCallback,
         .hostCallJobCallback = default_host_hooks.hostCallJobCallback,
+        .hostEnqueuePromiseJob = default_host_hooks.hostEnqueuePromiseJob,
         .hostEnsureCanCompileStrings = default_host_hooks.hostEnsureCanCompileStrings,
         .hostHasSourceTextAvailable = default_host_hooks.hostHasSourceTextAvailable,
     };
     self.execution_context_stack = std.ArrayList(ExecutionContext).init(self.gc_allocator);
+    self.queued_promise_jobs = std.ArrayList(QueuedPromiseJob).init(self.gc_allocator);
     return self;
 }
 
@@ -130,6 +145,7 @@ pub fn deinit(self: *Self) void {
     self.pre_allocated.pow_2_64.value.deinit();
     self.global_symbol_registry.deinit();
     self.execution_context_stack.deinit();
+    self.queued_promise_jobs.deinit();
 }
 
 pub fn createSymbol(self: *Self, description: ?String) !Symbol {
