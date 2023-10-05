@@ -294,10 +294,13 @@ pub fn newPromiseCapability(agent: *Agent, constructor: Value) !PromiseCapabilit
             const resolving_functions_ = &additional_fields.resolving_functions;
 
             // a. If resolvingFunctions.[[Resolve]] is not undefined, throw a TypeError exception.
-            if (resolving_functions_.resolve != .undefined) return agent_.throwException(.type_error, "TODO");
-
+            if (resolving_functions_.resolve != .undefined) {
+                return agent_.throwException(.type_error, "Resolve function has already been set");
+            }
             // b. If resolvingFunctions.[[Reject]] is not undefined, throw a TypeError exception.
-            if (resolving_functions_.reject != .undefined) return agent_.throwException(.type_error, "TODO");
+            if (resolving_functions_.reject != .undefined) {
+                return agent_.throwException(.type_error, "Reject function has already been set");
+            }
 
             // c. Set resolvingFunctions.[[Resolve]] to resolve.
             resolving_functions_.resolve = resolve;
