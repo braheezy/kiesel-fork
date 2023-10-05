@@ -72,6 +72,11 @@ pub const WellKnownSymbols = struct {
 
 pub const HostHooks = struct {
     hostMakeJobCallback: *const fn (callback: Object) JobCallback,
+    hostCallJobCallback: *const fn (
+        job_callback: JobCallback,
+        this_value: Value,
+        arguments_list: []const Value,
+    ) Error!Value,
     hostEnsureCanCompileStrings: *const fn (callee_realm: *Realm) Error!void,
     hostHasSourceTextAvailable: *const fn (func: Object) bool,
 };
@@ -110,6 +115,7 @@ pub fn init(gc_allocator: Allocator, options: Options) !Self {
     self.global_symbol_registry = std.StringArrayHashMap(Symbol).init(self.gc_allocator);
     self.host_hooks = .{
         .hostMakeJobCallback = default_host_hooks.hostMakeJobCallback,
+        .hostCallJobCallback = default_host_hooks.hostCallJobCallback,
         .hostEnsureCanCompileStrings = default_host_hooks.hostEnsureCanCompileStrings,
         .hostHasSourceTextAvailable = default_host_hooks.hostHasSourceTextAvailable,
     };
