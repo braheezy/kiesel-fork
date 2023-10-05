@@ -12,6 +12,8 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const Completion = types.Completion;
+const Job = execution.Job;
 const JobCallback = execution.JobCallback;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -102,7 +104,7 @@ pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunc
                 agent_.exception = null;
 
                 // b. Perform RejectPromise(promise, selfResolutionError).
-                rejectPromise(promise_, self_resolution_error);
+                try rejectPromise(agent_, promise_, self_resolution_error);
 
                 // c. Return undefined.
                 return .undefined;
@@ -111,7 +113,7 @@ pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunc
             // 8. If resolution is not an Object, then
             if (resolution != .object) {
                 // a. Perform FulfillPromise(promise, resolution).
-                fulfillPromise(promise_, resolution);
+                try fulfillPromise(agent_, promise_, resolution);
 
                 // b. Return undefined.
                 return .undefined;
@@ -125,7 +127,7 @@ pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunc
                 // 10. If then is an abrupt completion, then
                 error.ExceptionThrown => {
                     // a. Perform RejectPromise(promise, then.[[Value]]).
-                    rejectPromise(promise_, agent_.exception.?);
+                    try rejectPromise(agent_, promise_, agent_.exception.?);
                     agent_.exception = null;
 
                     // b. Return undefined.
@@ -136,7 +138,7 @@ pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunc
             // 12. If IsCallable(thenAction) is false, then
             if (!then_action.isCallable()) {
                 // a. Perform FulfillPromise(promise, resolution).
-                fulfillPromise(promise_, resolution);
+                try fulfillPromise(agent_, promise_, resolution);
 
                 // b. Return undefined.
                 return .undefined;
@@ -201,7 +203,7 @@ pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunc
             already_resolved_.value = true;
 
             // 7. Perform RejectPromise(promise, reason).
-            rejectPromise(promise_, reason);
+            try rejectPromise(agent_, promise_, reason);
 
             // 8. Return undefined.
             return .undefined;
@@ -235,7 +237,7 @@ pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunc
 
 /// 27.2.1.4 FulfillPromise ( promise, value )
 /// https://tc39.es/ecma262/#sec-fulfillpromise
-pub fn fulfillPromise(promise: *Promise, value: Value) void {
+pub fn fulfillPromise(agent: *Agent, promise: *Promise, value: Value) !void {
     // 1. Assert: The value of promise.[[PromiseState]] is pending.
     std.debug.assert(promise.fields.promise_state == .pending);
 
@@ -254,8 +256,8 @@ pub fn fulfillPromise(promise: *Promise, value: Value) void {
     // 6. Set promise.[[PromiseState]] to fulfilled.
     promise.fields.promise_state = .fulfilled;
 
-    // TODO: 7. Perform TriggerPromiseReactions(reactions, value).
-    _ = reactions;
+    // 7. Perform TriggerPromiseReactions(reactions, value).
+    try triggerPromiseReactions(agent, reactions.items, value);
 
     // 8. Return unused.
 }
@@ -358,7 +360,7 @@ pub fn newPromiseCapability(agent: *Agent, constructor: Value) !PromiseCapabilit
 
 /// 27.2.1.7 RejectPromise ( promise, reason )
 /// https://tc39.es/ecma262/#sec-rejectpromise
-pub fn rejectPromise(promise: *Promise, reason: Value) void {
+pub fn rejectPromise(agent: *Agent, promise: *Promise, reason: Value) !void {
     // 1. Assert: The value of promise.[[PromiseState]] is pending.
     std.debug.assert(promise.fields.promise_state == .pending);
 
@@ -378,10 +380,30 @@ pub fn rejectPromise(promise: *Promise, reason: Value) void {
     promise.fields.promise_state = .rejected;
 
     // TODO: 7. If promise.[[PromiseIsHandled]] is false, perform HostPromiseRejectionTracker(promise, "reject").
-    // TODO: 8. Perform TriggerPromiseReactions(reactions, reason).
-    _ = reactions;
+
+    // 8. Perform TriggerPromiseReactions(reactions, reason).
+    try triggerPromiseReactions(agent, reactions.items, reason);
 
     // 9. Return unused.
+}
+
+/// 27.2.1.8 TriggerPromiseReactions ( reactions, argument )
+/// https://tc39.es/ecma262/#sec-triggerpromisereactions
+pub fn triggerPromiseReactions(
+    agent: *Agent,
+    reactions: []const PromiseReaction,
+    argument: Value,
+) !void {
+    // 1. For each element reaction of reactions, do
+    for (reactions) |reaction| {
+        // a. Let job be NewPromiseReactionJob(reaction, argument).
+        const job = try newPromiseReactionJob(agent, reaction, argument);
+
+        // b. Perform HostEnqueuePromiseJob(job.[[Job]], job.[[Realm]]).
+        try agent.host_hooks.hostEnqueuePromiseJob(agent, job.job, job.realm);
+    }
+
+    // 2. Return unused.
 }
 
 /// 27.2.4.7.1 PromiseResolve ( C, x )
@@ -404,6 +426,121 @@ pub fn promiseResolve(agent: *Agent, constructor: Object, x: Value) !Object {
 
     // 4. Return promiseCapability.[[Promise]].
     return promise_capability.promise;
+}
+
+/// 27.2.2.1 NewPromiseReactionJob ( reaction, argument )
+/// https://tc39.es/ecma262/#sec-newpromisereactionjob
+pub fn newPromiseReactionJob(
+    agent: *Agent,
+    reaction: PromiseReaction,
+    argument: Value,
+) !struct { job: Job, realm: ?*Realm } {
+    const Captures = struct {
+        agent: *Agent,
+        reaction: PromiseReaction,
+        argument: Value,
+    };
+    const captures = try agent.gc_allocator.create(Captures);
+    captures.* = .{ .agent = agent, .reaction = reaction, .argument = argument };
+
+    // 1. Let job be a new Job Abstract Closure with no parameters that captures reaction and
+    //    argument and performs the following steps when called:
+    const func = struct {
+        fn func(captures_: SafePointer) !Value {
+            const agent_ = captures_.cast(*Captures).agent;
+            const reaction_ = captures_.cast(*Captures).reaction;
+            const argument_ = captures_.cast(*Captures).argument;
+
+            // a. Let promiseCapability be reaction.[[Capability]].
+            const promise_capability = reaction_.capability;
+
+            // b. Let type be reaction.[[Type]].
+            const @"type" = reaction_.type;
+
+            // c. Let handler be reaction.[[Handler]].
+            const handler = reaction_.handler;
+
+            // d. If handler is empty, then
+            const handler_result = if (handler == null) blk: {
+                switch (@"type") {
+                    // i. If type is fulfill, then
+                    .fulfill => {
+                        // 1. Let handlerResult be NormalCompletion(argument).
+                        break :blk Completion.normal(argument_);
+                    },
+                    // ii. Else,
+                    //    1. Assert: type is reject.
+                    .reject => {
+                        // 2. Let handlerResult be ThrowCompletion(argument).
+                        break :blk Completion.throw(argument_);
+                    },
+                }
+            }
+            // e. Else,
+            else blk: {
+                // i. Let handlerResult be Completion(HostCallJobCallback(handler, undefined, « argument »)).
+                if (agent_.host_hooks.hostCallJobCallback(handler.?, .undefined, &.{argument_})) |value|
+                    break :blk Completion.normal(value)
+                else |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    error.ExceptionThrown => break :blk Completion.throw(agent_.exception.?),
+                }
+            };
+
+            // f. If promiseCapability is undefined, then
+            if (promise_capability == null) {
+                // i. Assert: handlerResult is not an abrupt completion.
+                std.debug.assert(handler_result.type == .normal);
+
+                // ii. Return empty.
+                return .undefined;
+            }
+
+            // g. Assert: promiseCapability is a PromiseCapability Record.
+            // h. If handlerResult is an abrupt completion, then
+            if (handler_result.type != .normal) {
+                // i. Return ? Call(promiseCapability.[[Reject]], undefined, « handlerResult.[[Value]] »).
+                return Value.from(promise_capability.?.reject).callAssumeCallable(
+                    .undefined,
+                    .{handler_result.value.?},
+                );
+            }
+            // i. Else,
+            else {
+                // i. Return ? Call(promiseCapability.[[Resolve]], undefined, « handlerResult.[[Value]] »).
+                return Value.from(promise_capability.?.resolve).callAssumeCallable(
+                    .undefined,
+                    .{handler_result.value.?},
+                );
+            }
+        }
+    }.func;
+    const job = Job{ .func = func, .captures = SafePointer.make(*Captures, captures) };
+
+    // 2. Let handlerRealm be null.
+    var handler_realm: ?*Realm = null;
+
+    // 3. If reaction.[[Handler]] is not empty, then
+    if (reaction.handler) |handler| {
+        // a. Let getHandlerRealmResult be Completion(GetFunctionRealm(reaction.[[Handler]].[[Callback]])).
+        const get_handler_realm_result = handler.callback.getFunctionRealm();
+
+        // b. If getHandlerRealmResult is a normal completion, set handlerRealm to
+        //    getHandlerRealmResult.[[Value]].
+        if (get_handler_realm_result) |realm| {
+            handler_realm = realm;
+        }
+        // c. Else, set handlerRealm to the current Realm Record.
+        else |_| {
+            handler_realm = agent.currentRealm();
+        }
+
+        // d. NOTE: handlerRealm is never null unless the handler is undefined. When the handler is
+        //    a revoked Proxy and no ECMAScript code runs, handlerRealm is used to create error objects.
+    }
+
+    // 4. Return the Record { [[Job]]: job, [[Realm]]: handlerRealm }.
+    return .{ .job = job, .realm = handler_realm };
 }
 
 /// 27.2.5.4.1 PerformPromiseThen ( promise, onFulfilled, onRejected [ , resultCapability ] )
@@ -475,10 +612,11 @@ pub fn performPromiseThen(
             // a. Let value be promise.[[PromiseResult]].
             const value = promise.fields.promise_result;
 
-            // TODO: b. Let fulfillJob be NewPromiseReactionJob(fulfillReaction, value).
-            _ = value;
+            // b. Let fulfillJob be NewPromiseReactionJob(fulfillReaction, value).
+            const fulfill_job = try newPromiseReactionJob(agent, fulfill_reaction, value);
 
-            // TODO: c. Perform HostEnqueuePromiseJob(fulfillJob.[[Job]], fulfillJob.[[Realm]]).
+            // c. Perform HostEnqueuePromiseJob(fulfillJob.[[Job]], fulfillJob.[[Realm]]).
+            try agent.host_hooks.hostEnqueuePromiseJob(agent, fulfill_job.job, fulfill_job.realm);
         },
 
         // 11. Else,
@@ -488,10 +626,12 @@ pub fn performPromiseThen(
             const reason = promise.fields.promise_result;
 
             // TODO: c. If promise.[[PromiseIsHandled]] is false, perform HostPromiseRejectionTracker(promise, "handle").
-            // TODO: d. Let rejectJob be NewPromiseReactionJob(rejectReaction, reason).
-            _ = reason;
 
-            // TODO: e. Perform HostEnqueuePromiseJob(rejectJob.[[Job]], rejectJob.[[Realm]]).
+            // d. Let rejectJob be NewPromiseReactionJob(rejectReaction, reason).
+            const reject_job = try newPromiseReactionJob(agent, reject_reaction, reason);
+
+            // e. Perform HostEnqueuePromiseJob(rejectJob.[[Job]], rejectJob.[[Realm]]).
+            try agent.host_hooks.hostEnqueuePromiseJob(agent, reject_job.job, reject_job.realm);
         },
     }
 
