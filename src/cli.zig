@@ -171,6 +171,17 @@ fn run(
 
     if (agent.options.debug.print_ast) try script.ecmascript_code.print(stdout);
 
+    defer {
+        while (agent.queued_promise_jobs.items.len != 0) {
+            const queued_promise_job = agent.queued_promise_jobs.orderedRemove(0);
+            const current_realm = agent.runningExecutionContext().realm;
+            if (queued_promise_job.realm) |new_realm| {
+                agent.runningExecutionContext().realm = new_realm;
+            }
+            _ = queued_promise_job.job.func(queued_promise_job.job.captures) catch {};
+            agent.runningExecutionContext().realm = current_realm;
+        }
+    }
     return script.evaluate() catch |err| switch (err) {
         error.OutOfMemory => {
             try stderr.writeAll("Out of memory\n");
