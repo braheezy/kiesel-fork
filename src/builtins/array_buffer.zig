@@ -164,6 +164,15 @@ pub const ArrayBufferPrototype = struct {
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
 
+        // 25.1.5.4 ArrayBuffer.prototype [ @@toStringTag ]
+        // https://tc39.es/ecma262/#sec-arraybuffer.prototype-@@tostringtag
+        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+            .value = Value.from("ArrayBuffer"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
         return object;
     }
 
