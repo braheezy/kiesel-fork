@@ -268,7 +268,7 @@ pub const SymbolPrototype = struct {
         // 20.4.3.6 Symbol.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-symbol.prototype-@@tostringtag
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
-            .value = Value.from("String"),
+            .value = Value.from("Symbol"),
             .writable = false,
             .enumerable = false,
             .configurable = true,
