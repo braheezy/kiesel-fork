@@ -149,9 +149,16 @@ pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunc
             // 13. Let thenJobCallback be HostMakeJobCallback(thenAction).
             const then_job_callback = agent_.host_hooks.hostMakeJobCallback(then_action.object);
 
-            // TODO: 14. Let job be NewPromiseResolveThenableJob(promise, resolution, thenJobCallback).
-            // TODO: 15. Perform HostEnqueuePromiseJob(job.[[Job]], job.[[Realm]]).
-            _ = then_job_callback;
+            // 14. Let job be NewPromiseResolveThenableJob(promise, resolution, thenJobCallback).
+            const job = try newPromiseResolveThenableJob(
+                agent_,
+                promise_,
+                resolution.object,
+                then_job_callback,
+            );
+
+            // 15. Perform HostEnqueuePromiseJob(job.[[Job]], job.[[Realm]]).
+            try agent_.host_hooks.hostEnqueuePromiseJob(agent_, job.job, job.realm);
 
             // 16. Return undefined.
             return .undefined;
@@ -537,6 +544,89 @@ pub fn newPromiseReactionJob(
 
     // 4. Return the Record { [[Job]]: job, [[Realm]]: handlerRealm }.
     return .{ .job = job, .realm = handler_realm };
+}
+
+/// 27.2.2.2 NewPromiseResolveThenableJob ( promiseToResolve, thenable, then )
+/// https://tc39.es/ecma262/#sec-newpromiseresolvethenablejob
+pub fn newPromiseResolveThenableJob(
+    agent: *Agent,
+    promise_to_resolve: *Promise,
+    thenable: Object,
+    then: JobCallback,
+) !struct { job: Job, realm: *Realm } {
+    const Captures = struct {
+        agent: *Agent,
+        promise_to_resolve: *Promise,
+        thenable: Object,
+        then: JobCallback,
+    };
+    const captures = try agent.gc_allocator.create(Captures);
+    captures.* = .{
+        .agent = agent,
+        .promise_to_resolve = promise_to_resolve,
+        .thenable = thenable,
+        .then = then,
+    };
+
+    // 1. Let job be a new Job Abstract Closure with no parameters that captures promiseToResolve,
+    //    thenable, and then and performs the following steps when called:
+    const func = struct {
+        fn func(captures_: SafePointer) Agent.Error!Value {
+            const agent_ = captures_.cast(*Captures).agent;
+            const promise_to_resolve_ = captures_.cast(*Captures).promise_to_resolve;
+            const thenable_ = captures_.cast(*Captures).thenable;
+            const then_ = captures_.cast(*Captures).then;
+
+            // a. Let resolvingFunctions be CreateResolvingFunctions(promiseToResolve).
+            const resolving_functions = try createResolvingFunctions(agent_, promise_to_resolve_);
+
+            // b. Let thenCallResult be Completion(HostCallJobCallback(then, thenable,
+            //    « resolvingFunctions.[[Resolve]], resolvingFunctions.[[Reject]] »)).
+            const then_call_result = agent_.host_hooks.hostCallJobCallback(
+                then_,
+                Value.from(thenable_),
+                &.{
+                    Value.from(resolving_functions.resolve),
+                    Value.from(resolving_functions.reject),
+                },
+            ) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+
+                // c. If thenCallResult is an abrupt completion, then
+                error.ExceptionThrown => {
+                    // i. Return ? Call(resolvingFunctions.[[Reject]], undefined,
+                    //    « thenCallResult.[[Value]] »).
+                    return Value.from(resolving_functions.reject).callAssumeCallable(
+                        .undefined,
+                        .{agent_.exception.?},
+                    );
+                },
+            };
+
+            // d. Return ? thenCallResult.
+            return then_call_result;
+        }
+    }.func;
+    const job = Job{ .func = func, .captures = SafePointer.make(*Captures, captures) };
+
+    // 2. Let getThenRealmResult be Completion(GetFunctionRealm(then.[[Callback]])).
+    const get_handler_realm_result = then.callback.getFunctionRealm();
+
+    // 3. If getThenRealmResult is a normal completion, let thenRealm be
+    //    getThenRealmResult.[[Value]].
+    const then_realm = if (get_handler_realm_result) |realm| blk: {
+        break :blk realm;
+    }
+    // 4. Else, let thenRealm be the current Realm Record.
+    else |_| blk: {
+        break :blk agent.currentRealm();
+    };
+
+    // 5. NOTE: thenRealm is never null. When then.[[Callback]] is a revoked Proxy and no code
+    //    runs, thenRealm is used to create error objects.
+
+    // 6. Return the Record { [[Job]]: job, [[Realm]]: thenRealm }.
+    return .{ .job = job, .realm = then_realm };
 }
 
 /// 27.2.5.4.1 PerformPromiseThen ( promise, onFulfilled, onRejected [ , resultCapability ] )
