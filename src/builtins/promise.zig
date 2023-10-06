@@ -67,6 +67,8 @@ pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunc
         already_resolved: AlreadyResolved,
     };
 
+    const additional_fields = try agent.gc_allocator.create(AdditionalFields);
+
     // 1. Let alreadyResolved be the Record { [[Value]]: false }.
     const already_resolved = AlreadyResolved{ .value = false };
 
@@ -81,13 +83,13 @@ pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunc
             const function = agent_.activeFunctionObject();
 
             // 2. Assert: F has a [[Promise]] internal slot whose value is an Object.
-            const additional_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
+            const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
 
             // 3. Let promise be F.[[Promise]].
-            const promise_ = additional_fields.promise;
+            const promise_ = additional_fields_.promise;
 
             // 4. Let alreadyResolved be F.[[AlreadyResolved]].
-            const already_resolved_ = &additional_fields.already_resolved;
+            const already_resolved_ = &additional_fields_.already_resolved;
 
             // 5. If alreadyResolved.[[Value]] is true, return undefined.
             if (already_resolved_.value) return .undefined;
@@ -162,14 +164,13 @@ pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunc
 
     // 4. Let resolve be CreateBuiltinFunction(stepsResolve, lengthResolve, "", « [[Promise]],
     //    [[AlreadyResolved]] »).
-    const resolve_additional_fields = try agent.gc_allocator.create(AdditionalFields);
     const resolve = try createBuiltinFunction(agent, .{ .regular = steps_resolve }, .{
         .length = length_resolve,
         .name = "",
-        .additional_fields = SafePointer.make(*AdditionalFields, resolve_additional_fields),
+        .additional_fields = SafePointer.make(*AdditionalFields, additional_fields),
     });
 
-    resolve_additional_fields.* = .{
+    additional_fields.* = .{
         // 5. Set resolve.[[Promise]] to promise.
         .promise = promise,
 
@@ -188,13 +189,13 @@ pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunc
             const function = agent_.activeFunctionObject();
 
             // 2. Assert: F has a [[Promise]] internal slot whose value is an Object.
-            const additional_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
+            const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
 
             // 3. Let promise be F.[[Promise]].
-            const promise_ = additional_fields.promise;
+            const promise_ = additional_fields_.promise;
 
             // 4. Let alreadyResolved be F.[[AlreadyResolved]].
-            const already_resolved_ = &additional_fields.already_resolved;
+            const already_resolved_ = &additional_fields_.already_resolved;
 
             // 5. If alreadyResolved.[[Value]] is true, return undefined.
             if (already_resolved_.value) return .undefined;
@@ -216,20 +217,15 @@ pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunc
 
     // 9. Let reject be CreateBuiltinFunction(stepsReject, lengthReject, "", « [[Promise]],
     //    [[AlreadyResolved]] »).
-    const reject_additional_fields = try agent.gc_allocator.create(AdditionalFields);
     const reject = try createBuiltinFunction(agent, .{ .regular = steps_reject }, .{
         .length = length_reject,
         .name = "",
-        .additional_fields = SafePointer.make(*AdditionalFields, reject_additional_fields),
+        .additional_fields = SafePointer.make(*AdditionalFields, additional_fields),
     });
 
-    reject_additional_fields.* = .{
-        // 10. Set reject.[[Promise]] to promise.
-        .promise = promise,
-
-        // 11. Set reject.[[AlreadyResolved]] to alreadyResolved.
-        .already_resolved = already_resolved,
-    };
+    // 10. Set reject.[[Promise]] to promise.
+    // 11. Set reject.[[AlreadyResolved]] to alreadyResolved.
+    // NOTE: This was already done for the resolve function, `additional_fields` is shared between both.
 
     // 12. Return the Record { [[Resolve]]: resolve, [[Reject]]: reject }.
     return .{ .resolve = resolve, .reject = reject };
