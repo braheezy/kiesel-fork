@@ -893,6 +893,7 @@ pub const PromisePrototype = struct {
         });
 
         try defineBuiltinFunction(object, "catch", @"catch", 1, realm);
+        try defineBuiltinFunction(object, "finally", finally, 1, realm);
         try defineBuiltinFunction(object, "then", then, 2, realm);
 
         // 27.2.5.5 Promise.prototype [ @@toStringTag ]
@@ -917,6 +918,171 @@ pub const PromisePrototype = struct {
 
         // 2. Return ? Invoke(promise, "then", « undefined, onRejected »).
         return promise.invoke(agent, PropertyKey.from("then"), .{ .undefined, on_rejected });
+    }
+
+    /// 27.2.5.3 Promise.prototype.finally ( onFinally )
+    /// https://tc39.es/ecma262/#sec-promise.prototype.finally
+    fn finally(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const realm = agent.currentRealm();
+        const on_finally = arguments.get(0);
+
+        // 1. Let promise be the this value.
+        const promise = this_value;
+
+        // 2. If promise is not an Object, throw a TypeError exception.
+        if (promise != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{promise}),
+            );
+        }
+
+        // 3. Let C be ? SpeciesConstructor(promise, %Promise%).
+        const constructor = try promise.object.speciesConstructor(try realm.intrinsics.@"%Promise%"());
+
+        // 4. Assert: IsConstructor(C) is true.
+        std.debug.assert(Value.from(constructor).isConstructor());
+
+        var then_finally: Value = undefined;
+        var catch_finally: Value = undefined;
+
+        // 5. If IsCallable(onFinally) is false, then
+        if (!on_finally.isCallable()) {
+            // a. Let thenFinally be onFinally.
+            then_finally = on_finally;
+
+            // b. Let catchFinally be onFinally.
+            catch_finally = on_finally;
+        }
+        // 6. Else,
+        else {
+            const Captures = struct {
+                on_finally: Value,
+                constructor: Object,
+            };
+            const captures = try agent.gc_allocator.create(Captures);
+            captures.* = .{ .on_finally = on_finally, .constructor = constructor };
+
+            // a. Let thenFinallyClosure be a new Abstract Closure with parameters (value) that
+            //    captures onFinally and C and performs the following steps when called:
+            const then_finally_closure = struct {
+                fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) !Value {
+                    const function = agent_.activeFunctionObject();
+                    const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+                    const on_finally_ = captures_.on_finally;
+                    const constructor_ = captures_.constructor;
+                    const value = arguments_.get(0);
+
+                    // i. Let result be ? Call(onFinally, undefined).
+                    const result = try on_finally_.callAssumeCallableNoArgs(.undefined);
+
+                    // ii. Let p be ? PromiseResolve(C, result).
+                    const new_promise = try promiseResolve(agent_, constructor_, result);
+
+                    const value_capture = try agent_.gc_allocator.create(Value);
+                    value_capture.* = value;
+
+                    // iii. Let returnValue be a new Abstract Closure with no parameters that captures
+                    //      value and performs the following steps when called:
+                    const return_value = struct {
+                        fn func(agent__: *Agent, _: Value, _: ArgumentsList) !Value {
+                            const function_ = agent__.activeFunctionObject();
+                            const value_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Value).*;
+
+                            // 1. Return value.
+                            return value_;
+                        }
+                    }.func;
+
+                    // iv. Let valueThunk be CreateBuiltinFunction(returnValue, 0, "", « »).
+                    const value_thunk = try createBuiltinFunction(agent_, .{
+                        .regular = return_value,
+                    }, .{
+                        .length = 0,
+                        .name = "",
+                        .additional_fields = SafePointer.make(*Value, value_capture),
+                    });
+
+                    // v. Return ? Invoke(p, "then", « valueThunk »).
+                    return Value.from(new_promise).invoke(
+                        agent_,
+                        PropertyKey.from("then"),
+                        .{Value.from(value_thunk)},
+                    );
+                }
+            }.func;
+
+            // b. Let thenFinally be CreateBuiltinFunction(thenFinallyClosure, 1, "", « »).
+            then_finally = Value.from(
+                try createBuiltinFunction(agent, .{ .regular = then_finally_closure }, .{
+                    .length = 1,
+                    .name = "",
+                    .additional_fields = SafePointer.make(*Captures, captures),
+                }),
+            );
+
+            // c. Let catchFinallyClosure be a new Abstract Closure with parameters (reason) that
+            //    captures onFinally and C and performs the following steps when called:
+            const catch_finally_closure = struct {
+                fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) !Value {
+                    const function = agent_.activeFunctionObject();
+                    const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+                    const on_finally_ = captures_.on_finally;
+                    const constructor_ = captures_.constructor;
+                    const reason = arguments_.get(0);
+
+                    // i. Let result be ? Call(onFinally, undefined).
+                    const result = try on_finally_.callAssumeCallableNoArgs(.undefined);
+
+                    // ii. Let p be ? PromiseResolve(C, result).
+                    const new_promise = try promiseResolve(agent_, constructor_, result);
+
+                    const reason_capture = try agent_.gc_allocator.create(Value);
+                    reason_capture.* = reason;
+
+                    // iii. Let throwReason be a new Abstract Closure with no parameters that captures
+                    //      reason and performs the following steps when called:
+                    const throw_reason = struct {
+                        fn func(agent__: *Agent, _: Value, _: ArgumentsList) !Value {
+                            const function_ = agent__.activeFunctionObject();
+                            const reason_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Value).*;
+
+                            // 1. Return ThrowCompletion(reason).
+                            agent__.exception = reason_;
+                            return error.ExceptionThrown;
+                        }
+                    }.func;
+
+                    // iv. Let thrower be CreateBuiltinFunction(throwReason, 0, "", « »).
+                    const thrower = try createBuiltinFunction(agent_, .{
+                        .regular = throw_reason,
+                    }, .{
+                        .length = 0,
+                        .name = "",
+                        .additional_fields = SafePointer.make(*Value, reason_capture),
+                    });
+
+                    // v. Return ? Invoke(p, "then", « thrower »).
+                    return Value.from(new_promise).invoke(
+                        agent_,
+                        PropertyKey.from("then"),
+                        .{Value.from(thrower)},
+                    );
+                }
+            }.func;
+
+            // d. Let catchFinally be CreateBuiltinFunction(catchFinallyClosure, 1, "", « »).
+            catch_finally = Value.from(
+                try createBuiltinFunction(agent, .{ .regular = catch_finally_closure }, .{
+                    .length = 1,
+                    .name = "",
+                    .additional_fields = SafePointer.make(*Captures, captures),
+                }),
+            );
+        }
+
+        // 7. Return ? Invoke(promise, "then", « thenFinally, catchFinally »).
+        return promise.invoke(agent, PropertyKey.from("then"), .{ then_finally, catch_finally });
     }
 
     /// 27.2.5.4 Promise.prototype.then ( onFulfilled, onRejected )
