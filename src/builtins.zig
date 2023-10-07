@@ -155,6 +155,8 @@ pub const isDetachedBuffer = array_buffer.isDetachedBuffer;
 pub const makeConstructor = ecmascript_function.makeConstructor;
 pub const makeMethod = ecmascript_function.makeMethod;
 pub const newPromiseCapability = promise.newPromiseCapability;
+pub const newPromiseReactionJob = promise.newPromiseReactionJob;
+pub const newPromiseResolveThenableJob = promise.newPromiseResolveThenableJob;
 pub const ordinaryCreateFromConstructor = ordinary.ordinaryCreateFromConstructor;
 pub const ordinaryDefineOwnProperty = ordinary.ordinaryDefineOwnProperty;
 pub const ordinaryDelete = ordinary.ordinaryDelete;
@@ -172,11 +174,13 @@ pub const ordinarySet = ordinary.ordinarySet;
 pub const ordinarySetPrototypeOf = ordinary.ordinarySetPrototypeOf;
 pub const ordinarySetWithOwnDescriptor = ordinary.ordinarySetWithOwnDescriptor;
 pub const performEval = eval.performEval;
+pub const performPromiseThen = promise.performPromiseThen;
 pub const promiseResolve = promise.promiseResolve;
 pub const rejectPromise = promise.rejectPromise;
 pub const setFunctionLength = ecmascript_function.setFunctionLength;
 pub const setFunctionName = ecmascript_function.setFunctionName;
 pub const stringCreate = string.stringCreate;
+pub const triggerPromiseReactions = promise.triggerPromiseReactions;
 pub const validateNonRevokedProxy = proxy.validateNonRevokedProxy;
 
 test {
