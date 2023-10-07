@@ -3169,7 +3169,7 @@ pub const FunctionBody = struct {
 pub const ArrowFunction = struct {
     const Self = @This();
 
-    arrow_parameters: FormalParameters,
+    formal_parameters: FormalParameters,
     function_body: FunctionBody,
     source_text: []const u8,
 
@@ -3193,8 +3193,8 @@ pub const ArrowFunction = struct {
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("ArrowFunction", writer, indentation);
-        try printString("arrow_parameters:", writer, indentation + 1);
-        try self.arrow_parameters.print(writer, indentation + 2);
+        try printString("formal_parameters:", writer, indentation + 1);
+        try self.formal_parameters.print(writer, indentation + 2);
         try printString("function_body:", writer, indentation + 1);
         try self.function_body.print(writer, indentation + 2);
     }

@@ -471,7 +471,7 @@ fn instantiateArrowFunctionExpression(
         agent,
         try realm.intrinsics.@"%Function.prototype%"(),
         source_text,
-        arrow_function.arrow_parameters,
+        arrow_function.formal_parameters,
         arrow_function.function_body,
         .lexical_this,
         env,

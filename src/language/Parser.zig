@@ -1489,7 +1489,7 @@ pub fn acceptArrowFunction(self: *Self) AcceptError!ast.ArrowFunction {
         self.core.tokenizer.source[start_offset..end_offset],
     );
     return .{
-        .arrow_parameters = formal_parameters,
+        .formal_parameters = formal_parameters,
         .function_body = function_body,
         .source_text = source_text,
     };
