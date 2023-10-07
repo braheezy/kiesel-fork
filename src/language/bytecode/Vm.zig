@@ -865,6 +865,51 @@ fn instantiateAsyncFunctionExpression(
     }
 }
 
+/// 15.9.4 Runtime Semantics: InstantiateAsyncArrowFunctionExpression
+/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncarrowfunctionexpression
+fn instantiateAsyncArrowFunctionExpression(
+    agent: *Agent,
+    async_arrow_function: ast.AsyncArrowFunction,
+    default_name: ?[]const u8,
+) !Object {
+    const realm = agent.currentRealm();
+
+    // 1. If name is not present, set name to "".
+    const name = default_name orelse "";
+
+    // 2. Let env be the LexicalEnvironment of the running execution context.
+    const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+    // 3. Let privateEnv be the running execution context's PrivateEnvironment.
+    const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+
+    // 4. Let sourceText be the source text matched by AsyncArrowFunction.
+    const source_text = async_arrow_function.source_text;
+
+    // 5. Let head be the AsyncArrowHead that is covered by CoverCallExpressionAndAsyncArrowHead.
+    // 6. Let parameters be the ArrowFormalParameters of head.
+    const parameters = async_arrow_function.formal_parameters;
+
+    // 7. Let closure be OrdinaryFunctionCreate(%AsyncFunction.prototype%, sourceText, parameters,
+    //    AsyncConciseBody, lexical-this, env, privateEnv).
+    const closure = try ordinaryFunctionCreate(
+        agent,
+        try realm.intrinsics.@"%AsyncFunction.prototype%"(),
+        source_text,
+        parameters,
+        async_arrow_function.function_body,
+        .lexical_this,
+        env,
+        private_env,
+    );
+
+    // 8. Perform SetFunctionName(closure, name).
+    try setFunctionName(closure, PropertyKey.from(name), null);
+
+    // 9. Return closure.
+    return closure;
+}
+
 pub fn executeInstruction(self: *Self, executable: Executable, instruction: Instruction) !void {
     switch (instruction) {
         .apply_string_or_numeric_binary_operator => {
@@ -1158,6 +1203,15 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             const closure = try instantiateArrowFunctionExpression(
                 self.agent,
                 function_expression.arrow_function,
+                null,
+            );
+            self.result = Value.from(closure);
+        },
+        .instantiate_async_arrow_function_expression => {
+            const function_expression = self.fetchFunctionExpression(executable);
+            const closure = try instantiateAsyncArrowFunctionExpression(
+                self.agent,
+                function_expression.async_arrow_function,
                 null,
             );
             self.result = Value.from(closure);

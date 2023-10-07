@@ -318,7 +318,10 @@ pub fn acceptIdentifierReference(self: *Self) AcceptError!ast.IdentifierReferenc
         if (next_token.type == .@"=>") return error.UnexpectedToken;
         if (std.mem.eql(u8, token.text, "async")) {
             if (self.noLineTerminatorHere()) {
+                // AsyncFunction{Expression,Declaration}
                 if (next_token.type == .function) return error.UnexpectedToken;
+                // AsyncArrowFunction
+                if (next_token.type == .@"(" or next_token.type == .identifier) return error.UnexpectedToken;
             } else |_| {}
         }
     }
@@ -357,6 +360,8 @@ pub fn acceptPrimaryExpression(self: *Self) AcceptError!ast.PrimaryExpression {
         return .{ .async_generator_expression = async_generator_expression }
     else |_| if (self.acceptArrowFunction()) |arrow_function|
         return .{ .arrow_function = arrow_function }
+    else |_| if (self.acceptAsyncArrowFunction()) |async_arrow_function|
+        return .{ .async_arrow_function = async_arrow_function }
     else |_| if (self.acceptParenthesizedExpression()) |parenthesized_expression|
         return .{ .parenthesized_expression = parenthesized_expression }
     else |_|
@@ -1466,22 +1471,20 @@ pub fn acceptArrowFunction(self: *Self) AcceptError!ast.ArrowFunction {
     }
     _ = try self.core.accept(RuleSet.is(.@"=>"));
     try self.noLineTerminatorHere();
-    const function_body = blk: {
-        if (self.core.accept(RuleSet.is(.@"{"))) |_| {
-            const function_body = try self.acceptFunctionBody(.normal);
-            _ = try self.core.accept(RuleSet.is(.@"}"));
-            break :blk function_body;
-        } else |_| {
-            const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
-            const expression_body = try self.acceptExpression(ctx);
-            // Synthesize a FunctionBody with return statement
-            const statement = try self.allocator.create(ast.Statement);
-            statement.* = ast.Statement{ .return_statement = .{ .expression = expression_body } };
-            const items = try self.allocator.alloc(ast.StatementListItem, 1);
-            items[0] = .{ .statement = statement };
-            const statement_list = ast.StatementList{ .items = items };
-            break :blk ast.FunctionBody{ .type = .normal, .statement_list = statement_list };
-        }
+    const function_body = if (self.core.accept(RuleSet.is(.@"{"))) |_| blk: {
+        const function_body = try self.acceptFunctionBody(.normal);
+        _ = try self.core.accept(RuleSet.is(.@"}"));
+        break :blk function_body;
+    } else |_| blk: {
+        const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
+        const expression_body = try self.acceptExpression(ctx);
+        // Synthesize a FunctionBody with return statement
+        const statement = try self.allocator.create(ast.Statement);
+        statement.* = ast.Statement{ .return_statement = .{ .expression = expression_body } };
+        const items = try self.allocator.alloc(ast.StatementListItem, 1);
+        items[0] = .{ .statement = statement };
+        const statement_list = ast.StatementList{ .items = items };
+        break :blk ast.FunctionBody{ .type = .normal, .statement_list = statement_list };
     };
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
@@ -1678,6 +1681,59 @@ pub fn acceptAsyncFunctionExpression(self: *Self) AcceptError!ast.AsyncFunctionE
     );
     return .{
         .identifier = identifier,
+        .formal_parameters = formal_parameters,
+        .function_body = function_body,
+        .source_text = source_text,
+    };
+}
+
+pub fn acceptAsyncArrowFunction(self: *Self) AcceptError!ast.AsyncArrowFunction {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.is(.identifier));
+    if (!std.mem.eql(u8, token.text, "async")) return error.UnexpectedToken;
+    // We need to do this after consuming the 'async' token to skip preceeding whitespace.
+    const start_offset = self.core.tokenizer.offset - (comptime "async".len);
+    try self.noLineTerminatorHere();
+    var formal_parameters: ast.FormalParameters = undefined;
+    if (self.acceptBindingIdentifier()) |identifier| {
+        var formal_parameters_items = try std.ArrayList(ast.FormalParameters.Item).initCapacity(
+            self.allocator,
+            1,
+        );
+        formal_parameters_items.appendAssumeCapacity(.{
+            .formal_parameter = .{ .binding_element = .{ .identifier = identifier } },
+        });
+        formal_parameters = .{ .items = try formal_parameters_items.toOwnedSlice() };
+    } else |_| {
+        _ = try self.core.accept(RuleSet.is(.@"("));
+        formal_parameters = try self.acceptFormalParameters();
+        _ = try self.core.accept(RuleSet.is(.@")"));
+    }
+    _ = try self.core.accept(RuleSet.is(.@"=>"));
+    try self.noLineTerminatorHere();
+    const function_body = if (self.core.accept(RuleSet.is(.@"{"))) |_| blk: {
+        const function_body = try self.acceptFunctionBody(.@"async");
+        _ = try self.core.accept(RuleSet.is(.@"}"));
+        break :blk function_body;
+    } else |_| blk: {
+        const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
+        const expression_body = try self.acceptExpression(ctx);
+        // Synthesize a FunctionBody with return statement
+        const statement = try self.allocator.create(ast.Statement);
+        statement.* = ast.Statement{ .return_statement = .{ .expression = expression_body } };
+        const items = try self.allocator.alloc(ast.StatementListItem, 1);
+        items[0] = .{ .statement = statement };
+        const statement_list = ast.StatementList{ .items = items };
+        break :blk ast.FunctionBody{ .type = .@"async", .statement_list = statement_list };
+    };
+    const end_offset = self.core.tokenizer.offset;
+    const source_text = try self.allocator.dupe(
+        u8,
+        self.core.tokenizer.source[start_offset..end_offset],
+    );
+    return .{
         .formal_parameters = formal_parameters,
         .function_body = function_body,
         .source_text = source_text,

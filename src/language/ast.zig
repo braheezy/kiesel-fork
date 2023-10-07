@@ -112,6 +112,7 @@ pub const PrimaryExpression = union(enum) {
     async_function_expression: AsyncFunctionExpression,
     async_generator_expression: AsyncGeneratorExpression,
     arrow_function: ArrowFunction,
+    async_arrow_function: AsyncArrowFunction,
     parenthesized_expression: ParenthesizedExpression,
 
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
@@ -3694,6 +3695,41 @@ pub const AsyncFunctionExpression = struct {
         try printString("AsyncFunctionExpression", writer, indentation);
         try printString("identifier:", writer, indentation + 1);
         if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
+        try printString("formal_parameters:", writer, indentation + 1);
+        try self.formal_parameters.print(writer, indentation + 2);
+        try printString("function_body:", writer, indentation + 1);
+        try self.function_body.print(writer, indentation + 2);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-AsyncArrowFunction
+pub const AsyncArrowFunction = struct {
+    const Self = @This();
+
+    formal_parameters: FormalParameters,
+    function_body: FunctionBody,
+    source_text: []const u8,
+
+    /// 15.9.5 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-async-arrow-function-definitions-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
+
+        // Copy `self` so that we can assign the function body's strictness, which is needed for
+        // the deferred bytecode generation.
+        // FIXME: This should ideally happen at parse time.
+        var async_arrow_function = self;
+        async_arrow_function.function_body.strict = strict;
+
+        // 1. Return InstantiateAsyncArrowFunctionExpression of AsyncArrowFunction.
+        try executable.addInstructionWithFunctionExpression(
+            .instantiate_async_arrow_function_expression,
+            .{ .async_arrow_function = async_arrow_function },
+        );
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("AsyncArrowFunction", writer, indentation);
         try printString("formal_parameters:", writer, indentation + 1);
         try self.formal_parameters.print(writer, indentation + 2);
         try printString("function_body:", writer, indentation + 1);
