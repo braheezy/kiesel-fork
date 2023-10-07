@@ -52,8 +52,6 @@ const Associativity = enum {
 };
 
 const PrecedenceAndAssociativityAltFlag = enum {
-    postfix_increment,
-    postfix_decrement,
     prefix_increment,
     prefix_decrement,
     unary_plus,
@@ -69,6 +67,9 @@ fn getPrecedenceAndAssociativity(token_type: Tokenizer.TokenType) struct { Prece
         => .{ 17, .left_to_right },
         .@"[" => .{ 17, null },
         .new => .{ 16, null },
+        .@"++",
+        .@"--",
+        => .{ 15, null },
         .@"!",
         .@"~",
         .typeof,
@@ -136,8 +137,11 @@ fn getPrecedenceAndAssociativity(token_type: Tokenizer.TokenType) struct { Prece
 
 fn getPrecedenceAndAssociativityAlt(flag: PrecedenceAndAssociativityAltFlag) struct { Precedence, ?Associativity } {
     return switch (flag) {
-        .postfix_increment, .postfix_decrement => .{ 15, null },
-        .prefix_increment, .prefix_decrement, .unary_plus, .unary_minus => .{ 14, null },
+        .prefix_increment,
+        .prefix_decrement,
+        .unary_plus,
+        .unary_minus,
+        => .{ 14, null },
     };
 }
 
