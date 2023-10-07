@@ -142,6 +142,7 @@ pub const createArrayIterator = array_iterator.createArrayIterator;
 pub const createBuiltinFunction = builtin_function.createBuiltinFunction;
 pub const createDynamicFunction = function.createDynamicFunction;
 pub const createMapIterator = map_iterator.createMapIterator;
+pub const createMappedArgumentsObject = arguments.createMappedArgumentsObject;
 pub const createResolvingFunctions = promise.createResolvingFunctions;
 pub const createSetIterator = set_iterator.createSetIterator;
 pub const createUnmappedArgumentsObject = arguments.createUnmappedArgumentsObject;

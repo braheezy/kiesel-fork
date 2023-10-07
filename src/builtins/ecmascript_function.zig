@@ -26,6 +26,7 @@ const ScriptOrModule = execution.ScriptOrModule;
 const String = types.String;
 const Value = types.Value;
 const containsSlice = utils.containsSlice;
+const createMappedArgumentsObject = builtins.createMappedArgumentsObject;
 const createUnmappedArgumentsObject = builtins.createUnmappedArgumentsObject;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
@@ -971,8 +972,13 @@ fn functionDeclarationInstantiation(agent: *Agent, function: *ECMAScriptFunction
             //    destructured parameters.
 
             // ii. Let ao be CreateMappedArgumentsObject(func, formals, argumentsList, env).
-            // TODO: This should use CreateMappedArgumentsObject
-            break :ao_blk try createUnmappedArgumentsObject(agent, arguments_list.values);
+            break :ao_blk try createMappedArgumentsObject(
+                agent,
+                function.object(),
+                formals,
+                arguments_list.values,
+                env,
+            );
         };
 
         // c. If strict is true, then
