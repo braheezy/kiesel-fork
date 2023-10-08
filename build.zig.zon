@@ -6,6 +6,10 @@
             .url = "https://github.com/MasterQ32/any-pointer/archive/88bd1b406d58bc9e82159581ea3e71a004011058.tar.gz",
             .hash = "1220d00cd17f9b1f840ea4bee9b552547e1ca5938517018078046c83b71f332d3b5e",
         },
+        .libregexp = .{
+            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/033337a6ad35970ecade1ed01d2e282c76c3c98f.tar.gz",
+            .hash = "1220616c6e363651e48fc33eb5591c27bdd6f550aba4ee639df724aeb0d0456c806a",
+        },
         .linenoise = .{
             .url = "https://github.com/joachimschmidt557/linenoize/archive/180e8d1d8df4811d20ab7e216da9a6e2c35eb3a5.tar.gz",
             .hash = "1220aa9878b4bfa6a70a10793ae8ad42ea7cb1bbd1394c78613c3a9480aae0694d79",

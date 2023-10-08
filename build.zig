@@ -51,6 +51,10 @@ pub fn build(b: *std.Build) void {
     });
 
     const any_pointer = b.dependency("any_pointer", .{});
+    const libregexp = b.dependency("libregexp", .{
+        .target = target,
+        .optimize = optimize,
+    });
     const linenoise = b.dependency("linenoise", .{});
     const parser_toolkit = b.dependency("parser_toolkit", .{});
     const zig_args = b.dependency("zig_args", .{});
@@ -77,6 +81,7 @@ pub fn build(b: *std.Build) void {
         .single_threaded = true,
     });
     exe.linkLibrary(libgc);
+    exe.linkLibrary(libregexp.artifact("regexp"));
     exe.addIncludePath(.{ .path = "vendor/zig-libgc/vendor/bdwgc/include" });
     exe.addModule("kiesel", kiesel_module);
     exe.addModule("any-pointer", any_pointer.module("any-pointer"));
@@ -102,6 +107,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     unit_tests.linkLibrary(libgc);
+    unit_tests.linkLibrary(libregexp.artifact("regexp"));
     unit_tests.addIncludePath(.{ .path = "vendor/zig-libgc/vendor/bdwgc/include" });
     unit_tests.addModule("any-pointer", any_pointer.module("any-pointer"));
     unit_tests.addModule("gc", gc_module);
