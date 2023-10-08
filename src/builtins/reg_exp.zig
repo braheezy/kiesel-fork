@@ -27,6 +27,7 @@ const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -321,6 +322,7 @@ pub const RegExpPrototype = struct {
         try defineBuiltinAccessor(object, "multiline", multiline, null, realm);
         try defineBuiltinAccessor(object, "source", source, null, realm);
         try defineBuiltinAccessor(object, "sticky", sticky, null, realm);
+        try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinAccessor(object, "unicode", unicode, null, realm);
 
         return object;
@@ -541,6 +543,37 @@ pub const RegExpPrototype = struct {
         // 2. Let cu be the code unit 0x0079 (LATIN SMALL LETTER Y).
         // 3. Return ? RegExpHasFlag(R, cu).
         return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_STICKY);
+    }
+
+    /// 22.2.6.17 RegExp.prototype.toString ( )
+    /// https://tc39.es/ecma262/#sec-regexp.prototype.tostring
+    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let R be the this value.
+        const reg_exp = this_value;
+
+        // 2. If R is not an Object, throw a TypeError exception.
+        if (reg_exp != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{reg_exp}),
+            );
+        }
+
+        // 3. Let pattern be ? ToString(? Get(R, "source")).
+        const pattern = try (try reg_exp.object.get(PropertyKey.from("source"))).toString(agent);
+
+        // 4. Let flags be ? ToString(? Get(R, "flags")).
+        const flags_ = try (try reg_exp.object.get(PropertyKey.from("flags"))).toString(agent);
+
+        // 5. Let result be the string-concatenation of "/", pattern, "/", and flags.
+        const result = try std.mem.concat(
+            agent.gc_allocator,
+            u8,
+            &.{ "/", pattern.utf8, "/", flags_.utf8 },
+        );
+
+        // 6. Return result.
+        return Value.from(result);
     }
 
     /// 22.2.6.18 get RegExp.prototype.unicode
