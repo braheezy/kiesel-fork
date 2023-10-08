@@ -66,6 +66,8 @@ lazy_intrinsics: struct {
     @"%ReferenceError%": ?Object = null,
     @"%ReferenceError.prototype%": ?Object = null,
     @"%Reflect%": ?Object = null,
+    @"%RegExp%": ?Object = null,
+    @"%RegExp.prototype%": ?Object = null,
     @"%Set%": ?Object = null,
     @"%Set.prototype%": ?Object = null,
     @"%SetIteratorPrototype%": ?Object = null,
@@ -270,6 +272,12 @@ pub fn @"%ReferenceError.prototype%"(self: *Self) error{OutOfMemory}!Object {
 }
 pub fn @"%Reflect%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Reflect%", builtins.Reflect);
+}
+pub fn @"%RegExp%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%RegExp%", builtins.RegExpConstructor);
+}
+pub fn @"%RegExp.prototype%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%RegExp.prototype%", builtins.RegExpPrototype);
 }
 pub fn @"%Set%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Set%", builtins.SetConstructor);

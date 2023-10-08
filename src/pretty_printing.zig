@@ -244,6 +244,20 @@ fn prettyPrintProxy(proxy: *const builtins.Proxy, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintRegExp(reg_exp: *const builtins.RegExp, writer: anytype) !void {
+    const original_source = reg_exp.fields.original_source;
+    const original_flags = reg_exp.fields.original_flags;
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("RegExp(");
+    try tty_config.setColor(writer, .green);
+    try writer.print("/{s}/{s}", .{ original_source, original_flags });
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintSet(set: *const builtins.Set, writer: anytype) !void {
     const set_data = set.fields.set_data;
     const tty_config = getTtyConfigForWriter(writer);
@@ -456,6 +470,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
             .{ builtins.Number, prettyPrintPrimitiveWrapper },
             .{ builtins.Promise, prettyPrintPromise },
             .{ builtins.Proxy, prettyPrintProxy },
+            .{ builtins.RegExp, prettyPrintRegExp },
             .{ builtins.Set, prettyPrintSet },
             .{ builtins.SetIterator, prettyPrintSetIterator },
             .{ builtins.String, prettyPrintPrimitiveWrapper },
