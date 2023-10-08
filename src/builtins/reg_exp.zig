@@ -314,6 +314,7 @@ pub const RegExpPrototype = struct {
         try defineBuiltinAccessor(object, "dotAll", dotAll, null, realm);
         try defineBuiltinAccessor(object, "global", global, null, realm);
         try defineBuiltinAccessor(object, "hasIndices", hasIndices, null, realm);
+        try defineBuiltinAccessor(object, "ignoreCase", ignoreCase, null, realm);
 
         return object;
     }
@@ -376,6 +377,15 @@ pub const RegExpPrototype = struct {
         // 2. Let cu be the code unit 0x0064 (LATIN SMALL LETTER D).
         // 3. Return ? RegExpHasFlag(R, cu).
         return regExpHasFlag(agent, this_value, FLAG_HAS_INDICES);
+    }
+
+    /// 22.2.6.7 get RegExp.prototype.ignoreCase
+    /// https://tc39.es/ecma262/#sec-get-regexp.prototype.ignorecase
+    fn ignoreCase(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let R be the this value.
+        // 2. Let cu be the code unit 0x0069 (LATIN SMALL LETTER I).
+        // 3. Return ? RegExpHasFlag(R, cu).
+        return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_IGNORECASE);
     }
 };
 
