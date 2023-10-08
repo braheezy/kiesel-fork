@@ -315,6 +315,7 @@ pub const RegExpPrototype = struct {
         try defineBuiltinAccessor(object, "global", global, null, realm);
         try defineBuiltinAccessor(object, "hasIndices", hasIndices, null, realm);
         try defineBuiltinAccessor(object, "ignoreCase", ignoreCase, null, realm);
+        try defineBuiltinAccessor(object, "multiline", multiline, null, realm);
 
         return object;
     }
@@ -386,6 +387,15 @@ pub const RegExpPrototype = struct {
         // 2. Let cu be the code unit 0x0069 (LATIN SMALL LETTER I).
         // 3. Return ? RegExpHasFlag(R, cu).
         return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_IGNORECASE);
+    }
+
+    /// 22.2.6.10 get RegExp.prototype.multiline
+    /// https://tc39.es/ecma262/#sec-get-regexp.prototype.multiline
+    fn multiline(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let R be the this value.
+        // 2. Let cu be the code unit 0x006D (LATIN SMALL LETTER M).
+        // 3. Return ? RegExpHasFlag(R, cu).
+        return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_MULTILINE);
     }
 };
 
