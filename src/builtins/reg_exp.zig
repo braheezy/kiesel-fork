@@ -316,6 +316,7 @@ pub const RegExpPrototype = struct {
         try defineBuiltinAccessor(object, "hasIndices", hasIndices, null, realm);
         try defineBuiltinAccessor(object, "ignoreCase", ignoreCase, null, realm);
         try defineBuiltinAccessor(object, "multiline", multiline, null, realm);
+        try defineBuiltinAccessor(object, "sticky", sticky, null, realm);
 
         return object;
     }
@@ -396,6 +397,15 @@ pub const RegExpPrototype = struct {
         // 2. Let cu be the code unit 0x006D (LATIN SMALL LETTER M).
         // 3. Return ? RegExpHasFlag(R, cu).
         return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_MULTILINE);
+    }
+
+    /// 22.2.6.15 get RegExp.prototype.sticky
+    /// https://tc39.es/ecma262/#sec-get-regexp.prototype.sticky
+    fn sticky(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let R be the this value.
+        // 2. Let cu be the code unit 0x0079 (LATIN SMALL LETTER Y).
+        // 3. Return ? RegExpHasFlag(R, cu).
+        return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_STICKY);
     }
 };
 
