@@ -312,6 +312,7 @@ pub const RegExpPrototype = struct {
         });
 
         try defineBuiltinAccessor(object, "dotAll", dotAll, null, realm);
+        try defineBuiltinAccessor(object, "flags", flags, null, realm);
         try defineBuiltinAccessor(object, "global", global, null, realm);
         try defineBuiltinAccessor(object, "hasIndices", hasIndices, null, realm);
         try defineBuiltinAccessor(object, "ignoreCase", ignoreCase, null, realm);
@@ -329,6 +330,76 @@ pub const RegExpPrototype = struct {
         // 2. Let cu be the code unit 0x0073 (LATIN SMALL LETTER S).
         // 3. Return ? RegExpHasFlag(R, cu).
         return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_DOTALL);
+    }
+
+    /// 22.2.6.4 get RegExp.prototype.flags
+    /// https://tc39.es/ecma262/#sec-get-regexp.prototype.flags
+    fn flags(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let R be the this value.
+        const reg_exp = this_value;
+
+        // 2. If R is not an Object, throw a TypeError exception.
+        if (reg_exp != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{reg_exp}),
+            );
+        }
+
+        // 3. Let codeUnits be a new empty List.
+        var code_units = try std.ArrayList(u8).initCapacity(agent.gc_allocator, 8);
+
+        // 4. Let hasIndices be ToBoolean(? Get(R, "hasIndices")).
+        // 5. If hasIndices is true, append the code unit 0x0064 (LATIN SMALL LETTER D) to codeUnits.
+        if ((try reg_exp.object.get(PropertyKey.from("hasIndices"))).toBoolean()) {
+            code_units.appendAssumeCapacity('d');
+        }
+
+        // 6. Let global be ToBoolean(? Get(R, "global")).
+        // 7. If global is true, append the code unit 0x0067 (LATIN SMALL LETTER G) to codeUnits.
+        if ((try reg_exp.object.get(PropertyKey.from("global"))).toBoolean()) {
+            code_units.appendAssumeCapacity('g');
+        }
+
+        // 8. Let ignoreCase be ToBoolean(? Get(R, "ignoreCase")).
+        // 9. If ignoreCase is true, append the code unit 0x0069 (LATIN SMALL LETTER I) to codeUnits.
+        if ((try reg_exp.object.get(PropertyKey.from("ignoreCase"))).toBoolean()) {
+            code_units.appendAssumeCapacity('i');
+        }
+
+        // 10. Let multiline be ToBoolean(? Get(R, "multiline")).
+        // 11. If multiline is true, append the code unit 0x006D (LATIN SMALL LETTER M) to codeUnits.
+        if ((try reg_exp.object.get(PropertyKey.from("multiline"))).toBoolean()) {
+            code_units.appendAssumeCapacity('m');
+        }
+
+        // 12. Let dotAll be ToBoolean(? Get(R, "dotAll")).
+        // 13. If dotAll is true, append the code unit 0x0073 (LATIN SMALL LETTER S) to codeUnits.
+        if ((try reg_exp.object.get(PropertyKey.from("dotAll"))).toBoolean()) {
+            code_units.appendAssumeCapacity('s');
+        }
+
+        // 14. Let unicode be ToBoolean(? Get(R, "unicode")).
+        // 15. If unicode is true, append the code unit 0x0075 (LATIN SMALL LETTER U) to codeUnits.
+        if ((try reg_exp.object.get(PropertyKey.from("unicode"))).toBoolean()) {
+            code_units.appendAssumeCapacity('u');
+        }
+
+        // 16. Let unicodeSets be ToBoolean(? Get(R, "unicodeSets")).
+        // 17. If unicodeSets is true, append the code unit 0x0076 (LATIN SMALL LETTER V) to codeUnits.
+        if ((try reg_exp.object.get(PropertyKey.from("unicodeSets"))).toBoolean()) {
+            code_units.appendAssumeCapacity('v');
+        }
+
+        // 18. Let sticky be ToBoolean(? Get(R, "sticky")).
+        // 19. If sticky is true, append the code unit 0x0079 (LATIN SMALL LETTER Y) to codeUnits.
+        if ((try reg_exp.object.get(PropertyKey.from("sticky"))).toBoolean()) {
+            code_units.appendAssumeCapacity('y');
+        }
+
+        // 20. Return the String value whose code units are the elements of the List codeUnits. If
+        //     codeUnits has no elements, the empty String is returned.
+        return Value.from(try code_units.toOwnedSlice());
     }
 
     /// 22.2.6.4.1 RegExpHasFlag ( R, codeUnit )
