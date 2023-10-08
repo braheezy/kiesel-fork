@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const gc = @cImport({
     @cInclude("gc.h");
 });
@@ -317,6 +319,7 @@ pub const RegExpPrototype = struct {
         try defineBuiltinAccessor(object, "hasIndices", hasIndices, null, realm);
         try defineBuiltinAccessor(object, "ignoreCase", ignoreCase, null, realm);
         try defineBuiltinAccessor(object, "multiline", multiline, null, realm);
+        try defineBuiltinAccessor(object, "source", source, null, realm);
         try defineBuiltinAccessor(object, "sticky", sticky, null, realm);
         try defineBuiltinAccessor(object, "unicode", unicode, null, realm);
 
@@ -469,6 +472,66 @@ pub const RegExpPrototype = struct {
         // 2. Let cu be the code unit 0x006D (LATIN SMALL LETTER M).
         // 3. Return ? RegExpHasFlag(R, cu).
         return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_MULTILINE);
+    }
+
+    /// 22.2.6.13 get RegExp.prototype.source
+    /// https://tc39.es/ecma262/#sec-get-regexp.prototype.source
+    fn source(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // Let R be the this value.
+        const reg_exp = this_value;
+
+        // 2. If R is not an Object, throw a TypeError exception.
+        if (reg_exp != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{reg_exp}),
+            );
+        }
+
+        // 3. If R does not have an [[OriginalSource]] internal slot, then
+        if (!reg_exp.object.is(RegExp)) {
+            const realm = agent.currentRealm();
+
+            // a. If SameValue(R, %RegExp.prototype%) is true, return "(?:)".
+            if (reg_exp.object.sameValue(try realm.intrinsics.@"%RegExp.prototype%"())) {
+                return Value.from("(?:)");
+            }
+
+            // b. Otherwise, throw a TypeError exception.
+            return agent.throwException(.type_error, "This value must be a RegExp object");
+        }
+
+        // 4. Assert: R has an [[OriginalFlags]] internal slot.
+        // 5. Let src be R.[[OriginalSource]].
+        const src = reg_exp.object.as(RegExp).fields.original_source;
+
+        // 6. Let flags be R.[[OriginalFlags]].
+        const re_bytecode = reg_exp.object.as(RegExp).fields.re_bytecode;
+        const re_flags = libregexp.lre_get_flags(@ptrCast(re_bytecode));
+
+        // 7. Return EscapeRegExpPattern(src, flags).
+        return Value.from(try escapeRegExpPattern(agent.gc_allocator, src, re_flags));
+    }
+
+    /// 22.2.6.13.1 EscapeRegExpPattern ( P, F )
+    /// https://tc39.es/ecma262/#sec-escaperegexppattern
+    fn escapeRegExpPattern(allocator: Allocator, pattern: String, _: c_int) !String {
+        // TODO: 1-4.
+        // 5. The code points / or any LineTerminator occurring in the pattern shall be escaped in
+        //    S as necessary to ensure that the string-concatenation of "/", S, "/", and F can be
+        //    parsed (in an appropriate lexical context) as a RegularExpressionLiteral that behaves
+        //    identically to the constructed regular expression. For example, if P is "/", then S
+        //    could be "\/" or "\u002F", among other possibilities, but not "/", because /// followed
+        //    by F would be parsed as a SingleLineComment rather than a RegularExpressionLiteral.
+        //    If P is the empty String, this specification can be met by letting S be "(?:)".
+        // 6. Return S.
+        if (pattern.utf16Length() == 0) return String.from("(?:)");
+        var output = try allocator.alloc(
+            u8,
+            std.mem.replacementSize(u8, pattern.utf8, "/", "\\/"),
+        );
+        _ = std.mem.replace(u8, pattern.utf8, "/", "\\/", output);
+        return String.from(output);
     }
 
     /// 22.2.6.15 get RegExp.prototype.sticky
