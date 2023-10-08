@@ -311,7 +311,51 @@ pub const RegExpPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinAccessor(object, "dotAll", dotAll, null, realm);
+
         return object;
+    }
+
+    /// 22.2.6.3 get RegExp.prototype.dotAll
+    /// https://tc39.es/ecma262/#sec-get-regexp.prototype.dotAll
+    fn dotAll(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let R be the this value.
+        // 2. Let cu be the code unit 0x0073 (LATIN SMALL LETTER S).
+        // 3. Return ? RegExpHasFlag(R, cu).
+        return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_DOTALL);
+    }
+
+    /// 22.2.6.4.1 RegExpHasFlag ( R, codeUnit )
+    /// https://tc39.es/ecma262/#sec-regexphasflag
+    fn regExpHasFlag(agent: *Agent, reg_exp: Value, flag: c_int) !Value {
+        // 1. If R is not an Object, throw a TypeError exception.
+        if (reg_exp != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{reg_exp}),
+            );
+        }
+
+        // 2. If R does not have an [[OriginalFlags]] internal slot, then
+        if (!reg_exp.object.is(RegExp)) {
+            const realm = agent.currentRealm();
+
+            // a. If SameValue(R, %RegExp.prototype%) is true, return undefined.
+            if (reg_exp.object.sameValue(try realm.intrinsics.@"%RegExp.prototype%"())) {
+                return .undefined;
+            }
+
+            // b. Otherwise, throw a TypeError exception.
+            return agent.throwException(.type_error, "This value must be a RegExp object");
+        }
+
+        // 3. Let flags be R.[[OriginalFlags]].
+        const re_bytecode = reg_exp.object.as(RegExp).fields.re_bytecode;
+        const re_flags = libregexp.lre_get_flags(@ptrCast(re_bytecode));
+
+        // 4. If flags contains codeUnit, return true.
+        // 5. Return false.
+        return Value.from((re_flags & flag) != 0);
     }
 };
 
