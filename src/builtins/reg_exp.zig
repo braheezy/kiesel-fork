@@ -58,6 +58,8 @@ export fn lre_realloc(@"opaque": ?*anyopaque, maybe_ptr: ?*anyopaque, size: usiz
     }
 }
 
+const FLAG_HAS_INDICES = @as(c_int, 1) << @as(c_int, 6);
+
 /// 22.2.3.2 RegExpAlloc ( newTarget )
 /// https://tc39.es/ecma262/#sec-regexpalloc
 pub fn regExpAlloc(agent: *Agent, new_target: Object) !Object {
@@ -101,12 +103,11 @@ pub fn regExpInitialize(agent: *Agent, object: Object, pattern: Value, flags: Va
     // 8. If F contains "s", let s be true; else let s be false.
     // 9. If F contains "u", let u be true; else let u be false.
     // 10. If F contains "v", let v be true; else let v be false.
-    const flag_d = @as(c_int, 1) << @as(c_int, 6);
     var re_flags: c_int = 0;
     for (f.utf8) |c| {
         const mask = switch (c) {
             // NOTE: "v" is not supported by libregexp
-            'd' => flag_d,
+            'd' => FLAG_HAS_INDICES,
             'g' => libregexp.LRE_FLAG_GLOBAL,
             'i' => libregexp.LRE_FLAG_IGNORECASE,
             'm' => libregexp.LRE_FLAG_MULTILINE,
@@ -126,7 +127,6 @@ pub fn regExpInitialize(agent: *Agent, object: Object, pattern: Value, flags: Va
         }
         re_flags |= mask;
     }
-    re_flags &= ~flag_d;
 
     // TODO: 11. If u is true or v is true, then
     //     a. Let patternText be StringToCodePoints(P).
@@ -313,6 +313,7 @@ pub const RegExpPrototype = struct {
 
         try defineBuiltinAccessor(object, "dotAll", dotAll, null, realm);
         try defineBuiltinAccessor(object, "global", global, null, realm);
+        try defineBuiltinAccessor(object, "hasIndices", hasIndices, null, realm);
 
         return object;
     }
@@ -366,6 +367,15 @@ pub const RegExpPrototype = struct {
         // 2. Let cu be the code unit 0x0067 (LATIN SMALL LETTER G).
         // 3. Return ? RegExpHasFlag(R, cu).
         return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_GLOBAL);
+    }
+
+    /// 22.2.6.6 get RegExp.prototype.hasIndices
+    /// https://tc39.es/ecma262/#sec-get-regexp.prototype.global
+    fn hasIndices(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let R be the this value.
+        // 2. Let cu be the code unit 0x0064 (LATIN SMALL LETTER D).
+        // 3. Return ? RegExpHasFlag(R, cu).
+        return regExpHasFlag(agent, this_value, FLAG_HAS_INDICES);
     }
 };
 
