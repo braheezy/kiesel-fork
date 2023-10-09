@@ -73,6 +73,17 @@ pub fn build(b: *std.Build) void {
         },
     });
 
+    _ = std.process.Child.exec(.{
+        .allocator = b.allocator,
+        .argv = &.{
+            "patch",
+            "--forward",
+            "--reject-file=-",
+            libregexp.builder.build_root.join(b.allocator, &.{"upstream/libregexp.c"}) catch @panic("OOM"),
+            "patches/libregexp.patch",
+        },
+    }) catch |err| @panic(@errorName(err));
+
     const exe = b.addExecutable(.{
         .name = "kiesel",
         .root_source_file = .{ .path = "src/cli.zig" },

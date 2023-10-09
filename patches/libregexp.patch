@@ -1,0 +1,11 @@
+--- libregexp.c
++++ libregexp.c
+@@ -1198,6 +1198,8 @@
+     
+     name_len = strlen(name);
+     p = (char *)s->group_names.buf;
++    // The line below causes a SIGILL, I think arithmetic on a null pointer is UB
++    if (!p) return -1;
+     buf_end = (char *)s->group_names.buf + s->group_names.size;
+     capture_index = 1;
+     while (p < buf_end) {
