@@ -182,6 +182,7 @@ pub const performEval = eval.performEval;
 pub const performPromiseThen = promise.performPromiseThen;
 pub const promiseResolve = promise.promiseResolve;
 pub const regExpAlloc = reg_exp.regExpAlloc;
+pub const regExpBuiltinExec = reg_exp.regExpBuiltinExec;
 pub const regExpInitialize = reg_exp.regExpInitialize;
 pub const rejectPromise = promise.rejectPromise;
 pub const setFunctionLength = ecmascript_function.setFunctionLength;

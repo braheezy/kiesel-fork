@@ -25,12 +25,15 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
+const arrayCreate = builtins.arrayCreate;
+const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const sameValue = types.sameValue;
 
 /// Copied from zig-libgc, unfortunately not a public API
@@ -185,6 +188,351 @@ pub fn regExpInitialize(agent: *Agent, object: Object, pattern: Value, flags: Va
     return object;
 }
 
+const CapturesList = [*c][*c]u8;
+
+fn getMatch(captures_list: CapturesList, string: String, full_unicode: bool, i: usize) ?Match {
+    if (captures_list[2 * i] == null or captures_list[2 * i + 1] == null) return null;
+    const start_index = (@intFromPtr(captures_list[2 * i]) -
+        @intFromPtr(string.utf8.ptr)) >> @intFromBool(full_unicode);
+    const end_index = (@intFromPtr(captures_list[2 * i + 1]) -
+        @intFromPtr(string.utf8.ptr)) >> @intFromBool(full_unicode);
+    return .{ .start_index = start_index, .end_index = end_index };
+}
+
+/// 22.2.7.2 RegExpBuiltinExec ( R, S )
+/// https://tc39.es/ecma262/#sec-regexpbuiltinexec
+pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) !?Object {
+    // 1. Let length be the length of S.
+    const length = string.utf16Length();
+
+    // 2. Let lastIndex be ℝ(? ToLength(? Get(R, "lastIndex"))).
+    var last_index = std.math.lossyCast(
+        usize,
+        try (try reg_exp.object().get(PropertyKey.from("lastIndex"))).toLength(agent),
+    );
+
+    const re_bytecode = reg_exp.fields.re_bytecode;
+    const capture_count: usize = @intCast(libregexp.lre_get_capture_count(@ptrCast(re_bytecode)));
+
+    // libregexp's capture count includes the matched string
+    std.debug.assert(capture_count >= 1);
+
+    const captures_list: CapturesList = @ptrCast(
+        try agent.gc_allocator.alloc([*c]u8, @intCast(@sizeOf([*c]u8) * capture_count * 2)),
+    );
+
+    // 3. Let flags be R.[[OriginalFlags]].
+    const re_flags = libregexp.lre_get_flags(@ptrCast(re_bytecode));
+
+    // 4. If flags contains "g", let global be true; else let global be false.
+    // 5. If flags contains "y", let sticky be true; else let sticky be false.
+    // 6. If flags contains "d", let hasIndices be true; else let hasIndices be false.
+
+    // 7. If global is false and sticky is false, set lastIndex to 0.
+    if ((re_flags & (libregexp.LRE_FLAG_GLOBAL | libregexp.LRE_FLAG_STICKY)) == 0) {
+        last_index = 0;
+    }
+
+    // 8. Let matcher be R.[[RegExpMatcher]].
+
+    // TODO: 9. If flags contains "u" or flags contains "v", let fullUnicode be true; else let fullUnicode be false.
+    // NOTE: This is being used as a shift value, we must pass the right kind of string to libregexp for that to work.
+    const full_unicode = false;
+
+    // 10-13.
+    const result = libregexp.lre_exec(
+        captures_list,
+        @ptrCast(re_bytecode),
+        @ptrCast(string.utf8),
+        @intCast(last_index),
+        @intCast(string.utf8.len),
+        @intFromBool(full_unicode),
+        agent,
+    );
+
+    if (result < 0) return error.OutOfMemory;
+    if (result == 0) {
+        if (last_index > length or (re_flags & (libregexp.LRE_FLAG_GLOBAL | libregexp.LRE_FLAG_STICKY)) != 0) {
+            reg_exp.object().set(
+                PropertyKey.from("lastIndex"),
+                Value.from(0),
+                .throw,
+            ) catch |err| try noexcept(err);
+        }
+        return null;
+    }
+    var match = getMatch(captures_list, string, full_unicode, 0).?;
+    last_index = match.start_index;
+
+    // 14. Let e be r's endIndex value.
+    // 15. If fullUnicode is true, set e to GetStringIndex(S, e).
+    const end_index = match.end_index;
+
+    // 16. If global is true or sticky is true, then
+    if ((re_flags & (libregexp.LRE_FLAG_GLOBAL | libregexp.LRE_FLAG_STICKY)) != 0) {
+        // a. Perform ? Set(R, "lastIndex", 𝔽(e), true).
+        try reg_exp.object().set(PropertyKey.from("lastIndex"), Value.from(end_index), .throw);
+    }
+
+    // 17. Let n be the number of elements in r's captures List.
+    const n = capture_count - 1;
+
+    // 18. Assert: n = R.[[RegExpRecord]].[[CapturingGroupsCount]].
+    // 19. Assert: n < 2**32 - 1.
+    std.debug.assert(n < std.math.maxInt(u32));
+
+    // 20. Let A be ! ArrayCreate(n + 1).
+    // 21. Assert: The mathematical value of A's "length" property is n + 1.
+    const array = arrayCreate(agent, n + 1, null) catch |err| try noexcept(err);
+
+    // 22. Perform ! CreateDataPropertyOrThrow(A, "index", 𝔽(lastIndex)).
+    array.createDataPropertyOrThrow(
+        PropertyKey.from("index"),
+        Value.from(last_index),
+    ) catch |err| try noexcept(err);
+
+    // 23. Perform ! CreateDataPropertyOrThrow(A, "input", S).
+    array.createDataPropertyOrThrow(
+        PropertyKey.from("input"),
+        Value.from(string),
+    ) catch |err| try noexcept(err);
+
+    // 24. Let match be the Match Record { [[StartIndex]]: lastIndex, [[EndIndex]]: e }.
+    match = Match{ .start_index = last_index, .end_index = end_index };
+
+    // 25. Let indices be a new empty List.
+    var indices = std.ArrayList(?Match).init(agent.gc_allocator);
+    defer indices.deinit();
+
+    // 26. Let groupNames be a new empty List.
+    var group_names = std.ArrayList(?[]const u8).init(agent.gc_allocator);
+    defer group_names.deinit();
+
+    // 27. Append match to indices.
+    try indices.append(match);
+
+    // 28. Let matchedSubstr be GetMatchString(S, match).
+    const matched_substr = Value.from(try getMatchString(agent, string, match));
+
+    // 29. Perform ! CreateDataPropertyOrThrow(A, "0", matchedSubstr).
+    array.createDataPropertyOrThrow(
+        PropertyKey.from(0),
+        matched_substr,
+    ) catch |err| try noexcept(err);
+
+    var group_name_ptr = libregexp.lre_get_groupnames(@ptrCast(re_bytecode));
+    const has_groups = group_name_ptr != null;
+
+    // 30. If R contains any GroupName, then
+    const groups = if (has_groups) blk: {
+        // a. Let groups be OrdinaryObjectCreate(null).
+        break :blk Value.from(try ordinaryObjectCreate(agent, null));
+
+        // b. Let hasGroups be true.
+    }
+    // 31. Else,
+    else blk: {
+        // a. Let groups be undefined.
+        break :blk .undefined;
+
+        // b. Let hasGroups be false.
+    };
+
+    // 32. Perform ! CreateDataPropertyOrThrow(A, "groups", groups).
+    array.createDataPropertyOrThrow(
+        PropertyKey.from("groups"),
+        groups,
+    ) catch |err| try noexcept(err);
+
+    // 33. For each integer i such that 1 ≤ i ≤ n, in ascending order, do
+    var i: usize = 1;
+    while (i <= n) : (i += 1) {
+        var captured_value: Value = undefined;
+
+        // a. Let captureI be ith element of r's captures List.
+        const capture_i = getMatch(captures_list, string, full_unicode, i);
+
+        // b. If captureI is undefined, then
+        if (capture_i == null) {
+            // i. Let capturedValue be undefined.
+            captured_value = .undefined;
+
+            // ii. Append undefined to indices.
+            try indices.append(null);
+        }
+        // c. Else,
+        else {
+            // i. Let captureStart be captureI's startIndex.
+            // ii. Let captureEnd be captureI's endIndex.
+            // iii. If fullUnicode is true, then
+            //     1. Set captureStart to GetStringIndex(S, captureStart).
+            //     2. Set captureEnd to GetStringIndex(S, captureEnd).
+            // iv. Let capture be the Match Record { [[StartIndex]]: captureStart, [[EndIndex]]: captureEnd }.
+            const capture = capture_i.?;
+
+            // v. Let capturedValue be GetMatchString(S, capture).
+            captured_value = Value.from(try getMatchString(agent, string, capture));
+
+            // vi. Append capture to indices.
+            try indices.append(capture);
+        }
+
+        // d. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(i)), capturedValue).
+        array.createDataPropertyOrThrow(
+            PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i))),
+            captured_value,
+        ) catch |err| try noexcept(err);
+
+        // e. If the ith capture of R was defined with a GroupName, then
+        if (group_name_ptr != null and group_name_ptr.* != 0) {
+            // i. Let s be the CapturingGroupName of that GroupName.
+            const group_name = std.mem.span(group_name_ptr);
+            group_name_ptr += group_name.len + 1;
+
+            // ii. Perform ! CreateDataPropertyOrThrow(groups, s, capturedValue).
+            groups.object.createDataPropertyOrThrow(
+                PropertyKey.from(group_name),
+                captured_value,
+            ) catch |err| try noexcept(err);
+
+            // iii. Append s to groupNames.
+            try group_names.append(group_name);
+        }
+        // f. Else,
+        else {
+            // i. Append undefined to groupNames.
+            try group_names.append(null);
+        }
+    }
+
+    // 34. If hasIndices is true, then
+    if ((re_flags & FLAG_HAS_INDICES) != 0) {
+        // a. Let indicesArray be MakeMatchIndicesIndexPairArray(S, indices, groupNames, hasGroups).
+        const indices_array = try makeMatchIndicesIndexPairArray(
+            agent,
+            string,
+            indices.items,
+            group_names.items,
+            has_groups,
+        );
+
+        // b. Perform ! CreateDataPropertyOrThrow(A, "indices", indicesArray).
+        array.createDataPropertyOrThrow(
+            PropertyKey.from("indices"),
+            Value.from(indices_array),
+        ) catch |err| try noexcept(err);
+    }
+
+    // 35. Return A.
+    return array;
+}
+
+/// 22.2.7.5 Match Records
+/// https://tc39.es/ecma262/#sec-match-records
+const Match = struct {
+    start_index: usize,
+    end_index: usize,
+};
+
+/// 22.2.7.6 GetMatchString ( S, match )
+/// https://tc39.es/ecma262/#sec-getmatchstring
+fn getMatchString(agent: *Agent, string: String, match: Match) ![]const u8 {
+    // 1. Assert: match.[[StartIndex]] ≤ match.[[EndIndex]] ≤ the length of S.
+    std.debug.assert(match.start_index <= match.end_index);
+    std.debug.assert(match.end_index <= string.utf16Length());
+
+    // 2. Return the substring of S from match.[[StartIndex]] to match.[[EndIndex]].
+    return string.substring(agent.gc_allocator, match.start_index, match.end_index);
+}
+
+/// 22.2.7.7 GetMatchIndexPair ( S, match )
+/// https://tc39.es/ecma262/#sec-getmatchindexpair
+fn getMatchIndexPair(agent: *Agent, string: String, match: Match) !Object {
+    // 1. Assert: match.[[StartIndex]] ≤ match.[[EndIndex]] ≤ the length of S.
+    std.debug.assert(match.start_index <= match.end_index);
+    std.debug.assert(match.end_index <= string.utf16Length());
+
+    // 2. Return CreateArrayFromList(« 𝔽(match.[[StartIndex]]), 𝔽(match.[[EndIndex]]) »).
+    return createArrayFromList(
+        agent,
+        &.{ Value.from(match.start_index), Value.from(match.end_index) },
+    );
+}
+
+/// 22.2.7.8 MakeMatchIndicesIndexPairArray ( S, indices, groupNames, hasGroups )
+/// https://tc39.es/ecma262/#sec-makematchindicesindexpairarray
+fn makeMatchIndicesIndexPairArray(agent: *Agent, string: String, indices: []const ?Match, group_names: []const ?[]const u8, has_groups: bool) !Object {
+    // 1. Let n be the number of elements in indices.
+    const n = indices.len;
+
+    // 2. Assert: n < 2**32 - 1.
+    std.debug.assert(n < std.math.maxInt(u32));
+
+    // 3. Assert: groupNames has n - 1 elements.
+    // 4. NOTE: The groupNames List contains elements aligned with the indices List starting at
+    //    indices[1].
+    std.debug.assert(group_names.len == n - 1);
+
+    // 5. Let A be ! ArrayCreate(n).
+    const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
+
+    // 6. If hasGroups is true, then
+    const groups = if (has_groups) blk: {
+        // a. Let groups be OrdinaryObjectCreate(null).
+        break :blk Value.from(try ordinaryObjectCreate(agent, null));
+    }
+    // 7. Else,
+    else blk: {
+        // a. Let groups be undefined.
+        break :blk .undefined;
+    };
+
+    // 8. Perform ! CreateDataPropertyOrThrow(A, "groups", groups).
+    array.createDataPropertyOrThrow(
+        PropertyKey.from("groups"),
+        groups,
+    ) catch |err| try noexcept(err);
+
+    // 9. For each integer i such that 0 ≤ i < n, in ascending order, do
+    var i: usize = 0;
+    while (i < n) : (i += 1) {
+        // a. Let matchIndices be indices[i].
+        const match_indices = indices[i];
+
+        // b. If matchIndices is not undefined,
+        const match_index_pair = if (match_indices != null) blk: {
+            // i. Let matchIndexPair be GetMatchIndexPair(S, matchIndices).
+            break :blk Value.from(try getMatchIndexPair(agent, string, match_indices.?));
+        }
+        // c. Else,
+        else blk: {
+            // i. Let matchIndexPair be undefined.
+            break :blk .undefined;
+        };
+
+        // d. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(i)), matchIndexPair).
+        array.createDataPropertyOrThrow(
+            PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i))),
+            match_index_pair,
+        ) catch |err| try noexcept(err);
+
+        // e. If i > 0 and groupNames[i - 1] is not undefined, then
+        if (i > 0 and group_names[i - 1] != null) {
+            // i. Assert: groups is not undefined.
+            std.debug.assert(groups != .undefined);
+
+            // ii. Perform ! CreateDataPropertyOrThrow(groups, groupNames[i - 1], matchIndexPair).
+            groups.object.createDataPropertyOrThrow(
+                PropertyKey.from(try agent.gc_allocator.dupe(u8, group_names[i - 1].?)),
+                match_index_pair,
+            ) catch |err| try noexcept(err);
+        }
+    }
+
+    // 10. Return A.
+    return array;
+}
+
 /// 22.2.5 Properties of the RegExp Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-regexp-constructor
 pub const RegExpConstructor = struct {
@@ -315,6 +663,7 @@ pub const RegExpPrototype = struct {
         });
 
         try defineBuiltinAccessor(object, "dotAll", dotAll, null, realm);
+        try defineBuiltinFunction(object, "exec", exec, 1, realm);
         try defineBuiltinAccessor(object, "flags", flags, null, realm);
         try defineBuiltinAccessor(object, "global", global, null, realm);
         try defineBuiltinAccessor(object, "hasIndices", hasIndices, null, realm);
@@ -326,6 +675,23 @@ pub const RegExpPrototype = struct {
         try defineBuiltinAccessor(object, "unicode", unicode, null, realm);
 
         return object;
+    }
+
+    /// 22.2.6.2 RegExp.prototype.exec ( string )
+    /// https://tc39.es/ecma262/#sec-regexp.prototype.exec
+    fn exec(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        // 1. Let R be the this value.
+        // 2. Perform ? RequireInternalSlot(R, [[RegExpMatcher]]).
+        const reg_exp = try this_value.requireInternalSlot(agent, RegExp);
+
+        // 3. Let S be ? ToString(string).
+        const string = try arguments.get(0).toString(agent);
+
+        // 4. Return ? RegExpBuiltinExec(R, S).
+        return if (try regExpBuiltinExec(agent, reg_exp, string)) |object|
+            Value.from(object)
+        else
+            .null;
     }
 
     /// 22.2.6.3 get RegExp.prototype.dotAll
