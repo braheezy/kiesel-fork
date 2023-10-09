@@ -188,6 +188,38 @@ pub fn regExpInitialize(agent: *Agent, object: Object, pattern: Value, flags: Va
     return object;
 }
 
+/// 22.2.7.1 RegExpExec ( R, S )
+/// https://tc39.es/ecma262/#sec-regexpexec
+pub fn regExpExec(agent: *Agent, reg_exp: Object, string: String) !?Object {
+    // 1. Let exec be ? Get(R, "exec").
+    const exec = try reg_exp.get(PropertyKey.from("exec"));
+
+    // 2. If IsCallable(exec) is true, then
+    if (exec.isCallable()) {
+        // a. Let result be ? Call(exec, R, « S »).
+        const result = try exec.callAssumeCallable(Value.from(reg_exp), .{Value.from(string)});
+
+        // b. If result is not an Object and result is not null, throw a TypeError exception.
+        if (result != .object and result != .null) {
+            return agent.throwException(
+                .type_error,
+                "RegExp exec function must return object or null",
+            );
+        }
+
+        // c. Return result.
+        return if (result == .object) result.object else null;
+    }
+
+    // 3. Perform ? RequireInternalSlot(R, [[RegExpMatcher]]).
+    // 4. Return ? RegExpBuiltinExec(R, S).
+    return regExpBuiltinExec(
+        agent,
+        try Value.from(reg_exp).requireInternalSlot(agent, RegExp),
+        string,
+    );
+}
+
 const CapturesList = [*c][*c]u8;
 
 fn getMatch(captures_list: CapturesList, string: String, full_unicode: bool, i: usize) ?Match {
@@ -671,6 +703,7 @@ pub const RegExpPrototype = struct {
         try defineBuiltinAccessor(object, "multiline", multiline, null, realm);
         try defineBuiltinAccessor(object, "source", source, null, realm);
         try defineBuiltinAccessor(object, "sticky", sticky, null, realm);
+        try defineBuiltinFunction(object, "test", @"test", 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinAccessor(object, "unicode", unicode, null, realm);
 
@@ -909,6 +942,30 @@ pub const RegExpPrototype = struct {
         // 2. Let cu be the code unit 0x0079 (LATIN SMALL LETTER Y).
         // 3. Return ? RegExpHasFlag(R, cu).
         return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_STICKY);
+    }
+
+    /// 22.2.6.16 RegExp.prototype.test ( S )
+    /// https://tc39.es/ecma262/#sec-regexp.prototype.test
+    fn @"test"(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        // 1. Let R be the this value.
+        const reg_exp = this_value;
+
+        // 2. If R is not an Object, throw a TypeError exception.
+        if (reg_exp != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{reg_exp}),
+            );
+        }
+
+        // 3. Let string be ? ToString(S).
+        const string = try arguments.get(0).toString(agent);
+
+        // 4. Let match be ? RegExpExec(R, string).
+        const match = try regExpExec(agent, reg_exp.object, string);
+
+        // 5. If match is not null, return true; else return false.
+        return Value.from(match == null);
     }
 
     /// 22.2.6.17 RegExp.prototype.toString ( )
