@@ -46,9 +46,6 @@ const version = std.fmt.comptimePrint(
     .zig = builtin.zig_version_string,
 });
 
-const stdout = std.io.getStdOut().writer();
-const stderr = std.io.getStdErr().writer();
-
 pub const Kiesel = struct {
     pub fn create(realm: *Realm) !Object {
         const kiesel_object = try ordinaryObjectCreate(realm.agent, try realm.intrinsics.@"%Object.prototype%"());
@@ -128,6 +125,7 @@ pub const Kiesel = struct {
     }
 
     fn print(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const stdout = std.io.getStdOut().writer();
         const value = arguments.get(0);
         const options = try coerceOptionsToObject(agent, arguments.get(1));
         const pretty = try getOption(options, "pretty", .boolean, null, false);
@@ -145,6 +143,8 @@ fn run(
     file_name: []const u8,
     source_text: []const u8,
 ) !?Value {
+    const stdout = std.io.getStdOut().writer();
+    const stderr = std.io.getStdErr().writer();
     const agent = realm.agent;
 
     var diagnostics = Diagnostics.init(allocator);
@@ -213,6 +213,8 @@ fn getHistoryPath(allocator: Allocator) ![]const u8 {
 }
 
 fn repl(allocator: Allocator, realm: *Realm) !void {
+    const stdout = std.io.getStdOut().writer();
+
     var linenoise = Linenoise.init(allocator);
     defer linenoise.deinit();
 
@@ -248,6 +250,7 @@ fn repl(allocator: Allocator, realm: *Realm) !void {
 
 fn replBasic(allocator: Allocator, realm: *Realm) !void {
     const stdin = std.io.getStdIn().reader();
+    const stdout = std.io.getStdOut().writer();
 
     while (true) {
         var array_list = std.ArrayList(u8).init(allocator);
@@ -279,6 +282,8 @@ pub fn main() !u8 {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
+
+    const stdout = std.io.getStdOut().writer();
 
     const Options = struct {
         command: ?[]const u8 = null,
