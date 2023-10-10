@@ -170,19 +170,17 @@ pub fn parse(
     if (T != ast.Script)
         @compileError("Parser.parse() is only implemented for ast.Script");
 
-    return ast.Script{
-        .statement_list = try parseNode(
-            ast.StatementList,
-            struct {
-                fn accept(parser: *Self) error{OutOfMemory}!ast.StatementList {
-                    return parser.acceptStatementList();
-                }
-            }.accept,
-            allocator,
-            source_text,
-            ctx,
-        ),
-    };
+    return parseNode(
+        ast.Script,
+        struct {
+            fn accept(parser: *Self) AcceptError!ast.Script {
+                return parser.acceptScript();
+            }
+        }.accept,
+        allocator,
+        source_text,
+        ctx,
+    );
 }
 
 pub fn parseNode(
@@ -1075,7 +1073,7 @@ pub fn acceptBlock(self: *Self) AcceptError!ast.Block {
     return block;
 }
 
-pub fn acceptStatementList(self: *Self) error{OutOfMemory}!ast.StatementList {
+pub fn acceptStatementList(self: *Self) AcceptError!ast.StatementList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1738,4 +1736,12 @@ pub fn acceptAsyncArrowFunction(self: *Self) AcceptError!ast.AsyncArrowFunction 
         .function_body = function_body,
         .source_text = source_text,
     };
+}
+
+pub fn acceptScript(self: *Self) AcceptError!ast.Script {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const statement_list = try self.acceptStatementList();
+    return .{ .statement_list = statement_list };
 }
