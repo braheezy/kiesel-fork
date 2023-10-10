@@ -197,6 +197,7 @@ pub fn parseNode(
         .core = core,
         .diagnostics = ctx.diagnostics,
     };
+    tokenizer_.state.tokenizer = &tokenizer;
     const ast_node: ?T = acceptFn(&parser) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         else => null,
@@ -1742,6 +1743,7 @@ pub fn acceptScript(self: *Self) AcceptError!ast.Script {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    _ = self.core.accept(RuleSet.is(.hashbang_comment)) catch {};
     const statement_list = try self.acceptStatementList();
     return .{ .statement_list = statement_list };
 }

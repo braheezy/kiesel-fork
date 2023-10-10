@@ -83,6 +83,7 @@ const TokenType = enum {
     finally,
     @"for",
     function,
+    hashbang_comment,
     identifier,
     @"if",
     import,
@@ -117,6 +118,7 @@ const patterns = .{
     //       as '/' (vs '// foo') or '.' (vs '.123'). For simplicity we group all the non-literal
     //       matchers here.
     Pattern.create(.comment, commentMatcher),
+    Pattern.create(.hashbang_comment, hashbangCommentMatcher),
     Pattern.create(.numeric, numericMatcher),
     Pattern.create(.string, stringMatcher),
     Pattern.create(.whitespace, whitespaceMatcher),
@@ -219,6 +221,11 @@ const patterns = .{
 
 pub const Tokenizer = ptk.Tokenizer(TokenType, &patterns);
 
+// FIXME: ptk should provide tokenizer state to matchers
+pub var state: struct {
+    tokenizer: *Tokenizer = undefined,
+} = .{};
+
 comptime {
     @setEvalBranchQuota(10000);
     token_types: for (std.enums.values(TokenType)) |token_type| {
@@ -311,6 +318,20 @@ fn commentMatcher(str: []const u8) ?usize {
     if (std.mem.startsWith(u8, str, "/*")) {
         if (std.mem.indexOf(u8, str, "*/")) |index|
             return index + 2;
+    }
+    return null;
+}
+
+/// 12.5 Hashbang Comments
+/// https://tc39.es/ecma262/#sec-hashbang
+fn hashbangCommentMatcher(str: []const u8) ?usize {
+    if (state.tokenizer.offset > 0) return null;
+    if (std.mem.startsWith(u8, str, "#!")) {
+        for (line_terminators) |line_terminator| {
+            if (std.mem.indexOf(u8, str, line_terminator)) |index|
+                return index;
+        }
+        return str.len;
     }
     return null;
 }
