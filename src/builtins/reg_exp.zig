@@ -285,11 +285,11 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) !?Obje
     if (result < 0) return error.OutOfMemory;
     if (result == 0) {
         if (last_index > length or (re_flags & (libregexp.LRE_FLAG_GLOBAL | libregexp.LRE_FLAG_STICKY)) != 0) {
-            reg_exp.object().set(
+            try reg_exp.object().set(
                 PropertyKey.from("lastIndex"),
                 Value.from(0),
                 .throw,
-            ) catch |err| try noexcept(err);
+            );
         }
         return null;
     }
