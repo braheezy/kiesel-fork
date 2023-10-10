@@ -66,6 +66,21 @@ export fn lre_realloc(@"opaque": ?*anyopaque, maybe_ptr: ?*anyopaque, size: usiz
 
 const FLAG_HAS_INDICES = @as(c_int, 1) << @as(c_int, 6);
 
+/// 22.2.3.1 RegExpCreate ( P, F )
+/// https://tc39.es/ecma262/#sec-regexpcreate
+pub fn regExpCreate(agent: *Agent, pattern: Value, flags: Value) !Object {
+    const realm = agent.currentRealm();
+
+    // 1. Let obj be ! RegExpAlloc(%RegExp%).
+    const object = regExpAlloc(
+        agent,
+        try realm.intrinsics.@"%RegExp%"(),
+    ) catch |err| try noexcept(err);
+
+    // 2. Return ? RegExpInitialize(obj, P, F).
+    return regExpInitialize(agent, object, pattern, flags);
+}
+
 /// 22.2.3.2 RegExpAlloc ( newTarget )
 /// https://tc39.es/ecma262/#sec-regexpalloc
 pub fn regExpAlloc(agent: *Agent, new_target: Object) !Object {
