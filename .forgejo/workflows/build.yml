@@ -23,6 +23,9 @@ jobs:
           if [ -f zig-out/bin/kiesel ]; then
             mv zig-out/bin/kiesel zig-out/bin/\$2
           fi
+          if [ -f zig-out/bin/kiesel.exe ]; then
+            mv zig-out/bin/kiesel.exe zig-out/bin/\$2
+          fi
           EOF
           chmod +x build.sh
       - name: Create upload.sh script
@@ -47,6 +50,14 @@ jobs:
         run: |
           ./build.sh x86_64-linux-gnu kiesel-linux-x86_64
           ./upload.sh zig-out/bin/kiesel-linux-x86_64
+      - name: Build and upload kiesel-windows-x86
+        run: |
+          ./build.sh x86-windows-gnu kiesel-windows-x86.exe
+          ./upload.sh zig-out/bin/kiesel-windows-x86.exe
+      - name: Build and upload kiesel-windows-x86_64
+        run: |
+          ./build.sh x86_64-windows-gnu kiesel-windows-x86_64.exe
+          ./upload.sh zig-out/bin/kiesel-windows-x86_64.exe
       - name: Build and upload kiesel.wasm
         run: |
           ./build.sh wasm32-wasi
