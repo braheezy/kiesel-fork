@@ -50,7 +50,7 @@ pub const String = union(enum) {
             error.DanglingSurrogateHalf,
             error.ExpectedSecondSurrogateHalf,
             error.UnexpectedSecondSurrogateHalf,
-            => unreachable,
+            => @panic("Surrogate pairs are not handled in String.substring()"),
         };
     }
 };
