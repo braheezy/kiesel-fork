@@ -11,6 +11,7 @@ const utils = @import("../utils.zig");
 const Tokenizer = tokenizer_.Tokenizer;
 const containsLineTerminator = tokenizer_.containsLineTerminator;
 const parseNumericLiteral = literals.parseNumericLiteral;
+const parseRegularExpressionLiteral = literals.parseRegularExpressionLiteral;
 const parseStringLiteral = literals.parseStringLiteral;
 const temporaryChange = utils.temporaryChange;
 const reserved_words = tokenizer_.reserved_words;
@@ -357,6 +358,8 @@ pub fn acceptPrimaryExpression(self: *Self) AcceptError!ast.PrimaryExpression {
         return .{ .async_function_expression = async_function_expression }
     else |_| if (self.acceptAsyncGeneratorExpression()) |async_generator_expression|
         return .{ .async_generator_expression = async_generator_expression }
+    else |_| if (self.acceptRegularExpressionLiteral()) |regular_expression_literal|
+        return .{ .regular_expression_literal = regular_expression_literal }
     else |_| if (self.acceptArrowFunction()) |arrow_function|
         return .{ .arrow_function = arrow_function }
     else |_| if (self.acceptAsyncArrowFunction()) |async_arrow_function|
@@ -1619,6 +1622,33 @@ pub fn acceptAsyncGeneratorExpression(self: *Self) AcceptError!ast.AsyncGenerato
         .function_body = function_body,
         .source_text = source_text,
     };
+}
+
+fn acceptRegularExpressionLiteral(self: *Self) AcceptError!ast.RegularExpressionLiteral {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const tmp = temporaryChange(&tokenizer_.state, "parsing_regular_expression", true);
+    defer tmp.restore();
+
+    const token = try self.core.accept(RuleSet.is(.regular_expression));
+    var regular_expression_literal = parseRegularExpressionLiteral(token.text, .complete) catch unreachable;
+    switch (regular_expression_literal.isValidRegularExpressionLiteral()) {
+        .invalid_pattern => {
+            try self.emitErrorAt(token.location, "Invalid RegExp pattern", .{});
+            return error.UnexpectedToken;
+        },
+        .invalid_flags => {
+            var flags_location = token.location;
+            flags_location.column += @intCast(regular_expression_literal.pattern.len + 2);
+            try self.emitErrorAt(flags_location, "Invalid RegExp flags", .{});
+            return error.UnexpectedToken;
+        },
+        .valid => {},
+    }
+    regular_expression_literal.pattern = try self.allocator.dupe(u8, regular_expression_literal.pattern);
+    regular_expression_literal.flags = try self.allocator.dupe(u8, regular_expression_literal.flags);
+    return regular_expression_literal;
 }
 
 fn acceptAsyncFunctionDeclaration(self: *Self) AcceptError!ast.AsyncFunctionDeclaration {

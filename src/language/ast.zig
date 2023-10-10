@@ -111,6 +111,7 @@ pub const PrimaryExpression = union(enum) {
     generator_expression: GeneratorExpression,
     async_function_expression: AsyncFunctionExpression,
     async_generator_expression: AsyncGeneratorExpression,
+    regular_expression_literal: RegularExpressionLiteral,
     arrow_function: ArrowFunction,
     async_arrow_function: AsyncArrowFunction,
     parenthesized_expression: ParenthesizedExpression,
@@ -805,6 +806,64 @@ pub const PropertyName = union(enum) {
                 try expression.print(writer, indentation + 1);
             },
         }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-RegularExpressionLiteral
+pub const RegularExpressionLiteral = struct {
+    const Self = @This();
+
+    pattern: []const u8,
+    flags: []const u8,
+
+    /// 13.2.7.2 Static Semantics: IsValidRegularExpressionLiteral ( literal )
+    /// https://tc39.es/ecma262/#sec-isvalidregularexpressionliteral
+    pub fn isValidRegularExpressionLiteral(self: Self) enum {
+        valid,
+        invalid_pattern,
+        invalid_flags,
+    } {
+        // 1. Let flags be FlagText of literal.
+        // 2. If flags contains any code points other than d, g, i, m, s, u, v, or y, or if flags
+        //    contains any code point more than once, return false.
+        var seen_flags: [8]bool = .{false} ** 8;
+        for (self.flags) |flag| {
+            for ("dgimsuvy", 0..) |c, i| {
+                if (flag == c) {
+                    if (seen_flags[i]) return .invalid_flags;
+                    seen_flags[i] = true;
+                    break;
+                }
+            } else {
+                return .invalid_flags;
+            }
+        }
+
+        // TODO: 3-8.
+        // The only way we have right now to validate a regex pattern is `libregexp.lre_compile()`,
+        // which would be wasteful to call here. At the very least we'd have to reuse the bytecode.
+        return .valid;
+    }
+
+    /// 13.2.7.3 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-regular-expression-literals-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, _: *BytecodeContext) !void {
+        // 1. Let pattern be CodePointsToString(BodyText of RegularExpressionLiteral).
+        try executable.addInstructionWithConstant(.load_constant, Value.from(self.pattern));
+
+        // 2. Let flags be CodePointsToString(FlagText of RegularExpressionLiteral).
+        try executable.addInstructionWithConstant(.load_constant, Value.from(self.flags));
+
+        // 3. Return ! RegExpCreate(pattern, flags).
+        try executable.addInstruction(.reg_exp_create);
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
+        try printString("RegularExpressionLiteral", writer, indentation);
+        try printString("pattern:", writer, indentation + 1);
+        try printString(self.pattern, writer, indentation + 2);
+        try printString("flags:", writer, indentation + 1);
+        try printString(self.flags, writer, indentation + 2);
     }
 };
 

@@ -269,6 +269,67 @@ pub fn parseStringLiteral(
     };
 }
 
+/// 12.9.5 Regular Expression Literals
+/// https://tc39.es/ecma262/#sec-literals-regular-expression-literals
+pub fn parseRegularExpressionLiteral(
+    str: []const u8,
+    consume: enum { partial, complete },
+) !ast.RegularExpressionLiteral {
+    var state: enum {
+        start,
+        opening_slash,
+        closing_slash,
+        pattern_character,
+        flag_character,
+        backslash,
+    } = .start;
+    var closing_slash_index: usize = 0;
+    for (str, 0..) |c, i| switch (c) {
+        '/' => switch (state) {
+            .start => state = .opening_slash,
+            .pattern_character => {
+                state = .closing_slash;
+                closing_slash_index = i;
+            },
+            .backslash => state = .pattern_character,
+            else => return error.InvalidRegularExpressionLiteral,
+        },
+        '\\' => switch (state) {
+            .opening_slash, .pattern_character => state = .backslash,
+            .backslash => state = .pattern_character,
+            else => return error.InvalidRegularExpressionLiteral,
+        },
+        'a'...'z' => switch (state) {
+            .opening_slash, .pattern_character, .backslash => state = .pattern_character,
+            .closing_slash, .flag_character => state = .flag_character,
+            else => return error.InvalidRegularExpressionLiteral,
+        },
+        else => {
+            if (startsWithLineTerminator(str[i..])) return error.InvalidRegularExpressionLiteral;
+            switch (state) {
+                .opening_slash, .pattern_character => state = .pattern_character,
+                .closing_slash, .flag_character => switch (consume) {
+                    .partial => return .{
+                        .pattern = str[1..closing_slash_index],
+                        .flags = str[closing_slash_index + 1 .. i],
+                    },
+                    .complete => return error.InvalidRegularExpressionLiteral,
+                },
+                else => return error.InvalidRegularExpressionLiteral,
+            }
+        },
+    };
+
+    return switch (state) {
+        // Valid end states after exhausting the input string
+        .closing_slash, .flag_character => return .{
+            .pattern = str[1..closing_slash_index],
+            .flags = str[closing_slash_index + 1 ..],
+        },
+        else => error.InvalidRegularExpressionLiteral,
+    };
+}
+
 test "parseNumericLiteral" {
     for ([_]ast.NumericLiteral{
         .{ .text = "0", .system = .decimal, .production = .regular, .type = .number },
@@ -397,5 +458,39 @@ test "parseStringLiteral" {
     ) |input| {
         const parse_error = parseStringLiteral(input, .complete);
         try std.testing.expectError(error.InvalidStringLiteral, parse_error);
+    }
+}
+
+test "parseRegularExpressionLiteral" {
+    for ([_]struct { []const u8, ast.RegularExpressionLiteral }{
+        .{ "/ /", .{ .pattern = " ", .flags = "" } },
+        .{ "/a/", .{ .pattern = "a", .flags = "" } },
+        .{ "/a/g", .{ .pattern = "a", .flags = "g" } },
+        .{ "/a/xxx", .{ .pattern = "a", .flags = "xxx" } }, // Considered valid for the purpose of parsing
+        .{ "/^[a-z0-9]+$/giu", .{ .pattern = "^[a-z0-9]+$", .flags = "giu" } },
+        .{ "/\\//", .{ .pattern = "\\/", .flags = "" } },
+        .{ "/\\\\/", .{ .pattern = "\\\\", .flags = "" } },
+    }) |test_case| {
+        const input = test_case[0];
+        const expected = test_case[1];
+        const parsed = parseRegularExpressionLiteral(input, .complete) catch unreachable;
+        try std.testing.expectEqualStrings(expected.pattern, parsed.pattern);
+        try std.testing.expectEqualStrings(expected.flags, parsed.flags);
+    }
+
+    for ([_][]const u8
+    // zig fmt: off
+    {
+        // Garbage input
+        "", "//", "foo",
+        // Invalid flags
+        "/a/$", "/a/ ",
+        // Invalid escapes
+        "/\\/", "/\\\\\\/",
+    }
+    // zig fmt: on
+    ) |input| {
+        const parse_error = parseRegularExpressionLiteral(input, .complete);
+        try std.testing.expectError(error.InvalidRegularExpressionLiteral, parse_error);
     }
 }

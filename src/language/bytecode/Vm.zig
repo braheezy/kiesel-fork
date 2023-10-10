@@ -1486,6 +1486,11 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             try lref.putValue(self.agent, rval);
             self.reference = null;
         },
+        .reg_exp_create => {
+            const flags = self.stack.pop();
+            const pattern = self.stack.pop();
+            self.result = Value.from(try builtins.regExpCreate(self.agent, pattern, flags));
+        },
         .resolve_binding => {
             const name = self.fetchIdentifier(executable);
             const strict = self.fetchIndex(executable) == 1;

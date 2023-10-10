@@ -3,6 +3,7 @@ const std = @import("std");
 
 const literals = @import("literals.zig");
 const parseNumericLiteral = literals.parseNumericLiteral;
+const parseRegularExpressionLiteral = literals.parseRegularExpressionLiteral;
 const parseStringLiteral = literals.parseStringLiteral;
 
 const TokenType = enum {
@@ -92,6 +93,7 @@ const TokenType = enum {
     new,
     null,
     numeric,
+    regular_expression,
     @"return",
     string,
     super,
@@ -120,6 +122,7 @@ const patterns = .{
     Pattern.create(.comment, commentMatcher),
     Pattern.create(.hashbang_comment, hashbangCommentMatcher),
     Pattern.create(.numeric, numericMatcher),
+    Pattern.create(.regular_expression, regularExpressionMatcher),
     Pattern.create(.string, stringMatcher),
     Pattern.create(.whitespace, whitespaceMatcher),
     Pattern.create(.@"--", ptk.matchers.literal("--")),
@@ -224,6 +227,7 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &patterns);
 // FIXME: ptk should provide tokenizer state to matchers
 pub var state: struct {
     tokenizer: *Tokenizer = undefined,
+    parsing_regular_expression: bool = false,
 } = .{};
 
 comptime {
@@ -383,5 +387,14 @@ fn stringMatcher(str: []const u8) ?usize {
         return string_literal.text.len
     else |err| switch (err) {
         error.InvalidStringLiteral => return null,
+    }
+}
+
+fn regularExpressionMatcher(str: []const u8) ?usize {
+    if (!state.parsing_regular_expression) return null;
+    if (parseRegularExpressionLiteral(str, .partial)) |regular_expression_literal|
+        return regular_expression_literal.pattern.len + regular_expression_literal.flags.len + 2
+    else |err| switch (err) {
+        error.InvalidRegularExpressionLiteral => return null,
     }
 }
