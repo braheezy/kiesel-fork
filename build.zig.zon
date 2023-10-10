@@ -23,4 +23,11 @@
             .hash = "12208556082c280af264ca2a174fd04fc7a35f865bfe59e2c61f4a977bf7a65063e4",
         },
     },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "patches/",
+        "src/",
+        "vendor/",
+    },
 }
