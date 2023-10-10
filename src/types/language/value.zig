@@ -1,3 +1,4 @@
+const builtin = @import("builtin");
 const std = @import("std");
 
 const Allocator = std.mem.Allocator;
@@ -82,7 +83,17 @@ pub const Value = union(enum) {
         writer: anytype,
     ) !void {
         _ = options;
-        if (std.mem.eql(u8, fmt, "pretty")) return prettyPrintValue(self, writer);
+        if (std.mem.eql(u8, fmt, "pretty")) {
+            return prettyPrintValue(self, writer) catch |err| {
+                // NOTE: When targeting Windows the error set contains error.Unexpected (from the
+                //       `std.io.tty.Config.setColor()` calls), which `std.fmt.formatType()`
+                //       doesn't include in its error set.
+                if (builtin.os.tag == .windows) switch (err) {
+                    error.Unexpected => {},
+                    else => |e| return e,
+                } else return err;
+            };
+        }
         switch (self) {
             .undefined => try writer.writeAll("undefined"),
             .null => try writer.writeAll("null"),
