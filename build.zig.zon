@@ -10,9 +10,10 @@
             .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/033337a6ad35970ecade1ed01d2e282c76c3c98f.tar.gz",
             .hash = "1220616c6e363651e48fc33eb5591c27bdd6f550aba4ee639df724aeb0d0456c806a",
         },
+        // FIXME: This points to https://github.com/joachimschmidt557/linenoize/pull/17, update when merged
         .linenoise = .{
-            .url = "https://github.com/joachimschmidt557/linenoize/archive/180e8d1d8df4811d20ab7e216da9a6e2c35eb3a5.tar.gz",
-            .hash = "1220aa9878b4bfa6a70a10793ae8ad42ea7cb1bbd1394c78613c3a9480aae0694d79",
+            .url = "https://github.com/joachimschmidt557/linenoize/archive/36c6bea5375426239a06e0aec99a448af72201d1.tar.gz",
+            .hash = "1220be133956a58d7e19a2dfb5c65e5afe0452530106a5b06f2239a352067234524c",
         },
         .parser_toolkit = .{
             .url = "https://github.com/MasterQ32/parser-toolkit/archive/7e7188bfaa46d0ba36d1ef31c1f368d264aa6876.tar.gz",
