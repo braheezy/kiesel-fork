@@ -7,7 +7,7 @@
 
 <img src="https://kiesel.dev/kiesel.svg" height="200" alt="logo">
 
-## What is this?
+## Introduction
 
 _Kiesel_ is a JavaScript engine written from scratch for the purpose of
 [me](https://linus.dev) learning the
@@ -20,19 +20,20 @@ possible in pure Zig - currently with two exceptions:
 - [libregexp](https://github.com/bellard/quickjs/blob/master/libregexp.h) for
   regular expressions
 
-A simple CLI/file interpreter is available but it also aims to be easily
-embeddable into other projects.
+A simple CLI (REPL/file interpreter) is available but being easy to embed in
+other projects is also a goal.
 
-The implementation style is similar to [LibJS](https://libjs.dev) (the JS engine
-used in SerenityOS and the Ladybird browser which I also work on) in various
-aspects, most notably the desire to stay very close to spec. Despite these
-similarities and my involvement in both projects, Kiesel is not intended as a
-successor to LibJS in any way :^)
+The implementation style is similar to [LibJS](https://libjs.dev) - the JS
+engine used in SerenityOS and the Ladybird browser which I worked on before - in
+various aspects, most notably the desire to stay very close to spec. Development
+is still at an early stage and the engine's usefulness thus limited. While there
+are various things that already work well, there's an equal amount of things
+that don't :^)
 
-Development is still at an early stage and the engine not actually useful at
-this point. Pull requests and issues are disabled for the time being, if you
-want to report a bug (not missing feature, most features are missing!), please
-ping me directly.
+Issues are disabled for the time being, if you want to report a bug (not missing
+feature, many features are missing!), please get in touch with me directly. Pull
+requests containing small fixes are welcome, if you want to work on features
+please also get in touch beforehand.
 
 Further reading:
 
@@ -79,5 +80,5 @@ Options:
 
 - [Website](https://kiesel.dev)
 - [Wasm-based online playground](https://kiesel.dev/playground)
-- [Builds for the main branch](https://files.kiesel.dev) (Linux only)
+- [Builds for the main branch](https://files.kiesel.dev)
 - [test262 results](https://test262.fyi/#|kiesel)
