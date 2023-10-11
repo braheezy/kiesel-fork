@@ -66,6 +66,31 @@ export fn lre_realloc(@"opaque": ?*anyopaque, maybe_ptr: ?*anyopaque, size: usiz
 
 const FLAG_HAS_INDICES = @as(c_int, 1) << @as(c_int, 6);
 
+pub const ParsedFlags = packed struct(u8) {
+    const Self = @This();
+
+    d: bool = false,
+    g: bool = false,
+    i: bool = false,
+    m: bool = false,
+    s: bool = false,
+    u: bool = false,
+    v: bool = false,
+    y: bool = false,
+
+    pub fn from(flags: []const u8) ?Self {
+        var parsed_flags = Self{};
+        for (flags) |flag| switch (flag) {
+            inline 'd', 'g', 'i', 'm', 's', 'u', 'v', 'y' => |c| {
+                if (@field(parsed_flags, &.{c})) return null;
+                @field(parsed_flags, &.{c}) = true;
+            },
+            else => return null,
+        };
+        return parsed_flags;
+    }
+};
+
 /// 22.2.3.1 RegExpCreate ( P, F )
 /// https://tc39.es/ecma262/#sec-regexpcreate
 pub fn regExpCreate(agent: *Agent, pattern: Value, flags: Value) !Object {
@@ -124,30 +149,20 @@ pub fn regExpInitialize(agent: *Agent, object: Object, pattern: Value, flags: Va
     // 8. If F contains "s", let s be true; else let s be false.
     // 9. If F contains "u", let u be true; else let u be false.
     // 10. If F contains "v", let v be true; else let v be false.
+    const parsed_flags = ParsedFlags.from(f.utf8) orelse return agent.throwException(
+        .syntax_error,
+        try std.fmt.allocPrint(agent.gc_allocator, "Invalid RegExp flags '{s}'", .{f.utf8}),
+    );
+
+    // NOTE: "v" is not supported by libregexp
     var re_flags: c_int = 0;
-    for (f.utf8) |c| {
-        const mask = switch (c) {
-            // NOTE: "v" is not supported by libregexp
-            'd' => FLAG_HAS_INDICES,
-            'g' => libregexp.LRE_FLAG_GLOBAL,
-            'i' => libregexp.LRE_FLAG_IGNORECASE,
-            'm' => libregexp.LRE_FLAG_MULTILINE,
-            's' => libregexp.LRE_FLAG_DOTALL,
-            'u' => libregexp.LRE_FLAG_UTF16,
-            'y' => libregexp.LRE_FLAG_STICKY,
-            else => return agent.throwException(
-                .syntax_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "Invalid RegExp flag '{c}'", .{c}),
-            ),
-        };
-        if ((re_flags & mask) != 0) {
-            return agent.throwException(
-                .syntax_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "Duplicate RegExp flag '{c}'", .{c}),
-            );
-        }
-        re_flags |= mask;
-    }
+    if (parsed_flags.d) re_flags |= FLAG_HAS_INDICES;
+    if (parsed_flags.g) re_flags |= libregexp.LRE_FLAG_GLOBAL;
+    if (parsed_flags.i) re_flags |= libregexp.LRE_FLAG_IGNORECASE;
+    if (parsed_flags.m) re_flags |= libregexp.LRE_FLAG_MULTILINE;
+    if (parsed_flags.s) re_flags |= libregexp.LRE_FLAG_DOTALL;
+    if (parsed_flags.u) re_flags |= libregexp.LRE_FLAG_UTF16;
+    if (parsed_flags.y) re_flags |= libregexp.LRE_FLAG_STICKY;
 
     // TODO: 11. If u is true or v is true, then
     //     a. Let patternText be StringToCodePoints(P).

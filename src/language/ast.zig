@@ -5,6 +5,7 @@ const Allocator = std.mem.Allocator;
 const builtins = @import("../builtins.zig");
 const bytecode = @import("bytecode.zig");
 const execution = @import("../execution.zig");
+const reg_exp = @import("../builtins/reg_exp.zig");
 const tokenizer = @import("tokenizer.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
@@ -826,18 +827,7 @@ pub const RegularExpressionLiteral = struct {
         // 1. Let flags be FlagText of literal.
         // 2. If flags contains any code points other than d, g, i, m, s, u, v, or y, or if flags
         //    contains any code point more than once, return false.
-        var seen_flags: [8]bool = .{false} ** 8;
-        for (self.flags) |flag| {
-            for ("dgimsuvy", 0..) |c, i| {
-                if (flag == c) {
-                    if (seen_flags[i]) return .invalid_flags;
-                    seen_flags[i] = true;
-                    break;
-                }
-            } else {
-                return .invalid_flags;
-            }
-        }
+        _ = reg_exp.ParsedFlags.from(self.flags) orelse return .invalid_flags;
 
         // TODO: 3-8.
         // The only way we have right now to validate a regex pattern is `libregexp.lre_compile()`,
