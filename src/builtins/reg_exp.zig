@@ -739,6 +739,7 @@ pub const RegExpPrototype = struct {
         try defineBuiltinFunction(object, "test", @"test", 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinAccessor(object, "unicode", unicode, null, realm);
+        try defineBuiltinAccessor(object, "unicodeSets", unicodeSets, null, realm);
 
         return object;
     }
@@ -1039,6 +1040,15 @@ pub const RegExpPrototype = struct {
         // 2. Let cu be the code unit 0x0075 (LATIN SMALL LETTER U).
         // 3. Return ? RegExpHasFlag(R, cu).
         return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_UTF16);
+    }
+
+    /// 22.2.6.19 get RegExp.prototype.unicodeSets
+    /// https://tc39.es/ecma262/#sec-get-regexp.prototype.unicodesets
+    fn unicodeSets(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let R be the this value.
+        // 2. Let cu be the code unit 0x0076 (LATIN SMALL LETTER V).
+        // 3. Return ? RegExpHasFlag(R, cu).
+        return regExpHasFlag(agent, this_value, FLAG_UNICODE_SETS);
     }
 };
 
