@@ -40,6 +40,7 @@ Further reading:
 - [Kiesel Devlog #1: Now passing 25% of test262!](https://linus.dev/posts/kiesel-devlog-1/)
 - [Kiesel Devlog #2: Iterators, more math, and a bug in the Zig stdlib](https://linus.dev/posts/kiesel-devlog-2/)
 - [Kiesel Devlog #3: Accessors, Date/Map/Set, test262 history graph](https://linus.dev/posts/kiesel-devlog-3/)
+- [Kiesel Devlog #4: The biggest update yet!](https://linus.dev/posts/kiesel-devlog-4/)
 
 ## Build
 
