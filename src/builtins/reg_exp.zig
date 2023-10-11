@@ -64,7 +64,8 @@ export fn lre_realloc(@"opaque": ?*anyopaque, maybe_ptr: ?*anyopaque, size: usiz
     }
 }
 
-const FLAG_HAS_INDICES = @as(c_int, 1) << @as(c_int, 6);
+const FLAG_HAS_INDICES: c_int = 1 << 6;
+const FLAG_UNICODE_SETS: c_int = 1 << 7;
 
 pub const ParsedFlags = packed struct(u8) {
     const Self = @This();
@@ -87,6 +88,7 @@ pub const ParsedFlags = packed struct(u8) {
             },
             else => return null,
         };
+        if (parsed_flags.u and parsed_flags.v) return null;
         return parsed_flags;
     }
 };
@@ -154,7 +156,7 @@ pub fn regExpInitialize(agent: *Agent, object: Object, pattern: Value, flags: Va
         try std.fmt.allocPrint(agent.gc_allocator, "Invalid RegExp flags '{s}'", .{f.utf8}),
     );
 
-    // NOTE: "v" is not supported by libregexp
+    // NOTE: "v" is not supported by libregexp, but we parse and store it regardless
     var re_flags: c_int = 0;
     if (parsed_flags.d) re_flags |= FLAG_HAS_INDICES;
     if (parsed_flags.g) re_flags |= libregexp.LRE_FLAG_GLOBAL;
@@ -162,6 +164,7 @@ pub fn regExpInitialize(agent: *Agent, object: Object, pattern: Value, flags: Va
     if (parsed_flags.m) re_flags |= libregexp.LRE_FLAG_MULTILINE;
     if (parsed_flags.s) re_flags |= libregexp.LRE_FLAG_DOTALL;
     if (parsed_flags.u) re_flags |= libregexp.LRE_FLAG_UTF16;
+    if (parsed_flags.v) re_flags |= FLAG_UNICODE_SETS;
     if (parsed_flags.y) re_flags |= libregexp.LRE_FLAG_STICKY;
 
     // TODO: 11. If u is true or v is true, then
