@@ -100,6 +100,12 @@ pub const NumberConstructor = struct {
             try realm.intrinsics.@"%parseFloat%"(),
         ));
 
+        // 21.1.2.13 Number.parseInt ( string, radix )
+        // https://tc39.es/ecma262/#sec-number.parseint
+        try defineBuiltinProperty(object, "parseInt", Value.from(
+            try realm.intrinsics.@"%parseInt%"(),
+        ));
+
         // 21.1.2.14 Number.POSITIVE_INFINITY
         // https://tc39.es/ecma262/#sec-number.positive_infinity
         try defineBuiltinProperty(object, "POSITIVE_INFINITY", PropertyDescriptor{
