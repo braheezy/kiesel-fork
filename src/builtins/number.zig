@@ -94,6 +94,12 @@ pub const NumberConstructor = struct {
             .configurable = false,
         });
 
+        // 21.1.2.12 Number.parseFloat ( string )
+        // https://tc39.es/ecma262/#sec-number.parsefloat
+        try defineBuiltinProperty(object, "parseFloat", Value.from(
+            try realm.intrinsics.@"%parseFloat%"(),
+        ));
+
         // 21.1.2.14 Number.POSITIVE_INFINITY
         // https://tc39.es/ecma262/#sec-number.positive_infinity
         try defineBuiltinProperty(object, "POSITIVE_INFINITY", PropertyDescriptor{
