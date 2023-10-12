@@ -202,43 +202,43 @@ pub const Error = Object.Factory(.{
 
 /// 20.5.5.1 EvalError
 /// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-evalerror
-pub const EvalError = NativeError();
-pub const EvalErrorConstructor = NativeErrorConstructor("EvalError");
-pub const EvalErrorPrototype = NativeErrorPrototype("EvalError");
+pub const EvalError = MakeNativeError();
+pub const EvalErrorConstructor = MakeNativeErrorConstructor("EvalError");
+pub const EvalErrorPrototype = MakeNativeErrorPrototype("EvalError");
 
 /// 20.5.5.2 RangeError
 /// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-rangeerror
-pub const RangeError = NativeError();
-pub const RangeErrorConstructor = NativeErrorConstructor("RangeError");
-pub const RangeErrorPrototype = NativeErrorPrototype("RangeError");
+pub const RangeError = MakeNativeError();
+pub const RangeErrorConstructor = MakeNativeErrorConstructor("RangeError");
+pub const RangeErrorPrototype = MakeNativeErrorPrototype("RangeError");
 
 /// 20.5.5.3 ReferenceError
 /// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-referenceerror
-pub const ReferenceError = NativeError();
-pub const ReferenceErrorConstructor = NativeErrorConstructor("ReferenceError");
-pub const ReferenceErrorPrototype = NativeErrorPrototype("ReferenceError");
+pub const ReferenceError = MakeNativeError();
+pub const ReferenceErrorConstructor = MakeNativeErrorConstructor("ReferenceError");
+pub const ReferenceErrorPrototype = MakeNativeErrorPrototype("ReferenceError");
 
 /// 20.5.5.4 SyntaxError
 /// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-syntaxerror
-pub const SyntaxError = NativeError();
-pub const SyntaxErrorConstructor = NativeErrorConstructor("SyntaxError");
-pub const SyntaxErrorPrototype = NativeErrorPrototype("SyntaxError");
+pub const SyntaxError = MakeNativeError();
+pub const SyntaxErrorConstructor = MakeNativeErrorConstructor("SyntaxError");
+pub const SyntaxErrorPrototype = MakeNativeErrorPrototype("SyntaxError");
 
 /// 20.5.5.5 TypeError
 /// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-typeerror
-pub const TypeError = NativeError();
-pub const TypeErrorConstructor = NativeErrorConstructor("TypeError");
-pub const TypeErrorPrototype = NativeErrorPrototype("TypeError");
+pub const TypeError = MakeNativeError();
+pub const TypeErrorConstructor = MakeNativeErrorConstructor("TypeError");
+pub const TypeErrorPrototype = MakeNativeErrorPrototype("TypeError");
 
 /// 20.5.5.6 URIError
 /// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-urierror
-pub const URIError = NativeError();
-pub const URIErrorConstructor = NativeErrorConstructor("URIError");
-pub const URIErrorPrototype = NativeErrorPrototype("URIError");
+pub const URIError = MakeNativeError();
+pub const URIErrorConstructor = MakeNativeErrorConstructor("URIError");
+pub const URIErrorPrototype = MakeNativeErrorPrototype("URIError");
 
 /// 20.5.6.2 Properties of the NativeError Constructors
 /// https://tc39.es/ecma262/#sec-properties-of-the-nativeerror-constructors
-fn NativeErrorConstructor(comptime name: []const u8) type {
+fn MakeNativeErrorConstructor(comptime name: []const u8) type {
     return struct {
         pub fn create(realm: *Realm) !Object {
             const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
@@ -325,7 +325,7 @@ fn NativeErrorConstructor(comptime name: []const u8) type {
 
 /// 20.5.6.3 Properties of the NativeError Prototype Objects
 /// https://tc39.es/ecma262/#sec-properties-of-the-nativeerror-prototype-objects
-fn NativeErrorPrototype(comptime name: []const u8) type {
+fn MakeNativeErrorPrototype(comptime name: []const u8) type {
     return struct {
         pub fn create(realm: *Realm) !Object {
             const object = try builtins.Object.create(realm.agent, .{
@@ -355,7 +355,7 @@ fn NativeErrorPrototype(comptime name: []const u8) type {
 
 /// 20.5.6.4 Properties of NativeError Instances
 /// https://tc39.es/ecma262/#sec-properties-of-nativeerror-instances
-fn NativeError() type {
+fn MakeNativeError() type {
     return Object.Factory(.{
         // NOTE: This shares a tag with the plain Error objects as it is identified by the same
         //       internal slot in the spec and thus subtypes are not distinguishable. For this
