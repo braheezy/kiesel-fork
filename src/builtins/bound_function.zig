@@ -9,6 +9,7 @@ const types = @import("../types.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const Value = types.Value;
 
@@ -116,7 +117,7 @@ pub fn boundFunctionCreate(
 
 /// Table 31: Internal Slots of Bound Function Exotic Objects
 /// https://tc39.es/ecma262/#table-internal-slots-of-bound-function-exotic-objects
-pub const BoundFunction = Object.Factory(.{
+pub const BoundFunction = MakeObject(.{
     .Fields = struct {
         // [[BoundTargetFunction]]
         bound_target_function: Object,

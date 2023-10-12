@@ -5,6 +5,7 @@ pub const BigInt = language.BigInt;
 pub const Completion = spec.Completion;
 pub const DataBlock = spec.DataBlock;
 pub const Iterator = spec.Iterator;
+pub const MakeObject = language.MakeObject;
 pub const Number = language.Number;
 pub const Object = language.Object;
 pub const PreferredType = Value.PreferredType;

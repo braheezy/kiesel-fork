@@ -11,6 +11,7 @@ const types = @import("../types.zig");
 
 const Agent = execution.Agent;
 const ExecutionContext = execution.ExecutionContext;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
@@ -56,7 +57,7 @@ pub const Behaviour = union(enum) {
     constructor: *const ConstructorFn,
 };
 
-pub const BuiltinFunction = Object.Factory(.{
+pub const BuiltinFunction = MakeObject(.{
     .Fields = struct {
         behaviour: Behaviour,
 

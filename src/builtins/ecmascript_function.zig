@@ -17,6 +17,7 @@ const BuiltinFunction = builtins.BuiltinFunction;
 const Completion = types.Completion;
 const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PrivateEnvironment = execution.PrivateEnvironment;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -54,7 +55,7 @@ pub const ThisMode = enum {
     global,
 };
 
-pub const ECMAScriptFunction = Object.Factory(.{
+pub const ECMAScriptFunction = MakeObject(.{
     .Fields = struct {
         /// [[Environment]]
         environment: Environment,

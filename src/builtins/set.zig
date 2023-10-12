@@ -11,6 +11,7 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
 const Iterator = types.Iterator;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
@@ -334,7 +335,7 @@ const IterableValues = std.ArrayList(?Value);
 
 /// 24.2.4 Properties of Set Instances
 /// https://tc39.es/ecma262/#sec-properties-of-set-instances
-pub const Set = Object.Factory(.{
+pub const Set = MakeObject(.{
     .Fields = struct {
         const Self = @This();
 

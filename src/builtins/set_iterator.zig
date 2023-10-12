@@ -10,6 +10,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
@@ -147,7 +148,7 @@ pub const SetIteratorPrototype = struct {
     }
 };
 
-pub const SetIterator = Object.Factory(.{
+pub const SetIterator = MakeObject(.{
     .Fields = union(enum) {
         state: struct {
             set: *Set,

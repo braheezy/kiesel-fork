@@ -10,6 +10,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
@@ -311,7 +312,7 @@ pub const NumberPrototype = struct {
 
 /// 21.1.4 Properties of Number Instances
 /// https://tc39.es/ecma262/#sec-properties-of-number-instances
-pub const Number = Object.Factory(.{
+pub const Number = MakeObject(.{
     .Fields = struct {
         /// [[NumberData]]
         number_data: types.Number,

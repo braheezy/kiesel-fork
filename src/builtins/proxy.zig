@@ -12,6 +12,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
@@ -1165,7 +1166,7 @@ pub const ProxyConstructor = struct {
 
 /// 10.5 Proxy Object Internal Methods and Internal Slots
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots
-pub const Proxy = Object.Factory(.{
+pub const Proxy = MakeObject(.{
     .Fields = struct {
         /// [[ProxyTarget]]
         proxy_target: ?Object,

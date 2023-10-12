@@ -8,6 +8,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const MakeObject = types.MakeObject;
 const Map = builtins.Map;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -142,7 +143,7 @@ pub const MapIteratorPrototype = struct {
     }
 };
 
-pub const MapIterator = Object.Factory(.{
+pub const MapIterator = MakeObject(.{
     .Fields = union(enum) {
         state: struct {
             map: *Map,

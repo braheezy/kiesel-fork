@@ -10,6 +10,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
@@ -332,7 +333,7 @@ pub const SymbolPrototype = struct {
 
 /// 20.4.4 Properties of Symbol Instances
 /// https://tc39.es/ecma262/#sec-properties-of-symbol-instances
-pub const Symbol = Object.Factory(.{
+pub const Symbol = MakeObject(.{
     .Fields = struct {
         /// [[SymbolData]]
         symbol_data: types.Symbol,

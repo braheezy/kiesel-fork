@@ -10,6 +10,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
@@ -520,7 +521,7 @@ pub const StringPrototype = struct {
 
 /// 22.1.4 Properties of String Instances
 /// https://tc39.es/ecma262/#sec-properties-of-string-instances
-pub const String = Object.Factory(.{
+pub const String = MakeObject(.{
     .Fields = struct {
         /// [[StringData]]
         string_data: types.String,

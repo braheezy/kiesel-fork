@@ -8,6 +8,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const MakeObject = types.MakeObject;
 const Number = types.Number;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -173,7 +174,7 @@ pub const BigIntPrototype = struct {
 
 /// 21.2.4 Properties of BigInt Instances
 /// https://tc39.es/ecma262/#sec-properties-of-bigint-instances
-pub const BigInt = Object.Factory(.{
+pub const BigInt = MakeObject(.{
     .Fields = struct {
         /// [[BigIntData]]
         big_int_data: types.BigInt,

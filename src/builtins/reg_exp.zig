@@ -19,6 +19,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
@@ -1054,7 +1055,7 @@ pub const RegExpPrototype = struct {
 
 /// 22.2.8 Properties of RegExp Instances
 /// https://tc39.es/ecma262/#sec-properties-of-regexp-instances
-pub const RegExp = Object.Factory(.{
+pub const RegExp = MakeObject(.{
     .Fields = struct {
         /// [[OriginalSource]]
         original_source: String,

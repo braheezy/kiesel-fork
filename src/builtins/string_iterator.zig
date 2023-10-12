@@ -10,6 +10,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
@@ -87,7 +88,7 @@ pub const StringIteratorPrototype = struct {
     }
 };
 
-pub const StringIterator = Object.Factory(.{
+pub const StringIterator = MakeObject(.{
     .Fields = union(enum) {
         state: struct {
             it: std.unicode.Utf16LeIterator,

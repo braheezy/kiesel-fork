@@ -12,6 +12,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PreferredType = Value.PreferredType;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -2163,7 +2164,7 @@ pub const DatePrototype = struct {
 
 /// 21.4.5 Properties of Date Instances
 /// https://tc39.es/ecma262/#sec-properties-of-date-instances
-pub const Date = Object.Factory(.{
+pub const Date = MakeObject(.{
     .Fields = struct {
         /// [[DateValue]]
         date_value: f64,

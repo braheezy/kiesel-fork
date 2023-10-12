@@ -11,6 +11,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const MakeObject = types.MakeObject;
 const Object_ = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
@@ -790,4 +791,4 @@ pub const ObjectPrototype = struct {
 
 /// 20.1.4 Properties of Object Instances
 /// https://tc39.es/ecma262/#sec-properties-of-object-instances
-pub const Object = Object_.Factory(.{});
+pub const Object = MakeObject(.{});

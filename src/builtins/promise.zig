@@ -15,6 +15,7 @@ const ArgumentsList = builtins.ArgumentsList;
 const Completion = types.Completion;
 const Job = execution.Job;
 const JobCallback = execution.JobCallback;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
@@ -1126,7 +1127,7 @@ pub const PromisePrototype = struct {
 
 /// 27.2.6 Properties of Promise Instances
 /// https://tc39.es/ecma262/#sec-properties-of-promise-instances
-pub const Promise = Object.Factory(.{
+pub const Promise = MakeObject(.{
     .Fields = struct {
         /// [[PromiseState]]
         promise_state: enum {

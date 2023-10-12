@@ -10,6 +10,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
@@ -188,7 +189,7 @@ pub const ErrorPrototype = struct {
 
 /// 20.5.4 Properties of Error Instances
 /// https://tc39.es/ecma262/#sec-properties-of-error-instances
-pub const Error = Object.Factory(.{
+pub const Error = MakeObject(.{
     .Fields = struct {
         // NOTE: [[ErrorData]] is undefined in the spec, we use it to store the name and message
         //       for pretty-printing purposes without property lookup.
@@ -356,7 +357,7 @@ fn MakeNativeErrorPrototype(comptime name: []const u8) type {
 /// 20.5.6.4 Properties of NativeError Instances
 /// https://tc39.es/ecma262/#sec-properties-of-nativeerror-instances
 fn MakeNativeError() type {
-    return Object.Factory(.{
+    return MakeObject(.{
         // NOTE: This shares a tag with the plain Error objects as it is identified by the same
         //       internal slot in the spec and thus subtypes are not distinguishable. For this
         //       reason the Fields type must be identical for Object.as() casts to work.
@@ -491,7 +492,7 @@ pub const AggregateErrorPrototype = struct {
 
 /// 20.5.7.4 Properties of AggregateError Instances
 /// https://tc39.es/ecma262/#sec-properties-of-aggregate-error-instances
-pub const AggregateError = Object.Factory(.{
+pub const AggregateError = MakeObject(.{
     // NOTE: This shares a tag with the plain Error objects as it is identified by the same
     //       internal slot in the spec and thus subtypes are not distinguishable. For this
     //       reason the Fields type must be identical for Object.as() casts to work.

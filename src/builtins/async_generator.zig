@@ -6,6 +6,7 @@ const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
@@ -44,6 +45,6 @@ pub const AsyncGeneratorPrototype = struct {
 
 /// 27.6.2 Properties of AsyncGenerator Instances
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgenerator-intances
-pub const AsyncGenerator = Object.Factory(.{
+pub const AsyncGenerator = MakeObject(.{
     .tag = .async_generator,
 });

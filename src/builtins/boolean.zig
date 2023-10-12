@@ -8,6 +8,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
@@ -139,7 +140,7 @@ pub const BooleanPrototype = struct {
 
 /// 20.3.4 Properties of Boolean Instances
 /// https://tc39.es/ecma262/#sec-properties-of-boolean-instances
-pub const Boolean = Object.Factory(.{
+pub const Boolean = MakeObject(.{
     .Fields = struct {
         /// [[BooleanData]]
         boolean_data: bool,

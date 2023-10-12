@@ -14,6 +14,7 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
 const Environment = execution.Environment;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
@@ -473,7 +474,7 @@ fn makeArgSetter(agent: *Agent, name: []const u8, env: Environment) !Object {
     return setter;
 }
 
-pub const Arguments = Object.Factory(.{
+pub const Arguments = MakeObject(.{
     .Fields = struct {
         /// [[ParameterMap]]
         parameter_map: Object,

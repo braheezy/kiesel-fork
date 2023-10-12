@@ -6,6 +6,7 @@ const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
@@ -44,6 +45,6 @@ pub const GeneratorPrototype = struct {
 
 /// 27.5.2 Properties of Generator Instances
 /// https://tc39.es/ecma262/#sec-properties-of-generator-instances
-pub const Generator = Object.Factory(.{
+pub const Generator = MakeObject(.{
     .tag = .generator,
 });

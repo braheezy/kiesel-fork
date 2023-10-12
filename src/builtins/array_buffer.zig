@@ -10,6 +10,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
@@ -305,7 +306,7 @@ pub const ArrayBufferPrototype = struct {
 
 /// 25.1.6 Properties of ArrayBuffer Instances
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-instances
-pub const ArrayBuffer = Object.Factory(.{
+pub const ArrayBuffer = MakeObject(.{
     .Fields = struct {
         /// [[ArrayBufferData]]
         /// [[ArrayBufferByteLength]]

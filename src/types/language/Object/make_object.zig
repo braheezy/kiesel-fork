@@ -7,7 +7,7 @@ const Data = @import("Data.zig");
 const InternalMethods = @import("InternalMethods.zig");
 const Object = @import("../Object.zig");
 
-pub fn Factory(
+pub fn MakeObject(
     comptime options: struct {
         Fields: type = void,
         tag: ?Object.Tag = null,

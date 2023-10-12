@@ -22,7 +22,6 @@ const noexcept = utils.noexcept;
 const validateNonRevokedProxy = builtins.validateNonRevokedProxy;
 
 pub const Data = @import("Object/Data.zig");
-pub const Factory = @import("Object/Factory.zig").Factory;
 pub const InternalMethods = @import("Object/InternalMethods.zig");
 pub const PropertyKey = @import("Object/PropertyKey.zig").PropertyKey;
 pub const PropertyStorage = @import("Object/PropertyStorage.zig");
