@@ -123,6 +123,14 @@ pub fn getArrayBufferMaxByteLengthOption(agent: *Agent, options: Value) !?u53 {
     return try max_byte_length.toIndex(agent);
 }
 
+/// 25.1.3.8 IsFixedLengthArrayBuffer ( arrayBuffer )
+/// https://tc39.es/ecma262/#sec-isfixedlengtharraybuffer
+pub fn isFixedLengthArrayBuffer(array_buffer: *const ArrayBuffer) bool {
+    // 1. If arrayBuffer has an [[ArrayBufferMaxByteLength]] internal slot, return false.
+    // 2. Return true.
+    return array_buffer.fields.array_buffer_max_byte_length == null;
+}
+
 /// 25.1.5 Properties of the ArrayBuffer Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-constructor
 pub const ArrayBufferConstructor = struct {
@@ -217,6 +225,7 @@ pub const ArrayBufferPrototype = struct {
         });
 
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
+        try defineBuiltinAccessor(object, "maxByteLength", maxByteLength, null, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
 
         // 25.1.6.7 ArrayBuffer.prototype [ @@toStringTag ]
@@ -247,6 +256,34 @@ pub const ArrayBufferPrototype = struct {
         const length = object.fields.array_buffer_data.?.items.len;
 
         // 6. Return 𝔽(length).
+        return Value.from(length);
+    }
+
+    /// 25.1.6.3 get ArrayBuffer.prototype.maxByteLength
+    /// https://tc39.es/ecma262/#sec-get-arraybuffer.prototype.maxbytelength
+    fn maxByteLength(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
+
+        // TODO: 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
+
+        // 4. If IsDetachedBuffer(O) is true, return +0𝔽.
+        if (isDetachedBuffer(object)) return Value.from(0);
+
+        // 5. If IsFixedLengthArrayBuffer(O) is true, then
+        const length = if (isFixedLengthArrayBuffer(object)) blk: {
+            // a. Let length be O.[[ArrayBufferByteLength]].
+            break :blk object.fields.array_buffer_data.?.items.len;
+        }
+
+        // 6. Else,
+        else blk: {
+            // a. Let length be O.[[ArrayBufferMaxByteLength]].
+            break :blk object.fields.array_buffer_max_byte_length.?;
+        };
+
+        // 7. Return 𝔽(length).
         return Value.from(length);
     }
 
