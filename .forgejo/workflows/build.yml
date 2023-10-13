@@ -54,11 +54,15 @@ jobs:
         run: |
           ./build.sh x86_64-linux-musl kiesel-linux-x86_64
           ./upload.sh zig-out/bin/kiesel-linux-x86_64
-      - name: Build and upload kiesel-windows-x86
+      - name: Build and upload kiesel-windows-aarch64.exe
+        run: |
+          ./build.sh aarch64-windows-gnu kiesel-windows-aarch64.exe
+          ./upload.sh zig-out/bin/kiesel-windows-aarch64.exe
+      - name: Build and upload kiesel-windows-x86.exe
         run: |
           ./build.sh x86-windows-gnu kiesel-windows-x86.exe
           ./upload.sh zig-out/bin/kiesel-windows-x86.exe
-      - name: Build and upload kiesel-windows-x86_64
+      - name: Build and upload kiesel-windows-x86_64.exe
         run: |
           ./build.sh x86_64-windows-gnu kiesel-windows-x86_64.exe
           ./upload.sh zig-out/bin/kiesel-windows-x86_64.exe
