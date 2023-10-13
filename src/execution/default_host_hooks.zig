@@ -2,6 +2,7 @@ const std = @import("std");
 
 const SafePointer = @import("any-pointer").SafePointer;
 
+const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
@@ -50,4 +51,14 @@ pub fn hostEnsureCanCompileStrings(_: *Realm) !void {
 pub fn hostHasSourceTextAvailable(_: Object) bool {
     // The default implementation of HostHasSourceTextAvailable is to return true.
     return true;
+}
+
+/// 25.1.3.7 HostResizeArrayBuffer ( buffer, newByteLength )
+/// https://tc39.es/ecma262/#sec-hostresizearraybuffer
+pub fn hostResizeArrayBuffer(
+    _: *builtins.ArrayBuffer,
+    _: u53,
+) Agent.Error!Agent.HostHooks.ResizeArrayBufferHandled {
+    // The default implementation of HostResizeArrayBuffer is to return NormalCompletion(unhandled).
+    return .unhandled;
 }

@@ -227,6 +227,7 @@ pub const ArrayBufferPrototype = struct {
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinAccessor(object, "maxByteLength", maxByteLength, null, realm);
         try defineBuiltinAccessor(object, "resizable", resizable, null, realm);
+        try defineBuiltinFunction(object, "resize", resize, 1, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
 
         // 25.1.6.7 ArrayBuffer.prototype [ @@toStringTag ]
@@ -299,6 +300,70 @@ pub const ArrayBufferPrototype = struct {
 
         // 4. If IsFixedLengthArrayBuffer(O) is false, return true; otherwise return false.
         return Value.from(!isFixedLengthArrayBuffer(object));
+    }
+
+    /// 25.1.6.5 ArrayBuffer.prototype.resize ( newLength )
+    /// https://tc39.es/ecma262/#sec-arraybuffer.prototype.resize
+    fn resize(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const new_length = arguments.get(0);
+
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferMaxByteLength]]).
+        const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
+        if (object.fields.array_buffer_max_byte_length == null) {
+            return agent.throwException(.type_error, "ArrayBuffer is not resizable");
+        }
+
+        // TODO: 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
+
+        // 4. Let newByteLength be ? ToIndex(newLength).
+        const new_byte_length = try new_length.toIndex(agent);
+
+        // 5. If IsDetachedBuffer(O) is true, throw a TypeError exception.
+        if (isDetachedBuffer(object)) {
+            return agent.throwException(.type_error, "ArrayBuffer is detached");
+        }
+
+        // 6. If newByteLength > O.[[ArrayBufferMaxByteLength]], throw a RangeError exception.
+        if (new_byte_length > object.fields.array_buffer_max_byte_length.?) {
+            return agent.throwException(.range_error, "Maximum buffer size exceeded");
+        }
+
+        // 7. Let hostHandled be ? HostResizeArrayBuffer(O, newByteLength).
+        const host_handled = try agent.host_hooks.hostResizeArrayBuffer(object, new_byte_length);
+
+        // 8. If hostHandled is handled, return undefined.
+        if (host_handled == .handled) return .undefined;
+
+        // 9. Let oldBlock be O.[[ArrayBufferData]].
+        // 10. Let newBlock be ? CreateByteDataBlock(newByteLength).
+        // 11. Let copyLength be min(newByteLength, O.[[ArrayBufferByteLength]]).
+        // 12. Perform CopyDataBlockBytes(newBlock, 0, oldBlock, 0, copyLength).
+        // 13. NOTE: Neither creation of the new Data Block nor copying from the old Data Block are
+        //    observable. Implementations may implement this method as in-place growth or shrinkage.
+        // 14. Set O.[[ArrayBufferData]] to newBlock.
+        // 15. Set O.[[ArrayBufferByteLength]] to newByteLength.
+        const old_byte_length = object.fields.array_buffer_data.?.items.len;
+        const result = if (std.math.cast(usize, new_byte_length)) |new_byte_length_casted|
+            object.fields.array_buffer_data.?.resize(new_byte_length_casted)
+        else
+            error.Overflow;
+        result catch {
+            return agent.throwException(
+                .range_error,
+                try std.fmt.allocPrint(
+                    agent.gc_allocator,
+                    "Cannot resize buffer to size {}",
+                    .{new_byte_length},
+                ),
+            );
+        };
+        if (new_byte_length > old_byte_length) {
+            @memset(object.fields.array_buffer_data.?.items[old_byte_length..], 0);
+        }
+
+        // 16. Return undefined.
+        return .undefined;
     }
 
     /// 25.1.6.6 ArrayBuffer.prototype.slice ( start, end )
