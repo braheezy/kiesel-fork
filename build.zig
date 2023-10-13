@@ -99,6 +99,7 @@ pub fn build(b: *std.Build) void {
     exe.addModule("args", zig_args.module("args"));
     exe.addModule("gc", gc_module);
     exe.addModule("linenoise", linenoise.module("linenoise"));
+    if (optimize != .Debug) exe.strip = true;
 
     b.installArtifact(exe);
 
