@@ -7,8 +7,8 @@
             .hash = "1220d00cd17f9b1f840ea4bee9b552547e1ca5938517018078046c83b71f332d3b5e",
         },
         .libregexp = .{
-            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/033337a6ad35970ecade1ed01d2e282c76c3c98f.tar.gz",
-            .hash = "1220616c6e363651e48fc33eb5591c27bdd6f550aba4ee639df724aeb0d0456c806a",
+            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/995a1b533e6841b51a366b59dc149ef8e332b61e.tar.gz",
+            .hash = "1220dcd23e29ab9a9ee17990546577316afcefa972d767cfdb61b06d0ed7a0f60ea5",
         },
         // FIXME: This points to https://github.com/joachimschmidt557/linenoize/pull/17, update when merged
         .linenoise = .{
