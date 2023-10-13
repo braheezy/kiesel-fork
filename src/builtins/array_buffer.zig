@@ -226,6 +226,7 @@ pub const ArrayBufferPrototype = struct {
 
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinAccessor(object, "maxByteLength", maxByteLength, null, realm);
+        try defineBuiltinAccessor(object, "resizable", resizable, null, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
 
         // 25.1.6.7 ArrayBuffer.prototype [ @@toStringTag ]
@@ -285,6 +286,19 @@ pub const ArrayBufferPrototype = struct {
 
         // 7. Return 𝔽(length).
         return Value.from(length);
+    }
+
+    /// 25.1.6.4 get ArrayBuffer.prototype.resizable
+    /// https://tc39.es/ecma262/#sec-get-arraybuffer.prototype.resizable
+    fn resizable(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
+
+        // TODO: 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
+
+        // 4. If IsFixedLengthArrayBuffer(O) is false, return true; otherwise return false.
+        return Value.from(!isFixedLengthArrayBuffer(object));
     }
 
     /// 25.1.6.6 ArrayBuffer.prototype.slice ( start, end )
