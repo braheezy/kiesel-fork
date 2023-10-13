@@ -13,6 +13,7 @@ const ArgumentsList = builtins.ArgumentsList;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 const copyDataBlockBytes = types.copyDataBlockBytes;
@@ -24,11 +25,26 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const sameValue = types.sameValue;
 
-/// 25.1.2.1 AllocateArrayBuffer ( constructor, byteLength )
+/// 25.1.3.1 AllocateArrayBuffer ( constructor, byteLength )
 /// https://tc39.es/ecma262/#sec-allocatearraybuffer
-pub fn allocateArrayBuffer(agent: *Agent, constructor: Object, byte_length: u64) !Object {
-    // 1. Let obj be ? OrdinaryCreateFromConstructor(constructor, "%ArrayBuffer.prototype%",
-    //    « [[ArrayBufferData]], [[ArrayBufferByteLength]], [[ArrayBufferDetachKey]] »).
+pub fn allocateArrayBuffer(agent: *Agent, constructor: Object, byte_length: u64, max_byte_length: ?u53) !Object {
+    // 1. Let slots be « [[ArrayBufferData]], [[ArrayBufferByteLength]], [[ArrayBufferDetachKey]] ».
+
+    // 2. If maxByteLength is present and maxByteLength is not empty, let allocatingResizableBuffer
+    //    be true; otherwise let allocatingResizableBuffer be false.
+    const allocating_resizable_bufffer = max_byte_length != null;
+
+    // 3. If allocatingResizableBuffer is true, then
+    if (allocating_resizable_bufffer) {
+        // a. If byteLength > maxByteLength, throw a RangeError exception.
+        if (byte_length > max_byte_length.?) {
+            return agent.throwException(.range_error, "Maximum buffer size exceeded");
+        }
+
+        // b. Append [[ArrayBufferMaxByteLength]] to slots.
+    }
+
+    // 4. Let obj be ? OrdinaryCreateFromConstructor(constructor, "%ArrayBuffer.prototype%", slots).
     const object = try ordinaryCreateFromConstructor(
         ArrayBuffer,
         agent,
@@ -36,20 +52,31 @@ pub fn allocateArrayBuffer(agent: *Agent, constructor: Object, byte_length: u64)
         "%ArrayBuffer.prototype%",
     );
 
-    // 2. Let block be ? CreateByteDataBlock(byteLength).
+    // 5. Let block be ? CreateByteDataBlock(byteLength).
     const block = try createByteDataBlock(agent, byte_length);
 
     object.as(ArrayBuffer).fields = .{
-        // 3. Set obj.[[ArrayBufferData]] to block.
-        // 4. Set obj.[[ArrayBufferByteLength]] to byteLength.
+        // 6. Set obj.[[ArrayBufferData]] to block.
+        // 7. Set obj.[[ArrayBufferByteLength]] to byteLength.
         .array_buffer_data = block,
     };
+
+    // 8. If allocatingResizableBuffer is true, then
+    if (allocating_resizable_bufffer) {
+        // a. If it is not possible to create a Data Block block consisting of maxByteLength bytes,
+        //    throw a RangeError exception.
+        // b. NOTE: Resizable ArrayBuffers are designed to be implementable with in-place growth.
+        //    Implementations may throw if, for example, virtual memory cannot be reserved up front.
+
+        // c. Set obj.[[ArrayBufferMaxByteLength]] to maxByteLength.
+        object.as(ArrayBuffer).fields.array_buffer_max_byte_length = @intCast(max_byte_length.?);
+    }
 
     // 5. Return obj.
     return object;
 }
 
-/// 25.1.2.2 IsDetachedBuffer ( arrayBuffer )
+/// 25.1.3.4 IsDetachedBuffer ( arrayBuffer )
 /// https://tc39.es/ecma262/#sec-isdetachedbuffer
 pub fn isDetachedBuffer(array_buffer: *const ArrayBuffer) bool {
     // 1. If arrayBuffer.[[ArrayBufferData]] is null, return true.
@@ -57,7 +84,7 @@ pub fn isDetachedBuffer(array_buffer: *const ArrayBuffer) bool {
     return array_buffer.fields.array_buffer_data == null;
 }
 
-/// 25.1.2.3 DetachArrayBuffer ( arrayBuffer [ , key ] )
+/// 25.1.3.3 DetachArrayBuffer ( arrayBuffer [ , key ] )
 /// https://tc39.es/ecma262/#sec-detacharraybuffer
 pub fn detachArrayBuffer(agent: *Agent, array_buffer: *ArrayBuffer, maybe_key: ?Value) !void {
     // TODO: 1. Assert: IsSharedArrayBuffer(arrayBuffer) is false.
@@ -80,7 +107,23 @@ pub fn detachArrayBuffer(agent: *Agent, array_buffer: *ArrayBuffer, maybe_key: ?
     // 6. Return unused.
 }
 
-/// 25.1.4 Properties of the ArrayBuffer Constructor
+/// 25.1.3.6 GetArrayBufferMaxByteLengthOption ( options )
+/// https://tc39.es/ecma262/#sec-getarraybuffermaxbytelengthoption
+pub fn getArrayBufferMaxByteLengthOption(agent: *Agent, options: Value) !?u53 {
+    // 1. If options is not an Object, return empty.
+    if (options != .object) return null;
+
+    // 2. Let maxByteLength be ? Get(options, "maxByteLength").
+    const max_byte_length = try options.object.get(PropertyKey.from("maxByteLength"));
+
+    // 3. If maxByteLength is undefined, return empty.
+    if (max_byte_length == .undefined) return null;
+
+    // 4. Return ? ToIndex(maxByteLength).
+    return try max_byte_length.toIndex(agent);
+}
+
+/// 25.1.5 Properties of the ArrayBuffer Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-constructor
 pub const ArrayBufferConstructor = struct {
     pub fn create(realm: *Realm) !Object {
@@ -93,7 +136,7 @@ pub const ArrayBufferConstructor = struct {
 
         try defineBuiltinFunction(object, "isView", isView, 1, realm);
 
-        // 25.1.4.2 ArrayBuffer.prototype
+        // 25.1.5.2 ArrayBuffer.prototype
         // https://tc39.es/ecma262/#sec-arraybuffer.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%ArrayBuffer.prototype%"()),
@@ -102,7 +145,7 @@ pub const ArrayBufferConstructor = struct {
             .configurable = false,
         });
 
-        // 25.1.5.2 ArrayBuffer.prototype.constructor
+        // 25.1.6.2 ArrayBuffer.prototype.constructor
         // https://tc39.es/ecma262/#sec-arraybuffer.prototype.constructor
         try defineBuiltinProperty(
             realm.intrinsics.@"%ArrayBuffer.prototype%"() catch unreachable,
@@ -110,7 +153,7 @@ pub const ArrayBufferConstructor = struct {
             Value.from(object),
         );
 
-        // 25.1.4.3 get ArrayBuffer [ @@species ]
+        // 25.1.5.3 get ArrayBuffer [ @@species ]
         // https://tc39.es/ecma262/#sec-get-arraybuffer-@@species
         try defineBuiltinAccessor(object, "@@species", struct {
             fn getter(_: *Agent, this_value: Value, _: ArgumentsList) !Value {
@@ -122,10 +165,11 @@ pub const ArrayBufferConstructor = struct {
         return object;
     }
 
-    /// 25.1.3.1 ArrayBuffer ( length )
+    /// 25.1.4.1 ArrayBuffer ( length [ , options ] )
     /// https://tc39.es/ecma262/#sec-arraybuffer-length
     fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, new_target: ?Object) !Value {
         const length = arguments.get(0);
+        const options = arguments.get(1);
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
         if (new_target == null) {
@@ -135,11 +179,21 @@ pub const ArrayBufferConstructor = struct {
         // 2. Let byteLength be ? ToIndex(length).
         const byte_length = try length.toIndex(agent);
 
-        // 3. Return ? AllocateArrayBuffer(NewTarget, byteLength).
-        return Value.from(try allocateArrayBuffer(agent, new_target.?, @intCast(byte_length)));
+        // 3. Let requestedMaxByteLength be ? GetArrayBufferMaxByteLengthOption(options).
+        const requested_max_byte_length = try getArrayBufferMaxByteLengthOption(agent, options);
+
+        // 4. Return ? AllocateArrayBuffer(NewTarget, byteLength, requestedMaxByteLength).
+        return Value.from(
+            try allocateArrayBuffer(
+                agent,
+                new_target.?,
+                @intCast(byte_length),
+                requested_max_byte_length,
+            ),
+        );
     }
 
-    /// 25.1.4.1 ArrayBuffer.isView ( arg )
+    /// 25.1.5.1 ArrayBuffer.isView ( arg )
     /// https://tc39.es/ecma262/#sec-arraybuffer.isview
     fn isView(_: *Agent, _: Value, arguments: ArgumentsList) !Value {
         const arg = arguments.get(0);
@@ -154,7 +208,7 @@ pub const ArrayBufferConstructor = struct {
     }
 };
 
-/// 25.1.5 Properties of the ArrayBuffer Prototype Object
+/// 25.1.6 Properties of the ArrayBuffer Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-prototype-object
 pub const ArrayBufferPrototype = struct {
     pub fn create(realm: *Realm) !Object {
@@ -165,7 +219,7 @@ pub const ArrayBufferPrototype = struct {
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
 
-        // 25.1.5.4 ArrayBuffer.prototype [ @@toStringTag ]
+        // 25.1.6.7 ArrayBuffer.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-arraybuffer.prototype-@@tostringtag
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
             .value = Value.from("ArrayBuffer"),
@@ -177,7 +231,7 @@ pub const ArrayBufferPrototype = struct {
         return object;
     }
 
-    /// 25.1.5.1 get ArrayBuffer.prototype.byteLength
+    /// 25.1.6.1 get ArrayBuffer.prototype.byteLength
     /// https://tc39.es/ecma262/#sec-get-arraybuffer.prototype.bytelength
     fn byteLength(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
         // 1. Let O be the this value.
@@ -196,7 +250,7 @@ pub const ArrayBufferPrototype = struct {
         return Value.from(length);
     }
 
-    /// 25.1.5.3 ArrayBuffer.prototype.slice ( start, end )
+    /// 25.1.6.6 ArrayBuffer.prototype.slice ( start, end )
     /// https://tc39.es/ecma262/#sec-arraybuffer.prototype.slice
     fn slice(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
         const realm = agent.currentRealm();
@@ -284,7 +338,7 @@ pub const ArrayBufferPrototype = struct {
             return agent.throwException(.type_error, "ArrayBuffer is too small");
         }
 
-        // 22. NOTE: Side-effects of the above steps may have detached O.
+        // 22. NOTE: Side-effects of the above steps may have detached or resized O.
         // 23. If IsDetachedBuffer(O) is true, throw a TypeError exception.
         if (isDetachedBuffer(object)) {
             return agent.throwException(.type_error, "ArrayBuffer is detached");
@@ -296,15 +350,24 @@ pub const ArrayBufferPrototype = struct {
         // 25. Let toBuf be new.[[ArrayBufferData]].
         var to_buf = &new.fields.array_buffer_data.?;
 
-        // 26. Perform CopyDataBlockBytes(toBuf, 0, fromBuf, first, newLen).
-        copyDataBlockBytes(to_buf, 0, from_buf, first, new_len);
+        // 26. Let currentLen be O.[[ArrayBufferByteLength]].
+        const current_len: u53 = @intCast(object.fields.array_buffer_data.?.items.len);
 
-        // 27. Return new.
+        // 27. If first < currentLen, then
+        if (first < current_len) {
+            // a. Let count be min(newLen, currentLen - first).
+            const count = @min(new_len, current_len - first);
+
+            // b. Perform CopyDataBlockBytes(toBuf, 0, fromBuf, first, count).
+            copyDataBlockBytes(to_buf, 0, from_buf, first, count);
+        }
+
+        // 28. Return new.
         return Value.from(new.object());
     }
 };
 
-/// 25.1.6 Properties of ArrayBuffer Instances
+/// 25.1.7 Properties of ArrayBuffer Instances
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-instances
 pub const ArrayBuffer = MakeObject(.{
     .Fields = struct {
@@ -314,6 +377,9 @@ pub const ArrayBuffer = MakeObject(.{
 
         /// [[ArrayBufferDetachKey]]
         array_buffer_detach_key: Value = .undefined,
+
+        /// [[ArrayBufferMaxByteLength]]
+        array_buffer_max_byte_length: ?u53 = null,
     },
     .tag = .array_buffer,
 });

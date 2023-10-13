@@ -89,8 +89,9 @@ pub const ArrayIteratorPrototype = struct {
 
         // TODO: i. If array has a [[TypedArrayName]] internal slot, then
         const len = if (false) {
-            // 1. If IsDetachedBuffer(array.[[ViewedArrayBuffer]]) is true, throw a TypeError exception.
-            // 2. Let len be array.[[ArrayLength]].
+            // 1. Let iieoRecord be MakeIntegerIndexedObjectWithBufferWitnessRecord(array, seq-cst).
+            // 2. If IsIntegerIndexedObjectOutOfBounds(iieoRecord) is true, throw a TypeError exception.
+            // 3. Let len be IntegerIndexedObjectLength(iieoRecord).
         }
         // ii. Else,
         else blk: {

@@ -69,6 +69,9 @@ fn prettyPrintArrayBuffer(array_buffer: *const builtins.ArrayBuffer, writer: any
     try tty_config.setColor(writer, .reset);
     if (array_buffer.fields.array_buffer_data) |data| {
         try writer.print("byteLength: {pretty}", .{Value.from(data.items.len)});
+        if (array_buffer.fields.array_buffer_max_byte_length) |max_byte_length| {
+            try writer.print(", maxByteLength: {pretty}", .{Value.from(max_byte_length)});
+        }
         if (data.items.len != 0) {
             try writer.writeAll(", data: ");
             try tty_config.setColor(writer, .dim);
