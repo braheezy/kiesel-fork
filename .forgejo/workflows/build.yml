@@ -40,15 +40,15 @@ jobs:
           chmod +x upload.sh
       - name: Build and upload kiesel-linux-aarch64
         run: |
-          ./build.sh aarch64-linux-gnu kiesel-linux-aarch64
+          ./build.sh aarch64-linux-musl kiesel-linux-aarch64
           ./upload.sh zig-out/bin/kiesel-linux-aarch64
       - name: Build and upload kiesel-linux-x86
         run: |
-          ./build.sh x86-linux-gnu kiesel-linux-x86
+          ./build.sh x86-linux-musl kiesel-linux-x86
           ./upload.sh zig-out/bin/kiesel-linux-x86
       - name: Build and upload kiesel-linux-x86_64
         run: |
-          ./build.sh x86_64-linux-gnu kiesel-linux-x86_64
+          ./build.sh x86_64-linux-musl kiesel-linux-x86_64
           ./upload.sh zig-out/bin/kiesel-linux-x86_64
       - name: Build and upload kiesel-windows-x86
         run: |
