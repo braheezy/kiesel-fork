@@ -25,6 +25,7 @@ const isCompatiblePropertyDescriptor = builtins.isCompatiblePropertyDescriptor;
 const noexcept = utils.noexcept;
 const ordinaryDefineOwnProperty = builtins.ordinaryDefineOwnProperty;
 const ordinaryGetOwnProperty = builtins.ordinaryGetOwnProperty;
+const regExpCreate = builtins.regExpCreate;
 
 /// 10.4.3.1 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-getownproperty-p
@@ -224,6 +225,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "charCodeAt", charCodeAt, 1, realm);
         try defineBuiltinFunction(object, "concat", concat, 1, realm);
         try defineBuiltinFunction(object, "repeat", repeat, 1, realm);
+        try defineBuiltinFunction(object, "search", search, 1, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
@@ -412,6 +414,43 @@ pub const StringPrototype = struct {
             new_string.appendSliceAssumeCapacity(string.utf8);
         }
         return Value.from(try new_string.toOwnedSlice());
+    }
+
+    /// 22.1.3.21 String.prototype.search ( regexp )
+    /// https://tc39.es/ecma262/#sec-string.prototype.search
+    fn search(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const regexp = arguments.get(0);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. If regexp is neither undefined nor null, then
+        if (regexp != .undefined and regexp != .null) {
+            // a. Let searcher be ? GetMethod(regexp, @@search).
+            const searcher = try regexp.getMethod(
+                agent,
+                PropertyKey.from(agent.well_known_symbols.@"@@search"),
+            );
+
+            // b. If searcher is not undefined, then
+            if (searcher != null) {
+                // i. Return ? Call(searcher, regexp, « O »).
+                return Value.from(searcher.?).callAssumeCallable(regexp, .{object});
+            }
+        }
+
+        // 3. Let string be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 4. Let rx be ? RegExpCreate(regexp, undefined).
+        const rx = try regExpCreate(agent, regexp, .undefined);
+
+        // 5. Return ? Invoke(rx, @@search, « string »).
+        return Value.from(rx).invoke(
+            agent,
+            PropertyKey.from(agent.well_known_symbols.@"@@search"),
+            .{Value.from(string)},
+        );
     }
 
     /// 22.1.3.22 String.prototype.slice ( start, end )
