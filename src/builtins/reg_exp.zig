@@ -29,6 +29,7 @@ const Value = types.Value;
 const arrayCreate = builtins.arrayCreate;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const createRegExpStringIterator = builtins.createRegExpStringIterator;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
@@ -759,6 +760,7 @@ pub const RegExpPrototype = struct {
         try defineBuiltinAccessor(object, "global", global, null, realm);
         try defineBuiltinAccessor(object, "hasIndices", hasIndices, null, realm);
         try defineBuiltinAccessor(object, "ignoreCase", ignoreCase, null, realm);
+        try defineBuiltinFunction(object, "@@matchAll", @"@@matchAll", 1, realm);
         try defineBuiltinAccessor(object, "multiline", multiline, null, realm);
         try defineBuiltinFunction(object, "@@search", @"@@search", 1, realm);
         try defineBuiltinAccessor(object, "source", source, null, realm);
@@ -925,6 +927,56 @@ pub const RegExpPrototype = struct {
         // 2. Let cu be the code unit 0x0069 (LATIN SMALL LETTER I).
         // 3. Return ? RegExpHasFlag(R, cu).
         return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_IGNORECASE);
+    }
+
+    /// 22.2.6.9 RegExp.prototype [ @@matchAll ] ( string )
+    /// https://tc39.es/ecma262/#sec-regexp-prototype-matchall
+    fn @"@@matchAll"(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const string_value = arguments.get(0);
+        const realm = agent.currentRealm();
+
+        // 1. Let R be the this value.
+        const reg_exp = this_value;
+
+        // 2. If R is not an Object, throw a TypeError exception.
+        if (reg_exp != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{reg_exp}),
+            );
+        }
+
+        // 3. Let S be ? ToString(string).
+        const string = try string_value.toString(agent);
+
+        // 4. Let C be ? SpeciesConstructor(R, %RegExp%).
+        const constructor = try reg_exp.object.speciesConstructor(try realm.intrinsics.@"%RegExp%"());
+
+        // 5. Let flags be ? ToString(? Get(R, "flags")).
+        const flags_ = try (try reg_exp.object.get(PropertyKey.from("flags"))).toString(agent);
+
+        // 6. Let matcher be ? Construct(C, « R, flags »).
+        const matcher = try constructor.construct(.{ reg_exp, Value.from(flags_) }, null);
+
+        // 7. Let lastIndex be ? ToLength(? Get(R, "lastIndex")).
+        const last_index = try (try reg_exp.object.get(PropertyKey.from("lastIndex"))).toLength(agent);
+
+        // 8. Perform ? Set(matcher, "lastIndex", lastIndex, true).
+        try matcher.set(PropertyKey.from("lastIndex"), Value.from(last_index), .throw);
+
+        // 9. If flags contains "g", let global be true.
+        // 10. Else, let global be false.
+        const global_ = std.mem.indexOfScalar(u8, flags_.utf8, 'g') != null;
+
+        // 11. If flags contains "u" or flags contains "v", let fullUnicode be true.
+        // 12. Else, let fullUnicode be false.
+        const full_unicode = std.mem.indexOfScalar(u8, flags_.utf8, 'u') != null or
+            std.mem.indexOfScalar(u8, flags_.utf8, 'v') != null;
+
+        // 13. Return CreateRegExpStringIterator(matcher, S, global, fullUnicode).
+        return Value.from(
+            try createRegExpStringIterator(agent, matcher, string, global_, full_unicode),
+        );
     }
 
     /// 22.2.6.10 get RegExp.prototype.multiline
