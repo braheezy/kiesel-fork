@@ -48,6 +48,7 @@ pub const Tag = enum(u32) {
     promise,
     proxy,
     reg_exp,
+    reg_exp_string_iterator,
     set,
     set_iterator,
     string,

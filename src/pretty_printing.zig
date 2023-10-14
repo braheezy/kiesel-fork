@@ -261,6 +261,33 @@ fn prettyPrintRegExp(reg_exp: *const builtins.RegExp, writer: anytype) !void {
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintRegExpStringIterator(
+    reg_exp_string_iterator: *const builtins.RegExpStringIterator,
+    writer: anytype,
+) !void {
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("%RegExpStringIterator%(");
+    try tty_config.setColor(writer, .reset);
+    switch (reg_exp_string_iterator.fields) {
+        .state => |state_| {
+            try writer.print("{pretty}, {pretty}", .{
+                Value.from(state_.reg_exp),
+                Value.from(state_.string),
+            });
+        },
+        .completed => {
+            try tty_config.setColor(writer, .dim);
+            try writer.writeAll("<completed>");
+            try tty_config.setColor(writer, .reset);
+        },
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintSet(set: *const builtins.Set, writer: anytype) !void {
     const set_data = set.fields.set_data;
     const tty_config = getTtyConfigForWriter(writer);
@@ -474,6 +501,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
             .{ builtins.Promise, prettyPrintPromise },
             .{ builtins.Proxy, prettyPrintProxy },
             .{ builtins.RegExp, prettyPrintRegExp },
+            .{ builtins.RegExpStringIterator, prettyPrintRegExpStringIterator },
             .{ builtins.Set, prettyPrintSet },
             .{ builtins.SetIterator, prettyPrintSetIterator },
             .{ builtins.String, prettyPrintPrimitiveWrapper },

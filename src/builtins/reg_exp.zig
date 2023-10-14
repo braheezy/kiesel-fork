@@ -493,6 +493,31 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) !?Obje
     return array;
 }
 
+/// 22.2.7.3 AdvanceStringIndex ( S, index, unicode )
+/// https://tc39.es/ecma262/#sec-advancestringindex
+pub fn advanceStringIndex(string: String, index: u53, unicode: bool) u53 {
+    // 1. Assert: index ≤ 2**53 - 1.
+
+    // 2. If unicode is false, return index + 1.
+    if (!unicode) return index + 1;
+
+    // 3. Let length be the length of S.
+    const length = string.utf16Length();
+
+    // 4. If index + 1 ≥ length, return index + 1.
+    if (index + 1 >= length) return index + 1;
+
+    // 5. Let cp be CodePointAt(S, index).
+    var it = std.unicode.Utf8View.initUnchecked(string.utf8).iterator();
+    var i: u53 = 0;
+    const code_point = while (it.nextCodepoint()) |code_point| : (i += 1) {
+        if (i == index) break code_point;
+    } else unreachable;
+
+    // 6. Return index + cp.[[CodeUnitCount]].
+    return index + (std.unicode.utf16CodepointSequenceLength(code_point) catch unreachable);
+}
+
 /// 22.2.7.5 Match Records
 /// https://tc39.es/ecma262/#sec-match-records
 const Match = struct {
