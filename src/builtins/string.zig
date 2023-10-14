@@ -224,6 +224,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "charAt", charAt, 1, realm);
         try defineBuiltinFunction(object, "charCodeAt", charCodeAt, 1, realm);
         try defineBuiltinFunction(object, "concat", concat, 1, realm);
+        try defineBuiltinFunction(object, "matchAll", matchAll, 1, realm);
         try defineBuiltinFunction(object, "repeat", repeat, 1, realm);
         try defineBuiltinFunction(object, "search", search, 1, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
@@ -372,6 +373,63 @@ pub const StringPrototype = struct {
 
         // 5. Return R.
         return Value.from(try new_string.toOwnedSlice());
+    }
+
+    /// 22.1.3.14 String.prototype.matchAll ( regexp )
+    /// https://tc39.es/ecma262/#sec-string.prototype.matchall
+    fn matchAll(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const regexp = arguments.get(0);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. If regexp is neither undefined nor null, then
+        if (regexp != .undefined and regexp != .null) {
+            // a. Let isRegExp be ? IsRegExp(regexp).
+            const is_reg_exp = try regexp.isRegExp();
+
+            // b. If isRegExp is true, then
+            if (is_reg_exp) {
+                // i. Let flags be ? Get(regexp, "flags").
+                const flags = try regexp.object.get(PropertyKey.from("flags"));
+
+                // ii. Perform ? RequireObjectCoercible(flags).
+                _ = try flags.requireObjectCoercible(agent);
+
+                // iii. If ? ToString(flags) does not contain "g", throw a TypeError exception.
+                if (std.mem.indexOfScalar(u8, (try flags.toString(agent)).utf8, 'g') == null) {
+                    return agent.throwException(
+                        .type_error,
+                        "RegExp object must have the 'g' flag set",
+                    );
+                }
+            }
+
+            // c. Let matcher be ? GetMethod(regexp, @@matchAll).
+            const matcher = try regexp.getMethod(
+                agent,
+                PropertyKey.from(agent.well_known_symbols.@"@@matchAll"),
+            );
+
+            // d. If matcher is not undefined, then
+            if (matcher != null) {
+                // i. Return ? Call(matcher, regexp, « O »).
+                return Value.from(matcher.?).callAssumeCallable(regexp, .{object});
+            }
+        }
+
+        // 3. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 4. Let rx be ? RegExpCreate(regexp, "g").
+        const rx = try regExpCreate(agent, regexp, Value.from("g"));
+
+        // 5. Return ? Invoke(rx, @@matchAll, « S »).
+        return Value.from(rx).invoke(
+            agent,
+            PropertyKey.from(agent.well_known_symbols.@"@@matchAll"),
+            .{Value.from(string)},
+        );
     }
 
     /// 22.1.3.18 String.prototype.repeat ( count )
