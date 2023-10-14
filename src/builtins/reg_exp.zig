@@ -735,6 +735,7 @@ pub const RegExpPrototype = struct {
         try defineBuiltinAccessor(object, "hasIndices", hasIndices, null, realm);
         try defineBuiltinAccessor(object, "ignoreCase", ignoreCase, null, realm);
         try defineBuiltinAccessor(object, "multiline", multiline, null, realm);
+        try defineBuiltinFunction(object, "@@search", @"@@search", 1, realm);
         try defineBuiltinAccessor(object, "source", source, null, realm);
         try defineBuiltinAccessor(object, "sticky", sticky, null, realm);
         try defineBuiltinFunction(object, "test", @"test", 1, realm);
@@ -908,6 +909,53 @@ pub const RegExpPrototype = struct {
         // 2. Let cu be the code unit 0x006D (LATIN SMALL LETTER M).
         // 3. Return ? RegExpHasFlag(R, cu).
         return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_MULTILINE);
+    }
+
+    /// 22.2.6.12 RegExp.prototype [ @@search ] ( string )
+    /// https://tc39.es/ecma262/#sec-regexp.prototype-@@search
+    fn @"@@search"(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const string_value = arguments.get(0);
+
+        // 1. Let rx be the this value.
+        const reg_exp = this_value;
+
+        // 2. If rx is not an Object, throw a TypeError exception.
+        if (reg_exp != .object) {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{reg_exp}),
+            );
+        }
+
+        // 3. Let S be ? ToString(string).
+        const string = try string_value.toString(agent);
+
+        // 4. Let previousLastIndex be ? Get(rx, "lastIndex").
+        const previous_last_index = try reg_exp.object.get(PropertyKey.from("lastIndex"));
+
+        // 5. If SameValue(previousLastIndex, +0𝔽) is false, then
+        if (!sameValue(previous_last_index, Value.from(0))) {
+            // a. Perform ? Set(rx, "lastIndex", +0𝔽, true).
+            try reg_exp.object.set(PropertyKey.from("lastIndex"), Value.from(0), .throw);
+        }
+
+        // 6. Let result be ? RegExpExec(rx, S).
+        const result = try regExpExec(agent, reg_exp.object, string);
+
+        // 7. Let currentLastIndex be ? Get(rx, "lastIndex").
+        const current_last_index = try reg_exp.object.get(PropertyKey.from("lastIndex"));
+
+        // 8. If SameValue(currentLastIndex, previousLastIndex) is false, then
+        if (!sameValue(current_last_index, previous_last_index)) {
+            // a. Perform ? Set(rx, "lastIndex", previousLastIndex, true).
+            try reg_exp.object.set(PropertyKey.from("lastIndex"), previous_last_index, .throw);
+        }
+
+        // 9. If result is null, return -1𝔽.
+        if (result == null) return Value.from(-1);
+
+        // 10. Return ? Get(result, "index").
+        return try result.?.get(PropertyKey.from("index"));
     }
 
     /// 22.2.6.13 get RegExp.prototype.source
