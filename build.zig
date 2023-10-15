@@ -81,7 +81,7 @@ pub fn build(b: *std.Build) void {
             "patch",
             "--forward",
             "--reject-file=-",
-            libregexp.builder.build_root.join(b.allocator, &.{"upstream/libregexp.c"}) catch @panic("OOM"),
+            libregexp.builder.dependency("quickjs", .{}).path("libregexp.c").getPath(b),
             "patches/libregexp.patch",
         },
     }) catch |err| @panic(@errorName(err));
