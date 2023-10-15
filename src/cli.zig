@@ -8,10 +8,6 @@ const kiesel = @import("kiesel");
 const Linenoise = @import("linenoise").Linenoise;
 const SafePointer = @import("any-pointer").SafePointer;
 
-const gc_h = @cImport({
-    @cInclude("gc.h");
-});
-
 const Allocator = std.mem.Allocator;
 
 const Agent = kiesel.execution.Agent;
@@ -30,9 +26,9 @@ const getOption = kiesel.types.getOption;
 const ordinaryObjectCreate = kiesel.builtins.ordinaryObjectCreate;
 
 const bdwgc_version_string = std.fmt.comptimePrint("{}.{}.{}", .{
-    gc_h.GC_VERSION_MAJOR,
-    gc_h.GC_VERSION_MINOR,
-    gc_h.GC_VERSION_MICRO,
+    gc.c.GC_VERSION_MAJOR,
+    gc.c.GC_VERSION_MINOR,
+    gc.c.GC_VERSION_MICRO,
 });
 
 const version = std.fmt.comptimePrint(
@@ -330,8 +326,8 @@ pub fn main() !u8 {
 
     if (parsed_args.options.@"disable-gc") gc.disable();
     if (!parsed_args.options.@"print-gc-warnings") {
-        gc_h.GC_set_warn_proc(struct {
-            fn func(_: [*c]u8, _: gc_h.GC_word) callconv(.C) void {}
+        gc.c.GC_set_warn_proc(struct {
+            fn func(_: [*c]u8, _: gc.c.GC_word) callconv(.C) void {}
         }.func);
     }
     var agent = try Agent.init(gc.allocator(), .{

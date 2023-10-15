@@ -45,12 +45,7 @@ Further reading:
 ## Build
 
 Dependencies managed through [`build.zig.zon`](./build.zig.zon) will be
-installed automatically when building for the first time, to fetch vendored
-dependencies run:
-
-```console
-git submodule update --init --recursive
-```
+installed automatically when building for the first time
 
 To build and run the Kiesel CLI:
 

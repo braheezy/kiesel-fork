@@ -6,6 +6,10 @@
             .url = "https://github.com/MasterQ32/any-pointer/archive/88bd1b406d58bc9e82159581ea3e71a004011058.tar.gz",
             .hash = "1220d00cd17f9b1f840ea4bee9b552547e1ca5938517018078046c83b71f332d3b5e",
         },
+        .libgc = .{
+            .url = "https://github.com/linusg/zig-libgc/archive/9013b9601c01127ae28206e155faa935e06af6ba.tar.gz",
+            .hash = "122078afb2452cc02a9b6b52fde9fb91fda951e5f507a52002058b8d93a268e95bf6",
+        },
         .libregexp = .{
             .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/9dac5e90d6626cbf796c0dc1f272a4ac2b188e00.tar.gz",
             .hash = "12205de931f30201b793f5dea74907fdac7f0e65a082b34d3a43ffed29cc393be239",
@@ -31,6 +35,5 @@
         "build.zig.zon",
         "patches/",
         "src/",
-        "vendor/",
     },
 }

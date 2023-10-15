@@ -5,9 +5,8 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
-const gc = @cImport({
-    @cInclude("gc.h");
-});
+const gc = @import("gc");
+
 const libregexp = @cImport({
     @cInclude("libregexp.h");
 });
@@ -47,7 +46,7 @@ fn getHeader(ptr: [*]u8) *[*]u8 {
 fn alignedAllocSize(ptr: [*]u8) usize {
     const unaligned_ptr = getHeader(ptr).*;
     const delta = @intFromPtr(ptr) - @intFromPtr(unaligned_ptr);
-    return gc.GC_size(unaligned_ptr) - delta;
+    return gc.c.GC_size(unaligned_ptr) - delta;
 }
 
 export fn lre_check_stack_overflow(_: ?*anyopaque, _: usize) c_int {

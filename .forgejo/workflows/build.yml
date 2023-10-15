@@ -11,8 +11,6 @@ jobs:
       image: ghcr.io/catthehacker/ubuntu:act-22.04
     steps:
       - uses: actions/checkout@v3
-        with:
-          submodules: recursive
       - uses: https://github.com/goto-bus-stop/setup-zig@v2
       - name: Create build.sh script
         run: |
