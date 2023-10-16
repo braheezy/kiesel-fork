@@ -601,6 +601,53 @@ pub fn getFunctionRealm(self: Self) !*Realm {
     return self.agent().currentRealm();
 }
 
+/// 7.3.26 CopyDataProperties ( target, source, excludedItems )
+/// https://tc39.es/ecma262/#sec-copydataproperties
+pub fn copyDataProperties(self: *Self, source: Value, excluded_items: []const PropertyKey) !void {
+    // 1. If source is either undefined or null, return unused.
+    if (source == .undefined or source == .null) return;
+
+    // 2. Let from be ! ToObject(source).
+    const from = source.toObject(self.agent()) catch |err| try noexcept(err);
+
+    // 3. Let keys be ? from.[[OwnPropertyKeys]]().
+    const keys = try from.internalMethods().ownPropertyKeys(from);
+    defer keys.deinit();
+
+    // 4. For each element nextKey of keys, do
+    for (keys.items) |next_key| {
+        // a. Let excluded be false.
+        // b. For each element e of excludedItems, do
+        const excluded = for (excluded_items) |e| {
+            // i. If SameValue(e, nextKey) is true, then
+            if (e.eql(next_key)) {
+                // 1. Set excluded to true.
+                break true;
+            }
+        } else false;
+
+        // c. If excluded is false, then
+        if (!excluded) {
+            // i. Let desc be ? from.[[GetOwnProperty]](nextKey).
+            const descriptor = try from.internalMethods().getOwnProperty(from, next_key);
+
+            // ii. If desc is not undefined and desc.[[Enumerable]] is true, then
+            if (descriptor != null and descriptor.?.enumerable == true) {
+                // 1. Let propValue be ? Get(from, nextKey).
+                const property_value = try from.get(next_key);
+
+                // 2. Perform ! CreateDataPropertyOrThrow(target, nextKey, propValue).
+                self.createDataPropertyOrThrow(
+                    next_key,
+                    property_value,
+                ) catch |err| try noexcept(err);
+            }
+        }
+    }
+
+    // 5. Return unused.
+}
+
 test "format" {
     const gc = @import("gc");
     var agent_ = try Agent.init(gc.allocator(), .{});
