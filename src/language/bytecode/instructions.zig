@@ -10,8 +10,8 @@ pub const Instruction = enum(u8) {
     apply_string_or_numeric_binary_operator,
     /// Store ArrayCreate(0) as the result value.
     array_create,
-    /// Set an array's value at the given index.
-    array_set_value,
+    /// Append value on the stack to an array.
+    array_push_value,
     /// Set the length property of an array to the given index.
     array_set_length,
     /// Apply bitwise NOT to the last value on the stack and store it as the result value.
@@ -136,7 +136,6 @@ pub const Instruction = enum(u8) {
             => 2,
             .apply_string_or_numeric_binary_operator,
             .array_set_length,
-            .array_set_value,
             .create_catch_binding,
             .evaluate_new,
             .evaluate_property_access_with_expression_key,

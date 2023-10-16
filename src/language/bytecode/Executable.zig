@@ -179,7 +179,6 @@ pub fn print(self: Self, writer: anytype) !void {
                 );
             },
             .array_set_length,
-            .array_set_value,
             .instantiate_arrow_function_expression,
             .instantiate_async_arrow_function_expression,
             .instantiate_async_function_expression,

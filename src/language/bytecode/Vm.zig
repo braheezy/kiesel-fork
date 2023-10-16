@@ -920,17 +920,10 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             self.result = try applyStringOrNumericBinaryOperator(self.agent, lval, operator, rval);
         },
         .array_create => self.result = Value.from(try arrayCreate(self.agent, 0, null)),
-        .array_set_length => {
-            const length = self.fetchIndex(executable);
-            const array = self.result.?.object;
-            // From ArrayAccumulation:
-            // 2. Perform ? Set(array, "length", 𝔽(len), true).
-            try array.set(PropertyKey.from("length"), Value.from(length), .throw);
-        },
-        .array_set_value => {
-            const index = self.fetchIndex(executable);
+        .array_push_value => {
             const init_value = self.stack.pop();
             const array = self.stack.pop().object;
+            const index = getArrayLength(array);
             // From ArrayAccumulation:
             // 4. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), initValue).
             array.createDataPropertyOrThrow(
@@ -938,6 +931,13 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
                 init_value,
             ) catch |err| try noexcept(err);
             self.result = Value.from(array);
+        },
+        .array_set_length => {
+            const length = self.fetchIndex(executable);
+            const array = self.result.?.object;
+            // From ArrayAccumulation:
+            // 2. Perform ? Set(array, "length", 𝔽(len), true).
+            try array.set(PropertyKey.from("length"), Value.from(length), .throw);
         },
         .bitwise_not => {
             const value = self.result.?;

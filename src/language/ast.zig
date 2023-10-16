@@ -544,7 +544,7 @@ pub const ArrayLiteral = struct {
                     try executable.addInstruction(.load);
                 },
 
-                // ElementList : Elisionopt AssignmentExpression
+                // ElementList : Elision[opt] AssignmentExpression
                 .expression => |expression| {
                     // 1. If Elision is present, then
                     // NOTE: This is handled above.
@@ -557,8 +557,7 @@ pub const ArrayLiteral = struct {
                     try executable.addInstruction(.load);
 
                     // 4. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), initValue).
-                    try executable.addInstruction(.array_set_value);
-                    try executable.addIndex(i);
+                    try executable.addInstruction(.array_push_value);
                     try executable.addInstruction(.load);
 
                     // 5. Return nextIndex + 1.
