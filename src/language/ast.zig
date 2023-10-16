@@ -2397,6 +2397,19 @@ pub const BindingElement = struct {
     }
 };
 
+/// https://tc39.es/ecma262/#prod-BindingRestElement
+pub const BindingRestElement = struct {
+    const Self = @This();
+
+    identifier: Identifier,
+    // TODO: Binding patterns
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("BindingRestElement", writer, indentation);
+        try printString(self.identifier, writer, indentation + 1);
+    }
+};
+
 /// https://tc39.es/ecma262/#prod-ExpressionStatement
 pub const ExpressionStatement = struct {
     const Self = @This();
@@ -3029,7 +3042,7 @@ pub const FormalParameters = struct {
 
     pub const Item = union(enum) {
         formal_parameter: FormalParameter,
-        // TODO: FunctionRestParameter
+        function_rest_parameter: FunctionRestParameter,
     };
 
     items: []const Item,
@@ -3043,11 +3056,15 @@ pub const FormalParameters = struct {
         // 2. Let names2 be BoundNames of FormalParameter.
         // 3. Return the list-concatenation of names1 and names2.
         for (self.items) |item| {
-            // BindingElement : BindingPattern Initializeropt
+            // BindingElement : BindingPattern Initializer[opt]
             // 1. Return the BoundNames of BindingPattern.
-            // SingleNameBinding : BindingIdentifier Initializeropt
+            // SingleNameBinding : BindingIdentifier Initializer[opt]
             // 1. Return the BoundNames of BindingIdentifier.
-            bound_names.appendAssumeCapacity(item.formal_parameter.binding_element.identifier);
+            const name = switch (item) {
+                .formal_parameter => |formal_parameter| formal_parameter.binding_element.identifier,
+                .function_rest_parameter => |function_rest_parameter| function_rest_parameter.binding_rest_element.identifier,
+            };
+            bound_names.appendAssumeCapacity(name);
         }
         return bound_names.toOwnedSlice();
     }
@@ -3055,16 +3072,31 @@ pub const FormalParameters = struct {
     /// 15.1.5 Static Semantics: ExpectedArgumentCount
     /// https://tc39.es/ecma262/#sec-static-semantics-expectedargumentcount
     pub fn expectedArgumentCount(self: Self) usize {
-        return self.items.len;
+        if (self.items.len != 0 and self.items[self.items.len - 1] == .function_rest_parameter)
+            return self.items.len - 1
+        else
+            return self.items.len;
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         // Omit printing 'FormalParameters' here, it's implied and only adds nesting.
         for (self.items) |item| {
             switch (item) {
-                .formal_parameter => |formal_parameter| try formal_parameter.print(writer, indentation),
+                inline else => |node| try node.print(writer, indentation),
             }
         }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-FunctionRestParameter
+pub const FunctionRestParameter = struct {
+    const Self = @This();
+
+    binding_rest_element: BindingRestElement,
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("FunctionRestParameter", writer, indentation);
+        try self.binding_rest_element.print(writer, indentation + 1);
     }
 };
 

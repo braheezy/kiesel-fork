@@ -26,6 +26,7 @@ const Realm = execution.Realm;
 const ScriptOrModule = execution.ScriptOrModule;
 const String = types.String;
 const Value = types.Value;
+const arrayCreate = builtins.arrayCreate;
 const containsSlice = utils.containsSlice;
 const createMappedArgumentsObject = builtins.createMappedArgumentsObject;
 const createUnmappedArgumentsObject = builtins.createUnmappedArgumentsObject;
@@ -850,7 +851,9 @@ fn functionDeclarationInstantiation(agent: *Agent, function: *ECMAScriptFunction
     };
 
     // TODO: 7. Let simpleParameterList be IsSimpleParameterList of formals.
-    const simple_parameter_list = true;
+    const simple_parameter_list = for (formals.items) |formal_parameter| {
+        if (formal_parameter == .function_rest_parameter) break false;
+    } else true;
 
     // TODO: 8. Let hasParameterExpressions be ContainsExpression of formals.
     const has_parameter_expressions = false;
@@ -1016,15 +1019,36 @@ fn functionDeclarationInstantiation(agent: *Agent, function: *ECMAScriptFunction
     defer if (arguments_object_needed) agent.gc_allocator.free(parameter_bindings);
 
     // TODO: 24-26.
-    // NOTE: Ad-hoc implementation of IteratorBindingInitialization for SingleNameBinding
-    for (parameter_names, 0..) |parameter_name, i| {
-        const environment = if (has_duplicates) null else env;
-        const value = arguments_list.get(i);
-        const reference = try agent.resolveBinding(parameter_name, environment, strict);
-        if (environment == null)
-            try reference.putValue(agent, value)
-        else
-            try reference.initializeReferencedBinding(agent, value);
+    // NOTE: Ad-hoc implementation of IteratorBindingInitialization for SingleNameBinding and BindingRestElement
+    const environment = if (has_duplicates) null else env;
+    for (formals.items, 0..) |item, i| {
+        switch (item) {
+            .formal_parameter => |formal_parameter| {
+                const name = formal_parameter.binding_element.identifier;
+                const value = arguments_list.get(i);
+                const reference = try agent.resolveBinding(name, environment, strict);
+                if (environment == null)
+                    try reference.putValue(agent, value)
+                else
+                    try reference.initializeReferencedBinding(agent, value);
+            },
+            .function_rest_parameter => |function_rest_parameter| {
+                const name = function_rest_parameter.binding_rest_element.identifier;
+                const reference = try agent.resolveBinding(name, environment, strict);
+                const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
+                const rest = arguments_list.values[@min(i, arguments_list.values.len)..];
+                for (rest, 0..) |value, n| {
+                    array.createDataPropertyOrThrow(
+                        PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(n))),
+                        value,
+                    ) catch |err| try noexcept(err);
+                }
+                if (environment == null)
+                    try reference.putValue(agent, Value.from(array))
+                else
+                    try reference.initializeReferencedBinding(agent, Value.from(array));
+            },
+        }
     }
 
     // 27. If hasParameterExpressions is false, then

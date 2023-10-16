@@ -1374,13 +1374,23 @@ pub fn acceptFormalParameters(self: *Self) AcceptError!ast.FormalParameters {
 
     var formal_parameters_items = std.ArrayList(ast.FormalParameters.Item).init(self.allocator);
     defer formal_parameters_items.deinit();
-    while (self.acceptBindingIdentifier()) |identifier| {
-        const formal_parameter = ast.FormalParameter{
-            .binding_element = .{ .identifier = identifier },
-        };
-        try formal_parameters_items.append(.{ .formal_parameter = formal_parameter });
-        _ = self.core.accept(RuleSet.is(.@",")) catch break;
-    } else |_| {}
+    while (true) {
+        if (self.core.accept(RuleSet.is(.@"..."))) |_| {
+            const identifier = try self.acceptBindingIdentifier();
+            const function_rest_parameter = ast.FunctionRestParameter{
+                .binding_rest_element = .{ .identifier = identifier },
+            };
+            try formal_parameters_items.append(.{ .function_rest_parameter = function_rest_parameter });
+            _ = self.core.accept(RuleSet.is(.@",")) catch {};
+            break;
+        } else |_| if (self.acceptBindingIdentifier()) |identifier| {
+            const formal_parameter = ast.FormalParameter{
+                .binding_element = .{ .identifier = identifier },
+            };
+            try formal_parameters_items.append(.{ .formal_parameter = formal_parameter });
+            _ = self.core.accept(RuleSet.is(.@",")) catch break;
+        } else |_| break;
+    }
     return .{ .items = try formal_parameters_items.toOwnedSlice() };
 }
 
