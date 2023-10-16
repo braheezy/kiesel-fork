@@ -47,15 +47,6 @@ pub const PropertyKeyHashMapContext = struct {
     const hashSymbol = std.hash_map.getAutoHashFn(Symbol.Id, struct {});
     const hashIntegerIndex = std.hash_map.getAutoHashFn(PropertyKey.IntegerIndex, struct {});
 
-    const eqlString = std.hash_map.eqlString;
-
-    fn eqlStringAndIntegerIndex(string: []const u8, index: PropertyKey.IntegerIndex) bool {
-        const len = comptime std.fmt.count("{d}", .{std.math.maxInt(PropertyKey.IntegerIndex)});
-        var index_string: [len]u8 = undefined;
-        _ = std.fmt.bufPrint(&index_string, "{d}", .{index}) catch unreachable;
-        return eqlString(string, &index_string);
-    }
-
     pub fn hash(_: anytype, property_key: PropertyKey) u64 {
         return switch (property_key) {
             .string => |string| hashString(string.utf8),
@@ -65,23 +56,7 @@ pub const PropertyKeyHashMapContext = struct {
     }
 
     pub fn eql(_: anytype, a: PropertyKey, b: PropertyKey) bool {
-        return switch (a) {
-            .string => |a_string| switch (b) {
-                .string => |b_string| eqlString(a_string.utf8, b_string.utf8),
-                .symbol => false,
-                .integer_index => |b_integer_index| eqlStringAndIntegerIndex(a_string.utf8, b_integer_index),
-            },
-            .symbol => |a_symbol| switch (b) {
-                .string => false,
-                .symbol => |b_symbol| a_symbol.id == b_symbol.id,
-                .integer_index => false,
-            },
-            .integer_index => |a_integer_index| switch (b) {
-                .string => |b_string| eqlStringAndIntegerIndex(b_string.utf8, a_integer_index),
-                .symbol => false,
-                .integer_index => |b_integer_index| a_integer_index == b_integer_index,
-            },
-        };
+        return a.eql(b);
     }
 };
 

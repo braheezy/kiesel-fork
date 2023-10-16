@@ -50,6 +50,34 @@ pub const PropertyKey = union(enum) {
         return self == .integer_index and self.integer_index <= (std.math.maxInt(u32) - 1);
     }
 
+    fn eqlStringAndIntegerIndex(string: String, index: IntegerIndex) bool {
+        const len = comptime std.fmt.count("{d}", .{std.math.maxInt(IntegerIndex)});
+        var index_string: [len]u8 = undefined;
+        _ = std.fmt.bufPrint(&index_string, "{d}", .{index}) catch unreachable;
+        return string.eql(String.from(&index_string));
+    }
+
+    /// Non-standard helper to check `PropertyKey` equality without going through `sameValue()`.
+    pub fn eql(a: Self, b: Self) bool {
+        return switch (a) {
+            .string => |a_string| switch (b) {
+                .string => |b_string| a_string.eql(b_string),
+                .symbol => false,
+                .integer_index => |b_integer_index| eqlStringAndIntegerIndex(a_string, b_integer_index),
+            },
+            .symbol => |a_symbol| switch (b) {
+                .string => false,
+                .symbol => |b_symbol| a_symbol.id == b_symbol.id,
+                .integer_index => false,
+            },
+            .integer_index => |a_integer_index| switch (b) {
+                .string => |b_string| eqlStringAndIntegerIndex(b_string, a_integer_index),
+                .symbol => false,
+                .integer_index => |b_integer_index| a_integer_index == b_integer_index,
+            },
+        };
+    }
+
     /// Non-standard helper to convert a `PropertyKey` to a `Value` - they *are* plain (string or
     /// symbol) values in the spec.
     pub fn toValue(self: Self, agent: *Agent) !Value {
