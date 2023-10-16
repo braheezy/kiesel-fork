@@ -14,6 +14,8 @@ pub const Instruction = enum(u8) {
     array_push_value,
     /// Set the length property of an array to the given index.
     array_set_length,
+    /// Spread value into an array.
+    array_spread_value,
     /// Apply bitwise NOT to the last value on the stack and store it as the result value.
     bitwise_not,
     /// Create a catch binding for the given name and populate it with the stored exception.

@@ -13,6 +13,7 @@ const BigInt = types.BigInt;
 const Completion = types.Completion;
 const Executable = @import("Executable.zig");
 const Instruction = instructions_.Instruction;
+const Iterator = types.Iterator;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
@@ -21,6 +22,8 @@ const String = types.String;
 const Value = types.Value;
 const arrayCreate = builtins.arrayCreate;
 const defineMethodProperty = builtins.defineMethodProperty;
+const getArrayLength = @import("../../builtins/array.zig").getArrayLength;
+const getIterator = types.getIterator;
 const isLessThan = types.isLessThan;
 const isLooselyEqual = types.isLooselyEqual;
 const isStrictlyEqual = types.isStrictlyEqual;
@@ -938,6 +941,32 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             // From ArrayAccumulation:
             // 2. Perform ? Set(array, "length", 𝔽(len), true).
             try array.set(PropertyKey.from("length"), Value.from(length), .throw);
+        },
+        .array_spread_value => {
+            const spread_obj = self.stack.pop();
+            const array = self.stack.pop().object;
+            var next_index: u53 = @intCast(getArrayLength(array));
+
+            // From ArrayAccumulation:
+            // 3. Let iteratorRecord be ? GetIterator(spreadObj, sync).
+            const iterator = try getIterator(self.agent, spread_obj, .sync);
+
+            // 4. Repeat,
+            //     a. Let next be ? IteratorStep(iteratorRecord).
+            //     b. If next is false, return nextIndex.
+            while (try iterator.step()) |next| : (next_index += 1) {
+                // c. Let nextValue be ? IteratorValue(next).
+                const next_value = try Iterator.value(next);
+
+                // d. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), nextValue).
+                array.createDataPropertyOrThrow(
+                    PropertyKey.from(next_index),
+                    next_value,
+                ) catch |err| try noexcept(err);
+
+                // e. Set nextIndex to nextIndex + 1.
+            }
+            self.result = Value.from(array);
         },
         .bitwise_not => {
             const value = self.result.?;

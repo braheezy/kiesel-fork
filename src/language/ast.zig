@@ -524,7 +524,7 @@ pub const ArrayLiteral = struct {
     pub const Element = union(enum) {
         elision,
         expression: Expression,
-        // TODO: SpreadElement
+        spread: Expression,
     };
 
     element_list: []const Element,
@@ -562,6 +562,20 @@ pub const ArrayLiteral = struct {
 
                     // 5. Return nextIndex + 1.
                 },
+
+                // SpreadElement : ... AssignmentExpression
+                .spread => |expression| {
+                    // 1. Let spreadRef be ? Evaluation of AssignmentExpression.
+                    try expression.generateBytecode(executable, ctx);
+
+                    // 2. Let spreadObj be ? GetValue(spreadRef).
+                    if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                    try executable.addInstruction(.load);
+
+                    // 3-4.
+                    try executable.addInstruction(.array_spread_value);
+                    try executable.addInstruction(.load);
+                },
             }
         }
         try executable.addInstruction(.store);
@@ -572,6 +586,10 @@ pub const ArrayLiteral = struct {
         for (self.element_list) |element| switch (element) {
             .elision => try printString("<elision>", writer, indentation + 1),
             .expression => |expression| try expression.print(writer, indentation + 1),
+            .spread => |expression| {
+                try printString("...", writer, indentation + 1);
+                try expression.print(writer, indentation + 1);
+            },
         };
     }
 };

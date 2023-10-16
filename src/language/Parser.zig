@@ -580,7 +580,11 @@ pub fn acceptArrayLiteral(self: *Self) AcceptError!ast.ArrayLiteral {
     defer elements.deinit();
     const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
     while (true) {
-        if (self.acceptExpression(ctx)) |expression| {
+        if (self.core.accept(RuleSet.is(.@"..."))) |_| {
+            const expression = try self.acceptExpression(ctx);
+            try elements.append(.{ .spread = expression });
+            _ = self.core.accept(RuleSet.is(.@",")) catch break;
+        } else |_| if (self.acceptExpression(ctx)) |expression| {
             try elements.append(.{ .expression = expression });
             _ = self.core.accept(RuleSet.is(.@",")) catch break;
         } else |_| if (self.core.accept(RuleSet.is(.@","))) |_| {
