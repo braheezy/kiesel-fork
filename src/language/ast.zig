@@ -666,15 +666,31 @@ pub const PropertyDefinition = union(enum) {
         expression: Expression,
     };
 
+    spread: Expression,
     identifier_reference: IdentifierReference,
     property_name_and_expression: PropertyNameAndExpression,
     method_definition: MethodDefinition,
-    // TODO: ...Expression
 
     /// 13.2.5.5 Runtime Semantics: PropertyDefinitionEvaluation
     /// https://tc39.es/ecma262/#sec-runtime-semantics-propertydefinitionevaluation
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         switch (self) {
+            // PropertyDefinition : ... AssignmentExpression
+            .spread => |expression| {
+                // 1. Let exprValue be ? Evaluation of AssignmentExpression.
+                try expression.generateBytecode(executable, ctx);
+
+                // 2. Let fromValue be ? GetValue(exprValue).
+                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                try executable.addInstruction(.load);
+
+                // 3. Let excludedNames be a new empty List.
+                // 4. Perform ? CopyDataProperties(object, fromValue, excludedNames).
+                try executable.addInstruction(.object_spread_value);
+
+                // 5. Return unused.
+            },
+
             // PropertyDefinition : IdentifierReference
             .identifier_reference => |identifier_reference| {
                 // 1. Let propName be StringValue of IdentifierReference.
@@ -735,9 +751,12 @@ pub const PropertyDefinition = union(enum) {
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         // Omit printing 'PropertyDefinition' here, it's implied and only adds nesting.
         switch (self) {
+            .spread => |expression| {
+                try printString("...", writer, indentation);
+                try expression.print(writer, indentation);
+            },
             .identifier_reference => |identifier_reference| {
-                try printString("identifier_reference:", writer, indentation);
-                try identifier_reference.print(writer, indentation + 1);
+                try identifier_reference.print(writer, indentation);
             },
             .property_name_and_expression => |property_name_and_expression| {
                 try printString("property_name_and_expression:", writer, indentation);
@@ -745,8 +764,8 @@ pub const PropertyDefinition = union(enum) {
                 try property_name_and_expression.expression.print(writer, indentation + 1);
             },
             .method_definition => |method_definition| {
-                try printString("method_definition:", writer, indentation);
-                try method_definition.print(writer, indentation + 1);
+                try printString("MethodDefinition", writer, indentation);
+                try method_definition.print(writer, indentation);
             },
         }
     }

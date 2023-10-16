@@ -627,8 +627,12 @@ pub fn acceptPropertyDefinition(
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
     var property_name: ast.PropertyName = undefined;
-    if (self.acceptIdentifierReference()) |identifier_reference| {
+    if (self.core.accept(RuleSet.is(.@"..."))) |_| {
+        const expression = try self.acceptExpression(ctx);
+        return .{ .spread = expression };
+    } else |_| if (self.acceptIdentifierReference()) |identifier_reference| {
         if (method_type == null) {
             const get = std.mem.eql(u8, identifier_reference.identifier, "get");
             const set = std.mem.eql(u8, identifier_reference.identifier, "set");
@@ -678,7 +682,6 @@ pub fn acceptPropertyDefinition(
     } else |_| return error.UnexpectedToken;
 
     if (self.core.accept(RuleSet.is(.@":"))) |_| {
-        const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
         const expression = try self.acceptExpression(ctx);
         return .{
             .property_name_and_expression = .{

@@ -91,6 +91,8 @@ pub const Instruction = enum(u8) {
     object_define_method,
     /// Set an object's property to the key/value pair from the last two values on the stack.
     object_set_property,
+    // Spread value into an object.
+    object_spread_value,
     /// Pop a jump target for uncaught exceptions
     pop_exception_jump_target,
     /// Pop the last stored reference.

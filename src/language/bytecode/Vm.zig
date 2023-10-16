@@ -1502,6 +1502,15 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             object.createDataPropertyOrThrow(property_name, property_value) catch |err| try noexcept(err);
             self.result = Value.from(object);
         },
+        .object_spread_value => {
+            const from_value = self.stack.pop();
+            var object = self.stack.pop().object;
+            const excluded_names: []const PropertyKey = &.{};
+            // From PropertyDefinitionEvaluation:
+            // 4. Perform ? CopyDataProperties(object, fromValue, excludedNames).
+            try object.copyDataProperties(from_value, excluded_names);
+            self.result = Value.from(object);
+        },
         .pop_exception_jump_target => _ = self.exception_jump_target_stack.pop(),
         .pop_reference => _ = self.reference_stack.pop(),
         .push_exception_jump_target => {
