@@ -10,6 +10,7 @@ const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
+const ConstructorKind = ecmascript_function.ConstructorKind;
 const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
@@ -55,6 +56,14 @@ pub const Behaviour = union(enum) {
 
     regular: *const RegularFn,
     constructor: *const ConstructorFn,
+};
+
+pub const ClassConstructorFields = struct {
+    /// [[ConstructorKind]]
+    constructor_kind: ConstructorKind,
+
+    /// [[SourceText]]
+    source_text: []const u8,
 };
 
 pub const BuiltinFunction = MakeObject(.{

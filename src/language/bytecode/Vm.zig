@@ -1,7 +1,10 @@
 const std = @import("std");
 
+const SafePointer = @import("any-pointer").SafePointer;
+
 const ast = @import("../ast.zig");
 const builtins = @import("../../builtins.zig");
+const bytecode = @import("../bytecode.zig");
 const execution = @import("../../execution.zig");
 const instructions_ = @import("instructions.zig");
 const types = @import("../../types.zig");
@@ -10,7 +13,9 @@ const utils = @import("../../utils.zig");
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
 const BigInt = types.BigInt;
+const ClassConstructorFields = builtins.ClassConstructorFields;
 const Completion = types.Completion;
+const Environment = execution.Environment;
 const Executable = @import("Executable.zig");
 const Instruction = instructions_.Instruction;
 const Iterator = types.Iterator;
@@ -21,7 +26,9 @@ const Reference = types.Reference;
 const String = types.String;
 const Value = types.Value;
 const arrayCreate = builtins.arrayCreate;
+const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineMethodProperty = builtins.defineMethodProperty;
+const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const getArrayLength = @import("../../builtins/array.zig").getArrayLength;
 const getIterator = types.getIterator;
 const isLessThan = types.isLessThan;
@@ -30,7 +37,9 @@ const isStrictlyEqual = types.isStrictlyEqual;
 const makeConstructor = builtins.makeConstructor;
 const makeMethod = builtins.makeMethod;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
+const newPrivateEnvironment = execution.newPrivateEnvironment;
 const noexcept = utils.noexcept;
+const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const performEval = builtins.performEval;
@@ -85,16 +94,47 @@ fn fetchIdentifier(self: *Self, executable: Executable) []const u8 {
     return identifiers[index];
 }
 
-fn fetchFunctionExpression(self: *Self, executable: Executable) Executable.FunctionExpression {
-    const function_expressions = executable.function_expressions.items;
+fn fetchFunctionOrClass(self: *Self, executable: Executable) Executable.FunctionOrClass {
+    const functions_and_classes = executable.functions_and_classes.items;
     const index = self.fetchIndex(executable);
-    return function_expressions[index];
+    return functions_and_classes[index];
 }
 
 fn fetchIndex(self: *Self, executable: Executable) Executable.IndexType {
     const b1 = @intFromEnum(self.fetchInstruction(executable).?);
     const b2 = @intFromEnum(self.fetchInstruction(executable).?);
     return std.mem.bytesToValue(Executable.IndexType, &[_]u8{ b1, b2 });
+}
+
+/// 8.6.2.1 InitializeBoundName ( name, value, environment )
+/// https://tc39.es/ecma262/#sec-initializeboundname
+fn initializeBoundName(
+    agent: *Agent,
+    name: []const u8,
+    value: Value,
+    environment_or_strict: union(enum) {
+        environment: Environment,
+        strict: bool,
+    },
+) !void {
+    switch (environment_or_strict) {
+        // 1. If environment is not undefined, then
+        .environment => |environment| {
+            // a. Perform ! environment.InitializeBinding(name, value).
+            environment.initializeBinding(agent, name, value) catch |err| try noexcept(err);
+
+            // b. Return unused.
+        },
+
+        // 2. Else,
+        .strict => |strict| {
+            // a. Let lhs be ? ResolveBinding(name).
+            const lhs = try agent.resolveBinding(name, null, strict);
+
+            // b. Return ? PutValue(lhs, value).
+            try lhs.putValue(agent, value);
+        },
+    }
 }
 
 /// 13.3.5.1.1 EvaluateNew ( constructExpr, arguments )
@@ -779,6 +819,315 @@ fn instantiateAsyncGeneratorFunctionExpression(
     }
 }
 
+/// 15.7.14 Runtime Semantics: ClassDefinitionEvaluation
+/// https://tc39.es/ecma262/#sec-runtime-semantics-classdefinitionevaluation
+fn classDefinitionEvaluation(
+    agent: *Agent,
+    class_tail: ast.ClassTail,
+    class_binding: ?[]const u8,
+    class_name: []const u8,
+) !Object {
+    const realm = agent.currentRealm();
+
+    // 1. Let env be the LexicalEnvironment of the running execution context.
+    const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+    // 2. Let classEnv be NewDeclarativeEnvironment(env).
+    const class_env = try newDeclarativeEnvironment(agent.gc_allocator, env);
+
+    // 3. If classBinding is not undefined, then
+    if (class_binding != null) {
+        // a. Perform ! classEnv.CreateImmutableBinding(classBinding, true).
+        class_env.createImmutableBinding(
+            agent,
+            class_binding.?,
+            true,
+        ) catch |err| try noexcept(err);
+    }
+
+    // 4. Let outerPrivateEnvironment be the running execution context's PrivateEnvironment.
+    const outer_private_environment = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+
+    // 5. Let classPrivateEnvironment be NewPrivateEnvironment(outerPrivateEnvironment).
+    const class_private_environment = try newPrivateEnvironment(
+        agent.gc_allocator,
+        outer_private_environment,
+    );
+
+    const class_body_present = class_tail.class_body.class_element_list.items.len != 0;
+
+    // 6. If ClassBody[opt] is present, then
+    if (class_body_present) {
+        // TODO: Initialize private environment
+    }
+
+    var prototype_parent: ?Object = undefined;
+    var constructor_parent: Object = undefined;
+
+    // 7. If ClassHeritage[opt] is not present, then
+    if (class_tail.class_heritage == null) {
+        // a. Let protoParent be %Object.prototype%.
+        prototype_parent = try realm.intrinsics.@"%Object.prototype%"();
+
+        // b. Let constructorParent be %Function.prototype%.
+        constructor_parent = try realm.intrinsics.@"%Function.prototype%"();
+    }
+    // 8. Else,
+    else {
+        // a. Set the running execution context's LexicalEnvironment to classEnv.
+        agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{ .declarative_environment = class_env };
+
+        // b. NOTE: The running execution context's PrivateEnvironment is outerPrivateEnvironment
+        //    when evaluating ClassHeritage.
+        // c. Let superclassRef be Completion(Evaluation of ClassHeritage).
+        const superclass_ref = generateAndRunBytecode(
+            agent,
+            ast.ExpressionStatement{ .expression = class_tail.class_heritage.? },
+        );
+
+        // d. Set the running execution context's LexicalEnvironment to env.
+        agent.runningExecutionContext().ecmascript_code.?.lexical_environment = env;
+
+        // e. Let superclass be ? GetValue(? superclassRef).
+        // NOTE: Wrapping the Expression node in a ExpressionStatement above ensures a get_value
+        //       instruction is emitted for references.
+        const superclass = (try superclass_ref).value.?;
+
+        // f. If superclass is null, then
+        if (superclass == .null) {
+            // i. Let protoParent be null.
+            prototype_parent = null;
+
+            // ii. Let constructorParent be %Function.prototype%.
+            constructor_parent = try realm.intrinsics.@"%Function.prototype%"();
+        }
+        // g. Else if IsConstructor(superclass) is false, then
+        else if (!superclass.isConstructor()) {
+            // i. Throw a TypeError exception.
+        }
+        // h. Else,
+        else {
+            // i. Let protoParent be ? Get(superclass, "prototype").
+            const prototype_parent_value = try superclass.object.get(PropertyKey.from("prototype"));
+
+            // ii. If protoParent is not an Object and protoParent is not null, throw a TypeError
+            //     exception.
+            if (prototype_parent_value != .object and prototype_parent_value != .null) {
+                return agent.throwException(
+                    .type_error,
+                    try std.fmt.allocPrint(
+                        agent.gc_allocator,
+                        "{} is not an Object or null",
+                        .{prototype_parent_value},
+                    ),
+                );
+            }
+
+            prototype_parent = if (prototype_parent_value == .object)
+                prototype_parent_value.object
+            else
+                null;
+
+            // iii. Let constructorParent be superclass.
+            constructor_parent = superclass.object;
+        }
+    }
+
+    // 9. Let proto be OrdinaryObjectCreate(protoParent).
+    const prototype = try ordinaryObjectCreate(agent, prototype_parent);
+
+    // TODO: 10. If ClassBody[opt] is not present, let constructor be empty.
+    // TODO: 11. Else, let constructor be ConstructorMethod of ClassBody.
+    const constructor = null;
+
+    // 12. Set the running execution context's LexicalEnvironment to classEnv.
+    agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{ .declarative_environment = class_env };
+
+    // 13. Set the running execution context's PrivateEnvironment to classPrivateEnvironment.
+    agent.runningExecutionContext().ecmascript_code.?.private_environment = class_private_environment;
+
+    // 14. If constructor is empty, then
+    const function = if (constructor == null) blk: {
+        // a. Let defaultConstructor be a new Abstract Closure with no parameters that captures
+        //    nothing and performs the following steps when called:
+        const default_constructor = struct {
+            // agent: *Agent, _: Value, arguments: ArgumentsList, new_target: ?Object
+            fn func(agent_: *Agent, _: Value, arguments_list: ArgumentsList, new_target: ?Object) !Value {
+                // i. Let args be the List of arguments that was passed to this function by [[Call]]
+                //    or [[Construct]].
+                const args = arguments_list.values;
+
+                // ii. If NewTarget is undefined, throw a TypeError exception.
+                if (new_target == null) {
+                    return agent_.throwException(.type_error, "Class must be constructed with 'new'");
+                }
+
+                // iii. Let F be the active function object.
+                const function = agent_.activeFunctionObject();
+                const class_constructor_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+
+                // iv. If F.[[ConstructorKind]] is derived, then
+                const result = if (class_constructor_fields.constructor_kind == .derived) blk: {
+                    // 1. NOTE: This branch behaves similarly to constructor(...args) { super(...args); }.
+                    //    The most notable distinction is that while the aforementioned ECMAScript
+                    //    source text observably calls the @@iterator method on %Array.prototype%,
+                    //    this function does not.
+
+                    // 2. Let func be ! F.[[GetPrototypeOf]]().
+                    const prototype_function = function.internalMethods().getPrototypeOf(function) catch |err| try noexcept(err);
+
+                    // 3. If IsConstructor(func) is false, throw a TypeError exception.
+                    if (prototype_function == null or !Value.from(prototype_function.?).isConstructor()) {
+                        return agent_.throwException(
+                            .type_error,
+                            try std.fmt.allocPrint(
+                                agent_.gc_allocator,
+                                "{} is not a constructor",
+                                .{
+                                    if (prototype_function == null)
+                                        .undefined
+                                    else
+                                        Value.from(prototype_function.?),
+                                },
+                            ),
+                        );
+                    }
+
+                    // 4. Let result be ? Construct(func, args, NewTarget).
+                    break :blk try prototype_function.?.construct(args, new_target.?);
+                }
+                // v. Else,
+                else blk: {
+                    // 1. NOTE: This branch behaves similarly to constructor() {}.
+                    // 2. Let result be ? OrdinaryCreateFromConstructor(NewTarget, "%Object.prototype%").
+                    break :blk try ordinaryCreateFromConstructor(
+                        builtins.Object,
+                        agent_,
+                        new_target.?,
+                        "%Object.prototype%",
+                    );
+                };
+
+                // TODO: vi. Perform ? InitializeInstanceElements(result, F).
+
+                // vii. Return result.
+                return Value.from(result);
+            }
+        }.func;
+
+        // b. Let F be CreateBuiltinFunction(defaultConstructor, 0, className, « [[ConstructorKind]],
+        //    [[SourceText]] », the current Realm Record, constructorParent).
+        const class_constructor_fields = try agent.gc_allocator.create(ClassConstructorFields);
+        break :blk try createBuiltinFunction(agent, .{ .constructor = default_constructor }, .{
+            .length = 0,
+            .name = class_name,
+            .realm = agent.currentRealm(),
+            .prototype = constructor_parent,
+            .additional_fields = SafePointer.make(*ClassConstructorFields, class_constructor_fields),
+        });
+    }
+    // 15. Else,
+    else {
+        // TODO: a-d.
+        unreachable;
+    };
+
+    // 16. Perform MakeConstructor(F, false, proto).
+    try makeConstructor(function, .{ .writable_prototype = false, .prototype = prototype });
+
+    // 17. If ClassHeritage[opt] is present, set F.[[ConstructorKind]] to derived.
+    if (class_tail.class_heritage != null) {
+        if (function.is(builtins.ECMAScriptFunction)) {
+            // TODO: Implement this with step 15 above
+        } else if (function.is(builtins.BuiltinFunction)) {
+            const class_constructor_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+            class_constructor_fields.constructor_kind = .derived;
+        } else unreachable;
+    }
+
+    // 18. Perform CreateMethodProperty(proto, "constructor", F).
+    try prototype.createMethodProperty(PropertyKey.from("constructor"), Value.from(function));
+
+    // TODO: 19-25.
+
+    // 26. Set the running execution context's LexicalEnvironment to env.
+    agent.runningExecutionContext().ecmascript_code.?.lexical_environment = env;
+
+    // 27. If classBinding is not undefined, then
+    if (class_binding != null) {
+        // a. Perform ! classEnv.InitializeBinding(classBinding, F).
+        class_env.initializeBinding(agent, class_binding.?, Value.from(function));
+    }
+
+    // TODO: 28-31.
+
+    // 32. Set the running execution context's PrivateEnvironment to outerPrivateEnvironment.
+    agent.runningExecutionContext().ecmascript_code.?.private_environment = outer_private_environment;
+
+    // 33. Return F.
+    return function;
+}
+
+/// 15.7.15 Runtime Semantics: BindingClassDeclarationEvaluation
+/// https://tc39.es/ecma262/#sec-runtime-semantics-bindingclassdeclarationevaluation
+fn bindingClassDeclarationEvaluation(
+    agent: *Agent,
+    class_declaration: ast.ClassDeclaration,
+) !Object {
+    // ClassDeclaration : class BindingIdentifier ClassTail
+    if (class_declaration.identifier) |identifier| {
+        // 1. Let className be StringValue of BindingIdentifier.
+        const class_name = identifier;
+
+        // 2. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments className and className.
+        const value = try classDefinitionEvaluation(
+            agent,
+            class_declaration.class_tail,
+            class_name,
+            class_name,
+        );
+
+        // 3. Set value.[[SourceText]] to the source text matched by ClassDeclaration.
+        if (value.is(builtins.ECMAScriptFunction)) {
+            // TODO
+        } else if (value.is(builtins.BuiltinFunction)) {
+            const class_constructor_fields = value.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+            class_constructor_fields.source_text = class_declaration.source_text;
+        } else unreachable;
+
+        // 4. Let env be the running execution context's LexicalEnvironment.
+        const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+        // 5. Perform ? InitializeBoundName(className, value, env).
+        try initializeBoundName(agent, class_name, Value.from(value), .{ .environment = env });
+
+        // 6. Return value.
+        return value;
+    }
+    // ClassDeclaration : class ClassTail
+    else {
+        // 1. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments undefined and
+        //    "default".
+        const value = try classDefinitionEvaluation(
+            agent,
+            class_declaration.class_tail,
+            null,
+            "default",
+        );
+
+        // 2. Set value.[[SourceText]] to the source text matched by ClassDeclaration.
+        if (value.is(builtins.ECMAScriptFunction)) {
+            // TODO
+        } else if (value.is(builtins.BuiltinFunction)) {
+            const class_constructor_fields = value.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+            class_constructor_fields.source_text = class_declaration.source_text;
+        } else unreachable;
+
+        // 3. Return value.
+        return value;
+    }
+}
+
 /// 15.8.3 Runtime Semantics: InstantiateAsyncFunctionExpression
 /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncfunctionexpression
 fn instantiateAsyncFunctionExpression(
@@ -967,6 +1316,10 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
                 // e. Set nextIndex to nextIndex + 1.
             }
             self.result = Value.from(array);
+        },
+        .binding_class_declaration_evaluation => {
+            const class_declaration = self.fetchFunctionOrClass(executable).class_declaration;
+            self.result = Value.from(try bindingClassDeclarationEvaluation(self.agent, class_declaration));
         },
         .bitwise_not => {
             const value = self.result.?;
@@ -1228,55 +1581,55 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             self.result = Value.from(try instanceofOperator(self.agent, lval, rval));
         },
         .instantiate_arrow_function_expression => {
-            const function_expression = self.fetchFunctionExpression(executable);
+            const arrow_function = self.fetchFunctionOrClass(executable).arrow_function;
             const closure = try instantiateArrowFunctionExpression(
                 self.agent,
-                function_expression.arrow_function,
+                arrow_function,
                 null,
             );
             self.result = Value.from(closure);
         },
         .instantiate_async_arrow_function_expression => {
-            const function_expression = self.fetchFunctionExpression(executable);
+            const async_arrow_function = self.fetchFunctionOrClass(executable).async_arrow_function;
             const closure = try instantiateAsyncArrowFunctionExpression(
                 self.agent,
-                function_expression.async_arrow_function,
+                async_arrow_function,
                 null,
             );
             self.result = Value.from(closure);
         },
         .instantiate_async_function_expression => {
-            const function_expression = self.fetchFunctionExpression(executable);
+            const async_function_expression = self.fetchFunctionOrClass(executable).async_function_expression;
             const closure = try instantiateAsyncFunctionExpression(
                 self.agent,
-                function_expression.async_function_expression,
+                async_function_expression,
                 null,
             );
             self.result = Value.from(closure);
         },
         .instantiate_async_generator_function_expression => {
-            const function_expression = self.fetchFunctionExpression(executable);
+            const async_generator_expression = self.fetchFunctionOrClass(executable).async_generator_expression;
             const closure = try instantiateAsyncGeneratorFunctionExpression(
                 self.agent,
-                function_expression.async_generator_expression,
+                async_generator_expression,
                 null,
             );
             self.result = Value.from(closure);
         },
         .instantiate_generator_function_expression => {
-            const function_expression = self.fetchFunctionExpression(executable);
+            const generator_expression = self.fetchFunctionOrClass(executable).generator_expression;
             const closure = try instantiateGeneratorFunctionExpression(
                 self.agent,
-                function_expression.generator_expression,
+                generator_expression,
                 null,
             );
             self.result = Value.from(closure);
         },
         .instantiate_ordinary_function_expression => {
-            const function_expression = self.fetchFunctionExpression(executable);
+            const function_expression = self.fetchFunctionOrClass(executable).function_expression;
             const closure = try instantiateOrdinaryFunctionExpression(
                 self.agent,
-                function_expression.function_expression,
+                function_expression,
                 null,
             );
             self.result = Value.from(closure);
@@ -1350,8 +1703,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
         // https://tc39.es/ecma262/#sec-runtime-semantics-methoddefinitionevaluation
         .object_define_method => {
             const realm = self.agent.currentRealm();
-            const function_expression = self.fetchFunctionExpression(executable);
-            const method_definition = function_expression.function_expression;
+            const method_definition = self.fetchFunctionOrClass(executable).function_expression;
             const method_type_raw = self.fetchIndex(executable);
             const method_type: ast.MethodDefinition.Type = @enumFromInt(method_type_raw);
             const property_name = self.stack.pop();

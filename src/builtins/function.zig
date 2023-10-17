@@ -13,6 +13,7 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
 const BuiltinFunction = builtins.BuiltinFunction;
+const ClassConstructorFields = builtins.ClassConstructorFields;
 const Diagnostics = language.Diagnostics;
 const ECMAScriptFunction = builtins.ECMAScriptFunction;
 const Object = types.Object;
@@ -614,11 +615,17 @@ pub const FunctionPrototype = struct {
 
         // 2. If func is an Object, func has a [[SourceText]] internal slot, func.[[SourceText]] is
         //    a sequence of Unicode code points, and HostHasSourceTextAvailable(func) is true, then
-        if (func == .object and func.object.is(ECMAScriptFunction)) {
-            const ecmascript_function = func.object.as(ECMAScriptFunction);
-
-            // a. Return CodePointsToString(func.[[SourceText]]).
-            return Value.from(ecmascript_function.fields.source_text);
+        //     a. Return CodePointsToString(func.[[SourceText]]).
+        if (func == .object) {
+            if (func.object.is(ECMAScriptFunction)) {
+                const ecmascript_function = func.object.as(ECMAScriptFunction);
+                return Value.from(ecmascript_function.fields.source_text);
+            } else if (func.object.is(BuiltinFunction)) {
+                const builtin_function = func.object.as(BuiltinFunction);
+                if (builtin_function.fields.additional_fields.tryCast(*ClassConstructorFields)) |class_constructor_fields| {
+                    return Value.from(class_constructor_fields.source_text);
+                }
+            }
         }
 
         // 3. If func is a built-in function object, return an implementation-defined String source

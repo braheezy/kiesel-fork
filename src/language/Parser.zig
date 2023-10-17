@@ -1034,6 +1034,8 @@ pub fn acceptDeclaration(self: *Self) !*ast.Declaration {
 
     if (self.acceptHoistableDeclaration()) |hoistable_declaration|
         declaration.* = .{ .hoistable_declaration = hoistable_declaration }
+    else |_| if (self.acceptClassDeclaration()) |class_declaration|
+        declaration.* = .{ .class_declaration = class_declaration }
     else |_| if (self.acceptLexicalDeclaration(false)) |lexical_declaration|
         declaration.* = .{ .lexical_declaration = lexical_declaration }
     else |_|
@@ -1639,6 +1641,71 @@ pub fn acceptAsyncGeneratorExpression(self: *Self) AcceptError!ast.AsyncGenerato
         .function_body = function_body,
         .source_text = source_text,
     };
+}
+
+fn acceptClassDeclaration(self: *Self) AcceptError!ast.ClassDeclaration {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.class));
+    // We need to do this after consuming the 'class' token to skip preceeding whitespace.
+    const start_offset = self.core.tokenizer.offset - (comptime "class".len);
+    const identifier = self.acceptBindingIdentifier() catch |err| {
+        try self.emitError("Class declaration must have a binding identifier", .{});
+        return err;
+    };
+    const class_tail = try self.acceptClassTail();
+    const end_offset = self.core.tokenizer.offset;
+    const source_text = try self.allocator.dupe(
+        u8,
+        self.core.tokenizer.source[start_offset..end_offset],
+    );
+    return .{
+        .identifier = identifier,
+        .class_tail = class_tail,
+        .source_text = source_text,
+    };
+}
+
+fn acceptClassTail(self: *Self) AcceptError!ast.ClassTail {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const class_heritage = if (self.core.accept(RuleSet.is(.extends))) |_|
+        try self.acceptExpression(.{})
+    else |_|
+        null;
+    _ = try self.core.accept(RuleSet.is(.@"{"));
+    const class_body = try self.acceptClassBody();
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+    return .{ .class_heritage = class_heritage, .class_body = class_body };
+}
+
+fn acceptClassBody(self: *Self) AcceptError!ast.ClassBody {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const class_element_list = try self.acceptClassElementList();
+    return .{ .class_element_list = class_element_list };
+}
+
+fn acceptClassElementList(self: *Self) AcceptError!ast.ClassElementList {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    var class_elements = std.ArrayList(ast.ClassElement).init(self.allocator);
+    while (self.acceptClassElement()) |class_element|
+        try class_elements.append(class_element)
+    else |_| {}
+    return .{ .items = try class_elements.toOwnedSlice() };
+}
+
+fn acceptClassElement(self: *Self) AcceptError!ast.ClassElement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    // TODO: Implement this, for now we can at least parse an empty class body
+    return error.UnexpectedToken;
 }
 
 fn acceptRegularExpressionLiteral(self: *Self) AcceptError!ast.RegularExpressionLiteral {

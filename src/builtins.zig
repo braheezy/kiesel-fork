@@ -69,6 +69,7 @@ pub const BooleanConstructor = boolean.BooleanConstructor;
 pub const BooleanPrototype = boolean.BooleanPrototype;
 pub const BoundFunction = bound_function.BoundFunction;
 pub const BuiltinFunction = builtin_function.BuiltinFunction;
+pub const ClassConstructorFields = builtin_function.ClassConstructorFields;
 pub const Date = date.Date;
 pub const DateConstructor = date.DateConstructor;
 pub const DatePrototype = date.DatePrototype;

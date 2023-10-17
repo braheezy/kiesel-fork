@@ -17,13 +17,14 @@ allocator: Allocator,
 instructions: std.ArrayList(Instruction),
 constants: std.ArrayList(Value),
 identifiers: std.ArrayList(ast.Identifier),
-function_expressions: std.ArrayList(FunctionExpression),
+functions_and_classes: std.ArrayList(FunctionOrClass),
 
-pub const FunctionExpression = union(enum) {
+pub const FunctionOrClass = union(enum) {
     arrow_function: ast.ArrowFunction,
     async_arrow_function: ast.AsyncArrowFunction,
     async_function_expression: ast.AsyncFunctionExpression,
     async_generator_expression: ast.AsyncGeneratorExpression,
+    class_declaration: ast.ClassDeclaration,
     function_expression: ast.FunctionExpression,
     generator_expression: ast.GeneratorExpression,
 };
@@ -36,7 +37,7 @@ pub fn init(allocator: Allocator) Self {
         .instructions = std.ArrayList(Instruction).init(allocator),
         .constants = std.ArrayList(Value).init(allocator),
         .identifiers = std.ArrayList(ast.Identifier).init(allocator),
-        .function_expressions = std.ArrayList(FunctionExpression).init(allocator),
+        .functions_and_classes = std.ArrayList(FunctionOrClass).init(allocator),
     };
 }
 
@@ -44,7 +45,7 @@ pub fn deinit(self: Self) void {
     self.instructions.deinit();
     self.constants.deinit();
     self.identifiers.deinit();
-    self.function_expressions.deinit();
+    self.functions_and_classes.deinit();
 }
 
 pub fn addInstruction(self: *Self, instruction: Instruction) !void {
@@ -59,8 +60,8 @@ pub fn addIdentifier(self: *Self, identifier: ast.Identifier) !void {
     try self.identifiers.append(identifier);
 }
 
-pub fn addFunctionExpression(self: *Self, function_expression: FunctionExpression) !void {
-    try self.function_expressions.append(function_expression);
+pub fn addFunctionOrClass(self: *Self, function_or_class: FunctionOrClass) !void {
+    try self.functions_and_classes.append(function_or_class);
 }
 
 pub fn addInstructionWithConstant(
@@ -85,15 +86,15 @@ pub fn addInstructionWithIdentifier(
     try self.addIndex(self.identifiers.items.len - 1);
 }
 
-pub fn addInstructionWithFunctionExpression(
+pub fn addInstructionWithFunctionOrClass(
     self: *Self,
     instruction: Instruction,
-    function_expression: FunctionExpression,
+    function_or_class: FunctionOrClass,
 ) !void {
-    std.debug.assert(instruction.hasFunctionExpressionIndex());
+    std.debug.assert(instruction.asFunctionOrClassIndex());
     try self.addInstruction(instruction);
-    try self.addFunctionExpression(function_expression);
-    try self.addIndex(self.function_expressions.items.len - 1);
+    try self.addFunctionOrClass(function_or_class);
+    try self.addIndex(self.functions_and_classes.items.len - 1);
 }
 
 pub const JumpIndex = struct {
@@ -179,6 +180,7 @@ pub fn print(self: Self, writer: anytype) !void {
                 );
             },
             .array_set_length,
+            .binding_class_declaration_evaluation,
             .instantiate_arrow_function_expression,
             .instantiate_async_arrow_function_expression,
             .instantiate_async_function_expression,

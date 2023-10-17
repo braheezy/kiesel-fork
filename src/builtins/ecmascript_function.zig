@@ -14,6 +14,7 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
 const BuiltinFunction = builtins.BuiltinFunction;
+const ClassConstructorFields = builtins.ClassConstructorFields;
 const Completion = types.Completion;
 const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
@@ -631,7 +632,13 @@ pub fn makeConstructor(
     }
 
     // 3. Set F.[[ConstructorKind]] to base.
-    if (function.is(ECMAScriptFunction)) function.as(ECMAScriptFunction).fields.constructor_kind = .base;
+    if (function.is(ECMAScriptFunction)) {
+        function.as(ECMAScriptFunction).fields.constructor_kind = .base;
+    } else if (function.is(BuiltinFunction)) {
+        if (function.as(BuiltinFunction).fields.additional_fields.tryCast(*ClassConstructorFields)) |class_constructor_fields| {
+            class_constructor_fields.constructor_kind = .base;
+        }
+    }
 
     // 4. If writablePrototype is not present, set writablePrototype to true.
     // NOTE: This is done via the default argument.

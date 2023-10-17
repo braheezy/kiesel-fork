@@ -16,6 +16,8 @@ pub const Instruction = enum(u8) {
     array_set_length,
     /// Spread value into an array.
     array_spread_value,
+    /// Store BindingClassDeclarationEvaluation() as the result value.
+    binding_class_declaration_evaluation,
     /// Apply bitwise NOT to the last value on the stack and store it as the result value.
     bitwise_not,
     /// Create a catch binding for the given name and populate it with the stored exception.
@@ -140,6 +142,7 @@ pub const Instruction = enum(u8) {
             => 2,
             .apply_string_or_numeric_binary_operator,
             .array_set_length,
+            .binding_class_declaration_evaluation,
             .create_catch_binding,
             .evaluate_new,
             .evaluate_property_access_with_expression_key,
@@ -175,8 +178,9 @@ pub const Instruction = enum(u8) {
         };
     }
 
-    pub fn hasFunctionExpressionIndex(self: Self) bool {
+    pub fn asFunctionOrClassIndex(self: Self) bool {
         return switch (self) {
+            .binding_class_declaration_evaluation,
             .instantiate_arrow_function_expression,
             .instantiate_async_arrow_function_expression,
             .instantiate_async_function_expression,

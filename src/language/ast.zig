@@ -1973,6 +1973,7 @@ pub const Declaration = union(enum) {
     const Self = @This();
 
     hoistable_declaration: HoistableDeclaration,
+    class_declaration: ClassDeclaration,
     lexical_declaration: LexicalDeclaration,
 
     pub fn analyze(_: Self, query: AnalyzeQuery) bool {
@@ -3220,7 +3221,7 @@ pub const FunctionExpression = struct {
         function_expression.function_body.strict = strict;
 
         // 1. Return InstantiateOrdinaryFunctionExpression of FunctionExpression.
-        try executable.addInstructionWithFunctionExpression(
+        try executable.addInstructionWithFunctionOrClass(
             .instantiate_ordinary_function_expression,
             .{ .function_expression = function_expression },
         );
@@ -3303,7 +3304,7 @@ pub const ArrowFunction = struct {
         arrow_function.function_body.strict = strict;
 
         // 1. Return InstantiateArrowFunctionExpression of ArrowFunction.
-        try executable.addInstructionWithFunctionExpression(
+        try executable.addInstructionWithFunctionOrClass(
             .instantiate_arrow_function_expression,
             .{ .arrow_function = arrow_function },
         );
@@ -3346,7 +3347,7 @@ pub const MethodDefinition = struct {
         try self.property_name.generateBytecode(executable, ctx);
         try executable.addInstruction(.load);
 
-        try executable.addInstructionWithFunctionExpression(
+        try executable.addInstructionWithFunctionOrClass(
             .object_define_method,
             .{ .function_expression = function_expression },
         );
@@ -3479,7 +3480,7 @@ pub const GeneratorExpression = struct {
         generator_expression.function_body.strict = strict;
 
         // 1. Return InstantiateGeneratorFunctionExpression of GeneratorExpression.
-        try executable.addInstructionWithFunctionExpression(
+        try executable.addInstructionWithFunctionOrClass(
             .instantiate_generator_function_expression,
             .{ .generator_expression = generator_expression },
         );
@@ -3657,7 +3658,7 @@ pub const AsyncGeneratorExpression = struct {
         async_generator_expression.function_body.strict = strict;
 
         // 1. Return InstantiateAsyncGeneratorFunctionExpression of AsyncGeneratorExpression.
-        try executable.addInstructionWithFunctionExpression(
+        try executable.addInstructionWithFunctionOrClass(
             .instantiate_async_generator_function_expression,
             .{ .async_generator_expression = async_generator_expression },
         );
@@ -3671,6 +3672,114 @@ pub const AsyncGeneratorExpression = struct {
         try self.formal_parameters.print(writer, indentation + 2);
         try printString("function_body:", writer, indentation + 1);
         try self.function_body.print(writer, indentation + 2);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ClassDeclaration
+pub const ClassDeclaration = struct {
+    const Self = @This();
+
+    identifier: ?Identifier,
+    class_tail: ClassTail,
+    source_text: []const u8,
+
+    /// 15.7.16 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-class-definitions-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, _: *BytecodeContext) !void {
+        // ClassDeclaration : class BindingIdentifier ClassTail
+        // 1. Perform ? BindingClassDeclarationEvaluation of this ClassDeclaration.
+        try executable.addInstructionWithFunctionOrClass(
+            .binding_class_declaration_evaluation,
+            .{ .class_declaration = self },
+        );
+
+        // 2. Return empty.
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("ClassDeclaration", writer, indentation);
+        try printString("identifier:", writer, indentation + 1);
+        if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
+        try self.class_tail.print(writer, indentation + 1);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ClassTail
+pub const ClassTail = struct {
+    const Self = @This();
+
+    class_heritage: ?Expression,
+    class_body: ClassBody,
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'ClassTail' here, it's implied and only adds nesting.
+        if (self.class_heritage) |class_heritage| {
+            try printString("extends:", writer, indentation);
+            try class_heritage.print(writer, indentation + 1);
+        }
+        try self.class_body.print(writer, indentation);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ClassBody
+pub const ClassBody = struct {
+    const Self = @This();
+
+    class_element_list: ClassElementList,
+
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        const tmp = temporaryChange(ctx, "contained_in_strict_mode_code", true);
+        defer tmp.restore();
+        try self.class_element_list.generateBytecode(executable, ctx);
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'ClassBody' here, it's implied and only adds nesting.
+        try self.class_element_list.print(writer, indentation);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ClassElementList
+pub const ClassElementList = struct {
+    const Self = @This();
+
+    items: []const ClassElement,
+
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        for (self.items) |item| {
+            try item.generateBytecode(executable, ctx);
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'ClassElementList' here, it's implied and only adds nesting.
+        for (self.items) |item| {
+            try item.print(writer, indentation);
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ClassElement
+pub const ClassElement = union(enum) {
+    const Self = @This();
+
+    method_definition: MethodDefinition,
+    // TODO: static MethodDefinition[?Yield, ?Await]
+    // TODO: FieldDefinition[?Yield, ?Await] ;
+    // TODO: static FieldDefinition[?Yield, ?Await] ;
+    // TODO: ClassStaticBlock
+
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        switch (self) {
+            inline else => |node| try node.generateBytecode(executable, ctx),
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'ClassElement' here, it's implied and only adds nesting.
+        switch (self) {
+            inline else => |node| try node.print(writer, indentation),
+        }
     }
 };
 
@@ -3802,7 +3911,7 @@ pub const AsyncFunctionExpression = struct {
         async_function_expression.function_body.strict = strict;
 
         // 1. Return InstantiateAsyncFunctionExpression of AsyncFunctionExpression.
-        try executable.addInstructionWithFunctionExpression(
+        try executable.addInstructionWithFunctionOrClass(
             .instantiate_async_function_expression,
             .{ .async_function_expression = async_function_expression },
         );
@@ -3839,7 +3948,7 @@ pub const AsyncArrowFunction = struct {
         async_arrow_function.function_body.strict = strict;
 
         // 1. Return InstantiateAsyncArrowFunctionExpression of AsyncArrowFunction.
-        try executable.addInstructionWithFunctionExpression(
+        try executable.addInstructionWithFunctionOrClass(
             .instantiate_async_arrow_function_expression,
             .{ .async_arrow_function = async_arrow_function },
         );
