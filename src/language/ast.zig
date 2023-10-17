@@ -884,7 +884,7 @@ pub const RegularExpressionLiteral = struct {
         try executable.addInstruction(.reg_exp_create);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("RegularExpressionLiteral", writer, indentation);
         try printString("pattern:", writer, indentation + 1);
         try printString(self.pattern, writer, indentation + 2);
@@ -1020,7 +1020,7 @@ pub const UpdateExpression = struct {
         } else unreachable;
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("UpdateExpression", writer, indentation);
         try printString("type:", writer, indentation + 1);
         try printString(@tagName(self.type), writer, indentation + 2);
@@ -1155,7 +1155,7 @@ pub const UnaryExpression = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("UnaryExpression", writer, indentation);
         try printString("operator:", writer, indentation + 1);
         try printString(@tagName(self.operator), writer, indentation + 2);
@@ -2091,7 +2091,7 @@ pub const Block = struct {
         try self.statement_list.generateBytecode(executable, ctx);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("Block", writer, indentation);
         try self.statement_list.print(writer, indentation + 1);
     }
@@ -2182,7 +2182,7 @@ pub const StatementListItem = union(enum) {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
         // Omit printing 'StatementListItem' here, it's implied and only adds nesting.
         switch (self) {
             inline else => |node| try node.print(writer, indentation),
