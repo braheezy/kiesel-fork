@@ -352,6 +352,8 @@ pub fn acceptPrimaryExpression(self: *Self) AcceptError!ast.PrimaryExpression {
         return .{ .object_literal = object_literal }
     else |_| if (self.acceptFunctionExpression()) |function_expression|
         return .{ .function_expression = function_expression }
+    else |_| if (self.acceptClassExpression()) |class_expression|
+        return .{ .class_expression = class_expression }
     else |_| if (self.acceptGeneratorExpression()) |generator_expression|
         return .{ .generator_expression = generator_expression }
     else |_| if (self.acceptAsyncFunctionExpression()) |async_function_expression|
@@ -1667,14 +1669,36 @@ fn acceptClassDeclaration(self: *Self) AcceptError!ast.ClassDeclaration {
     };
 }
 
+fn acceptClassExpression(self: *Self) AcceptError!ast.ClassExpression {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.class));
+    // We need to do this after consuming the 'class' token to skip preceeding whitespace.
+    const start_offset = self.core.tokenizer.offset - (comptime "class".len);
+    const identifier = self.acceptBindingIdentifier() catch null;
+    const class_tail = try self.acceptClassTail();
+    const end_offset = self.core.tokenizer.offset;
+    const source_text = try self.allocator.dupe(
+        u8,
+        self.core.tokenizer.source[start_offset..end_offset],
+    );
+    return .{
+        .identifier = identifier,
+        .class_tail = class_tail,
+        .source_text = source_text,
+    };
+}
+
 fn acceptClassTail(self: *Self) AcceptError!ast.ClassTail {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const class_heritage = if (self.core.accept(RuleSet.is(.extends))) |_|
-        try self.acceptExpression(.{})
-    else |_|
-        null;
+    const class_heritage = if (self.core.accept(RuleSet.is(.extends))) |_| blk: {
+        const expression = try self.allocator.create(ast.Expression);
+        expression.* = try self.acceptExpression(.{});
+        break :blk expression;
+    } else |_| null;
     _ = try self.core.accept(RuleSet.is(.@"{"));
     const class_body = try self.acceptClassBody();
     _ = try self.core.accept(RuleSet.is(.@"}"));

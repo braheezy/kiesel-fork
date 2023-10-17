@@ -882,7 +882,7 @@ fn classDefinitionEvaluation(
         // c. Let superclassRef be Completion(Evaluation of ClassHeritage).
         const superclass_ref = generateAndRunBytecode(
             agent,
-            ast.ExpressionStatement{ .expression = class_tail.class_heritage.? },
+            ast.ExpressionStatement{ .expression = class_tail.class_heritage.?.* },
         );
 
         // d. Set the running execution context's LexicalEnvironment to env.
@@ -1328,6 +1328,55 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
                 .big_int => |big_int| Value.from(try big_int.bitwiseNOT(self.agent)),
                 else => unreachable,
             };
+        },
+        .class_definition_evaluation => {
+            const class_expression = self.fetchFunctionOrClass(executable).class_expression;
+
+            // ClassExpression : class BindingIdentifier ClassTail
+            if (class_expression.identifier) |identifier| {
+                // 1. Let className be StringValue of BindingIdentifier.
+                const class_name = identifier;
+
+                // 2. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments className and className.
+                const value = try classDefinitionEvaluation(
+                    self.agent,
+                    class_expression.class_tail,
+                    class_name,
+                    class_name,
+                );
+
+                // 3. Set value.[[SourceText]] to the source text matched by ClassExpression.
+                if (value.is(builtins.ECMAScriptFunction)) {
+                    // TODO
+                } else if (value.is(builtins.BuiltinFunction)) {
+                    const class_constructor_fields = value.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+                    class_constructor_fields.source_text = class_expression.source_text;
+                } else unreachable;
+
+                // 4. Return value.
+                self.result = Value.from(value);
+            }
+            // ClassExpression : class ClassTail
+            else {
+                // 1. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments undefined and "".
+                const value = try classDefinitionEvaluation(
+                    self.agent,
+                    class_expression.class_tail,
+                    null,
+                    "",
+                );
+
+                // 2. Set value.[[SourceText]] to the source text matched by ClassExpression.
+                if (value.is(builtins.ECMAScriptFunction)) {
+                    // TODO
+                } else if (value.is(builtins.BuiltinFunction)) {
+                    const class_constructor_fields = value.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+                    class_constructor_fields.source_text = class_expression.source_text;
+                } else unreachable;
+
+                // 3. Return value.
+                self.result = Value.from(value);
+            }
         },
         .create_catch_binding => {
             const name = self.fetchIdentifier(executable);

@@ -109,6 +109,7 @@ pub const PrimaryExpression = union(enum) {
     array_literal: ArrayLiteral,
     object_literal: ObjectLiteral,
     function_expression: FunctionExpression,
+    class_expression: ClassExpression,
     generator_expression: GeneratorExpression,
     async_function_expression: AsyncFunctionExpression,
     async_generator_expression: AsyncGeneratorExpression,
@@ -3704,11 +3705,38 @@ pub const ClassDeclaration = struct {
     }
 };
 
+/// https://tc39.es/ecma262/#prod-ClassExpression
+pub const ClassExpression = struct {
+    const Self = @This();
+
+    identifier: ?Identifier,
+    class_tail: ClassTail,
+    source_text: []const u8,
+
+    /// 15.7.16 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-class-definitions-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, _: *BytecodeContext) !void {
+        // ClassExpression : class ClassTail
+        // ClassExpression : class BindingIdentifier ClassTail
+        try executable.addInstructionWithFunctionOrClass(
+            .class_definition_evaluation,
+            .{ .class_expression = self },
+        );
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("ClassExpression", writer, indentation);
+        try printString("identifier:", writer, indentation + 1);
+        if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
+        try self.class_tail.print(writer, indentation + 1);
+    }
+};
+
 /// https://tc39.es/ecma262/#prod-ClassTail
 pub const ClassTail = struct {
     const Self = @This();
 
-    class_heritage: ?Expression,
+    class_heritage: ?*Expression,
     class_body: ClassBody,
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
