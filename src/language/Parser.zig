@@ -283,6 +283,15 @@ pub fn acceptOrInsertSemicolon(self: *Self) !void {
     return error.UnexpectedToken;
 }
 
+pub fn acceptKeyword(self: *Self, value: []const u8) AcceptError!Tokenizer.Token {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.is(.identifier));
+    if (!std.mem.eql(u8, token.text, value)) return error.UnexpectedToken;
+    return token;
+}
+
 pub fn acceptParenthesizedExpression(self: *Self) AcceptError!ast.ParenthesizedExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
@@ -434,8 +443,7 @@ pub fn acceptNewTarget(self: *Self) AcceptError!void {
 
     const token = try self.core.accept(RuleSet.is(.new));
     _ = try self.core.accept(RuleSet.is(.@"."));
-    const identifier = try self.core.accept(RuleSet.is(.identifier));
-    if (!std.mem.eql(u8, identifier.text, "target")) return error.UnexpectedToken;
+    _ = try self.acceptKeyword("target");
 
     if (!self.state.in_function_body) {
         try self.emitErrorAt(token.location, "new.target is only allowed in functions", .{});
@@ -1071,11 +1079,7 @@ pub fn acceptLexicalDeclaration(self: *Self, for_initializer: bool) AcceptError!
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const let_or_const = self.core.accept(RuleSet.is(.@"const")) catch blk: {
-        const identifier = try self.core.accept(RuleSet.is(.identifier));
-        if (!std.mem.eql(u8, identifier.text, "let")) return error.UnexpectedToken;
-        break :blk identifier;
-    };
+    const let_or_const = self.acceptKeyword("let") catch try self.core.accept(RuleSet.is(.@"const"));
     const @"type": ast.LexicalDeclaration.Type = switch (let_or_const.type) {
         .identifier => .let,
         .@"const" => .@"const",
@@ -1580,8 +1584,7 @@ fn acceptAsyncGeneratorDeclaration(self: *Self) AcceptError!ast.AsyncGeneratorDe
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const token = try self.core.accept(RuleSet.is(.identifier));
-    if (!std.mem.eql(u8, token.text, "async")) return error.UnexpectedToken;
+    _ = try self.acceptKeyword("async");
     // We need to do this after consuming the 'async' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
     try self.noLineTerminatorHere();
@@ -1614,8 +1617,7 @@ pub fn acceptAsyncGeneratorExpression(self: *Self) AcceptError!ast.AsyncGenerato
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const token = try self.core.accept(RuleSet.is(.identifier));
-    if (!std.mem.eql(u8, token.text, "async")) return error.UnexpectedToken;
+    _ = try self.acceptKeyword("async");
     // We need to do this after consuming the 'async' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
     try self.noLineTerminatorHere();
@@ -1759,8 +1761,7 @@ fn acceptAsyncFunctionDeclaration(self: *Self) AcceptError!ast.AsyncFunctionDecl
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const token = try self.core.accept(RuleSet.is(.identifier));
-    if (!std.mem.eql(u8, token.text, "async")) return error.UnexpectedToken;
+    _ = try self.acceptKeyword("async");
     // We need to do this after consuming the 'async' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
     try self.noLineTerminatorHere();
@@ -1794,8 +1795,7 @@ pub fn acceptAsyncFunctionExpression(self: *Self) AcceptError!ast.AsyncFunctionE
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const token = try self.core.accept(RuleSet.is(.identifier));
-    if (!std.mem.eql(u8, token.text, "async")) return error.UnexpectedToken;
+    _ = try self.acceptKeyword("async");
     // We need to do this after consuming the 'async' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
     try self.noLineTerminatorHere();
@@ -1824,8 +1824,7 @@ pub fn acceptAsyncArrowFunction(self: *Self) AcceptError!ast.AsyncArrowFunction 
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const token = try self.core.accept(RuleSet.is(.identifier));
-    if (!std.mem.eql(u8, token.text, "async")) return error.UnexpectedToken;
+    _ = try self.acceptKeyword("async");
     // We need to do this after consuming the 'async' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
     try self.noLineTerminatorHere();
