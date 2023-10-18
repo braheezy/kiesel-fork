@@ -613,110 +613,61 @@ pub fn acceptPropertyDefinitionList(self: *Self) AcceptError!ast.PropertyDefinit
 
     var property_definitions = std.ArrayList(ast.PropertyDefinition).init(self.allocator);
     defer property_definitions.deinit();
-    while (true) {
-        if (self.acceptPropertyDefinition(null)) |property_definition| {
-            try property_definitions.append(property_definition);
-            _ = self.core.accept(RuleSet.is(.@",")) catch break;
-        } else |_| break;
-    }
+    while (self.acceptPropertyDefinition()) |property_definition| {
+        try property_definitions.append(property_definition);
+        _ = self.core.accept(RuleSet.is(.@",")) catch break;
+    } else |_| {}
     return .{ .items = try property_definitions.toOwnedSlice() };
 }
 
-pub fn acceptPropertyDefinition(
-    self: *Self,
-    method_type: ?ast.MethodDefinition.Type,
-) AcceptError!ast.PropertyDefinition {
+pub fn acceptPropertyDefinition(self: *Self) AcceptError!ast.PropertyDefinition {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
     const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
-    var property_name: ast.PropertyName = undefined;
     if (self.core.accept(RuleSet.is(.@"..."))) |_| {
         const expression = try self.acceptExpression(ctx);
         return .{ .spread = expression };
-    } else |_| if (self.acceptIdentifierReference()) |identifier_reference| {
-        if (method_type == null) {
-            const get = std.mem.eql(u8, identifier_reference.identifier, "get");
-            const set = std.mem.eql(u8, identifier_reference.identifier, "set");
-            if (get or set) {
-                if (acceptPropertyDefinition(self, if (get) .get else .set)) |property_definition|
-                    return property_definition
-                else |_| {}
-            }
+    } else |_| if (self.acceptMethodDefinition(null)) |method_definition| {
+        return .{ .method_definition = method_definition };
+    } else |_| if (self.acceptPropertyName()) |property_name| {
+        if (self.core.accept(RuleSet.is(.@":"))) |_| {
+            const expression = try self.acceptExpression(ctx);
+            return .{
+                .property_name_and_expression = .{
+                    .property_name = property_name,
+                    .expression = expression,
+                },
+            };
+        } else |_| if (property_name == .literal_property_name and property_name.literal_property_name == .identifier) {
+            const identifier = property_name.literal_property_name.identifier;
+            return .{ .identifier_reference = .{ .identifier = identifier } };
+        } else return error.UnexpectedToken;
+    } else |_| return error.UnexpectedToken;
+}
 
-            var followed_by_valid_punctuation = false;
-            var followed_by_identifier_reference = false;
-            if (try self.core.peek()) |next_token| {
-                followed_by_valid_punctuation = switch (next_token.type) {
-                    .@":", .@"(" => true,
-                    else => false,
-                };
-                followed_by_identifier_reference = switch (next_token.type) {
-                    .identifier, .yield, .@"await" => true,
-                    else => false,
-                };
-            }
+pub fn acceptPropertyName(self: *Self) AcceptError!ast.PropertyName {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
 
-            // IdentifierReference
-            if (!followed_by_valid_punctuation and !followed_by_identifier_reference) {
-                return .{ .identifier_reference = identifier_reference };
-            }
-        }
-
+    if (self.acceptIdentifierReference()) |identifier_reference| {
         // LiteralPropertyName : IdentifierName
-        // MethodDefinition
         const identifier = identifier_reference.identifier;
-        property_name = .{ .literal_property_name = .{ .identifier = identifier } };
-    } else |_| if (self.acceptIdentifierName()) |identifier|
+        return .{ .literal_property_name = .{ .identifier = identifier } };
+    } else |_| if (self.acceptIdentifierName()) |identifier| {
         // LiteralPropertyName : IdentifierName
-        property_name = .{ .literal_property_name = .{ .identifier = identifier } }
-    else |_| if (self.acceptStringLiteral()) |string_literal|
+        return .{ .literal_property_name = .{ .identifier = identifier } };
+    } else |_| if (self.acceptStringLiteral()) |string_literal| {
         // LiteralPropertyName : StringLiteral
-        property_name = .{ .literal_property_name = .{ .string_literal = string_literal } }
-    else |_| if (self.acceptNumericLiteral()) |numeric_literal|
+        return .{ .literal_property_name = .{ .string_literal = string_literal } };
+    } else |_| if (self.acceptNumericLiteral()) |numeric_literal| {
         // LiteralPropertyName : NumericLiteral
-        property_name = .{ .literal_property_name = .{ .numeric_literal = numeric_literal } }
-    else |_| if (self.core.accept(RuleSet.is(.@"["))) |_| {
+        return .{ .literal_property_name = .{ .numeric_literal = numeric_literal } };
+    } else |_| if (self.core.accept(RuleSet.is(.@"["))) |_| {
         // ComputedPropertyName
         const computed_property_name = try self.acceptExpression(.{});
-        property_name = .{ .computed_property_name = computed_property_name };
         _ = try self.core.accept(RuleSet.is(.@"]"));
-    } else |_| return error.UnexpectedToken;
-
-    if (self.core.accept(RuleSet.is(.@":"))) |_| {
-        const expression = try self.acceptExpression(ctx);
-        return .{
-            .property_name_and_expression = .{
-                .property_name = property_name,
-                .expression = expression,
-            },
-        };
-    } else |_| if (self.core.accept(RuleSet.is(.@"("))) |_| {
-        // We need to do this after consuming the '(' token to skip preceeding whitespace.
-        const start_offset = self.core.tokenizer.offset - (comptime "(".len);
-        const formal_parameters = try self.acceptFormalParameters();
-        _ = try self.core.accept(RuleSet.is(.@")"));
-        _ = try self.core.accept(RuleSet.is(.@"{"));
-        const function_body = try self.acceptFunctionBody(.normal);
-        _ = try self.core.accept(RuleSet.is(.@"}"));
-        const end_offset = self.core.tokenizer.offset;
-        const source_text = try self.allocator.dupe(
-            u8,
-            self.core.tokenizer.source[start_offset..end_offset],
-        );
-        const function_expression = ast.FunctionExpression{
-            .identifier = null,
-            .formal_parameters = formal_parameters,
-            .function_body = function_body,
-            .source_text = source_text,
-        };
-        return .{
-            .method_definition = .{
-                .property_name = property_name,
-                .function_expression = function_expression,
-                .type = method_type orelse .method,
-            },
-        };
+        return .{ .computed_property_name = computed_property_name };
     } else |_| return error.UnexpectedToken;
 }
 
@@ -1518,6 +1469,51 @@ pub fn acceptArrowFunction(self: *Self) AcceptError!ast.ArrowFunction {
         .formal_parameters = formal_parameters,
         .function_body = function_body,
         .source_text = source_text,
+    };
+}
+
+pub fn acceptMethodDefinition(
+    self: *Self,
+    method_type: ?ast.MethodDefinition.Type,
+) AcceptError!ast.MethodDefinition {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const property_name = try self.acceptPropertyName();
+    if (method_type == null and
+        property_name == .literal_property_name and
+        property_name.literal_property_name == .identifier)
+    {
+        const identifier = property_name.literal_property_name.identifier;
+        const get = std.mem.eql(u8, identifier, "get");
+        const set = std.mem.eql(u8, identifier, "set");
+        if (get or set) {
+            return acceptMethodDefinition(self, if (get) .get else .set);
+        }
+    }
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    // We need to do this after consuming the '(' token to skip preceeding whitespace.
+    const start_offset = self.core.tokenizer.offset - (comptime "(".len);
+    const formal_parameters = try self.acceptFormalParameters();
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    _ = try self.core.accept(RuleSet.is(.@"{"));
+    const function_body = try self.acceptFunctionBody(.normal);
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+    const end_offset = self.core.tokenizer.offset;
+    const source_text = try self.allocator.dupe(
+        u8,
+        self.core.tokenizer.source[start_offset..end_offset],
+    );
+    const function_expression = ast.FunctionExpression{
+        .identifier = null,
+        .formal_parameters = formal_parameters,
+        .function_body = function_body,
+        .source_text = source_text,
+    };
+    return .{
+        .property_name = property_name,
+        .function_expression = function_expression,
+        .type = method_type orelse .method,
     };
 }
 
