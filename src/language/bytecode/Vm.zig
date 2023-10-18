@@ -34,6 +34,7 @@ const getIterator = types.getIterator;
 const isLessThan = types.isLessThan;
 const isLooselyEqual = types.isLooselyEqual;
 const isStrictlyEqual = types.isStrictlyEqual;
+const makeClassConstructor = builtins.makeClassConstructor;
 const makeConstructor = builtins.makeConstructor;
 const makeMethod = builtins.makeMethod;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
@@ -1118,9 +1119,9 @@ fn classDefinitionEvaluation(
     // 9. Let proto be OrdinaryObjectCreate(protoParent).
     const prototype = try ordinaryObjectCreate(agent, prototype_parent);
 
-    // TODO: 10. If ClassBody[opt] is not present, let constructor be empty.
-    // TODO: 11. Else, let constructor be ConstructorMethod of ClassBody.
-    const constructor = null;
+    // 10. If ClassBody[opt] is not present, let constructor be empty.
+    // 11. Else, let constructor be ConstructorMethod of ClassBody.
+    const constructor = class_tail.class_body.constructorMethod();
 
     // 12. Set the running execution context's LexicalEnvironment to classEnv.
     agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{ .declarative_environment = class_env };
@@ -1209,9 +1210,27 @@ fn classDefinitionEvaluation(
         });
     }
     // 15. Else,
-    else {
-        // TODO: a-d.
-        unreachable;
+    else blk: {
+        // a. Let constructorInfo be ! DefineMethod of constructor with arguments proto and
+        //    constructorParent.
+        const constructor_info = defineMethod(
+            agent,
+            constructor.?.function_expression,
+            Value.from("constructor"),
+            prototype,
+            constructor_parent,
+        ) catch |err| try noexcept(err);
+
+        // b. Let F be constructorInfo.[[Closure]].
+        const function = constructor_info.closure;
+
+        // c. Perform MakeClassConstructor(F).
+        makeClassConstructor(function.as(builtins.ECMAScriptFunction));
+
+        // d. Perform SetFunctionName(F, className).
+        try setFunctionName(function, PropertyKey.from(class_name), null);
+
+        break :blk function;
     };
 
     // 16. Perform MakeConstructor(F, false, proto).
@@ -1220,7 +1239,7 @@ fn classDefinitionEvaluation(
     // 17. If ClassHeritage[opt] is present, set F.[[ConstructorKind]] to derived.
     if (class_tail.class_heritage != null) {
         if (function.is(builtins.ECMAScriptFunction)) {
-            // TODO: Implement this with step 15 above
+            function.as(builtins.ECMAScriptFunction).fields.constructor_kind = .derived;
         } else if (function.is(builtins.BuiltinFunction)) {
             const class_constructor_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
             class_constructor_fields.constructor_kind = .derived;
@@ -1301,7 +1320,7 @@ fn bindingClassDeclarationEvaluation(
 
         // 3. Set value.[[SourceText]] to the source text matched by ClassDeclaration.
         if (value.is(builtins.ECMAScriptFunction)) {
-            // TODO
+            value.as(builtins.ECMAScriptFunction).fields.source_text = class_declaration.source_text;
         } else if (value.is(builtins.BuiltinFunction)) {
             const class_constructor_fields = value.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
             class_constructor_fields.source_text = class_declaration.source_text;
@@ -1329,7 +1348,7 @@ fn bindingClassDeclarationEvaluation(
 
         // 2. Set value.[[SourceText]] to the source text matched by ClassDeclaration.
         if (value.is(builtins.ECMAScriptFunction)) {
-            // TODO
+            value.as(builtins.ECMAScriptFunction).fields.source_text = class_declaration.source_text;
         } else if (value.is(builtins.BuiltinFunction)) {
             const class_constructor_fields = value.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
             class_constructor_fields.source_text = class_declaration.source_text;
@@ -1559,7 +1578,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
 
                 // 3. Set value.[[SourceText]] to the source text matched by ClassExpression.
                 if (value.is(builtins.ECMAScriptFunction)) {
-                    // TODO
+                    value.as(builtins.ECMAScriptFunction).fields.source_text = class_expression.source_text;
                 } else if (value.is(builtins.BuiltinFunction)) {
                     const class_constructor_fields = value.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
                     class_constructor_fields.source_text = class_expression.source_text;
@@ -1580,7 +1599,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
 
                 // 2. Set value.[[SourceText]] to the source text matched by ClassExpression.
                 if (value.is(builtins.ECMAScriptFunction)) {
-                    // TODO
+                    value.as(builtins.ECMAScriptFunction).fields.source_text = class_expression.source_text;
                 } else if (value.is(builtins.BuiltinFunction)) {
                     const class_constructor_fields = value.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
                     class_constructor_fields.source_text = class_expression.source_text;

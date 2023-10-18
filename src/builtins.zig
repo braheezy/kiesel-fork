@@ -165,6 +165,7 @@ pub const globalObjectProperties = global.globalObjectProperties;
 pub const isCompatiblePropertyDescriptor = ordinary.isCompatiblePropertyDescriptor;
 pub const isDetachedBuffer = array_buffer.isDetachedBuffer;
 pub const isFixedLengthArrayBuffer = array_buffer.isFixedLengthArrayBuffer;
+pub const makeClassConstructor = ecmascript_function.makeClassConstructor;
 pub const makeConstructor = ecmascript_function.makeConstructor;
 pub const makeMethod = ecmascript_function.makeMethod;
 pub const newPromiseCapability = promise.newPromiseCapability;

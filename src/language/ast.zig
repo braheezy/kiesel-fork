@@ -3755,6 +3755,25 @@ pub const ClassBody = struct {
 
     class_element_list: ClassElementList,
 
+    /// 15.7.3 Static Semantics: ConstructorMethod
+    /// https://tc39.es/ecma262/#sec-static-semantics-constructormethod
+    pub fn constructorMethod(self: Self) ?MethodDefinition {
+        // ClassElementList : ClassElement
+        // 1. If ClassElementKind of ClassElement is constructor-method, return ClassElement.
+        // 2. Return empty.
+        // ClassElementList : ClassElementList ClassElement
+        // 1. Let head be ConstructorMethod of ClassElementList.
+        // 2. If head is not empty, return head.
+        // 3. If ClassElementKind of ClassElement is constructor-method, return ClassElement.
+        // 4. Return empty.
+        for (self.class_element_list.items) |class_element| {
+            if (class_element.classElementKind() == .constructor_method) {
+                return class_element.method_definition;
+            }
+        }
+        return null;
+    }
+
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         // Omit printing 'ClassBody' here, it's implied and only adds nesting.
         try self.class_element_list.print(writer, indentation);
@@ -3779,12 +3798,56 @@ pub const ClassElementList = struct {
 pub const ClassElement = union(enum) {
     const Self = @This();
 
+    pub const Kind = enum {
+        constructor_method,
+        non_constructor_method,
+        empty,
+    };
+
     empty_statement,
     method_definition: MethodDefinition,
     static_method_definition: MethodDefinition,
     // TODO: field_definition: FieldDefinition,
     // TODO: static_field_definition: FieldDefinition,
     // TODO: class_static_block: ClassStaticBlock,
+
+    /// 15.7.2 Static Semantics: ClassElementKind
+    /// https://tc39.es/ecma262/#sec-static-semantics-classelementkind
+    pub fn classElementKind(self: Self) Kind {
+        switch (self) {
+            // ClassElement : MethodDefinition
+            .method_definition => |method_definition| {
+                // 1. If PropName of MethodDefinition is "constructor", return constructor-method.
+                if (method_definition.property_name == .literal_property_name and
+                    method_definition.property_name.literal_property_name == .identifier and
+                    std.mem.eql(u8, method_definition.property_name.literal_property_name.identifier, "constructor"))
+                {
+                    return .constructor_method;
+                }
+
+                // 2. Return non-constructor-method.
+                return .non_constructor_method;
+            },
+
+            // ClassElement :
+            //     static MethodDefinition
+            //     FieldDefinition ;
+            //     static FieldDefinition ;
+            .static_method_definition => {
+                // 1. Return non-constructor-method.
+                return .non_constructor_method;
+            },
+
+            // TODO: ClassElement : ClassStaticBlock
+            // TODO:     1. Return non-constructor-method.
+
+            // ClassElement : ;
+            .empty_statement => {
+                // 1. Return empty.
+                return .empty;
+            },
+        }
+    }
 
     /// 15.7.4 Static Semantics: IsStatic
     /// https://tc39.es/ecma262/#sec-static-semantics-isstatic

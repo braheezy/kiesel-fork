@@ -674,6 +674,18 @@ pub fn makeConstructor(
     // 7. Return unused.
 }
 
+/// 10.2.6 MakeClassConstructor ( F )
+/// https://tc39.es/ecma262/#sec-makeclassconstructor
+pub fn makeClassConstructor(function: *ECMAScriptFunction) void {
+    // 1. Assert: F.[[IsClassConstructor]] is false.
+    std.debug.assert(!function.fields.is_class_constructor);
+
+    // 2. Set F.[[IsClassConstructor]] to true.
+    function.fields.is_class_constructor = true;
+
+    // 3. Return unused.
+}
+
 /// 10.2.7 MakeMethod ( F, homeObject )
 /// https://tc39.es/ecma262/#sec-makemethod
 pub fn makeMethod(
