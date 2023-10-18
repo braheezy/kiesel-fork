@@ -3689,12 +3689,14 @@ pub const ClassDeclaration = struct {
     pub fn generateBytecode(self: Self, executable: *Executable, _: *BytecodeContext) !void {
         // ClassDeclaration : class BindingIdentifier ClassTail
         // 1. Perform ? BindingClassDeclarationEvaluation of this ClassDeclaration.
+        try executable.addInstruction(.load);
         try executable.addInstructionWithFunctionOrClass(
             .binding_class_declaration_evaluation,
             .{ .class_declaration = self },
         );
 
         // 2. Return empty.
+        try executable.addInstruction(.store);
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
