@@ -3356,11 +3356,11 @@ pub const MethodDefinition = struct {
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
-        // Omit printing 'MethodDefinition' here, it's implied and only adds nesting.
-        try printString("type:", writer, indentation);
-        try printString(@tagName(self.type), writer, indentation + 1);
-        try self.property_name.print(writer, indentation);
-        try self.function_expression.print(writer, indentation);
+        try printString("MethodDefinition", writer, indentation);
+        try printString("type:", writer, indentation + 1);
+        try printString(@tagName(self.type), writer, indentation + 2);
+        try self.property_name.print(writer, indentation + 1);
+        try self.function_expression.print(writer, indentation + 1);
     }
 };
 
