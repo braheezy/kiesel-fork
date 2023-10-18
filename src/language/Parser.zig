@@ -1726,8 +1726,18 @@ fn acceptClassElement(self: *Self) AcceptError!ast.ClassElement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    // TODO: Implement this, for now we can at least parse an empty class body
-    return error.UnexpectedToken;
+    if (self.acceptKeyword("static")) |_| {
+        if (self.acceptMethodDefinition(null)) |*method_definition| {
+            @constCast(method_definition).function_expression.function_body.strict = true;
+            return .{ .static_method_definition = method_definition.* };
+        } else |_| return error.UnexpectedToken;
+        // TODO: FieldDefinition
+    } else |_| if (self.acceptMethodDefinition(null)) |*method_definition| {
+        @constCast(method_definition).function_expression.function_body.strict = true;
+        return .{ .method_definition = method_definition.* };
+    } else |_| if (self.core.accept(RuleSet.is(.@";"))) |_| {
+        return .empty_statement;
+    } else |_| return error.UnexpectedToken;
 }
 
 fn acceptRegularExpressionLiteral(self: *Self) AcceptError!ast.RegularExpressionLiteral {

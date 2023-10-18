@@ -967,6 +967,40 @@ fn instantiateAsyncGeneratorFunctionExpression(
     }
 }
 
+/// 15.7.13 Runtime Semantics: ClassElementEvaluation
+/// https://tc39.es/ecma262/#sec-static-semantics-classelementevaluation
+fn classElementEvaluation(agent: *Agent, class_element: ast.ClassElement, object: Object) !void {
+    switch (class_element) {
+        // ClassElement :
+        //     MethodDefinition
+        //     static MethodDefinition
+        .method_definition,
+        .static_method_definition,
+        => |method_definition| {
+            // 1. Return ? MethodDefinitionEvaluation of MethodDefinition with arguments object and false.
+            const property_name = (try generateAndRunBytecode(
+                agent,
+                method_definition.property_name,
+            )).value.?;
+            try methodDefinitionEvaluation(
+                agent,
+                .{
+                    .property_name = property_name,
+                    .function_expression = method_definition.function_expression,
+                    .type = method_definition.type,
+                },
+                object,
+                false,
+            );
+        },
+
+        // ClassElement : ;
+        .empty_statement => {
+            // 1. Return unused.
+        },
+    }
+}
+
 /// 15.7.14 Runtime Semantics: ClassDefinitionEvaluation
 /// https://tc39.es/ecma262/#sec-runtime-semantics-classdefinitionevaluation
 fn classDefinitionEvaluation(
@@ -1196,7 +1230,37 @@ fn classDefinitionEvaluation(
     // 18. Perform CreateMethodProperty(proto, "constructor", F).
     try prototype.createMethodProperty(PropertyKey.from("constructor"), Value.from(function));
 
-    // TODO: 19-25.
+    // TODO: 19-24.
+
+    // 25. For each ClassElement e of elements, do
+    for (class_tail.class_body.class_element_list.items) |class_element| {
+        // a. If IsStatic of e is false, then
+        const element_or_error = if (!class_element.isStatic()) blk: {
+            // i. Let element be Completion(ClassElementEvaluation of e with argument proto).
+            break :blk classElementEvaluation(agent, class_element, prototype);
+        }
+        // b. Else,
+        else blk: {
+            // i. Let element be Completion(ClassElementEvaluation of e with argument F).
+            break :blk classElementEvaluation(agent, class_element, function);
+        };
+
+        // c. If element is an abrupt completion, then
+        const element = element_or_error catch |err| {
+            // i. Set the running execution context's LexicalEnvironment to env.
+            agent.runningExecutionContext().ecmascript_code.?.lexical_environment = env;
+
+            // ii. Set the running execution context's PrivateEnvironment to outerPrivateEnvironment.
+            agent.runningExecutionContext().ecmascript_code.?.private_environment = outer_private_environment;
+
+            // iii. Return ? element.
+            return err;
+        };
+
+        // d. Set element to element.[[Value]].
+        // TODO: e-g.
+        _ = element;
+    }
 
     // 26. Set the running execution context's LexicalEnvironment to env.
     agent.runningExecutionContext().ecmascript_code.?.lexical_environment = env;

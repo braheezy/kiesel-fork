@@ -3755,12 +3755,6 @@ pub const ClassBody = struct {
 
     class_element_list: ClassElementList,
 
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
-        const tmp = temporaryChange(ctx, "contained_in_strict_mode_code", true);
-        defer tmp.restore();
-        try self.class_element_list.generateBytecode(executable, ctx);
-    }
-
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         // Omit printing 'ClassBody' here, it's implied and only adds nesting.
         try self.class_element_list.print(writer, indentation);
@@ -3772,12 +3766,6 @@ pub const ClassElementList = struct {
     const Self = @This();
 
     items: []const ClassElement,
-
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
-        for (self.items) |item| {
-            try item.generateBytecode(executable, ctx);
-        }
-    }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         // Omit printing 'ClassElementList' here, it's implied and only adds nesting.
@@ -3791,21 +3779,41 @@ pub const ClassElementList = struct {
 pub const ClassElement = union(enum) {
     const Self = @This();
 
+    empty_statement,
     method_definition: MethodDefinition,
-    // TODO: static MethodDefinition[?Yield, ?Await]
-    // TODO: FieldDefinition[?Yield, ?Await] ;
-    // TODO: static FieldDefinition[?Yield, ?Await] ;
-    // TODO: ClassStaticBlock
+    static_method_definition: MethodDefinition,
+    // TODO: field_definition: FieldDefinition,
+    // TODO: static_field_definition: FieldDefinition,
+    // TODO: class_static_block: ClassStaticBlock,
 
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    /// 15.7.4 Static Semantics: IsStatic
+    /// https://tc39.es/ecma262/#sec-static-semantics-isstatic
+    pub fn isStatic(self: Self) bool {
         switch (self) {
-            inline else => |node| try node.generateBytecode(executable, ctx),
+            // ClassElement : MethodDefinition
+            // ClassElement : FieldDefinition ;
+            // ClassElement : ;
+            .method_definition,
+            .empty_statement,
+            => {
+                // 1. Return false.
+                return false;
+            },
+
+            // ClassElement : static MethodDefinition
+            // ClassElement : static FieldDefinition ;
+            // ClassElement : ClassStaticBlock
+            .static_method_definition => {
+                // 1. Return true.
+                return true;
+            },
         }
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         // Omit printing 'ClassElement' here, it's implied and only adds nesting.
         switch (self) {
+            .empty_statement => try printString("empty", writer, indentation + 1),
             inline else => |node| try node.print(writer, indentation),
         }
     }
