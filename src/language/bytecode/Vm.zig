@@ -15,6 +15,7 @@ const ArgumentsList = builtins.ArgumentsList;
 const BigInt = types.BigInt;
 const ClassConstructorFields = builtins.ClassConstructorFields;
 const ClassFieldDefinition = types.ClassFieldDefinition;
+const ClassStaticBlockDefinition = types.ClassStaticBlockDefinition;
 const Completion = types.Completion;
 const Environment = execution.Environment;
 const Executable = @import("Executable.zig");
@@ -1001,7 +1002,7 @@ fn classFieldDefinitionEvaluation(
 
         // e. Let initializer be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
         //    formalParameterList, Initializer, non-lexical-this, env, privateEnv).
-        const initializer_body = blk_body: {
+        const body = blk_body: {
             const statement = try agent.gc_allocator.create(ast.Statement);
             statement.* = ast.Statement{ .return_statement = .{ .expression = initializer } };
             const items = try agent.gc_allocator.alloc(ast.StatementListItem, 1);
@@ -1018,7 +1019,7 @@ fn classFieldDefinitionEvaluation(
             try realm.intrinsics.@"%Function.prototype%"(),
             source_text,
             formal_parameter_list,
-            initializer_body,
+            body,
             .non_lexical_this,
             env,
             private_env,
@@ -1045,6 +1046,56 @@ fn classFieldDefinitionEvaluation(
     };
 }
 
+/// 15.7.11 Runtime Semantics: ClassStaticBlockDefinitionEvaluation
+/// https://tc39.es/ecma262/#sec-runtime-semantics-classstaticblockdefinitionevaluation
+fn classStaticBlockDefinitionEvaluation(
+    agent: *Agent,
+    class_static_block: ast.ClassStaticBlock,
+    home_object: Object,
+) !ClassStaticBlockDefinition {
+    const realm = agent.currentRealm();
+
+    // 1. Let lex be the running execution context's LexicalEnvironment.
+    const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+    // 2. Let privateEnv be the running execution context's PrivateEnvironment.
+    const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+
+    // 3. Let sourceText be the empty sequence of Unicode code points.
+    const source_text = "";
+
+    // 4. Let formalParameters be an instance of the production FormalParameters : [empty] .
+    const formal_parameter_list = ast.FormalParameters{ .items = &.{} };
+
+    // 5. Let bodyFunction be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
+    //    formalParameters, ClassStaticBlockBody, non-lexical-this, lex, privateEnv).
+    const body = blk_body: {
+        // NOTE: This serves as a replacement for EvaluateClassStaticBlockBody, which invokes
+        //       FunctionDeclarationInstantiation before evaluating the statement list.
+        break :blk_body ast.FunctionBody{
+            .type = .normal,
+            .statement_list = class_static_block.statement_list,
+            .strict = true,
+        };
+    };
+    const body_function = try ordinaryFunctionCreate(
+        agent,
+        try realm.intrinsics.@"%Function.prototype%"(),
+        source_text,
+        formal_parameter_list,
+        body,
+        .non_lexical_this,
+        env,
+        private_env,
+    );
+
+    // 6. Perform MakeMethod(bodyFunction, homeObject).
+    makeMethod(body_function.as(builtins.ECMAScriptFunction), home_object);
+
+    // 7. Return the ClassStaticBlockDefinition Record { [[BodyFunction]]: bodyFunction }.
+    return .{ .body_function = body_function.as(builtins.ECMAScriptFunction) };
+}
+
 /// 15.7.13 Runtime Semantics: ClassElementEvaluation
 /// https://tc39.es/ecma262/#sec-static-semantics-classelementevaluation
 fn classElementEvaluation(
@@ -1053,6 +1104,7 @@ fn classElementEvaluation(
     object: Object,
 ) !?union(enum) {
     class_field_definition: ClassFieldDefinition,
+    class_static_block_definition: ClassStaticBlockDefinition,
 } {
     switch (class_element) {
         // ClassElement :
@@ -1093,6 +1145,14 @@ fn classElementEvaluation(
                 false,
             );
             return null;
+        },
+
+        // ClassElement : ClassStaticBlock
+        .class_static_block => |class_static_block| {
+            // 1. Return ClassStaticBlockDefinitionEvaluation of ClassStaticBlock with argument object.
+            return .{
+                .class_static_block_definition = try classStaticBlockDefinitionEvaluation(agent, class_static_block, object),
+            };
         },
 
         // ClassElement : ;
@@ -1363,7 +1423,7 @@ fn classDefinitionEvaluation(
     // 24. Let staticElements be a new empty List.
     var static_elements = std.ArrayList(union(enum) {
         class_field_definition: ClassFieldDefinition,
-        class_static_block_definition: void, // TODO: Implement class static blocks
+        class_static_block_definition: ClassStaticBlockDefinition,
     }).init(agent.gc_allocator);
     defer static_elements.deinit();
 
@@ -1409,7 +1469,13 @@ fn classDefinitionEvaluation(
                     );
             },
 
-            // TODO: g. Else if element is a ClassStaticBlockDefinition Record, then
+            // g. Else if element is a ClassStaticBlockDefinition Record, then
+            .class_static_block_definition => |class_static_block_definition| {
+                // i. Append element to staticElements.
+                try static_elements.append(
+                    .{ .class_static_block_definition = class_static_block_definition },
+                );
+            },
         };
     }
 
@@ -1444,10 +1510,13 @@ fn classDefinitionEvaluation(
                 break :blk function.defineField(class_field_definition);
             },
             // b. Else,
-            .class_static_block_definition => {
+            .class_static_block_definition => |class_static_block_definition| blk: {
                 // i. Assert: elementRecord is a ClassStaticBlockDefinition Record.
-                // TODO: ii. Let result be Completion(Call(elementRecord.[[BodyFunction]], F)).
-                unreachable;
+                // ii. Let result be Completion(Call(elementRecord.[[BodyFunction]], F)).
+                const body_function = class_static_block_definition.body_function.object();
+                _ = Value.from(body_function).callAssumeCallableNoArgs(
+                    Value.from(function),
+                ) catch |err| break :blk err;
             },
         };
 

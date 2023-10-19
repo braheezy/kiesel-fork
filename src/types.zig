@@ -3,6 +3,7 @@ pub const spec = @import("types/spec.zig");
 
 pub const BigInt = language.BigInt;
 pub const ClassFieldDefinition = spec.ClassFieldDefinition;
+pub const ClassStaticBlockDefinition = spec.ClassStaticBlockDefinition;
 pub const Completion = spec.Completion;
 pub const DataBlock = spec.DataBlock;
 pub const Iterator = spec.Iterator;

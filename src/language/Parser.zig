@@ -1733,6 +1733,10 @@ fn acceptClassElement(self: *Self) AcceptError!ast.ClassElement {
         } else |_| if (self.acceptFieldDefinition()) |field_definition| {
             _ = try self.core.accept(RuleSet.is(.@";"));
             return .{ .static_field_definition = field_definition };
+        } else |_| if (self.core.accept(RuleSet.is(.@"{"))) |_| {
+            const class_static_block = .{ .statement_list = try self.acceptStatementList() };
+            _ = try self.core.accept(RuleSet.is(.@"}"));
+            return .{ .class_static_block = class_static_block };
         } else |_| return error.UnexpectedToken;
     } else |_| if (self.acceptMethodDefinition(null)) |*method_definition| {
         @constCast(method_definition).function_expression.function_body.strict = true;

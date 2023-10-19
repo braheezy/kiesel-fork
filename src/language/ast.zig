@@ -3805,7 +3805,7 @@ pub const ClassElement = union(enum) {
     static_method_definition: MethodDefinition,
     field_definition: FieldDefinition,
     static_field_definition: FieldDefinition,
-    // TODO: class_static_block: ClassStaticBlock,
+    class_static_block: ClassStaticBlock,
 
     /// 15.7.2 Static Semantics: ClassElementKind
     /// https://tc39.es/ecma262/#sec-static-semantics-classelementkind
@@ -3829,16 +3829,15 @@ pub const ClassElement = union(enum) {
             //     static MethodDefinition
             //     FieldDefinition ;
             //     static FieldDefinition ;
+            // ClassElement : ClassStaticBlock
             .static_method_definition,
             .field_definition,
             .static_field_definition,
+            .class_static_block,
             => {
                 // 1. Return non-constructor-method.
                 return .non_constructor_method;
             },
-
-            // TODO: ClassElement : ClassStaticBlock
-            // TODO:     1. Return non-constructor-method.
 
             // ClassElement : ;
             .empty_statement => {
@@ -3868,6 +3867,7 @@ pub const ClassElement = union(enum) {
             // ClassElement : ClassStaticBlock
             .static_method_definition,
             .static_field_definition,
+            .class_static_block,
             => {
                 // 1. Return true.
                 return true;
@@ -3895,6 +3895,18 @@ pub const FieldDefinition = struct {
         try printString("FieldDefinition", writer, indentation);
         try self.property_name.print(writer, indentation + 1);
         if (self.initializer) |initializer| try initializer.print(writer, indentation + 1);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ClassStaticBlock
+pub const ClassStaticBlock = struct {
+    const Self = @This();
+
+    statement_list: StatementList,
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("ClassStaticBlock", writer, indentation);
+        try self.statement_list.print(writer, indentation + 1);
     }
 };
 
