@@ -428,8 +428,8 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) !?Obje
         }
         // c. Else,
         else {
-            // i. Let captureStart be captureI's startIndex.
-            // ii. Let captureEnd be captureI's endIndex.
+            // i. Let captureStart be captureI.[[StartIndex]].
+            // ii. Let captureEnd be captureI.[[EndIndex]].
             // iii. If fullUnicode is true, then
             //     1. Set captureStart to GetStringIndex(S, captureStart).
             //     2. Set captureEnd to GetStringIndex(S, captureEnd).
@@ -521,7 +521,10 @@ pub fn advanceStringIndex(string: String, index: u53, unicode: bool) u53 {
 /// 22.2.7.5 Match Records
 /// https://tc39.es/ecma262/#sec-match-records
 const Match = struct {
+    /// [[StartIndex]]
     start_index: usize,
+
+    /// [[EndIndex]]
     end_index: usize,
 };
 
