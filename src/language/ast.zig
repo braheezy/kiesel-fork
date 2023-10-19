@@ -1631,7 +1631,6 @@ pub const AssignmentExpression = struct {
             if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
             // 3. Let lbool be ToBoolean(lval).
-            try executable.addInstruction(.load);
             try executable.addInstruction(.jump_conditional);
             const consequent_jump = try executable.addJumpIndex();
             const alternate_jump = try executable.addJumpIndex();
@@ -2591,7 +2590,6 @@ pub const DoWhileStatement = struct {
         if (self.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
         // f. If ToBoolean(exprValue) is false, return V.
-        try executable.addInstruction(.load);
         try executable.addInstruction(.jump_conditional);
         const consequent_jump = try executable.addJumpIndex();
         const end_jump = try executable.addJumpIndex();
