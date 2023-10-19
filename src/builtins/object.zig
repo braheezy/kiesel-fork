@@ -103,14 +103,15 @@ pub const ObjectConstructor = struct {
         }
 
         // 2. If value is either undefined or null, return OrdinaryObjectCreate(%Object.prototype%).
-        if (value == .undefined or value == .null) return Value.from(try ordinaryObjectCreate(
-            agent,
-            try realm.intrinsics.@"%Object.prototype%"(),
-        ));
+        if (value == .undefined or value == .null) {
+            return Value.from(try ordinaryObjectCreate(
+                agent,
+                try realm.intrinsics.@"%Object.prototype%"(),
+            ));
+        }
 
         // 3. Return ! ToObject(value).
-        // TODO: Use `catch |err| try noexcept(err)` once Value.toObject() is fully implemented
-        return Value.from(try value.toObject(agent));
+        return Value.from(value.toObject(agent) catch |err| try noexcept(err));
     }
 
     /// 20.1.2.1 Object.assign ( target, ...sources )
