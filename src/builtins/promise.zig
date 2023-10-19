@@ -666,7 +666,7 @@ pub fn performPromiseThen(
         break :blk agent.host_hooks.hostMakeJobCallback(on_rejected.object);
     };
 
-    // 7. Let fulfillReaction be the PromiseReaction {
+    // 7. Let fulfillReaction be the PromiseReaction Record {
     //      [[Capability]]: resultCapability, [[Type]]: fulfill, [[Handler]]: onFulfilledJobCallback
     //    }.
     const fulfill_reaction = PromiseReaction{
@@ -675,7 +675,7 @@ pub fn performPromiseThen(
         .handler = on_fulfilled_job_callback,
     };
 
-    // 8. Let rejectReaction be the PromiseReaction {
+    // 8. Let rejectReaction be the PromiseReaction Record {
     //      [[Capability]]: resultCapability, [[Type]]: reject, [[Handler]]: onRejectedJobCallback
     //    }.
     const reject_reaction = PromiseReaction{
