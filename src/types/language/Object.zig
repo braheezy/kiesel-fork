@@ -13,6 +13,8 @@ const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const ClassConstructorFields = builtins.ClassConstructorFields;
+const ClassFieldDefinition = types.ClassFieldDefinition;
 const PreferredType = Value.PreferredType;
 const PropertyDescriptor = spec.PropertyDescriptor;
 const Realm = execution.Realm;
@@ -643,6 +645,63 @@ pub fn copyDataProperties(self: *Self, source: Value, excluded_items: []const Pr
                 ) catch |err| try noexcept(err);
             }
         }
+    }
+
+    // 5. Return unused.
+}
+
+/// 7.3.33 DefineField ( receiver, fieldRecord )
+/// https://tc39.es/ecma262/#sec-definefield
+pub fn defineField(self: *Self, field: ClassFieldDefinition) !void {
+    // 1. Let fieldName be fieldRecord.[[Name]].
+
+    // 2. Let initializer be fieldRecord.[[Initializer]].
+    // 3. If initializer is not empty, then
+    const init_value = if (field.initializer) |initializer| blk: {
+        // a. Let initValue be ? Call(initializer, receiver).
+        break :blk try Value.from(initializer.object()).callAssumeCallableNoArgs(Value.from(self.*));
+    }
+    // 4. Else,
+    else blk: {
+        // a. Let initValue be undefined.
+        break :blk .undefined;
+    };
+
+    switch (field.name) {
+        // 5. If fieldName is a Private Name, then
+        .private_name => {
+            // TODO: a. Perform ? PrivateFieldAdd(receiver, fieldName, initValue).
+        },
+        // 6. Else,
+        .property_key => |property_key| {
+            // a. Assert: IsPropertyKey(fieldName) is true.
+            // b. Perform ? CreateDataPropertyOrThrow(receiver, fieldName, initValue).
+            try self.createDataPropertyOrThrow(property_key, init_value);
+        },
+    }
+
+    // 7. Return unused.
+}
+
+/// 7.3.34 InitializeInstanceElements ( O, constructor )
+/// https://tc39.es/ecma262/#sec-initializeinstanceelements
+pub fn initializeInstanceElements(self: *Self, constructor: Self) !void {
+    // TODO: 1. Let methods be the value of constructor.[[PrivateMethods]].
+    // TODO: 2. For each PrivateElement method of methods, do
+    //     a. Perform ? PrivateMethodOrAccessorAdd(O, method).
+
+    // 3. Let fields be the value of constructor.[[Fields]].
+    const fields = if (constructor.is(builtins.ECMAScriptFunction)) blk: {
+        break :blk constructor.as(builtins.ECMAScriptFunction).fields.fields;
+    } else if (constructor.is(builtins.BuiltinFunction)) blk: {
+        const class_constructor_fields = constructor.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+        break :blk class_constructor_fields.fields;
+    } else unreachable;
+
+    // 4. For each element fieldRecord of fields, do
+    for (fields) |field| {
+        // a. Perform ? DefineField(O, fieldRecord).
+        try self.defineField(field);
     }
 
     // 5. Return unused.

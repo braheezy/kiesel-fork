@@ -15,6 +15,7 @@ const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
 const BuiltinFunction = builtins.BuiltinFunction;
 const ClassConstructorFields = builtins.ClassConstructorFields;
+const ClassFieldDefinition = types.ClassFieldDefinition;
 const Completion = types.Completion;
 const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
@@ -26,6 +27,7 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const ScriptOrModule = execution.ScriptOrModule;
 const String = types.String;
+const Symbol = types.Symbol;
 const Value = types.Value;
 const arrayCreate = builtins.arrayCreate;
 const containsSlice = utils.containsSlice;
@@ -89,10 +91,19 @@ pub const ECMAScriptFunction = MakeObject(.{
         /// [[HomeObject]]
         home_object: ?Object,
 
-        ///  [[SourceText]]
+        /// [[SourceText]]
         source_text: []const u8,
 
-        // TODO: [[Fields]],  [[PrivateMethods]], [[ClassFieldInitializerName]]
+        /// [[ClassFieldInitializerName]]
+        class_field_initializer_name: ?union(enum) {
+            property_key: PropertyKey,
+            private_name: void, // TODO: Implement private names
+        },
+
+        /// [[Fields]]
+        fields: []const ClassFieldDefinition,
+
+        // TODO: [[PrivateMethods]]
 
         /// [[IsClassConstructor]]
         is_class_constructor: bool,
@@ -410,17 +421,17 @@ pub fn construct(object: Object, arguments_list: ArgumentsList, new_target: Obje
     // 2. Let kind be F.[[ConstructorKind]].
     const kind = function.fields.constructor_kind;
 
-    var this_argument: Value = undefined;
+    var this_argument: Object = undefined;
 
     // 3. If kind is base, then
     if (kind == .base) {
         // a. Let thisArgument be ? OrdinaryCreateFromConstructor(newTarget, "%Object.prototype%").
-        this_argument = Value.from(try ordinaryCreateFromConstructor(
+        this_argument = try ordinaryCreateFromConstructor(
             builtins.Object,
             agent,
             new_target,
             "%Object.prototype%",
-        ));
+        );
     }
 
     // 4. Let calleeContext be PrepareForOrdinaryCall(F, newTarget).
@@ -432,13 +443,20 @@ pub fn construct(object: Object, arguments_list: ArgumentsList, new_target: Obje
     // 6. If kind is base, then
     if (kind == .base) {
         // a. Perform OrdinaryCallBindThis(F, calleeContext, thisArgument).
-        try ordinaryCallBindThis(agent, function, callee_context, this_argument);
+        try ordinaryCallBindThis(agent, function, callee_context, Value.from(this_argument));
 
-        // TODO: b. Let initializeResult be Completion(InitializeInstanceElements(thisArgument, F)).
-        // TODO: c. If initializeResult is an abrupt completion, then
-        // i. Remove calleeContext from the execution context stack and restore callerContext as
-        //    the running execution context.
-        // ii. Return ? initializeResult.
+        // b. Let initializeResult be Completion(InitializeInstanceElements(thisArgument, F)).
+        const initialize_result = this_argument.initializeInstanceElements(function.object());
+
+        // c. If initializeResult is an abrupt completion, then
+        initialize_result catch |err| {
+            // i. Remove calleeContext from the execution context stack and restore callerContext
+            //    as the running execution context.
+            _ = agent.execution_context_stack.pop();
+
+            // ii. Return ? initializeResult.
+            return err;
+        };
     }
 
     // 7. Let constructorEnv be the LexicalEnvironment of calleeContext.
@@ -458,7 +476,7 @@ pub fn construct(object: Object, arguments_list: ArgumentsList, new_target: Obje
             if (completion.value.? == .object) return completion.value.?.object;
 
             // b. If kind is base, return thisArgument.
-            if (kind == .base) return this_argument.object;
+            if (kind == .base) return this_argument;
 
             // c. If result.[[Value]] is not undefined, throw a TypeError exception.
             if (completion.value.? != .undefined) {
@@ -548,9 +566,13 @@ pub fn ordinaryFunctionCreate(
             // 17. Set F.[[HomeObject]] to undefined.
             .home_object = null,
 
-            // TODO: 18. Set F.[[Fields]] to a new empty List.
+            // 18. Set F.[[Fields]] to a new empty List.
+            .fields = &.{},
+
             // TODO: 19. Set F.[[PrivateMethods]] to a new empty List.
-            // TODO: 20. Set F.[[ClassFieldInitializerName]] to empty.
+
+            // 20. Set F.[[ClassFieldInitializerName]] to empty.
+            .class_field_initializer_name = null,
 
             // NOTE: Not in the spec but we need to provide a value
             .constructor_kind = .base,

@@ -10,6 +10,7 @@ const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
+const ClassFieldDefinition = types.ClassFieldDefinition;
 const ConstructorKind = ecmascript_function.ConstructorKind;
 const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
@@ -64,6 +65,12 @@ pub const ClassConstructorFields = struct {
 
     /// [[SourceText]]
     source_text: []const u8,
+
+    // TODO: These are not in the spec yet - https://github.com/tc39/ecma262/issues/3204
+    // TODO: [[PrivateMethods]]
+
+    /// [[Fields]]
+    fields: []const ClassFieldDefinition,
 };
 
 pub const BuiltinFunction = MakeObject(.{

@@ -14,6 +14,7 @@ const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
 const BigInt = types.BigInt;
 const ClassConstructorFields = builtins.ClassConstructorFields;
+const ClassFieldDefinition = types.ClassFieldDefinition;
 const Completion = types.Completion;
 const Environment = execution.Environment;
 const Executable = @import("Executable.zig");
@@ -968,10 +969,108 @@ fn instantiateAsyncGeneratorFunctionExpression(
     }
 }
 
+/// 15.7.10 Runtime Semantics: ClassFieldDefinitionEvaluation
+/// https://tc39.es/ecma262/#sec-runtime-semantics-classfielddefinitionevaluation
+fn classFieldDefinitionEvaluation(
+    agent: *Agent,
+    field_definition: ast.FieldDefinition,
+    home_object: Object,
+) !ClassFieldDefinition {
+    const realm = agent.currentRealm();
+
+    // 1. Let name be ? Evaluation of ClassElementName.
+    const property_key = (try generateAndRunBytecode(
+        agent,
+        field_definition.property_name,
+    )).value.?.toPropertyKey(agent) catch |err| try noexcept(err);
+    const name = .{ .property_key = property_key };
+
+    // 2. If Initializer[opt] is present, then
+    const initializer = if (field_definition.initializer) |initializer| blk: {
+        // a. Let formalParameterList be an instance of the production FormalParameters : [empty] .
+        const formal_parameter_list = ast.FormalParameters{ .items = &.{} };
+
+        // b. Let env be the LexicalEnvironment of the running execution context.
+        const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+        // c. Let privateEnv be the running execution context's PrivateEnvironment.
+        const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+
+        // d. Let sourceText be the empty sequence of Unicode code points.
+        const source_text = "";
+
+        // e. Let initializer be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
+        //    formalParameterList, Initializer, non-lexical-this, env, privateEnv).
+        const initializer_body = blk_body: {
+            const statement = try agent.gc_allocator.create(ast.Statement);
+            statement.* = ast.Statement{ .return_statement = .{ .expression = initializer } };
+            const items = try agent.gc_allocator.alloc(ast.StatementListItem, 1);
+            items[0] = .{ .statement = statement };
+            const statement_list = ast.StatementList{ .items = items };
+            break :blk_body ast.FunctionBody{
+                .type = .normal,
+                .statement_list = statement_list,
+                .strict = true,
+            };
+        };
+        const initializer_function = try ordinaryFunctionCreate(
+            agent,
+            try realm.intrinsics.@"%Function.prototype%"(),
+            source_text,
+            formal_parameter_list,
+            initializer_body,
+            .non_lexical_this,
+            env,
+            private_env,
+        );
+
+        // f. Perform MakeMethod(initializer, homeObject).
+        makeMethod(initializer_function.as(builtins.ECMAScriptFunction), home_object);
+
+        // g. Set initializer.[[ClassFieldInitializerName]] to name.
+        initializer_function.as(builtins.ECMAScriptFunction).fields.class_field_initializer_name = name;
+
+        break :blk initializer_function;
+    }
+    // 3. Else,
+    else blk: {
+        // a. Let initializer be empty.
+        break :blk null;
+    };
+
+    // 4. Return the ClassFieldDefinition Record { [[Name]]: name, [[Initializer]]: initializer }.
+    return .{
+        .name = name,
+        .initializer = if (initializer) |i| i.as(builtins.ECMAScriptFunction) else null,
+    };
+}
+
 /// 15.7.13 Runtime Semantics: ClassElementEvaluation
 /// https://tc39.es/ecma262/#sec-static-semantics-classelementevaluation
-fn classElementEvaluation(agent: *Agent, class_element: ast.ClassElement, object: Object) !void {
+fn classElementEvaluation(
+    agent: *Agent,
+    class_element: ast.ClassElement,
+    object: Object,
+) !?union(enum) {
+    class_field_definition: ClassFieldDefinition,
+} {
     switch (class_element) {
+        // ClassElement :
+        //     FieldDefinition ;
+        //     static FieldDefinition ;
+        .field_definition,
+        .static_field_definition,
+        => |field_definition| {
+            // 1. Return ? ClassFieldDefinitionEvaluation of FieldDefinition with argument object.
+            return .{
+                .class_field_definition = try classFieldDefinitionEvaluation(
+                    agent,
+                    field_definition,
+                    object,
+                ),
+            };
+        },
+
         // ClassElement :
         //     MethodDefinition
         //     static MethodDefinition
@@ -993,11 +1092,13 @@ fn classElementEvaluation(agent: *Agent, class_element: ast.ClassElement, object
                 object,
                 false,
             );
+            return null;
         },
 
         // ClassElement : ;
         .empty_statement => {
             // 1. Return unused.
+            return null;
         },
     }
 }
@@ -1130,7 +1231,7 @@ fn classDefinitionEvaluation(
     agent.runningExecutionContext().ecmascript_code.?.private_environment = class_private_environment;
 
     // 14. If constructor is empty, then
-    const function = if (constructor == null) blk: {
+    var function = if (constructor == null) blk: {
         // a. Let defaultConstructor be a new Abstract Closure with no parameters that captures
         //    nothing and performs the following steps when called:
         const default_constructor = struct {
@@ -1150,7 +1251,7 @@ fn classDefinitionEvaluation(
                 const class_constructor_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
 
                 // iv. If F.[[ConstructorKind]] is derived, then
-                const result = if (class_constructor_fields.constructor_kind == .derived) blk: {
+                var result = if (class_constructor_fields.constructor_kind == .derived) blk: {
                     // 1. NOTE: This branch behaves similarly to constructor(...args) { super(...args); }.
                     //    The most notable distinction is that while the aforementioned ECMAScript
                     //    source text observably calls the @@iterator method on %Array.prototype%,
@@ -1191,7 +1292,8 @@ fn classDefinitionEvaluation(
                     );
                 };
 
-                // TODO: vi. Perform ? InitializeInstanceElements(result, F).
+                // vi. Perform ? InitializeInstanceElements(result, F).
+                try result.initializeInstanceElements(function);
 
                 // vii. Return result.
                 return Value.from(result);
@@ -1249,10 +1351,24 @@ fn classDefinitionEvaluation(
     // 18. Perform CreateMethodProperty(proto, "constructor", F).
     try prototype.createMethodProperty(PropertyKey.from("constructor"), Value.from(function));
 
-    // TODO: 19-24.
+    // 19. If ClassBody[opt] is not present, let elements be a new empty List.
+    // TODO: 20. Else, let elements be NonConstructorElements of ClassBody.
+    const elements = class_tail.class_body.class_element_list.items;
+
+    // TODO: 21-22.
+
+    // 23. Let instanceFields be a new empty List.
+    var instance_fields = std.ArrayList(ClassFieldDefinition).init(agent.gc_allocator);
+
+    // 24. Let staticElements be a new empty List.
+    var static_elements = std.ArrayList(union(enum) {
+        class_field_definition: ClassFieldDefinition,
+        class_static_block_definition: void, // TODO: Implement class static blocks
+    }).init(agent.gc_allocator);
+    defer static_elements.deinit();
 
     // 25. For each ClassElement e of elements, do
-    for (class_tail.class_body.class_element_list.items) |class_element| {
+    for (elements) |class_element| {
         // a. If IsStatic of e is false, then
         const element_or_error = if (!class_element.isStatic()) blk: {
             // i. Let element be Completion(ClassElementEvaluation of e with argument proto).
@@ -1277,8 +1393,24 @@ fn classDefinitionEvaluation(
         };
 
         // d. Set element to element.[[Value]].
-        // TODO: e-g.
-        _ = element;
+
+        if (element != null) switch (element.?) {
+            // TODO: e. If element is a PrivateElement, then
+
+            // f. Else if element is a ClassFieldDefinition Record, then
+            .class_field_definition => |class_field_definition| {
+                // i. If IsStatic of e is false, append element to instanceFields.
+                // ii. Else, append element to staticElements.
+                if (!class_element.isStatic())
+                    try instance_fields.append(class_field_definition)
+                else
+                    try static_elements.append(
+                        .{ .class_field_definition = class_field_definition },
+                    );
+            },
+
+            // TODO: g. Else if element is a ClassStaticBlockDefinition Record, then
+        };
     }
 
     // 26. Set the running execution context's LexicalEnvironment to env.
@@ -1290,7 +1422,44 @@ fn classDefinitionEvaluation(
         class_env.initializeBinding(agent, class_binding.?, Value.from(function));
     }
 
-    // TODO: 28-31.
+    // TODO: 28. Set F.[[PrivateMethods]] to instancePrivateMethods.
+
+    // 29. Set F.[[Fields]] to instanceFields.
+    if (function.is(builtins.ECMAScriptFunction)) {
+        function.as(builtins.ECMAScriptFunction).fields.fields = try instance_fields.toOwnedSlice();
+    } else if (function.is(builtins.BuiltinFunction)) {
+        const class_constructor_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+        class_constructor_fields.fields = try instance_fields.toOwnedSlice();
+    } else unreachable;
+
+    // TODO: 30. For each PrivateElement method of staticPrivateMethods, do
+    //     a. Perform ! PrivateMethodOrAccessorAdd(F, method).
+
+    // 31. For each element elementRecord of staticElements, do
+    for (static_elements.items) |element| {
+        const result = switch (element) {
+            // a. If elementRecord is a ClassFieldDefinition Record, then
+            .class_field_definition => |class_field_definition| blk: {
+                // i. Let result be Completion(DefineField(F, elementRecord)).
+                break :blk function.defineField(class_field_definition);
+            },
+            // b. Else,
+            .class_static_block_definition => {
+                // i. Assert: elementRecord is a ClassStaticBlockDefinition Record.
+                // TODO: ii. Let result be Completion(Call(elementRecord.[[BodyFunction]], F)).
+                unreachable;
+            },
+        };
+
+        // c. If result is an abrupt completion, then
+        _ = result catch |err| {
+            // i. Set the running execution context's PrivateEnvironment to outerPrivateEnvironment.
+            agent.runningExecutionContext().ecmascript_code.?.private_environment = outer_private_environment;
+
+            // ii. Return ? result.
+            return err;
+        };
+    }
 
     // 32. Set the running execution context's PrivateEnvironment to outerPrivateEnvironment.
     agent.runningExecutionContext().ecmascript_code.?.private_environment = outer_private_environment;

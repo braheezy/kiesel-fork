@@ -1730,14 +1730,31 @@ fn acceptClassElement(self: *Self) AcceptError!ast.ClassElement {
         if (self.acceptMethodDefinition(null)) |*method_definition| {
             @constCast(method_definition).function_expression.function_body.strict = true;
             return .{ .static_method_definition = method_definition.* };
+        } else |_| if (self.acceptFieldDefinition()) |field_definition| {
+            _ = try self.core.accept(RuleSet.is(.@";"));
+            return .{ .static_field_definition = field_definition };
         } else |_| return error.UnexpectedToken;
-        // TODO: FieldDefinition
     } else |_| if (self.acceptMethodDefinition(null)) |*method_definition| {
         @constCast(method_definition).function_expression.function_body.strict = true;
         return .{ .method_definition = method_definition.* };
+    } else |_| if (self.acceptFieldDefinition()) |field_definition| {
+        _ = try self.core.accept(RuleSet.is(.@";"));
+        return .{ .field_definition = field_definition };
     } else |_| if (self.core.accept(RuleSet.is(.@";"))) |_| {
         return .empty_statement;
     } else |_| return error.UnexpectedToken;
+}
+
+fn acceptFieldDefinition(self: *Self) AcceptError!ast.FieldDefinition {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const property_name = try self.acceptPropertyName();
+    const initializer = if (self.core.accept(RuleSet.is(.@"="))) |_|
+        try self.acceptExpression(.{})
+    else |_|
+        null;
+    return .{ .property_name = property_name, .initializer = initializer };
 }
 
 fn acceptRegularExpressionLiteral(self: *Self) AcceptError!ast.RegularExpressionLiteral {

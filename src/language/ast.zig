@@ -829,20 +829,14 @@ pub const PropertyName = union(enum) {
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
-        // Omit printing 'PropertyName' here, it's implied and only adds nesting.
+        try printString("PropertyName", writer, indentation);
         switch (self) {
-            .literal_property_name => |literal| {
-                try printString("literal_property_name:", writer, indentation);
-                switch (literal) {
-                    .identifier => |identifier| try printString(identifier, writer, indentation + 1),
-                    .string_literal => |string_literal| try printString(string_literal.text, writer, indentation + 1),
-                    .numeric_literal => |numeric_literal| try printString(numeric_literal.text, writer, indentation + 1),
-                }
+            .literal_property_name => |literal| switch (literal) {
+                .identifier => |identifier| try printString(identifier, writer, indentation + 1),
+                .string_literal => |string_literal| try printString(string_literal.text, writer, indentation + 1),
+                .numeric_literal => |numeric_literal| try printString(numeric_literal.text, writer, indentation + 1),
             },
-            .computed_property_name => |expression| {
-                try printString("computed_property_name:", writer, indentation);
-                try expression.print(writer, indentation + 1);
-            },
+            .computed_property_name => |expression| try expression.print(writer, indentation + 1),
         }
     }
 };
@@ -3809,8 +3803,8 @@ pub const ClassElement = union(enum) {
     empty_statement,
     method_definition: MethodDefinition,
     static_method_definition: MethodDefinition,
-    // TODO: field_definition: FieldDefinition,
-    // TODO: static_field_definition: FieldDefinition,
+    field_definition: FieldDefinition,
+    static_field_definition: FieldDefinition,
     // TODO: class_static_block: ClassStaticBlock,
 
     /// 15.7.2 Static Semantics: ClassElementKind
@@ -3835,7 +3829,10 @@ pub const ClassElement = union(enum) {
             //     static MethodDefinition
             //     FieldDefinition ;
             //     static FieldDefinition ;
-            .static_method_definition => {
+            .static_method_definition,
+            .field_definition,
+            .static_field_definition,
+            => {
                 // 1. Return non-constructor-method.
                 return .non_constructor_method;
             },
@@ -3859,6 +3856,7 @@ pub const ClassElement = union(enum) {
             // ClassElement : FieldDefinition ;
             // ClassElement : ;
             .method_definition,
+            .field_definition,
             .empty_statement,
             => {
                 // 1. Return false.
@@ -3868,7 +3866,9 @@ pub const ClassElement = union(enum) {
             // ClassElement : static MethodDefinition
             // ClassElement : static FieldDefinition ;
             // ClassElement : ClassStaticBlock
-            .static_method_definition => {
+            .static_method_definition,
+            .static_field_definition,
+            => {
                 // 1. Return true.
                 return true;
             },
@@ -3878,9 +3878,23 @@ pub const ClassElement = union(enum) {
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         // Omit printing 'ClassElement' here, it's implied and only adds nesting.
         switch (self) {
-            .empty_statement => try printString("empty", writer, indentation + 1),
+            .empty_statement => try printString("empty", writer, indentation),
             inline else => |node| try node.print(writer, indentation),
         }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-FieldDefinition
+pub const FieldDefinition = struct {
+    const Self = @This();
+
+    property_name: PropertyName,
+    initializer: ?Expression,
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("FieldDefinition", writer, indentation);
+        try self.property_name.print(writer, indentation + 1);
+        if (self.initializer) |initializer| try initializer.print(writer, indentation + 1);
     }
 };
 
