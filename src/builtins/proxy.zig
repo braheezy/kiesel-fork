@@ -188,7 +188,7 @@ fn isExtensible(object: Object) !bool {
     // 8. Let targetResult be ? IsExtensible(target).
     const target_result = try target.isExtensible();
 
-    // 9. If SameValue(booleanTrapResult, targetResult) is false, throw a TypeError exception.
+    // 9. If booleanTrapResult is not targetResult, throw a TypeError exception.
     if (boolean_trap_result != target_result) {
         return agent.throwException(
             .type_error,

@@ -299,12 +299,12 @@ fn validateAndApplyPropertyDescriptor(
         // a. If Desc has a [[Configurable]] field and Desc.[[Configurable]] is true, return false.
         if (descriptor.configurable) |configurable| if (configurable) return false;
 
-        // b. If Desc has an [[Enumerable]] field and SameValue(Desc.[[Enumerable]], current.[[Enumerable]])
-        //    is false, return false.
+        // b. If Desc has an [[Enumerable]] field and Desc.[[Enumerable]] is not
+        //    current.[[Enumerable]], return false.
         if (descriptor.enumerable) |enumerable| if (enumerable != current.enumerable.?) return false;
 
-        // c. If IsGenericDescriptor(Desc) is false and SameValue(IsAccessorDescriptor(Desc), IsAccessorDescriptor(current))
-        //    is false, return false.
+        // c. If IsGenericDescriptor(Desc) is false and IsAccessorDescriptor(Desc) is not
+        //    IsAccessorDescriptor(current), return false.
         if (!descriptor.isGenericDescriptor() and
             descriptor.isAccessorDescriptor() != current.isAccessorDescriptor()) return false;
 
