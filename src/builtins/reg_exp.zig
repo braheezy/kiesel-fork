@@ -330,7 +330,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) !?Obje
     var match = getMatch(captures_list, string, full_unicode, 0).?;
     last_index = match.start_index;
 
-    // 14. Let e be r's endIndex value.
+    // 14. Let e be r.[[EndIndex]].
     // 15. If fullUnicode is true, set e to GetStringIndex(S, e).
     const end_index = match.end_index;
 
@@ -340,7 +340,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) !?Obje
         try reg_exp.object().set(PropertyKey.from("lastIndex"), Value.from(end_index), .throw);
     }
 
-    // 17. Let n be the number of elements in r's captures List.
+    // 17. Let n be the number of elements in r.[[Captures]].
     const n = capture_count - 1;
 
     // 18. Assert: n = R.[[RegExpRecord]].[[CapturingGroupsCount]].
@@ -415,7 +415,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) !?Obje
     while (i <= n) : (i += 1) {
         var captured_value: Value = undefined;
 
-        // a. Let captureI be ith element of r's captures List.
+        // a. Let captureI be ith element of r.[[Captures]].
         const capture_i = getMatch(captures_list, string, full_unicode, i);
 
         // b. If captureI is undefined, then
