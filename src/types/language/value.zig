@@ -1634,8 +1634,7 @@ test "format" {
         .{ Value.from(object), "[object Object]" },
     };
     for (test_cases) |test_case| {
-        const value = test_case[0];
-        const expected = test_case[1];
+        const value, const expected = test_case;
         const string = try std.fmt.allocPrint(std.testing.allocator, "{}", .{value});
         defer std.testing.allocator.free(string);
         defer if (value == .big_int) @constCast(&value.big_int).value.deinit();

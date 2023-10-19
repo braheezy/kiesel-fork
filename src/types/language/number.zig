@@ -629,8 +629,7 @@ test "format" {
         .{ Number.from(-std.math.inf(f64)), "-Infinity" },
     };
     for (test_cases) |test_case| {
-        const number = test_case[0];
-        const expected = test_case[1];
+        const number, const expected = test_case;
         const string = try std.fmt.allocPrint(std.testing.allocator, "{}", .{number});
         defer std.testing.allocator.free(string);
         try std.testing.expectEqualStrings(expected, string);

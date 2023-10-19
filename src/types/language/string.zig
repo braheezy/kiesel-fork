@@ -62,8 +62,7 @@ test "format" {
         .{ String.from("123"), "123" },
     };
     for (test_cases) |test_case| {
-        const string = test_case[0];
-        const expected = test_case[1];
+        const string, const expected = test_case;
         const actual = try std.fmt.allocPrint(std.testing.allocator, "{}", .{string});
         defer std.testing.allocator.free(actual);
         try std.testing.expectEqualStrings(expected, actual);

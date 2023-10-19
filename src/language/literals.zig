@@ -471,8 +471,7 @@ test "parseRegularExpressionLiteral" {
         .{ "/\\//", .{ .pattern = "\\/", .flags = "" } },
         .{ "/\\\\/", .{ .pattern = "\\\\", .flags = "" } },
     }) |test_case| {
-        const input = test_case[0];
-        const expected = test_case[1];
+        const input, const expected = test_case;
         const parsed = parseRegularExpressionLiteral(input, .complete) catch unreachable;
         try std.testing.expectEqualStrings(expected.pattern, parsed.pattern);
         try std.testing.expectEqualStrings(expected.flags, parsed.flags);

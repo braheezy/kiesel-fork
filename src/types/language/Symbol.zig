@@ -55,8 +55,7 @@ test "format" {
         .{ .{ .id = 2, .description = String.from("foo") }, "Symbol(\"foo\")" },
     };
     for (test_cases) |test_case| {
-        const symbol = test_case[0];
-        const expected = test_case[1];
+        const symbol, const expected = test_case;
         const string = try std.fmt.allocPrint(std.testing.allocator, "{}", .{symbol});
         defer std.testing.allocator.free(string);
         try std.testing.expectEqualStrings(expected, string);

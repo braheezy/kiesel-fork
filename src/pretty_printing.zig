@@ -508,8 +508,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
             .{ builtins.StringIterator, prettyPrintStringIterator },
             .{ builtins.Symbol, prettyPrintPrimitiveWrapper },
         }) |entry| {
-            const T = entry[0];
-            const prettyPrintFn = entry[1];
+            const T, const prettyPrintFn = entry;
             if (object.is(T)) return prettyPrintFn(object.as(T), writer);
         }
         if (object.internalMethods().call != null)

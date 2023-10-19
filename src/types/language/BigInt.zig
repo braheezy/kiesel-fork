@@ -256,8 +256,7 @@ test "format" {
         .{ try from(std.testing.allocator, -42), "-42n" },
     };
     for (test_cases) |test_case| {
-        const big_int = test_case[0];
-        const expected = test_case[1];
+        const big_int, const expected = test_case;
         const string = try std.fmt.allocPrint(std.testing.allocator, "{}", .{big_int});
         defer std.testing.allocator.free(string);
         defer @constCast(&big_int.value).deinit();
