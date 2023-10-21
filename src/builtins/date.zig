@@ -159,6 +159,7 @@ pub fn yearFromTime(t: f64) Year {
 /// 21.4.1.9 DayWithinYear ( t )
 /// https://tc39.es/ecma262/#sec-daywithinyear
 pub fn dayWithinYear(t: f64) DayWithinYear {
+    // 1. Return Day(t) - DayFromYear(YearFromTime(t)).
     const d = day(t) - dayFromYear(yearFromTime(t));
     // FIXME: This should not be necessary, but for `new Date(-1111, 0, 0)` this underflows to -1 -
     //        possible spec issue?
