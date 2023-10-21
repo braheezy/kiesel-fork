@@ -189,6 +189,13 @@ pub fn hasThisBinding(_: Self) bool {
     return false;
 }
 
+/// 9.1.1.1.9 HasSuperBinding ( )
+/// https://tc39.es/ecma262/#sec-declarative-environment-records-hassuperbinding
+pub fn hasSuperBinding(_: Self) bool {
+    // 1. Return false.
+    return false;
+}
+
 /// 9.1.1.1.10 WithBaseObject ( )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-withbaseobject
 pub fn withBaseObject(_: Self) ?Object {

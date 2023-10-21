@@ -72,6 +72,16 @@ pub fn hasThisBinding(self: Self) bool {
     return self.this_binding_status != .lexical;
 }
 
+/// 9.1.1.3.3 HasSuperBinding ( )
+/// https://tc39.es/ecma262/#sec-function-environment-records-hassuperbinding
+pub fn hasSuperBinding(self: Self) bool {
+    // 1. If envRec.[[ThisBindingStatus]] is lexical, return false.
+    if (self.this_binding_status == .lexical) return false;
+
+    // 2. If envRec.[[FunctionObject]].[[HomeObject]] is undefined, return false; otherwise, return true.
+    return self.function_object.fields.home_object != null;
+}
+
 /// 9.1.1.3.4 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-function-environment-records-getthisbinding
 pub fn getThisBinding(self: Self) !Value {

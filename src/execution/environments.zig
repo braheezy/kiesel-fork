@@ -93,8 +93,9 @@ pub const Environment = union(enum) {
     }
 
     pub fn hasSuperBinding(self: Self) bool {
-        _ = self;
-        @compileError("Not implemented");
+        return switch (self) {
+            inline else => |env| env.hasSuperBinding(),
+        };
     }
 
     pub fn withBaseObject(self: Self) ?Object {
