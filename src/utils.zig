@@ -27,7 +27,7 @@ pub fn noexcept(err: error{ ExceptionThrown, OutOfMemory }) !noreturn {
     }
 }
 
-fn TemporaryChange(comptime Lhs: type, comptime field_name: []const u8) type {
+pub fn TemporaryChange(comptime Lhs: type, comptime field_name: []const u8) type {
     const fields = switch (@typeInfo(Lhs)) {
         .Struct => |s| s.fields,
         .Pointer => |p| switch (@typeInfo(p.child)) {

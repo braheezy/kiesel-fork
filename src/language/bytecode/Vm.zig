@@ -229,6 +229,26 @@ fn evaluateCall(
     return function.callAssumeCallable(this_value, arguments);
 }
 
+/// 13.3.7.2 GetSuperConstructor ( )
+/// https://tc39.es/ecma262/#sec-getsuperconstructor
+fn getSuperConstructor(agent: *Agent) error{OutOfMemory}!Value {
+    // 1. Let envRec be GetThisEnvironment().
+    const env = agent.getThisEnvironment();
+
+    // 2. Assert: envRec is a Function Environment Record.
+    std.debug.assert(env == .function_environment);
+
+    // 3. Let activeFunction be envRec.[[FunctionObject]].
+    // 4. Assert: activeFunction is an ECMAScript function object.
+    const active_function = env.function_environment.function_object.object();
+
+    // 5. Let superConstructor be ! activeFunction.[[GetPrototypeOf]]().
+    const super_constructor = active_function.internalMethods().getPrototypeOf(active_function) catch |err| try noexcept(err);
+
+    // 6. Return superConstructor.
+    return if (super_constructor) |object| Value.from(object) else .null;
+}
+
 /// CallExpression : CoverCallExpressionAndAsyncArrowHead
 /// Step 6.a.
 fn directEval(agent: *Agent, arguments: []const Value, strict: bool) !Value {
@@ -2028,6 +2048,61 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
                 .strict = strict,
                 .this_value = null,
             };
+        },
+        .evaluate_super_call => {
+            const argument_count = self.fetchIndex(executable);
+
+            // 1. Let newTarget be GetNewTarget().
+            const new_target = self.agent.getNewTarget();
+
+            // 2. Assert: newTarget is an Object.
+            std.debug.assert(new_target != null);
+
+            // 3. Let func be GetSuperConstructor().
+            const function = try getSuperConstructor(self.agent);
+
+            // 4. Let argList be ? ArgumentListEvaluation of Arguments.
+            var arguments = try std.ArrayList(Value).initCapacity(
+                self.agent.gc_allocator,
+                argument_count,
+            );
+            defer arguments.deinit();
+            for (0..argument_count) |_| {
+                const argument = self.stack.pop();
+                try arguments.append(argument);
+            }
+            std.mem.reverse(Value, arguments.items);
+
+            // 5. If IsConstructor(func) is false, throw a TypeError exception.
+            if (!function.isConstructor()) {
+                return self.agent.throwException(
+                    .type_error,
+                    try std.fmt.allocPrint(
+                        self.agent.gc_allocator,
+                        "{} is not a constructor",
+                        .{function},
+                    ),
+                );
+            }
+
+            // 6. Let result be ? Construct(func, argList, newTarget).
+            var result = try function.object.construct(arguments.items, new_target);
+
+            // 7. Let thisER be GetThisEnvironment().
+            const this_environment = self.agent.getThisEnvironment();
+
+            // 8. Perform ? thisER.BindThisValue(result).
+            _ = try this_environment.bindThisValue(Value.from(result));
+
+            // 9. Let F be thisER.[[FunctionObject]].
+            // 10. Assert: F is an ECMAScript function object.
+            const constructor = this_environment.function_environment.function_object.object();
+
+            // 11. Perform ? InitializeInstanceElements(result, F).
+            try result.initializeInstanceElements(constructor);
+
+            // 12. Return result.
+            self.result = Value.from(result);
         },
         .get_new_target => {
             self.result = if (self.agent.getNewTarget()) |new_target|

@@ -393,6 +393,45 @@ pub const CallExpression = struct {
     }
 };
 
+/// https://tc39.es/ecma262/#prod-SuperCall
+pub const SuperCall = struct {
+    const Self = @This();
+
+    arguments: Arguments,
+
+    /// 13.3.7.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // SuperCall : super Arguments
+        // 1. Let newTarget be GetNewTarget().
+        // 2. Assert: newTarget is an Object.
+        // 3. Let func be GetSuperConstructor().
+        // 4. Let argList be ? ArgumentListEvaluation of Arguments.
+        // 5. If IsConstructor(func) is false, throw a TypeError exception.
+        // 6. Let result be ? Construct(func, argList, newTarget).
+        // 7. Let thisER be GetThisEnvironment().
+        // 8. Perform ? thisER.BindThisValue(result).
+        // 9. Let F be thisER.[[FunctionObject]].
+        // 10. Assert: F is an ECMAScript function object.
+        // 11. Perform ? InitializeInstanceElements(result, F).
+        // 12. Return result.
+        for (self.arguments) |argument| {
+            try argument.generateBytecode(executable, ctx);
+            if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
+        }
+        try executable.addInstruction(.evaluate_super_call);
+        try executable.addIndex(self.arguments.len);
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("SuperCall", writer, indentation);
+        for (self.arguments) |argument| {
+            try argument.print(writer, indentation + 1);
+        }
+    }
+};
+
 /// https://tc39.es/ecma262/#prod-Arguments
 pub const Arguments = []const Expression;
 
@@ -1862,6 +1901,7 @@ pub const Expression = union(enum) {
     meta_property: MetaProperty,
     new_expression: NewExpression,
     call_expression: CallExpression,
+    super_call: SuperCall,
     update_expression: UpdateExpression,
     unary_expression: UnaryExpression,
     binary_expression: BinaryExpression,

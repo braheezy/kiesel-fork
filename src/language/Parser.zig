@@ -8,6 +8,7 @@ const literals = @import("literals.zig");
 const tokenizer_ = @import("tokenizer.zig");
 const utils = @import("../utils.zig");
 
+const TemporaryChange = utils.TemporaryChange;
 const Tokenizer = tokenizer_.Tokenizer;
 const containsLineTerminator = tokenizer_.containsLineTerminator;
 const parseNumericLiteral = literals.parseNumericLiteral;
@@ -23,6 +24,7 @@ core: ParserCore,
 diagnostics: *ptk.Diagnostics,
 state: struct {
     in_class_body: bool = false,
+    in_class_constructor: bool = false,
     in_function_body: bool = false,
     in_method_definition: bool = false,
     call_expression_forbidden: bool = false,
@@ -510,6 +512,25 @@ pub fn acceptCallExpression(self: *Self, primary_expression: ast.Expression) Acc
     return .{ .expression = expression, .arguments = arguments };
 }
 
+pub fn acceptSuperCall(self: *Self) AcceptError!ast.SuperCall {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const super_token = try self.core.accept(RuleSet.is(.super));
+    const arguments = try self.acceptArguments();
+
+    if (!self.state.in_class_constructor) {
+        try self.emitErrorAt(
+            super_token.location,
+            "super() is only allowed in class constructors",
+            .{},
+        );
+        return error.UnexpectedToken;
+    }
+
+    return .{ .arguments = arguments };
+}
+
 pub fn acceptArguments(self: *Self) AcceptError!ast.Arguments {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
@@ -968,6 +989,8 @@ pub fn acceptExpression(self: *Self, ctx: AcceptContext) (ParserCore.AcceptError
         .{ .meta_property = meta_property }
     else |_| if (self.acceptNewExpression()) |new_expression|
         .{ .new_expression = new_expression }
+    else |_| if (self.acceptSuperCall()) |super_call|
+        .{ .super_call = super_call }
     else |_| if (self.acceptPrimaryExpression()) |primary_expression|
         .{ .primary_expression = primary_expression }
     else |_|
@@ -1515,8 +1538,11 @@ pub fn acceptMethodDefinition(
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const tmp = temporaryChange(&self.state, "in_method_definition", true);
-    defer tmp.restore();
+    const tmp1 = temporaryChange(&self.state, "in_method_definition", true);
+    defer tmp1.restore();
+
+    var tmp2: ?TemporaryChange(*@TypeOf(self.state), "in_class_constructor") = null;
+    defer if (tmp2) |tmp| tmp.restore();
 
     const property_name = try self.acceptPropertyName();
     if (method_type == null and
@@ -1528,6 +1554,9 @@ pub fn acceptMethodDefinition(
         const set = std.mem.eql(u8, identifier, "set");
         if (get or set) {
             return acceptMethodDefinition(self, if (get) .get else .set);
+        }
+        if (self.state.in_class_body and std.mem.eql(u8, identifier, "constructor")) {
+            tmp2 = temporaryChange(&self.state, "in_class_constructor", true);
         }
     }
     _ = try self.core.accept(RuleSet.is(.@"("));

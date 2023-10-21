@@ -42,6 +42,8 @@ pub const Instruction = enum(u8) {
     evaluate_property_access_with_expression_key,
     /// Store EvaluatePropertyAccessWithIdentifierKey() as the result value.
     evaluate_property_access_with_identifier_key,
+    // Store evaluation of a super() call as the result value.
+    evaluate_super_call,
     /// Store GetNewTarget() as the result value.
     get_new_target,
     /// Store GetValue() as the result value.
@@ -153,6 +155,7 @@ pub const Instruction = enum(u8) {
             .create_catch_binding,
             .evaluate_new,
             .evaluate_property_access_with_expression_key,
+            .evaluate_super_call,
             .instantiate_arrow_function_expression,
             .instantiate_async_arrow_function_expression,
             .instantiate_async_function_expression,
