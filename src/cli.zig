@@ -25,6 +25,11 @@ const formatParseErrorHint = kiesel.utils.formatParseErrorHint;
 const getOption = kiesel.types.getOption;
 const ordinaryObjectCreate = kiesel.builtins.ordinaryObjectCreate;
 
+var tracked_promise_rejections: std.AutoArrayHashMap(
+    *kiesel.builtins.Promise,
+    Agent.HostHooks.PromiseRejectionTrackerOperation,
+) = undefined;
+
 const bdwgc_version_string = std.fmt.comptimePrint("{}.{}.{}", .{
     gc.c.GC_VERSION_MAJOR,
     gc.c.GC_VERSION_MINOR,
@@ -168,6 +173,7 @@ fn run(
     if (agent.options.debug.print_ast) try script.ecmascript_code.print(stdout);
 
     defer {
+        // Run queued promise jobs
         while (agent.queued_promise_jobs.items.len != 0) {
             const queued_promise_job = agent.queued_promise_jobs.orderedRemove(0);
             const current_realm = agent.runningExecutionContext().realm;
@@ -177,6 +183,24 @@ fn run(
             _ = queued_promise_job.job.func(queued_promise_job.job.captures) catch {};
             agent.runningExecutionContext().realm = current_realm;
         }
+
+        // Report tracked promise rejections
+        var it = tracked_promise_rejections.iterator();
+        while (it.next()) |entry| {
+            const promise = entry.key_ptr.*;
+            const operation = entry.value_ptr.*;
+            switch (operation) {
+                .reject => stderr.print(
+                    "A promise was rejected without any handlers: {pretty}\n",
+                    .{Value.from(promise.object())},
+                ) catch {},
+                .handle => stderr.print(
+                    "A handler was added to an already rejected promise: {pretty}\n",
+                    .{Value.from(promise.object())},
+                ) catch {},
+            }
+        }
+        tracked_promise_rejections.clearAndFree();
     }
     return script.evaluate() catch |err| switch (err) {
         error.OutOfMemory => {
@@ -337,6 +361,26 @@ pub fn main() !u8 {
         },
     });
     defer agent.deinit();
+
+    tracked_promise_rejections = @TypeOf(tracked_promise_rejections).init(agent.gc_allocator);
+    defer tracked_promise_rejections.deinit();
+
+    agent.host_hooks.hostPromiseRejectionTracker = struct {
+        fn func(
+            promise: *kiesel.builtins.Promise,
+            operation: Agent.HostHooks.PromiseRejectionTrackerOperation,
+        ) void {
+            if (tracked_promise_rejections.get(promise)) |previous_operation| {
+                // Don't report `Promise.reject().catch(handler)` evaluated in a single script
+                if (previous_operation == .reject and operation == .handle) {
+                    _ = tracked_promise_rejections.orderedRemove(promise);
+                    return;
+                }
+            }
+            tracked_promise_rejections.put(promise, operation) catch {};
+        }
+    }.func;
+
     try Realm.initializeHostDefinedRealm(&agent, .{});
     const realm = agent.currentRealm();
     try defineBuiltinProperty(realm.global_object, "Kiesel", Value.from(try Kiesel.create(realm)));
