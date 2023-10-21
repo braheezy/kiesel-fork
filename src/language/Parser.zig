@@ -1544,6 +1544,12 @@ pub fn acceptMethodDefinition(
     var tmp2: ?TemporaryChange(*@TypeOf(self.state), "in_class_constructor") = null;
     defer if (tmp2) |tmp| tmp.restore();
 
+    if (method_type == null) {
+        if (self.core.accept(RuleSet.is(.@"*"))) |_|
+            return acceptMethodDefinition(self, .generator)
+        else |_| {}
+    }
+
     const property_name = try self.acceptPropertyName();
     if (method_type == null and
         property_name == .literal_property_name and
@@ -1565,24 +1571,26 @@ pub fn acceptMethodDefinition(
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
-    const function_body = try self.acceptFunctionBody(.normal);
+    const function_body_type: ast.FunctionBody.Type = switch (method_type orelse .method) {
+        .method, .get, .set => .normal,
+        .generator => .generator,
+    };
+    const function_body = try self.acceptFunctionBody(function_body_type);
     _ = try self.core.accept(RuleSet.is(.@"}"));
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
         u8,
         self.core.tokenizer.source[start_offset..end_offset],
     );
-    const function_expression = ast.FunctionExpression{
-        .identifier = null,
-        .formal_parameters = formal_parameters,
-        .function_body = function_body,
-        .source_text = source_text,
+    const method = switch (method_type orelse .method) {
+        inline else => |@"type"| @unionInit(ast.MethodDefinition.Method, @tagName(@"type"), .{
+            .identifier = null,
+            .formal_parameters = formal_parameters,
+            .function_body = function_body,
+            .source_text = source_text,
+        }),
     };
-    return .{
-        .property_name = property_name,
-        .function_expression = function_expression,
-        .type = method_type orelse .method,
-    };
+    return .{ .property_name = property_name, .method = method };
 }
 
 fn acceptGeneratorDeclaration(self: *Self) AcceptError!ast.GeneratorDeclaration {
@@ -1795,7 +1803,9 @@ fn acceptClassElement(self: *Self) AcceptError!ast.ClassElement {
 
     if (self.acceptKeyword("static")) |_| {
         if (self.acceptMethodDefinition(null)) |*method_definition| {
-            @constCast(method_definition).function_expression.function_body.strict = true;
+            switch (method_definition.method) {
+                inline else => |*expression| @constCast(expression).function_body.strict = true,
+            }
             return .{ .static_method_definition = method_definition.* };
         } else |_| if (self.acceptFieldDefinition()) |field_definition| {
             _ = try self.core.accept(RuleSet.is(.@";"));
@@ -1806,7 +1816,9 @@ fn acceptClassElement(self: *Self) AcceptError!ast.ClassElement {
             return .{ .class_static_block = class_static_block };
         } else |_| return error.UnexpectedToken;
     } else |_| if (self.acceptMethodDefinition(null)) |*method_definition| {
-        @constCast(method_definition).function_expression.function_body.strict = true;
+        switch (method_definition.method) {
+            inline else => |*expression| @constCast(expression).function_body.strict = true,
+        }
         return .{ .method_definition = method_definition.* };
     } else |_| if (self.acceptFieldDefinition()) |field_definition| {
         _ = try self.core.accept(RuleSet.is(.@";"));

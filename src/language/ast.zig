@@ -3428,39 +3428,55 @@ pub const MethodDefinition = struct {
         method,
         get,
         set,
+        generator,
+    };
+
+    pub const Method = union(Type) {
+        method: FunctionExpression,
+        get: FunctionExpression,
+        set: FunctionExpression,
+        generator: GeneratorExpression,
     };
 
     property_name: PropertyName,
-    function_expression: FunctionExpression,
-    type: Type,
+    method: Method,
 
     // 15.4.5 Runtime Semantics: MethodDefinitionEvaluation
     // https://tc39.es/ecma262/#sec-runtime-semantics-methoddefinitionevaluation
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
-        const strict = ctx.contained_in_strict_mode_code or self.function_expression.function_body.functionBodyContainsUseStrict();
+        const strict = ctx.contained_in_strict_mode_code or switch (self.method) {
+            inline else => |expression| expression.function_body.functionBodyContainsUseStrict(),
+        };
 
-        // Copy `function_expression` so that we can assign the function body's
-        // strictness, which is needed for the deferred bytecode generation.
+        // Copy `method` so that we can assign the function body's strictness,
+        // which is needed for the deferred bytecode generation.
         // FIXME: This should ideally happen at parse time.
-        var function_expression = self.function_expression;
-        function_expression.function_body.strict = strict;
+        var method = self.method;
+        switch (method) {
+            inline else => |*expression| expression.function_body.strict = strict,
+        }
 
         try self.property_name.generateBytecode(executable, ctx);
         try executable.addInstruction(.load);
 
         try executable.addInstructionWithFunctionOrClass(
             .object_define_method,
-            .{ .function_expression = function_expression },
+            switch (method) {
+                .method, .get, .set => |function_expression| .{ .function_expression = function_expression },
+                .generator => |generator_expression| .{ .generator_expression = generator_expression },
+            },
         );
-        try executable.addIndex(@intFromEnum(self.type));
+        try executable.addIndex(@intFromEnum(std.meta.activeTag(self.method)));
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("MethodDefinition", writer, indentation);
         try printString("type:", writer, indentation + 1);
-        try printString(@tagName(self.type), writer, indentation + 2);
+        try printString(@tagName(std.meta.activeTag(self.method)), writer, indentation + 2);
         try self.property_name.print(writer, indentation + 1);
-        try self.function_expression.print(writer, indentation + 1);
+        switch (self.method) {
+            inline else => |expression| try expression.print(writer, indentation + 1),
+        }
     }
 };
 

@@ -607,20 +607,19 @@ fn methodDefinitionEvaluation(
     // Like ast.MethodDefinition but with an evaluated ast.PropertyName
     method_definition: struct {
         property_name: Value,
-        function_expression: ast.FunctionExpression,
-        type: ast.MethodDefinition.Type,
+        method: ast.MethodDefinition.Method,
     },
     object: Object,
     enumerable: bool,
 ) !void {
     const realm = agent.currentRealm();
-    switch (method_definition.type) {
+    switch (method_definition.method) {
         // MethodDefinition : ClassElementName ( UniqueFormalParameters ) { FunctionBody }
-        .method => {
+        .method => |function_expression| {
             // 1. Let methodDef be ? DefineMethod of MethodDefinition with argument object.
             const method_def = try defineMethod(
                 agent,
-                method_definition.function_expression,
+                function_expression,
                 method_definition.property_name,
                 object,
                 null,
@@ -634,7 +633,7 @@ fn methodDefinitionEvaluation(
         },
 
         // MethodDefinition : get ClassElementName ( ) { FunctionBody }
-        .get => {
+        .get => |function_expression| {
             // 1. Let propKey be ? Evaluation of ClassElementName.
             const property_key = try method_definition.property_name.toPropertyKey(agent);
 
@@ -645,7 +644,7 @@ fn methodDefinitionEvaluation(
             const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
 
             // 4. Let sourceText be the source text matched by MethodDefinition.
-            const source_text = method_definition.function_expression.source_text;
+            const source_text = function_expression.source_text;
 
             // 5. Let formalParameterList be an instance of the production FormalParameters : [empty] .
             const formal_parameter_list = ast.FormalParameters{ .items = &.{} };
@@ -657,7 +656,7 @@ fn methodDefinitionEvaluation(
                 try realm.intrinsics.@"%Function.prototype%"(),
                 source_text,
                 formal_parameter_list,
-                method_definition.function_expression.function_body,
+                function_expression.function_body,
                 .non_lexical_this,
                 env,
                 private_env,
@@ -692,7 +691,7 @@ fn methodDefinitionEvaluation(
         },
 
         // MethodDefinition : set ClassElementName ( PropertySetParameterList ) { FunctionBody }
-        .set => {
+        .set => |function_expression| {
             // 1. Let propKey be ? Evaluation of ClassElementName.
             const property_key = try method_definition.property_name.toPropertyKey(agent);
 
@@ -703,7 +702,7 @@ fn methodDefinitionEvaluation(
             const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
 
             // 4. Let sourceText be the source text matched by MethodDefinition.
-            const source_text = method_definition.function_expression.source_text;
+            const source_text = function_expression.source_text;
 
             // 5. Let closure be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
             //    PropertySetParameterList, FunctionBody, non-lexical-this, env, privateEnv).
@@ -711,8 +710,8 @@ fn methodDefinitionEvaluation(
                 agent,
                 try realm.intrinsics.@"%Function.prototype%"(),
                 source_text,
-                method_definition.function_expression.formal_parameters,
-                method_definition.function_expression.function_body,
+                function_expression.formal_parameters,
+                function_expression.function_body,
                 .non_lexical_this,
                 env,
                 private_env,
@@ -744,6 +743,59 @@ fn methodDefinitionEvaluation(
 
                 // c. Return unused.
             }
+        },
+
+        // GeneratorMethod : * ClassElementName ( UniqueFormalParameters ) { GeneratorBody }
+        .generator => |generator_expression| {
+            // 1. Let propKey be ? Evaluation of ClassElementName.
+            const property_key = try method_definition.property_name.toPropertyKey(agent);
+
+            // 2. Let env be the running execution context's LexicalEnvironment.
+            const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+            // 3. Let privateEnv be the running execution context's PrivateEnvironment.
+            const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+
+            // 4. Let sourceText be the source text matched by GeneratorMethod.
+            const source_text = generator_expression.source_text;
+
+            // 5. Let closure be OrdinaryFunctionCreate(%GeneratorFunction.prototype%, sourceText,
+            //    UniqueFormalParameters, GeneratorBody, non-lexical-this, env, privateEnv).
+            const closure = try ordinaryFunctionCreate(
+                agent,
+                try realm.intrinsics.@"%GeneratorFunction.prototype%"(),
+                source_text,
+                generator_expression.formal_parameters,
+                generator_expression.function_body,
+                .non_lexical_this,
+                env,
+                private_env,
+            );
+
+            // 6. Perform MakeMethod(closure, object).
+            makeMethod(closure.as(builtins.ECMAScriptFunction), object);
+
+            // 7. Perform SetFunctionName(closure, propKey).
+            try setFunctionName(closure, property_key, null);
+
+            // 8. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
+            const prototype = try ordinaryObjectCreate(
+                agent,
+                try realm.intrinsics.@"%GeneratorFunction.prototype.prototype%"(),
+            );
+
+            // 9. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
+            //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
+            //    }).
+            closure.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+                .value = Value.from(prototype),
+                .writable = true,
+                .enumerable = false,
+                .configurable = false,
+            }) catch |err| try noexcept(err);
+
+            // 10. Return DefineMethodProperty(object, propKey, closure, enumerable).
+            try defineMethodProperty(object, property_key, closure, enumerable);
         },
     }
 }
@@ -1156,11 +1208,7 @@ fn classElementEvaluation(
             )).value.?;
             try methodDefinitionEvaluation(
                 agent,
-                .{
-                    .property_name = property_name,
-                    .function_expression = method_definition.function_expression,
-                    .type = method_definition.type,
-                },
+                .{ .property_name = property_name, .method = method_definition.method },
                 object,
                 false,
             );
@@ -1397,7 +1445,7 @@ fn classDefinitionEvaluation(
         //    constructorParent.
         const constructor_info = defineMethod(
             agent,
-            constructor.?.function_expression,
+            constructor.?.method.method,
             Value.from("constructor"),
             prototype,
             constructor_parent,
@@ -2325,17 +2373,23 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             self.result = Value.from(object);
         },
         .object_define_method => {
-            const function_expression = self.fetchFunctionOrClass(executable).function_expression;
-            const method_type_raw = self.fetchIndex(executable);
+            const function_or_class = self.fetchFunctionOrClass(executable);
+            const method_type: ast.MethodDefinition.Type = @enumFromInt((self.fetchIndex(executable)));
+            const method = switch (method_type) {
+                inline else => |@"type"| @unionInit(
+                    ast.MethodDefinition.Method,
+                    @tagName(@"type"),
+                    @field(function_or_class, switch (@"type") {
+                        .method, .get, .set => "function_expression",
+                        .generator => "generator_expression",
+                    }),
+                ),
+            };
             const property_name = self.stack.pop();
             const object = self.stack.pop().object;
             try methodDefinitionEvaluation(
                 self.agent,
-                .{
-                    .property_name = property_name,
-                    .function_expression = function_expression,
-                    .type = @enumFromInt(method_type_raw),
-                },
+                .{ .property_name = property_name, .method = method },
                 object,
                 true,
             );
