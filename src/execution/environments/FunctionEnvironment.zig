@@ -101,3 +101,20 @@ pub fn getThisBinding(self: Self) !Value {
     // 3. Return envRec.[[ThisValue]].
     return self.this_value;
 }
+
+/// 9.1.1.3.5 GetSuperBase ( )
+/// https://tc39.es/ecma262/#sec-getsuperbase
+pub fn getSuperBase(self: Self) !Value {
+    // 1. Let home be envRec.[[FunctionObject]].[[HomeObject]].
+    const home = self.function_object.fields.home_object;
+
+    // 2. If home is undefined, return undefined.
+    if (home == null) return .undefined;
+
+    // 3. Assert: home is an Object.
+    // 4. Return ? home.[[GetPrototypeOf]]().
+    return if (try home.?.internalMethods().getPrototypeOf(home.?)) |prototype|
+        Value.from(prototype)
+    else
+        .null;
+}

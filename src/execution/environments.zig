@@ -121,6 +121,13 @@ pub const Environment = union(enum) {
             else => unreachable,
         };
     }
+
+    pub fn getSuperBase(self: Self) !Value {
+        return switch (self) {
+            .function_environment => |env| env.getSuperBase(),
+            else => unreachable,
+        };
+    }
 };
 
 /// 9.1.2.1 GetIdentifierReference ( env, name, strict )
