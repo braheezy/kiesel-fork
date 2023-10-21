@@ -1730,6 +1730,7 @@ pub const AssignmentExpression = struct {
 
             // 2. Let lval be ? GetValue(lref).
             if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
 
             // 3. Let lbool be ToBoolean(lval).
             try executable.addInstruction(.jump_conditional);
