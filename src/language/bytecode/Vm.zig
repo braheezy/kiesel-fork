@@ -797,6 +797,43 @@ fn methodDefinitionEvaluation(
             // 10. Return DefineMethodProperty(object, propKey, closure, enumerable).
             try defineMethodProperty(object, property_key, closure, enumerable);
         },
+
+        // AsyncMethod : async ClassElementName ( UniqueFormalParameters ) { AsyncFunctionBody }
+        .@"async" => |async_function_expression| {
+            // 1. Let propKey be ? Evaluation of ClassElementName.
+            const property_key = try method_definition.property_name.toPropertyKey(agent);
+
+            // 2. Let env be the LexicalEnvironment of the running execution context.
+            const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+            // 3. Let privateEnv be the running execution context's PrivateEnvironment.
+            const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+
+            // 4. Let sourceText be the source text matched by AsyncMethod.
+            const source_text = async_function_expression.source_text;
+
+            // 5. Let closure be OrdinaryFunctionCreate(%AsyncFunction.prototype%, sourceText,
+            //    UniqueFormalParameters, AsyncFunctionBody, non-lexical-this, env, privateEnv).
+            const closure = try ordinaryFunctionCreate(
+                agent,
+                try realm.intrinsics.@"%AsyncFunction.prototype%"(),
+                source_text,
+                async_function_expression.formal_parameters,
+                async_function_expression.function_body,
+                .non_lexical_this,
+                env,
+                private_env,
+            );
+
+            // 6. Perform MakeMethod(closure, object).
+            makeMethod(closure.as(builtins.ECMAScriptFunction), object);
+
+            // 7. Perform SetFunctionName(closure, propKey).
+            try setFunctionName(closure, property_key, null);
+
+            // 8. Return DefineMethodProperty(object, propKey, closure, enumerable).
+            try defineMethodProperty(object, property_key, closure, enumerable);
+        },
     }
 }
 
@@ -2382,6 +2419,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
                     @field(function_or_class, switch (@"type") {
                         .method, .get, .set => "function_expression",
                         .generator => "generator_expression",
+                        .@"async" => "async_function_expression",
                     }),
                 ),
             };

@@ -1547,6 +1547,8 @@ pub fn acceptMethodDefinition(
     if (method_type == null) {
         if (self.core.accept(RuleSet.is(.@"*"))) |_|
             return acceptMethodDefinition(self, .generator)
+        else |_| if (self.acceptKeyword("async")) |_|
+            return acceptMethodDefinition(self, .@"async")
         else |_| {}
     }
 
@@ -1574,6 +1576,7 @@ pub fn acceptMethodDefinition(
     const function_body_type: ast.FunctionBody.Type = switch (method_type orelse .method) {
         .method, .get, .set => .normal,
         .generator => .generator,
+        .@"async" => .@"async",
     };
     const function_body = try self.acceptFunctionBody(function_body_type);
     _ = try self.core.accept(RuleSet.is(.@"}"));

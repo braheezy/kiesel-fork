@@ -3429,6 +3429,7 @@ pub const MethodDefinition = struct {
         get,
         set,
         generator,
+        @"async",
     };
 
     pub const Method = union(Type) {
@@ -3436,6 +3437,7 @@ pub const MethodDefinition = struct {
         get: FunctionExpression,
         set: FunctionExpression,
         generator: GeneratorExpression,
+        @"async": AsyncFunctionExpression,
     };
 
     property_name: PropertyName,
@@ -3464,6 +3466,7 @@ pub const MethodDefinition = struct {
             switch (method) {
                 .method, .get, .set => |function_expression| .{ .function_expression = function_expression },
                 .generator => |generator_expression| .{ .generator_expression = generator_expression },
+                .@"async" => |async_function_expression| .{ .async_function_expression = async_function_expression },
             },
         );
         try executable.addIndex(@intFromEnum(std.meta.activeTag(self.method)));
