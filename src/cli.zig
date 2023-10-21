@@ -323,7 +323,7 @@ pub fn main() !u8 {
         };
 
         pub const meta = .{
-            .summary = "[options] [file]",
+            .usage_summary = "[options] [file]",
             .option_docs = .{
                 .command = "Run the given code as a script",
                 .@"disable-gc" = "Disable garbage collection",

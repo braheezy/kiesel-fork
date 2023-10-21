@@ -11,8 +11,8 @@
             .hash = "122078afb2452cc02a9b6b52fde9fb91fda951e5f507a52002058b8d93a268e95bf6",
         },
         .libregexp = .{
-            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/9dac5e90d6626cbf796c0dc1f272a4ac2b188e00.tar.gz",
-            .hash = "12205de931f30201b793f5dea74907fdac7f0e65a082b34d3a43ffed29cc393be239",
+            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/7bd15f643c13c685d5221ce956a73fb401133961.tar.gz",
+            .hash = "1220165d3b16ff06b8ee31be922b64a185285c192cf5c9b79d09428250e592507c1b",
         },
         // FIXME: This points to https://github.com/joachimschmidt557/linenoize/pull/17, update when merged
         .linenoise = .{
@@ -20,12 +20,12 @@
             .hash = "1220be133956a58d7e19a2dfb5c65e5afe0452530106a5b06f2239a352067234524c",
         },
         .parser_toolkit = .{
-            .url = "https://github.com/MasterQ32/parser-toolkit/archive/7e7188bfaa46d0ba36d1ef31c1f368d264aa6876.tar.gz",
-            .hash = "12202ae562efbd6a4f12f1b10c5237329d19d1be15eec7fa1b0b02f5658500bfcbfd",
+            .url = "https://github.com/MasterQ32/parser-toolkit/archive/33d8f6f3793f972aa1b33d3b85b5a4f17654585e.tar.gz",
+            .hash = "1220122d27fddf43498a981807a6ae28987ce4dd9e4e8c834be0b04aa6a4a87bc00e",
         },
         .zig_args = .{
-            .url = "https://github.com/MasterQ32/zig-args/archive/bb2eced8ddf28114b3a1ff761c2d80b90b1a61e2.tar.gz",
-            .hash = "12208556082c280af264ca2a174fd04fc7a35f865bfe59e2c61f4a977bf7a65063e4",
+            .url = "https://github.com/MasterQ32/zig-args/archive/7989929d055ef7618e60de84cc54644046516fdb.tar.gz",
+            .hash = "12207752d975a7f5d7cc65662ed1c6b117da8dec6d1bd7af9a39e1b65d90bf86e833",
         },
     },
     .paths = .{
