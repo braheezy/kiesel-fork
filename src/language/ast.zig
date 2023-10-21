@@ -213,6 +213,68 @@ pub const MemberExpression = struct {
     }
 };
 
+/// https://tc39.es/ecma262/#prod-SuperProperty
+pub const SuperProperty = union(enum) {
+    const Self = @This();
+
+    expression: *Expression,
+    identifier: Identifier,
+
+    /// 13.3.7.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        switch (self) {
+            // SuperProperty : super [ Expression ]
+            .expression => |expression| {
+                // 1. Let env be GetThisEnvironment().
+                // 2. Let actualThis be ? env.GetThisBinding().
+                try executable.addInstruction(.load_this_value_for_make_super_property_reference);
+
+                // 3. Let propertyNameReference be ? Evaluation of Expression.
+                try expression.generateBytecode(executable, ctx);
+
+                // 4. Let propertyNameValue be ? GetValue(propertyNameReference).
+                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                try executable.addInstruction(.load);
+
+                // 6. If the source text matched by this SuperProperty is strict mode code, let
+                //    strict be true; else let strict be false.
+                const strict = ctx.contained_in_strict_mode_code;
+
+                // 7. Return ? MakeSuperPropertyReference(actualThis, propertyKey, strict).
+                try executable.addInstruction(.make_super_property_reference);
+                try executable.addIndex(@intFromBool(strict));
+            },
+
+            // SuperProperty : super . IdentifierName
+            .identifier => |identifier| {
+                // 1. Let env be GetThisEnvironment().
+                // 2. Let actualThis be ? env.GetThisBinding().
+                try executable.addInstruction(.load_this_value_for_make_super_property_reference);
+
+                // 3. Let propertyKey be StringValue of IdentifierName.
+                try executable.addInstructionWithConstant(.load_constant, Value.from(identifier));
+
+                // 4. If the source text matched by this SuperProperty is strict mode code, let
+                //    strict be true; else let strict be false.
+                const strict = ctx.contained_in_strict_mode_code;
+
+                // 5. Return ? MakeSuperPropertyReference(actualThis, propertyKey, strict).
+                try executable.addInstruction(.make_super_property_reference);
+                try executable.addIndex(@intFromBool(strict));
+            },
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("SuperProperty", writer, indentation);
+        switch (self) {
+            .expression => |expression| try expression.print(writer, indentation + 1),
+            .identifier => |identifier| try printString(identifier, writer, indentation + 1),
+        }
+    }
+};
+
 /// https://tc39.es/ecma262/#prod-MetaProperty
 pub const MetaProperty = union(enum) {
     const Self = @This();
@@ -301,7 +363,7 @@ pub const CallExpression = struct {
         // TODO: 3. Let thisCall be this CallExpression.
         // TODO: 4. Let tailCall be IsInTailPosition(thisCall).
 
-        try executable.addInstruction(.load_this_value);
+        try executable.addInstruction(.load_this_value_for_evaluate_call);
 
         for (self.arguments) |argument| {
             try argument.generateBytecode(executable, ctx);
@@ -1796,6 +1858,7 @@ pub const Expression = union(enum) {
 
     primary_expression: PrimaryExpression,
     member_expression: MemberExpression,
+    super_property: SuperProperty,
     meta_property: MetaProperty,
     new_expression: NewExpression,
     call_expression: CallExpression,
@@ -1833,7 +1896,9 @@ pub const Expression = union(enum) {
                 },
                 else => {},
             },
-            .member_expression => {
+            .member_expression,
+            .super_property,
+            => {
                 // 1. Return simple.
                 return .simple;
             },
@@ -1848,7 +1913,9 @@ pub const Expression = union(enum) {
         return switch (query) {
             .is_reference => switch (self) {
                 .primary_expression => |primary_expression| primary_expression.analyze(query),
-                .member_expression => true,
+                .member_expression,
+                .super_property,
+                => true,
                 else => false,
             },
             .is_string_literal => switch (self) {

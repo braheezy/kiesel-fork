@@ -2194,14 +2194,53 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             const value = self.fetchConstant(executable);
             try self.stack.append(value);
         },
-        .load_this_value => {
+        .load_this_value_for_evaluate_call => {
             const maybe_reference = self.reference_stack.getLast();
             const this_value = evaluateCallGetThisValue(maybe_reference);
             try self.stack.append(this_value);
         },
+        .load_this_value_for_make_super_property_reference => {
+            // 1. Let env be GetThisEnvironment().
+            const env = self.agent.getThisEnvironment();
+
+            // 2. Let actualThis be ? env.GetThisBinding().
+            const actual_this = try env.getThisBinding();
+
+            try self.stack.append(actual_this);
+        },
         .logical_not => {
             const value = self.result.?;
             self.result = Value.from(!value.toBoolean());
+        },
+        // 13.3.7.3 MakeSuperPropertyReference ( actualThis, propertyKey, strict )
+        // https://tc39.es/ecma262/#sec-makesuperpropertyreference
+        .make_super_property_reference => {
+            const property_name_value = self.stack.pop();
+            const strict = self.fetchIndex(executable) == 1;
+            const actual_this = self.stack.pop();
+            const property_key = try property_name_value.toPropertyKey(self.agent);
+
+            // 1. Let env be GetThisEnvironment().
+            const env = self.agent.getThisEnvironment();
+
+            // 2. Assert: env.HasSuperBinding() is true.
+            std.debug.assert(env.hasSuperBinding());
+
+            // 3. Let baseValue be ? env.GetSuperBase().
+            const base_value = try env.getSuperBase();
+
+            // 4. Return the Reference Record {
+            //      [[Base]]: baseValue, [[ReferencedName]]: propertyKey, [[Strict]]: strict, [[ThisValue]]: actualThis
+            //    }.
+            self.reference = Reference{
+                .base = .{ .value = base_value },
+                .referenced_name = switch (try property_key.toStringOrSymbol(self.agent)) {
+                    .string => |string| .{ .string = string },
+                    .symbol => |symbol| .{ .symbol = symbol },
+                },
+                .strict = strict,
+                .this_value = actual_this,
+            };
         },
         .object_create => {
             const object = try ordinaryObjectCreate(

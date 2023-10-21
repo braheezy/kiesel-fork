@@ -167,7 +167,9 @@ pub fn print(self: Self, writer: anytype) !void {
                 const argument_count = iterator.instruction_args[0].?;
                 try writer.print("(argument_count: {})", .{argument_count});
             },
-            .evaluate_property_access_with_expression_key => {
+            .evaluate_property_access_with_expression_key,
+            .make_super_property_reference,
+            => {
                 const strict = iterator.instruction_args[0].? == 1;
                 try writer.print("(strict: {})", .{strict});
             },

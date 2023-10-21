@@ -22,7 +22,9 @@ allocator: Allocator,
 core: ParserCore,
 diagnostics: *ptk.Diagnostics,
 state: struct {
+    in_class_body: bool = false,
     in_function_body: bool = false,
+    in_method_definition: bool = false,
     call_expression_forbidden: bool = false,
 } = .{},
 
@@ -425,6 +427,34 @@ pub fn acceptMemberExpression(self: *Self, primary_expression: ast.Expression) A
     const expression = try self.allocator.create(ast.Expression);
     expression.* = primary_expression;
     return .{ .expression = expression, .property = property };
+}
+
+pub fn acceptSuperProperty(self: *Self) AcceptError!ast.SuperProperty {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const super_token = try self.core.accept(RuleSet.is(.super));
+    const token = try self.core.accept(RuleSet.oneOf(.{ .@"[", .@"." }));
+
+    if (!(self.state.in_class_body or self.state.in_method_definition)) {
+        try self.emitErrorAt(
+            super_token.location,
+            "super property is only allowed in classes and method definitions",
+            .{},
+        );
+        return error.UnexpectedToken;
+    }
+
+    return switch (token.type) {
+        .@"[" => blk: {
+            const expression = try self.allocator.create(ast.Expression);
+            expression.* = try self.acceptExpression(.{});
+            _ = try self.core.accept(RuleSet.is(.@"]"));
+            break :blk .{ .expression = expression };
+        },
+        .@"." => .{ .identifier = try self.acceptIdentifierName() },
+        else => unreachable,
+    };
 }
 
 pub fn acceptMetaProperty(self: *Self) AcceptError!ast.MetaProperty {
@@ -932,6 +962,8 @@ pub fn acceptExpression(self: *Self, ctx: AcceptContext) (ParserCore.AcceptError
         .{ .unary_expression = unary_expression }
     else |_| if (self.acceptUpdateExpression(null)) |update_expression|
         .{ .update_expression = update_expression }
+    else |_| if (self.acceptSuperProperty()) |super_property|
+        .{ .super_property = super_property }
     else |_| if (self.acceptMetaProperty()) |meta_property|
         .{ .meta_property = meta_property }
     else |_| if (self.acceptNewExpression()) |new_expression|
@@ -1483,6 +1515,9 @@ pub fn acceptMethodDefinition(
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const tmp = temporaryChange(&self.state, "in_method_definition", true);
+    defer tmp.restore();
+
     const property_name = try self.acceptPropertyName();
     if (method_type == null and
         property_name == .literal_property_name and
@@ -1706,6 +1741,9 @@ fn acceptClassTail(self: *Self) AcceptError!ast.ClassTail {
 fn acceptClassBody(self: *Self) AcceptError!ast.ClassBody {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
+
+    const tmp = temporaryChange(&self.state, "in_class_body", true);
+    defer tmp.restore();
 
     const class_element_list = try self.acceptClassElementList();
     return .{ .class_element_list = class_element_list };

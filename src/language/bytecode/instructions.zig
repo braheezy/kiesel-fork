@@ -86,9 +86,13 @@ pub const Instruction = enum(u8) {
     /// Load a constant and add it to the stack.
     load_constant,
     /// Determine the this value for an upcoming evaluate_call instruction and add it to the stack.
-    load_this_value,
+    load_this_value_for_evaluate_call,
+    /// Determine the this value for an upcoming make_super_property_reference instruction and add it to the stack.
+    load_this_value_for_make_super_property_reference,
     /// Apply logical NOT to the last value on the stack and store it as the result value.
     logical_not,
+    /// Store MakeSuperPropertyReference() as the result value.
+    make_super_property_reference,
     /// Store OrdinaryObjectCreate(%Object.prototype%) as the result value.
     object_create,
     /// Set an object's property to the given function expression.
@@ -157,6 +161,7 @@ pub const Instruction = enum(u8) {
             .instantiate_ordinary_function_expression,
             .jump,
             .load_constant,
+            .make_super_property_reference,
             .push_exception_jump_target,
             .store_constant,
             => 1,
