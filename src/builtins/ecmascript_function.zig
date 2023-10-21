@@ -770,13 +770,8 @@ pub fn setFunctionName(
         function.extensible().* and !function.propertyStorage().has(PropertyKey.from("name")),
     );
 
-    var name = switch (name_property_key) {
-        .string => |string| string,
-        .integer_index => |integer_index| String.from(try std.fmt.allocPrint(
-            agent.gc_allocator,
-            "{d}",
-            .{integer_index},
-        )),
+    var name = switch (try name_property_key.toStringOrSymbol(agent)) {
+        .string => |string| String.from(string),
 
         // 2. If name is a Symbol, then
         .symbol => |symbol| blk: {

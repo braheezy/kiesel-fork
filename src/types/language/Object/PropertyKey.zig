@@ -91,4 +91,19 @@ pub const PropertyKey = union(enum) {
             )),
         };
     }
+
+    /// Non-standard helper to convert a `PropertyKey` to a `[]const u8` or `Symbol` (i.e. bypassing
+    /// the integer index optimization).
+    pub fn toStringOrSymbol(self: Self, agent: *Agent) !union(enum) {
+        string: []const u8,
+        symbol: Symbol,
+    } {
+        return switch (self) {
+            .string => |string| .{ .string = string.utf8 },
+            .symbol => |symbol| .{ .symbol = symbol },
+            .integer_index => |integer_index| .{
+                .string = try std.fmt.allocPrint(agent.gc_allocator, "{}", .{integer_index}),
+            },
+        };
+    }
 };
