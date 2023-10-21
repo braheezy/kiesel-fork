@@ -798,6 +798,59 @@ fn methodDefinitionEvaluation(
             try defineMethodProperty(object, property_key, closure, enumerable);
         },
 
+        // AsyncGeneratorMethod : async * ClassElementName ( UniqueFormalParameters ) { AsyncGeneratorBody }
+        .async_generator => |async_generator_expression| {
+            // 1. Let propKey be ? Evaluation of ClassElementName.
+            const property_key = try method_definition.property_name.toPropertyKey(agent);
+
+            // 2. Let env be the running execution context's LexicalEnvironment.
+            const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+            // 3. Let privateEnv be the running execution context's PrivateEnvironment.
+            const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+
+            // 4. Let sourceText be the source text matched by AsyncGeneratorMethod.
+            const source_text = async_generator_expression.source_text;
+
+            // 5. Let closure be OrdinaryFunctionCreate(%AsyncGeneratorFunction.prototype%,
+            //    sourceText, UniqueFormalParameters, AsyncGeneratorBody, non-lexical-this, env, privateEnv).
+            const closure = try ordinaryFunctionCreate(
+                agent,
+                try realm.intrinsics.@"%AsyncFunction.prototype%"(),
+                source_text,
+                async_generator_expression.formal_parameters,
+                async_generator_expression.function_body,
+                .non_lexical_this,
+                env,
+                private_env,
+            );
+
+            // 6. Perform MakeMethod(closure, object).
+            makeMethod(closure.as(builtins.ECMAScriptFunction), object);
+
+            // 7. Perform SetFunctionName(closure, propKey).
+            try setFunctionName(closure, property_key, null);
+
+            // 8. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
+            const prototype = try ordinaryObjectCreate(
+                agent,
+                try realm.intrinsics.@"%AsyncGeneratorFunction.prototype.prototype%"(),
+            );
+
+            // 9. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
+            //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
+            //    }).
+            closure.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+                .value = Value.from(prototype),
+                .writable = true,
+                .enumerable = false,
+                .configurable = false,
+            }) catch |err| try noexcept(err);
+
+            // 10. Return DefineMethodProperty(object, propKey, closure, enumerable).
+            try defineMethodProperty(object, property_key, closure, enumerable);
+        },
+
         // AsyncMethod : async ClassElementName ( UniqueFormalParameters ) { AsyncFunctionBody }
         .@"async" => |async_function_expression| {
             // 1. Let propKey be ? Evaluation of ClassElementName.
@@ -2420,6 +2473,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
                         .method, .get, .set => "function_expression",
                         .generator => "generator_expression",
                         .@"async" => "async_function_expression",
+                        .async_generator => "async_generator_expression",
                     }),
                 ),
             };

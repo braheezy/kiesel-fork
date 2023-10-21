@@ -1547,9 +1547,12 @@ pub fn acceptMethodDefinition(
     if (method_type == null) {
         if (self.core.accept(RuleSet.is(.@"*"))) |_|
             return acceptMethodDefinition(self, .generator)
-        else |_| if (self.acceptKeyword("async")) |_|
-            return acceptMethodDefinition(self, .@"async")
-        else |_| {}
+        else |_| if (self.acceptKeyword("async")) |_| {
+            return if (self.core.accept(RuleSet.is(.@"*"))) |_|
+                acceptMethodDefinition(self, .async_generator)
+            else |_|
+                acceptMethodDefinition(self, .@"async");
+        } else |_| {}
     }
 
     const property_name = try self.acceptPropertyName();
@@ -1577,6 +1580,7 @@ pub fn acceptMethodDefinition(
         .method, .get, .set => .normal,
         .generator => .generator,
         .@"async" => .@"async",
+        .async_generator => .async_generator,
     };
     const function_body = try self.acceptFunctionBody(function_body_type);
     _ = try self.core.accept(RuleSet.is(.@"}"));
