@@ -383,7 +383,10 @@ pub fn rejectPromise(agent: *Agent, promise: *Promise, reason: Value) !void {
     // 6. Set promise.[[PromiseState]] to rejected.
     promise.fields.promise_state = .rejected;
 
-    // TODO: 7. If promise.[[PromiseIsHandled]] is false, perform HostPromiseRejectionTracker(promise, "reject").
+    // 7. If promise.[[PromiseIsHandled]] is false, perform HostPromiseRejectionTracker(promise, "reject").
+    if (!promise.fields.promise_is_handled) {
+        agent.host_hooks.hostPromiseRejectionTracker(promise, .reject);
+    }
 
     // 8. Perform TriggerPromiseReactions(reactions, reason).
     try triggerPromiseReactions(agent, reactions.items, reason);
@@ -712,7 +715,10 @@ pub fn performPromiseThen(
             // b. Let reason be promise.[[PromiseResult]].
             const reason = promise.fields.promise_result;
 
-            // TODO: c. If promise.[[PromiseIsHandled]] is false, perform HostPromiseRejectionTracker(promise, "handle").
+            // c. If promise.[[PromiseIsHandled]] is false, perform HostPromiseRejectionTracker(promise, "handle").
+            if (!promise.fields.promise_is_handled) {
+                agent.host_hooks.hostPromiseRejectionTracker(promise, .handle);
+            }
 
             // d. Let rejectJob be NewPromiseReactionJob(rejectReaction, reason).
             const reject_job = try newPromiseReactionJob(agent, reject_reaction, reason);

@@ -62,3 +62,12 @@ pub fn hostResizeArrayBuffer(
     // The default implementation of HostResizeArrayBuffer is to return NormalCompletion(unhandled).
     return .unhandled;
 }
+
+/// 27.2.1.9 HostPromiseRejectionTracker ( promise, operation )
+/// https://tc39.es/ecma262/#sec-host-promise-rejection-tracker
+pub fn hostPromiseRejectionTracker(
+    _: *builtins.Promise,
+    _: Agent.HostHooks.PromiseRejectionTrackerOperation,
+) void {
+    // The default implementation of HostPromiseRejectionTracker is to return unused.
+}

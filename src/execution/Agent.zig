@@ -78,6 +78,11 @@ pub const HostHooks = struct {
         unhandled,
     };
 
+    pub const PromiseRejectionTrackerOperation = enum {
+        reject,
+        handle,
+    };
+
     hostMakeJobCallback: *const fn (callback: Object) JobCallback,
     hostCallJobCallback: *const fn (
         job_callback: JobCallback,
@@ -91,7 +96,14 @@ pub const HostHooks = struct {
     ) error{OutOfMemory}!void,
     hostEnsureCanCompileStrings: *const fn (callee_realm: *Realm) Error!void,
     hostHasSourceTextAvailable: *const fn (func: Object) bool,
-    hostResizeArrayBuffer: *const fn (buffer: *builtins.ArrayBuffer, new_byte_length: u53) Error!ResizeArrayBufferHandled,
+    hostResizeArrayBuffer: *const fn (
+        buffer: *builtins.ArrayBuffer,
+        new_byte_length: u53,
+    ) Error!ResizeArrayBufferHandled,
+    hostPromiseRejectionTracker: *const fn (
+        promise: *builtins.Promise,
+        operation: PromiseRejectionTrackerOperation,
+    ) void,
 };
 
 pub const QueuedPromiseJob = struct {
@@ -139,6 +151,7 @@ pub fn init(gc_allocator: Allocator, options: Options) !Self {
         .hostEnsureCanCompileStrings = default_host_hooks.hostEnsureCanCompileStrings,
         .hostHasSourceTextAvailable = default_host_hooks.hostHasSourceTextAvailable,
         .hostResizeArrayBuffer = default_host_hooks.hostResizeArrayBuffer,
+        .hostPromiseRejectionTracker = default_host_hooks.hostPromiseRejectionTracker,
     };
     self.execution_context_stack = std.ArrayList(ExecutionContext).init(self.gc_allocator);
     self.queued_promise_jobs = std.ArrayList(QueuedPromiseJob).init(self.gc_allocator);
