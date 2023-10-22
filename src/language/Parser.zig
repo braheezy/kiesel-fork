@@ -14,6 +14,7 @@ const containsLineTerminator = tokenizer_.containsLineTerminator;
 const parseNumericLiteral = literals.parseNumericLiteral;
 const parseRegularExpressionLiteral = literals.parseRegularExpressionLiteral;
 const parseStringLiteral = literals.parseStringLiteral;
+const parseTemplateLiteral = literals.parseTemplateLiteral;
 const temporaryChange = utils.temporaryChange;
 const reserved_words = tokenizer_.reserved_words;
 
@@ -375,6 +376,8 @@ pub fn acceptPrimaryExpression(self: *Self) AcceptError!ast.PrimaryExpression {
         return .{ .async_generator_expression = async_generator_expression }
     else |_| if (self.acceptRegularExpressionLiteral()) |regular_expression_literal|
         return .{ .regular_expression_literal = regular_expression_literal }
+    else |_| if (self.acceptTemplateLiteral()) |template_literal|
+        return .{ .template_literal = template_literal }
     else |_| if (self.acceptArrowFunction()) |arrow_function|
         return .{ .arrow_function = arrow_function }
     else |_| if (self.acceptAsyncArrowFunction()) |async_arrow_function|
@@ -1872,6 +1875,16 @@ fn acceptRegularExpressionLiteral(self: *Self) AcceptError!ast.RegularExpression
     regular_expression_literal.pattern = try self.allocator.dupe(u8, regular_expression_literal.pattern);
     regular_expression_literal.flags = try self.allocator.dupe(u8, regular_expression_literal.flags);
     return regular_expression_literal;
+}
+
+fn acceptTemplateLiteral(self: *Self) AcceptError!ast.TemplateLiteral {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.is(.template));
+    var template_literal = parseTemplateLiteral(token.text, .complete) catch unreachable;
+    template_literal.text = try self.allocator.dupe(u8, template_literal.text);
+    return template_literal;
 }
 
 fn acceptAsyncFunctionDeclaration(self: *Self) AcceptError!ast.AsyncFunctionDeclaration {

@@ -5,6 +5,7 @@ const literals = @import("literals.zig");
 const parseNumericLiteral = literals.parseNumericLiteral;
 const parseRegularExpressionLiteral = literals.parseRegularExpressionLiteral;
 const parseStringLiteral = literals.parseStringLiteral;
+const parseTemplateLiteral = literals.parseTemplateLiteral;
 
 const TokenType = enum {
     @"--",
@@ -98,6 +99,7 @@ const TokenType = enum {
     string,
     super,
     @"switch",
+    template,
     this,
     throw,
     true,
@@ -124,6 +126,7 @@ const patterns = .{
     Pattern.create(.numeric, numericMatcher),
     Pattern.create(.regular_expression, regularExpressionMatcher),
     Pattern.create(.string, stringMatcher),
+    Pattern.create(.template, templateMatcher),
     Pattern.create(.whitespace, whitespaceMatcher),
     Pattern.create(.@"--", ptk.matchers.literal("--")),
     Pattern.create(.@"-=", ptk.matchers.literal("-=")),
@@ -396,5 +399,13 @@ fn regularExpressionMatcher(str: []const u8) ?usize {
         return regular_expression_literal.pattern.len + regular_expression_literal.flags.len + 2
     else |err| switch (err) {
         error.InvalidRegularExpressionLiteral => return null,
+    }
+}
+
+fn templateMatcher(str: []const u8) ?usize {
+    if (parseTemplateLiteral(str, .partial)) |template_literal|
+        return template_literal.text.len
+    else |err| switch (err) {
+        error.InvalidTemplateLiteral => return null,
     }
 }

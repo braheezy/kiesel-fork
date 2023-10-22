@@ -114,6 +114,7 @@ pub const PrimaryExpression = union(enum) {
     async_function_expression: AsyncFunctionExpression,
     async_generator_expression: AsyncGeneratorExpression,
     regular_expression_literal: RegularExpressionLiteral,
+    template_literal: TemplateLiteral,
     arrow_function: ArrowFunction,
     async_arrow_function: AsyncArrowFunction,
     parenthesized_expression: ParenthesizedExpression,
@@ -986,6 +987,32 @@ pub const RegularExpressionLiteral = struct {
         try printString(self.pattern, writer, indentation + 2);
         try printString("flags:", writer, indentation + 1);
         try printString(self.flags, writer, indentation + 2);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-TemplateLiteral
+pub const TemplateLiteral = struct {
+    const Self = @This();
+
+    text: []const u8,
+
+    /// 13.2.8.6 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-template-literals-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, _: *BytecodeContext) !void {
+        // TemplateLiteral : NoSubstitutionTemplate
+        // 1. Return the TV of NoSubstitutionTemplate as defined in 12.9.6.
+        // TODO: Handle escapes
+        try executable.addInstructionWithConstant(
+            .store_constant,
+            Value.from(self.text[1 .. self.text.len - 1]),
+        );
+
+        // TODO: SubstitutionTemplate : TemplateHead Expression TemplateSpans
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("TemplateLiteral", writer, indentation);
+        try printString(self.text, writer, indentation + 1);
     }
 };
 

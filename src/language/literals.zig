@@ -330,6 +330,77 @@ pub fn parseRegularExpressionLiteral(
     };
 }
 
+/// 12.9.6 Template Literal Lexical Components
+/// https://tc39.es/ecma262/#sec-template-literal-lexical-components
+pub fn parseTemplateLiteral(
+    str: []const u8,
+    consume: enum { partial, complete },
+) !ast.TemplateLiteral {
+    // TODO: This needs more work to handle nested templates correctly, actually parse expressions, etc.
+    var state: enum {
+        start,
+        opening_backtick,
+        closing_backtick,
+        character,
+        backslash,
+        expression_start,
+        expression_end,
+        expression_character,
+    } = .start;
+    for (str, 0..) |c, i| switch (c) {
+        '`' => switch (state) {
+            .start => state = .opening_backtick,
+            .opening_backtick, .character, .expression_end => state = .closing_backtick,
+            .backslash => state = .character,
+            .expression_start, .expression_character => state = .expression_character,
+            else => return error.InvalidTemplateLiteral,
+        },
+        '\\' => switch (state) {
+            .opening_backtick, .character, .expression_end => state = .backslash,
+            .backslash => state = .character,
+            .expression_start, .expression_character => state = .expression_character,
+            else => return error.InvalidTemplateLiteral,
+        },
+        '{' => switch (state) {
+            .opening_backtick, .character, .backslash, .expression_end => state = .character,
+            .expression_start => {
+                state = if (i > 0 and str[i - 1] == '$')
+                    .expression_start
+                else
+                    .expression_character;
+            },
+            .expression_character => state = .expression_character,
+            else => return error.InvalidTemplateLiteral,
+        },
+        '}' => switch (state) {
+            .opening_backtick, .character, .backslash, .expression_end => state = .character,
+            .expression_character => state = .expression_end,
+            else => return error.InvalidTemplateLiteral,
+        },
+        else => switch (state) {
+            .opening_backtick, .character => {
+                state = if (i < str.len - 1 and c == '$' and str[i + 1] == '{')
+                    .expression_start
+                else
+                    .character;
+            },
+            .backslash => state = .character,
+            .expression_start, .expression_character => state = .expression_character,
+            .closing_backtick => switch (consume) {
+                .partial => return .{ .text = str[0..i] },
+                .complete => return error.InvalidTemplateLiteral,
+            },
+            else => return error.InvalidTemplateLiteral,
+        },
+    };
+
+    return switch (state) {
+        // Valid end states after exhausting the input string
+        .closing_backtick => .{ .text = str },
+        else => error.InvalidTemplateLiteral,
+    };
+}
+
 test "parseNumericLiteral" {
     for ([_]ast.NumericLiteral{
         .{ .text = "0", .system = .decimal, .production = .regular, .type = .number },
