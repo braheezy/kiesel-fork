@@ -1547,12 +1547,7 @@ pub fn acceptMethodDefinition(
     if (method_type == null) {
         if (self.core.accept(RuleSet.is(.@"*"))) |_|
             return acceptMethodDefinition(self, .generator)
-        else |_| if (self.acceptKeyword("async")) |_| {
-            return if (self.core.accept(RuleSet.is(.@"*"))) |_|
-                acceptMethodDefinition(self, .async_generator)
-            else |_|
-                acceptMethodDefinition(self, .@"async");
-        } else |_| {}
+        else |_| {}
     }
 
     const property_name = try self.acceptPropertyName();
@@ -1561,10 +1556,15 @@ pub fn acceptMethodDefinition(
         property_name.literal_property_name == .identifier)
     {
         const identifier = property_name.literal_property_name.identifier;
-        const get = std.mem.eql(u8, identifier, "get");
-        const set = std.mem.eql(u8, identifier, "set");
-        if (get or set) {
-            return acceptMethodDefinition(self, if (get) .get else .set);
+        if (self.core.peek() catch null) |next_token| if (next_token.type == .identifier) {
+            if (std.mem.eql(u8, identifier, "get")) return acceptMethodDefinition(self, .get);
+            if (std.mem.eql(u8, identifier, "set")) return acceptMethodDefinition(self, .set);
+            if (std.mem.eql(u8, identifier, "async")) return acceptMethodDefinition(self, .@"async");
+        };
+        if (std.mem.eql(u8, identifier, "async")) {
+            if (self.core.accept(RuleSet.is(.@"*"))) |_|
+                return acceptMethodDefinition(self, .async_generator)
+            else |_| {}
         }
         if (self.state.in_class_body and std.mem.eql(u8, identifier, "constructor")) {
             tmp2 = temporaryChange(&self.state, "in_class_constructor", true);
