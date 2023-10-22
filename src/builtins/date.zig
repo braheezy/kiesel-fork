@@ -149,7 +149,7 @@ pub fn timeFromYear(year: Year) f64 {
 /// https://tc39.es/ecma262/#sec-yearfromtime
 pub fn yearFromTime(t: f64) Year {
     // 1. Return the largest integral Number y (closest to +∞) such that TimeFromYear(y) ≤ t.
-    const year: Year = @intFromFloat(t / (365.2425 * std.time.ms_per_day) + 1970);
+    const year: Year = @intFromFloat(@divFloor(t, (365.2425 * std.time.ms_per_day)) + 1970);
     const t2 = timeFromYear(year);
     if (t2 > t) return year - 1;
     if (t2 + @as(f64, @floatFromInt(daysInYear(year))) * std.time.ms_per_day <= t) return year + 1;
@@ -160,11 +160,7 @@ pub fn yearFromTime(t: f64) Year {
 /// https://tc39.es/ecma262/#sec-daywithinyear
 pub fn dayWithinYear(t: f64) DayWithinYear {
     // 1. Return Day(t) - DayFromYear(YearFromTime(t)).
-    const d = day(t) - dayFromYear(yearFromTime(t));
-    // FIXME: This should not be necessary, but for `new Date(-1111, 0, 0)` this underflows to -1 -
-    //        possible spec issue?
-    if (d < 0) return @intFromFloat(365 + d);
-    return @intFromFloat(d);
+    return @intFromFloat(day(t) - dayFromYear(yearFromTime(t)));
 }
 
 /// 21.4.1.10 InLeapYear ( t )
