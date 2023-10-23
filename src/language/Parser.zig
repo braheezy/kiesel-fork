@@ -1559,7 +1559,7 @@ pub fn acceptMethodDefinition(
         property_name.literal_property_name == .identifier)
     {
         const identifier = property_name.literal_property_name.identifier;
-        if (self.core.peek() catch null) |next_token| if (next_token.type == .identifier) {
+        if (self.core.peek() catch null) |next_token| if (next_token.type != .@"(") {
             if (std.mem.eql(u8, identifier, "get")) return acceptMethodDefinition(self, .get);
             if (std.mem.eql(u8, identifier, "set")) return acceptMethodDefinition(self, .set);
             if (std.mem.eql(u8, identifier, "async")) return acceptMethodDefinition(self, .@"async");
