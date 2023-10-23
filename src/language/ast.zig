@@ -4272,3 +4272,69 @@ pub const Script = struct {
         try self.statement_list.print(writer, indentation + 1);
     }
 };
+
+/// https://tc39.es/ecma262/#prod-Module
+pub const Module = struct {
+    const Self = @This();
+
+    module_item_list: ModuleItemList,
+
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        ctx.contained_in_strict_mode_code = true;
+        try self.module_item_list.generateBytecode(executable, ctx);
+    }
+
+    pub fn print(self: Self, writer: anytype) !void {
+        const indentation: usize = 0;
+        try printString("Module", writer, indentation);
+        try self.module_item_list.print(writer, indentation + 1);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ModuleItemList
+pub const ModuleItemList = struct {
+    const Self = @This();
+
+    items: []const ModuleItem,
+
+    /// 16.2.1.11 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-module-semantics-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // ModuleItemList : ModuleItemList ModuleItem
+        // 1. Let sl be ? Evaluation of ModuleItemList.
+        // 2. Let s be Completion(Evaluation of ModuleItem).
+        // 3. Return ? UpdateEmpty(s, sl).
+        for (self.items) |item| {
+            try item.generateBytecode(executable, ctx);
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'ModuleItemList' here, it's implied and only adds nesting.
+        for (self.items) |item| {
+            try item.print(writer, indentation);
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ModuleItem
+pub const ModuleItem = union(enum) {
+    const Self = @This();
+
+    // TODO: ImportDeclaration
+    // TODO: ExportDeclaration
+    statement_list_item: StatementListItem,
+
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        switch (self) {
+            inline else => |node| try node.generateBytecode(executable, ctx),
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'ModuleItem' here, it's implied and only adds nesting.
+        switch (self) {
+            inline else => |node| try node.print(writer, indentation),
+        }
+    }
+};

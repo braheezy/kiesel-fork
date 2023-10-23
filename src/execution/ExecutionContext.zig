@@ -10,12 +10,11 @@ const Object = types.Object;
 const PrivateEnvironment = environments.PrivateEnvironment;
 const Realm = @import("Realm.zig");
 const Script = language.Script;
-
-const Module = struct {};
+const SourceTextModule = language.SourceTextModule;
 
 pub const ScriptOrModule = union(enum) {
     script: *Script,
-    module: *Module,
+    module: *SourceTextModule,
 };
 
 /// Function

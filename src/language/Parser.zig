@@ -173,14 +173,17 @@ pub fn parse(
     source_text: []const u8,
     ctx: ParseContext,
 ) Error!T {
-    if (T != ast.Script)
-        @compileError("Parser.parse() is only implemented for ast.Script");
+    if (T != ast.Script and T != ast.Module)
+        @compileError("Parser.parse() is only implemented for ast.Script and ast.Module");
 
     return parseNode(
-        ast.Script,
+        T,
         struct {
-            fn accept(parser: *Self) AcceptError!ast.Script {
-                return parser.acceptScript();
+            fn accept(parser: *Self) AcceptError!T {
+                if (T == ast.Script)
+                    return parser.acceptScript()
+                else
+                    return parser.acceptModule();
             }
         }.accept,
         allocator,
@@ -2009,4 +2012,36 @@ pub fn acceptScript(self: *Self) AcceptError!ast.Script {
     _ = self.core.accept(RuleSet.is(.hashbang_comment)) catch {};
     const statement_list = try self.acceptStatementList();
     return .{ .statement_list = statement_list };
+}
+
+pub fn acceptModule(self: *Self) AcceptError!ast.Module {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = self.core.accept(RuleSet.is(.hashbang_comment)) catch {};
+    const module_item_list = try self.acceptModuleItemList();
+    return .{ .module_item_list = module_item_list };
+}
+
+pub fn acceptModuleItemList(self: *Self) AcceptError!ast.ModuleItemList {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    var module_items = std.ArrayList(ast.ModuleItem).init(self.allocator);
+    while (self.acceptModuleItem()) |module_item|
+        try module_items.append(module_item)
+    else |_| {}
+    return .{ .items = try module_items.toOwnedSlice() };
+}
+
+pub fn acceptModuleItem(self: *Self) AcceptError!ast.ModuleItem {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    // TODO: ImportDeclaration
+    // TODO: ExportDeclaration
+    if (self.acceptStatementListItem()) |statement_list_item|
+        return .{ .statement_list_item = statement_list_item }
+    else |_|
+        return error.UnexpectedToken;
 }

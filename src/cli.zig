@@ -16,6 +16,8 @@ const Diagnostics = kiesel.language.Diagnostics;
 const Object = kiesel.types.Object;
 const Realm = kiesel.execution.Realm;
 const Script = kiesel.language.Script;
+const ScriptOrModule = kiesel.execution.ScriptOrModule;
+const SourceTextModule = kiesel.language.SourceTextModule;
 const Value = kiesel.types.Value;
 const coerceOptionsToObject = kiesel.types.coerceOptionsToObject;
 const defineBuiltinFunction = kiesel.utils.defineBuiltinFunction;
@@ -149,10 +151,19 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
     var diagnostics = Diagnostics.init(allocator);
     defer diagnostics.deinit();
 
-    const script = Script.parse(source_text, realm, SafePointer.null_pointer, .{
-        .diagnostics = &diagnostics,
-        .file_name = options.file_name,
-    }) catch |err| switch (err) {
+    const parse_result: error{ ParseError, OutOfMemory }!ScriptOrModule = if (options.module) blk: {
+        break :blk if (SourceTextModule.parse(source_text, realm, SafePointer.null_pointer, .{
+            .diagnostics = &diagnostics,
+            .file_name = options.file_name,
+        })) |module| .{ .module = module } else |err| err;
+    } else blk: {
+        break :blk if (Script.parse(source_text, realm, SafePointer.null_pointer, .{
+            .diagnostics = &diagnostics,
+            .file_name = options.file_name,
+        })) |script| .{ .script = script } else |err| err;
+    };
+
+    const script_or_module = parse_result catch |err| switch (err) {
         error.ParseError => {
             const parse_error = diagnostics.errors.items[0];
             const parse_error_hint = try formatParseErrorHint(allocator, parse_error, source_text);
@@ -168,7 +179,12 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
         error.OutOfMemory => return error.OutOfMemory,
     };
 
-    if (agent.options.debug.print_ast) try script.ecmascript_code.print(stdout);
+    if (agent.options.debug.print_ast) {
+        switch (script_or_module) {
+            .script => |script| try script.ecmascript_code.print(stdout),
+            .module => |module| try module.ecmascript_code.print(stdout),
+        }
+    }
 
     defer {
         // Run queued promise jobs
@@ -200,7 +216,15 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
         }
         tracked_promise_rejections.clearAndFree();
     }
-    return script.evaluate() catch |err| switch (err) {
+
+    return switch (script_or_module) {
+        .script => |script| script.evaluate(),
+        .module => |module| blk: {
+            module.initializeEnvironment() catch |err| break :blk err;
+            module.executeModule(null) catch |err| break :blk err;
+            return .undefined;
+        },
+    } catch |err| switch (err) {
         error.OutOfMemory => {
             try stderr.writeAll("Out of memory\n");
             return null;

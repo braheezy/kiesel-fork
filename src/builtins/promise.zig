@@ -30,7 +30,7 @@ const sameValue = types.sameValue;
 
 /// 27.2.1.1 PromiseCapability Records
 /// https://tc39.es/ecma262/#sec-promisecapability-records
-const PromiseCapability = struct {
+pub const PromiseCapability = struct {
     /// [[Promise]]
     promise: Object,
 
