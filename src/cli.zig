@@ -343,7 +343,6 @@ pub fn main() !u8 {
         try stdout.writeAll(version);
         return 0;
     } else if (parsed_args.options.help) {
-        try stdout.writeAll("Usage: ");
         try args.printHelp(Options, "kiesel", stdout);
         return 0;
     }
