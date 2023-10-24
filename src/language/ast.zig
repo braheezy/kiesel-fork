@@ -281,6 +281,7 @@ pub const MetaProperty = union(enum) {
     const Self = @This();
 
     new_target,
+    import_meta,
 
     /// 13.3.12.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-meta-properties-runtime-semantics-evaluation
@@ -291,6 +292,12 @@ pub const MetaProperty = union(enum) {
                 // 1. Return GetNewTarget().
                 try executable.addInstruction(.get_new_target);
             },
+
+            // ImportMeta : import . meta
+            .import_meta => {
+                // 1-5.
+                try executable.addInstruction(.get_or_create_import_meta);
+            },
         }
     }
 
@@ -298,6 +305,7 @@ pub const MetaProperty = union(enum) {
         try printString("MetaProperty", writer, indentation);
         switch (self) {
             .new_target => try printString("new.target", writer, indentation + 1),
+            .import_meta => try printString("import.meta", writer, indentation + 1),
         }
     }
 };

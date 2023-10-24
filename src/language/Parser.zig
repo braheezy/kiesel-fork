@@ -28,6 +28,7 @@ state: struct {
     in_class_constructor: bool = false,
     in_function_body: bool = false,
     in_method_definition: bool = false,
+    in_module: bool = false,
     call_expression_forbidden: bool = false,
 } = .{},
 
@@ -471,6 +472,8 @@ pub fn acceptMetaProperty(self: *Self) AcceptError!ast.MetaProperty {
 
     if (self.acceptNewTarget())
         return .new_target
+    else |_| if (self.acceptImportMeta())
+        return .import_meta
     else |_|
         return error.UnexpectedToken;
 }
@@ -485,6 +488,20 @@ pub fn acceptNewTarget(self: *Self) AcceptError!void {
 
     if (!self.state.in_function_body) {
         try self.emitErrorAt(token.location, "new.target is only allowed in functions", .{});
+        return error.UnexpectedToken;
+    }
+}
+
+pub fn acceptImportMeta(self: *Self) AcceptError!void {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.is(.import));
+    _ = try self.core.accept(RuleSet.is(.@"."));
+    _ = try self.acceptKeyword("meta");
+
+    if (!self.state.in_module) {
+        try self.emitErrorAt(token.location, "import.meta is only allowed in modules", .{});
         return error.UnexpectedToken;
     }
 }
@@ -2017,6 +2034,9 @@ pub fn acceptScript(self: *Self) AcceptError!ast.Script {
 pub fn acceptModule(self: *Self) AcceptError!ast.Module {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
+
+    const tmp = temporaryChange(&self.state, "in_module", true);
+    defer tmp.restore();
 
     _ = self.core.accept(RuleSet.is(.hashbang_comment)) catch {};
     const module_item_list = try self.acceptModuleItemList();

@@ -46,6 +46,8 @@ pub const Instruction = enum(u8) {
     evaluate_super_call,
     /// Store GetNewTarget() as the result value.
     get_new_target,
+    /// Store the import.meta object as the result value.
+    get_or_create_import_meta,
     /// Store GetValue() as the result value.
     get_value,
     /// Compare the last two values on the stack using the '>' operator rules.

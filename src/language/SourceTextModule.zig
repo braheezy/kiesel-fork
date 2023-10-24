@@ -8,9 +8,11 @@ const SafePointer = @import("any-pointer").SafePointer;
 const ast = @import("ast.zig");
 const bytecode = @import("bytecode.zig");
 const execution = @import("../execution.zig");
+const types = @import("../types.zig");
 
 const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
+const Object = types.Object;
 const Parser = @import("Parser.zig");
 const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
 const Realm = execution.Realm;
@@ -30,7 +32,10 @@ ecmascript_code: ast.Module,
 /// [[Context]]
 context: ?ExecutionContext,
 
-// TODO: [[ImportMeta]], [[ImportEntries]], [[LocalExportEntries]], [[IndirectExportEntries]], [[StarExportEntries]]
+/// [[ImportMeta]]
+import_meta: ?Object,
+
+// TODO: [[ImportEntries]], [[LocalExportEntries]], [[IndirectExportEntries]], [[StarExportEntries]]
 
 /// [[HostDefined]]
 host_defined: SafePointer = SafePointer.null_pointer,
@@ -73,6 +78,7 @@ pub fn parse(
         .host_defined = host_defined,
         .ecmascript_code = body,
         .context = null,
+        .import_meta = null,
     };
     return self;
 }

@@ -2248,6 +2248,47 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             else
                 .undefined;
         },
+        .get_or_create_import_meta => {
+            // 1. Let module be GetActiveScriptOrModule().
+            // 2. Assert: module is a Source Text Module Record.
+            var module = self.agent.getActiveScriptOrModule().?.module;
+
+            // 3. Let importMeta be module.[[ImportMeta]].
+            // 4. If importMeta is empty, then
+            if (module.import_meta == null) {
+                // a. Set importMeta to OrdinaryObjectCreate(null).
+                const import_meta = try ordinaryObjectCreate(self.agent, null);
+
+                // b. Let importMetaValues be HostGetImportMetaProperties(module).
+                var import_meta_values = try self.agent.host_hooks.hostGetImportMetaProperties(module);
+                defer import_meta_values.deinit();
+
+                // c. For each Record { [[Key]], [[Value]] } p of importMetaValues, do
+                var it = import_meta_values.iterator();
+                while (it.next()) |entry| {
+                    // i. Perform ! CreateDataPropertyOrThrow(importMeta, p.[[Key]], p.[[Value]]).
+                    import_meta.createDataPropertyOrThrow(
+                        entry.key_ptr.*,
+                        entry.value_ptr.*,
+                    ) catch |err| try noexcept(err);
+                }
+
+                // d. Perform HostFinalizeImportMeta(importMeta, module).
+                self.agent.host_hooks.hostFinalizeImportMeta(import_meta, module);
+
+                // e. Set module.[[ImportMeta]] to importMeta.
+                module.import_meta = import_meta;
+
+                // f. Return importMeta.
+                self.result = Value.from(import_meta);
+            }
+            // 5. Else,
+            else {
+                // a. Assert: importMeta is an Object.
+                // b. Return importMeta.
+                self.result = Value.from(module.import_meta.?);
+            }
+        },
         .get_value => {
             if (self.reference) |reference| self.result = try reference.getValue(self.agent);
             self.reference = null;
