@@ -35,7 +35,7 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    _ = std.process.Child.exec(.{
+    _ = std.process.Child.run(.{
         .allocator = b.allocator,
         .argv = &.{
             "patch",
