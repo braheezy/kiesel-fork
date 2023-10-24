@@ -12,11 +12,11 @@ const Symbol = @import("../Symbol.zig");
 const Self = @This();
 
 // TODO: Shapes, linear storage for arrays, etc. Gotta start somewhere :^)
-hash_map: PropertyHashMap,
+hash_map: PropertyKeyHashMap(PropertyDescriptor),
 
 pub fn init(allocator: Allocator) Self {
     return .{
-        .hash_map = PropertyHashMap.init(allocator),
+        .hash_map = PropertyKeyHashMap(PropertyDescriptor).init(allocator),
     };
 }
 
@@ -60,13 +60,15 @@ pub const PropertyKeyHashMapContext = struct {
     }
 };
 
-const PropertyHashMap = std.ArrayHashMap(PropertyKey, PropertyDescriptor, struct {
-    pub fn hash(self: @This(), property_key: PropertyKey) u32 {
-        return @truncate(PropertyKeyHashMapContext.hash(self, property_key));
-    }
+pub fn PropertyKeyHashMap(comptime T: type) type {
+    return std.ArrayHashMap(PropertyKey, T, struct {
+        pub fn hash(self: @This(), property_key: PropertyKey) u32 {
+            return @truncate(PropertyKeyHashMapContext.hash(self, property_key));
+        }
 
-    pub fn eql(self: @This(), a: PropertyKey, b: PropertyKey, b_index_in_hashmap: usize) bool {
-        _ = b_index_in_hashmap;
-        return PropertyKeyHashMapContext.eql(self, a, b);
-    }
-}, false);
+        pub fn eql(self: @This(), a: PropertyKey, b: PropertyKey, b_index_in_hashmap: usize) bool {
+            _ = b_index_in_hashmap;
+            return PropertyKeyHashMapContext.eql(self, a, b);
+        }
+    }, false);
+}
