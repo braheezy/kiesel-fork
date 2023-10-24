@@ -8,6 +8,7 @@ const Allocator = std.mem.Allocator;
 const builtins = @import("../builtins.zig");
 const default_host_hooks = @import("default_host_hooks.zig");
 const environments = @import("environments.zig");
+const language = @import("../language.zig");
 const types = @import("../types.zig");
 
 const ArgumentsList = builtins.ArgumentsList;
@@ -17,8 +18,10 @@ const ExecutionContext = @import("ExecutionContext.zig");
 const Job = @import("job.zig").Job;
 const JobCallback = @import("job.zig").JobCallback;
 const Object = types.Object;
+const PropertyKeyHashMap = Object.PropertyStorage.PropertyKeyHashMap;
 const Realm = @import("Realm.zig");
 const Reference = types.Reference;
+const SourceTextModule = language.SourceTextModule;
 const String = types.String;
 const Symbol = types.Symbol;
 const Value = types.Value;
@@ -73,6 +76,8 @@ pub const WellKnownSymbols = struct {
 };
 
 pub const HostHooks = struct {
+    pub const ImportMetaProperties = PropertyKeyHashMap(Value);
+
     pub const ResizeArrayBufferHandled = enum {
         handled,
         unhandled,
@@ -94,6 +99,7 @@ pub const HostHooks = struct {
         job: Job,
         realm: ?*Realm,
     ) error{OutOfMemory}!void,
+    hostGetImportMetaProperties: *const fn (module: *SourceTextModule) error{OutOfMemory}!ImportMetaProperties,
     hostEnsureCanCompileStrings: *const fn (callee_realm: *Realm) Error!void,
     hostHasSourceTextAvailable: *const fn (func: Object) bool,
     hostResizeArrayBuffer: *const fn (
@@ -148,6 +154,7 @@ pub fn init(gc_allocator: Allocator, options: Options) !Self {
         .hostMakeJobCallback = default_host_hooks.hostMakeJobCallback,
         .hostCallJobCallback = default_host_hooks.hostCallJobCallback,
         .hostEnqueuePromiseJob = default_host_hooks.hostEnqueuePromiseJob,
+        .hostGetImportMetaProperties = default_host_hooks.hostGetImportMetaProperties,
         .hostEnsureCanCompileStrings = default_host_hooks.hostEnsureCanCompileStrings,
         .hostHasSourceTextAvailable = default_host_hooks.hostHasSourceTextAvailable,
         .hostResizeArrayBuffer = default_host_hooks.hostResizeArrayBuffer,

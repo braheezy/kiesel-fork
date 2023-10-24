@@ -4,6 +4,7 @@ const SafePointer = @import("any-pointer").SafePointer;
 
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
+const language = @import("../language.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
@@ -11,6 +12,7 @@ const Job = execution.Job;
 const JobCallback = execution.JobCallback;
 const Object = types.Object;
 const Realm = execution.Realm;
+const SourceTextModule = language.SourceTextModule;
 const Value = types.Value;
 
 /// 9.5.2 HostMakeJobCallback ( callback )
@@ -38,6 +40,14 @@ pub fn hostCallJobCallback(
 /// https://tc39.es/ecma262/#sec-hostenqueuepromisejob
 pub fn hostEnqueuePromiseJob(agent: *Agent, job: Job, realm: ?*Realm) !void {
     try agent.queued_promise_jobs.append(.{ .job = job, .realm = realm });
+}
+
+/// 13.3.12.1.1 HostGetImportMetaProperties ( moduleRecord )
+/// https://tc39.es/ecma262/#sec-hostgetimportmetaproperties
+pub fn hostGetImportMetaProperties(module: *SourceTextModule) !Agent.HostHooks.ImportMetaProperties {
+    // The default implementation of HostGetImportMetaProperties is to return a new empty List.
+    const agent = module.realm.agent;
+    return Agent.HostHooks.ImportMetaProperties.init(agent.gc_allocator);
 }
 
 /// 19.2.1.2 HostEnsureCanCompileStrings ( calleeRealm )
