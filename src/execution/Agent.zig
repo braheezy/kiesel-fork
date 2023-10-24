@@ -100,6 +100,7 @@ pub const HostHooks = struct {
         realm: ?*Realm,
     ) error{OutOfMemory}!void,
     hostGetImportMetaProperties: *const fn (module: *SourceTextModule) error{OutOfMemory}!ImportMetaProperties,
+    hostFinalizeImportMeta: *const fn (import_meta: Object, module: *SourceTextModule) void,
     hostEnsureCanCompileStrings: *const fn (callee_realm: *Realm) Error!void,
     hostHasSourceTextAvailable: *const fn (func: Object) bool,
     hostResizeArrayBuffer: *const fn (
@@ -155,6 +156,7 @@ pub fn init(gc_allocator: Allocator, options: Options) !Self {
         .hostCallJobCallback = default_host_hooks.hostCallJobCallback,
         .hostEnqueuePromiseJob = default_host_hooks.hostEnqueuePromiseJob,
         .hostGetImportMetaProperties = default_host_hooks.hostGetImportMetaProperties,
+        .hostFinalizeImportMeta = default_host_hooks.hostFinalizeImportMeta,
         .hostEnsureCanCompileStrings = default_host_hooks.hostEnsureCanCompileStrings,
         .hostHasSourceTextAvailable = default_host_hooks.hostHasSourceTextAvailable,
         .hostResizeArrayBuffer = default_host_hooks.hostResizeArrayBuffer,

@@ -50,6 +50,12 @@ pub fn hostGetImportMetaProperties(module: *SourceTextModule) !Agent.HostHooks.I
     return Agent.HostHooks.ImportMetaProperties.init(agent.gc_allocator);
 }
 
+/// 13.3.12.1.2 HostFinalizeImportMeta ( importMeta, moduleRecord )
+/// https://tc39.es/ecma262/#sec-hostfinalizeimportmeta
+pub fn hostFinalizeImportMeta(_: Object, _: *SourceTextModule) void {
+    // The default implementation of HostFinalizeImportMeta is to return unused.
+}
+
 /// 19.2.1.2 HostEnsureCanCompileStrings ( calleeRealm )
 /// https://tc39.es/ecma262/#sec-hostensurecancompilestrings
 pub fn hostEnsureCanCompileStrings(_: *Realm) !void {
