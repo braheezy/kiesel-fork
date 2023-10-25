@@ -2251,23 +2251,9 @@ pub const StatementList = struct {
         // StatementListItem : Declaration
         // 1. Return a new empty List.
         var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
-        for (self.items) |item| switch (item) {
-            .statement => |statement| {
-                try variable_declarations.appendSlice(try statement.varScopedDeclarations(allocator));
-            },
-            .declaration => |declaration| switch (declaration.*) {
-                // HACK: Emit lexical declarations too while they're codegen'd as var decls
-                .lexical_declaration => |lexical_declaration| {
-                    for (lexical_declaration.binding_list.items) |lexical_binding| {
-                        try variable_declarations.append(.{
-                            .binding_identifier = lexical_binding.binding_identifier,
-                            .initializer = lexical_binding.initializer,
-                        });
-                    }
-                },
-                else => {},
-            },
-        };
+        for (self.items) |item| {
+            try variable_declarations.appendSlice(try item.varScopedDeclarations(allocator));
+        }
         return variable_declarations.toOwnedSlice();
     }
 
@@ -2307,6 +2293,30 @@ pub const StatementListItem = union(enum) {
 
     statement: *Statement,
     declaration: *Declaration,
+
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(self: Self, allocator: Allocator) ![]const VariableDeclaration {
+        switch (self) {
+            .statement => |statement| return try statement.varScopedDeclarations(allocator),
+            .declaration => |declaration| {
+                var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
+                switch (declaration.*) {
+                    // HACK: Emit lexical declarations too while they're codegen'd as var decls
+                    .lexical_declaration => |lexical_declaration| {
+                        for (lexical_declaration.binding_list.items) |lexical_binding| {
+                            try variable_declarations.append(.{
+                                .binding_identifier = lexical_binding.binding_identifier,
+                                .initializer = lexical_binding.initializer,
+                            });
+                        }
+                    },
+                    else => {},
+                }
+                return variable_declarations.toOwnedSlice();
+            },
+        }
+    }
 
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
         return switch (self) {
@@ -4304,6 +4314,22 @@ pub const ModuleItemList = struct {
     const Self = @This();
 
     items: []const ModuleItem,
+
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(self: Self, allocator: Allocator) ![]const VariableDeclaration {
+        // ModuleItemList : ModuleItemList ModuleItem
+        // 1. Let declarations1 be VarScopedDeclarations of ModuleItemList.
+        // 2. Let declarations2 be VarScopedDeclarations of ModuleItem.
+        // 3. Return the list-concatenation of declarations1 and declarations2.
+        var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
+        for (self.items) |item| switch (item) {
+            .statement_list_item => |statement_list_item| {
+                try variable_declarations.appendSlice(try statement_list_item.varScopedDeclarations(allocator));
+            },
+        };
+        return variable_declarations.toOwnedSlice();
+    }
 
     /// 16.2.1.11 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-module-semantics-runtime-semantics-evaluation

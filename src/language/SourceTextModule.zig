@@ -86,17 +86,91 @@ pub fn parse(
 /// 16.2.1.6.4 InitializeEnvironment ( )
 pub fn initializeEnvironment(self: *Self) !void {
     const agent = self.realm.agent;
-    _ = agent;
 
-    // TODO: 1-4.
+    // TODO: 1. For each ExportEntry Record e of module.[[IndirectExportEntries]], do
+    //     [...]
+    // TODO: 2. Assert: All named exports from module are resolvable.
+
+    // 3. Let realm be module.[[Realm]].
+    // 4. Assert: realm is not undefined.
+    const realm = self.realm;
 
     // TODO: 5. Let env be NewModuleEnvironment(realm.[[GlobalEnv]]).
-    const env = Environment{ .global_environment = self.realm.global_env };
+    const env = Environment{ .global_environment = realm.global_env };
 
     // 6. Set module.[[Environment]] to env.
     self.environment = env;
 
-    // TODO: 7-25.
+    // TODO: 7. For each ImportEntry Record in of module.[[ImportEntries]], do
+    //     [...]
+
+    // 8. Let moduleContext be a new ECMAScript code execution context.
+    const module_context = ExecutionContext{
+        // 9. Set the Function of moduleContext to null.
+        .function = null,
+
+        // 10. Assert: module.[[Realm]] is not undefined.
+        // 11. Set the Realm of moduleContext to module.[[Realm]].
+        .realm = self.realm,
+
+        // 12. Set the ScriptOrModule of moduleContext to module.
+        .script_or_module = .{ .module = self },
+
+        .ecmascript_code = .{
+            // 13. Set the VariableEnvironment of moduleContext to module.[[Environment]].
+            .variable_environment = self.environment.?,
+
+            // 14. Set the LexicalEnvironment of moduleContext to module.[[Environment]].
+            .lexical_environment = self.environment.?,
+
+            // 15. Set the PrivateEnvironment of moduleContext to null.
+            .private_environment = null,
+        },
+    };
+
+    // 16. Set module.[[Context]] to moduleContext.
+    self.context = module_context;
+
+    // 17. Push moduleContext onto the execution context stack; moduleContext is now the running
+    //     execution context.
+    try agent.execution_context_stack.append(module_context);
+
+    // 18. Let code be module.[[ECMAScriptCode]].
+    const code = self.ecmascript_code;
+
+    // 19. Let varDeclarations be the VarScopedDeclarations of code.
+    const var_declarations = try code.module_item_list.varScopedDeclarations(agent.gc_allocator);
+    defer agent.gc_allocator.free(var_declarations);
+
+    // 20. Let declaredVarNames be a new empty List.
+    var declared_var_names = std.StringHashMap(void).init(agent.gc_allocator);
+    defer declared_var_names.deinit();
+
+    // 21. For each element d of varDeclarations, do
+    for (var_declarations) |var_declaration| {
+        // TODO: a. For each element dn of the BoundNames of d, do
+        for ([_]ast.Identifier{var_declaration.binding_identifier}) |var_name| {
+            // i. If declaredVarNames does not contain dn, then
+            if (!declared_var_names.contains(var_name)) {
+                // 1. Perform ! env.CreateMutableBinding(dn, false).
+                try env.createMutableBinding(agent, var_name, false);
+
+                // 2. Perform ! env.InitializeBinding(dn, undefined).
+                try env.initializeBinding(agent, var_name, .undefined);
+
+                // 3. Append dn to declaredVarNames.
+                try declared_var_names.putNoClobber(var_name, {});
+            }
+        }
+    }
+
+    // TODO: 22. Let lexDeclarations be the LexicallyScopedDeclarations of code.
+    // TODO: 23. Let privateEnv be null.
+    // TODO: 24. For each element d of lexDeclarations, do
+    //     [...]
+
+    // 25. Remove moduleContext from the execution context stack.
+    _ = agent.execution_context_stack.pop();
 
     // 26. Return unused.
 }
