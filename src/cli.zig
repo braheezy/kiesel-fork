@@ -59,6 +59,7 @@ pub const Kiesel = struct {
         try defineBuiltinFunction(kiesel_object, "evalScript", evalScript, 1, realm);
         try defineBuiltinProperty(kiesel_object, "gc", Value.from(gc_object));
         try defineBuiltinFunction(kiesel_object, "print", print, 1, realm);
+        try defineBuiltinFunction(kiesel_object, "readStdin", readStdin, 0, realm);
         return kiesel_object;
     }
 
@@ -137,6 +138,26 @@ pub const Kiesel = struct {
         else
             stdout.print("{}\n", .{try value.toString(agent)}) catch {};
         return .undefined;
+    }
+
+    fn readStdin(agent: *Agent, _: Value, _: ArgumentsList) !Value {
+        const bytes = std.io.getStdIn().readToEndAlloc(
+            agent.gc_allocator,
+            std.math.maxInt(usize),
+        ) catch |err| {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(
+                    agent.gc_allocator,
+                    "Error while reading from stdin: {s}",
+                    .{@errorName(err)},
+                ),
+            );
+        };
+        if (!std.unicode.utf8ValidateSlice(bytes)) {
+            return agent.throwException(.type_error, "Invalid UTF-8");
+        }
+        return Value.from(bytes);
     }
 };
 
