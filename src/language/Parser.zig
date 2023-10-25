@@ -1173,10 +1173,12 @@ pub fn acceptBindingList(self: *Self) AcceptError!ast.BindingList {
     errdefer self.core.restoreState(state);
 
     var lexical_bindings = std.ArrayList(ast.LexicalBinding).init(self.allocator);
+    errdefer lexical_bindings.deinit();
     while (self.acceptLexicalBinding()) |lexical_binding| {
         try lexical_bindings.append(lexical_binding);
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
     } else |_| {}
+    if (lexical_bindings.items.len == 0) return error.UnexpectedToken;
     return .{ .items = try lexical_bindings.toOwnedSlice() };
 }
 
@@ -1208,11 +1210,12 @@ pub fn acceptVariableDeclarationList(self: *Self) AcceptError!ast.VariableDeclar
     errdefer self.core.restoreState(state);
 
     var variable_declarations = std.ArrayList(ast.VariableDeclaration).init(self.allocator);
-    defer variable_declarations.deinit();
+    errdefer variable_declarations.deinit();
     while (self.acceptVariableDeclaration()) |variable_declaration| {
         try variable_declarations.append(variable_declaration);
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
     } else |_| {}
+    if (variable_declarations.items.len == 0) return error.UnexpectedToken;
     return .{ .items = try variable_declarations.toOwnedSlice() };
 }
 
