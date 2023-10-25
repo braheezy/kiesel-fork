@@ -2058,10 +2058,35 @@ pub fn acceptModuleItem(self: *Self) AcceptError!ast.ModuleItem {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    // TODO: ImportDeclaration
     // TODO: ExportDeclaration
-    if (self.acceptStatementListItem()) |statement_list_item|
+    if (self.acceptImportDeclaration()) |import_declaration|
+        return .{ .import_declaration = import_declaration }
+    else |_| if (self.acceptStatementListItem()) |statement_list_item|
         return .{ .statement_list_item = statement_list_item }
+    else |_|
+        return error.UnexpectedToken;
+}
+
+pub fn acceptImportDeclaration(self: *Self) AcceptError!ast.ImportDeclaration {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.import));
+    const import_clause = if (self.acceptImportClause()) |import_clause| blk: {
+        _ = try self.acceptKeyword("from");
+        break :blk import_clause;
+    } else |_| null;
+    const module_specifier = try self.acceptStringLiteral();
+    _ = try self.acceptOrInsertSemicolon();
+    return .{ .import_clause = import_clause, .module_specifier = module_specifier };
+}
+
+pub fn acceptImportClause(self: *Self) AcceptError!ast.ImportClause {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    if (self.acceptBindingIdentifier()) |binding_identifier|
+        return .{ .imported_default_binding = .{ .binding_identifier = binding_identifier } }
     else |_|
         return error.UnexpectedToken;
 }

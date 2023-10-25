@@ -4327,6 +4327,7 @@ pub const ModuleItemList = struct {
             .statement_list_item => |statement_list_item| {
                 try variable_declarations.appendSlice(try statement_list_item.varScopedDeclarations(allocator));
             },
+            .import_declaration => {},
         };
         return variable_declarations.toOwnedSlice();
     }
@@ -4355,13 +4356,14 @@ pub const ModuleItemList = struct {
 pub const ModuleItem = union(enum) {
     const Self = @This();
 
-    // TODO: ImportDeclaration
+    import_declaration: ImportDeclaration,
     // TODO: ExportDeclaration
     statement_list_item: StatementListItem,
 
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
         switch (self) {
-            inline else => |node| try node.generateBytecode(executable, ctx),
+            .statement_list_item => |statement_list_item| try statement_list_item.generateBytecode(executable, ctx),
+            else => {},
         }
     }
 
@@ -4369,6 +4371,46 @@ pub const ModuleItem = union(enum) {
         // Omit printing 'ModuleItem' here, it's implied and only adds nesting.
         switch (self) {
             inline else => |node| try node.print(writer, indentation),
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ImportDeclaration
+pub const ImportDeclaration = struct {
+    const Self = @This();
+
+    import_clause: ?ImportClause,
+    module_specifier: StringLiteral,
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("ImportDeclaration", writer, indentation);
+        if (self.import_clause) |import_clause| try import_clause.print(writer, indentation + 1);
+        try printString(self.module_specifier.text, writer, indentation + 1);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ImportClause
+pub const ImportClause = union(enum) {
+    const Self = @This();
+
+    imported_default_binding: struct {
+        binding_identifier: Identifier,
+    },
+    // TODO: NameSpaceImport
+    // TODO: NamedImports
+    // TODO: ImportedDefaultBinding , NameSpaceImport
+    // TODO: ImportedDefaultBinding , NamedImports
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("ImportClause", writer, indentation);
+        switch (self) {
+            .imported_default_binding => |imported_default_binding| {
+                try printString(
+                    imported_default_binding.binding_identifier,
+                    writer,
+                    indentation + 1,
+                );
+            },
         }
     }
 };
