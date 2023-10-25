@@ -1838,7 +1838,7 @@ fn acceptClassElement(self: *Self) AcceptError!ast.ClassElement {
             }
             return .{ .static_method_definition = method_definition.* };
         } else |_| if (self.acceptFieldDefinition()) |field_definition| {
-            _ = try self.core.accept(RuleSet.is(.@";"));
+            _ = try self.acceptOrInsertSemicolon();
             return .{ .static_field_definition = field_definition };
         } else |_| if (self.core.accept(RuleSet.is(.@"{"))) |_| {
             const class_static_block = .{ .statement_list = try self.acceptStatementList() };
@@ -1851,7 +1851,7 @@ fn acceptClassElement(self: *Self) AcceptError!ast.ClassElement {
         }
         return .{ .method_definition = method_definition.* };
     } else |_| if (self.acceptFieldDefinition()) |field_definition| {
-        _ = try self.core.accept(RuleSet.is(.@";"));
+        _ = try self.acceptOrInsertSemicolon();
         return .{ .field_definition = field_definition };
     } else |_| if (self.core.accept(RuleSet.is(.@";"))) |_| {
         return .empty_statement;
