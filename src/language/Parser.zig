@@ -397,6 +397,8 @@ pub fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression
         return .{ .member_expression = member_expression }
     else |_| if (self.acceptCallExpression(primary_expression)) |call_expression|
         return .{ .call_expression = call_expression }
+    else |_| if (self.acceptOptionalExpression(primary_expression)) |optional_expression|
+        return .{ .optional_expression = optional_expression }
     else |_| if (self.acceptUpdateExpression(primary_expression)) |update_expression|
         return .{ .update_expression = update_expression }
     else |_| if (self.acceptBinaryExpression(primary_expression, ctx)) |binary_expression|
@@ -568,6 +570,25 @@ pub fn acceptArguments(self: *Self) AcceptError!ast.Arguments {
     } else |_| {}
     _ = try self.core.accept(RuleSet.is(.@")"));
     return arguments.toOwnedSlice();
+}
+
+pub fn acceptOptionalExpression(self: *Self, primary_expression: ast.Expression) AcceptError!ast.OptionalExpression {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"?."));
+    const property: ast.OptionalExpression.Property = if (self.acceptArguments()) |arguments|
+        .{ .arguments = arguments }
+    else |_| if (self.core.accept(RuleSet.is(.@"["))) |_| blk: {
+        const property_expression = try self.allocator.create(ast.Expression);
+        property_expression.* = try self.acceptExpression(.{});
+        _ = try self.core.accept(RuleSet.is(.@"]"));
+        break :blk .{ .expression = property_expression };
+    } else |_| .{ .identifier = try self.acceptIdentifierName() };
+    // Defer heap allocation of expression until we know this is an OptionalExpression
+    const expression = try self.allocator.create(ast.Expression);
+    expression.* = primary_expression;
+    return .{ .expression = expression, .property = property };
 }
 
 pub fn acceptUpdateExpression(self: *Self, primary_expression: ?ast.Expression) AcceptError!ast.UpdateExpression {

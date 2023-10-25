@@ -444,6 +444,121 @@ pub const SuperCall = struct {
 /// https://tc39.es/ecma262/#prod-Arguments
 pub const Arguments = []const Expression;
 
+/// https://tc39.es/ecma262/#prod-OptionalExpression
+pub const OptionalExpression = struct {
+    const Self = @This();
+
+    pub const Property = union(enum) {
+        arguments: Arguments,
+        expression: *Expression,
+        identifier: Identifier,
+    };
+
+    expression: *Expression,
+    property: Property,
+
+    /// 13.3.9.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-optional-chaining-evaluation
+    /// 13.3.9.2 Runtime Semantics: ChainEvaluation
+    /// https://tc39.es/ecma262/#sec-optional-chaining-chain-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // 1. Let baseReference be ? Evaluation of OptionalExpression.
+        try self.expression.generateBytecode(executable, ctx);
+
+        if (self.property == .arguments) try executable.addInstruction(.push_reference);
+
+        // 2. Let baseValue be ? GetValue(baseReference).
+        if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.load);
+
+        // 3. If baseValue is either undefined or null, then
+        try executable.addInstruction(.load);
+        try executable.addInstructionWithConstant(.load_constant, .undefined);
+        try executable.addInstruction(.is_loosely_equal);
+
+        try executable.addInstruction(.jump_conditional);
+        const consequent_jump = try executable.addJumpIndex();
+        const alternate_jump = try executable.addJumpIndex();
+
+        // a. Return undefined.
+        try consequent_jump.setTargetHere();
+        try executable.addInstruction(.store); // Drop baseValue from the stack
+        try executable.addInstructionWithConstant(.store_constant, .undefined);
+        try executable.addInstruction(.jump);
+        const end_jump = try executable.addJumpIndex();
+
+        // 4. Return ? ChainEvaluation of OptionalChain with arguments baseValue and baseReference.
+        try alternate_jump.setTargetHere();
+
+        // 1. If the source text matched by this OptionalChain is strict mode code, let strict be
+        //    true; else let strict be false.
+        const strict = ctx.contained_in_strict_mode_code;
+
+        switch (self.property) {
+            // OptionalChain : ?. Arguments
+            .arguments => |arguments| {
+                try executable.addInstruction(.load_this_value_for_evaluate_call);
+
+                for (arguments) |argument| {
+                    try argument.generateBytecode(executable, ctx);
+                    if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                    try executable.addInstruction(.load);
+                }
+
+                // TODO: 1. Let thisChain be this OptionalChain.
+                // TODO: 2. Let tailCall be IsInTailPosition(thisChain).
+
+                // 3. Return ? EvaluateCall(baseValue, baseReference, Arguments, tailCall).
+                try executable.addInstruction(.evaluate_call);
+                try executable.addIndex(arguments.len);
+                try executable.addIndex(@intFromBool(strict));
+
+                // TODO: We should probably also clean this up if something throws beforehand...
+                try executable.addInstruction(.pop_reference);
+            },
+
+            // OptionalChain : ?. [ Expression ]
+            .expression => |expression| {
+                // 2. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
+                try expression.generateBytecode(executable, ctx);
+                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                try executable.addInstruction(.load);
+                try executable.addInstruction(.evaluate_property_access_with_expression_key);
+                try executable.addIndex(@intFromBool(strict));
+            },
+
+            // OptionalChain : ?. IdentifierName
+            .identifier => |identifier| {
+                // 2. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
+                try executable.addInstructionWithIdentifier(
+                    .evaluate_property_access_with_identifier_key,
+                    identifier,
+                );
+                try executable.addIndex(@intFromBool(strict));
+            },
+        }
+
+        try end_jump.setTargetHere();
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("OptionalExpression", writer, indentation);
+        try printString("expression:", writer, indentation + 1);
+        try self.expression.print(writer, indentation + 2);
+        try printString("property:", writer, indentation + 1);
+        switch (self.property) {
+            .expression => |expression| try expression.print(writer, indentation + 2),
+            .identifier => |identifier| try printString(identifier, writer, indentation + 2),
+            .arguments => |arguments| {
+                try printString("arguments:", writer, indentation + 2);
+                for (arguments) |argument| {
+                    try argument.print(writer, indentation + 3);
+                }
+            },
+        }
+    }
+};
+
 /// https://tc39.es/ecma262/#prod-Literal
 pub const Literal = union(enum) {
     const Self = @This();
@@ -1938,6 +2053,7 @@ pub const Expression = union(enum) {
     new_expression: NewExpression,
     call_expression: CallExpression,
     super_call: SuperCall,
+    optional_expression: OptionalExpression,
     update_expression: UpdateExpression,
     unary_expression: UnaryExpression,
     binary_expression: BinaryExpression,
@@ -1991,6 +2107,7 @@ pub const Expression = union(enum) {
                 .primary_expression => |primary_expression| primary_expression.analyze(query),
                 .member_expression,
                 .super_property,
+                .optional_expression,
                 => true,
                 else => false,
             },
