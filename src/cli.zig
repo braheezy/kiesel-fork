@@ -59,6 +59,7 @@ pub const Kiesel = struct {
         try defineBuiltinFunction(kiesel_object, "evalScript", evalScript, 1, realm);
         try defineBuiltinProperty(kiesel_object, "gc", Value.from(gc_object));
         try defineBuiltinFunction(kiesel_object, "print", print, 1, realm);
+        try defineBuiltinFunction(kiesel_object, "readLine", readLine, 0, realm);
         try defineBuiltinFunction(kiesel_object, "readStdin", readStdin, 0, realm);
         return kiesel_object;
     }
@@ -140,8 +141,31 @@ pub const Kiesel = struct {
         return .undefined;
     }
 
+    fn readLine(agent: *Agent, _: Value, _: ArgumentsList) !Value {
+        const stdin = std.io.getStdIn().reader();
+        const bytes = stdin.readUntilDelimiterOrEofAlloc(
+            agent.gc_allocator,
+            '\n',
+            std.math.maxInt(usize),
+        ) catch |err| {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(
+                    agent.gc_allocator,
+                    "Error while reading from stdin: {s}",
+                    .{@errorName(err)},
+                ),
+            );
+        } orelse "";
+        if (!std.unicode.utf8ValidateSlice(bytes)) {
+            return agent.throwException(.type_error, "Invalid UTF-8");
+        }
+        return Value.from(bytes);
+    }
+
     fn readStdin(agent: *Agent, _: Value, _: ArgumentsList) !Value {
-        const bytes = std.io.getStdIn().readToEndAlloc(
+        const stdin = std.io.getStdIn().reader();
+        const bytes = stdin.readAllAlloc(
             agent.gc_allocator,
             std.math.maxInt(usize),
         ) catch |err| {
