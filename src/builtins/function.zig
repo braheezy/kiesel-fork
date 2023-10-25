@@ -369,14 +369,13 @@ pub fn createDynamicFunction(
     // 22. Let proto be ? GetPrototypeFromConstructor(newTarget, fallbackProto).
     const proto = try getPrototypeFromConstructor(new_target, fallback_prototype);
 
-    // 23. Let realmF be the current Realm Record.
-    // 24. Let env be realmF.[[GlobalEnv]].
-    const env = realm.global_env;
+    // 23. Let env be currentRealm.[[GlobalEnv]].
+    const env = current_realm.global_env;
 
-    // 25. Let privateEnv be null.
+    // 24. Let privateEnv be null.
     const private_env = null;
 
-    // 26. Let F be OrdinaryFunctionCreate(proto, sourceText, parameters, body, non-lexical-this, env, privateEnv).
+    // 25. Let F be OrdinaryFunctionCreate(proto, sourceText, parameters, body, non-lexical-this, env, privateEnv).
     const function = try ordinaryFunctionCreate(
         agent,
         proto,
@@ -388,11 +387,11 @@ pub fn createDynamicFunction(
         private_env,
     );
 
-    // 27. Perform SetFunctionName(F, "anonymous").
+    // 26. Perform SetFunctionName(F, "anonymous").
     try setFunctionName(function, PropertyKey.from("anonymous"), null);
 
     switch (kind) {
-        // 28. If kind is generator, then
+        // 27. If kind is generator, then
         .generator => {
             // a. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
             const prototype = try ordinaryObjectCreate(
@@ -411,7 +410,7 @@ pub fn createDynamicFunction(
             }) catch |err| try noexcept(err);
         },
 
-        // 29. Else if kind is async-generator, then
+        // 28. Else if kind is async-generator, then
         .async_generator => {
             // a. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
             const prototype = try ordinaryObjectCreate(
@@ -430,18 +429,18 @@ pub fn createDynamicFunction(
             }) catch |err| try noexcept(err);
         },
 
-        // 30. Else if kind is normal, then
+        // 29. Else if kind is normal, then
         .normal => {
             // a. Perform MakeConstructor(F).
             try makeConstructor(function, .{});
         },
 
-        // 31. NOTE: Functions whose kind is async are not constructible and do not have a
+        // 30. NOTE: Functions whose kind is async are not constructible and do not have a
         //           [[Construct]] internal method or a "prototype" property.
         .@"async" => {},
     }
 
-    // 32. Return F.
+    // 31. Return F.
     return function;
 }
 
