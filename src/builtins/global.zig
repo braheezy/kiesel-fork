@@ -28,7 +28,7 @@ const NameAndPropertyDescriptor = struct {
     PropertyDescriptor,
 };
 
-pub fn globalObjectProperties(realm: *Realm) ![34]NameAndPropertyDescriptor {
+pub fn globalObjectProperties(realm: *Realm) ![35]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
     return [_]NameAndPropertyDescriptor{
         // 19.1.1 globalThis
@@ -158,6 +158,10 @@ pub fn globalObjectProperties(realm: *Realm) ![34]NameAndPropertyDescriptor {
         // 19.3.37 URIError ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-urierror
         .{ "URIError", .{ .value = Value.from(try realm.intrinsics.@"%URIError%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.4.2 JSON
+        // https://tc39.es/ecma262/#sec-json
+        .{ "JSON", .{ .value = Value.from(try realm.intrinsics.@"%JSON%"()), .writable = true, .enumerable = false, .configurable = true } },
 
         // 19.4.3 Math
         // https://tc39.es/ecma262/#sec-math

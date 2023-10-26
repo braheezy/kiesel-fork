@@ -47,6 +47,7 @@ lazy_intrinsics: struct {
     @"%isFinite%": ?Object = null,
     @"%isNaN%": ?Object = null,
     @"%IteratorPrototype%": ?Object = null,
+    @"%JSON%": ?Object = null,
     @"%Map%": ?Object = null,
     @"%Map.prototype%": ?Object = null,
     @"%MapIteratorPrototype%": ?Object = null,
@@ -210,6 +211,9 @@ pub fn @"%isNaN%"(self: *Self) error{OutOfMemory}!Object {
 }
 pub fn @"%IteratorPrototype%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%IteratorPrototype%", builtins.IteratorPrototype);
+}
+pub fn @"%JSON%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%JSON%", builtins.JSON);
 }
 pub fn @"%Map%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Map%", builtins.MapConstructor);
