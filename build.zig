@@ -24,9 +24,9 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    const linenoise = b.dependency("linenoise", .{});
     const parser_toolkit = b.dependency("parser_toolkit", .{});
     const zig_args = b.dependency("zig_args", .{});
+    const zigline = b.dependency("zigline", .{});
 
     var dependencies = std.ArrayList(std.Build.ModuleDependency).init(b.allocator);
     defer dependencies.deinit();
@@ -80,7 +80,6 @@ pub fn build(b: *std.Build) void {
         .root_source_file = .{ .path = "src/cli.zig" },
         .target = target,
         .optimize = optimize,
-        .single_threaded = true,
     });
     if (enable_intl) {
         const icu4zig = b.dependency("icu4zig", .{
@@ -99,7 +98,7 @@ pub fn build(b: *std.Build) void {
     exe.addModule("any-pointer", any_pointer.module("any-pointer"));
     exe.addModule("args", zig_args.module("args"));
     exe.addModule("gc", libgc.module("gc"));
-    exe.addModule("linenoise", linenoise.module("linenoise"));
+    exe.addModule("zigline", zigline.module("zigline"));
     if (optimize != .Debug) exe.strip = true;
 
     b.installArtifact(exe);

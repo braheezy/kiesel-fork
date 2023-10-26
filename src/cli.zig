@@ -5,7 +5,7 @@ const args = @import("args");
 const gc = @import("gc");
 const kiesel = @import("kiesel");
 
-const Linenoise = @import("linenoise").Linenoise;
+const Editor = @import("zigline").Editor;
 const SafePointer = @import("any-pointer").SafePointer;
 
 const Allocator = std.mem.Allocator;
@@ -391,24 +391,7 @@ fn getHistoryPath(allocator: Allocator) GetHistoryPathError![]const u8 {
     return history_path;
 }
 
-// FIXME: This should be public in std.unicode
-const Utf8DecodeError = error{
-    DanglingSurrogateHalf,
-    ExpectedSecondSurrogateHalf,
-    UnexpectedSecondSurrogateHalf,
-    CodepointTooLarge,
-    Utf8CannotEncodeSurrogateHalf,
-};
-
-const ReplError =
-    GetHistoryPathError ||
-    std.os.ReadError ||
-    std.os.WriteError ||
-    std.os.TermiosGetError ||
-    std.os.TermiosSetError ||
-    Utf8DecodeError || // Windows
-    error{InitFailed} || // Windows
-    error{ NothingRead, StreamTooLong, EndOfStream };
+const ReplError = GetHistoryPathError || Editor.Error;
 
 fn repl(allocator: Allocator, realm: *Realm, options: struct {
     module: bool = false,
@@ -416,41 +399,111 @@ fn repl(allocator: Allocator, realm: *Realm, options: struct {
 }) ReplError!void {
     const stdout = std.io.getStdOut().writer();
 
-    var linenoise = Linenoise.init(allocator);
-    defer linenoise.deinit();
+    var editor = Editor.init(allocator, .{});
+    defer editor.deinit();
+
+    var handler: struct {
+        editor: *Editor,
+
+        pub fn display_refresh(self: *@This()) void {
+            self.editor.stripStyles();
+
+            const line = self.editor.getBufferedLine() catch return;
+            defer self.editor.allocator.free(line);
+
+            var tokenizer = kiesel.language.tokenizer.Tokenizer.init(line, null);
+            const change = kiesel.utils.temporaryChange(&kiesel.language.tokenizer.state.tokenizer, &tokenizer);
+            defer change.restore();
+
+            while (tokenizer.next() catch null) |token| {
+                self.editor.stylize(
+                    .{
+                        .begin = tokenizer.offset - token.text.len,
+                        .end = tokenizer.offset,
+                    },
+                    switch (token.type) {
+                        .@"await",
+                        .@"break",
+                        .@"catch",
+                        .class,
+                        .@"const",
+                        .@"continue",
+                        .debugger,
+                        .default,
+                        .delete,
+                        .@"enum",
+                        .@"export",
+                        .extends,
+                        .function,
+                        .hashbang_comment,
+                        .import,
+                        .in,
+                        .instanceof,
+                        .new,
+                        .@"return",
+                        .super,
+                        .this,
+                        .typeof,
+                        .@"var",
+                        .void,
+                        => .{ .foreground = .{ .xterm = .Blue }, .bold = true },
+
+                        .case,
+                        .comment,
+                        .do,
+                        .@"else",
+                        .finally,
+                        .@"for",
+                        .@"if",
+                        .@"switch",
+                        .throw,
+                        .@"try",
+                        .@"while",
+                        .with,
+                        .yield,
+                        => .{ .foreground = .{ .xterm = .Cyan } },
+
+                        .false, .true => .{ .foreground = .{ .xterm = .Blue } },
+                        .null => .{ .foreground = .{ .xterm = .Yellow } },
+                        .numeric => .{ .foreground = .{ .xterm = .Magenta } },
+                        .regular_expression, .template, .string => .{ .foreground = .{ .xterm = .Green } },
+                        else => .{},
+                    },
+                ) catch continue;
+            }
+        }
+    } = .{ .editor = &editor };
+    editor.setHandler(&handler);
 
     const history_path = try getHistoryPath(allocator);
     defer allocator.free(history_path);
 
-    linenoise.history.load(history_path) catch stdout.writeAll("Failed to load history\n") catch {};
-    defer linenoise.history.save(history_path) catch stdout.writeAll("Failed to save history\n") catch {};
+    editor.loadHistory(history_path) catch stdout.writeAll("Failed to load history\n") catch {};
+    defer editor.saveHistory(history_path) catch stdout.writeAll("Failed to save history\n") catch {};
 
     while (true) {
-        if (linenoise.linenoise("> ") catch |err| switch (err) {
-            error.CtrlC => continue,
-            else => |err_| return err_,
-        }) |source_text| {
-            defer allocator.free(source_text);
+        const source_text = editor.getLine("> ") catch |err| switch (err) {
+            error.Eof => break,
+            else => return err,
+        };
+        defer allocator.free(source_text);
 
-            // Directly show another prompt when spamming enter, whitespace is evaluated
-            // however (and will print 'undefined').
-            if (source_text.len == 0) continue;
+        // Directly show another prompt when spamming enter, whitespace is evaluated
+        // however (and will print 'undefined').
+        if (source_text.len == 0) continue;
 
-            try linenoise.history.add(source_text);
+        try editor.addToHistory(source_text);
 
-            if (try run(allocator, realm, source_text, .{
-                .base_dir = std.fs.cwd(),
-                .file_name = "repl",
-                .module = options.module,
-                .print_promise_rejection_warnings = options.print_promise_rejection_warnings,
-            })) |result| {
-                try stdout.print("{pretty}\n", .{result});
-            }
-            // Handled exception & printed something, carry on
-            else continue;
+        if (try run(allocator, realm, source_text, .{
+            .base_dir = std.fs.cwd(),
+            .file_name = "repl",
+            .module = options.module,
+            .print_promise_rejection_warnings = options.print_promise_rejection_warnings,
+        })) |result| {
+            try stdout.print("{pretty}\n", .{result});
         }
-        // ^D pressed, exit REPL
-        else break;
+        // Handled exception & printed something, carry on
+        else continue;
     }
 }
 
