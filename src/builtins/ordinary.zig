@@ -646,6 +646,11 @@ pub fn ordinaryOwnPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
             keys.appendAssumeCapacity(property_key);
         }
     }
+    std.mem.sortUnstable(PropertyKey, keys.items, {}, struct {
+        fn lessThanFn(_: void, a: PropertyKey, b: PropertyKey) bool {
+            return a.integer_index < b.integer_index;
+        }
+    }.lessThanFn);
 
     // 3. For each own property key P of O such that P is a String and P is not an array index, in
     //    ascending chronological order of property creation, do
