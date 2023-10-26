@@ -1596,13 +1596,13 @@ pub fn ValueHashMap(comptime V: type) type {
             const value_hash = switch (key) {
                 .string => |string| std.array_hash_map.hashString(string.utf8),
                 .number => |number| switch (number) {
-                    .i32 => |n| std.array_hash_map.getAutoHashFn(i32, struct {})(.{}, n),
-                    .f64 => |n| std.array_hash_map.getAutoHashFn(i64, struct {})(.{}, @bitCast(n)),
+                    .i32 => |n| std.array_hash_map.getAutoHashFn(i32, void)({}, n),
+                    .f64 => |n| std.array_hash_map.getAutoHashFn(i64, void)({}, @bitCast(n)),
                 },
                 inline else => |value| blk: {
                     const T = @TypeOf(value);
                     if (T == void) return @intFromEnum(key);
-                    break :blk std.array_hash_map.getAutoHashStratFn(T, struct {}, .Shallow)(.{}, value);
+                    break :blk std.array_hash_map.getAutoHashStratFn(T, void, .Shallow)({}, value);
                 },
             };
             const tag: u32 = @intFromEnum(key);
