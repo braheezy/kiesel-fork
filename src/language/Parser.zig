@@ -207,7 +207,8 @@ pub fn parseNode(
         .core = core,
         .diagnostics = ctx.diagnostics,
     };
-    tokenizer_.state.tokenizer = &tokenizer;
+    const tmp = temporaryChange(&tokenizer_.state.tokenizer, &tokenizer);
+    defer tmp.restore();
     const ast_node: ?T = acceptFn(&parser) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         else => null,
