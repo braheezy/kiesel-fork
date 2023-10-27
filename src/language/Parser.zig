@@ -512,7 +512,7 @@ pub fn acceptNewExpression(self: *Self) AcceptError!ast.NewExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const tmp = temporaryChange(&self.state, "call_expression_forbidden", true);
+    const tmp = temporaryChange(&self.state.call_expression_forbidden, true);
     defer tmp.restore();
 
     _ = try self.core.accept(RuleSet.is(.new));
@@ -1518,7 +1518,7 @@ pub fn acceptFunctionBody(self: *Self, @"type": ast.FunctionBody.Type) AcceptErr
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const tmp = temporaryChange(&self.state, "in_function_body", true);
+    const tmp = temporaryChange(&self.state.in_function_body, true);
     defer tmp.restore();
 
     const statement_list = try self.acceptStatementList();
@@ -1585,10 +1585,10 @@ pub fn acceptMethodDefinition(
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const tmp1 = temporaryChange(&self.state, "in_method_definition", true);
+    const tmp1 = temporaryChange(&self.state.in_method_definition, true);
     defer tmp1.restore();
 
-    var tmp2: ?TemporaryChange(*@TypeOf(self.state), "in_class_constructor") = null;
+    var tmp2: ?TemporaryChange(bool) = null;
     defer if (tmp2) |tmp| tmp.restore();
 
     if (method_type == null) {
@@ -1614,7 +1614,7 @@ pub fn acceptMethodDefinition(
             else |_| {}
         }
         if (self.state.in_class_body and std.mem.eql(u8, identifier, "constructor")) {
-            tmp2 = temporaryChange(&self.state, "in_class_constructor", true);
+            tmp2 = temporaryChange(&self.state.in_class_constructor, true);
         }
     }
     _ = try self.core.accept(RuleSet.is(.@"("));
@@ -1833,7 +1833,7 @@ fn acceptClassBody(self: *Self) AcceptError!ast.ClassBody {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const tmp = temporaryChange(&self.state, "in_class_body", true);
+    const tmp = temporaryChange(&self.state.in_class_body, true);
     defer tmp.restore();
 
     const class_element_list = try self.acceptClassElementList();
@@ -1898,7 +1898,7 @@ fn acceptRegularExpressionLiteral(self: *Self) AcceptError!ast.RegularExpression
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const tmp = temporaryChange(&tokenizer_.state, "parsing_regular_expression", true);
+    const tmp = temporaryChange(&tokenizer_.state.parsing_regular_expression, true);
     defer tmp.restore();
 
     const token = try self.core.accept(RuleSet.is(.regular_expression));
@@ -2059,7 +2059,7 @@ pub fn acceptModule(self: *Self) AcceptError!ast.Module {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const tmp = temporaryChange(&self.state, "in_module", true);
+    const tmp = temporaryChange(&self.state.in_module, true);
     defer tmp.restore();
 
     _ = self.core.accept(RuleSet.is(.hashbang_comment)) catch {};

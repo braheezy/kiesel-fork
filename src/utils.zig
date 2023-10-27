@@ -27,35 +27,26 @@ pub fn noexcept(err: error{ ExceptionThrown, OutOfMemory }) !noreturn {
     }
 }
 
-pub fn TemporaryChange(comptime Lhs: type, comptime field_name: []const u8) type {
-    const fields = switch (@typeInfo(Lhs)) {
-        .Struct => |s| s.fields,
-        .Pointer => |p| switch (@typeInfo(p.child)) {
-            .Struct => |s| s.fields,
-            else => @compileError("temporaryChange() called with incompatible type " ++ @typeName(Lhs)),
-        },
-        else => @compileError("temporaryChange() called with incompatible type " ++ @typeName(Lhs)),
-    };
-    const field = for (fields) |field| if (std.mem.eql(u8, field.name, field_name)) break field;
+pub fn TemporaryChange(comptime T: type) type {
     return struct {
         const Self = @This();
 
-        lhs: Lhs,
-        previous_value: field.type,
+        field: *T,
+        previous_value: T,
 
         pub fn restore(self: Self) void {
-            @field(self.lhs, field_name) = self.previous_value;
+            self.field.* = self.previous_value;
         }
     };
 }
 
-pub fn temporaryChange(
-    lhs: anytype,
-    comptime field_name: []const u8,
-    new_value: anytype,
-) TemporaryChange(@TypeOf(lhs), field_name) {
-    defer @field(lhs, field_name) = new_value;
-    return .{ .lhs = lhs, .previous_value = @field(lhs, field_name) };
+pub fn temporaryChange(field: anytype, new_value: @TypeOf(field.*)) TemporaryChange(@TypeOf(field.*)) {
+    const T = @TypeOf(field);
+    if (!comptime std.meta.trait.is(.Pointer)(T)) {
+        @compileError("temporaryChange() called with incompatible type " ++ @typeName(T));
+    }
+    defer field.* = new_value;
+    return .{ .field = field, .previous_value = field.* };
 }
 
 pub fn indexOfSlice(haystack: []const []const u8, needle: []const u8) ?usize {

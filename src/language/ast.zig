@@ -3536,7 +3536,7 @@ pub const FunctionBody = struct {
     }
 
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
-        const tmp = temporaryChange(ctx, "contained_in_strict_mode_code", self.strict.?);
+        const tmp = temporaryChange(&ctx.contained_in_strict_mode_code, self.strict.?);
         defer tmp.restore();
         try self.statement_list.generateBytecode(executable, ctx);
     }
