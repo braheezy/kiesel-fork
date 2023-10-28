@@ -24,6 +24,7 @@ allocator: Allocator,
 core: ParserCore,
 diagnostics: *ptk.Diagnostics,
 state: struct {
+    in_breakable_statement: bool = false,
     in_class_body: bool = false,
     in_class_constructor: bool = false,
     in_function_body: bool = false,
@@ -1085,6 +1086,8 @@ pub fn acceptStatement(self: *Self) (ParserCore.AcceptError || error{OutOfMemory
         statement.* = .{ .breakable_statement = breakable_statement }
     else |_| if (self.acceptContinueStatement()) |continue_statement|
         statement.* = .{ .continue_statement = continue_statement }
+    else |_| if (self.acceptBreakStatement()) |break_statement|
+        statement.* = .{ .break_statement = break_statement }
     else |_| if (self.acceptReturnStatement()) |return_statement|
         statement.* = .{ .return_statement = return_statement }
     else |_| if (self.acceptThrowStatement()) |throw_statement|
@@ -1134,6 +1137,9 @@ pub fn acceptHoistableDeclaration(self: *Self) AcceptError!ast.HoistableDeclarat
 pub fn acceptBreakableStatement(self: *Self) AcceptError!ast.BreakableStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
+
+    const tmp = temporaryChange(&self.state.in_breakable_statement, true);
+    defer tmp.restore();
 
     if (self.acceptIterationStatement()) |iteration_statement|
         return .{ .iteration_statement = iteration_statement }
@@ -1380,6 +1386,35 @@ pub fn acceptContinueStatement(self: *Self) AcceptError!ast.ContinueStatement {
         try self.emitErrorAt(
             state.location,
             "Continue statement is only allowed in iteration statement",
+            .{},
+        );
+        return error.UnexpectedToken;
+    }
+
+    if (self.noLineTerminatorHere()) |_| {
+        if (self.acceptLabelIdentifier()) |label| {
+            try self.acceptOrInsertSemicolon();
+            return .{ .label = label };
+        } else |_| {}
+    } else |err| switch (err) {
+        // Drop emitted 'unexpected newline' error
+        error.UnexpectedToken => _ = self.diagnostics.errors.pop(),
+        else => {},
+    }
+    try self.acceptOrInsertSemicolon();
+    return .{ .label = null };
+}
+
+pub fn acceptBreakStatement(self: *Self) AcceptError!ast.BreakStatement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"break"));
+
+    if (!self.state.in_breakable_statement) {
+        try self.emitErrorAt(
+            state.location,
+            "Break statement is only allowed in iteration or switch statement",
             .{},
         );
         return error.UnexpectedToken;

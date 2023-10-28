@@ -32,6 +32,7 @@ pub const BytecodeContext = struct {
     agent: *Agent,
     contained_in_strict_mode_code: bool = false,
     continue_jumps: std.ArrayList(Executable.JumpIndex),
+    break_jumps: std.ArrayList(Executable.JumpIndex),
 };
 
 fn printIndentation(writer: anytype, indentation: usize) !void {
@@ -2144,6 +2145,7 @@ pub const Statement = union(enum) {
     if_statement: IfStatement,
     breakable_statement: BreakableStatement,
     continue_statement: ContinueStatement,
+    break_statement: BreakStatement,
     return_statement: ReturnStatement,
     throw_statement: ThrowStatement,
     try_statement: TryStatement,
@@ -2178,6 +2180,7 @@ pub const Statement = union(enum) {
             .empty_statement,
             .expression_statement,
             .continue_statement,
+            .break_statement,
             .return_statement,
             .throw_statement,
             .debugger_statement,
@@ -2875,6 +2878,9 @@ pub const DoWhileStatement = struct {
         while (ctx.continue_jumps.popOrNull()) |jump_index| {
             try jump_index.setTarget(continue_index);
         }
+        while (ctx.break_jumps.popOrNull()) |jump_index| {
+            try jump_index.setTargetHere();
+        }
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
@@ -2942,6 +2948,9 @@ pub const WhileStatement = struct {
 
         while (ctx.continue_jumps.popOrNull()) |jump_index| {
             try jump_index.setTarget(continue_index);
+        }
+        while (ctx.break_jumps.popOrNull()) |jump_index| {
+            try jump_index.setTargetHere();
         }
     }
 
@@ -3086,6 +3095,9 @@ pub const ForStatement = struct {
         while (ctx.continue_jumps.popOrNull()) |jump_index| {
             try jump_index.setTarget(continue_index);
         }
+        while (ctx.break_jumps.popOrNull()) |jump_index| {
+            try jump_index.setTargetHere();
+        }
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
@@ -3138,6 +3150,39 @@ pub const ContinueStatement = struct {
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("ContinueStatement", writer, indentation);
+        if (self.label) |label| try printString(label, writer, indentation + 1);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-BreakStatement
+pub const BreakStatement = struct {
+    const Self = @This();
+
+    label: ?Identifier,
+
+    /// 14.9.2 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-break-statement-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // TODO: BreakStatement : break LabelIdentifier ;
+        if (self.label) |label| {
+            _ = label;
+            // 1. Let label be the StringValue of LabelIdentifier.
+            // 2. Return Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: label }.
+            try executable.addInstruction(.jump);
+            const jump_index = try executable.addJumpIndex();
+            try ctx.break_jumps.append(jump_index);
+        }
+        // BreakStatement : break ;
+        else {
+            // 1. Return Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: empty }.
+            try executable.addInstruction(.jump);
+            const jump_index = try executable.addJumpIndex();
+            try ctx.break_jumps.append(jump_index);
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("BreakStatement", writer, indentation);
         if (self.label) |label| try printString(label, writer, indentation + 1);
     }
 };
