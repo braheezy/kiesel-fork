@@ -27,6 +27,7 @@ state: struct {
     in_class_body: bool = false,
     in_class_constructor: bool = false,
     in_function_body: bool = false,
+    in_iteration_statement: bool = false,
     in_method_definition: bool = false,
     in_module: bool = false,
     call_expression_forbidden: bool = false,
@@ -348,6 +349,14 @@ pub fn acceptIdentifierReference(self: *Self) AcceptError!ast.IdentifierReferenc
 }
 
 pub fn acceptBindingIdentifier(self: *Self) AcceptError!ast.Identifier {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .@"await" }));
+    return self.allocator.dupe(u8, token.text);
+}
+
+pub fn acceptLabelIdentifier(self: *Self) AcceptError!ast.Identifier {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1074,6 +1083,8 @@ pub fn acceptStatement(self: *Self) (ParserCore.AcceptError || error{OutOfMemory
         statement.* = .{ .if_statement = if_statement }
     else |_| if (self.acceptBreakableStatement()) |breakable_statement|
         statement.* = .{ .breakable_statement = breakable_statement }
+    else |_| if (self.acceptContinueStatement()) |continue_statement|
+        statement.* = .{ .continue_statement = continue_statement }
     else |_| if (self.acceptReturnStatement()) |return_statement|
         statement.* = .{ .return_statement = return_statement }
     else |_| if (self.acceptThrowStatement()) |throw_statement|
@@ -1287,6 +1298,9 @@ pub fn acceptIterationStatement(self: *Self) AcceptError!ast.IterationStatement 
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const tmp = temporaryChange(&self.state.in_iteration_statement, true);
+    defer tmp.restore();
+
     if (self.acceptDoWhileStatement()) |do_while_statement|
         return .{ .do_while_statement = do_while_statement }
     else |_| if (self.acceptWhileStatement()) |while_statement|
@@ -1354,6 +1368,35 @@ pub fn acceptForStatement(self: *Self) AcceptError!ast.ForStatement {
         .increment_expression = increment_expression,
         .consequent_statement = consequent_statement,
     };
+}
+
+pub fn acceptContinueStatement(self: *Self) AcceptError!ast.ContinueStatement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"continue"));
+
+    if (!self.state.in_iteration_statement) {
+        try self.emitErrorAt(
+            state.location,
+            "Continue statement is only allowed in iteration statement",
+            .{},
+        );
+        return error.UnexpectedToken;
+    }
+
+    if (self.noLineTerminatorHere()) |_| {
+        if (self.acceptLabelIdentifier()) |label| {
+            try self.acceptOrInsertSemicolon();
+            return .{ .label = label };
+        } else |_| {}
+    } else |err| switch (err) {
+        // Drop emitted 'unexpected newline' error
+        error.UnexpectedToken => _ = self.diagnostics.errors.pop(),
+        else => {},
+    }
+    try self.acceptOrInsertSemicolon();
+    return .{ .label = null };
 }
 
 pub fn acceptReturnStatement(self: *Self) AcceptError!ast.ReturnStatement {

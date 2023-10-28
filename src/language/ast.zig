@@ -31,6 +31,7 @@ const BytecodeError = error{ OutOfMemory, IndexOutOfRange };
 pub const BytecodeContext = struct {
     agent: *Agent,
     contained_in_strict_mode_code: bool = false,
+    continue_jumps: std.ArrayList(Executable.JumpIndex),
 };
 
 fn printIndentation(writer: anytype, indentation: usize) !void {
@@ -2142,6 +2143,7 @@ pub const Statement = union(enum) {
     expression_statement: ExpressionStatement,
     if_statement: IfStatement,
     breakable_statement: BreakableStatement,
+    continue_statement: ContinueStatement,
     return_statement: ReturnStatement,
     throw_statement: ThrowStatement,
     try_statement: TryStatement,
@@ -2175,6 +2177,7 @@ pub const Statement = union(enum) {
             // 1. Return a new empty List.
             .empty_statement,
             .expression_statement,
+            .continue_statement,
             .return_statement,
             .throw_statement,
             .debugger_statement,
@@ -2844,11 +2847,11 @@ pub const DoWhileStatement = struct {
         const start_index = executable.instructions.items.len;
 
         // a. Let stmtResult be Completion(Evaluation of Statement).
+        // b. If LoopContinues(stmtResult, labelSet) is false, return ? UpdateEmpty(stmtResult, V).
         try executable.addInstruction(.store);
         try self.consequent_statement.generateBytecode(executable, ctx);
+        const continue_index = executable.instructions.items.len;
         try executable.addInstruction(.load);
-
-        // TODO: b. If LoopContinues(stmtResult, labelSet) is false, return ? UpdateEmpty(stmtResult, V).
 
         // c. If stmtResult.[[Value]] is not empty, set V to stmtResult.[[Value]].
         // NOTE: This is done by the store/load sequence around each consequent execution.
@@ -2868,6 +2871,10 @@ pub const DoWhileStatement = struct {
 
         try end_jump.setTargetHere();
         try executable.addInstruction(.store);
+
+        while (ctx.continue_jumps.popOrNull()) |jump_index| {
+            try jump_index.setTarget(continue_index);
+        }
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
@@ -2916,12 +2923,12 @@ pub const WhileStatement = struct {
         const end_jump = try executable.addJumpIndex();
 
         // d. Let stmtResult be Completion(Evaluation of Statement).
+        // e. If LoopContinues(stmtResult, labelSet) is false, return ? UpdateEmpty(stmtResult, V).
         try consequent_jump.setTargetHere();
         try executable.addInstruction(.store);
         try self.consequent_statement.generateBytecode(executable, ctx);
+        const continue_index = executable.instructions.items.len;
         try executable.addInstruction(.load);
-
-        // TODO: e. If LoopContinues(stmtResult, labelSet) is false, return ? UpdateEmpty(stmtResult, V).
 
         try executable.addInstruction(.jump);
         const start_jump = try executable.addJumpIndex();
@@ -2932,6 +2939,10 @@ pub const WhileStatement = struct {
 
         try end_jump.setTargetHere();
         try executable.addInstruction(.store);
+
+        while (ctx.continue_jumps.popOrNull()) |jump_index| {
+            try jump_index.setTarget(continue_index);
+        }
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
@@ -3045,11 +3056,11 @@ pub const ForStatement = struct {
         }
 
         // b. Let result be Completion(Evaluation of stmt).
+        // c. If LoopContinues(result, labelSet) is false, return ? UpdateEmpty(result, V).
         try executable.addInstruction(.store);
         try self.consequent_statement.generateBytecode(executable, ctx);
+        const continue_index = executable.instructions.items.len;
         try executable.addInstruction(.load);
-
-        // TODO: c. If LoopContinues(result, labelSet) is false, return ? UpdateEmpty(result, V).
 
         // d. If result.[[Value]] is not empty, set V to result.[[Value]].
         // NOTE: This is done by the store/load sequence around each consequent execution.
@@ -3071,6 +3082,10 @@ pub const ForStatement = struct {
 
         if (self.test_expression != null) try end_jump.setTargetHere();
         try executable.addInstruction(.store);
+
+        while (ctx.continue_jumps.popOrNull()) |jump_index| {
+            try jump_index.setTarget(continue_index);
+        }
     }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
@@ -3091,6 +3106,39 @@ pub const ForStatement = struct {
         }
         try printString("consequent:", writer, indentation + 1);
         try self.consequent_statement.print(writer, indentation + 2);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ContinueStatement
+pub const ContinueStatement = struct {
+    const Self = @This();
+
+    label: ?Identifier,
+
+    /// 14.8.2 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-continue-statement-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        // TODO: ContinueStatement : continue LabelIdentifier ;
+        if (self.label) |label| {
+            _ = label;
+            // 1. Let label be the StringValue of LabelIdentifier.
+            // 2. Return Completion Record { [[Type]]: continue, [[Value]]: empty, [[Target]]: label }.
+            try executable.addInstruction(.jump);
+            const jump_index = try executable.addJumpIndex();
+            try ctx.continue_jumps.append(jump_index);
+        }
+        // ContinueStatement : continue ;
+        else {
+            // 1. Return Completion Record { [[Type]]: continue, [[Value]]: empty, [[Target]]: empty }.
+            try executable.addInstruction(.jump);
+            const jump_index = try executable.addJumpIndex();
+            try ctx.continue_jumps.append(jump_index);
+        }
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("ContinueStatement", writer, indentation);
+        if (self.label) |label| try printString(label, writer, indentation + 1);
     }
 };
 

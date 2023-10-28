@@ -28,9 +28,13 @@ pub fn generateAndRunBytecode(agent: *Agent, ast_node: anytype) Agent.Error!Comp
     var executable = Executable.init(agent.gc_allocator);
     defer executable.deinit();
 
+    var continue_jumps = std.ArrayList(Executable.JumpIndex).init(agent.gc_allocator);
+    defer continue_jumps.deinit();
+
     var ctx = ast.BytecodeContext{
         .agent = agent,
         .contained_in_strict_mode_code = false,
+        .continue_jumps = continue_jumps,
     };
     ast_node.generateBytecode(&executable, &ctx) catch |err| switch (err) {
         error.IndexOutOfRange => return agent.throwException(
