@@ -59,9 +59,11 @@ pub const Kiesel = struct {
         try defineBuiltinFunction(kiesel_object, "evalScript", evalScript, 1, realm);
         try defineBuiltinProperty(kiesel_object, "gc", Value.from(gc_object));
         try defineBuiltinFunction(kiesel_object, "print", print, 1, realm);
+        try defineBuiltinFunction(kiesel_object, "readFile", readFile, 1, realm);
         try defineBuiltinFunction(kiesel_object, "readLine", readLine, 0, realm);
         try defineBuiltinFunction(kiesel_object, "readStdin", readStdin, 0, realm);
         try defineBuiltinFunction(kiesel_object, "sleep", sleep, 1, realm);
+        try defineBuiltinFunction(kiesel_object, "writeFile", writeFile, 2, realm);
         return kiesel_object;
     }
 
@@ -142,6 +144,39 @@ pub const Kiesel = struct {
         return .undefined;
     }
 
+    fn readFile(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const path = try arguments.get(0).toString(agent);
+        const file = std.fs.cwd().openFile(path.utf8, .{}) catch |err| {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(
+                    agent.gc_allocator,
+                    "Error while opening file: {s}",
+                    .{@errorName(err)},
+                ),
+            );
+        };
+        defer file.close();
+        const bytes = file.readToEndAlloc(
+            agent.gc_allocator,
+            std.math.maxInt(usize),
+        ) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(
+                    agent.gc_allocator,
+                    "Error while reading file: {s}",
+                    .{@errorName(err)},
+                ),
+            ),
+        };
+        if (!std.unicode.utf8ValidateSlice(bytes)) {
+            return agent.throwException(.type_error, "Invalid UTF-8");
+        }
+        return Value.from(bytes);
+    }
+
     fn readLine(agent: *Agent, _: Value, _: ArgumentsList) !Value {
         const stdin = std.io.getStdIn().reader();
         const bytes = stdin.readUntilDelimiterOrEofAlloc(
@@ -192,6 +227,34 @@ pub const Kiesel = struct {
         }
         const nanoseconds = std.math.lossyCast(u64, milliseconds.asFloat() * 1_000_000);
         std.time.sleep(nanoseconds);
+        return .undefined;
+    }
+
+    fn writeFile(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const path = try arguments.get(0).toString(agent);
+        const contents = try arguments.get(1).toString(agent);
+
+        const file = std.fs.cwd().createFile(path.utf8, .{}) catch |err| {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(
+                    agent.gc_allocator,
+                    "Error while opening file: {s}",
+                    .{@errorName(err)},
+                ),
+            );
+        };
+        defer file.close();
+        file.writeAll(contents.utf8) catch |err| {
+            return agent.throwException(
+                .type_error,
+                try std.fmt.allocPrint(
+                    agent.gc_allocator,
+                    "Error while writing file: {s}",
+                    .{@errorName(err)},
+                ),
+            );
+        };
         return .undefined;
     }
 };
