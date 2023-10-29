@@ -229,6 +229,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "repeat", repeat, 1, realm);
         try defineBuiltinFunction(object, "search", search, 1, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
+        try defineBuiltinFunction(object, "startsWith", startsWith, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
         try defineBuiltinFunction(object, "@@iterator", @"@@iterator", 0, realm);
@@ -608,6 +609,64 @@ pub const StringPrototype = struct {
                 std.math.lossyCast(usize, to),
             ),
         );
+    }
+
+    /// 22.1.3.24 String.prototype.startsWith ( searchString [ , position ] )
+    /// https://tc39.es/ecma262/#sec-string.prototype.startswith
+    fn startsWith(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const search_string = arguments.get(0);
+        const position = arguments.get(1);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 3. Let isRegExp be ? IsRegExp(searchString).
+        const is_regexp = try search_string.isRegExp();
+
+        // 4. If isRegExp is true, throw a TypeError exception.
+        if (is_regexp) {
+            return agent.throwException(
+                .type_error,
+                "String.prototype.startsWith() argument must not be a regular expression",
+                .{},
+            );
+        }
+
+        // 5. Let searchStr be ? ToString(searchString).
+        const search_str = try search_string.toString(agent);
+
+        // 6. Let len be the length of S.
+        const len = string.utf16Length();
+
+        // 7. If position is undefined, let pos be 0; else let pos be ? ToIntegerOrInfinity(position).
+        const pos = if (position == .undefined) 0 else try position.toIntegerOrInfinity(agent);
+
+        // 8. Let start be the result of clamping pos between 0 and len.
+        const start = std.math.clamp(std.math.lossyCast(usize, pos), 0, len);
+
+        // 9. Let searchLength be the length of searchStr.
+        const search_length = search_str.utf16Length();
+
+        // 10. If searchLength = 0, return true.
+        if (search_length == 0) return Value.from(true);
+
+        // 11. Let end be start + searchLength.
+        const end = start +| search_length;
+
+        // 12. If end > len, return false.
+        if (end > len) return Value.from(false);
+
+        // 13. Let substring be the substring of S from start to end.
+        const substring = try string.substring(agent.gc_allocator, start, end);
+
+        // 14. If substring is searchStr, return true.
+        if (types.String.from(substring).eql(search_str)) return Value.from(true);
+
+        // 15. Return false.
+        return Value.from(false);
     }
 
     /// 22.1.3.29 String.prototype.toString ( )
