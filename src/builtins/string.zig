@@ -225,6 +225,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "charCodeAt", charCodeAt, 1, realm);
         try defineBuiltinFunction(object, "concat", concat, 1, realm);
         try defineBuiltinFunction(object, "endsWith", endsWith, 1, realm);
+        try defineBuiltinFunction(object, "includes", includes, 1, realm);
         try defineBuiltinFunction(object, "indexOf", indexOf, 1, realm);
         try defineBuiltinFunction(object, "matchAll", matchAll, 1, realm);
         try defineBuiltinFunction(object, "repeat", repeat, 1, realm);
@@ -436,6 +437,51 @@ pub const StringPrototype = struct {
 
         // 15. Return false.
         return Value.from(false);
+    }
+
+    /// 22.1.3.8 String.prototype.includes ( searchString [ , position ] )
+    /// https://tc39.es/ecma262/#sec-string.prototype.includes
+    fn includes(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const search_string = arguments.get(0);
+        const position = arguments.get(1);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 3. Let isRegExp be ? IsRegExp(searchString).
+        const is_regexp = try search_string.isRegExp();
+
+        // 4. If isRegExp is true, throw a TypeError exception.
+        if (is_regexp) {
+            return agent.throwException(
+                .type_error,
+                "String.prototype.includes() argument must not be a regular expression",
+                .{},
+            );
+        }
+
+        // 5. Let searchStr be ? ToString(searchString).
+        const search_str = try search_string.toString(agent);
+
+        // 6. Let pos be ? ToIntegerOrInfinity(position).
+        // 7. Assert: If position is undefined, then pos is 0.
+        const pos = try position.toIntegerOrInfinity(agent);
+
+        // 8. Let len be the length of S.
+        const len = string.utf16Length();
+
+        // 9. Let start be the result of clamping pos between 0 and len.
+        const start = std.math.clamp(std.math.lossyCast(usize, pos), 0, len);
+
+        // 10. Let index be StringIndexOf(S, searchStr, start).
+        const index = string.indexOf(search_str, start);
+
+        // 11. If index ≠ -1, return true.
+        // 12. Return false.
+        return Value.from(index != null);
     }
 
     /// 22.1.3.9 String.prototype.indexOf ( searchString [ , position ] )
