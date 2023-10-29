@@ -224,6 +224,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "charAt", charAt, 1, realm);
         try defineBuiltinFunction(object, "charCodeAt", charCodeAt, 1, realm);
         try defineBuiltinFunction(object, "concat", concat, 1, realm);
+        try defineBuiltinFunction(object, "indexOf", indexOf, 1, realm);
         try defineBuiltinFunction(object, "matchAll", matchAll, 1, realm);
         try defineBuiltinFunction(object, "repeat", repeat, 1, realm);
         try defineBuiltinFunction(object, "search", search, 1, realm);
@@ -374,6 +375,35 @@ pub const StringPrototype = struct {
 
         // 5. Return R.
         return Value.from(try new_string.toOwnedSlice());
+    }
+
+    /// 22.1.3.9 String.prototype.indexOf ( searchString [ , position ] )
+    /// https://tc39.es/ecma262/#sec-string.prototype.indexof
+    fn indexOf(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const search_string = arguments.get(0);
+        const position = arguments.get(1);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 3. Let searchStr be ? ToString(searchString).
+        const search_str = try search_string.toString(agent);
+
+        // 4. Let pos be ? ToIntegerOrInfinity(position).
+        // 5. Assert: If position is undefined, then pos is 0.
+        const pos = try position.toIntegerOrInfinity(agent);
+
+        // 6. Let len be the length of S.
+        const len = string.utf16Length();
+
+        // 7. Let start be the result of clamping pos between 0 and len.
+        const start = std.math.clamp(std.math.lossyCast(usize, pos), 0, len);
+
+        // 8. Return 𝔽(StringIndexOf(S, searchStr, start)).
+        return Value.from(string.indexOf(search_str, start) orelse return Value.from(-1));
     }
 
     /// 22.1.3.14 String.prototype.matchAll ( regexp )
