@@ -36,6 +36,10 @@ jobs:
             "https://files.kiesel.dev/upload?path=/files"
           EOF
           chmod +x upload.sh
+      - name: Build and upload kiesel.wasm
+        run: |
+          ./build.sh wasm32-wasi
+          ./upload.sh zig-out/bin/kiesel.wasm
       - name: Build and upload kiesel-linux-aarch64
         run: |
           ./build.sh aarch64-linux-musl kiesel-linux-aarch64
@@ -64,10 +68,6 @@ jobs:
         run: |
           ./build.sh x86_64-windows-gnu kiesel-windows-x86_64.exe
           ./upload.sh zig-out/bin/kiesel-windows-x86_64.exe
-      - name: Build and upload kiesel.wasm
-        run: |
-          ./build.sh wasm32-wasi
-          ./upload.sh zig-out/bin/kiesel.wasm
       - name: Update version.txt
         run: |
           git rev-parse main > version.txt
