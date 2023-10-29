@@ -74,6 +74,15 @@ pub const String = union(enum) {
         else
             null;
     }
+
+    pub fn codePointAt(self: Self, index: usize) u21 {
+        var it = std.unicode.Utf8View.initUnchecked(self.utf8).iterator();
+        var i: usize = 0;
+        while (it.nextCodepoint()) |code_point| : (i += 1) {
+            if (i == index) return code_point;
+        }
+        unreachable;
+    }
 };
 
 test "format" {

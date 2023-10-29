@@ -505,11 +505,7 @@ pub fn advanceStringIndex(string: String, index: u53, unicode: bool) u53 {
     if (index + 1 >= length) return index + 1;
 
     // 5. Let cp be CodePointAt(S, index).
-    var it = std.unicode.Utf8View.initUnchecked(string.utf8).iterator();
-    var i: u53 = 0;
-    const code_point = while (it.nextCodepoint()) |code_point| : (i += 1) {
-        if (i == index) break code_point;
-    } else unreachable;
+    const code_point = string.codePointAt(@intCast(index));
 
     // 6. Return index + cp.[[CodeUnitCount]].
     return index + (std.unicode.utf16CodepointSequenceLength(code_point) catch unreachable);
