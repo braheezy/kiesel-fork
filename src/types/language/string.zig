@@ -53,6 +53,27 @@ pub const String = union(enum) {
             => @panic("Surrogate pairs are not handled in String.substring()"),
         };
     }
+
+    /// 6.1.4.1 StringIndexOf ( string, searchValue, fromIndex )
+    /// https://tc39.es/ecma262/#sec-stringindexof
+    pub fn indexOf(self: Self, search_value: String, from_index: usize) ?usize {
+        // 1. Let len be the length of string.
+        const len = self.utf16Length();
+
+        // 2. If searchValue is the empty String and fromIndex ≤ len, return fromIndex.
+        if (search_value.utf16Length() == 0 and from_index <= len) return from_index;
+
+        // 3. Let searchLen be the length of searchValue.
+        // 4. For each integer i such that fromIndex ≤ i ≤ len - searchLen, in ascending order, do
+        //     a. Let candidate be the substring of string from i to i + searchLen.
+        //     b. If candidate is searchValue, return i.
+        // 5. Return -1.
+        if (from_index >= len) return null;
+        return if (std.mem.indexOf(u8, self.utf8[from_index..], search_value.utf8)) |index|
+            index + from_index
+        else
+            null;
+    }
 };
 
 test "format" {
