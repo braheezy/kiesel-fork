@@ -61,6 +61,7 @@ pub const Kiesel = struct {
         try defineBuiltinFunction(kiesel_object, "print", print, 1, realm);
         try defineBuiltinFunction(kiesel_object, "readLine", readLine, 0, realm);
         try defineBuiltinFunction(kiesel_object, "readStdin", readStdin, 0, realm);
+        try defineBuiltinFunction(kiesel_object, "sleep", sleep, 1, realm);
         return kiesel_object;
     }
 
@@ -182,6 +183,16 @@ pub const Kiesel = struct {
             return agent.throwException(.type_error, "Invalid UTF-8");
         }
         return Value.from(bytes);
+    }
+
+    fn sleep(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        const milliseconds = try arguments.get(0).toNumber(agent);
+        if (milliseconds.asFloat() < 0 or !milliseconds.isFinite()) {
+            return agent.throwException(.range_error, "Sleep duration must be a positive finite number");
+        }
+        const nanoseconds = std.math.lossyCast(u64, milliseconds.asFloat() * 1_000_000);
+        std.time.sleep(nanoseconds);
+        return .undefined;
     }
 };
 
