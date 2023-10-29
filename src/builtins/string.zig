@@ -223,6 +223,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinFunction(object, "charAt", charAt, 1, realm);
         try defineBuiltinFunction(object, "charCodeAt", charCodeAt, 1, realm);
+        try defineBuiltinFunction(object, "codePointAt", codePointAt, 1, realm);
         try defineBuiltinFunction(object, "concat", concat, 1, realm);
         try defineBuiltinFunction(object, "endsWith", endsWith, 1, realm);
         try defineBuiltinFunction(object, "includes", includes, 1, realm);
@@ -352,6 +353,32 @@ pub const StringPrototype = struct {
         const code_units = try string.utf16CodeUnits(agent.gc_allocator);
         defer agent.gc_allocator.free(code_units);
         return Value.from(code_units[position]);
+    }
+
+    /// 22.1.3.4 String.prototype.codePointAt ( pos )
+    /// https://tc39.es/ecma262/#sec-string.prototype.codepointat
+    fn codePointAt(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const pos = arguments.get(0);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 3. Let position be ? ToIntegerOrInfinity(pos).
+        const position_f64 = try pos.toIntegerOrInfinity(agent);
+
+        // 4. Let size be the length of S.
+        const size = string.utf16Length();
+
+        // 5. If position < 0 or position ≥ size, return undefined.
+        if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return .undefined;
+        const position: usize = @intFromFloat(position_f64);
+
+        // 6. Let cp be CodePointAt(S, position).
+        // 7. Return 𝔽(cp.[[CodePoint]]).
+        return Value.from(string.codePointAt(position));
     }
 
     /// 22.1.3.5 String.prototype.concat ( ...args )
