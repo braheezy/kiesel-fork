@@ -83,7 +83,11 @@ pub const RegExpStringIteratorPrototype = struct {
 
         // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
         if (this_value != .object or !this_value.object.is(RegExpStringIterator)) {
-            return agent.throwException(.type_error, "This value must be a RegExp String Iterator");
+            return agent.throwException(
+                .type_error,
+                "This value must be a RegExp String Iterator",
+                .{},
+            );
         }
         const reg_exp_string_iterator = this_value.object.as(RegExpStringIterator);
 

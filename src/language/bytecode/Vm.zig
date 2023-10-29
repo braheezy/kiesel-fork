@@ -153,10 +153,7 @@ fn evaluateNew(agent: *Agent, constructor: Value, arguments: []const Value) !Val
 
     // 5. If IsConstructor(constructor) is false, throw a TypeError exception.
     if (!constructor.isConstructor()) {
-        return agent.throwException(
-            .type_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "{} is not a constructor", .{constructor}),
-        );
+        return agent.throwException(.type_error, "{} is not a constructor", .{constructor});
     }
 
     // 6. Return ? Construct(constructor, argList).
@@ -209,18 +206,12 @@ fn evaluateCall(
 
     // 4. If func is not an Object, throw a TypeError exception.
     if (function != .object) {
-        return agent.throwException(
-            .type_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{function}),
-        );
+        return agent.throwException(.type_error, "{} is not an Object", .{function});
     }
 
     // 5. If IsCallable(func) is false, throw a TypeError exception.
     if (!function.isCallable()) {
-        return agent.throwException(
-            .type_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{function}),
-        );
+        return agent.throwException(.type_error, "{} is not callable", .{function});
     }
 
     // TODO: 6. If tailPosition is true, perform PrepareForTailCall().
@@ -277,6 +268,7 @@ fn instanceofOperator(agent: *Agent, value: Value, target: Value) !bool {
         return agent.throwException(
             .type_error,
             "Right-hand side of 'in' operator must be an object",
+            .{},
         );
     }
 
@@ -294,10 +286,7 @@ fn instanceofOperator(agent: *Agent, value: Value, target: Value) !bool {
 
     // 4. If IsCallable(target) is false, throw a TypeError exception.
     if (!target.isCallable()) {
-        return agent.throwException(
-            .type_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{target}),
-        );
+        return agent.throwException(.type_error, "{} is not callable", .{target});
     }
 
     // 5. Return ? OrdinaryHasInstance(target, V).
@@ -353,6 +342,7 @@ fn applyStringOrNumericBinaryOperator(agent: *Agent, lval: Value, operator: ast.
         return agent.throwException(
             .type_error,
             "Left-hand side and right-hand side of numeric binary expression must have the same type",
+            .{},
         );
     }
 
@@ -1417,11 +1407,8 @@ fn classDefinitionEvaluation(
             if (prototype_parent_value != .object and prototype_parent_value != .null) {
                 return agent.throwException(
                     .type_error,
-                    try std.fmt.allocPrint(
-                        agent.gc_allocator,
-                        "{} is not an Object or null",
-                        .{prototype_parent_value},
-                    ),
+                    "{} is not an Object or null",
+                    .{prototype_parent_value},
                 );
             }
 
@@ -1461,7 +1448,7 @@ fn classDefinitionEvaluation(
 
                 // ii. If NewTarget is undefined, throw a TypeError exception.
                 if (new_target == null) {
-                    return agent_.throwException(.type_error, "Class must be constructed with 'new'");
+                    return agent_.throwException(.type_error, "Class must be constructed with 'new'", .{});
                 }
 
                 // iii. Let F be the active function object.
@@ -1482,16 +1469,13 @@ fn classDefinitionEvaluation(
                     if (prototype_function == null or !Value.from(prototype_function.?).isConstructor()) {
                         return agent_.throwException(
                             .type_error,
-                            try std.fmt.allocPrint(
-                                agent_.gc_allocator,
-                                "{} is not a constructor",
-                                .{
-                                    if (prototype_function == null)
-                                        .undefined
-                                    else
-                                        Value.from(prototype_function.?),
-                                },
-                            ),
+                            "{} is not a constructor",
+                            .{
+                                if (prototype_function == null)
+                                    .undefined
+                                else
+                                    Value.from(prototype_function.?),
+                            },
                         );
                     }
 
@@ -2048,6 +2032,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
                     return self.agent.throwException(
                         .reference_error,
                         "Cannot delete super reference",
+                        .{},
                     );
                 }
 
@@ -2064,7 +2049,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
 
                 // e. If deleteStatus is false and ref.[[Strict]] is true, throw a TypeError exception.
                 if (!delete_status and reference.strict) {
-                    return self.agent.throwException(.type_error, "Could not delete property");
+                    return self.agent.throwException(.type_error, "Could not delete property", .{});
                 }
 
                 // f. Return deleteStatus.
@@ -2215,11 +2200,8 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             if (!function.isConstructor()) {
                 return self.agent.throwException(
                     .type_error,
-                    try std.fmt.allocPrint(
-                        self.agent.gc_allocator,
-                        "{} is not a constructor",
-                        .{function},
-                    ),
+                    "{} is not a constructor",
+                    .{function},
                 );
             }
 
@@ -2318,10 +2300,13 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             const lval = self.stack.pop();
 
             // 5. If rval is not an Object, throw a TypeError exception.
-            if (rval != .object) return self.agent.throwException(
-                .type_error,
-                "Right-hand side of 'in' operator must be an object",
-            );
+            if (rval != .object) {
+                return self.agent.throwException(
+                    .type_error,
+                    "Right-hand side of 'in' operator must be an object",
+                    .{},
+                );
+            }
 
             // 6. Return ? HasProperty(rval, ? ToPropertyKey(lval)).
             self.result = Value.from(

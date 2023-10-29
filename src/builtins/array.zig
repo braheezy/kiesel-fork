@@ -122,10 +122,9 @@ pub fn arrayCreate(agent: *Agent, length: u64, maybe_prototype: ?Object) !Object
     const realm = agent.currentRealm();
 
     // 1. If length > 2**32 - 1, throw a RangeError exception.
-    if (length >= std.math.maxInt(u32)) return agent.throwException(
-        .range_error,
-        "Invalid array length",
-    );
+    if (length >= std.math.maxInt(u32)) {
+        return agent.throwException(.range_error, "Invalid array length", .{});
+    }
 
     // 2. If proto is not present, set proto to %Array.prototype%.
     const prototype = maybe_prototype orelse try realm.intrinsics.@"%Array.prototype%"();
@@ -201,10 +200,7 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: u64) !O
 
     // 7. If IsConstructor(C) is false, throw a TypeError exception.
     if (!constructor.isConstructor()) {
-        return agent.throwException(
-            .type_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "{} is not a constructor", .{constructor}),
-        );
+        return agent.throwException(.type_error, "{} is not a constructor", .{constructor});
     }
 
     // 8. Return ? Construct(C, « 𝔽(length) »).
@@ -234,10 +230,9 @@ pub fn arraySetLength(agent: *Agent, array: Object, property_descriptor: Propert
     const number_len = try property_descriptor.value.?.toNumber(agent);
 
     // 5. If SameValueZero(newLen, numberLen) is false, throw a RangeError exception.
-    if (@as(f64, @floatFromInt(new_len)) != number_len.asFloat()) return agent.throwException(
-        .range_error,
-        "Invalid array length",
-    );
+    if (@as(f64, @floatFromInt(new_len)) != number_len.asFloat()) {
+        return agent.throwException(.range_error, "Invalid array length", .{});
+    }
 
     // 6. Set newLenDesc.[[Value]] to newLen.
     new_len_desc.value = Value.from(new_len);
@@ -444,10 +439,9 @@ pub const ArrayConstructor = struct {
                 int_len = len.toUint32(agent) catch unreachable;
 
                 // ii. If SameValueZero(intLen, len) is false, throw a RangeError exception.
-                if (@as(f64, @floatFromInt(int_len)) != len.number.asFloat()) return agent.throwException(
-                    .range_error,
-                    "Invalid array length",
-                );
+                if (@as(f64, @floatFromInt(int_len)) != len.number.asFloat()) {
+                    return agent.throwException(.range_error, "Invalid array length", .{});
+                }
             }
 
             // e. Perform ! Set(array, "length", intLen, true).
@@ -508,10 +502,7 @@ pub const ArrayConstructor = struct {
         else blk: {
             // a. If IsCallable(mapfn) is false, throw a TypeError exception.
             if (!map_fn.isCallable()) {
-                return agent.throwException(
-                    .type_error,
-                    try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{map_fn}),
-                );
+                return agent.throwException(.type_error, "{} is not callable", .{map_fn});
             }
 
             // b. Let mapping be true.
@@ -551,6 +542,7 @@ pub const ArrayConstructor = struct {
                     const @"error" = agent.throwException(
                         .type_error,
                         "Maximum array length exceeded",
+                        .{},
                     );
 
                     // 2. Return ? IteratorClose(iteratorRecord, error).
@@ -874,7 +866,7 @@ pub const ArrayPrototype = struct {
 
                 // ii. If n + len > 2**53 - 1, throw a TypeError exception.
                 if (std.meta.isError(std.math.add(u53, n, len))) {
-                    return agent.throwException(.type_error, "Maximum array length exceeded");
+                    return agent.throwException(.type_error, "Maximum array length exceeded", .{});
                 }
 
                 // iii. Let k be 0.
@@ -910,7 +902,7 @@ pub const ArrayPrototype = struct {
 
                 // ii. If n ≥ 2**53 - 1, throw a TypeError exception.
                 if (n == std.math.maxInt(u53)) {
-                    return agent.throwException(.type_error, "Maximum array length exceeded");
+                    return agent.throwException(.type_error, "Maximum array length exceeded", .{});
                 }
 
                 // iii. Perform ? CreateDataPropertyOrThrow(A, ! ToString(𝔽(n)), E).
@@ -1100,10 +1092,7 @@ pub const ArrayPrototype = struct {
 
         // 3. If IsCallable(callbackfn) is false, throw a TypeError exception.
         if (!callback_fn.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{callback_fn}),
-            );
+            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
         }
 
         // 4. Let k be 0.
@@ -1220,10 +1209,7 @@ pub const ArrayPrototype = struct {
 
         // 3. If IsCallable(callbackfn) is false, throw a TypeError exception.
         if (!callback_fn.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{callback_fn}),
-            );
+            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
         }
 
         // 4. Let A be ? ArraySpeciesCreate(O, 0).
@@ -1465,7 +1451,7 @@ pub const ArrayPrototype = struct {
                 else {
                     // 1. If targetIndex ≥ 2**53 - 1, throw a TypeError exception.
                     if (target_index >= std.math.maxInt(u53)) {
-                        return agent.throwException(.type_error, "Maximum array length exceeded");
+                        return agent.throwException(.type_error, "Maximum array length exceeded", .{});
                     }
 
                     // 2. Perform ? CreateDataPropertyOrThrow(target, ! ToString(𝔽(targetIndex)), element).
@@ -1500,10 +1486,7 @@ pub const ArrayPrototype = struct {
 
         // 3. If IsCallable(mapperFunction) is false, throw a TypeError exception.
         if (!mapper_function.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{mapper_function}),
-            );
+            return agent.throwException(.type_error, "{} is not callable", .{mapper_function});
         }
 
         // 4. Let A be ? ArraySpeciesCreate(O, 0).
@@ -1539,10 +1522,7 @@ pub const ArrayPrototype = struct {
 
         // 3. If IsCallable(callbackfn) is false, throw a TypeError exception.
         if (!callback_fn.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{callback_fn}),
-            );
+            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
         }
 
         // 4. Let k be 0.
@@ -1813,10 +1793,7 @@ pub const ArrayPrototype = struct {
 
         // 3. If IsCallable(callbackfn) is false, throw a TypeError exception.
         if (!callback_fn.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{callback_fn}),
-            );
+            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
         }
 
         // 4. Let A be ? ArraySpeciesCreate(O, len).
@@ -1911,7 +1888,7 @@ pub const ArrayPrototype = struct {
 
         // 4. If len + argCount > 2**53 - 1, throw a TypeError exception.
         if (std.meta.isError(std.math.add(u53, len, arg_count))) {
-            return agent.throwException(.type_error, "Maximum array length exceeded");
+            return agent.throwException(.type_error, "Maximum array length exceeded", .{});
         }
 
         // 5. For each element E of items, do
@@ -1944,10 +1921,7 @@ pub const ArrayPrototype = struct {
 
         // 3. If IsCallable(callbackfn) is false, throw a TypeError exception.
         if (!callback_fn.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{callback_fn}),
-            );
+            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
         }
 
         // 4. If len = 0 and initialValue is not present, throw a TypeError exception.
@@ -1955,6 +1929,7 @@ pub const ArrayPrototype = struct {
             return agent.throwException(
                 .type_error,
                 "Cannot reduce empty array without initial value",
+                .{},
             );
         }
 
@@ -1996,6 +1971,7 @@ pub const ArrayPrototype = struct {
                 return agent.throwException(
                     .type_error,
                     "Cannot reduce empty array without initial value",
+                    .{},
                 );
             }
         }
@@ -2041,10 +2017,7 @@ pub const ArrayPrototype = struct {
 
         // 3. If IsCallable(callbackfn) is false, throw a TypeError exception.
         if (!callback_fn.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{callback_fn}),
-            );
+            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
         }
 
         // 4. If len = 0 and initialValue is not present, throw a TypeError exception.
@@ -2052,6 +2025,7 @@ pub const ArrayPrototype = struct {
             return agent.throwException(
                 .type_error,
                 "Cannot reduce empty array without initial value",
+                .{},
             );
         }
 
@@ -2093,6 +2067,7 @@ pub const ArrayPrototype = struct {
                 return agent.throwException(
                     .type_error,
                     "Cannot reduce empty array without initial value",
+                    .{},
                 );
             }
         }
@@ -2378,10 +2353,7 @@ pub const ArrayPrototype = struct {
 
         // 3. If IsCallable(callbackfn) is false, throw a TypeError exception.
         if (!callback_fn.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{callback_fn}),
-            );
+            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
         }
 
         // 4. Let k be 0.
@@ -2425,10 +2397,7 @@ pub const ArrayPrototype = struct {
         // 1. If comparefn is not undefined and IsCallable(comparefn) is false, throw a TypeError
         //    exception.
         if (compare_fn != .undefined and !compare_fn.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{compare_fn}),
-            );
+            return agent.throwException(.type_error, "{} is not callable", .{compare_fn});
         }
 
         // 2. Let obj be ? ToObject(this value).
@@ -2545,7 +2514,7 @@ pub const ArrayPrototype = struct {
 
         // 11. If len + itemCount - actualDeleteCount > 2**53 - 1, throw a TypeError exception.
         if (std.meta.isError(std.math.add(u53, len - actual_delete_count, item_count))) {
-            return agent.throwException(.type_error, "Maximum array length exceeded");
+            return agent.throwException(.type_error, "Maximum array length exceeded", .{});
         }
 
         // 12. Let A be ? ArraySpeciesCreate(O, actualDeleteCount).
@@ -2766,10 +2735,7 @@ pub const ArrayPrototype = struct {
         // 1. If comparefn is not undefined and IsCallable(comparefn) is false, throw a TypeError
         //    exception.
         if (compare_fn != .undefined and !compare_fn.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{compare_fn}),
-            );
+            return agent.throwException(.type_error, "{} is not callable", .{compare_fn});
         }
 
         // 2. Let O be ? ToObject(this value).
@@ -2875,7 +2841,7 @@ pub const ArrayPrototype = struct {
         // 11. Let newLen be len + insertCount - actualSkipCount.
         // 12. If newLen > 2**53 - 1, throw a TypeError exception.
         const new_len = std.math.add(u53, len - actual_skip_count, insert_count) catch {
-            return agent.throwException(.type_error, "Maximum array length exceeded");
+            return agent.throwException(.type_error, "Maximum array length exceeded", .{});
         };
 
         // 13. Let A be ? ArrayCreate(newLen).
@@ -2972,7 +2938,7 @@ pub const ArrayPrototype = struct {
         if (arg_count > 0) {
             // a. If len + argCount > 2**53 - 1, throw a TypeError exception.
             if (std.meta.isError(std.math.add(u53, len, @intCast(arg_count)))) {
-                return agent.throwException(.type_error, "Maximum array length exceeded");
+                return agent.throwException(.type_error, "Maximum array length exceeded", .{});
             }
 
             // b. Let k be len.
@@ -3063,7 +3029,7 @@ pub const ArrayPrototype = struct {
 
         // 6. If actualIndex ≥ len or actualIndex < 0, throw a RangeError exception.
         if (actual_index_f64 >= @as(f64, @floatFromInt(len)) or actual_index_f64 < 0) {
-            return agent.throwException(.range_error, "Index is out of array bounds");
+            return agent.throwException(.range_error, "Index is out of array bounds", .{});
         }
         const actual_index: u53 = @intFromFloat(actual_index_f64);
 
@@ -3109,10 +3075,7 @@ pub fn findViaPredicate(
 
     // 1. If IsCallable(predicate) is false, throw a TypeError exception.
     if (!predicate.isCallable()) {
-        return agent.throwException(
-            .type_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{predicate}),
-        );
+        return agent.throwException(.type_error, "{} is not callable", .{predicate});
     }
 
     // 2. If direction is ascending, then

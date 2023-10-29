@@ -131,10 +131,7 @@ fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) !Va
     if (function.fields.is_class_constructor) {
         // a. Let error be a newly created TypeError object.
         // b. NOTE: error is created in calleeContext with F's associated Realm Record.
-        const err = agent.throwException(
-            .type_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{object}),
-        );
+        const err = agent.throwException(.type_error, "{} is not callable", .{object});
 
         // c. Remove calleeContext from the execution context stack and restore callerContext as
         //    the running execution context.
@@ -483,6 +480,7 @@ pub fn construct(object: Object, arguments_list: ArgumentsList, new_target: Obje
                 return agent.throwException(
                     .type_error,
                     "Constructor must return an object or undefined",
+                    .{},
                 );
             }
         }

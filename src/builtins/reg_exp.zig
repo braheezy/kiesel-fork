@@ -152,10 +152,9 @@ pub fn regExpInitialize(agent: *Agent, object: Object, pattern: Value, flags: Va
     // 8. If F contains "s", let s be true; else let s be false.
     // 9. If F contains "u", let u be true; else let u be false.
     // 10. If F contains "v", let v be true; else let v be false.
-    const parsed_flags = ParsedFlags.from(f.utf8) orelse return agent.throwException(
-        .syntax_error,
-        try std.fmt.allocPrint(agent.gc_allocator, "Invalid RegExp flags '{s}'", .{f.utf8}),
-    );
+    const parsed_flags = ParsedFlags.from(f.utf8) orelse {
+        return agent.throwException(.syntax_error, "Invalid RegExp flags '{s}'", .{f.utf8});
+    };
 
     // NOTE: "v" is not supported by libregexp, but we parse and store it regardless
     var re_flags: c_int = 0;
@@ -192,10 +191,7 @@ pub fn regExpInitialize(agent: *Agent, object: Object, pattern: Value, flags: Va
     ) orelse {
         const str = std.mem.span(@as([*:0]const u8, @ptrCast(&error_msg)));
         if (std.mem.eql(u8, str, "out of memory")) return error.OutOfMemory;
-        return agent.throwException(
-            .syntax_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "Invalid RegExp pattern: {s}", .{str}),
-        );
+        return agent.throwException(.syntax_error, "Invalid RegExp pattern: {s}", .{str});
     };
 
     // 16. Set obj.[[OriginalSource]] to P.
@@ -238,6 +234,7 @@ pub fn regExpExec(agent: *Agent, reg_exp: Object, string: String) !?Object {
             return agent.throwException(
                 .type_error,
                 "RegExp exec function must return object or null",
+                .{},
             );
         }
 
@@ -809,10 +806,7 @@ pub const RegExpPrototype = struct {
 
         // 2. If R is not an Object, throw a TypeError exception.
         if (reg_exp != .object) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{reg_exp}),
-            );
+            return agent.throwException(.type_error, "{} is not an Object", .{reg_exp});
         }
 
         // 3. Let codeUnits be a new empty List.
@@ -876,10 +870,7 @@ pub const RegExpPrototype = struct {
     fn regExpHasFlag(agent: *Agent, reg_exp: Value, flag: c_int) !Value {
         // 1. If R is not an Object, throw a TypeError exception.
         if (reg_exp != .object) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{reg_exp}),
-            );
+            return agent.throwException(.type_error, "{} is not an Object", .{reg_exp});
         }
 
         // 2. If R does not have an [[OriginalFlags]] internal slot, then
@@ -892,7 +883,7 @@ pub const RegExpPrototype = struct {
             }
 
             // b. Otherwise, throw a TypeError exception.
-            return agent.throwException(.type_error, "This value must be a RegExp object");
+            return agent.throwException(.type_error, "This value must be a RegExp object", .{});
         }
 
         // 3. Let flags be R.[[OriginalFlags]].
@@ -942,10 +933,7 @@ pub const RegExpPrototype = struct {
 
         // 2. If R is not an Object, throw a TypeError exception.
         if (reg_exp != .object) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{reg_exp}),
-            );
+            return agent.throwException(.type_error, "{} is not an Object", .{reg_exp});
         }
 
         // 3. Let S be ? ToString(string).
@@ -1000,10 +988,7 @@ pub const RegExpPrototype = struct {
 
         // 2. If rx is not an Object, throw a TypeError exception.
         if (reg_exp != .object) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{reg_exp}),
-            );
+            return agent.throwException(.type_error, "{} is not an Object", .{reg_exp});
         }
 
         // 3. Let S be ? ToString(string).
@@ -1045,10 +1030,7 @@ pub const RegExpPrototype = struct {
 
         // 2. If R is not an Object, throw a TypeError exception.
         if (reg_exp != .object) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{reg_exp}),
-            );
+            return agent.throwException(.type_error, "{} is not an Object", .{reg_exp});
         }
 
         // 3. If R does not have an [[OriginalSource]] internal slot, then
@@ -1061,7 +1043,7 @@ pub const RegExpPrototype = struct {
             }
 
             // b. Otherwise, throw a TypeError exception.
-            return agent.throwException(.type_error, "This value must be a RegExp object");
+            return agent.throwException(.type_error, "This value must be a RegExp object", .{});
         }
 
         // 4. Assert: R has an [[OriginalFlags]] internal slot.
@@ -1114,10 +1096,7 @@ pub const RegExpPrototype = struct {
 
         // 2. If R is not an Object, throw a TypeError exception.
         if (reg_exp != .object) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{reg_exp}),
-            );
+            return agent.throwException(.type_error, "{} is not an Object", .{reg_exp});
         }
 
         // 3. Let string be ? ToString(S).
@@ -1138,10 +1117,7 @@ pub const RegExpPrototype = struct {
 
         // 2. If R is not an Object, throw a TypeError exception.
         if (reg_exp != .object) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{reg_exp}),
-            );
+            return agent.throwException(.type_error, "{} is not an Object", .{reg_exp});
         }
 
         // 3. Let pattern be ? ToString(? Get(R, "source")).

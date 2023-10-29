@@ -259,6 +259,7 @@ pub const StringPrototype = struct {
         return agent.throwException(
             .type_error,
             "This value must be a string or String object",
+            .{},
         );
     }
 
@@ -401,6 +402,7 @@ pub const StringPrototype = struct {
                     return agent.throwException(
                         .type_error,
                         "RegExp object must have the 'g' flag set",
+                        .{},
                     );
                 }
             }
@@ -451,6 +453,7 @@ pub const StringPrototype = struct {
             return agent.throwException(
                 .range_error,
                 "Repeat count must be a positive finite number",
+                .{},
             );
         }
 

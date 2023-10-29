@@ -62,11 +62,8 @@ fn getPrototypeOf(object: Object) !?Object {
     if (handler_prototype != .object and handler_prototype != .null) {
         return agent.throwException(
             .type_error,
-            try std.fmt.allocPrint(
-                agent.gc_allocator,
-                "{} is not an Object or null",
-                .{handler_prototype},
-            ),
+            "{} is not an Object or null",
+            .{handler_prototype},
         );
     }
 
@@ -89,6 +86,7 @@ fn getPrototypeOf(object: Object) !?Object {
         return agent.throwException(
             .type_error,
             "Proxy 'getPrototypeOf' trap must return same prototype for non-extensible target",
+            .{},
         );
     }
 
@@ -147,6 +145,7 @@ pub fn setPrototypeOf(object: Object, prototype: ?Object) !bool {
         return agent.throwException(
             .type_error,
             "Proxy 'setPrototypeOf' trap must return false or receive same prototype for non-extensible target",
+            .{},
         );
     }
 
@@ -193,6 +192,7 @@ fn isExtensible(object: Object) !bool {
         return agent.throwException(
             .type_error,
             "Proxy 'isExtensible' trap must return same result as target",
+            .{},
         );
     }
 
@@ -241,6 +241,7 @@ fn preventExtensions(object: Object) !bool {
             return agent.throwException(
                 .type_error,
                 "Proxy 'preventExtensions' trap must not return true for extensible target",
+                .{},
             );
         }
     }
@@ -285,6 +286,7 @@ fn getOwnProperty(object: Object, property_key: PropertyKey) !?PropertyDescripto
         return agent.throwException(
             .type_error,
             "Proxy 'getOwnPropertyDescriptor' trap must return an object or undefined",
+            .{},
         );
     }
 
@@ -301,6 +303,7 @@ fn getOwnProperty(object: Object, property_key: PropertyKey) !?PropertyDescripto
             return agent.throwException(
                 .type_error,
                 "Proxy 'getOwnPropertyDescriptor' trap must not return undefined for non-configurable property on target",
+                .{},
             );
         }
 
@@ -312,6 +315,7 @@ fn getOwnProperty(object: Object, property_key: PropertyKey) !?PropertyDescripto
             return agent.throwException(
                 .type_error,
                 "Proxy 'getOwnPropertyDescriptor' trap must not return undefined for property on non-extensible target",
+                .{},
             );
         }
 
@@ -340,6 +344,7 @@ fn getOwnProperty(object: Object, property_key: PropertyKey) !?PropertyDescripto
         return agent.throwException(
             .type_error,
             "Proxy 'getOwnPropertyDescriptor' trap must return a property descriptor compatible with the target object",
+            .{},
         );
     }
 
@@ -351,6 +356,7 @@ fn getOwnProperty(object: Object, property_key: PropertyKey) !?PropertyDescripto
             return agent.throwException(
                 .type_error,
                 "Proxy 'getOwnPropertyDescriptor' trap must not return 'configurable: false' for missing or configurable property on target",
+                .{},
             );
         }
 
@@ -364,6 +370,7 @@ fn getOwnProperty(object: Object, property_key: PropertyKey) !?PropertyDescripto
                 return agent.throwException(
                     .type_error,
                     "Proxy 'getOwnPropertyDescriptor' trap must not return 'writable: false' for non-configurable but writable property on target",
+                    .{},
                 );
             }
         }
@@ -437,6 +444,7 @@ fn defineOwnProperty(
             return agent.throwException(
                 .type_error,
                 "Proxy 'defineProperty' trap must not return true for missing property on non-extensible target",
+                .{},
             );
         }
 
@@ -445,6 +453,7 @@ fn defineOwnProperty(
             return agent.throwException(
                 .type_error,
                 "Proxy 'defineProperty' trap must not return 'configurable: false' for missing property on target",
+                .{},
             );
         }
     }
@@ -456,6 +465,7 @@ fn defineOwnProperty(
             return agent.throwException(
                 .type_error,
                 "Proxy 'defineProperty' trap must return a property descriptor compatible with the target object",
+                .{},
             );
         }
 
@@ -465,6 +475,7 @@ fn defineOwnProperty(
             return agent.throwException(
                 .type_error,
                 "Proxy 'defineProperty' trap must not return 'configurable: false' for configurable property on target",
+                .{},
             );
         }
 
@@ -480,6 +491,7 @@ fn defineOwnProperty(
             return agent.throwException(
                 .type_error,
                 "Proxy 'defineProperty' trap must not return 'writable: false' for non-configurable but writable property on target",
+                .{},
             );
         }
     }
@@ -531,6 +543,7 @@ fn hasProperty(object: Object, property_key: PropertyKey) !bool {
                 return agent.throwException(
                     .type_error,
                     "Proxy 'has' trap must not return false for non-configurable property on target",
+                    .{},
                 );
             }
 
@@ -542,6 +555,7 @@ fn hasProperty(object: Object, property_key: PropertyKey) !bool {
                 return agent.throwException(
                     .type_error,
                     "Proxy 'has' trap must not return false for property on non-extensible target",
+                    .{},
                 );
             }
         }
@@ -594,6 +608,7 @@ fn get(object: Object, property_key: PropertyKey, receiver: Value) !Value {
                 return agent.throwException(
                     .type_error,
                     "Proxy 'get' trap must not return different value for non-configurable, non-writable property on target",
+                    .{},
                 );
             }
         }
@@ -605,6 +620,7 @@ fn get(object: Object, property_key: PropertyKey, receiver: Value) !Value {
                 return agent.throwException(
                     .type_error,
                     "Proxy 'get' trap must return undefined for non-configurable accessor property with no getter on target",
+                    .{},
                 );
             }
         }
@@ -660,6 +676,7 @@ fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value)
                 return agent.throwException(
                     .type_error,
                     "Proxy 'set' trap must not return true when attempting to change the value of a non-configurable, non-writable property on target",
+                    .{},
                 );
             }
         }
@@ -671,6 +688,7 @@ fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value)
                 return agent.throwException(
                     .type_error,
                     "Proxy 'set' trap must not return true when attempting to set the value of a non-configurable accessor property with no setter on target",
+                    .{},
                 );
             }
         }
@@ -725,6 +743,7 @@ fn delete(object: Object, property_key: PropertyKey) !bool {
         return agent.throwException(
             .type_error,
             "Proxy 'deleteProperty' trap must not return true for non-configurable property on target",
+            .{},
         );
     }
 
@@ -736,6 +755,7 @@ fn delete(object: Object, property_key: PropertyKey) !bool {
         return agent.throwException(
             .type_error,
             "Proxy 'deleteProperty' trap must not return true for property on non-extensible target",
+            .{},
         );
     }
 
@@ -810,6 +830,7 @@ fn ownPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
         return agent.throwException(
             .type_error,
             "Proxy 'ownKeys' trap must not return duplicate property keys",
+            .{},
         );
     }
 
@@ -868,6 +889,7 @@ fn ownPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
             return agent.throwException(
                 .type_error,
                 "Proxy 'ownKeys' trap must not omit any non-configurable properties",
+                .{},
             );
         }
     }
@@ -883,6 +905,7 @@ fn ownPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
             return agent.throwException(
                 .type_error,
                 "Proxy 'ownKeys' trap must not omit any properties of non-extensible target",
+                .{},
             );
         }
     }
@@ -892,6 +915,7 @@ fn ownPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
         return agent.throwException(
             .type_error,
             "Proxy 'ownKeys' trap must not include new properties of non-extensible target",
+            .{},
         );
     }
 
@@ -973,7 +997,11 @@ pub fn construct(object: Object, arguments_list: ArgumentsList, new_target: Obje
 
     // 10. If newObj is not an Object, throw a TypeError exception.
     if (new_obj != .object) {
-        return agent.throwException(.type_error, "Proxy 'construct' trap must return an object");
+        return agent.throwException(
+            .type_error,
+            "Proxy 'construct' trap must return an object",
+            .{},
+        );
     }
 
     // 11. Return newObj.
@@ -987,7 +1015,7 @@ pub fn validateNonRevokedProxy(proxy: *Proxy) !void {
 
     // 1. If proxy.[[ProxyTarget]] is null, throw a TypeError exception.
     if (proxy.fields.proxy_target == null) {
-        return agent.throwException(.type_error, "Proxy has been revoked");
+        return agent.throwException(.type_error, "Proxy has been revoked", .{});
     }
 
     // 2. Assert: proxy.[[ProxyHandler]] is not null.
@@ -1001,18 +1029,12 @@ pub fn validateNonRevokedProxy(proxy: *Proxy) !void {
 fn proxyCreate(agent: *Agent, target: Value, handler: Value) !Object {
     // 1. If target is not an Object, throw a TypeError exception.
     if (target != .object) {
-        return agent.throwException(
-            .type_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{target}),
-        );
+        return agent.throwException(.type_error, "{} is not an Object", .{target});
     }
 
     // 2. If handler is not an Object, throw a TypeError exception.
     if (handler != .object) {
-        return agent.throwException(
-            .type_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{handler}),
-        );
+        return agent.throwException(.type_error, "{} is not an Object", .{handler});
     }
 
     // 3. Let P be MakeBasicObject(« [[ProxyHandler]], [[ProxyTarget]] »).
@@ -1083,7 +1105,7 @@ pub const ProxyConstructor = struct {
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
         if (new_target == null) {
-            return agent.throwException(.type_error, "Proxy must be constructed with 'new'");
+            return agent.throwException(.type_error, "Proxy must be constructed with 'new'", .{});
         }
 
         // 2. Return ? ProxyCreate(target, handler).

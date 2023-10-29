@@ -82,7 +82,7 @@ pub fn exponentiate(base: Self, agent: *Agent, exponent: Self) !Self {
 
     // 1. If exponent < 0ℤ, throw a RangeError exception.
     if (!exponent.value.isPositive() and !exponent.value.eqlZero()) {
-        return agent.throwException(.range_error, "Exponent must be positive");
+        return agent.throwException(.range_error, "Exponent must be positive", .{});
     }
 
     // 2. If base is 0ℤ and exponent is 0ℤ, return 1ℤ.
@@ -113,7 +113,7 @@ pub fn multiply(x: Self, agent: *Agent, y: Self) !Self {
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-divide
 pub fn divide(x: Self, agent: *Agent, y: Self) !Self {
     // 1. If y is 0ℤ, throw a RangeError exception.
-    if (y.value.eqlZero()) return agent.throwException(.range_error, "Division by zero");
+    if (y.value.eqlZero()) return agent.throwException(.range_error, "Division by zero", .{});
 
     // 2. Let quotient be ℝ(x) / ℝ(y).
     // 3. Return ℤ(truncate(quotient)).
@@ -127,7 +127,7 @@ pub fn divide(x: Self, agent: *Agent, y: Self) !Self {
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-remainder
 pub fn remainder(n: Self, agent: *Agent, d: Self) !Self {
     // 1. If d is 0ℤ, throw a RangeError exception.
-    if (d.value.eqlZero()) return agent.throwException(.range_error, "Division by zero");
+    if (d.value.eqlZero()) return agent.throwException(.range_error, "Division by zero", .{});
 
     // 2. If n is 0ℤ, return 0ℤ.
     if (n.value.eqlZero()) return n;
@@ -166,7 +166,7 @@ pub fn leftShift(_: Self, agent: *Agent, _: Self) !Self {
     //     a. Return ℤ(floor(ℝ(x) / 2**(-ℝ(y)))).
     // 2. Return x × 2ℤ^y.
     // TODO: Figure out how to do this with built-in functionality, shiftLeft() only accepts an usize
-    return agent.throwException(.internal_error, "Left-shift for BigInts is not implemented");
+    return agent.throwException(.internal_error, "Left-shift for BigInts is not implemented", .{});
 }
 
 /// 6.1.6.2.10 BigInt::signedRightShift ( x, y )
@@ -181,7 +181,7 @@ pub fn signedRightShift(x: Self, agent: *Agent, y: Self) !Self {
     var result = try from(agent.gc_allocator, 0);
     try result.value.shiftRight(
         &x.value,
-        y.value.to(usize) catch return agent.throwException(.internal_error, error_message),
+        y.value.to(usize) catch return agent.throwException(.internal_error, error_message, .{}),
     );
     return result;
 }
@@ -193,6 +193,7 @@ pub fn unsignedRightShift(_: Self, agent: *Agent, _: Self) !Self {
     return agent.throwException(
         .type_error,
         "Unsigned right-shift is not supported for BigInts",
+        .{},
     );
 }
 

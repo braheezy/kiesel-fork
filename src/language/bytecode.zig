@@ -43,6 +43,7 @@ pub fn generateAndRunBytecode(agent: *Agent, ast_node: anytype) Agent.Error!Comp
         error.IndexOutOfRange => return agent.throwException(
             .internal_error,
             "Bytecode generation failed",
+            .{},
         ),
         error.OutOfMemory => return error.OutOfMemory,
     };

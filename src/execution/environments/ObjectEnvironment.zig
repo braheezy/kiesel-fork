@@ -100,10 +100,7 @@ pub fn setMutableBinding(self: Self, agent: *Agent, name: []const u8, value: Val
 
     // 3. If stillExists is false and S is true, throw a ReferenceError exception.
     if (!still_exists and strict) {
-        return agent.throwException(
-            .reference_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "'{s}' is not defined", .{name}),
-        );
+        return agent.throwException(.reference_error, "'{s}' is not defined", .{name});
     }
 
     // 4. Perform ? Set(bindingObject, N, V, S).
@@ -123,10 +120,7 @@ pub fn getBindingValue(self: Self, agent: *Agent, name: []const u8, strict: bool
     if (!value) {
         // a. If S is false, return undefined; otherwise throw a ReferenceError exception.
         if (!strict) return .undefined;
-        return agent.throwException(
-            .reference_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "'{s}' is not defined", .{name}),
-        );
+        return agent.throwException(.reference_error, "'{s}' is not defined", .{name});
     }
 
     // 4. Return ? Get(bindingObject, N).

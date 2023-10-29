@@ -117,6 +117,7 @@ pub const BooleanPrototype = struct {
         return agent.throwException(
             .type_error,
             "This value must be a boolean or Boolean object",
+            .{},
         );
     }
 

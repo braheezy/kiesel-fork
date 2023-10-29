@@ -47,10 +47,7 @@ pub const Iterator = struct {
 
         // 3. If result is not an Object, throw a TypeError exception.
         if (result != .object) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{result}),
-            );
+            return agent.throwException(.type_error, "{} is not an Object", .{result});
         }
 
         // 4. Return result.
@@ -121,18 +118,11 @@ pub const Iterator = struct {
         };
 
         // 6. If innerResult.[[Type]] is throw, return ? innerResult.
-        _ = inner_result catch |err| return err;
+        const inner_result_value = inner_result catch |err| return err;
 
         // 7. If innerResult.[[Value]] is not an Object, throw a TypeError exception.
-        if (inner_result catch unreachable != .object) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "{} is not an Object",
-                    .{inner_result catch unreachable},
-                ),
-            );
+        if (inner_result_value != .object) {
+            return agent.throwException(.type_error, "{} is not an Object", .{inner_result_value});
         }
 
         // 8. Return ? completion.
@@ -174,10 +164,7 @@ pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: Object) !Iter
 
     // 2. If iterator is not an Object, throw a TypeError exception.
     if (iterator != .object) {
-        return agent.throwException(
-            .type_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{iterator}),
-        );
+        return agent.throwException(.type_error, "{} is not an Object", .{iterator});
     }
 
     // 3. Let nextMethod be ? Get(iterator, "next").
@@ -220,6 +207,7 @@ pub fn getIterator(agent: *Agent, object: Value, kind: enum { sync, @"async" }) 
                 return agent.throwException(
                     .type_error,
                     "Object has no Symbol.asyncIterator or Symbol.iterator method",
+                    .{},
                 );
             }
 
@@ -244,7 +232,7 @@ pub fn getIterator(agent: *Agent, object: Value, kind: enum { sync, @"async" }) 
 
     // 3. If method is undefined, throw a TypeError exception.
     if (method == null) {
-        return agent.throwException(.type_error, "Object has no Symbol.iterator method");
+        return agent.throwException(.type_error, "Object has no Symbol.iterator method", .{});
     }
 
     // 4. Return ? GetIteratorFromMethod(obj, method).

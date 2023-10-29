@@ -73,7 +73,7 @@ pub const MapIteratorPrototype = struct {
 
         // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
         if (this_value != .object or !this_value.object.is(MapIterator)) {
-            return agent.throwException(.type_error, "This value must be a Map Iterator");
+            return agent.throwException(.type_error, "This value must be a Map Iterator", .{});
         }
         const map_iterator = this_value.object.as(MapIterator);
 

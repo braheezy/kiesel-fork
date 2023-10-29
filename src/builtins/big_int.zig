@@ -56,7 +56,7 @@ pub const BigIntConstructor = struct {
 
         // 1. If NewTarget is not undefined, throw a TypeError exception.
         if (new_target != null) {
-            return agent.throwException(.type_error, "BigInt is not a constructor");
+            return agent.throwException(.type_error, "BigInt is not a constructor", .{});
         }
 
         // 2. Let prim be ? ToPrimitive(value, number).
@@ -75,7 +75,11 @@ pub const BigIntConstructor = struct {
 fn numberToBigInt(agent: *Agent, number: Number) !types.BigInt {
     // 1. If IsIntegralNumber(number) is false, throw a RangeError exception.
     if (!Value.from(number).isIntegralNumber()) {
-        return agent.throwException(.range_error, "Cannot convert non-integral number to BigInt");
+        return agent.throwException(
+            .range_error,
+            "Cannot convert non-integral number to BigInt",
+            .{},
+        );
     }
 
     // 2. Return ℤ(ℝ(number)).
@@ -133,6 +137,7 @@ pub const BigIntPrototype = struct {
         return agent.throwException(
             .type_error,
             "This value must be a BigInt or BigInt object",
+            .{},
         );
     }
 
@@ -157,7 +162,7 @@ pub const BigIntPrototype = struct {
 
         // 4. If radixMV is not in the inclusive interval from 2 to 36, throw a RangeError exception.
         if (radix_mv < 2 or radix_mv > 36) {
-            return agent.throwException(.range_error, "Radix must be in range 2-36");
+            return agent.throwException(.range_error, "Radix must be in range 2-36", .{});
         }
 
         // 5. Return BigInt::toString(x, radixMV).

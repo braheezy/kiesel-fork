@@ -75,7 +75,7 @@ pub const SetIteratorPrototype = struct {
 
         // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
         if (this_value != .object or !this_value.object.is(SetIterator)) {
-            return agent.throwException(.type_error, "This value must be a Set Iterator");
+            return agent.throwException(.type_error, "This value must be a Set Iterator", .{});
         }
         const set_iterator = this_value.object.as(SetIterator);
 

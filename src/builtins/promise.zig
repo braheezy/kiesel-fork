@@ -102,7 +102,7 @@ pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunc
             if (sameValue(resolution, Value.from(promise_.object()))) {
                 // a. Let selfResolutionError be a newly created TypeError object.
                 // FIXME: This is awkward :)
-                agent_.throwException(.type_error, "Cannot resolve promise with itself") catch {};
+                agent_.throwException(.type_error, "Cannot resolve promise with itself", .{}) catch {};
                 const self_resolution_error = agent_.exception.?;
                 agent_.exception = null;
 
@@ -271,10 +271,7 @@ pub fn fulfillPromise(agent: *Agent, promise: *Promise, value: Value) !void {
 pub fn newPromiseCapability(agent: *Agent, constructor: Value) !PromiseCapability {
     // 1. If IsConstructor(C) is false, throw a TypeError exception.
     if (!constructor.isConstructor()) {
-        return agent.throwException(
-            .type_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "{} is not a constructor", .{constructor}),
-        );
+        return agent.throwException(.type_error, "{} is not a constructor", .{constructor});
     }
 
     // 2. NOTE: C is assumed to be a constructor function that supports the parameter conventions
@@ -302,11 +299,19 @@ pub fn newPromiseCapability(agent: *Agent, constructor: Value) !PromiseCapabilit
 
             // a. If resolvingFunctions.[[Resolve]] is not undefined, throw a TypeError exception.
             if (resolving_functions_.resolve != .undefined) {
-                return agent_.throwException(.type_error, "Resolve function has already been set");
+                return agent_.throwException(
+                    .type_error,
+                    "Resolve function has already been set",
+                    .{},
+                );
             }
             // b. If resolvingFunctions.[[Reject]] is not undefined, throw a TypeError exception.
             if (resolving_functions_.reject != .undefined) {
-                return agent_.throwException(.type_error, "Reject function has already been set");
+                return agent_.throwException(
+                    .type_error,
+                    "Reject function has already been set",
+                    .{},
+                );
             }
 
             // c. Set resolvingFunctions.[[Resolve]] to resolve.
@@ -339,17 +344,15 @@ pub fn newPromiseCapability(agent: *Agent, constructor: Value) !PromiseCapabilit
 
     // 7. If IsCallable(resolvingFunctions.[[Resolve]]) is false, throw a TypeError exception.
     if (!resolving_functions.resolve.isCallable()) {
-        return agent.throwException(
-            .type_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{resolving_functions.resolve}),
-        );
+        return agent.throwException(.type_error, "{} is not callable", .{resolving_functions.resolve});
     }
 
     // 8. If IsCallable(resolvingFunctions.[[Reject]]) is false, throw a TypeError exception.
     if (!resolving_functions.reject.isCallable()) {
         return agent.throwException(
             .type_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{resolving_functions.reject}),
+            "{} is not callable",
+            .{resolving_functions.reject},
         );
     }
 
@@ -792,15 +795,16 @@ pub const PromiseConstructor = struct {
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
         if (new_target == null) {
-            return agent.throwException(.type_error, "Promise must be constructed with 'new'");
+            return agent.throwException(
+                .type_error,
+                "Promise must be constructed with 'new'",
+                .{},
+            );
         }
 
         // 2. If IsCallable(executor) is false, throw a TypeError exception.
         if (!executor.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{executor}),
-            );
+            return agent.throwException(.type_error, "{} is not callable", .{executor});
         }
 
         // 3. Let promise be ? OrdinaryCreateFromConstructor(NewTarget, "%Promise.prototype%",
@@ -880,10 +884,7 @@ pub const PromiseConstructor = struct {
 
         // 2. If C is not an Object, throw a TypeError exception.
         if (constructor != .object) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{constructor}),
-            );
+            return agent.throwException(.type_error, "{} is not an Object", .{constructor});
         }
 
         // 3. Return ? PromiseResolve(C, x).
@@ -938,10 +939,7 @@ pub const PromisePrototype = struct {
 
         // 2. If promise is not an Object, throw a TypeError exception.
         if (promise != .object) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{promise}),
-            );
+            return agent.throwException(.type_error, "{} is not an Object", .{promise});
         }
 
         // 3. Let C be ? SpeciesConstructor(promise, %Promise%).
@@ -1104,10 +1102,7 @@ pub const PromisePrototype = struct {
 
         // 2. If IsPromise(promise) is false, throw a TypeError exception.
         if (!promise.isPromise()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not a Promise", .{promise}),
-            );
+            return agent.throwException(.type_error, "{} is not a Promise", .{promise});
         }
 
         // 3. Let C be ? SpeciesConstructor(promise, %Promise%).

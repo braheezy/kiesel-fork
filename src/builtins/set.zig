@@ -73,7 +73,7 @@ pub const SetConstructor = struct {
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
         if (new_target == null) {
-            return agent.throwException(.type_error, "Set must be constructed with 'new'");
+            return agent.throwException(.type_error, "Set must be constructed with 'new'", .{});
         }
 
         // 2. Let set be ? OrdinaryCreateFromConstructor(NewTarget, "%Set.prototype%", « [[SetData]] »).
@@ -90,10 +90,7 @@ pub const SetConstructor = struct {
 
         // 6. If IsCallable(adder) is false, throw a TypeError exception.
         if (!adder.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{adder}),
-            );
+            return agent.throwException(.type_error, "{} is not callable", .{adder});
         }
 
         // 7. Let iteratorRecord be ? GetIterator(iterable, sync).
@@ -251,10 +248,7 @@ pub const SetPrototype = struct {
 
         // 3. If IsCallable(callbackfn) is false, throw a TypeError exception.
         if (!callback_fn.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{callback_fn}),
-            );
+            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
         }
 
         // 4. Let entries be S.[[SetData]].

@@ -75,15 +75,14 @@ pub fn getValue(self: Self, agent: *Agent) !Value {
 
     // 2. If IsUnresolvableReference(V) is true, throw a ReferenceError exception.
     if (self.isUnresolvableReference()) {
-        const message = switch (self.referenced_name) {
-            .string => |string| try std.fmt.allocPrint(
-                agent.gc_allocator,
+        return switch (self.referenced_name) {
+            .string => |string| agent.throwException(
+                .reference_error,
                 "'{s}' is not defined",
                 .{string},
             ),
-            else => "Cannot resolve reference",
+            else => agent.throwException(.reference_error, "Cannot resolve reference", .{}),
         };
-        return agent.throwException(.reference_error, message);
     }
 
     // 3. If IsPropertyReference(V) is true, then
@@ -132,11 +131,8 @@ pub fn putValue(self: Self, agent: *Agent, value: Value) !void {
         if (self.strict) {
             return agent.throwException(
                 .reference_error,
-                try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "'{s}' is not defined",
-                    .{self.referenced_name.string},
-                ),
+                "'{s}' is not defined",
+                .{self.referenced_name.string},
             );
         }
 
@@ -175,8 +171,9 @@ pub fn putValue(self: Self, agent: *Agent, value: Value) !void {
         );
 
         // d. If succeeded is false and V.[[Strict]] is true, throw a TypeError exception.
-        if (!succeeded and self.strict)
-            return agent.throwException(.type_error, "Could not set property");
+        if (!succeeded and self.strict) {
+            return agent.throwException(.type_error, "Could not set property", .{});
+        }
 
         // e. Return unused.
         return;

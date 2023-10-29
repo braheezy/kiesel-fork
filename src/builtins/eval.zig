@@ -54,7 +54,8 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) !
             const parse_error = diagnostics.errors.items[0];
             return agent.throwException(
                 .syntax_error,
-                try formatParseError(agent.gc_allocator, parse_error),
+                "{s}",
+                .{try formatParseError(agent.gc_allocator, parse_error)},
             );
         },
     };

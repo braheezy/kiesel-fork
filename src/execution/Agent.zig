@@ -216,7 +216,8 @@ const ExceptionType = enum {
 pub fn throwException(
     self: *Self,
     comptime exception_type: ExceptionType,
-    message: []const u8,
+    comptime fmt: []const u8,
+    args: anytype,
 ) error{ExceptionThrown} {
     const realm = self.currentRealm();
     const constructor = @field(
@@ -224,6 +225,13 @@ pub fn throwException(
         "%" ++ exception_type.typeName() ++ "%",
     )(&realm.intrinsics) catch unreachable; // Already allocated for the global object
     self.exception = blk: {
+        const message = std.fmt.allocPrint(
+            self.gc_allocator,
+            fmt,
+            args,
+        ) catch |err| switch (err) {
+            error.OutOfMemory => break :blk Value.from("Out of memory"),
+        };
         const error_object = constructor.construct(.{Value.from(message)}, null) catch |err| switch (err) {
             error.OutOfMemory => break :blk Value.from("Out of memory"),
             error.ExceptionThrown => unreachable,

@@ -90,10 +90,9 @@ pub fn setMutableBinding(self: *Self, agent: *Agent, name: []const u8, value: Va
     // 1. If envRec does not have a binding for N, then
     if (maybe_binding == null) {
         // a. If S is true, throw a ReferenceError exception.
-        if (strict) return agent.throwException(
-            .reference_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "'{s}' is not defined", .{name}),
-        );
+        if (strict) {
+            return agent.throwException(.reference_error, "'{s}' is not defined", .{name});
+        }
 
         // b. Perform ! envRec.CreateMutableBinding(N, true).
         try self.createMutableBinding(agent, name, true);
@@ -115,11 +114,8 @@ pub fn setMutableBinding(self: *Self, agent: *Agent, name: []const u8, value: Va
         // a. Throw a ReferenceError exception.
         return agent.throwException(
             .reference_error,
-            try std.fmt.allocPrint(
-                agent.gc_allocator,
-                "Binding for '{s}' is not initialized",
-                .{name},
-            ),
+            "Binding for '{s}' is not initialized",
+            .{name},
         );
     }
 
@@ -135,11 +131,8 @@ pub fn setMutableBinding(self: *Self, agent: *Agent, name: []const u8, value: Va
         if (final_strict) {
             return agent.throwException(
                 .reference_error,
-                try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "Binding for '{s}' is immutable",
-                    .{name},
-                ),
+                "Binding for '{s}' is immutable",
+                .{name},
             );
         }
     }
@@ -157,11 +150,8 @@ pub fn getBindingValue(self: Self, agent: *Agent, name: []const u8, _: bool) !Va
     // 3. Return the value currently bound to N in envRec.
     return binding.value orelse agent.throwException(
         .reference_error,
-        try std.fmt.allocPrint(
-            agent.gc_allocator,
-            "Binding for '{s}' is not initialized",
-            .{name},
-        ),
+        "Binding for '{s}' is not initialized",
+        .{name},
     );
 }
 

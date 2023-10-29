@@ -74,7 +74,7 @@ pub const ArrayIteratorPrototype = struct {
 
         // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
         if (this_value != .object or !this_value.object.is(ArrayIterator)) {
-            return agent.throwException(.type_error, "This value must be an Array Iterator");
+            return agent.throwException(.type_error, "This value must be an Array Iterator", .{});
         }
         const array_iterator = this_value.object.as(ArrayIterator);
 

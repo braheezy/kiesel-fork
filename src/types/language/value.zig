@@ -150,10 +150,7 @@ pub const Value = union(enum) {
     pub fn toPropertyDescriptor(self: Self, agent: *Agent) !PropertyDescriptor {
         // 1. If Obj is not an Object, throw a TypeError exception.
         if (self != .object) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{self}),
-            );
+            return agent.throwException(.type_error, "{} is not an Object", .{self});
         }
 
         // 2. Let desc be a new Property Descriptor that initially has no fields.
@@ -218,10 +215,7 @@ pub const Value = union(enum) {
             // b. If IsCallable(getter) is false and getter is not undefined, throw a TypeError
             //    exception.
             if (!getter.isCallable() and getter != .undefined) {
-                return agent.throwException(
-                    .type_error,
-                    try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{getter}),
-                );
+                return agent.throwException(.type_error, "{} is not callable", .{getter});
             }
 
             // c. Set desc.[[Get]] to getter.
@@ -239,10 +233,7 @@ pub const Value = union(enum) {
             // b. If IsCallable(setter) is false and setter is not undefined, throw a TypeError
             //    exception.
             if (!setter.isCallable() and setter != .undefined) {
-                return agent.throwException(
-                    .type_error,
-                    try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{setter}),
-                );
+                return agent.throwException(.type_error, "{} is not callable", .{setter});
             }
 
             // c. Set desc.[[Set]] to setter.
@@ -257,6 +248,7 @@ pub const Value = union(enum) {
                 return agent.throwException(
                     .type_error,
                     "Descriptor with 'get' or 'set' property must not have 'value' or 'writable property'",
+                    .{},
                 );
             }
         }
@@ -308,6 +300,7 @@ pub const Value = union(enum) {
                 return agent.throwException(
                     .type_error,
                     "Could not convert object to primitive",
+                    .{},
                 );
             }
 
@@ -372,10 +365,12 @@ pub const Value = union(enum) {
             .symbol => return agent.throwException(
                 .type_error,
                 "Cannot convert Symbol to number",
+                .{},
             ),
             .big_int => return agent.throwException(
                 .type_error,
                 "Cannot convert BigInt to number",
+                .{},
             ),
 
             // 3. If argument is undefined, return NaN.
@@ -581,10 +576,10 @@ pub const Value = union(enum) {
         // 2. Return the value that prim corresponds to in Table 12.
         return switch (primitive) {
             // Throw a TypeError exception.
-            .undefined => agent.throwException(.type_error, "Cannot convert undefined to BigInt"),
-            .null => agent.throwException(.type_error, "Cannot convert null to BigInt"),
-            .number => agent.throwException(.type_error, "Cannot convert number to BigInt"),
-            .symbol => agent.throwException(.type_error, "Cannot convert symbol to BigInt"),
+            .undefined => agent.throwException(.type_error, "Cannot convert undefined to BigInt", .{}),
+            .null => agent.throwException(.type_error, "Cannot convert null to BigInt", .{}),
+            .number => agent.throwException(.type_error, "Cannot convert number to BigInt", .{}),
+            .symbol => agent.throwException(.type_error, "Cannot convert symbol to BigInt", .{}),
 
             // Return 1n if prim is true and 0n if prim is false.
             .boolean => |boolean| if (boolean)
@@ -604,6 +599,7 @@ pub const Value = union(enum) {
                 return n orelse agent.throwException(
                     .syntax_error,
                     "Cannot convert string to BigInt",
+                    .{},
                 );
             },
 
@@ -663,6 +659,7 @@ pub const Value = union(enum) {
             .symbol => return agent.throwException(
                 .type_error,
                 "Cannot convert Symbol to string",
+                .{},
             ),
 
             // 3. If argument is undefined, return "undefined".
@@ -700,8 +697,8 @@ pub const Value = union(enum) {
     pub fn toObject(self: Self, agent: *Agent) !Object {
         const realm = agent.currentRealm();
         return switch (self) {
-            .undefined => agent.throwException(.type_error, "Cannot convert undefined to Object"),
-            .null => agent.throwException(.type_error, "Cannot convert null to Object"),
+            .undefined => agent.throwException(.type_error, "Cannot convert undefined to Object", .{}),
+            .null => agent.throwException(.type_error, "Cannot convert null to Object", .{}),
             .boolean => |boolean| try builtins.Boolean.create(agent, .{
                 .fields = .{ .boolean_data = boolean },
                 .prototype = try realm.intrinsics.@"%Boolean.prototype%"(),
@@ -765,7 +762,7 @@ pub const Value = union(enum) {
 
         // 2. If integer is not in the inclusive interval from 0 to 2**53 - 1, throw a RangeError exception.
         if (integer < 0 or integer > std.math.maxInt(u53))
-            return agent.throwException(.range_error, "Value is not not a valid index");
+            return agent.throwException(.range_error, "Value is not not a valid index", .{});
 
         // 3. Return integer.
         return @intFromFloat(integer);
@@ -775,8 +772,8 @@ pub const Value = union(enum) {
     /// https://tc39.es/ecma262/#sec-requireobjectcoercible
     pub fn requireObjectCoercible(self: Self, agent: *Agent) !Self {
         switch (self) {
-            .undefined => return agent.throwException(.type_error, "Cannot convert undefined to Object"),
-            .null => return agent.throwException(.type_error, "Cannot convert null to Object"),
+            .undefined => return agent.throwException(.type_error, "Cannot convert undefined to Object", .{}),
+            .null => return agent.throwException(.type_error, "Cannot convert null to Object", .{}),
             else => return self,
         }
     }
@@ -890,10 +887,7 @@ pub const Value = union(enum) {
 
         // 3. If IsCallable(func) is false, throw a TypeError exception.
         if (!function.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{self}),
-            );
+            return agent.throwException(.type_error, "{} is not callable", .{self});
         }
 
         // 4. Return func.
@@ -914,10 +908,7 @@ pub const Value = union(enum) {
 
         // 2. If IsCallable(F) is false, throw a TypeError exception.
         if (!self.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{self}),
-            );
+            return agent.throwException(.type_error, "{} is not callable", .{self});
         }
 
         // 3. Return ? F.[[Call]](V, argumentsList).
@@ -947,10 +938,7 @@ pub const Value = union(enum) {
 
         // 2. If obj is not an Object, throw a TypeError exception.
         if (self != .object) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{self}),
-            );
+            return agent.throwException(.type_error, "{} is not an Object", .{self});
         }
 
         // 3. Let len be ? LengthOfArrayLike(obj).
@@ -976,11 +964,8 @@ pub const Value = union(enum) {
             if (std.mem.indexOfScalar(std.meta.Tag(Value), element_types, next) == null) {
                 return agent.throwException(
                     .type_error,
-                    try std.fmt.allocPrint(
-                        agent.gc_allocator,
-                        "Array element {} has invalid type '{s}'",
-                        .{ next, @tagName(next) },
-                    ),
+                    "Array element {} has invalid type '{s}'",
+                    .{ next, @tagName(next) },
                 );
             }
 
@@ -1026,7 +1011,7 @@ pub const Value = union(enum) {
 
         // 5. If P is not an Object, throw a TypeError exception.
         if (prototype != .object) {
-            return agent.throwException(.type_error, "'prototype' property must be an object");
+            return agent.throwException(.type_error, "'prototype' property must be an object", .{});
         }
 
         var object: ?Object = object_value.object;
@@ -1063,18 +1048,12 @@ pub const Value = union(enum) {
 
         // 1. If O is not an Object, throw a TypeError exception.
         if (self != .object) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{self}),
-            );
+            return agent.throwException(.type_error, "{} is not an Object", .{self});
         }
 
         // 2. If O does not have an internalSlot internal slot, throw a TypeError exception.
         if (!self.object.is(T)) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not a {s} object", .{ self, name }),
-            );
+            return agent.throwException(.type_error, "{} is not a {s} object", .{ self, name });
         }
 
         // 3. Return unused.
@@ -1533,7 +1512,8 @@ pub fn getOption(
         if (default == null) {
             return agent.throwException(
                 .range_error,
-                std.fmt.comptimePrint("Required option '{s}' must not be undefined", .{property}),
+                "Required option '{s}' must not be undefined",
+                .{property},
             );
         }
 
@@ -1557,7 +1537,8 @@ pub fn getOption(
             if (number.isNan()) {
                 return agent.throwException(
                     .range_error,
-                    std.fmt.comptimePrint("Number option '{s}' must not be NaN", .{property}),
+                    "Number option '{s}' must not be NaN",
+                    .{property},
                 );
             }
 

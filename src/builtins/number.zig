@@ -283,6 +283,7 @@ pub const NumberPrototype = struct {
         return agent.throwException(
             .type_error,
             "This value must be a number or Number object",
+            .{},
         );
     }
 
@@ -307,7 +308,7 @@ pub const NumberPrototype = struct {
 
         // 4. If radixMV is not in the inclusive interval from 2 to 36, throw a RangeError exception.
         if (radix_mv < 2 or radix_mv > 36) {
-            return agent.throwException(.range_error, "Radix must be in range 2-36");
+            return agent.throwException(.range_error, "Radix must be in range 2-36", .{});
         }
 
         // 5. Return Number::toString(x, radixMV).

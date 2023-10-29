@@ -182,7 +182,7 @@ pub const SymbolConstructor = struct {
 
         // 1. If NewTarget is not undefined, throw a TypeError exception.
         if (new_target != null) {
-            return agent.throwException(.type_error, "Symbol is not a constructor");
+            return agent.throwException(.type_error, "Symbol is not a constructor", .{});
         }
 
         const description_string = blk: {
@@ -198,6 +198,7 @@ pub const SymbolConstructor = struct {
             error.Overflow => return agent.throwException(
                 .internal_error,
                 "Maximum number of symbols exceeded",
+                .{},
             ),
         });
     }
@@ -222,6 +223,7 @@ pub const SymbolConstructor = struct {
             error.Overflow => return agent.throwException(
                 .internal_error,
                 "Maximum number of symbols exceeded",
+                .{},
             ),
         };
 
@@ -239,10 +241,7 @@ pub const SymbolConstructor = struct {
 
         // 1. If sym is not a Symbol, throw a TypeError exception.
         if (symbol != .symbol) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not a Symbol", .{symbol}),
-            );
+            return agent.throwException(.type_error, "{} is not a Symbol", .{symbol});
         }
 
         // 2. Return KeyForSymbol(sym).
@@ -302,6 +301,7 @@ pub const SymbolPrototype = struct {
         return agent.throwException(
             .type_error,
             "This value must be a symbol or Symbol object",
+            .{},
         );
     }
 

@@ -38,7 +38,7 @@ pub fn allocateArrayBuffer(agent: *Agent, constructor: Object, byte_length: u64,
     if (allocating_resizable_bufffer) {
         // a. If byteLength > maxByteLength, throw a RangeError exception.
         if (byte_length > max_byte_length.?) {
-            return agent.throwException(.range_error, "Maximum buffer size exceeded");
+            return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
         }
 
         // b. Append [[ArrayBufferMaxByteLength]] to slots.
@@ -94,7 +94,7 @@ pub fn detachArrayBuffer(agent: *Agent, array_buffer: *ArrayBuffer, maybe_key: ?
 
     // 3. If arrayBuffer.[[ArrayBufferDetachKey]] is not key, throw a TypeError exception.
     if (!sameValue(array_buffer.fields.array_buffer_detach_key, key)) {
-        return agent.throwException(.type_error, "ArrayBuffer detach key does not match");
+        return agent.throwException(.type_error, "ArrayBuffer detach key does not match", .{});
     }
 
     // 4. Set arrayBuffer.[[ArrayBufferData]] to null.
@@ -181,7 +181,11 @@ pub const ArrayBufferConstructor = struct {
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
         if (new_target == null) {
-            return agent.throwException(.type_error, "ArrayBuffer must be constructed with 'new'");
+            return agent.throwException(
+                .type_error,
+                "ArrayBuffer must be constructed with 'new'",
+                .{},
+            );
         }
 
         // 2. Let byteLength be ? ToIndex(length).
@@ -311,7 +315,7 @@ pub const ArrayBufferPrototype = struct {
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferMaxByteLength]]).
         const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
         if (object.fields.array_buffer_max_byte_length == null) {
-            return agent.throwException(.type_error, "ArrayBuffer is not resizable");
+            return agent.throwException(.type_error, "ArrayBuffer is not resizable", .{});
         }
 
         // TODO: 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
@@ -321,12 +325,12 @@ pub const ArrayBufferPrototype = struct {
 
         // 5. If IsDetachedBuffer(O) is true, throw a TypeError exception.
         if (isDetachedBuffer(object)) {
-            return agent.throwException(.type_error, "ArrayBuffer is detached");
+            return agent.throwException(.type_error, "ArrayBuffer is detached", .{});
         }
 
         // 6. If newByteLength > O.[[ArrayBufferMaxByteLength]], throw a RangeError exception.
         if (new_byte_length > object.fields.array_buffer_max_byte_length.?) {
-            return agent.throwException(.range_error, "Maximum buffer size exceeded");
+            return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
         }
 
         // 7. Let hostHandled be ? HostResizeArrayBuffer(O, newByteLength).
@@ -351,11 +355,8 @@ pub const ArrayBufferPrototype = struct {
         result catch {
             return agent.throwException(
                 .range_error,
-                try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "Cannot resize buffer to size {}",
-                    .{new_byte_length},
-                ),
+                "Cannot resize buffer to size {}",
+                .{new_byte_length},
             );
         };
         if (new_byte_length > old_byte_length) {
@@ -381,7 +382,7 @@ pub const ArrayBufferPrototype = struct {
 
         // 4. If IsDetachedBuffer(O) is true, throw a TypeError exception.
         if (isDetachedBuffer(object)) {
-            return agent.throwException(.type_error, "ArrayBuffer is detached");
+            return agent.throwException(.type_error, "ArrayBuffer is detached", .{});
         }
 
         // 5. Let len be O.[[ArrayBufferByteLength]].
@@ -441,23 +442,27 @@ pub const ArrayBufferPrototype = struct {
 
         // 19. If IsDetachedBuffer(new) is true, throw a TypeError exception.
         if (isDetachedBuffer(new)) {
-            return agent.throwException(.type_error, "ArrayBuffer is detached");
+            return agent.throwException(.type_error, "ArrayBuffer is detached", .{});
         }
 
         // 20. If SameValue(new, O) is true, throw a TypeError exception.
         if (new.object().sameValue(object.object())) {
-            return agent.throwException(.type_error, "Species constructor must return a new object");
+            return agent.throwException(
+                .type_error,
+                "Species constructor must return a new object",
+                .{},
+            );
         }
 
         // 21. If new.[[ArrayBufferByteLength]] < newLen, throw a TypeError exception.
         if (new.fields.array_buffer_data.?.items.len < new_len) {
-            return agent.throwException(.type_error, "ArrayBuffer is too small");
+            return agent.throwException(.type_error, "ArrayBuffer is too small", .{});
         }
 
         // 22. NOTE: Side-effects of the above steps may have detached or resized O.
         // 23. If IsDetachedBuffer(O) is true, throw a TypeError exception.
         if (isDetachedBuffer(object)) {
-            return agent.throwException(.type_error, "ArrayBuffer is detached");
+            return agent.throwException(.type_error, "ArrayBuffer is detached", .{});
         }
 
         // 24. Let fromBuf be O.[[ArrayBufferData]].

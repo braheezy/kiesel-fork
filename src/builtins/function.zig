@@ -321,7 +321,8 @@ pub fn createDynamicFunction(
             const parse_error = diagnostics.errors.items[0];
             return agent.throwException(
                 .syntax_error,
-                try formatParseError(agent.gc_allocator, parse_error),
+                "{s}",
+                .{try formatParseError(agent.gc_allocator, parse_error)},
             );
         },
     };
@@ -337,7 +338,8 @@ pub fn createDynamicFunction(
             const parse_error = diagnostics.errors.items[0];
             return agent.throwException(
                 .syntax_error,
-                try formatParseError(agent.gc_allocator, parse_error),
+                "{s}",
+                .{try formatParseError(agent.gc_allocator, parse_error)},
             );
         },
     };
@@ -361,7 +363,8 @@ pub fn createDynamicFunction(
             const parse_error = diagnostics.errors.items[0];
             return agent.throwException(
                 .syntax_error,
-                try formatParseError(agent.gc_allocator, parse_error),
+                "{s}",
+                .{try formatParseError(agent.gc_allocator, parse_error)},
             );
         },
     };
@@ -484,10 +487,7 @@ pub const FunctionPrototype = struct {
 
         // 2. If IsCallable(func) is false, throw a TypeError exception.
         if (!func.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not a function", .{func}),
-            );
+            return agent.throwException(.type_error, "{} is not a function", .{func});
         }
 
         // 3. If argArray is either undefined or null, then
@@ -518,10 +518,7 @@ pub const FunctionPrototype = struct {
 
         // 2. If IsCallable(Target) is false, throw a TypeError exception.
         if (!target.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not a function", .{target}),
-            );
+            return agent.throwException(.type_error, "{} is not a function", .{target});
         }
 
         // 3. Let F be ? BoundFunctionCreate(Target, thisArg, args).
@@ -594,10 +591,7 @@ pub const FunctionPrototype = struct {
 
         // 2. If IsCallable(func) is false, throw a TypeError exception.
         if (!func.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not a function", .{func}),
-            );
+            return agent.throwException(.type_error, "{} is not a function", .{func});
         }
 
         // TODO: 3. Perform PrepareForTailCall().
@@ -650,9 +644,6 @@ pub const FunctionPrototype = struct {
         if (func.isCallable()) return Value.from("function () { [native code] }");
 
         // 5. Throw a TypeError exception.
-        return agent.throwException(
-            .type_error,
-            try std.fmt.allocPrint(agent.gc_allocator, "{} is not a function", .{func}),
-        );
+        return agent.throwException(.type_error, "{} is not a function", .{func});
     }
 };

@@ -152,12 +152,11 @@ pub fn ordinaryToPrimitive(self: Self, hint: PreferredType) !Value {
     }
 
     // 4. Throw a TypeError exception.
-    const message = try std.fmt.allocPrint(
-        self.agent().gc_allocator,
+    return self.agent().throwException(
+        .type_error,
         "Could not convert object to {s}",
         .{@tagName(hint)},
     );
-    return self.agent().throwException(.type_error, message);
 }
 
 /// 7.2.5 IsExtensible ( O )
@@ -187,7 +186,7 @@ pub fn set(
 
     // 2. If success is false and Throw is true, throw a TypeError exception.
     if (!success and throw == .throw)
-        return self.agent().throwException(.type_error, "Could not set property");
+        return self.agent().throwException(.type_error, "Could not set property", .{});
 
     // 3. Return unused.
 }
@@ -244,7 +243,7 @@ pub fn createDataPropertyOrThrow(self: Self, property_key: PropertyKey, value: V
 
     // 2. If success is false, throw a TypeError exception.
     if (!success)
-        return self.agent().throwException(.type_error, "Could not create data property");
+        return self.agent().throwException(.type_error, "Could not create data property", .{});
 
     // 3. Return unused.
 }
@@ -296,7 +295,7 @@ pub fn definePropertyOrThrow(
 
     // 2. If success is false, throw a TypeError exception.
     if (!success)
-        return self.agent().throwException(.type_error, "Could not define property");
+        return self.agent().throwException(.type_error, "Could not define property", .{});
 
     // 3. Return unused.
 }
@@ -309,7 +308,7 @@ pub fn deletePropertyOrThrow(self: Self, property_key: PropertyKey) !void {
 
     // 2. If success is false, throw a TypeError exception.
     if (!success)
-        return self.agent().throwException(.type_error, "Could not delete property");
+        return self.agent().throwException(.type_error, "Could not delete property", .{});
 
     // 3. Return unused.
 }
@@ -475,14 +474,7 @@ pub fn speciesConstructor(self: Self, default_constructor: Self) !Self {
 
     // 3. If C is not an Object, throw a TypeError exception.
     if (constructor != .object) {
-        return self.agent().throwException(
-            .type_error,
-            try std.fmt.allocPrint(
-                self.agent().gc_allocator,
-                "{} is not an Object",
-                .{constructor},
-            ),
-        );
+        return self.agent().throwException(.type_error, "{} is not an Object", .{constructor});
     }
 
     // 4. Let S be ? Get(C, @@species).
@@ -500,6 +492,7 @@ pub fn speciesConstructor(self: Self, default_constructor: Self) !Self {
     return self.agent().throwException(
         .type_error,
         "Object's [Symbol.species] property must be a constructor",
+        .{},
     );
 }
 

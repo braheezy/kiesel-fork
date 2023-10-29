@@ -51,6 +51,6 @@ pub const ThrowTypeError = struct {
 
     fn behaviour(agent: *Agent, _: Value, _: ArgumentsList) !Value {
         // 1. Throw a TypeError exception.
-        return agent.throwException(.type_error, "Forbidden property access");
+        return agent.throwException(.type_error, "Forbidden property access", .{});
     }
 };

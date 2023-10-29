@@ -52,6 +52,7 @@ pub fn bindThisValue(self: *Self, value: Value) !Value {
         return agent.throwException(
             .reference_error,
             "Function this binding is already initialized",
+            .{},
         );
     }
 
@@ -95,6 +96,7 @@ pub fn getThisBinding(self: Self) !Value {
         return agent.throwException(
             .reference_error,
             "Function this binding is uninitialized",
+            .{},
         );
     }
 

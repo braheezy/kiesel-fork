@@ -82,7 +82,7 @@ pub const Kiesel = struct {
     fn detachArrayBuffer(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
         const array_buffer = arguments.get(0);
         if (array_buffer != .object or !array_buffer.object.is(kiesel.builtins.ArrayBuffer)) {
-            return agent.throwException(.type_error, "Argument must be an ArrayBuffer");
+            return agent.throwException(.type_error, "Argument must be an ArrayBuffer", .{});
         }
         try kiesel.builtins.detachArrayBuffer(
             agent,
@@ -120,7 +120,8 @@ pub const Kiesel = struct {
                 // b. Return Completion{[[Type]]: throw, [[Value]]: error, [[Target]]: empty}.
                 return agent.throwException(
                     .syntax_error,
-                    try formatParseError(agent.gc_allocator, parse_error),
+                    "{s}",
+                    .{try formatParseError(agent.gc_allocator, parse_error)},
                 );
             },
         };
@@ -149,11 +150,8 @@ pub const Kiesel = struct {
         const file = std.fs.cwd().openFile(path.utf8, .{}) catch |err| {
             return agent.throwException(
                 .type_error,
-                try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "Error while opening file: {s}",
-                    .{@errorName(err)},
-                ),
+                "Error while opening file: {s}",
+                .{@errorName(err)},
             );
         };
         defer file.close();
@@ -164,15 +162,12 @@ pub const Kiesel = struct {
             error.OutOfMemory => return error.OutOfMemory,
             else => return agent.throwException(
                 .type_error,
-                try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "Error while reading file: {s}",
-                    .{@errorName(err)},
-                ),
+                "Error while reading file: {s}",
+                .{@errorName(err)},
             ),
         };
         if (!std.unicode.utf8ValidateSlice(bytes)) {
-            return agent.throwException(.type_error, "Invalid UTF-8");
+            return agent.throwException(.type_error, "Invalid UTF-8", .{});
         }
         return Value.from(bytes);
     }
@@ -186,15 +181,12 @@ pub const Kiesel = struct {
         ) catch |err| {
             return agent.throwException(
                 .type_error,
-                try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "Error while reading from stdin: {s}",
-                    .{@errorName(err)},
-                ),
+                "Error while reading from stdin: {s}",
+                .{@errorName(err)},
             );
         } orelse "";
         if (!std.unicode.utf8ValidateSlice(bytes)) {
-            return agent.throwException(.type_error, "Invalid UTF-8");
+            return agent.throwException(.type_error, "Invalid UTF-8", .{});
         }
         return Value.from(bytes);
     }
@@ -207,15 +199,12 @@ pub const Kiesel = struct {
         ) catch |err| {
             return agent.throwException(
                 .type_error,
-                try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "Error while reading from stdin: {s}",
-                    .{@errorName(err)},
-                ),
+                "Error while reading from stdin: {s}",
+                .{@errorName(err)},
             );
         };
         if (!std.unicode.utf8ValidateSlice(bytes)) {
-            return agent.throwException(.type_error, "Invalid UTF-8");
+            return agent.throwException(.type_error, "Invalid UTF-8", .{});
         }
         return Value.from(bytes);
     }
@@ -223,7 +212,11 @@ pub const Kiesel = struct {
     fn sleep(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
         const milliseconds = try arguments.get(0).toNumber(agent);
         if (milliseconds.asFloat() < 0 or !milliseconds.isFinite()) {
-            return agent.throwException(.range_error, "Sleep duration must be a positive finite number");
+            return agent.throwException(
+                .range_error,
+                "Sleep duration must be a positive finite number",
+                .{},
+            );
         }
         const nanoseconds = std.math.lossyCast(u64, milliseconds.asFloat() * 1_000_000);
         std.time.sleep(nanoseconds);
@@ -237,22 +230,16 @@ pub const Kiesel = struct {
         const file = std.fs.cwd().createFile(path.utf8, .{}) catch |err| {
             return agent.throwException(
                 .type_error,
-                try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "Error while opening file: {s}",
-                    .{@errorName(err)},
-                ),
+                "Error while opening file: {s}",
+                .{@errorName(err)},
             );
         };
         defer file.close();
         file.writeAll(contents.utf8) catch |err| {
             return agent.throwException(
                 .type_error,
-                try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "Error while writing file: {s}",
-                    .{@errorName(err)},
-                ),
+                "Error while writing file: {s}",
+                .{@errorName(err)},
             );
         };
         return .undefined;
@@ -290,7 +277,8 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
             try stderr.print("{s}\n", .{parse_error_hint});
             agent.throwException(
                 .syntax_error,
-                try formatParseError(agent.gc_allocator, parse_error),
+                "{s}",
+                .{try formatParseError(agent.gc_allocator, parse_error)},
             ) catch {};
             try stderr.print("Uncaught exception: {pretty}\n", .{agent.exception.?});
             return null;

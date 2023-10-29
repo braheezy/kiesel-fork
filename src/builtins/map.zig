@@ -52,6 +52,7 @@ pub fn addEntriesFromIterable(
             const @"error" = agent.throwException(
                 .type_error,
                 "Iterable must return object items",
+                .{},
             );
 
             // ii. Return ? IteratorClose(iteratorRecord, error).
@@ -127,7 +128,7 @@ pub const MapConstructor = struct {
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
         if (new_target == null) {
-            return agent.throwException(.type_error, "Map must be constructed with 'new'");
+            return agent.throwException(.type_error, "Map must be constructed with 'new'", .{});
         }
 
         // 2. Let map be ? OrdinaryCreateFromConstructor(NewTarget, "%Map.prototype%", « [[MapData]] »).
@@ -144,10 +145,7 @@ pub const MapConstructor = struct {
 
         // 6. If IsCallable(adder) is false, throw a TypeError exception.
         if (!adder.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{adder}),
-            );
+            return agent.throwException(.type_error, "{} is not callable", .{adder});
         }
 
         // 7. Return ? AddEntriesFromIterable(map, iterable, adder).
@@ -258,10 +256,7 @@ pub const MapPrototype = struct {
 
         // 3. If IsCallable(callbackfn) is false, throw a TypeError exception.
         if (!callback_fn.isCallable()) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not callable", .{callback_fn}),
-            );
+            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
         }
 
         const iterable_keys = try map.fields.registerIterator();

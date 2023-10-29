@@ -166,14 +166,7 @@ pub const ObjectConstructor = struct {
 
         // 1. If O is not an Object and O is not null, throw a TypeError exception.
         if (object != .object and object != .null) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "{} is not an Object or null",
-                    .{object},
-                ),
-            );
+            return agent.throwException(.type_error, "{} is not an Object or null", .{object});
         }
 
         // 2. Let obj be OrdinaryObjectCreate(O).
@@ -197,10 +190,7 @@ pub const ObjectConstructor = struct {
 
         // 1. If O is not an Object, throw a TypeError exception.
         if (object != .object) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{object}),
-            );
+            return agent.throwException(.type_error, "{} is not an Object", .{object});
         }
 
         // 2. Return ? ObjectDefineProperties(O, Properties).
@@ -263,10 +253,7 @@ pub const ObjectConstructor = struct {
 
         // 1. If O is not an Object, throw a TypeError exception.
         if (object != .object) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{object}),
-            );
+            return agent.throwException(.type_error, "{} is not an Object", .{object});
         }
 
         // 2. Let key be ? ToPropertyKey(P).
@@ -310,7 +297,7 @@ pub const ObjectConstructor = struct {
         const status = try object.object.setIntegrityLevel(.frozen);
 
         // 3. If status is false, throw a TypeError exception.
-        if (!status) return agent.throwException(.type_error, "Could not freeze object");
+        if (!status) return agent.throwException(.type_error, "Could not freeze object", .{});
 
         // 4. Return O.
         return object;
@@ -544,7 +531,7 @@ pub const ObjectConstructor = struct {
         const status = try object.object.internalMethods().preventExtensions(object.object);
 
         // 3. If status is false, throw a TypeError exception.
-        if (!status) return agent.throwException(.type_error, "Could not prevent extensions");
+        if (!status) return agent.throwException(.type_error, "Could not prevent extensions", .{});
 
         // 4. Return O.
         return object;
@@ -562,7 +549,7 @@ pub const ObjectConstructor = struct {
         const status = try object.object.setIntegrityLevel(.sealed);
 
         // 3. If status is false, throw a TypeError exception.
-        if (!status) return agent.throwException(.type_error, "Could not seal object");
+        if (!status) return agent.throwException(.type_error, "Could not seal object", .{});
 
         // 4. Return O.
         return object;
@@ -579,14 +566,7 @@ pub const ObjectConstructor = struct {
 
         // 2. If proto is not an Object and proto is not null, throw a TypeError exception.
         if (prototype != .object and prototype != .null) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "{} is not an Object or null",
-                    .{prototype},
-                ),
-            );
+            return agent.throwException(.type_error, "{} is not an Object or null", .{prototype});
         }
 
         // 3. If O is not an Object, return O.
@@ -599,7 +579,7 @@ pub const ObjectConstructor = struct {
         );
 
         // 5. If status is false, throw a TypeError exception.
-        if (!status) return agent.throwException(.type_error, "Could not set prototype");
+        if (!status) return agent.throwException(.type_error, "Could not set prototype", .{});
 
         // 6. Return O.
         return object;

@@ -50,14 +50,7 @@ pub fn createMutableBinding(self: *Self, agent: *Agent, name: []const u8, deleta
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, throw a TypeError exception.
     if (self.declarative_record.hasBinding(name)) {
-        return agent.throwException(
-            .type_error,
-            try std.fmt.allocPrint(
-                agent.gc_allocator,
-                "Binding for '{s}' already exists",
-                .{name},
-            ),
-        );
+        return agent.throwException(.type_error, "Binding for '{s}' already exists", .{name});
     }
 
     // 3. Return ! DclRec.CreateMutableBinding(N, D).
@@ -70,14 +63,7 @@ pub fn createImmutableBinding(self: *Self, agent: *Agent, name: []const u8, stri
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, throw a TypeError exception.
     if (self.declarative_record.hasBinding(name)) {
-        return agent.throwException(
-            .type_error,
-            try std.fmt.allocPrint(
-                agent.gc_allocator,
-                "Binding for '{s}' already exists",
-                .{name},
-            ),
-        );
+        return agent.throwException(.type_error, "Binding for '{s}' already exists", .{name});
     }
 
     // 3. Return ! DclRec.CreateImmutableBinding(N, S).

@@ -249,7 +249,7 @@ fn serializeJSONProperty(
 
     // 10. If value is a BigInt, throw a TypeError exception.
     if (value == .big_int) {
-        return agent.throwException(.type_error, "Cannot serialize BigInt to JSON");
+        return agent.throwException(.type_error, "Cannot serialize BigInt to JSON", .{});
     }
 
     // 11. If value is an Object and IsCallable(value) is false, then
@@ -344,7 +344,7 @@ fn serializeJSONObject(
     // 1. If state.[[Stack]] contains value, throw a TypeError exception because the structure is
     //    cyclical.
     if (state.stack.contains(value)) {
-        return agent.throwException(.type_error, "Cannot serialize cyclic object to JSON");
+        return agent.throwException(.type_error, "Cannot serialize cyclic object to JSON", .{});
     }
 
     // 2. Append value to state.[[Stack]].
@@ -485,7 +485,7 @@ fn serializeJSONArray(
     // 1. If state.[[Stack]] contains value, throw a TypeError exception because the structure is
     //    cyclical.
     if (state.stack.contains(value)) {
-        return agent.throwException(.type_error, "Cannot serialize cyclic array to JSON");
+        return agent.throwException(.type_error, "Cannot serialize cyclic array to JSON", .{});
     }
 
     // 2. Append value to state.[[Stack]].
@@ -641,7 +641,7 @@ pub const JSON = struct {
             .{},
         ) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
-            else => return agent.throwException(.syntax_error, "Invalid JSON document"),
+            else => return agent.throwException(.syntax_error, "Invalid JSON document", .{}),
         };
         defer completion.deinit();
 

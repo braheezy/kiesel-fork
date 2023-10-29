@@ -1945,7 +1945,7 @@ pub const DatePrototype = struct {
 
         // 4. If tv is not finite, throw a RangeError exception.
         if (!std.math.isFinite(time_value)) {
-            return agent.throwException(.range_error, "Invalid Date object");
+            return agent.throwException(.range_error, "Invalid Date object", .{});
         }
 
         // 5. If tv corresponds with a year that cannot be represented in the Date Time String
@@ -2120,18 +2120,12 @@ pub const DatePrototype = struct {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
         if (this_value != .object) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not an Object", .{this_value}),
-            );
+            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
         const object = this_value.object;
 
         if (hint_value != .string) {
-            return agent.throwException(
-                .type_error,
-                try std.fmt.allocPrint(agent.gc_allocator, "{} is not a string", .{hint_value}),
-            );
+            return agent.throwException(.type_error, "{} is not a string", .{hint_value});
         }
         const hint = hint_value.string;
 
@@ -2151,6 +2145,7 @@ pub const DatePrototype = struct {
             return agent.throwException(
                 .type_error,
                 "Hint must be one of 'string', 'number', or 'default'",
+                .{},
             );
         };
 
