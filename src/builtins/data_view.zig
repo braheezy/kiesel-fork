@@ -313,6 +313,15 @@ pub const DataViewPrototype = struct {
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinAccessor(object, "byteOffset", byteOffset, null, realm);
 
+        // 25.3.4.25 DataView.prototype [ @@toStringTag ]
+        // https://tc39.es/ecma262/#sec-dataview.prototype-@@tostringtag
+        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+            .value = Value.from("DataView"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
         return object;
     }
 
