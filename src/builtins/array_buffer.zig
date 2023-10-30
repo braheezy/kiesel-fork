@@ -25,7 +25,7 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const sameValue = types.sameValue;
 
-const Order = enum {
+pub const Order = enum {
     seq_cst,
     unordered,
 };
