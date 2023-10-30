@@ -311,6 +311,7 @@ pub const DataViewPrototype = struct {
 
         try defineBuiltinAccessor(object, "buffer", buffer, null, realm);
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
+        try defineBuiltinAccessor(object, "byteOffset", byteOffset, null, realm);
 
         return object;
     }
@@ -351,6 +352,29 @@ pub const DataViewPrototype = struct {
 
         // 7. Return 𝔽(size).
         return Value.from(size);
+    }
+
+    /// 25.3.4.3 get DataView.prototype.byteOffset
+    /// https://tc39.es/ecma262/#sec-get-dataview.prototype.byteoffset
+    fn byteOffset(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[DataView]]).
+        const object = try this_value.requireInternalSlot(agent, DataView);
+
+        // 3. Assert: O has a [[ViewedArrayBuffer]] internal slot.
+        // 4. Let viewRecord be MakeDataViewWithBufferWitnessRecord(O, seq-cst).
+        const view = makeDataViewWithBufferWitnessRecord(object, .seq_cst);
+
+        // 5. If IsViewOutOfBounds(viewRecord) is true, throw a TypeError exception.
+        if (isViewOutOfBounds(view)) {
+            return agent.throwException(.type_error, "DataView is out of bounds", .{});
+        }
+
+        // 6. Let offset be O.[[ByteOffset]].
+        const offset = object.fields.byte_offset;
+
+        // 7. Return 𝔽(offset).
+        return Value.from(offset);
     }
 };
 
