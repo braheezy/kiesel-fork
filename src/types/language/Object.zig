@@ -40,6 +40,7 @@ pub const Tag = enum(u32) {
     boolean,
     bound_function,
     builtin_function,
+    data_view,
     date,
     ecmascript_function,
     @"error",

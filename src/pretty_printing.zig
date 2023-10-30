@@ -117,6 +117,27 @@ fn prettyPrintArrayIterator(array_iterator: *const builtins.ArrayIterator, write
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintDataView(date: *const builtins.DataView, writer: anytype) !void {
+    const viewed_array_buffer = date.fields.viewed_array_buffer;
+    const byte_length = date.fields.byte_length;
+    const byte_offset = date.fields.byte_offset;
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("DataView(");
+    try tty_config.setColor(writer, .reset);
+    try writer.print("arrayBuffer: {pretty}", .{Value.from(viewed_array_buffer.object())});
+    if (byte_length != .auto) {
+        try writer.print(", byteLength: {pretty}", .{Value.from(byte_length.value)});
+    }
+    if (byte_offset != 0) {
+        try writer.print(", byteOffset: {pretty}", .{Value.from(byte_offset)});
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintDate(date: *const builtins.Date, writer: anytype) !void {
     const date_value = date.fields.date_value;
     const tty_config = getTtyConfigForWriter(writer);
@@ -492,6 +513,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) !void {
             .{ builtins.AsyncGenerator, prettyPrintAsyncGenerator },
             .{ builtins.BigInt, prettyPrintPrimitiveWrapper },
             .{ builtins.Boolean, prettyPrintPrimitiveWrapper },
+            .{ builtins.DataView, prettyPrintDataView },
             .{ builtins.Date, prettyPrintDate },
             .{ builtins.Error, prettyPrintError },
             .{ builtins.Generator, prettyPrintGenerator },

@@ -25,6 +25,11 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const sameValue = types.sameValue;
 
+const Order = enum {
+    seq_cst,
+    unordered,
+};
+
 /// 25.1.3.1 AllocateArrayBuffer ( constructor, byteLength )
 /// https://tc39.es/ecma262/#sec-allocatearraybuffer
 pub fn allocateArrayBuffer(agent: *Agent, constructor: Object, byte_length: u64, max_byte_length: ?u53) !Object {
@@ -76,7 +81,21 @@ pub fn allocateArrayBuffer(agent: *Agent, constructor: Object, byte_length: u64,
     return object;
 }
 
-/// 25.1.3.4 IsDetachedBuffer ( arrayBuffer )
+/// 25.1.3.2 ArrayBufferByteLength ( arrayBuffer, order )
+/// https://tc39.es/ecma262/#sec-arraybufferbytelength
+pub fn arrayBufferByteLength(array_buffer: *const ArrayBuffer, _: Order) u53 {
+    // TODO: 1. If IsSharedArrayBuffer(arrayBuffer) is true and arrayBuffer has an
+    //          [[ArrayBufferByteLengthData]] internal slot, then
+    // [...]
+
+    // 2. Assert: IsDetachedBuffer(arrayBuffer) is false.
+    std.debug.assert(!isDetachedBuffer(array_buffer));
+
+    // 3. Return arrayBuffer.[[ArrayBufferByteLength]].
+    return @intCast(array_buffer.fields.array_buffer_data.?.items.len);
+}
+
+/// 25.1.3.3 IsDetachedBuffer ( arrayBuffer )
 /// https://tc39.es/ecma262/#sec-isdetachedbuffer
 pub fn isDetachedBuffer(array_buffer: *const ArrayBuffer) bool {
     // 1. If arrayBuffer.[[ArrayBufferData]] is null, return true.
@@ -84,7 +103,7 @@ pub fn isDetachedBuffer(array_buffer: *const ArrayBuffer) bool {
     return array_buffer.fields.array_buffer_data == null;
 }
 
-/// 25.1.3.3 DetachArrayBuffer ( arrayBuffer [ , key ] )
+/// 25.1.3.4 DetachArrayBuffer ( arrayBuffer [ , key ] )
 /// https://tc39.es/ecma262/#sec-detacharraybuffer
 pub fn detachArrayBuffer(agent: *Agent, array_buffer: *ArrayBuffer, maybe_key: ?Value) !void {
     // TODO: 1. Assert: IsSharedArrayBuffer(arrayBuffer) is false.
@@ -213,7 +232,8 @@ pub const ArrayBufferConstructor = struct {
         // 1. If arg is not an Object, return false.
         if (arg != .object) return Value.from(false);
 
-        // TODO: 2. If arg has a [[ViewedArrayBuffer]] internal slot, return true.
+        // 2. If arg has a [[ViewedArrayBuffer]] internal slot, return true.
+        if (arg.object.is(builtins.DataView)) return Value.from(true);
 
         // 3. Return false.
         return Value.from(false);
