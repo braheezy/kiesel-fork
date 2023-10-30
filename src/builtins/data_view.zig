@@ -17,6 +17,7 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const arrayBufferByteLength = builtins.arrayBufferByteLength;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const isDetachedBuffer = builtins.isDetachedBuffer;
 const isFixedLengthArrayBuffer = builtins.isFixedLengthArrayBuffer;
@@ -193,7 +194,24 @@ pub const DataViewPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinAccessor(object, "buffer", buffer, null, realm);
+
         return object;
+    }
+
+    /// 25.3.4.1 get DataView.prototype.buffer
+    /// https://tc39.es/ecma262/#sec-get-dataview.prototype.buffer
+    fn buffer(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[DataView]]).
+        const object = try this_value.requireInternalSlot(agent, DataView);
+
+        // 3. Assert: O has a [[ViewedArrayBuffer]] internal slot.
+        // 4. Let buffer be O.[[ViewedArrayBuffer]].
+        const buffer_ = object.fields.viewed_array_buffer;
+
+        // 5. Return buffer.
+        return Value.from(buffer_.object());
     }
 };
 
