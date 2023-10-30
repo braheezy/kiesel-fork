@@ -150,6 +150,70 @@ pub fn isFixedLengthArrayBuffer(array_buffer: *const ArrayBuffer) bool {
     return array_buffer.fields.array_buffer_max_byte_length == null;
 }
 
+/// 25.1.3.13 RawBytesToNumeric ( type, rawBytes, isLittleEndian )
+/// https://tc39.es/ecma262/#sec-rawbytestonumeric
+pub fn rawBytesToNumeric(comptime T: type, raw_bytes: []const u8, is_little_endian: bool) T {
+    // 1. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
+    const element_size = @sizeOf(T);
+
+    var bytes: [element_size]u8 = undefined;
+    @memcpy(&bytes, raw_bytes);
+
+    // 2. If isLittleEndian is false, reverse the order of the elements of rawBytes.
+    if (!is_little_endian) std.mem.reverse(u8, &bytes);
+
+    // 3-8.
+    return std.mem.bytesToValue(T, &bytes);
+}
+
+/// 25.1.3.15 GetValueFromBuffer ( arrayBuffer, byteIndex, type, isTypedArray, order [ , isLittleEndian ] )
+/// https://tc39.es/ecma262/#sec-getvaluefrombuffer
+pub fn getValueFromBuffer(
+    agent: *Agent,
+    array_buffer: *const ArrayBuffer,
+    byte_index: u53,
+    comptime T: type,
+    is_typed_array: bool,
+    order: Order,
+    maybe_is_little_endian: ?bool,
+) T {
+    // 1. Assert: IsDetachedBuffer(arrayBuffer) is false.
+    std.debug.assert(!isDetachedBuffer(array_buffer));
+
+    // 2. Assert: There are sufficient bytes in arrayBuffer starting at byteIndex to represent a
+    //    value of type.
+    std.debug.assert(array_buffer.fields.array_buffer_data.?.items.len >= byte_index + @sizeOf(T));
+
+    // 3. Let block be arrayBuffer.[[ArrayBufferData]].
+    const block = array_buffer.fields.array_buffer_data.?;
+
+    // 4. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
+    const element_size = @sizeOf(T);
+
+    // TODO: 5. If IsSharedArrayBuffer(arrayBuffer) is true, then
+    const raw_value = if (false) {
+        // [...]
+        _ = order;
+        _ = is_typed_array;
+    }
+    // 6. Else,
+    else blk: {
+        // a. Let rawValue be a List whose elements are bytes from block at indices in the interval
+        //    from byteIndex (inclusive) to byteIndex + elementSize (exclusive).
+        break :blk block.items[@intCast(byte_index)..@intCast(byte_index + element_size)];
+    };
+
+    // 7. Assert: The number of elements in rawValue is elementSize.
+    std.debug.assert(raw_value.len == element_size);
+
+    // 8. If isLittleEndian is not present, set isLittleEndian to the value of the [[LittleEndian]]
+    //    field of the surrounding agent's Agent Record.
+    const is_little_endian = maybe_is_little_endian orelse agent.little_endian;
+
+    // 9. Return RawBytesToNumeric(type, rawValue, isLittleEndian).
+    return rawBytesToNumeric(T, raw_value, is_little_endian);
+}
+
 /// 25.1.5 Properties of the ArrayBuffer Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-constructor
 pub const ArrayBufferConstructor = struct {

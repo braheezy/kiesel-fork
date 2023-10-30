@@ -1,6 +1,7 @@
 //! 9.7 Agents
 //! https://tc39.es/ecma262/#sec-agents
 
+const builtin = @import("builtin");
 const std = @import("std");
 
 const Allocator = std.mem.Allocator;
@@ -44,6 +45,9 @@ global_symbol_registry: std.StringArrayHashMap(Symbol),
 host_hooks: HostHooks,
 execution_context_stack: std.ArrayList(ExecutionContext),
 queued_promise_jobs: std.ArrayList(QueuedPromiseJob),
+
+/// [[LittleEndian]]
+little_endian: bool = builtin.cpu.arch.endian() == .Little,
 
 pub const Options = struct {
     debug: struct {
