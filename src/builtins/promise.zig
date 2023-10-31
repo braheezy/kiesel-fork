@@ -31,6 +31,8 @@ const sameValue = types.sameValue;
 /// 27.2.1.1 PromiseCapability Records
 /// https://tc39.es/ecma262/#sec-promisecapability-records
 pub const PromiseCapability = struct {
+    const Self = @This();
+
     /// [[Promise]]
     promise: Object,
 
@@ -39,6 +41,31 @@ pub const PromiseCapability = struct {
 
     /// [[Reject]]
     reject: Object,
+
+    /// 27.2.1.1.1 IfAbruptRejectPromise ( value, capability )
+    /// https://tc39.es/ecma262/#sec-ifabruptrejectpromise
+    pub fn rejectPromise(self: Self, agent: *Agent, err: Agent.Error) !Object {
+        // 1. Assert: value is a Completion Record.
+        switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+
+            // 2. If value is an abrupt completion, then
+            error.ExceptionThrown => {
+                const exception = agent.exception.?;
+                agent.exception = null;
+
+                // a. Perform ? Call(capability.[[Reject]], undefined, « value.[[Value]] »).
+                _ = try Value.from(self.reject).callAssumeCallable(.undefined, .{exception});
+
+                // b. Return capability.[[Promise]].
+                return self.promise;
+            },
+        }
+
+        // 3. Else,
+        //     a. Set value to value.[[Value]].
+        // NOTE: This has to be handled at the call site.
+    }
 };
 
 /// 27.2.1.2 PromiseReaction Records
