@@ -7,17 +7,20 @@ const Allocator = std.mem.Allocator;
 
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
+const language = @import("../language.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
 const ECMAScriptFunction = builtins.ECMAScriptFunction;
 const Object = types.Object;
 const Reference = types.Reference;
+const SourceTextModule = language.SourceTextModule;
 const Value = types.Value;
 
 pub const DeclarativeEnvironment = @import("environments/DeclarativeEnvironment.zig");
 pub const FunctionEnvironment = @import("environments/FunctionEnvironment.zig");
 pub const GlobalEnvironment = @import("environments/GlobalEnvironment.zig");
+pub const ModuleEnvironment = @import("environments/ModuleEnvironment.zig");
 pub const ObjectEnvironment = @import("environments/ObjectEnvironment.zig");
 pub const PrivateEnvironment = @import("environments/PrivateEnvironment.zig");
 
@@ -30,45 +33,58 @@ pub const Environment = union(enum) {
     object_environment: *ObjectEnvironment,
     function_environment: *FunctionEnvironment,
     global_environment: *GlobalEnvironment,
+    module_environment: *ModuleEnvironment,
 
     pub fn outerEnv(self: Self) ?Self {
         return switch (self) {
-            .function_environment => |env| env.declarative_environment.outer_env,
+            inline .function_environment,
+            .module_environment,
+            => |env| env.declarative_environment.outer_env,
             inline else => |env| env.outer_env,
         };
     }
 
     pub fn hasBinding(self: Self, name: []const u8) !bool {
         return switch (self) {
-            .function_environment => |env| env.declarative_environment.hasBinding(name),
+            inline .function_environment,
+            .module_environment,
+            => |env| env.declarative_environment.hasBinding(name),
             inline else => |env| env.hasBinding(name),
         };
     }
 
     pub fn createMutableBinding(self: Self, agent: *Agent, name: []const u8, deletable: bool) !void {
         return switch (self) {
-            .function_environment => |env| env.declarative_environment.createMutableBinding(agent, name, deletable),
+            inline .function_environment,
+            .module_environment,
+            => |env| env.declarative_environment.createMutableBinding(agent, name, deletable),
             inline else => |env| env.createMutableBinding(agent, name, deletable),
         };
     }
 
     pub fn createImmutableBinding(self: Self, agent: *Agent, name: []const u8, strict: bool) !void {
         return switch (self) {
-            .function_environment => |env| env.declarative_environment.createImmutableBinding(agent, name, strict),
+            inline .function_environment,
+            .module_environment,
+            => |env| env.declarative_environment.createImmutableBinding(agent, name, strict),
             inline else => |env| env.createImmutableBinding(agent, name, strict),
         };
     }
 
     pub fn initializeBinding(self: Self, agent: *Agent, name: []const u8, value: Value) !void {
         return switch (self) {
-            .function_environment => |env| env.declarative_environment.initializeBinding(agent, name, value),
+            inline .function_environment,
+            .module_environment,
+            => |env| env.declarative_environment.initializeBinding(agent, name, value),
             inline else => |env| env.initializeBinding(agent, name, value),
         };
     }
 
     pub fn setMutableBinding(self: Self, agent: *Agent, name: []const u8, value: Value, strict: bool) !void {
         return switch (self) {
-            .function_environment => |env| env.declarative_environment.setMutableBinding(agent, name, value, strict),
+            inline .function_environment,
+            .module_environment,
+            => |env| env.declarative_environment.setMutableBinding(agent, name, value, strict),
             inline else => |env| env.setMutableBinding(agent, name, value, strict),
         };
     }
@@ -95,13 +111,16 @@ pub const Environment = union(enum) {
 
     pub fn hasSuperBinding(self: Self) bool {
         return switch (self) {
+            .module_environment => |env| env.declarative_environment.hasSuperBinding(),
             inline else => |env| env.hasSuperBinding(),
         };
     }
 
     pub fn withBaseObject(self: Self) ?Object {
         return switch (self) {
-            .function_environment => |env| env.declarative_environment.withBaseObject(),
+            inline .function_environment,
+            .module_environment,
+            => |env| env.declarative_environment.withBaseObject(),
             inline else => |env| env.withBaseObject(),
         };
     }
@@ -111,8 +130,8 @@ pub const Environment = union(enum) {
             .declarative_environment,
             .object_environment,
             => unreachable,
-            .function_environment => |env| env.getThisBinding(),
             .global_environment => |env| Value.from(env.getThisBinding()),
+            inline else => |env| env.getThisBinding(),
         };
     }
 
@@ -126,6 +145,18 @@ pub const Environment = union(enum) {
     pub fn getSuperBase(self: Self) !Value {
         return switch (self) {
             .function_environment => |env| env.getSuperBase(),
+            else => unreachable,
+        };
+    }
+
+    pub fn createImportBinding(
+        self: Self,
+        name: []const u8,
+        module: *SourceTextModule,
+        binding_name: []const u8,
+    ) !Value {
+        return switch (self) {
+            .module_environment => |env| env.createImportBinding(name, module, binding_name),
             else => unreachable,
         };
     }
@@ -288,6 +319,23 @@ pub fn newGlobalEnvironment(
     };
 
     // 9. Return env.
+    return env;
+}
+
+/// 9.1.2.6 NewModuleEnvironment ( E )
+/// https://tc39.es/ecma262/#sec-newmoduleenvironment
+pub fn newModuleEnvironment(allocator: Allocator, outer_env: Environment) !*ModuleEnvironment {
+    // 1. Let env be a new Module Environment Record containing no bindings.
+    const env = try allocator.create(ModuleEnvironment);
+
+    env.* = .{
+        // 2. Set env.[[OuterEnv]] to E.
+        .declarative_environment = try newDeclarativeEnvironment(allocator, outer_env),
+
+        .indirect_bindings = std.StringArrayHashMap(ModuleEnvironment.IndirectBinding).init(allocator),
+    };
+
+    // 3. Return env.
     return env;
 }
 

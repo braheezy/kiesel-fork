@@ -17,6 +17,7 @@ const Parser = @import("Parser.zig");
 const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
 const Realm = execution.Realm;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
+const newModuleEnvironment = execution.newModuleEnvironment;
 
 const Self = @This();
 
@@ -95,8 +96,12 @@ pub fn initializeEnvironment(self: *Self) !void {
     // 4. Assert: realm is not undefined.
     const realm = self.realm;
 
-    // TODO: 5. Let env be NewModuleEnvironment(realm.[[GlobalEnv]]).
-    const env = Environment{ .global_environment = realm.global_env };
+    // 5. Let env be NewModuleEnvironment(realm.[[GlobalEnv]]).
+    const env: Environment = .{
+        .module_environment = try newModuleEnvironment(agent.gc_allocator, .{
+            .global_environment = realm.global_env,
+        }),
+    };
 
     // 6. Set module.[[Environment]] to env.
     self.environment = env;

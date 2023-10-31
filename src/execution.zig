@@ -16,6 +16,7 @@ pub const getIdentifierReference = environments.getIdentifierReference;
 pub const newDeclarativeEnvironment = environments.newDeclarativeEnvironment;
 pub const newFunctionEnvironment = environments.newFunctionEnvironment;
 pub const newGlobalEnvironment = environments.newGlobalEnvironment;
+pub const newModuleEnvironment = environments.newModuleEnvironment;
 pub const newObjectEnvironment = environments.newObjectEnvironment;
 pub const newPrivateEnvironment = environments.newPrivateEnvironment;
 
