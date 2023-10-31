@@ -8,12 +8,16 @@ const language = @import("../language.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
+const ImportedModulePayload = language.ImportedModulePayload;
+const ImportedModuleReferrer = language.ImportedModuleReferrer;
 const Job = execution.Job;
 const JobCallback = execution.JobCallback;
 const Object = types.Object;
 const Realm = execution.Realm;
 const SourceTextModule = language.SourceTextModule;
+const String = types.String;
 const Value = types.Value;
+const finishLoadingImportedModule = language.finishLoadingImportedModule;
 
 /// 9.5.2 HostMakeJobCallback ( callback )
 /// https://tc39.es/ecma262/#sec-hostmakejobcallback
@@ -54,6 +58,19 @@ pub fn hostGetImportMetaProperties(module: *SourceTextModule) !Agent.HostHooks.I
 /// https://tc39.es/ecma262/#sec-hostfinalizeimportmeta
 pub fn hostFinalizeImportMeta(_: Object, _: *SourceTextModule) void {
     // The default implementation of HostFinalizeImportMeta is to return unused.
+}
+
+/// 16.2.1.8 HostLoadImportedModule ( referrer, specifier, hostDefined, payload )
+/// https://tc39.es/ecma262/#sec-HostLoadImportedModule
+pub fn hostLoadImportedModule(
+    agent: *Agent,
+    referrer: ImportedModuleReferrer,
+    specifier: String,
+    _: SafePointer,
+    payload: ImportedModulePayload,
+) error{OutOfMemory}!void {
+    const result = agent.throwException(.internal_error, "Module loading is disabled", .{});
+    try finishLoadingImportedModule(agent, referrer, specifier, payload, result);
 }
 
 /// 19.2.1.2 HostEnsureCanCompileStrings ( calleeRealm )

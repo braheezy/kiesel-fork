@@ -6,6 +6,8 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const SafePointer = @import("any-pointer").SafePointer;
+
 const builtins = @import("../builtins.zig");
 const default_host_hooks = @import("default_host_hooks.zig");
 const environments = @import("environments.zig");
@@ -16,6 +18,8 @@ const ArgumentsList = builtins.ArgumentsList;
 const BigInt = types.BigInt;
 const Environment = environments.Environment;
 const ExecutionContext = @import("ExecutionContext.zig");
+const ImportedModulePayload = language.ImportedModulePayload;
+const ImportedModuleReferrer = language.ImportedModuleReferrer;
 const Job = @import("job.zig").Job;
 const JobCallback = @import("job.zig").JobCallback;
 const Object = types.Object;
@@ -105,6 +109,13 @@ pub const HostHooks = struct {
     ) error{OutOfMemory}!void,
     hostGetImportMetaProperties: *const fn (module: *SourceTextModule) error{OutOfMemory}!ImportMetaProperties,
     hostFinalizeImportMeta: *const fn (import_meta: Object, module: *SourceTextModule) void,
+    hostLoadImportedModule: *const fn (
+        agent: *Self,
+        referrer: ImportedModuleReferrer,
+        specifier: String,
+        host_defined: SafePointer,
+        payload: ImportedModulePayload,
+    ) error{OutOfMemory}!void,
     hostEnsureCanCompileStrings: *const fn (callee_realm: *Realm) Error!void,
     hostHasSourceTextAvailable: *const fn (func: Object) bool,
     hostResizeArrayBuffer: *const fn (
@@ -161,6 +172,7 @@ pub fn init(gc_allocator: Allocator, options: Options) !Self {
         .hostEnqueuePromiseJob = default_host_hooks.hostEnqueuePromiseJob,
         .hostGetImportMetaProperties = default_host_hooks.hostGetImportMetaProperties,
         .hostFinalizeImportMeta = default_host_hooks.hostFinalizeImportMeta,
+        .hostLoadImportedModule = default_host_hooks.hostLoadImportedModule,
         .hostEnsureCanCompileStrings = default_host_hooks.hostEnsureCanCompileStrings,
         .hostHasSourceTextAvailable = default_host_hooks.hostHasSourceTextAvailable,
         .hostResizeArrayBuffer = default_host_hooks.hostResizeArrayBuffer,
