@@ -22,6 +22,7 @@ const createByteDataBlock = types.createByteDataBlock;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const sameValue = types.sameValue;
 
@@ -150,6 +151,14 @@ pub fn isFixedLengthArrayBuffer(array_buffer: *const ArrayBuffer) bool {
     return array_buffer.fields.array_buffer_max_byte_length == null;
 }
 
+/// 25.1.3.11 IsBigIntElementType ( type )
+/// https://tc39.es/ecma262/#sec-isbigintelementtype
+pub fn isBigIntElementType(comptime T: type) bool {
+    // 1. If type is either biguint64 or bigint64, return true.
+    // 2. Return false.
+    return T == u64 or T == i64;
+}
+
 /// 25.1.3.13 RawBytesToNumeric ( type, rawBytes, isLittleEndian )
 /// https://tc39.es/ecma262/#sec-rawbytestonumeric
 pub fn rawBytesToNumeric(comptime T: type, raw_bytes: []const u8, is_little_endian: bool) T {
@@ -212,6 +221,129 @@ pub fn getValueFromBuffer(
 
     // 9. Return RawBytesToNumeric(type, rawValue, isLittleEndian).
     return rawBytesToNumeric(T, raw_value, is_little_endian);
+}
+
+/// 25.1.3.16 NumericToRawBytes ( type, value, isLittleEndian )
+/// https://tc39.es/ecma262/#sec-numerictorawbytes
+pub fn numericToRawBytes(
+    agent: *Agent,
+    comptime T: type,
+    value: Value,
+    is_little_endian: bool,
+) ![@sizeOf(T)]u8 {
+    // 1. If type is float32, then
+    var raw_bytes = if (T == f32) blk: {
+        // a. Let rawBytes be a List whose elements are the 4 bytes that are the result of
+        //    converting value to IEEE 754-2019 binary32 format using roundTiesToEven mode. The
+        //    bytes are arranged in little endian order. If value is NaN, rawBytes may be set to
+        //    any implementation chosen IEEE 754-2019 binary32 format Not-a-Number encoding. An
+        //    implementation must always choose the same encoding for each implementation
+        //    distinguishable NaN value.
+        break :blk std.mem.toBytes(
+            if (value.number.isNan())
+                std.math.nan(f32)
+            else
+                @as(f32, @floatCast(value.number.asFloat())),
+        );
+    }
+    // 2. Else if type is float64, then
+    else if (T == f64) blk: {
+        // a. Let rawBytes be a List whose elements are the 8 bytes that are the IEEE 754-2019
+        //    binary64 format encoding of value. The bytes are arranged in little endian order. If
+        //    value is NaN, rawBytes may be set to any implementation chosen IEEE 754-2019 binary64
+        //    format Not-a-Number encoding. An implementation must always choose the same encoding
+        //    for each implementation distinguishable NaN value.
+        break :blk std.mem.toBytes(
+            if (value.number.isNan())
+                std.math.nan(f64)
+            else
+                value.number.asFloat(),
+        );
+    }
+    // 3. Else,
+    else blk: {
+        // a. Let n be the Element Size value specified in Table 71 for Element Type type.
+        // b. Let convOp be the abstract operation named in the Conversion Operation column in Table 71 for Element Type type.
+        const conv_op = switch (T) {
+            i8 => "toInt8",
+            u8 => "toUint8",
+            i16 => "toInt16",
+            u16 => "toUint16",
+            i32 => "toInt32",
+            u32 => "toUint32",
+            i64 => "toBigInt64",
+            u64 => "toBigUint64",
+            else => unreachable,
+        };
+
+        // c. Let intValue be ℝ(convOp(value)).
+        const int_value = @field(Value, conv_op)(value, agent) catch |err| try noexcept(err);
+
+        // d. If intValue ≥ 0, then
+        //     i. Let rawBytes be a List whose elements are the n-byte binary encoding of intValue.
+        //        The bytes are ordered in little endian order.
+        // e. Else,
+        //     i. Let rawBytes be a List whose elements are the n-byte binary two's complement
+        //        encoding of intValue. The bytes are ordered in little endian order.
+        break :blk std.mem.toBytes(int_value);
+    };
+
+    // 4. If isLittleEndian is false, reverse the order of the elements of rawBytes.
+    if (!is_little_endian) std.mem.reverse(u8, &raw_bytes);
+
+    // 5. Return rawBytes.
+    return raw_bytes;
+}
+
+/// 25.1.3.17 SetValueInBuffer ( arrayBuffer, byteIndex, type, value, isTypedArray, order [ , isLittleEndian ] )
+/// https://tc39.es/ecma262/#sec-setvalueinbuffer
+pub fn setValueInBuffer(
+    agent: *Agent,
+    array_buffer: *const ArrayBuffer,
+    byte_index: u53,
+    comptime T: type,
+    value: Value,
+    is_typed_array: bool,
+    order: Order,
+    maybe_is_little_endian: ?bool,
+) !void {
+    // 1. Assert: IsDetachedBuffer(arrayBuffer) is false.
+    std.debug.assert(!isDetachedBuffer(array_buffer));
+
+    // 2. Assert: There are sufficient bytes in arrayBuffer starting at byteIndex to represent a
+    //    value of type.
+    std.debug.assert(array_buffer.fields.array_buffer_data.?.items.len >= byte_index + @sizeOf(T));
+
+    // 3. Assert: value is a BigInt if IsBigIntElementType(type) is true; otherwise, value is a
+    //    Number.
+    std.debug.assert(value == if (comptime isBigIntElementType(T)) .big_int else .number);
+
+    // 4. Let block be arrayBuffer.[[ArrayBufferData]].
+    const block = array_buffer.fields.array_buffer_data.?;
+
+    // 5. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
+    const element_size = @sizeOf(T);
+
+    // 6. If isLittleEndian is not present, set isLittleEndian to the value of the [[LittleEndian]]
+    //    field of the surrounding agent's Agent Record.
+    const is_little_endian = maybe_is_little_endian orelse agent.little_endian;
+
+    // 7. Let rawBytes be NumericToRawBytes(type, value, isLittleEndian).
+    const raw_bytes = try numericToRawBytes(agent, T, value, is_little_endian);
+
+    // TODO: 8. If IsSharedArrayBuffer(arrayBuffer) is true, then
+    if (false) {
+        // [...]
+        _ = order;
+        _ = is_typed_array;
+    }
+    // 9. Else,
+    else {
+        // a. Store the individual bytes of rawBytes into block, starting at block[byteIndex].
+        @memcpy(block.items[@intCast(byte_index)..@intCast(byte_index + element_size)], &raw_bytes);
+    }
+
+    // 10. Return unused.
 }
 
 /// 25.1.5 Properties of the ArrayBuffer Constructor

@@ -12,6 +12,7 @@ const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
 const BigInt = types.BigInt;
 const MakeObject = types.MakeObject;
+const Number = types.Number;
 const Object = types.Object;
 const Order = @import("../builtins/array_buffer.zig").Order;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -23,9 +24,11 @@ const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getValueFromBuffer = builtins.getValueFromBuffer;
+const isBigIntElementType = builtins.isBigIntElementType;
 const isDetachedBuffer = builtins.isDetachedBuffer;
 const isFixedLengthArrayBuffer = builtins.isFixedLengthArrayBuffer;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const setValueInBuffer = builtins.setValueInBuffer;
 
 /// 25.3.1.1 DataView With Buffer Witness Records
 /// https://tc39.es/ecma262/#sec-dataview-with-buffer-witness-records
@@ -202,10 +205,85 @@ fn getViewValue(
         .unordered,
         is_little_endian,
     );
-    return if (T == u64 or T == i64)
+    return if (comptime isBigIntElementType(T))
         Value.from(try BigInt.from(agent.gc_allocator, value))
     else
         Value.from(value);
+}
+
+/// 25.3.1.6 SetViewValue ( view, requestIndex, isLittleEndian, type, value )
+/// https://tc39.es/ecma262/#sec-setviewvalue
+fn setViewValue(
+    agent: *Agent,
+    view_value: Value,
+    request_index: Value,
+    is_little_endian_value: Value,
+    comptime T: type,
+    value: Value,
+) !Value {
+    // 1. Perform ? RequireInternalSlot(view, [[DataView]]).
+    // 2. Assert: view has a [[ViewedArrayBuffer]] internal slot.
+    const data_view = try view_value.requireInternalSlot(agent, DataView);
+
+    // 3. Let getIndex be ? ToIndex(requestIndex).
+    const get_index = try request_index.toIndex(agent);
+
+    // 4. If IsBigIntElementType(type) is true, let numberValue be ? ToBigInt(value).
+    // 5. Otherwise, let numberValue be ? ToNumber(value).
+    const number_value = if (comptime isBigIntElementType(T))
+        Value.from(try value.toBigInt(agent))
+    else
+        Value.from(try value.toNumber(agent));
+
+    // 6. Set isLittleEndian to ToBoolean(isLittleEndian).
+    const is_little_endian = is_little_endian_value.toBoolean();
+
+    // 7. Let viewOffset be view.[[ByteOffset]].
+    const view_offset = data_view.fields.byte_offset;
+
+    // 8. Let viewRecord be MakeDataViewWithBufferWitnessRecord(view, unordered).
+    // 9. NOTE: Bounds checking is not a synchronizing operation when view's backing buffer is a
+    //    growable SharedArrayBuffer.
+    const view = makeDataViewWithBufferWitnessRecord(data_view, .unordered);
+
+    // 10. If IsViewOutOfBounds(viewRecord) is true, throw a TypeError exception.
+    if (isViewOutOfBounds(view)) {
+        return agent.throwException(.type_error, "DataView is out of bounds", .{});
+    }
+
+    // 11. Let viewSize be GetViewByteLength(viewRecord).
+    const view_size = getViewByteLength(view);
+
+    // 12. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
+    const element_size = @sizeOf(T);
+
+    // 13. If getIndex + elementSize > viewSize, throw a RangeError exception.
+    if (if (std.math.add(u53, get_index, element_size)) |x| x > view_size else |_| true) {
+        return agent.throwException(
+            .range_error,
+            "Cannot set element of size {} at index {}",
+            .{ element_size, get_index },
+        );
+    }
+
+    // 14. Let bufferIndex be getIndex + viewOffset.
+    const buffer_index = get_index + view_offset;
+
+    // 15. Perform SetValueInBuffer(view.[[ViewedArrayBuffer]], bufferIndex, type, numberValue,
+    //     false, unordered, isLittleEndian).
+    try setValueInBuffer(
+        agent,
+        data_view.fields.viewed_array_buffer,
+        buffer_index,
+        T,
+        number_value,
+        false,
+        .unordered,
+        is_little_endian,
+    );
+
+    // 16. Return undefined.
+    return .undefined;
 }
 
 /// 25.3.3 Properties of the DataView Constructor
@@ -392,6 +470,16 @@ pub const DataViewPrototype = struct {
         try defineBuiltinFunction(object, "getUint8", getUint8, 1, realm);
         try defineBuiltinFunction(object, "getUint16", getUint16, 1, realm);
         try defineBuiltinFunction(object, "getUint32", getUint32, 1, realm);
+        try defineBuiltinFunction(object, "setBigInt64", setBigInt64, 2, realm);
+        try defineBuiltinFunction(object, "setBigUint64", setBigUint64, 2, realm);
+        try defineBuiltinFunction(object, "setFloat32", setFloat32, 2, realm);
+        try defineBuiltinFunction(object, "setFloat64", setFloat64, 2, realm);
+        try defineBuiltinFunction(object, "setInt8", setInt8, 2, realm);
+        try defineBuiltinFunction(object, "setInt16", setInt16, 2, realm);
+        try defineBuiltinFunction(object, "setInt32", setInt32, 2, realm);
+        try defineBuiltinFunction(object, "setUint8", setUint8, 2, realm);
+        try defineBuiltinFunction(object, "setUint16", setUint16, 2, realm);
+        try defineBuiltinFunction(object, "setUint32", setUint32, 2, realm);
 
         // 25.3.4.25 DataView.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-dataview.prototype-@@tostringtag
@@ -578,6 +666,130 @@ pub const DataViewPrototype = struct {
         // 2. If littleEndian is not present, set littleEndian to false.
         // 3. Return ? GetViewValue(v, byteOffset, littleEndian, uint32).
         return getViewValue(agent, this_value, byte_offset, little_endian, u32);
+    }
+
+    /// 25.3.4.15 DataView.prototype.setBigInt64 ( byteOffset, value [ , littleEndian ] )
+    /// https://tc39.es/ecma262/#sec-dataview.prototype.setbigint64
+    fn setBigInt64(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const byte_offset = arguments.get(0);
+        const value = arguments.get(1);
+        const little_endian = arguments.get(2);
+
+        // 1. Let v be the this value.
+        // 2. Return ? SetViewValue(v, byteOffset, littleEndian, bigint64, value).
+        return setViewValue(agent, this_value, byte_offset, little_endian, i64, value);
+    }
+
+    /// 25.3.4.16 DataView.prototype.setBigUint64 ( byteOffset, value [ , littleEndian ] )
+    /// https://tc39.es/ecma262/#sec-dataview.prototype.setbiguint64
+    fn setBigUint64(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const byte_offset = arguments.get(0);
+        const value = arguments.get(1);
+        const little_endian = arguments.get(2);
+
+        // 1. Let v be the this value.
+        // 2. Return ? SetViewValue(v, byteOffset, littleEndian, biguint64, value).
+        return setViewValue(agent, this_value, byte_offset, little_endian, u64, value);
+    }
+
+    /// 25.3.4.17 DataView.prototype.setFloat32 ( byteOffset, value [ , littleEndian ] )
+    /// https://tc39.es/ecma262/#sec-dataview.prototype.setfloat32
+    fn setFloat32(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const byte_offset = arguments.get(0);
+        const value = arguments.get(1);
+        const little_endian = arguments.getOrNull(2) orelse Value.from(false);
+
+        // 1. Let v be the this value.
+        // 2. If littleEndian is not present, set littleEndian to false.
+        // 3. Return ? SetViewValue(v, byteOffset, littleEndian, float32, value).
+        return setViewValue(agent, this_value, byte_offset, little_endian, f32, value);
+    }
+
+    /// 25.3.4.18 DataView.prototype.setFloat64 ( byteOffset, value [ , littleEndian ] )
+    /// https://tc39.es/ecma262/#sec-dataview.prototype.setfloat64
+    fn setFloat64(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const byte_offset = arguments.get(0);
+        const value = arguments.get(1);
+        const little_endian = arguments.getOrNull(2) orelse Value.from(false);
+
+        // 1. Let v be the this value.
+        // 2. If littleEndian is not present, set littleEndian to false.
+        // 3. Return ? SetViewValue(v, byteOffset, littleEndian, float64, value).
+        return setViewValue(agent, this_value, byte_offset, little_endian, f64, value);
+    }
+
+    /// 25.3.4.19 DataView.prototype.setInt8 ( byteOffset, value )
+    /// https://tc39.es/ecma262/#sec-dataview.prototype.setint8
+    fn setInt8(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const byte_offset = arguments.get(0);
+        const value = arguments.get(1);
+
+        // 1. Let v be the this value.
+        // 2. Return ? SetViewValue(v, byteOffset, true, int8, value).
+        return setViewValue(agent, this_value, byte_offset, Value.from(true), i8, value);
+    }
+
+    /// 25.3.4.20 DataView.prototype.setInt16 ( byteOffset, value [ , littleEndian ] )
+    /// https://tc39.es/ecma262/#sec-dataview.prototype.setint16
+    fn setInt16(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const byte_offset = arguments.get(0);
+        const value = arguments.get(1);
+        const little_endian = arguments.getOrNull(2) orelse Value.from(false);
+
+        // 1. Let v be the this value.
+        // 2. If littleEndian is not present, set littleEndian to false.
+        // 3. Return ? SetViewValue(v, byteOffset, littleEndian, int16, value).
+        return setViewValue(agent, this_value, byte_offset, little_endian, i16, value);
+    }
+
+    /// 25.3.4.21 DataView.prototype.setInt32 ( byteOffset, value [ , littleEndian ] )
+    /// https://tc39.es/ecma262/#sec-dataview.prototype.setint32
+    fn setInt32(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const byte_offset = arguments.get(0);
+        const value = arguments.get(1);
+        const little_endian = arguments.getOrNull(2) orelse Value.from(false);
+
+        // 1. Let v be the this value.
+        // 2. If littleEndian is not present, set littleEndian to false.
+        // 3. Return ? SetViewValue(v, byteOffset, littleEndian, int32, value).
+        return setViewValue(agent, this_value, byte_offset, little_endian, i32, value);
+    }
+
+    /// 25.3.4.22 DataView.prototype.setUint8 ( byteOffset, value )
+    /// https://tc39.es/ecma262/#sec-dataview.prototype.setuint8
+    fn setUint8(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const byte_offset = arguments.get(0);
+        const value = arguments.get(1);
+
+        // 1. Let v be the this value.
+        // 2. Return ? SetViewValue(v, byteOffset, true, uint8, value).
+        return setViewValue(agent, this_value, byte_offset, Value.from(true), u8, value);
+    }
+
+    /// 25.3.4.23 DataView.prototype.setUint16 ( byteOffset, value [ , littleEndian ] )
+    /// https://tc39.es/ecma262/#sec-dataview.prototype.setuint16
+    fn setUint16(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const byte_offset = arguments.get(0);
+        const value = arguments.get(1);
+        const little_endian = arguments.getOrNull(2) orelse Value.from(false);
+
+        // 1. Let v be the this value.
+        // 2. If littleEndian is not present, set littleEndian to false.
+        // 3. Return ? SetViewValue(v, byteOffset, littleEndian, uint16, value).
+        return setViewValue(agent, this_value, byte_offset, little_endian, u16, value);
+    }
+
+    /// 25.3.4.24 DataView.prototype.setUint32 ( byteOffset, value [ , littleEndian ] )
+    /// https://tc39.es/ecma262/#sec-dataview.prototype.setuint32
+    fn setUint32(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+        const byte_offset = arguments.get(0);
+        const value = arguments.get(1);
+        const little_endian = arguments.getOrNull(2) orelse Value.from(false);
+
+        // 1. Let v be the this value.
+        // 2. If littleEndian is not present, set littleEndian to false.
+        // 3. Return ? SetViewValue(v, byteOffset, littleEndian, uint32, value).
+        return setViewValue(agent, this_value, byte_offset, little_endian, u32, value);
     }
 };
 
