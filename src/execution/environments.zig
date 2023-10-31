@@ -33,6 +33,7 @@ pub const Environment = union(enum) {
 
     pub fn outerEnv(self: Self) ?Self {
         return switch (self) {
+            .function_environment => |env| env.declarative_environment.outer_env,
             inline else => |env| env.outer_env,
         };
     }
@@ -244,10 +245,9 @@ pub fn newFunctionEnvironment(
         .new_target = new_target,
 
         // 6. Set env.[[OuterEnv]] to F.[[Environment]].
-        .outer_env = function.fields.environment,
+        .declarative_environment = try newDeclarativeEnvironment(allocator, function.fields.environment),
 
         .this_value = .undefined,
-        .declarative_environment = try newDeclarativeEnvironment(allocator, null),
     };
 
     // 7. Return env.

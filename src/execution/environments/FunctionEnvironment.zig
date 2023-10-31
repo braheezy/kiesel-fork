@@ -33,9 +33,6 @@ function_object: *ECMAScriptFunction,
 /// [[NewTarget]]
 new_target: ?Object,
 
-/// [[OuterEnv]]
-outer_env: ?Environment,
-
 // NOTE: This is how we implement the spec's inheritance of function environments.
 declarative_environment: *DeclarativeEnvironment,
 
