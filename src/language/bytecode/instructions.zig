@@ -33,6 +33,8 @@ pub const Instruction = enum(u8) {
     /// (last to first) as an argument, the values on the stack afterwards are the this value and
     /// lastly the function to call.
     evaluate_call,
+    // Store evaluation of a import() call as the result value.
+    evaluate_import_call,
     /// Store EvaluateNew() as the result value.
     /// This instruction has the number of argument values that need to be popped from the stack
     /// (last to first) as an argument, the value on the stack afterwards is the constructor to

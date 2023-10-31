@@ -567,6 +567,18 @@ pub fn acceptSuperCall(self: *Self) AcceptError!ast.SuperCall {
     return .{ .arguments = arguments };
 }
 
+pub fn acceptImportCall(self: *Self) AcceptError!ast.ImportCall {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.import));
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    const expression = try self.allocator.create(ast.Expression);
+    expression.* = try self.acceptExpression(.{});
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    return .{ .expression = expression };
+}
+
 pub fn acceptArguments(self: *Self) AcceptError!ast.Arguments {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
@@ -1046,6 +1058,8 @@ pub fn acceptExpression(self: *Self, ctx: AcceptContext) (ParserCore.AcceptError
         .{ .new_expression = new_expression }
     else |_| if (self.acceptSuperCall()) |super_call|
         .{ .super_call = super_call }
+    else |_| if (self.acceptImportCall()) |import_call|
+        .{ .import_call = import_call }
     else |_| if (self.acceptPrimaryExpression()) |primary_expression|
         .{ .primary_expression = primary_expression }
     else |_|

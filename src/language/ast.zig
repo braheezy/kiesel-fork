@@ -413,19 +413,6 @@ pub const SuperCall = struct {
     /// 13.3.7.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
-        // SuperCall : super Arguments
-        // 1. Let newTarget be GetNewTarget().
-        // 2. Assert: newTarget is an Object.
-        // 3. Let func be GetSuperConstructor().
-        // 4. Let argList be ? ArgumentListEvaluation of Arguments.
-        // 5. If IsConstructor(func) is false, throw a TypeError exception.
-        // 6. Let result be ? Construct(func, argList, newTarget).
-        // 7. Let thisER be GetThisEnvironment().
-        // 8. Perform ? thisER.BindThisValue(result).
-        // 9. Let F be thisER.[[FunctionObject]].
-        // 10. Assert: F is an ECMAScript function object.
-        // 11. Perform ? InitializeInstanceElements(result, F).
-        // 12. Return result.
         for (self.arguments) |argument| {
             try argument.generateBytecode(executable, ctx);
             if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
@@ -440,6 +427,27 @@ pub const SuperCall = struct {
         for (self.arguments) |argument| {
             try argument.print(writer, indentation + 1);
         }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ImportCall
+pub const ImportCall = struct {
+    const Self = @This();
+
+    expression: *Expression,
+
+    /// 13.3.10.1 Runtime Semantics: Evaluation
+    /// https://tc39.es/ecma262/#sec-import-call-runtime-semantics-evaluation
+    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+        try self.expression.generateBytecode(executable, ctx);
+        if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.load);
+        try executable.addInstruction(.evaluate_import_call);
+    }
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("ImportCall", writer, indentation);
+        try self.expression.print(writer, indentation + 1);
     }
 };
 
@@ -2055,6 +2063,7 @@ pub const Expression = union(enum) {
     new_expression: NewExpression,
     call_expression: CallExpression,
     super_call: SuperCall,
+    import_call: ImportCall,
     optional_expression: OptionalExpression,
     update_expression: UpdateExpression,
     unary_expression: UnaryExpression,

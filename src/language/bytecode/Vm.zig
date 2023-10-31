@@ -7,6 +7,7 @@ const builtins = @import("../../builtins.zig");
 const bytecode = @import("../bytecode.zig");
 const execution = @import("../../execution.zig");
 const instructions_ = @import("instructions.zig");
+const language = @import("../../language.zig");
 const types = @import("../../types.zig");
 const utils = @import("../../utils.zig");
 
@@ -19,6 +20,7 @@ const ClassStaticBlockDefinition = types.ClassStaticBlockDefinition;
 const Completion = types.Completion;
 const Environment = execution.Environment;
 const Executable = @import("Executable.zig");
+const ImportedModuleReferrer = language.ImportedModuleReferrer;
 const Instruction = instructions_.Instruction;
 const Iterator = types.Iterator;
 const Object = types.Object;
@@ -41,6 +43,7 @@ const makeConstructor = builtins.makeConstructor;
 const makeMethod = builtins.makeMethod;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const newPrivateEnvironment = execution.newPrivateEnvironment;
+const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
@@ -2105,6 +2108,48 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
                 this_value,
                 arguments.items,
             );
+        },
+        .evaluate_import_call => {
+            const realm = self.agent.currentRealm();
+
+            // 1. Let referrer be GetActiveScriptOrModule().
+            // 2. If referrer is null, set referrer to the current Realm Record.
+            const referrer: ImportedModuleReferrer = if (self.agent.getActiveScriptOrModule()) |script_or_module|
+                switch (script_or_module) {
+                    .script => |script| .{ .script = script },
+                    .module => |module| .{ .module = module },
+                }
+            else
+                .{ .realm = realm };
+
+            // 3. Let argRef be ? Evaluation of AssignmentExpression.
+            // 4. Let specifier be ? GetValue(argRef).
+            const specifier = self.stack.pop();
+
+            // 5. Let promiseCapability be ! NewPromiseCapability(%Promise%).
+            const promise_capability = newPromiseCapability(
+                self.agent,
+                Value.from(try realm.intrinsics.@"%Promise%"()),
+            ) catch |err| try noexcept(err);
+
+            // 6. Let specifierString be Completion(ToString(specifier)).
+            const specifier_string = specifier.toString(self.agent) catch |err| {
+                // 7. IfAbruptRejectPromise(specifierString, promiseCapability).
+                self.result = Value.from(try promise_capability.rejectPromise(self.agent, err));
+                return;
+            };
+
+            // 8. Perform HostLoadImportedModule(referrer, specifierString, empty, promiseCapability).
+            try self.agent.host_hooks.hostLoadImportedModule(
+                self.agent,
+                referrer,
+                specifier_string,
+                SafePointer.null_pointer,
+                .{ .promise_capability = promise_capability },
+            );
+
+            // 9. Return promiseCapability.[[Promise]].
+            self.result = Value.from(promise_capability.promise);
         },
         .evaluate_new => {
             const argument_count = self.fetchIndex(executable);
