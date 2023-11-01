@@ -59,7 +59,7 @@ pub const Kiesel = struct {
         try defineBuiltinFunction(kiesel_object, "evalScript", evalScript, 1, realm);
         try defineBuiltinProperty(kiesel_object, "gc", Value.from(gc_object));
         try defineBuiltinFunction(kiesel_object, "print", print, 1, realm);
-        try defineBuiltinFunction(kiesel_object, "readFile", readFile, 1, realm);
+        try defineBuiltinFunction(kiesel_object, "readFile", readFile_, 1, realm);
         try defineBuiltinFunction(kiesel_object, "readLine", readLine, 0, realm);
         try defineBuiltinFunction(kiesel_object, "readStdin", readStdin, 0, realm);
         try defineBuiltinFunction(kiesel_object, "sleep", sleep, 1, realm);
@@ -145,19 +145,12 @@ pub const Kiesel = struct {
         return .undefined;
     }
 
-    fn readFile(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn readFile_(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
         const path = try arguments.get(0).toString(agent);
-        const file = std.fs.cwd().openFile(path.utf8, .{}) catch |err| {
-            return agent.throwException(
-                .type_error,
-                "Error while opening file: {s}",
-                .{@errorName(err)},
-            );
-        };
-        defer file.close();
-        const bytes = file.readToEndAlloc(
+        const bytes = readFile(
             agent.gc_allocator,
-            std.math.maxInt(usize),
+            std.fs.cwd(),
+            path.utf8,
         ) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             else => return agent.throwException(
@@ -344,6 +337,12 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
             return null;
         },
     };
+}
+
+fn readFile(allocator: Allocator, base_dir: std.fs.Dir, sub_path: []const u8) ![]const u8 {
+    const file = try base_dir.openFile(sub_path, .{});
+    defer file.close();
+    return file.readToEndAlloc(allocator, std.math.maxInt(usize));
 }
 
 fn getHistoryPath(allocator: Allocator) ![]const u8 {
@@ -535,15 +534,12 @@ pub fn main() !u8 {
     const realm = agent.currentRealm();
     try defineBuiltinProperty(realm.global_object, "Kiesel", Value.from(try Kiesel.create(realm)));
 
-    const path = if (parsed_args.positionals.len > 0) parsed_args.positionals[0] else null;
-    if (path != null) {
-        const file = try std.fs.cwd().openFile(path.?, .{});
-        defer file.close();
-        const file_name = std.fs.path.basename(path.?);
-        const source_text = try file.reader().readAllAlloc(allocator, std.math.maxInt(usize));
+    const path_arg = if (parsed_args.positionals.len > 0) parsed_args.positionals[0] else null;
+    if (path_arg) |path| {
+        const source_text = try readFile(allocator, std.fs.cwd(), path);
         defer allocator.free(source_text);
         if (try run(allocator, realm, source_text, .{
-            .file_name = file_name,
+            .file_name = std.fs.path.basename(path),
             .module = parsed_args.options.module,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
         })) |result| {
