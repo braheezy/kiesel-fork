@@ -13,15 +13,20 @@ const Allocator = std.mem.Allocator;
 const Agent = kiesel.execution.Agent;
 const ArgumentsList = kiesel.builtins.ArgumentsList;
 const Diagnostics = kiesel.language.Diagnostics;
+const ImportedModulePayload = kiesel.language.ImportedModulePayload;
+const ImportedModuleReferrer = kiesel.language.ImportedModuleReferrer;
+const Module = kiesel.language.Module;
 const Object = kiesel.types.Object;
 const Realm = kiesel.execution.Realm;
 const Script = kiesel.language.Script;
 const ScriptOrModule = kiesel.execution.ScriptOrModule;
 const SourceTextModule = kiesel.language.SourceTextModule;
+const String = kiesel.types.String;
 const Value = kiesel.types.Value;
 const coerceOptionsToObject = kiesel.types.coerceOptionsToObject;
 const defineBuiltinFunction = kiesel.utils.defineBuiltinFunction;
 const defineBuiltinProperty = kiesel.utils.defineBuiltinProperty;
+const finishLoadingImportedModule = kiesel.language.finishLoadingImportedModule;
 const formatParseError = kiesel.utils.formatParseError;
 const formatParseErrorHint = kiesel.utils.formatParseErrorHint;
 const getOption = kiesel.types.getOption;
@@ -48,6 +53,10 @@ const version = std.fmt.comptimePrint(
     .bdwgc = bdwgc_version_string,
     .zig = builtin.zig_version_string,
 });
+
+const ScriptOrModuleHostDefined = struct {
+    base_dir: std.fs.Dir,
+};
 
 pub const Kiesel = struct {
     pub fn create(realm: *Realm) !Object {
@@ -98,7 +107,9 @@ pub const Kiesel = struct {
 
         // 1. Let hostDefined be any host-defined values for the provided sourceText (obtained in
         //    an implementation dependent manner)
-        const host_defined = SafePointer.null_pointer;
+        const host_defined = switch (agent.getActiveScriptOrModule().?) {
+            inline else => |x| x.host_defined,
+        };
 
         // 2. Let realm be the current Realm Record.
         const realm = agent.currentRealm();
@@ -240,6 +251,7 @@ pub const Kiesel = struct {
 };
 
 fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: struct {
+    base_dir: std.fs.Dir,
     file_name: ?[]const u8 = null,
     module: bool = false,
     print_promise_rejection_warnings: bool = true,
@@ -248,16 +260,22 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
     const stderr = std.io.getStdErr().writer();
     const agent = realm.agent;
 
+    const host_defined = SafePointer.make(*ScriptOrModuleHostDefined, blk: {
+        const ptr = try realm.agent.gc_allocator.create(ScriptOrModuleHostDefined);
+        ptr.* = .{ .base_dir = options.base_dir };
+        break :blk ptr;
+    });
+
     var diagnostics = Diagnostics.init(allocator);
     defer diagnostics.deinit();
 
     const parse_result: error{ ParseError, OutOfMemory }!ScriptOrModule = if (options.module) blk: {
-        break :blk if (SourceTextModule.parse(source_text, realm, SafePointer.null_pointer, .{
+        break :blk if (SourceTextModule.parse(source_text, realm, host_defined, .{
             .diagnostics = &diagnostics,
             .file_name = options.file_name,
         })) |module| .{ .module = module } else |err| err;
     } else blk: {
-        break :blk if (Script.parse(source_text, realm, SafePointer.null_pointer, .{
+        break :blk if (Script.parse(source_text, realm, host_defined, .{
             .diagnostics = &diagnostics,
             .file_name = options.file_name,
         })) |script| .{ .script = script } else |err| err;
@@ -392,6 +410,7 @@ fn repl(allocator: Allocator, realm: *Realm, options: struct {
             try linenoise.history.add(source_text);
 
             if (try run(allocator, realm, source_text, .{
+                .base_dir = std.fs.cwd(),
                 .file_name = "repl",
                 .module = options.module,
                 .print_promise_rejection_warnings = options.print_promise_rejection_warnings,
@@ -432,6 +451,7 @@ fn replBasic(allocator: Allocator, realm: *Realm, options: struct {
         if (source_text.len == 0) continue;
 
         if (try run(allocator, realm, source_text, .{
+            .base_dir = std.fs.cwd(),
             .file_name = "repl",
             .module = options.module,
             .print_promise_rejection_warnings = options.print_promise_rejection_warnings,
@@ -514,6 +534,71 @@ pub fn main() !u8 {
     tracked_promise_rejections = @TypeOf(tracked_promise_rejections).init(agent.gc_allocator);
     defer tracked_promise_rejections.deinit();
 
+    agent.host_hooks.hostLoadImportedModule = struct {
+        fn func(
+            agent_: *Agent,
+            referrer: ImportedModuleReferrer,
+            specifier: String,
+            _: SafePointer,
+            payload: ImportedModulePayload,
+        ) !void {
+            const result = if (parseSourceTextModule(agent_, referrer, specifier)) |source_text_module|
+                Module{ .source_text_module = source_text_module }
+            else |err| switch (err) {
+                error.OutOfMemory, error.ExceptionThrown => @as(Agent.Error, @errorCast(err)),
+                else => agent_.throwException(
+                    .internal_error,
+                    "Failed to import '{}': {s}",
+                    .{ specifier, @errorName(err) },
+                ),
+            };
+            try finishLoadingImportedModule(agent_, referrer, specifier, payload, result);
+        }
+
+        fn parseSourceTextModule(
+            agent_: *Agent,
+            referrer: ImportedModuleReferrer,
+            specifier: String,
+        ) !*SourceTextModule {
+            const realm = agent_.currentRealm();
+            const base_dir = switch (referrer) {
+                inline .script, .module => |x| x.host_defined.cast(*ScriptOrModuleHostDefined).base_dir,
+                .realm => unreachable,
+            };
+            const module_dir = try base_dir.openDir(
+                std.fs.path.dirname(specifier.utf8) orelse ".",
+                .{},
+            );
+            const module_file_name = std.fs.path.basename(specifier.utf8);
+            const source_text = try readFile(agent_.gc_allocator, module_dir, module_file_name);
+            defer agent_.gc_allocator.free(source_text);
+
+            const host_defined = SafePointer.make(*ScriptOrModuleHostDefined, blk: {
+                const ptr = try realm.agent.gc_allocator.create(ScriptOrModuleHostDefined);
+                ptr.* = .{ .base_dir = module_dir };
+                break :blk ptr;
+            });
+
+            var diagnostics = Diagnostics.init(agent_.gc_allocator);
+            defer diagnostics.deinit();
+
+            return SourceTextModule.parse(source_text, realm, host_defined, .{
+                .diagnostics = &diagnostics,
+                .file_name = module_file_name,
+            }) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                error.ParseError => {
+                    const parse_error = diagnostics.errors.items[0];
+                    return agent_.throwException(
+                        .syntax_error,
+                        "{s}",
+                        .{try formatParseError(agent_.gc_allocator, parse_error)},
+                    );
+                },
+            };
+        }
+    }.func;
+
     agent.host_hooks.hostPromiseRejectionTracker = struct {
         fn func(
             promise: *kiesel.builtins.Promise,
@@ -539,6 +624,10 @@ pub fn main() !u8 {
         const source_text = try readFile(allocator, std.fs.cwd(), path);
         defer allocator.free(source_text);
         if (try run(allocator, realm, source_text, .{
+            .base_dir = if (std.fs.path.dirname(path)) |dirname|
+                try std.fs.cwd().openDir(dirname, .{})
+            else
+                std.fs.cwd(),
             .file_name = std.fs.path.basename(path),
             .module = parsed_args.options.module,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
@@ -548,6 +637,7 @@ pub fn main() !u8 {
         } else return 1;
     } else if (parsed_args.options.command) |source_text| {
         if (try run(allocator, realm, source_text, .{
+            .base_dir = std.fs.cwd(),
             .file_name = "command",
             .module = parsed_args.options.module,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
