@@ -526,11 +526,19 @@ pub fn acceptNewExpression(self: *Self) AcceptError!ast.NewExpression {
     const tmp = temporaryChange(&self.state.call_expression_forbidden, true);
     defer tmp.restore();
 
-    _ = try self.core.accept(RuleSet.is(.new));
+    const token = try self.core.accept(RuleSet.is(.new));
     const ctx = AcceptContext{ .precedence = getPrecedence(.new) };
     const expression = try self.allocator.create(ast.Expression);
     expression.* = try self.acceptExpression(ctx);
     tmp.restore();
+    if (expression.* == .import_call) {
+        try self.emitErrorAt(token.location, "new expression cannot be used with import()", .{});
+        return error.UnexpectedToken;
+    }
+    if (expression.* == .super_call) {
+        try self.emitErrorAt(token.location, "new expression cannot be used with super()", .{});
+        return error.UnexpectedToken;
+    }
     const arguments = self.acceptArguments() catch &[_]ast.Expression{};
     return .{ .expression = expression, .arguments = arguments };
 }
