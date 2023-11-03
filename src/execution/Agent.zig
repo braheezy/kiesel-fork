@@ -51,7 +51,7 @@ execution_context_stack: std.ArrayList(ExecutionContext),
 queued_promise_jobs: std.ArrayList(QueuedPromiseJob),
 
 /// [[LittleEndian]]
-little_endian: bool = builtin.cpu.arch.endian() == .Little,
+little_endian: bool = builtin.cpu.arch.endian() == .little,
 
 pub const Options = struct {
     debug: struct {
