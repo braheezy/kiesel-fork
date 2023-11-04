@@ -27,6 +27,9 @@ realm: *Realm,
 /// [[Environment]]
 environment: ?Environment,
 
+/// [[Namespace]]
+namespace: ?Object,
+
 /// [[ECMAScriptCode]]
 ecmascript_code: ast.Module,
 
@@ -75,6 +78,7 @@ pub fn parse(
     self.* = .{
         .realm = realm,
         .environment = null,
+        .namespace = null,
         .has_tla = @"async",
         .host_defined = host_defined,
         .ecmascript_code = body,
