@@ -1,17 +1,20 @@
 const std = @import("std");
 
+const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const language = @import("../language.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
+const Object = types.Object;
 const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
 const Realm = execution.Realm;
 const Script = language.Script;
 const SourceTextModule = language.SourceTextModule;
 const String = types.String;
 const Value = types.Value;
+const moduleNamespaceCreate = builtins.moduleNamespaceCreate;
 const noexcept = utils.noexcept;
 
 pub const Module = union(enum) {
@@ -95,4 +98,38 @@ pub fn finishLoadingImportedModule(
     }
 
     // 4. Return unused.
+}
+
+/// 16.2.1.10 GetModuleNamespace ( module )
+/// https://tc39.es/ecma262/#sec-getmodulenamespace
+pub fn getModuleNamespace(agent: *Agent, module: Module) !Object {
+    // TODO: 1. Assert: If module is a Cyclic Module Record, then module.[[Status]] is not new or unlinked.
+
+    // 2. Let namespace be module.[[Namespace]].
+    var namespace = switch (module) {
+        .source_text_module => |source_text_module| source_text_module.namespace,
+    };
+
+    // 3. If namespace is empty, then
+    if (namespace == null) {
+        // TODO: a. Let exportedNames be module.GetExportedNames().
+        const exported_names = &[_][]const u8{};
+
+        // b. Let unambiguousNames be a new empty List.
+        var unambiguous_names = std.ArrayList([]const u8).init(agent.gc_allocator);
+        defer unambiguous_names.deinit();
+
+        // c. For each element name of exportedNames, do
+        for (exported_names) |name| {
+            // TODO: i. Let resolution be module.ResolveExport(name).
+            // TODO: ii. If resolution is a ResolvedBinding Record, append name to unambiguousNames.
+            _ = name;
+        }
+
+        // d. Set namespace to ModuleNamespaceCreate(module, unambiguousNames).
+        namespace = try moduleNamespaceCreate(agent, module, unambiguous_names.items);
+    }
+
+    // 4. Return namespace.
+    return namespace.?;
 }
