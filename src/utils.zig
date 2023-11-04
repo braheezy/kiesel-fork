@@ -166,7 +166,7 @@ pub fn defineBuiltinAccessor(
         .enumerable = false,
         .configurable = true,
     };
-    object.definePropertyOrThrow(property_key, property_descriptor) catch |err| try noexcept(err);
+    try object.propertyStorage().set(property_key, property_descriptor);
 }
 
 pub fn defineBuiltinFunction(
@@ -225,5 +225,5 @@ pub fn defineBuiltinProperty(object: Object, comptime name: []const u8, value: a
         value
     else
         @compileError("defineBuiltinProperty() called with incompatible type " ++ @typeName(T));
-    object.definePropertyOrThrow(property_key, property_descriptor) catch |err| try noexcept(err);
+    try object.propertyStorage().set(property_key, property_descriptor);
 }
