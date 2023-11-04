@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const SafePointer = @import("any-pointer").SafePointer;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const language = @import("../language.zig");
@@ -7,6 +9,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
+const ArgumentsList = builtins.ArgumentsList;
 const Object = types.Object;
 const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
 const Realm = execution.Realm;
@@ -14,8 +17,11 @@ const Script = language.Script;
 const SourceTextModule = language.SourceTextModule;
 const String = types.String;
 const Value = types.Value;
+const createBuiltinFunction = builtins.createBuiltinFunction;
 const moduleNamespaceCreate = builtins.moduleNamespaceCreate;
+const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
+const performPromiseThen = builtins.performPromiseThen;
 
 pub const Module = union(enum) {
     source_text_module: *SourceTextModule,
@@ -60,8 +66,194 @@ fn continueDynamicImport(
         },
     };
 
-    // TODO: 3-8.
-    _ = module;
+    // TODO: 3. Let loadPromise be module.LoadRequestedModules().
+    const load_promise = blk: {
+        const realm = agent.currentRealm();
+
+        // From 16.2.1.5.1 LoadRequestedModules ( [ hostDefined ] )
+        // 2. Let pc be ! NewPromiseCapability(%Promise%).
+        const capability = newPromiseCapability(
+            agent,
+            Value.from(try realm.intrinsics.@"%Promise%"()),
+        ) catch |err| try noexcept(err);
+
+        // 4. Perform InnerModuleLoading(state, module).
+        {
+            // From 16.2.1.5.1.1 InnerModuleLoading ( state, module )
+            // c. Perform ! Call(state.[[PromiseCapability]].[[Resolve]], undefined, « undefined »).
+            _ = Value.from(capability.resolve).callAssumeCallable(
+                .undefined,
+                .{.undefined},
+            ) catch |err| try noexcept(err);
+        }
+
+        // 5. Return pc.[[Promise]].
+        break :blk capability.promise.as(builtins.Promise);
+    };
+
+    const RejectedClosureCaptures = struct {
+        promise_capability: PromiseCapability,
+    };
+    const rejected_closure_captures = try agent.gc_allocator.create(RejectedClosureCaptures);
+    rejected_closure_captures.* = .{ .promise_capability = promise_capability };
+
+    // 3. Let rejectedClosure be a new Abstract Closure with parameters (reason) that captures
+    //    promiseCapability and performs the following steps when called:
+    const rejected_closure = struct {
+        fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) !Value {
+            const function = agent_.activeFunctionObject();
+            const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*RejectedClosureCaptures);
+            const promise_capability_ = captures_.promise_capability;
+            const reason = arguments_.get(0);
+
+            // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « reason »).
+            _ = Value.from(promise_capability_.reject).callAssumeCallable(
+                .undefined,
+                .{reason},
+            ) catch |err| try noexcept(err);
+
+            // b. Return unused.
+            return .undefined;
+        }
+    }.func;
+
+    // 5. Let onRejected be CreateBuiltinFunction(rejectedClosure, 1, "", « »).
+    const on_rejected = try createBuiltinFunction(agent, .{ .regular = rejected_closure }, .{
+        .length = 1,
+        .name = "",
+        .additional_fields = SafePointer.make(*RejectedClosureCaptures, rejected_closure_captures),
+    });
+
+    const LinkAndEvaluateClosureCaptures = struct {
+        module: Module,
+        promise_capability: PromiseCapability,
+        on_rejected: Object,
+    };
+    const link_and_evaluate_closure_captures = try agent.gc_allocator.create(LinkAndEvaluateClosureCaptures);
+    link_and_evaluate_closure_captures.* = .{
+        .module = module,
+        .promise_capability = promise_capability,
+        .on_rejected = on_rejected,
+    };
+
+    // 6. Let linkAndEvaluateClosure be a new Abstract Closure with no parameters that captures
+    //    module, promiseCapability, and onRejected and performs the following steps when called:
+    const link_and_evaluate_closure = struct {
+        fn func(agent_: *Agent, _: Value, _: ArgumentsList) !Value {
+            const function = agent_.activeFunctionObject();
+            const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*LinkAndEvaluateClosureCaptures);
+            const promise_capability_ = captures_.promise_capability;
+            const module_ = captures_.module;
+            const on_rejected_ = captures_.on_rejected;
+
+            // TODO: a. Let link be Completion(module.Link()).
+            // TODO: b. If link is an abrupt completion, then
+            if (false) {
+                const value = agent_.exception.?;
+                agent_.exception = null;
+
+                // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « link.[[Value]] »).
+                _ = Value.from(promise_capability_.reject).callAssumeCallable(
+                    .undefined,
+                    .{value},
+                ) catch |err| try noexcept(err);
+
+                // ii. Return unused.
+                return .undefined;
+            }
+
+            // TODO: c. Let evaluatePromise be module.Evaluate().
+            const evaluate_promise = blk: {
+                const realm = agent_.currentRealm();
+
+                // From 16.2.1.5.3 Evaluate ( )
+                // 6. Let capability be ! NewPromiseCapability(%Promise%).
+                const capability = newPromiseCapability(
+                    agent_,
+                    Value.from(try realm.intrinsics.@"%Promise%"()),
+                ) catch |err| try noexcept(err);
+
+                // ii. Perform ! Call(capability.[[Resolve]], undefined, « undefined »).
+                _ = Value.from(capability.resolve).callAssumeCallable(
+                    .undefined,
+                    .{.undefined},
+                ) catch |err| try noexcept(err);
+
+                // 11. Return capability.[[Promise]].
+                break :blk capability.promise.as(builtins.Promise);
+            };
+
+            const FulfilledClosureCaptures = struct {
+                module: Module,
+                promise_capability: PromiseCapability,
+            };
+            const fulfilled_closure_captures = try agent_.gc_allocator.create(FulfilledClosureCaptures);
+            fulfilled_closure_captures.* = .{
+                .module = module_,
+                .promise_capability = promise_capability_,
+            };
+
+            // d. Let fulfilledClosure be a new Abstract Closure with no parameters that captures module and promiseCapability and performs the following steps when called:
+            const fulfilled_closure = struct {
+                fn func(agent__: *Agent, _: Value, _: ArgumentsList) !Value {
+                    const function_ = agent__.activeFunctionObject();
+                    const captures__ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*FulfilledClosureCaptures);
+                    const promise_capability__ = captures__.promise_capability;
+                    const module__ = captures__.module;
+
+                    // i. Let namespace be GetModuleNamespace(module).
+                    const namespace = try getModuleNamespace(agent__, module__);
+
+                    // ii. Perform ! Call(promiseCapability.[[Resolve]], undefined, « namespace »).
+                    _ = Value.from(promise_capability__.resolve).callAssumeCallable(
+                        .undefined,
+                        .{Value.from(namespace)},
+                    ) catch |err| try noexcept(err);
+
+                    // iii. Return unused.
+                    return .undefined;
+                }
+            }.func;
+
+            // e. Let onFulfilled be CreateBuiltinFunction(fulfilledClosure, 0, "", « »).
+            const on_fulfilled = try createBuiltinFunction(agent_, .{ .regular = fulfilled_closure }, .{
+                .length = 0,
+                .name = "",
+                .additional_fields = SafePointer.make(*FulfilledClosureCaptures, fulfilled_closure_captures),
+            });
+
+            // f. Perform PerformPromiseThen(evaluatePromise, onFulfilled, onRejected).
+            _ = try performPromiseThen(
+                agent_,
+                evaluate_promise,
+                Value.from(on_fulfilled),
+                Value.from(on_rejected_),
+                null,
+            );
+
+            // g. Return unused.
+            return .undefined;
+        }
+    }.func;
+
+    // 7. Let linkAndEvaluate be CreateBuiltinFunction(linkAndEvaluateClosure, 0, "", « »).
+    const link_and_evaluate = try createBuiltinFunction(agent, .{ .regular = link_and_evaluate_closure }, .{
+        .length = 0,
+        .name = "",
+        .additional_fields = SafePointer.make(
+            *LinkAndEvaluateClosureCaptures,
+            link_and_evaluate_closure_captures,
+        ),
+    });
+
+    // 8. Perform PerformPromiseThen(loadPromise, linkAndEvaluate, onRejected).
+    _ = try performPromiseThen(
+        agent,
+        load_promise,
+        Value.from(link_and_evaluate),
+        Value.from(on_rejected),
+        null,
+    );
 
     // 9. Return unused.
 }
