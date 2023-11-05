@@ -1993,13 +1993,27 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             }
         },
         .create_catch_binding => {
+            // TODO: This should create a new environment - for now we approximate this by creating
+            //       a new binding and ignoring the error if one already exists.
             const name = self.fetchIdentifier(executable);
             const thrown_value = self.exception.?;
             self.exception = null;
             const running_context = self.agent.runningExecutionContext();
             const catch_env = running_context.ecmascript_code.?.lexical_environment;
-            try catch_env.createMutableBinding(self.agent, name, false);
-            try catch_env.initializeBinding(self.agent, name, thrown_value);
+            if (catch_env.createMutableBinding(self.agent, name, false)) {
+                try catch_env.initializeBinding(self.agent, name, thrown_value);
+            } else |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                error.ExceptionThrown => {
+                    self.exception = null;
+                    catch_env.setMutableBinding(
+                        self.agent,
+                        name,
+                        thrown_value,
+                        false,
+                    ) catch unreachable;
+                },
+            }
         },
         .decrement => {
             const value = self.result.?;
