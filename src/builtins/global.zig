@@ -29,7 +29,7 @@ const NameAndPropertyDescriptor = struct {
     PropertyDescriptor,
 };
 
-pub fn globalObjectProperties(realm: *Realm) ![37]NameAndPropertyDescriptor {
+pub fn globalObjectProperties(realm: *Realm) ![38]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
     return [_]NameAndPropertyDescriptor{
         // 19.1.1 globalThis
@@ -71,6 +71,10 @@ pub fn globalObjectProperties(realm: *Realm) ![37]NameAndPropertyDescriptor {
         // 19.2.6.1 decodeURI ( encodedURI )
         // https://tc39.es/ecma262/#sec-decodeuri-encodeduri
         .{ "decodeURI", .{ .value = Value.from(try realm.intrinsics.@"%decodeURI%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.2.6.2 decodeURIComponent ( encodedURIComponent )
+        // https://tc39.es/ecma262/#sec-decodeuricomponent-encodeduricomponent
+        .{ "decodeURIComponent", .{ .value = Value.from(try realm.intrinsics.@"%decodeURIComponent%"()), .writable = true, .enumerable = false, .configurable = true } },
 
         // 19.3.1 AggregateError ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-aggregate-error
@@ -201,6 +205,7 @@ pub const global_functions = struct {
     pub const ParseFloat = GlobalFunction(.{ .name = "parseFloat", .length = 1 });
     pub const ParseInt = GlobalFunction(.{ .name = "parseInt", .length = 2 });
     pub const DecodeURI = GlobalFunction(.{ .name = "decodeURI", .length = 1 });
+    pub const DecodeURIComponent = GlobalFunction(.{ .name = "decodeURIComponent", .length = 1 });
 };
 
 /// 19.2.1 eval ( x )
@@ -365,6 +370,21 @@ fn decodeURI(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
 
     // 3. Return ? Decode(uriString, preserveEscapeSet).
     return Value.from(try decode(agent, uri_string, preserve_escape_set));
+}
+
+/// 19.2.6.2 decodeURIComponent ( encodedURIComponent )
+/// https://tc39.es/ecma262/#sec-decodeuricomponent-encodeduricomponent
+fn decodeURIComponent(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    const encoded_uri_component = arguments.get(0);
+
+    // 1. Let componentString be ? ToString(encodedURIComponent).
+    const component_string = try encoded_uri_component.toString(agent);
+
+    // 2. Let preserveEscapeSet be the empty String.
+    const preserve_escape_set = "";
+
+    // 3. Return ? Decode(componentString, preserveEscapeSet).
+    return Value.from(try decode(agent, component_string, preserve_escape_set));
 }
 
 /// 19.2.6.6 Decode ( string, preserveEscapeSet )
