@@ -14,6 +14,7 @@ const ArgumentsList = builtins.ArgumentsList;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
+const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const performEval = @import("eval.zig").performEval;
@@ -28,7 +29,7 @@ const NameAndPropertyDescriptor = struct {
     PropertyDescriptor,
 };
 
-pub fn globalObjectProperties(realm: *Realm) ![36]NameAndPropertyDescriptor {
+pub fn globalObjectProperties(realm: *Realm) ![37]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
     return [_]NameAndPropertyDescriptor{
         // 19.1.1 globalThis
@@ -66,6 +67,10 @@ pub fn globalObjectProperties(realm: *Realm) ![36]NameAndPropertyDescriptor {
         // 19.2.5 parseInt ( string, radix )
         // https://tc39.es/ecma262/#sec-parseint-string-radix
         .{ "parseInt", .{ .value = Value.from(try realm.intrinsics.@"%parseInt%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.2.6.1 decodeURI ( encodedURI )
+        // https://tc39.es/ecma262/#sec-decodeuri-encodeduri
+        .{ "decodeURI", .{ .value = Value.from(try realm.intrinsics.@"%decodeURI%"()), .writable = true, .enumerable = false, .configurable = true } },
 
         // 19.3.1 AggregateError ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-aggregate-error
@@ -195,6 +200,7 @@ pub const global_functions = struct {
     pub const IsNaN = GlobalFunction(.{ .name = "isNaN", .length = 1 });
     pub const ParseFloat = GlobalFunction(.{ .name = "parseFloat", .length = 1 });
     pub const ParseInt = GlobalFunction(.{ .name = "parseInt", .length = 2 });
+    pub const DecodeURI = GlobalFunction(.{ .name = "decodeURI", .length = 1 });
 };
 
 /// 19.2.1 eval ( x )
@@ -344,4 +350,137 @@ fn parseInt(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
     //     b. Return +0𝔽.
     // 16. Return 𝔽(sign × mathInt).
     return Value.from(sign * math_int.?);
+}
+
+/// 19.2.6.1 decodeURI ( encodedURI )
+/// https://tc39.es/ecma262/#sec-decodeuri-encodeduri
+fn decodeURI(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    const encoded_uri = arguments.get(0);
+
+    // 1. Let uriString be ? ToString(encodedURI).
+    const uri_string = try encoded_uri.toString(agent);
+
+    // 2. Let preserveEscapeSet be ";/?:@&=+$,#".
+    const preserve_escape_set = ";/?:@&=+$,#";
+
+    // 3. Return ? Decode(uriString, preserveEscapeSet).
+    return Value.from(try decode(agent, uri_string, preserve_escape_set));
+}
+
+/// 19.2.6.6 Decode ( string, preserveEscapeSet )
+/// https://tc39.es/ecma262/#sec-decode
+fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u8) ![]const u8 {
+    const input = string.utf8;
+
+    // 1. Let len be the length of string.
+    const len = input.len;
+
+    // 2. Let R be the empty String.
+    var result = std.ArrayList(u8).init(agent.gc_allocator);
+
+    // 3. Let k be 0.
+    var k: usize = 0;
+
+    // 4. Repeat, while k < len,
+    while (k < len) : (k += 1) {
+        // a. Let C be the code unit at index k within string.
+        const c = input[k];
+
+        // b. Let S be C.
+        var s: []const u8 = &.{c};
+
+        // c. If C is the code unit 0x0025 (PERCENT SIGN), then
+        if (c == '%') {
+            // i. If k + 3 > len, throw a URIError exception.
+            if (k + 3 > len) {
+                return agent.throwException(.uri_error, "Escape sequence must be of form '%XX'", .{});
+            }
+
+            // ii. Let escape be the substring of string from k to k + 3.
+            const escape = input[k .. k + 3];
+
+            // iii. Let B be ParseHexOctet(string, k + 1).
+            // iv. If B is not an integer, throw a URIError exception.
+            const byte = std.fmt.parseInt(u8, escape[1..], 16) catch {
+                return agent.throwException(.uri_error, "Escape sequence must be hex digits", .{});
+            };
+
+            // v. Set k to k + 2.
+            k += 2;
+
+            // vi. Let n be the number of leading 1 bits in B.
+            const byte_sequence_length = std.unicode.utf8ByteSequenceLength(byte) catch null;
+
+            // vii. If n = 0, then
+            if (byte_sequence_length == 1) {
+                // 1. Let asciiChar be the code unit whose numeric value is B.
+                // 2. If preserveEscapeSet contains asciiChar, set S to escape. Otherwise, set S to
+                //    asciiChar.
+                s = if (std.mem.indexOfScalar(u8, preserve_escape_set, byte) != null)
+                    escape
+                else
+                    &.{byte};
+            }
+            // viii. Else,
+            else {
+                // 1. If n = 1 or n > 4, throw a URIError exception.
+                if (byte_sequence_length == null) {
+                    return agent.throwException(.uri_error, "Invalid UTF-8 start byte", .{});
+                }
+
+                // 2. Let Octets be « B ».
+                var octets = [4]u8{ byte, 0, 0, 0 };
+
+                // 3. Let j be 1.
+                var j: u3 = 1;
+
+                // 4. Repeat, while j < n,
+                while (j < byte_sequence_length.?) : (j += 1) {
+                    // a. Set k to k + 1.
+                    k += 1;
+
+                    // b. If k + 3 > len, throw a URIError exception.
+                    // c. If the code unit at index k within string is not the code unit 0x0025
+                    //    (PERCENT SIGN), throw a URIError exception.
+                    if (k + 3 > len or input[k] != '%') {
+                        return agent.throwException(.uri_error, "Escape sequence must be of form '%XX'", .{});
+                    }
+
+                    // d. Let continuationByte be ParseHexOctet(string, k + 1).
+                    // e. If continuationByte is not an integer, throw a URIError exception.
+                    const continuation_byte = std.fmt.parseInt(u8, input[k + 1 .. k + 3], 16) catch {
+                        return agent.throwException(.uri_error, "Escape sequence must be hex digits", .{});
+                    };
+
+                    // f. Append continuationByte to Octets.
+                    octets[j] = continuation_byte;
+
+                    // g. Set k to k + 2.
+                    k += 2;
+
+                    // h. Set j to j + 1.
+                }
+
+                // 5. Assert: The length of Octets is n.
+                // 6. If Octets does not contain a valid UTF-8 encoding of a Unicode code point,
+                //    throw a URIError exception.
+                if (!std.unicode.utf8ValidateSlice(octets[0..byte_sequence_length.?])) {
+                    return agent.throwException(.uri_error, "Invalid UTF-8 byte sequence", .{});
+                }
+
+                // 7. Let V be the code point obtained by applying the UTF-8 transformation to
+                //    Octets, that is, from a List of octets into a 21-bit value.
+                // 8. Set S to UTF16EncodeCodePoint(V).
+                s = octets[0..byte_sequence_length.?];
+            }
+        }
+
+        // d. Set R to the string-concatenation of R and S.
+        try result.appendSlice(s);
+
+        // e. Set k to k + 1.
+    }
+
+    // 5. Return R.
+    return result.toOwnedSlice();
 }
