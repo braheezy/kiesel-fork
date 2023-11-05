@@ -154,6 +154,8 @@ pub const StringConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "fromCharCode", fromCharCode, 1, realm);
+
         // 22.1.2.3 String.prototype
         // https://tc39.es/ecma262/#sec-string.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -206,6 +208,39 @@ pub const StringConstructor = struct {
             s,
             try getPrototypeFromConstructor(new_target.?, "%String.prototype%"),
         ));
+    }
+
+    /// 22.1.2.1 String.fromCharCode ( ...codeUnits )
+    /// https://tc39.es/ecma262/#sec-string.fromcharcode
+    fn fromCharCode(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        // 1. Let result be the empty String.
+        var result = try std.ArrayList(u16).initCapacity(agent.gc_allocator, arguments.count());
+        defer result.deinit();
+
+        // 2. For each element next of codeUnits, do
+        for (arguments.values) |next| {
+            // a. Let nextCU be the code unit whose numeric value is ℝ(? ToUint16(next)).
+            const next_code_unit = try next.toUint16(agent);
+
+            // b. Set result to the string-concatenation of result and nextCU.
+            result.appendAssumeCapacity(next_code_unit);
+        }
+
+        // 3. Return result.
+        return Value.from(std.unicode.utf16leToUtf8Alloc(
+            agent.gc_allocator,
+            result.items,
+        ) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.DanglingSurrogateHalf,
+            error.ExpectedSecondSurrogateHalf,
+            error.UnexpectedSecondSurrogateHalf,
+            => return agent.throwException(
+                .internal_error,
+                "UTF-16 strings are not implemented yet",
+                .{},
+            ),
+        });
     }
 };
 
