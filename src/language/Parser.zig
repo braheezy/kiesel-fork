@@ -2183,11 +2183,24 @@ pub fn acceptModuleItem(self: *Self) AcceptError!ast.ModuleItem {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    // TODO: ExportDeclaration
     if (self.acceptImportDeclaration()) |import_declaration|
         return .{ .import_declaration = import_declaration }
+    else |_| if (self.acceptExportDeclaration()) |export_declaration|
+        return .{ .export_declaration = export_declaration }
     else |_| if (self.acceptStatementListItem()) |statement_list_item|
         return .{ .statement_list_item = statement_list_item }
+    else |_|
+        return error.UnexpectedToken;
+}
+
+pub fn acceptModuleExportName(self: *Self) AcceptError!ast.ModuleExportName {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    if (self.acceptIdentifierName()) |identifier|
+        return .{ .identifier = identifier }
+    else |_| if (self.acceptStringLiteral()) |string_literal|
+        return .{ .string_literal = string_literal }
     else |_|
         return error.UnexpectedToken;
 }
@@ -2214,4 +2227,90 @@ pub fn acceptImportClause(self: *Self) AcceptError!ast.ImportClause {
         return .{ .imported_default_binding = .{ .binding_identifier = binding_identifier } }
     else |_|
         return error.UnexpectedToken;
+}
+
+pub fn acceptExportDeclaration(self: *Self) AcceptError!ast.ExportDeclaration {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"export"));
+    if (self.acceptExportFrom()) |export_from|
+        return .{ .export_from = export_from }
+    else |_| if (self.acceptNamedExports()) |named_exports| {
+        _ = try self.acceptOrInsertSemicolon();
+        return .{ .named_exports = named_exports };
+    } else |_| if (self.acceptVariableStatement(false)) |variable_statement|
+        return .{ .variable_statement = variable_statement }
+    else |_| if (self.acceptDeclaration()) |declaration|
+        return .{ .declaration = declaration }
+    else |_| if (self.core.accept(RuleSet.is(.default))) |_| {
+        if (self.acceptHoistableDeclaration()) |hoistable_declaration|
+            return .{ .default_hoistable_declaration = hoistable_declaration }
+        else |_| if (self.acceptClassDeclaration()) |class_declaration|
+            return .{ .default_class_declaration = class_declaration }
+        else |_| if (self.acceptExpression(.{})) |expression|
+            return .{ .default_expression = expression }
+        else |_|
+            return error.UnexpectedToken;
+    } else |_| return error.UnexpectedToken;
+}
+
+pub fn acceptExportFrom(self: *Self) AcceptError!ast.ExportDeclaration.ExportFrom {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const export_from_clause = try self.acceptExportFromClause();
+    _ = try self.acceptKeyword("from");
+    const module_specifier = try self.acceptStringLiteral();
+    _ = try self.acceptOrInsertSemicolon();
+    return .{ .export_from_clause = export_from_clause, .module_specifier = module_specifier };
+}
+
+pub fn acceptExportFromClause(self: *Self) AcceptError!ast.ExportFromClause {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    if (self.core.accept(RuleSet.is(.@"*"))) |_| {
+        if (self.acceptKeyword("as")) |_|
+            return .{ .star_as = try self.acceptModuleExportName() }
+        else |_|
+            return .star;
+    } else |_| if (self.acceptNamedExports()) |named_exports|
+        return .{ .named_exports = named_exports }
+    else |_|
+        return error.UnexpectedToken;
+}
+
+pub fn acceptNamedExports(self: *Self) AcceptError!ast.NamedExports {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const exports_list = try self.acceptExportsList();
+    return .{ .exports_list = exports_list };
+}
+
+pub fn acceptExportsList(self: *Self) AcceptError!ast.ExportsList {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"{"));
+    var export_specifiers = std.ArrayList(ast.ExportSpecifier).init(self.allocator);
+    while (self.acceptExportSpecifier()) |export_specifier| {
+        try export_specifiers.append(export_specifier);
+        _ = self.core.accept(RuleSet.is(.@",")) catch break;
+    } else |_| {}
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+    return .{ .items = try export_specifiers.toOwnedSlice() };
+}
+
+pub fn acceptExportSpecifier(self: *Self) AcceptError!ast.ExportSpecifier {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const name = try self.acceptModuleExportName();
+    const alias = if (self.acceptKeyword("as")) |_|
+        try self.acceptModuleExportName()
+    else |_|
+        null;
+    return .{ .name = name, .alias = alias };
 }

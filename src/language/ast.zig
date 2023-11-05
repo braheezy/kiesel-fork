@@ -4541,10 +4541,21 @@ pub const ModuleItemList = struct {
         // 1. Let declarations1 be VarScopedDeclarations of ModuleItemList.
         // 2. Let declarations2 be VarScopedDeclarations of ModuleItem.
         // 3. Return the list-concatenation of declarations1 and declarations2.
+        // ModuleItem : ImportDeclaration
+        // 1. Return a new empty List.
+        // ModuleItem : ExportDeclaration
+        // 1. If ExportDeclaration is export VariableStatement, return VarScopedDeclarations of VariableStatement.
+        // 2. Return a new empty List.
         var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
         for (self.items) |item| switch (item) {
             .statement_list_item => |statement_list_item| {
                 try variable_declarations.appendSlice(try statement_list_item.varScopedDeclarations(allocator));
+            },
+            .export_declaration => |export_declaration| switch (export_declaration) {
+                .variable_statement => |variable_statement| try variable_declarations.appendSlice(
+                    try variable_statement.variable_declaration_list.varScopedDeclarations(allocator),
+                ),
+                else => {},
             },
             .import_declaration => {},
         };
@@ -4576,7 +4587,7 @@ pub const ModuleItem = union(enum) {
     const Self = @This();
 
     import_declaration: ImportDeclaration,
-    // TODO: ExportDeclaration
+    export_declaration: ExportDeclaration,
     statement_list_item: StatementListItem,
 
     pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
@@ -4590,6 +4601,22 @@ pub const ModuleItem = union(enum) {
         // Omit printing 'ModuleItem' here, it's implied and only adds nesting.
         switch (self) {
             inline else => |node| try node.print(writer, indentation),
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ModuleExportName
+pub const ModuleExportName = union(enum) {
+    const Self = @This();
+
+    identifier: Identifier,
+    string_literal: StringLiteral,
+
+    pub fn print(self: Self, writer: anytype) !void {
+        // NOTE: These are always printed inline, so no newline or indentation are added.
+        switch (self) {
+            .identifier => |identifier| try writer.writeAll(identifier),
+            .string_literal => |string_literal| try writer.writeAll(string_literal.text),
         }
     }
 };
@@ -4631,5 +4658,111 @@ pub const ImportClause = union(enum) {
                 );
             },
         }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ExportDeclaration
+pub const ExportDeclaration = union(enum) {
+    const Self = @This();
+
+    pub const ExportFrom = struct {
+        export_from_clause: ExportFromClause,
+        module_specifier: StringLiteral,
+
+        pub fn print(self: @This(), writer: anytype, indentation: usize) !void {
+            try self.export_from_clause.print(writer, indentation);
+            try printString("from", writer, indentation);
+            try printString(self.module_specifier.text, writer, indentation + 1);
+        }
+    };
+
+    export_from: ExportFrom,
+    named_exports: NamedExports,
+    declaration: *Declaration,
+    variable_statement: VariableStatement,
+    default_hoistable_declaration: HoistableDeclaration,
+    default_class_declaration: ClassDeclaration,
+    default_expression: Expression,
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("ExportDeclaration", writer, indentation);
+        switch (self) {
+            .default_hoistable_declaration,
+            .default_class_declaration,
+            .default_expression,
+            => try printString("default", writer, indentation + 1),
+            else => {},
+        }
+        switch (self) {
+            inline else => |node| try node.print(writer, indentation + 1),
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ExportFromClause
+pub const ExportFromClause = union(enum) {
+    const Self = @This();
+
+    star,
+    star_as: ModuleExportName,
+    named_exports: NamedExports,
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'ExportFromClause' here, it's implied and only adds nesting.
+        switch (self) {
+            .star => try printString("*", writer, indentation),
+            .star_as => |module_export_name| {
+                try printIndentation(writer, indentation);
+                try writer.writeAll("* as ");
+                try module_export_name.print(writer);
+                try writer.writeAll("\n");
+            },
+            .named_exports => |named_exports| try named_exports.print(writer, indentation),
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-NamedExports
+pub const NamedExports = struct {
+    const Self = @This();
+
+    exports_list: ExportsList,
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        try printString("NamedExports", writer, indentation);
+        try self.exports_list.print(writer, indentation + 1);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ExportsList
+pub const ExportsList = struct {
+    const Self = @This();
+
+    items: []const ExportSpecifier,
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'ExportsList' here, it's implied and only adds nesting.
+        for (self.items) |export_specifier| {
+            try export_specifier.print(writer, indentation);
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ExportSpecifier
+pub const ExportSpecifier = struct {
+    const Self = @This();
+
+    name: ModuleExportName,
+    alias: ?ModuleExportName,
+
+    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+        // Omit printing 'ExportSpecifier' here, it's implied and only adds nesting.
+        try printIndentation(writer, indentation);
+        try self.name.print(writer);
+        if (self.alias) |alias| {
+            try writer.writeAll(" as ");
+            try alias.print(writer);
+        }
+        try writer.writeAll("\n");
     }
 };
