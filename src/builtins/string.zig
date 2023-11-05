@@ -155,6 +155,7 @@ pub const StringConstructor = struct {
         });
 
         try defineBuiltinFunction(object, "fromCharCode", fromCharCode, 1, realm);
+        try defineBuiltinFunction(object, "fromCodePoint", fromCodePoint, 1, realm);
 
         // 22.1.2.3 String.prototype
         // https://tc39.es/ecma262/#sec-string.prototype
@@ -241,6 +242,56 @@ pub const StringConstructor = struct {
                 .{},
             ),
         });
+    }
+
+    /// 22.1.2.2 String.fromCodePoint ( ...codePoints )
+    /// https://tc39.es/ecma262/#sec-string.fromcharcode
+    fn fromCodePoint(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        // 1. Let result be the empty String.
+        var result = std.ArrayList(u8).init(agent.gc_allocator);
+
+        // 2. For each element next of codePoints, do
+        for (arguments.values) |next| {
+            // a. Let nextCP be ? ToNumber(next).
+            const next_code_point = try next.toNumber(agent);
+
+            // b. If IsIntegralNumber(nextCP) is false, throw a RangeError exception.
+            if (!Value.from(next_code_point).isIntegralNumber()) {
+                return agent.throwException(
+                    .range_error,
+                    "Cannot convert non-integral number to code point",
+                    .{},
+                );
+            }
+
+            // c. If ℝ(nextCP) < 0 or ℝ(nextCP) > 0x10FFFF, throw a RangeError exception.
+            if (next_code_point.asFloat() < 0 or next_code_point.asFloat() > 0x10FFFF) {
+                return agent.throwException(
+                    .range_error,
+                    "Invalid code point {}",
+                    .{next_code_point},
+                );
+            }
+
+            // d. Set result to the string-concatenation of result and UTF16EncodeCodePoint(ℝ(nextCP)).
+            var out: [4]u8 = undefined;
+            const len = std.unicode.utf8Encode(
+                @intFromFloat(next_code_point.asFloat()),
+                &out,
+            ) catch |err| switch (err) {
+                error.CodepointTooLarge => unreachable,
+                error.Utf8CannotEncodeSurrogateHalf => return agent.throwException(
+                    .internal_error,
+                    "UTF-16 strings are not implemented yet",
+                    .{},
+                ),
+            };
+            try result.appendSlice(out[0..len]);
+        }
+
+        // 3. Assert: If codePoints is empty, then result is the empty String.
+        // 4. Return result.
+        return Value.from(try result.toOwnedSlice());
     }
 };
 
