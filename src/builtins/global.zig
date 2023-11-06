@@ -29,7 +29,7 @@ const NameAndPropertyDescriptor = struct {
     PropertyDescriptor,
 };
 
-pub fn globalObjectProperties(realm: *Realm) ![38]NameAndPropertyDescriptor {
+pub fn globalObjectProperties(realm: *Realm) ![39]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
     return [_]NameAndPropertyDescriptor{
         // 19.1.1 globalThis
@@ -75,6 +75,10 @@ pub fn globalObjectProperties(realm: *Realm) ![38]NameAndPropertyDescriptor {
         // 19.2.6.2 decodeURIComponent ( encodedURIComponent )
         // https://tc39.es/ecma262/#sec-decodeuricomponent-encodeduricomponent
         .{ "decodeURIComponent", .{ .value = Value.from(try realm.intrinsics.@"%decodeURIComponent%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.2.6.3 encodeURI ( uri )
+        // https://tc39.es/ecma262/#sec-encodeuri-uri
+        .{ "encodeURI", .{ .value = Value.from(try realm.intrinsics.@"%encodeURI%"()), .writable = true, .enumerable = false, .configurable = true } },
 
         // 19.3.1 AggregateError ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-aggregate-error
@@ -206,6 +210,7 @@ pub const global_functions = struct {
     pub const ParseInt = GlobalFunction(.{ .name = "parseInt", .length = 2 });
     pub const DecodeURI = GlobalFunction(.{ .name = "decodeURI", .length = 1 });
     pub const DecodeURIComponent = GlobalFunction(.{ .name = "decodeURIComponent", .length = 1 });
+    pub const EncodeURI = GlobalFunction(.{ .name = "encodeURI", .length = 1 });
 };
 
 /// 19.2.1 eval ( x )
@@ -385,6 +390,39 @@ fn decodeURIComponent(agent: *Agent, _: Value, arguments: ArgumentsList) !Value 
 
     // 3. Return ? Decode(componentString, preserveEscapeSet).
     return Value.from(try decode(agent, component_string, preserve_escape_set));
+}
+
+/// 19.2.6.3 encodeURI ( uri )
+/// https://tc39.es/ecma262/#sec-encodeuri-uri
+fn encodeURI(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    const uri = arguments.get(0);
+
+    // 1. Let uriString be ? ToString(uri).
+    const uri_string = try uri.toString(agent);
+
+    // 2. Let extraUnescaped be ";/?:@&=+$,#".
+    const extra_unescaped = ";/?:@&=+$,#";
+
+    // 3. Return ? Encode(uriString, extraUnescaped).
+    return Value.from(try encode(agent, uri_string, extra_unescaped));
+}
+
+/// 19.2.6.5 Encode ( string, extraUnescaped )
+/// https://tc39.es/ecma262/#sec-encode
+fn encode(agent: *Agent, string: String, comptime extra_unescaped: []const u8) ![]const u8 {
+    // 3. Let alwaysUnescaped be the string-concatenation of the ASCII word characters and
+    //    "-.!~*'()".
+    const always_unescaped = String.ascii_word_characters ++ "-.!~*'()";
+
+    // 4. Let unescapedSet be the string-concatenation of alwaysUnescaped and extraUnescaped.
+    const unescaped_set = always_unescaped ++ extra_unescaped;
+
+    // 1-2., 5-7.
+    return std.Uri.escapeStringWithFn(agent.gc_allocator, string.utf8, struct {
+        fn keepUnescaped(c: u8) bool {
+            return std.mem.indexOfScalar(u8, unescaped_set, c) != null;
+        }
+    }.keepUnescaped);
 }
 
 /// 19.2.6.6 Decode ( string, preserveEscapeSet )

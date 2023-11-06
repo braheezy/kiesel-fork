@@ -8,6 +8,9 @@ const Allocator = std.mem.Allocator;
 pub const String = union(enum) {
     const Self = @This();
 
+    /// https://tc39.es/ecma262/#ASCII-word-characters
+    pub const ascii_word_characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_";
+
     utf8: []const u8,
 
     pub fn format(
