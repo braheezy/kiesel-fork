@@ -263,39 +263,6 @@ fn directEval(agent: *Agent, arguments: []const Value, strict: bool) !Value {
     return performEval(agent, eval_arg, strict_caller, true);
 }
 
-/// 13.10.2 InstanceofOperator ( V, target )
-/// https://tc39.es/ecma262/#sec-instanceofoperator
-fn instanceofOperator(agent: *Agent, value: Value, target: Value) !bool {
-    // 1. If target is not an Object, throw a TypeError exception.
-    if (target != .object) {
-        return agent.throwException(
-            .type_error,
-            "Right-hand side of 'in' operator must be an object",
-            .{},
-        );
-    }
-
-    // 2. Let instOfHandler be ? GetMethod(target, @@hasInstance).
-    const maybe_instanceof_handler = try target.getMethod(
-        agent,
-        PropertyKey.from(agent.well_known_symbols.@"@@hasInstance"),
-    );
-
-    // 3. If instOfHandler is not undefined, then
-    if (maybe_instanceof_handler) |instanceof_handler| {
-        // a. Return ToBoolean(? Call(instOfHandler, target, « V »)).
-        return (try Value.from(instanceof_handler).call(agent, target, .{value})).toBoolean();
-    }
-
-    // 4. If IsCallable(target) is false, throw a TypeError exception.
-    if (!target.isCallable()) {
-        return agent.throwException(.type_error, "{} is not callable", .{target});
-    }
-
-    // 5. Return ? OrdinaryHasInstance(target, V).
-    return target.ordinaryHasInstance(value);
-}
-
 /// 13.15.3 ApplyStringOrNumericBinaryOperator ( lval, opText, rval )
 /// https://tc39.es/ecma262/#sec-applystringornumericbinaryoperator
 fn applyStringOrNumericBinaryOperator(agent: *Agent, lval: Value, operator: ast.BinaryExpression.Operator, rval: Value) !Value {
@@ -2387,7 +2354,7 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             const lval = self.stack.pop();
 
             // 5. Return ? InstanceofOperator(lval, rval).
-            self.result = Value.from(try instanceofOperator(self.agent, lval, rval));
+            self.result = Value.from(try lval.instanceofOperator(self.agent, rval));
         },
         .instantiate_arrow_function_expression => {
             const arrow_function = self.fetchFunctionOrClass(executable).arrow_function;

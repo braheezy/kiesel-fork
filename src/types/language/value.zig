@@ -993,15 +993,20 @@ pub const Value = union(enum) {
 
     /// 7.3.22 OrdinaryHasInstance ( C, O )
     /// https://tc39.es/ecma262/#sec-ordinaryhasinstance
-    pub fn ordinaryHasInstance(self: Self, object_value: Value) !bool {
+    pub fn ordinaryHasInstance(self: Self, object_value: Value) Agent.Error!bool {
         // 1. If IsCallable(C) is false, return false.
         if (!self.isCallable()) return false;
 
         const agent = self.object.agent();
 
-        // TODO: 2. If C has a [[BoundTargetFunction]] internal slot, then
-        //     a. Let BC be C.[[BoundTargetFunction]].
-        //     b. Return ? InstanceofOperator(O, BC).
+        // 2. If C has a [[BoundTargetFunction]] internal slot, then
+        if (self.object.is(builtins.BoundFunction)) {
+            // a. Let BC be C.[[BoundTargetFunction]].
+            const bound_constructor = self.object.as(builtins.BoundFunction).fields.bound_target_function;
+
+            // b. Return ? InstanceofOperator(O, BC).
+            return self.instanceofOperator(agent, Value.from(bound_constructor));
+        }
 
         // 3. If O is not an Object, return false.
         if (object_value != .object) return false;
@@ -1059,6 +1064,39 @@ pub const Value = union(enum) {
         // 3. Return unused.
         // NOTE: Returning the object here allows for direct assignment of the object at the call site.
         return self.object.as(T);
+    }
+
+    /// 13.10.2 InstanceofOperator ( V, target )
+    /// https://tc39.es/ecma262/#sec-instanceofoperator
+    pub fn instanceofOperator(self: Self, agent: *Agent, target: Self) !bool {
+        // 1. If target is not an Object, throw a TypeError exception.
+        if (target != .object) {
+            return agent.throwException(
+                .type_error,
+                "Right-hand side of 'instanceof' operator must be an object",
+                .{},
+            );
+        }
+
+        // 2. Let instOfHandler be ? GetMethod(target, @@hasInstance).
+        const maybe_instanceof_handler = try target.getMethod(
+            agent,
+            PropertyKey.from(agent.well_known_symbols.@"@@hasInstance"),
+        );
+
+        // 3. If instOfHandler is not undefined, then
+        if (maybe_instanceof_handler) |instanceof_handler| {
+            // a. Return ToBoolean(? Call(instOfHandler, target, « V »)).
+            return (try from(instanceof_handler).call(agent, target, .{self})).toBoolean();
+        }
+
+        // 4. If IsCallable(target) is false, throw a TypeError exception.
+        if (!target.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{target});
+        }
+
+        // 5. Return ? OrdinaryHasInstance(target, V).
+        return target.ordinaryHasInstance(self);
     }
 
     /// 27.2.1.6 IsPromise ( x )
