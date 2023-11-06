@@ -39,6 +39,7 @@ lazy_intrinsics: struct {
     @"%decodeURI%": ?Object = null,
     @"%decodeURIComponent%": ?Object = null,
     @"%encodeURI%": ?Object = null,
+    @"%encodeURIComponent%": ?Object = null,
     @"%Error%": ?Object = null,
     @"%Error.prototype%": ?Object = null,
     @"%eval%": ?Object = null,
@@ -192,6 +193,9 @@ pub fn @"%decodeURIComponent%"(self: *Self) error{OutOfMemory}!Object {
 }
 pub fn @"%encodeURI%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%encodeURI%", builtins.global_functions.EncodeURI);
+}
+pub fn @"%encodeURIComponent%"(self: *Self) error{OutOfMemory}!Object {
+    return self.lazyIntrinsic("%encodeURIComponent%", builtins.global_functions.EncodeURIComponent);
 }
 pub fn @"%Error%"(self: *Self) error{OutOfMemory}!Object {
     return self.lazyIntrinsic("%Error%", builtins.ErrorConstructor);

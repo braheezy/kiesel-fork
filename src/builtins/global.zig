@@ -29,7 +29,7 @@ const NameAndPropertyDescriptor = struct {
     PropertyDescriptor,
 };
 
-pub fn globalObjectProperties(realm: *Realm) ![39]NameAndPropertyDescriptor {
+pub fn globalObjectProperties(realm: *Realm) ![40]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
     return [_]NameAndPropertyDescriptor{
         // 19.1.1 globalThis
@@ -79,6 +79,10 @@ pub fn globalObjectProperties(realm: *Realm) ![39]NameAndPropertyDescriptor {
         // 19.2.6.3 encodeURI ( uri )
         // https://tc39.es/ecma262/#sec-encodeuri-uri
         .{ "encodeURI", .{ .value = Value.from(try realm.intrinsics.@"%encodeURI%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.2.6.4 encodeURIComponent ( uriComponent )
+        // https://tc39.es/ecma262/#sec-encodeuricomponent-uricomponent
+        .{ "encodeURIComponent", .{ .value = Value.from(try realm.intrinsics.@"%encodeURIComponent%"()), .writable = true, .enumerable = false, .configurable = true } },
 
         // 19.3.1 AggregateError ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-aggregate-error
@@ -211,6 +215,7 @@ pub const global_functions = struct {
     pub const DecodeURI = GlobalFunction(.{ .name = "decodeURI", .length = 1 });
     pub const DecodeURIComponent = GlobalFunction(.{ .name = "decodeURIComponent", .length = 1 });
     pub const EncodeURI = GlobalFunction(.{ .name = "encodeURI", .length = 1 });
+    pub const EncodeURIComponent = GlobalFunction(.{ .name = "encodeURIComponent", .length = 1 });
 };
 
 /// 19.2.1 eval ( x )
@@ -405,6 +410,21 @@ fn encodeURI(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
 
     // 3. Return ? Encode(uriString, extraUnescaped).
     return Value.from(try encode(agent, uri_string, extra_unescaped));
+}
+
+/// 19.2.6.4 encodeURIComponent ( uriComponent )
+/// https://tc39.es/ecma262/#sec-encodeuricomponent-uricomponent
+fn encodeURIComponent(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    const uri_component = arguments.get(0);
+
+    // 1. Let componentString be ? ToString(uriComponent).
+    const component_string = try uri_component.toString(agent);
+
+    // 2. Let extraUnescaped be the empty String.
+    const extra_unescaped = "";
+
+    // 3. Return ? Encode(componentString, extraUnescaped).
+    return Value.from(try encode(agent, component_string, extra_unescaped));
 }
 
 /// 19.2.6.5 Encode ( string, extraUnescaped )
