@@ -321,6 +321,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "startsWith", startsWith, 1, realm);
         try defineBuiltinFunction(object, "toLowerCase", toLowerCase, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
+        try defineBuiltinFunction(object, "toUpperCase", toUpperCase, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
         try defineBuiltinFunction(object, "@@iterator", @"@@iterator", 0, realm);
 
@@ -913,6 +914,27 @@ pub const StringPrototype = struct {
     fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
         // 1. Return ? ThisStringValue(this value).
         return Value.from(try thisStringValue(agent, this_value));
+    }
+
+    /// 22.1.3.30 String.prototype.toUpperCase ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype.touppercase
+    fn toUpperCase(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // NOTE: The spec simply references toLowerCase() for this, so the steps below are inferred.
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 3. Let sText be StringToCodePoints(S).
+        // 4. Let upperText be the result of toUppercase(sText), according to the Unicode Default
+        //    Case Conversion algorithm.
+        // 5. Let U be CodePointsToString(upperText).
+        const upper = try std.ascii.allocUpperString(agent.gc_allocator, string.utf8);
+
+        // 6. Return U.
+        return Value.from(upper);
     }
 
     /// 22.1.3.35 String.prototype.valueOf ( )
