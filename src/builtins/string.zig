@@ -319,6 +319,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "search", search, 1, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
         try defineBuiltinFunction(object, "startsWith", startsWith, 1, realm);
+        try defineBuiltinFunction(object, "toLowerCase", toLowerCase, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
         try defineBuiltinFunction(object, "@@iterator", @"@@iterator", 0, realm);
@@ -886,6 +887,25 @@ pub const StringPrototype = struct {
 
         // 15. Return false.
         return Value.from(false);
+    }
+
+    /// 22.1.3.28 String.prototype.toLowerCase ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype.tolowercase
+    fn toLowerCase(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 3. Let sText be StringToCodePoints(S).
+        // 4. Let lowerText be the result of toLowercase(sText), according to the Unicode Default
+        //    Case Conversion algorithm.
+        // 5. Let L be CodePointsToString(lowerText).
+        const lower = try std.ascii.allocLowerString(agent.gc_allocator, string.utf8);
+
+        // 6. Return L.
+        return Value.from(lower);
     }
 
     /// 22.1.3.29 String.prototype.toString ( )
