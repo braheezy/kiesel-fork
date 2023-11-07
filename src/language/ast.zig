@@ -19,6 +19,7 @@ const Object = types.Object;
 const PrivateEnvironment = execution.PrivateEnvironment;
 const PropertyKey = types.PropertyKey;
 const Value = types.Value;
+const escapeSequenceMatcher = tokenizer.escapeSequenceMatcher;
 const makeConstructor = builtins.makeConstructor;
 const noexcept = utils.noexcept;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
@@ -720,10 +721,8 @@ pub const StringLiteral = struct {
     /// 12.9.4.2 Static Semantics: SV
     /// https://tc39.es/ecma262/#sec-static-semantics-sv
     pub fn stringValue(self: Self, allocator: Allocator) !Value {
-        // TODO: Implement remaining escape sequence types
         std.debug.assert(self.text.len >= 2);
         var str = try std.ArrayList(u8).initCapacity(allocator, self.text.len - 2);
-        defer str.deinit();
         var i: usize = 1;
         while (i <= self.text.len - 2) : (i += 1) {
             const c = self.text[i];
@@ -734,9 +733,7 @@ pub const StringLiteral = struct {
                         break;
                     }
                 } else {
-                    const next_c = self.text[i + 1];
-                    i += 1;
-                    switch (next_c) {
+                    switch (self.text[i + 1]) {
                         '0' => str.appendAssumeCapacity(0),
                         'b' => str.appendAssumeCapacity(0x08),
                         'f' => str.appendAssumeCapacity(0x0c),
@@ -744,8 +741,36 @@ pub const StringLiteral = struct {
                         'r' => str.appendAssumeCapacity('\r'),
                         't' => str.appendAssumeCapacity('\t'),
                         'v' => str.appendAssumeCapacity(0x0b),
-                        else => str.appendAssumeCapacity(next_c),
+                        'x' => {
+                            const byte = std.fmt.parseInt(
+                                u8,
+                                self.text[i + 2 .. i + 4],
+                                16,
+                            ) catch unreachable;
+                            str.appendAssumeCapacity(byte);
+                            i += 2;
+                        },
+                        'u' => {
+                            const chars = switch (self.text[i + 2]) {
+                                '{' => self.text[i + 3 .. i + escapeSequenceMatcher(self.text[i..]).? - 1],
+                                else => self.text[i + 2 .. i + 6],
+                            };
+                            const code_point = std.fmt.parseInt(u21, chars, 16) catch unreachable;
+                            var out: [4]u8 = undefined;
+                            const len = std.unicode.utf8Encode(code_point, &out) catch |err| switch (err) {
+                                error.CodepointTooLarge => unreachable,
+                                // TODO: Handle surrogate halfs
+                                error.Utf8CannotEncodeSurrogateHalf => @as(u3, 0),
+                            };
+                            str.appendSliceAssumeCapacity(out[0..len]);
+                            i += switch (self.text[i + 2]) {
+                                '{' => chars.len + 2,
+                                else => 4,
+                            };
+                        },
+                        else => |next_c| str.appendAssumeCapacity(next_c),
                     }
+                    i += 1;
                 }
             } else str.appendAssumeCapacity(c);
         }

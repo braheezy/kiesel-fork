@@ -2,6 +2,7 @@ const std = @import("std");
 
 const ast = @import("ast.zig");
 const tokenizer = @import("tokenizer.zig");
+const escapeSequenceMatcher = tokenizer.escapeSequenceMatcher;
 const startsWithLineTerminator = tokenizer.startsWithLineTerminator;
 
 /// 12.9.3 Numeric Literals
@@ -228,8 +229,10 @@ pub fn parseStringLiteral(
                         .line_continuation_end
                     else
                         .line_continuation_start;
-                } else {
+                } else if (escapeSequenceMatcher(str[i - 1 ..]) != null) {
                     state = .character;
+                } else {
+                    return error.InvalidStringLiteral;
                 }
             },
             .line_continuation_start => {

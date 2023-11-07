@@ -409,3 +409,79 @@ fn templateMatcher(str: []const u8) ?usize {
         error.InvalidTemplateLiteral => return null,
     }
 }
+
+pub fn escapeSequenceMatcher(str: []const u8) ?usize {
+    if (str.len < 2 or str[0] != '\\') return null;
+    switch (str[1]) {
+        'x' => {
+            // \xXX
+            if (str.len >= 4 and std.ascii.isHex(str[2]) and std.ascii.isHex(str[3]))
+                return 4
+            else
+                return null;
+        },
+        'u' => {
+            if (str.len < 3) return null;
+            switch (str[2]) {
+                // \u{X} - \u{XXXXXX}
+                '{' => {
+                    var i: usize = 3;
+                    while (i < str.len) : (i += 1) {
+                        if (str[i] == '}') break;
+                        if (!std.ascii.isHex(str[i])) return null;
+                    }
+                    if (i < 4 or i > 9) return null;
+                    const code_point = std.fmt.parseInt(u24, str[3..i], 16) catch unreachable;
+                    if (code_point > 0x10FFFF) return null;
+                    return i + 1;
+                },
+                // \uXXXX
+                else => if (str.len >= 6 and
+                    std.ascii.isHex(str[2]) and
+                    std.ascii.isHex(str[3]) and
+                    std.ascii.isHex(str[4]) and
+                    std.ascii.isHex(str[5]))
+                    return 6
+                else
+                    return null,
+            }
+        },
+        else => return 2,
+    }
+}
+
+test escapeSequenceMatcher {
+    for ([_][]const u8
+    // zig fmt: off
+    {
+        // Garbage input
+        "", "\\", "foo",
+        // Invalid \x escapes
+        "\\x", "\\xxx", "\\xXX", "\\x{00}",
+        // Invalid \u escapes
+        "\\u", "\\uxxxx", "\\uXXXX", "\\u0", "\\u00", "\\u000",
+        "\\u{}", "\\u{x}", "\\u{X}", "\\u{xxxx}", "\\u{XXXX}", "\\u{0000000}",
+    }
+    // zig fmt: on
+    ) |input| {
+        try std.testing.expect(escapeSequenceMatcher(input) == null);
+    }
+
+    for ([_][]const u8
+    // zig fmt: off
+    {
+        // Valid no-op escapes
+        "\\a", "\\z", "\\A", "\\Z", "\\1", "\\9",
+        // Valid one-char escapes
+        "\\0", "\\f", "\\n", "\\r", "\\t", "\\v", "\\\\",
+        // Valid \x escapes
+        "\\x00", "\\xff", "\\xFF", "\\x0f", "\\x12",
+        // Valid \u escapes
+        "\\u0000", "\\uffff", "\\uFFFF", "\\u1234", "\\u0000",
+        "\\u{0}", "\\u{00}", "\\u{000}", "\\u{0000}", "\\u{00000}", "\\u{000000}",
+    }
+    // zig fmt: on
+    ) |input| {
+        try std.testing.expect(escapeSequenceMatcher(input).? == input.len);
+    }
+}
