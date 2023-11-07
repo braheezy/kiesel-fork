@@ -322,6 +322,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "toLowerCase", toLowerCase, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "toUpperCase", toUpperCase, 0, realm);
+        try defineBuiltinFunction(object, "trim", trim, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
         try defineBuiltinFunction(object, "@@iterator", @"@@iterator", 0, realm);
 
@@ -935,6 +936,51 @@ pub const StringPrototype = struct {
 
         // 6. Return U.
         return Value.from(upper);
+    }
+
+    /// 22.1.3.32 String.prototype.trim ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype.trim
+    fn trim(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let S be the this value.
+        // 2. Return ? TrimString(S, start+end).
+        return Value.from(try trimString(agent, this_value, .@"start+end"));
+    }
+
+    /// 22.1.3.32.1 TrimString ( string, where )
+    /// https://tc39.es/ecma262/#sec-trimstring
+    fn trimString(agent: *Agent, string_value: Value, where: enum { start, end, @"start+end" }) ![]const u8 {
+        // 1. Let str be ? RequireObjectCoercible(string).
+        const str = try string_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(str).
+        const string = try str.toString(agent);
+
+        const trimmed = switch (where) {
+            // 3. If where is start, then
+            .start => blk: {
+                // a. Let T be the String value that is a copy of S with leading white space
+                //    removed.
+                break :blk utils.trimLeft(string.utf8, &types.String.whitespace);
+            },
+
+            // 4. Else if where is end, then
+            .end => blk: {
+                // a. Let T be the String value that is a copy of S with trailing white space
+                //    removed.
+                break :blk utils.trimRight(string.utf8, &types.String.whitespace);
+            },
+
+            // 5. Else,
+            //     a. Assert: where is start+end.
+            .@"start+end" => blk: {
+                // b. Let T be the String value that is a copy of S with both leading and trailing
+                //    white space removed.
+                break :blk utils.trim(string.utf8, &types.String.whitespace);
+            },
+        };
+
+        // 6. Return T.
+        return trimmed;
     }
 
     /// 22.1.3.35 String.prototype.valueOf ( )
