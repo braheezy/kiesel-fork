@@ -324,6 +324,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "toUpperCase", toUpperCase, 0, realm);
         try defineBuiltinFunction(object, "trim", trim, 0, realm);
         try defineBuiltinFunction(object, "trimEnd", trimEnd, 0, realm);
+        try defineBuiltinFunction(object, "trimStart", trimStart, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
         try defineBuiltinFunction(object, "@@iterator", @"@@iterator", 0, realm);
 
@@ -990,6 +991,14 @@ pub const StringPrototype = struct {
         // 1. Let S be the this value.
         // 2. Return ? TrimString(S, end).
         return Value.from(try trimString(agent, this_value, .end));
+    }
+
+    /// 22.1.3.34 String.prototype.trimStart ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype.trimend
+    fn trimStart(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+        // 1. Let S be the this value.
+        // 2. Return ? TrimString(S, start).
+        return Value.from(try trimString(agent, this_value, .start));
     }
 
     /// 22.1.3.35 String.prototype.valueOf ( )
