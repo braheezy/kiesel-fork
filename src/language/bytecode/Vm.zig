@@ -1967,19 +1967,16 @@ pub fn executeInstruction(self: *Self, executable: Executable, instruction: Inst
             self.exception = null;
             const running_context = self.agent.runningExecutionContext();
             const catch_env = running_context.ecmascript_code.?.lexical_environment;
-            if (catch_env.createMutableBinding(self.agent, name, false)) {
+            if (!try catch_env.hasBinding(name)) {
+                try catch_env.createMutableBinding(self.agent, name, false);
                 try catch_env.initializeBinding(self.agent, name, thrown_value);
-            } else |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
-                error.ExceptionThrown => {
-                    self.exception = null;
-                    catch_env.setMutableBinding(
-                        self.agent,
-                        name,
-                        thrown_value,
-                        false,
-                    ) catch unreachable;
-                },
+            } else {
+                catch_env.setMutableBinding(
+                    self.agent,
+                    name,
+                    thrown_value,
+                    false,
+                ) catch unreachable;
             }
         },
         .decrement => {
