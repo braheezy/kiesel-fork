@@ -6,7 +6,6 @@ const Allocator = std.mem.Allocator;
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const pretty_printing = @import("../../pretty_printing.zig");
-const tokenizer = @import("../../language/tokenizer.zig");
 const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
@@ -25,8 +24,6 @@ const prettyPrintValue = pretty_printing.prettyPrintValue;
 const stringCreate = builtins.stringCreate;
 const trim = utils.trim;
 const validateNonRevokedProxy = builtins.validateNonRevokedProxy;
-const line_terminators = tokenizer.line_terminators;
-const whitespace = tokenizer.whitespace;
 
 const pow_2_8 = std.math.pow(f64, 2, 8);
 const pow_2_16 = std.math.pow(f64, 2, 16);
@@ -1122,7 +1119,7 @@ pub fn stringToNumber(string: String) Number {
     // 3. If literal is a List of errors, return NaN.
     // 4. Return StringNumericValue of literal.
     // TODO: Implement the proper string parsing grammar!
-    const value = trim(string.utf8, &(whitespace ++ line_terminators));
+    const value = trim(string.utf8, &String.whitespace);
     if (value.len == 0) return Number.from(0);
     return Number.from(std.fmt.parseFloat(f64, value) catch std.math.nan(f64));
 }

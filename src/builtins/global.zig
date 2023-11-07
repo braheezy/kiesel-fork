@@ -5,7 +5,6 @@ const std = @import("std");
 
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
-const tokenizer = @import("../language/tokenizer.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
@@ -19,8 +18,6 @@ const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const performEval = @import("eval.zig").performEval;
 const trimLeft = utils.trimLeft;
-const line_terminators = tokenizer.line_terminators;
-const whitespace = tokenizer.whitespace;
 
 const Self = @This();
 
@@ -262,7 +259,7 @@ fn parseFloat(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
     const input_string = try string_value.toString(agent);
 
     // 2. Let trimmedString be ! TrimString(inputString, start).
-    const trimmed_string = trimLeft(input_string.utf8, &(whitespace ++ line_terminators));
+    const trimmed_string = trimLeft(input_string.utf8, &String.whitespace);
 
     // 3. Let trimmed be StringToCodePoints(trimmedString).
     // 4. Let trimmedPrefix be the longest prefix of trimmed that satisfies the syntax of a
@@ -292,7 +289,7 @@ fn parseInt(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
     const input_string = try string_value.toString(agent);
 
     // 2. Let S be ! TrimString(inputString, start).
-    var string = trimLeft(input_string.utf8, &(whitespace ++ line_terminators));
+    var string = trimLeft(input_string.utf8, &String.whitespace);
 
     // 3. Let sign be 1.
     var sign: f64 = 1;

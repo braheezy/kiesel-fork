@@ -5,11 +5,16 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const tokenizer = @import("../../language/tokenizer.zig");
+
 pub const String = union(enum) {
     const Self = @This();
 
     /// https://tc39.es/ecma262/#ASCII-word-characters
     pub const ascii_word_characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_";
+
+    /// The definition of white space is the union of WhiteSpace and LineTerminator.
+    pub const whitespace = tokenizer.whitespace ++ tokenizer.line_terminators;
 
     utf8: []const u8,
 
