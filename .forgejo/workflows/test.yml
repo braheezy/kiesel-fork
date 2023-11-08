@@ -12,4 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: https://github.com/goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.12.0-dev.1486+234693bcb
       - run: zig build test
