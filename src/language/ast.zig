@@ -2694,11 +2694,42 @@ pub const BindingElement = struct {
     const Self = @This();
 
     identifier: Identifier,
-    // TODO: Binding patterns, initializers
+    initializer: ?Expression,
+    // TODO: Binding patterns
+
+    /// 15.1.2 Static Semantics: ContainsExpression
+    /// https://tc39.es/ecma262/#sec-static-semantics-containsexpression
+    pub fn containsExpression(self: Self) bool {
+        // TODO: BindingElement : BindingPattern Initializer
+        // 1. Return true.
+        // SingleNameBinding : BindingIdentifier
+        // 1. Return false.
+        // SingleNameBinding : BindingIdentifier Initializer
+        // 1. Return true.
+        return self.initializer != null;
+    }
+
+    /// 15.1.3 Static Semantics: IsSimpleParameterList
+    /// https://tc39.es/ecma262/#sec-static-semantics-issimpleparameterlist
+    pub fn isSimpleParameterList(self: Self) bool {
+        // TODO: BindingElement : BindingPattern
+        // 1. Return false.
+        // TODO: BindingElement : BindingPattern Initializer
+        // 1. Return false.
+        // SingleNameBinding : BindingIdentifier
+        // 1. Return true.
+        // SingleNameBinding : BindingIdentifier Initializer
+        // 1. Return false.
+        return self.initializer != null;
+    }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("BindingElement", writer, indentation);
         try printString(self.identifier, writer, indentation + 1);
+        if (self.initializer) |initializer| {
+            try printString("initializer:", writer, indentation + 1);
+            try initializer.print(writer, indentation + 2);
+        }
     }
 };
 
@@ -2708,6 +2739,17 @@ pub const BindingRestElement = struct {
 
     identifier: Identifier,
     // TODO: Binding patterns
+
+    /// 15.1.2 Static Semantics: ContainsExpression
+    /// https://tc39.es/ecma262/#sec-static-semantics-containsexpression
+    pub fn containsExpression(_: Self) bool {
+        // BindingRestElement : ... BindingIdentifier
+        // 1. Return false.
+        return false;
+
+        // TODO: BindingRestElement : ... BindingPattern
+        // 1. Return ContainsExpression of BindingPattern.
+    }
 
     pub fn print(self: Self, writer: anytype, indentation: usize) !void {
         try printString("BindingRestElement", writer, indentation);
@@ -3458,6 +3500,51 @@ pub const FormalParameters = struct {
             bound_names.appendAssumeCapacity(name);
         }
         return bound_names.toOwnedSlice();
+    }
+
+    /// 15.1.2 Static Semantics: ContainsExpression
+    /// https://tc39.es/ecma262/#sec-static-semantics-containsexpression
+    pub fn containsExpression(self: Self) bool {
+        // FormalParameters : [empty]
+        // 1. Return false.
+        // FormalParameters : FormalParameterList , FunctionRestParameter
+        // 1. If ContainsExpression of FormalParameterList is true, return true.
+        // 2. Return ContainsExpression of FunctionRestParameter.
+        // FormalParameterList : FormalParameterList , FormalParameter
+        // 1. If ContainsExpression of FormalParameterList is true, return true.
+        // 2. Return ContainsExpression of FormalParameter.
+        for (self.items) |item| switch (item) {
+            .formal_parameter => |formal_parameter| {
+                if (formal_parameter.binding_element.containsExpression()) return true;
+            },
+            .function_rest_parameter => |function_rest_parameter| {
+                if (function_rest_parameter.binding_rest_element.containsExpression()) return true;
+            },
+        };
+        return false;
+    }
+
+    /// 15.1.3 Static Semantics: IsSimpleParameterList
+    /// https://tc39.es/ecma262/#sec-static-semantics-issimpleparameterlist
+    pub fn isSimpleParameterList(self: Self) bool {
+        // FormalParameters : [empty]
+        // 1. Return true.
+        // FormalParameters : FunctionRestParameter
+        // 1. Return false.
+        // FormalParameters : FormalParameterList , FunctionRestParameter
+        // 1. Return false.
+        // FormalParameterList : FormalParameterList , FormalParameter
+        // 1. If IsSimpleParameterList of FormalParameterList is false, return false.
+        // 2. Return IsSimpleParameterList of FormalParameter.
+        for (self.items) |item| switch (item) {
+            .formal_parameter => |formal_parameter| {
+                //  FormalParameter : BindingElement
+                // 1. Return IsSimpleParameterList of BindingElement.
+                if (!formal_parameter.binding_element.isSimpleParameterList()) return false;
+            },
+            .function_rest_parameter => return false,
+        };
+        return true;
     }
 
     /// 15.1.5 Static Semantics: ExpectedArgumentCount

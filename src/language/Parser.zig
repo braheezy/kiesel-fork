@@ -1298,7 +1298,11 @@ pub fn acceptBindingElement(self: *Self) AcceptError!ast.BindingElement {
     errdefer self.core.restoreState(state);
 
     const identifier = try self.acceptBindingIdentifier();
-    return .{ .identifier = identifier };
+    const initializer = if (self.core.accept(RuleSet.is(.@"="))) |_|
+        try self.acceptExpression(.{})
+    else |_|
+        null;
+    return .{ .identifier = identifier, .initializer = initializer };
 }
 
 pub fn acceptBindingRestElement(self: *Self) AcceptError!ast.BindingRestElement {
@@ -1656,7 +1660,9 @@ pub fn acceptArrowFunction(self: *Self) AcceptError!ast.ArrowFunction {
             1,
         );
         formal_parameters_items.appendAssumeCapacity(.{
-            .formal_parameter = .{ .binding_element = .{ .identifier = identifier } },
+            .formal_parameter = .{
+                .binding_element = .{ .identifier = identifier, .initializer = null },
+            },
         });
         formal_parameters = .{ .items = try formal_parameters_items.toOwnedSlice() };
     } else |_| {
@@ -2126,7 +2132,9 @@ pub fn acceptAsyncArrowFunction(self: *Self) AcceptError!ast.AsyncArrowFunction 
             1,
         );
         formal_parameters_items.appendAssumeCapacity(.{
-            .formal_parameter = .{ .binding_element = .{ .identifier = identifier } },
+            .formal_parameter = .{
+                .binding_element = .{ .identifier = identifier, .initializer = null },
+            },
         });
         formal_parameters = .{ .items = try formal_parameters_items.toOwnedSlice() };
     } else |_| {

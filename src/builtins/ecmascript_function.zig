@@ -884,13 +884,11 @@ fn functionDeclarationInstantiation(agent: *Agent, function: *ECMAScriptFunction
         break :blk false;
     };
 
-    // TODO: 7. Let simpleParameterList be IsSimpleParameterList of formals.
-    const simple_parameter_list = for (formals.items) |formal_parameter| {
-        if (formal_parameter == .function_rest_parameter) break false;
-    } else true;
+    // 7. Let simpleParameterList be IsSimpleParameterList of formals.
+    const simple_parameter_list = formals.isSimpleParameterList();
 
-    // TODO: 8. Let hasParameterExpressions be ContainsExpression of formals.
-    const has_parameter_expressions = false;
+    // 8. Let hasParameterExpressions be ContainsExpression of formals.
+    const has_parameter_expressions = formals.containsExpression();
 
     // TODO: 9. Let varNames be the VarDeclaredNames of code.
 
@@ -1059,8 +1057,15 @@ fn functionDeclarationInstantiation(agent: *Agent, function: *ECMAScriptFunction
         switch (item) {
             .formal_parameter => |formal_parameter| {
                 const name = formal_parameter.binding_element.identifier;
-                const value = arguments_list.get(i);
+                const initializer = formal_parameter.binding_element.initializer;
+                var value = arguments_list.get(i);
                 const reference = try agent.resolveBinding(name, environment, strict);
+                if (initializer != null and value == .undefined) {
+                    value = (try generateAndRunBytecode(
+                        agent,
+                        ast.ExpressionStatement{ .expression = initializer.? },
+                    )).value.?;
+                }
                 if (environment == null)
                     try reference.putValue(agent, value)
                 else
