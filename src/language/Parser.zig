@@ -1293,6 +1293,23 @@ pub fn acceptVariableDeclaration(self: *Self) AcceptError!ast.VariableDeclaratio
     return .{ .binding_identifier = binding_identifier, .initializer = initializer };
 }
 
+pub fn acceptBindingElement(self: *Self) AcceptError!ast.BindingElement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const identifier = try self.acceptBindingIdentifier();
+    return .{ .identifier = identifier };
+}
+
+pub fn acceptBindingRestElement(self: *Self) AcceptError!ast.BindingRestElement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"..."));
+    const identifier = try self.acceptBindingIdentifier();
+    return .{ .identifier = identifier };
+}
+
 pub fn acceptExpressionStatement(self: *Self) AcceptError!ast.ExpressionStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
@@ -1537,17 +1554,16 @@ pub fn acceptFormalParameters(self: *Self) AcceptError!ast.FormalParameters {
     var formal_parameters_items = std.ArrayList(ast.FormalParameters.Item).init(self.allocator);
     defer formal_parameters_items.deinit();
     while (true) {
-        if (self.core.accept(RuleSet.is(.@"..."))) |_| {
-            const identifier = try self.acceptBindingIdentifier();
+        if (self.acceptBindingRestElement()) |binding_rest_element| {
             const function_rest_parameter = ast.FunctionRestParameter{
-                .binding_rest_element = .{ .identifier = identifier },
+                .binding_rest_element = binding_rest_element,
             };
             try formal_parameters_items.append(.{ .function_rest_parameter = function_rest_parameter });
             _ = self.core.accept(RuleSet.is(.@",")) catch {};
             break;
-        } else |_| if (self.acceptBindingIdentifier()) |identifier| {
+        } else |_| if (self.acceptBindingElement()) |binding_element| {
             const formal_parameter = ast.FormalParameter{
-                .binding_element = .{ .identifier = identifier },
+                .binding_element = binding_element,
             };
             try formal_parameters_items.append(.{ .formal_parameter = formal_parameter });
             _ = self.core.accept(RuleSet.is(.@",")) catch break;
