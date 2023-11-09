@@ -27,8 +27,6 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const setFunctionName = builtins.setFunctionName;
 const temporaryChange = utils.temporaryChange;
 
-const BytecodeError = error{ OutOfMemory, IndexOutOfRange };
-
 pub const BytecodeContext = struct {
     agent: *Agent,
     contained_in_strict_mode_code: bool = false,
@@ -36,13 +34,17 @@ pub const BytecodeContext = struct {
     break_jumps: std.ArrayList(Executable.JumpIndex),
 };
 
-fn printIndentation(writer: anytype, indentation: usize) !void {
+fn printIndentation(writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     var i: usize = 0;
     while (i < indentation) : (i += 1)
         try writer.print("  ", .{});
 }
 
-fn printString(string: []const u8, writer: anytype, indentation: usize) !void {
+fn printString(
+    string: []const u8,
+    writer: anytype,
+    indentation: usize,
+) @TypeOf(writer).Error!void {
     try printIndentation(writer, indentation);
     try writer.print("{s}\n", .{string});
 }
@@ -65,11 +67,15 @@ pub const ParenthesizedExpression = struct {
         };
     }
 
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         try self.expression.generateBytecode(executable, ctx);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("ParenthesizedExpression", writer, indentation);
         try self.expression.print(writer, indentation + 1);
     }
@@ -83,7 +89,11 @@ pub const IdentifierReference = struct {
 
     /// 13.1.3 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-identifiers-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // IdentifierReference : Identifier
         // IdentifierReference : yield
         // IdentifierReference : await
@@ -93,7 +103,7 @@ pub const IdentifierReference = struct {
         try executable.addIndex(@intFromBool(strict));
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("IdentifierReference", writer, indentation);
         try printString(self.identifier, writer, indentation + 1);
     }
@@ -136,7 +146,11 @@ pub const PrimaryExpression = union(enum) {
         };
     }
 
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         switch (self) {
             // PrimaryExpression : this
             .this => {
@@ -147,7 +161,7 @@ pub const PrimaryExpression = union(enum) {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'PrimaryExpression' here, it's implied and only adds nesting.
         switch (self) {
             .this => try printString("this", writer, indentation),
@@ -170,7 +184,11 @@ pub const MemberExpression = struct {
 
     /// 13.3.2.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-property-accessors-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // 1. Let baseReference be ? Evaluation of MemberExpression.
         try self.expression.generateBytecode(executable, ctx);
 
@@ -205,7 +223,7 @@ pub const MemberExpression = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("MemberExpression", writer, indentation);
         try printString("expression:", writer, indentation + 1);
         try self.expression.print(writer, indentation + 2);
@@ -226,7 +244,11 @@ pub const SuperProperty = union(enum) {
 
     /// 13.3.7.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         switch (self) {
             // SuperProperty : super [ Expression ]
             .expression => |expression| {
@@ -270,7 +292,7 @@ pub const SuperProperty = union(enum) {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("SuperProperty", writer, indentation);
         switch (self) {
             .expression => |expression| try expression.print(writer, indentation + 1),
@@ -288,7 +310,11 @@ pub const MetaProperty = union(enum) {
 
     /// 13.3.12.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-meta-properties-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, _: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        _: *BytecodeContext,
+    ) Executable.Error!void {
         switch (self) {
             // NewTarget : new . target
             .new_target => {
@@ -304,7 +330,7 @@ pub const MetaProperty = union(enum) {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("MetaProperty", writer, indentation);
         switch (self) {
             .new_target => try printString("new.target", writer, indentation + 1),
@@ -322,7 +348,11 @@ pub const NewExpression = struct {
 
     /// 13.3.5.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-new-operator-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // NewExpression : new NewExpression
         // 1. Return ? EvaluateNew(NewExpression, empty).
         // MemberExpression : new MemberExpression Arguments
@@ -341,7 +371,7 @@ pub const NewExpression = struct {
         try executable.addIndex(self.arguments.len);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("NewExpression", writer, indentation);
         try printString("expression:", writer, indentation + 1);
         try self.expression.print(writer, indentation + 2);
@@ -361,7 +391,11 @@ pub const CallExpression = struct {
 
     /// 13.3.6.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-function-calls-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // CallExpression : CallExpression Arguments
         // 1. Let ref be ? Evaluation of CallExpression.
         try self.expression.generateBytecode(executable, ctx);
@@ -394,7 +428,7 @@ pub const CallExpression = struct {
         try executable.addInstruction(.pop_reference);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("CallExpression", writer, indentation);
         try printString("expression:", writer, indentation + 1);
         try self.expression.print(writer, indentation + 2);
@@ -413,7 +447,11 @@ pub const SuperCall = struct {
 
     /// 13.3.7.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         for (self.arguments) |argument| {
             try argument.generateBytecode(executable, ctx);
             if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
@@ -423,7 +461,7 @@ pub const SuperCall = struct {
         try executable.addIndex(self.arguments.len);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("SuperCall", writer, indentation);
         for (self.arguments) |argument| {
             try argument.print(writer, indentation + 1);
@@ -439,14 +477,18 @@ pub const ImportCall = struct {
 
     /// 13.3.10.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-import-call-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         try self.expression.generateBytecode(executable, ctx);
         if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
         try executable.addInstruction(.load);
         try executable.addInstruction(.evaluate_import_call);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("ImportCall", writer, indentation);
         try self.expression.print(writer, indentation + 1);
     }
@@ -472,7 +514,11 @@ pub const OptionalExpression = struct {
     /// https://tc39.es/ecma262/#sec-optional-chaining-evaluation
     /// 13.3.9.2 Runtime Semantics: ChainEvaluation
     /// https://tc39.es/ecma262/#sec-optional-chaining-chain-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // 1. Let baseReference be ? Evaluation of OptionalExpression.
         try self.expression.generateBytecode(executable, ctx);
 
@@ -552,7 +598,7 @@ pub const OptionalExpression = struct {
         try end_jump.setTargetHere();
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("OptionalExpression", writer, indentation);
         try printString("expression:", writer, indentation + 1);
         try self.expression.print(writer, indentation + 2);
@@ -588,7 +634,11 @@ pub const Literal = union(enum) {
 
     /// 13.2.3.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-literals-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, _: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        _: *BytecodeContext,
+    ) Executable.Error!void {
         switch (self) {
             // Literal : NullLiteral
             .null => {
@@ -619,7 +669,7 @@ pub const Literal = union(enum) {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("Literal", writer, indentation);
         switch (self) {
             .null => try printString("null", writer, indentation + 1),
@@ -674,7 +724,7 @@ pub const NumericLiteral = struct {
 
     /// 12.9.3.3 Static Semantics: NumericValue
     /// https://tc39.es/ecma262/#sec-numericvalue
-    pub fn numericValue(self: Self, allocator: Allocator) !Value {
+    pub fn numericValue(self: Self, allocator: Allocator) Allocator.Error!Value {
         const base: u8 = switch (self.system) {
             .binary => 2,
             .octal => 8,
@@ -720,7 +770,7 @@ pub const StringLiteral = struct {
 
     /// 12.9.4.2 Static Semantics: SV
     /// https://tc39.es/ecma262/#sec-static-semantics-sv
-    pub fn stringValue(self: Self, allocator: Allocator) !Value {
+    pub fn stringValue(self: Self, allocator: Allocator) Allocator.Error!Value {
         std.debug.assert(self.text.len >= 2);
         var str = try std.ArrayList(u8).initCapacity(allocator, self.text.len - 2);
         var i: usize = 1;
@@ -792,7 +842,11 @@ pub const ArrayLiteral = struct {
 
     /// 13.2.4.2 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-array-initializer-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         try executable.addInstruction(.array_create);
         try executable.addInstruction(.load);
         for (self.element_list, 0..) |element, i| {
@@ -842,7 +896,7 @@ pub const ArrayLiteral = struct {
         try executable.addInstruction(.store);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("ArrayLiteral", writer, indentation);
         for (self.element_list) |element| switch (element) {
             .elision => try printString("<elision>", writer, indentation + 1),
@@ -863,7 +917,11 @@ pub const ObjectLiteral = struct {
 
     /// 13.2.5.4 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-object-initializer-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // ObjectLiteral : { }
         if (self.property_definition_list.items.len == 0) {
             // 1. Return OrdinaryObjectCreate(%Object.prototype%).
@@ -883,7 +941,7 @@ pub const ObjectLiteral = struct {
         // 3. Return obj.
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("ObjectLiteral", writer, indentation);
         try self.property_definition_list.print(writer, indentation + 1);
     }
@@ -897,7 +955,11 @@ pub const PropertyDefinitionList = struct {
 
     /// 13.2.5.5 Runtime Semantics: PropertyDefinitionEvaluation
     /// https://tc39.es/ecma262/#sec-runtime-semantics-propertydefinitionevaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // PropertyDefinitionList : PropertyDefinitionList , PropertyDefinition
         // 1. Perform ? PropertyDefinitionEvaluation of PropertyDefinitionList with argument object.
         // 2. Perform ? PropertyDefinitionEvaluation of PropertyDefinition with argument object.
@@ -910,7 +972,7 @@ pub const PropertyDefinitionList = struct {
         // 3. Return unused.
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'PropertyDefinitionList' here, it's implied and only adds nesting.
         for (self.items) |property_definition| {
             try property_definition.print(writer, indentation);
@@ -934,7 +996,11 @@ pub const PropertyDefinition = union(enum) {
 
     /// 13.2.5.5 Runtime Semantics: PropertyDefinitionEvaluation
     /// https://tc39.es/ecma262/#sec-runtime-semantics-propertydefinitionevaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         switch (self) {
             // PropertyDefinition : ... AssignmentExpression
             .spread => |expression| {
@@ -1009,7 +1075,7 @@ pub const PropertyDefinition = union(enum) {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'PropertyDefinition' here, it's implied and only adds nesting.
         switch (self) {
             .spread => |expression| {
@@ -1045,7 +1111,11 @@ pub const PropertyName = union(enum) {
 
     /// 13.2.5.4 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-object-initializer-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         switch (self) {
             .literal_property_name => |literal| switch (literal) {
                 // LiteralPropertyName : IdentifierName
@@ -1088,7 +1158,7 @@ pub const PropertyName = union(enum) {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("PropertyName", writer, indentation);
         switch (self) {
             .literal_property_name => |literal| switch (literal) {
@@ -1128,7 +1198,11 @@ pub const RegularExpressionLiteral = struct {
 
     /// 13.2.7.3 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-regular-expression-literals-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, _: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        _: *BytecodeContext,
+    ) Executable.Error!void {
         // 1. Let pattern be CodePointsToString(BodyText of RegularExpressionLiteral).
         try executable.addInstructionWithConstant(.load_constant, Value.from(self.pattern));
 
@@ -1139,7 +1213,7 @@ pub const RegularExpressionLiteral = struct {
         try executable.addInstruction(.reg_exp_create);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("RegularExpressionLiteral", writer, indentation);
         try printString("pattern:", writer, indentation + 1);
         try printString(self.pattern, writer, indentation + 2);
@@ -1156,7 +1230,11 @@ pub const TemplateLiteral = struct {
 
     /// 13.2.8.6 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-template-literals-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, _: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        _: *BytecodeContext,
+    ) Executable.Error!void {
         // TemplateLiteral : NoSubstitutionTemplate
         // 1. Return the TV of NoSubstitutionTemplate as defined in 12.9.6.
         // TODO: Handle escapes
@@ -1168,7 +1246,7 @@ pub const TemplateLiteral = struct {
         // TODO: SubstitutionTemplate : TemplateHead Expression TemplateSpans
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("TemplateLiteral", writer, indentation);
         try printString(self.text, writer, indentation + 1);
     }
@@ -1200,7 +1278,11 @@ pub const UpdateExpression = struct {
     /// https://tc39.es/ecma262/#sec-prefix-increment-operator-runtime-semantics-evaluation
     /// 13.4.5.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-prefix-decrement-operator-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // UpdateExpression : LeftHandSideExpression ++
         if (self.type == .postfix and self.operator == .@"++") {
             // 1. Let lhs be ? Evaluation of LeftHandSideExpression.
@@ -1301,7 +1383,7 @@ pub const UpdateExpression = struct {
         } else unreachable;
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("UpdateExpression", writer, indentation);
         try printString("type:", writer, indentation + 1);
         try printString(@tagName(self.type), writer, indentation + 2);
@@ -1329,7 +1411,11 @@ pub const UnaryExpression = struct {
     operator: Operator,
     expression: *Expression,
 
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         switch (self.operator) {
             // 13.5.1.2 Runtime Semantics: Evaluation
             // https://tc39.es/ecma262/#sec-delete-operator-runtime-semantics-evaluation
@@ -1436,7 +1522,7 @@ pub const UnaryExpression = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("UnaryExpression", writer, indentation);
         try printString("operator:", writer, indentation + 1);
         try printString(@tagName(self.operator), writer, indentation + 2);
@@ -1476,7 +1562,11 @@ pub const BinaryExpression = struct {
 
     /// 13.15.4 EvaluateStringOrNumericBinaryExpression ( leftOperand, opText, rightOperand )
     /// https://tc39.es/ecma262/#sec-evaluatestringornumericbinaryexpression
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // 1. Let lref be ? Evaluation of leftOperand.
         try self.lhs_expression.generateBytecode(executable, ctx);
 
@@ -1496,7 +1586,7 @@ pub const BinaryExpression = struct {
         try executable.addIndex(@intFromEnum(self.operator));
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("BinaryExpression", writer, indentation);
         try self.lhs_expression.print(writer, indentation + 1);
         try printString(@tagName(self.operator), writer, indentation + 1);
@@ -1523,7 +1613,11 @@ pub const RelationalExpression = struct {
 
     /// 13.10.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-relational-operators-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // RelationalExpression : RelationalExpression < ShiftExpression
         // RelationalExpression : RelationalExpression > ShiftExpression
         // RelationalExpression : RelationalExpression <= ShiftExpression
@@ -1554,7 +1648,7 @@ pub const RelationalExpression = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("RelationalExpression", writer, indentation);
         try self.lhs_expression.print(writer, indentation + 1);
         try printString(@tagName(self.operator), writer, indentation + 1);
@@ -1579,7 +1673,11 @@ pub const EqualityExpression = struct {
 
     /// 13.11.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-equality-operators-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // EqualityExpression : EqualityExpression == RelationalExpression
         // EqualityExpression : EqualityExpression != RelationalExpression
         // EqualityExpression : EqualityExpression === RelationalExpression
@@ -1624,7 +1722,7 @@ pub const EqualityExpression = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("EqualityExpression", writer, indentation);
         try self.lhs_expression.print(writer, indentation + 1);
         try printString(@tagName(self.operator), writer, indentation + 1);
@@ -1648,7 +1746,11 @@ pub const LogicalExpression = struct {
 
     /// 13.13.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-binary-logical-operators-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         switch (self.operator) {
             // LogicalANDExpression : LogicalANDExpression && BitwiseORExpression
             .@"&&" => {
@@ -1740,7 +1842,7 @@ pub const LogicalExpression = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("LogicalExpression", writer, indentation);
         try self.lhs_expression.print(writer, indentation + 1);
         try printString(@tagName(self.operator), writer, indentation + 1);
@@ -1758,7 +1860,11 @@ pub const ConditionalExpression = struct {
 
     /// 13.14.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-conditional-operator-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // ConditionalExpression : ShortCircuitExpression ? AssignmentExpression : AssignmentExpression
         // 1. Let lref be ? Evaluation of ShortCircuitExpression.
         try self.test_expression.generateBytecode(executable, ctx);
@@ -1794,7 +1900,7 @@ pub const ConditionalExpression = struct {
         try end_jump.setTargetHere();
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("ConditionalExpression", writer, indentation);
         try printString("test:", writer, indentation + 1);
         try self.test_expression.print(writer, indentation + 2);
@@ -1834,7 +1940,11 @@ pub const AssignmentExpression = struct {
 
     /// 13.15.2 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-assignment-operators-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // AssignmentExpression : LeftHandSideExpression = AssignmentExpression
         if (self.operator == .@"=") {
             // 1. If LeftHandSideExpression is neither an ObjectLiteral nor an ArrayLiteral, then
@@ -2043,7 +2153,7 @@ pub const AssignmentExpression = struct {
         } else unreachable;
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("AssignmentExpression", writer, indentation);
         try self.lhs_expression.print(writer, indentation + 1);
         try printString(@tagName(self.operator), writer, indentation + 1);
@@ -2058,7 +2168,11 @@ pub const SequenceExpression = struct {
 
     /// 13.16.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-comma-operator-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // 1. Let lref be ? Evaluation of Expression.
         // 2. Perform ? GetValue(lref).
         // 3. Let rref be ? Evaluation of AssignmentExpression.
@@ -2069,7 +2183,7 @@ pub const SequenceExpression = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("SequenceExpression", writer, indentation);
         for (self.expressions) |expression| {
             try expression.print(writer, indentation + 1);
@@ -2154,13 +2268,17 @@ pub const Expression = union(enum) {
         };
     }
 
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         switch (self) {
             inline else => |node| try node.generateBytecode(executable, ctx),
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("Expression", writer, indentation);
         switch (self) {
             inline else => |node| try node.print(writer, indentation + 1),
@@ -2200,7 +2318,10 @@ pub const Statement = union(enum) {
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
-    pub fn varScopedDeclarations(self: Self, allocator: Allocator) error{OutOfMemory}![]const VariableDeclaration {
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VariableDeclaration {
         switch (self) {
             // Statement :
             //     EmptyStatement
@@ -2232,7 +2353,11 @@ pub const Statement = union(enum) {
         }
     }
 
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         switch (self) {
             // EmptyStatement : ;
             .empty_statement => {
@@ -2252,7 +2377,7 @@ pub const Statement = union(enum) {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("Statement", writer, indentation);
         switch (self) {
             .empty_statement => try printString("empty", writer, indentation + 1),
@@ -2277,13 +2402,17 @@ pub const Declaration = union(enum) {
         };
     }
 
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         switch (self) {
             inline else => |node| try node.generateBytecode(executable, ctx),
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("Declaration", writer, indentation);
         switch (self) {
             inline else => |node| try node.print(writer, indentation + 1),
@@ -2302,7 +2431,11 @@ pub const HoistableDeclaration = union(enum) {
 
     /// 14.1.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-statement-semantics-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // HoistableDeclaration :
         //     GeneratorDeclaration
         //     AsyncFunctionDeclaration
@@ -2317,7 +2450,7 @@ pub const HoistableDeclaration = union(enum) {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'HoistableDeclaration' here, it's implied and only adds nesting.
         switch (self) {
             inline else => |node| try node.print(writer, indentation),
@@ -2331,13 +2464,17 @@ pub const BreakableStatement = union(enum) {
 
     iteration_statement: IterationStatement,
 
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         switch (self) {
             .iteration_statement => |iteration_statement| try iteration_statement.generateBytecode(executable, ctx),
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'BreakableStatement' here, it's implied and only adds nesting.
         switch (self) {
             .iteration_statement => |iteration_statement| try iteration_statement.print(
@@ -2354,11 +2491,15 @@ pub const BlockStatement = struct {
 
     block: Block,
 
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         try self.block.generateBytecode(executable, ctx);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'BlockStatement' here, it's implied and only adds nesting.
         try self.block.print(writer, indentation);
     }
@@ -2372,7 +2513,11 @@ pub const Block = struct {
 
     /// 14.2.2 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-block-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) BytecodeError!void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // Block : { }
         if (self.statement_list.items.len == 0) {
             // 1. Return empty.
@@ -2386,7 +2531,7 @@ pub const Block = struct {
         try self.statement_list.generateBytecode(executable, ctx);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("Block", writer, indentation);
         try self.statement_list.print(writer, indentation + 1);
     }
@@ -2400,7 +2545,10 @@ pub const StatementList = struct {
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
-    pub fn varScopedDeclarations(self: Self, allocator: Allocator) ![]const VariableDeclaration {
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VariableDeclaration {
         // StatementList : StatementList StatementListItem
         // 1. Let declarations1 be VarScopedDeclarations of StatementList.
         // 2. Let declarations2 be VarScopedDeclarations of StatementListItem.
@@ -2426,7 +2574,11 @@ pub const StatementList = struct {
         return false;
     }
 
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let sl be ? Evaluation of StatementList.
         // 2. Let s be Completion(Evaluation of StatementListItem).
@@ -2436,7 +2588,7 @@ pub const StatementList = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'StatementList' here, it's implied and only adds nesting.
         for (self.items) |item| {
             try item.print(writer, indentation);
@@ -2453,7 +2605,10 @@ pub const StatementListItem = union(enum) {
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
-    pub fn varScopedDeclarations(self: Self, allocator: Allocator) ![]const VariableDeclaration {
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VariableDeclaration {
         switch (self) {
             .statement => |statement| return try statement.varScopedDeclarations(allocator),
             .declaration => |declaration| {
@@ -2481,13 +2636,17 @@ pub const StatementListItem = union(enum) {
         };
     }
 
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         switch (self) {
             inline else => |node| try node.generateBytecode(executable, ctx),
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) std.os.WriteError!void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'StatementListItem' here, it's implied and only adds nesting.
         switch (self) {
             inline else => |node| try node.print(writer, indentation),
@@ -2509,7 +2668,11 @@ pub const LexicalDeclaration = struct {
 
     /// 14.3.1.2 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-let-and-const-declarations-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // LexicalDeclaration : LetOrConst BindingList ;
         // 1. Perform ? Evaluation of BindingList.
         try self.binding_list.generateBytecode(executable, ctx);
@@ -2517,7 +2680,7 @@ pub const LexicalDeclaration = struct {
         // 2. Return empty.
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("LexicalDeclaration", writer, indentation);
         try printString(@tagName(self.type), writer, indentation + 1);
         try self.binding_list.print(writer, indentation + 1);
@@ -2532,7 +2695,11 @@ pub const BindingList = struct {
 
     /// 14.3.1.2 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-let-and-const-declarations-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // BindingList : BindingList , LexicalBinding
         // 1. Perform ? Evaluation of BindingList.
         // 2. Return ? Evaluation of LexicalBinding.
@@ -2541,7 +2708,7 @@ pub const BindingList = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'BindingList' here, it's implied and only adds nesting.
         for (self.items) |lexical_binding| {
             try lexical_binding.print(writer, indentation);
@@ -2558,7 +2725,11 @@ pub const LexicalBinding = struct {
 
     /// 14.3.1.2 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-let-and-const-declarations-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // TODO: Implement this properly, we just codegen a VariableDeclaration for now
         const variable_declaration = VariableDeclaration{
             .binding_identifier = self.binding_identifier,
@@ -2567,7 +2738,7 @@ pub const LexicalBinding = struct {
         try variable_declaration.generateBytecode(executable, ctx);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("LexicalBinding", writer, indentation);
         try printString("binding_identifier:", writer, indentation + 1);
         try printString(self.binding_identifier, writer, indentation + 2);
@@ -2586,7 +2757,11 @@ pub const VariableStatement = struct {
 
     /// 14.3.2.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-variable-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // VariableStatement : var VariableDeclarationList ;
         // 1. Perform ? Evaluation of VariableDeclarationList.
         try self.variable_declaration_list.generateBytecode(executable, ctx);
@@ -2594,7 +2769,7 @@ pub const VariableStatement = struct {
         // 2. Return empty.
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("VariableStatement", writer, indentation);
         try self.variable_declaration_list.print(writer, indentation + 1);
     }
@@ -2608,7 +2783,10 @@ pub const VariableDeclarationList = struct {
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
-    pub fn varScopedDeclarations(self: Self, _: Allocator) ![]const VariableDeclaration {
+    pub fn varScopedDeclarations(
+        self: Self,
+        _: Allocator,
+    ) Allocator.Error![]const VariableDeclaration {
         // VariableDeclarationList : VariableDeclaration
         // 1. Return « VariableDeclaration ».
         // VariableDeclarationList : VariableDeclarationList , VariableDeclaration
@@ -2619,7 +2797,11 @@ pub const VariableDeclarationList = struct {
 
     /// 14.3.2.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-variable-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // VariableDeclarationList : VariableDeclarationList , VariableDeclaration
         // 1. Perform ? Evaluation of VariableDeclarationList.
         // 2. Return ? Evaluation of VariableDeclaration.
@@ -2628,7 +2810,7 @@ pub const VariableDeclarationList = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'VariableDeclarationList' here, it's implied and only adds nesting.
         for (self.items) |variable_declaration| {
             try variable_declaration.print(writer, indentation);
@@ -2645,7 +2827,11 @@ pub const VariableDeclaration = struct {
 
     /// 14.3.2.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-variable-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // VariableDeclaration : BindingIdentifier
         // 1. Return empty.
         if (self.initializer == null) return;
@@ -2678,7 +2864,7 @@ pub const VariableDeclaration = struct {
         try executable.addInstruction(.store);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("VariableDeclaration", writer, indentation);
         try printString("binding_identifier:", writer, indentation + 1);
         try printString(self.binding_identifier, writer, indentation + 2);
@@ -2723,7 +2909,7 @@ pub const BindingElement = struct {
         return self.initializer != null;
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("BindingElement", writer, indentation);
         try printString(self.identifier, writer, indentation + 1);
         if (self.initializer) |initializer| {
@@ -2751,7 +2937,7 @@ pub const BindingRestElement = struct {
         // 1. Return ContainsExpression of BindingPattern.
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("BindingRestElement", writer, indentation);
         try printString(self.identifier, writer, indentation + 1);
     }
@@ -2769,7 +2955,11 @@ pub const ExpressionStatement = struct {
 
     /// 14.5.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-expression-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // ExpressionStatement : Expression ;
         // 1. Let exprRef be ? Evaluation of Expression.
         try self.expression.generateBytecode(executable, ctx);
@@ -2778,7 +2968,7 @@ pub const ExpressionStatement = struct {
         if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'ExpressionStatement' here, it's implied and only adds nesting.
         try self.expression.print(writer, indentation);
     }
@@ -2794,7 +2984,10 @@ pub const IfStatement = struct {
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
-    pub fn varScopedDeclarations(self: Self, allocator: Allocator) ![]const VariableDeclaration {
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VariableDeclaration {
         // IfStatement : if ( Expression ) Statement else Statement
         // 1. Let declarations1 be VarScopedDeclarations of the first Statement.
         // 2. Let declarations2 be VarScopedDeclarations of the second Statement.
@@ -2813,7 +3006,11 @@ pub const IfStatement = struct {
 
     /// 14.6.2 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-if-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // 1. Let exprRef be ? Evaluation of Expression.
         try self.test_expression.generateBytecode(executable, ctx);
 
@@ -2847,7 +3044,7 @@ pub const IfStatement = struct {
         try end_jump.setTargetHere();
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("IfStatement", writer, indentation);
         try printString("test:", writer, indentation + 1);
         try self.test_expression.print(writer, indentation + 2);
@@ -2870,7 +3067,11 @@ pub const IterationStatement = union(enum) {
 
     /// 14.7.1.2 Runtime Semantics: LoopEvaluation
     /// https://tc39.es/ecma262/#sec-runtime-semantics-loopevaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         switch (self) {
             // IterationStatement : DoWhileStatement
             .do_while_statement => |do_while_statement| {
@@ -2892,7 +3093,7 @@ pub const IterationStatement = union(enum) {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'IterationStatement' here, it's implied and only adds nesting.
         switch (self) {
             inline else => |node| try node.print(writer, indentation),
@@ -2909,7 +3110,10 @@ pub const DoWhileStatement = struct {
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
-    pub fn varScopedDeclarations(self: Self, allocator: Allocator) ![]const VariableDeclaration {
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VariableDeclaration {
         // DoWhileStatement : do Statement while ( Expression ) ;
         // 1. Return the VarScopedDeclarations of Statement.
         return self.consequent_statement.varScopedDeclarations(allocator);
@@ -2917,7 +3121,11 @@ pub const DoWhileStatement = struct {
 
     /// 14.7.2.2 Runtime Semantics: DoWhileLoopEvaluation
     /// https://tc39.es/ecma262/#sec-runtime-semantics-dowhileloopevaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // DoWhileStatement : do Statement while ( Expression ) ;
         // 1. Let V be undefined.
         try executable.addInstructionWithConstant(.load_constant, .undefined);
@@ -2959,7 +3167,7 @@ pub const DoWhileStatement = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("DoWhileStatement", writer, indentation);
         try printString("consequent:", writer, indentation + 1);
         try self.consequent_statement.print(writer, indentation + 2);
@@ -2977,7 +3185,10 @@ pub const WhileStatement = struct {
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
-    pub fn varScopedDeclarations(self: Self, allocator: Allocator) ![]const VariableDeclaration {
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VariableDeclaration {
         // WhileStatement : while ( Expression ) Statement
         // 1. Return the VarScopedDeclarations of Statement.
         return self.consequent_statement.varScopedDeclarations(allocator);
@@ -2985,7 +3196,11 @@ pub const WhileStatement = struct {
 
     /// 14.7.3.2 Runtime Semantics: WhileLoopEvaluation
     /// https://tc39.es/ecma262/#sec-runtime-semantics-whileloopevaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // WhileStatement : while ( Expression ) Statement
         // 1. Let V be undefined.
         try executable.addInstructionWithConstant(.load_constant, .undefined);
@@ -3030,7 +3245,7 @@ pub const WhileStatement = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("WhileStatement", writer, indentation);
         try printString("test:", writer, indentation + 1);
         try self.test_expression.print(writer, indentation + 2);
@@ -3056,7 +3271,10 @@ pub const ForStatement = struct {
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
-    pub fn varScopedDeclarations(self: Self, allocator: Allocator) ![]const VariableDeclaration {
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VariableDeclaration {
         // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
         // 1. Let declarations1 be VarScopedDeclarations of VariableDeclarationList.
         // 2. Let declarations2 be VarScopedDeclarations of Statement.
@@ -3079,7 +3297,11 @@ pub const ForStatement = struct {
     /// https://tc39.es/ecma262/#sec-runtime-semantics-forloopevaluation
     /// 14.7.4.3 ForBodyEvaluation ( test, increment, stmt, perIterationBindings, labelSet )
     /// https://tc39.es/ecma262/#sec-forbodyevaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         if (self.initializer) |initializer| switch (initializer) {
             // ForStatement : for ( Expression[opt] ; Expression[opt] ; Expression[opt] ) Statement
             .expression => |expression| {
@@ -3176,7 +3398,7 @@ pub const ForStatement = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("ForStatement", writer, indentation);
         if (self.initializer) |initializer| {
             try printString("initializer:", writer, indentation + 1);
@@ -3205,7 +3427,11 @@ pub const ContinueStatement = struct {
 
     /// 14.8.2 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-continue-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // TODO: ContinueStatement : continue LabelIdentifier ;
         if (self.label) |label| {
             _ = label;
@@ -3224,7 +3450,7 @@ pub const ContinueStatement = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("ContinueStatement", writer, indentation);
         if (self.label) |label| try printString(label, writer, indentation + 1);
     }
@@ -3238,7 +3464,11 @@ pub const BreakStatement = struct {
 
     /// 14.9.2 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-break-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // TODO: BreakStatement : break LabelIdentifier ;
         if (self.label) |label| {
             _ = label;
@@ -3257,7 +3487,7 @@ pub const BreakStatement = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("BreakStatement", writer, indentation);
         if (self.label) |label| try printString(label, writer, indentation + 1);
     }
@@ -3271,7 +3501,11 @@ pub const ReturnStatement = struct {
 
     /// 14.10.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-return-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // ReturnStatement : return Expression ;
         if (self.expression) |expression| {
             // 1. Let exprRef be ? Evaluation of Expression.
@@ -3293,7 +3527,7 @@ pub const ReturnStatement = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("ReturnStatement", writer, indentation);
         if (self.expression) |expression| try expression.print(writer, indentation + 1);
     }
@@ -3307,7 +3541,11 @@ pub const ThrowStatement = struct {
 
     /// 14.14.1 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-throw-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // ThrowStatement : throw Expression ;
         // 1. Let exprRef be ? Evaluation of Expression.
         try self.expression.generateBytecode(executable, ctx);
@@ -3319,7 +3557,7 @@ pub const ThrowStatement = struct {
         try executable.addInstruction(.throw);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("ThrowStatement", writer, indentation);
         try self.expression.print(writer, indentation + 1);
     }
@@ -3336,7 +3574,10 @@ pub const TryStatement = struct {
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
-    pub fn varScopedDeclarations(self: Self, allocator: Allocator) ![]const VariableDeclaration {
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VariableDeclaration {
         // TryStatement : try Block Catch
         // 1. Let declarations1 be VarScopedDeclarations of Block.
         // 2. Let declarations2 be VarScopedDeclarations of Catch.
@@ -3365,7 +3606,11 @@ pub const TryStatement = struct {
 
     /// 14.15.3 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-try-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // TryStatement : try Block Catch
         if (self.finally_block == null) {
             try executable.addInstruction(.push_exception_jump_target);
@@ -3451,7 +3696,7 @@ pub const TryStatement = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("TryStatement", writer, indentation);
         try printString("try:", writer, indentation + 1);
         try self.try_block.print(writer, indentation + 2);
@@ -3482,7 +3727,7 @@ pub const FormalParameters = struct {
 
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
-    pub fn boundNames(self: Self, allocator: Allocator) ![]const []const u8 {
+    pub fn boundNames(self: Self, allocator: Allocator) Allocator.Error![]const []const u8 {
         var bound_names = try std.ArrayList([]const u8).initCapacity(allocator, self.items.len);
         // FormalParameterList : FormalParameterList , FormalParameter
         // 1. Let names1 be BoundNames of FormalParameterList.
@@ -3556,7 +3801,7 @@ pub const FormalParameters = struct {
             return self.items.len;
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'FormalParameters' here, it's implied and only adds nesting.
         for (self.items) |item| {
             switch (item) {
@@ -3572,7 +3817,7 @@ pub const FunctionRestParameter = struct {
 
     binding_rest_element: BindingRestElement,
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("FunctionRestParameter", writer, indentation);
         try self.binding_rest_element.print(writer, indentation + 1);
     }
@@ -3584,7 +3829,7 @@ pub const FormalParameter = struct {
 
     binding_element: BindingElement,
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("FormalParameter", writer, indentation);
         try self.binding_element.print(writer, indentation + 1);
     }
@@ -3606,7 +3851,7 @@ pub const FunctionDeclaration = struct {
         agent: *Agent,
         env: Environment,
         private_env: ?*PrivateEnvironment,
-    ) !Object {
+    ) Allocator.Error!Object {
         const realm = agent.currentRealm();
 
         // 1. Let name be StringValue of BindingIdentifier.
@@ -3639,7 +3884,11 @@ pub const FunctionDeclaration = struct {
 
     /// 15.2.6 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, _: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        _: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // FIXME: This should be called in the various FooDeclarationInstantiation AOs instead.
         //        It's enough to get ECMAScript Functions Objects up and running however :^)
         const realm = ctx.agent.currentRealm();
@@ -3666,7 +3915,7 @@ pub const FunctionDeclaration = struct {
         // 1. Return empty.
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("FunctionDeclaration", writer, indentation);
         try printString("identifier:", writer, indentation + 1);
         try printString(self.identifier, writer, indentation + 2);
@@ -3688,7 +3937,11 @@ pub const FunctionExpression = struct {
 
     /// 15.2.6 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
 
         // Copy `self` so that we can assign the function body's strictness, which is needed for
@@ -3704,7 +3957,7 @@ pub const FunctionExpression = struct {
         );
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("FunctionExpression", writer, indentation);
         try printString("identifier:", writer, indentation + 1);
         if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
@@ -3732,7 +3985,10 @@ pub const FunctionBody = struct {
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
-    pub fn varScopedDeclarations(self: Self, allocator: Allocator) error{OutOfMemory}![]const VariableDeclaration {
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VariableDeclaration {
         // FunctionStatementList : [empty]
         // 1. Return a new empty List.
         // FunctionStatementList : StatementList
@@ -3749,13 +4005,17 @@ pub const FunctionBody = struct {
         return self.statement_list.containsDirective("use strict");
     }
 
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         const tmp = temporaryChange(&ctx.contained_in_strict_mode_code, self.strict.?);
         defer tmp.restore();
         try self.statement_list.generateBytecode(executable, ctx);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'FunctionBody' here, it's implied and only adds nesting.
         try self.statement_list.print(writer, indentation);
     }
@@ -3771,7 +4031,11 @@ pub const ArrowFunction = struct {
 
     /// 15.3.5 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
 
         // Copy `self` so that we can assign the function body's strictness, which is needed for
@@ -3787,7 +4051,7 @@ pub const ArrowFunction = struct {
         );
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("ArrowFunction", writer, indentation);
         try printString("formal_parameters:", writer, indentation + 1);
         try self.formal_parameters.print(writer, indentation + 2);
@@ -3823,7 +4087,11 @@ pub const MethodDefinition = struct {
 
     // 15.4.5 Runtime Semantics: MethodDefinitionEvaluation
     // https://tc39.es/ecma262/#sec-runtime-semantics-methoddefinitionevaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         const strict = ctx.contained_in_strict_mode_code or switch (self.method) {
             inline else => |expression| expression.function_body.functionBodyContainsUseStrict(),
         };
@@ -3851,7 +4119,7 @@ pub const MethodDefinition = struct {
         try executable.addIndex(@intFromEnum(std.meta.activeTag(self.method)));
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("MethodDefinition", writer, indentation);
         try printString("type:", writer, indentation + 1);
         try printString(@tagName(std.meta.activeTag(self.method)), writer, indentation + 2);
@@ -3878,7 +4146,7 @@ pub const GeneratorDeclaration = struct {
         agent: *Agent,
         env: Environment,
         private_env: ?*PrivateEnvironment,
-    ) !Object {
+    ) Allocator.Error!Object {
         const realm = agent.currentRealm();
 
         // 1. Let name be StringValue of BindingIdentifier.
@@ -3923,7 +4191,11 @@ pub const GeneratorDeclaration = struct {
         return function;
     }
 
-    pub fn generateBytecode(self: Self, _: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        _: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // FIXME: This should be called in the various FooDeclarationInstantiation AOs instead.
         const realm = ctx.agent.currentRealm();
         const env = Environment{ .global_environment = realm.global_env };
@@ -3947,7 +4219,7 @@ pub const GeneratorDeclaration = struct {
         ) catch |err| try noexcept(err);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("GeneratorDeclaration", writer, indentation);
         try printString("identifier:", writer, indentation + 1);
         try printString(self.identifier, writer, indentation + 2);
@@ -3969,7 +4241,11 @@ pub const GeneratorExpression = struct {
 
     /// 15.5.5 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-generator-function-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
 
         // Copy `self` so that we can assign the function body's strictness, which is needed for
@@ -3985,7 +4261,7 @@ pub const GeneratorExpression = struct {
         );
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("GeneratorExpression", writer, indentation);
         try printString("identifier:", writer, indentation + 1);
         if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
@@ -4012,7 +4288,7 @@ pub const AsyncGeneratorDeclaration = struct {
         agent: *Agent,
         env: Environment,
         private_env: ?*PrivateEnvironment,
-    ) !Object {
+    ) Allocator.Error!Object {
         const realm = agent.currentRealm();
 
         // AsyncGeneratorDeclaration : async function * BindingIdentifier ( FormalParameters ) { AsyncGeneratorBody }
@@ -4101,7 +4377,11 @@ pub const AsyncGeneratorDeclaration = struct {
         }
     }
 
-    pub fn generateBytecode(self: Self, _: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        _: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // FIXME: This should be called in the various FooDeclarationInstantiation AOs instead.
         const realm = ctx.agent.currentRealm();
         const env = Environment{ .global_environment = realm.global_env };
@@ -4125,7 +4405,7 @@ pub const AsyncGeneratorDeclaration = struct {
         ) catch |err| try noexcept(err);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("AsyncGeneratorDeclaration", writer, indentation);
         try printString("identifier:", writer, indentation + 1);
         if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
@@ -4147,7 +4427,11 @@ pub const AsyncGeneratorExpression = struct {
 
     /// 15.6.5 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-asyncgenerator-definitions-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
 
         // Copy `self` so that we can assign the function body's strictness, which is needed for
@@ -4163,7 +4447,7 @@ pub const AsyncGeneratorExpression = struct {
         );
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("AsyncGeneratorExpression", writer, indentation);
         try printString("identifier:", writer, indentation + 1);
         if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
@@ -4184,7 +4468,11 @@ pub const ClassDeclaration = struct {
 
     /// 15.7.16 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-class-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, _: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        _: *BytecodeContext,
+    ) Executable.Error!void {
         // ClassDeclaration : class BindingIdentifier ClassTail
         // 1. Perform ? BindingClassDeclarationEvaluation of this ClassDeclaration.
         try executable.addInstruction(.load);
@@ -4197,7 +4485,7 @@ pub const ClassDeclaration = struct {
         try executable.addInstruction(.store);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("ClassDeclaration", writer, indentation);
         try printString("identifier:", writer, indentation + 1);
         if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
@@ -4215,7 +4503,11 @@ pub const ClassExpression = struct {
 
     /// 15.7.16 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-class-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, _: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        _: *BytecodeContext,
+    ) Executable.Error!void {
         // ClassExpression : class ClassTail
         // ClassExpression : class BindingIdentifier ClassTail
         try executable.addInstructionWithFunctionOrClass(
@@ -4224,7 +4516,7 @@ pub const ClassExpression = struct {
         );
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("ClassExpression", writer, indentation);
         try printString("identifier:", writer, indentation + 1);
         if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
@@ -4239,7 +4531,7 @@ pub const ClassTail = struct {
     class_heritage: ?*Expression,
     class_body: ClassBody,
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'ClassTail' here, it's implied and only adds nesting.
         if (self.class_heritage) |class_heritage| {
             try printString("extends:", writer, indentation);
@@ -4274,7 +4566,7 @@ pub const ClassBody = struct {
         return null;
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'ClassBody' here, it's implied and only adds nesting.
         try self.class_element_list.print(writer, indentation);
     }
@@ -4286,7 +4578,7 @@ pub const ClassElementList = struct {
 
     items: []const ClassElement,
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'ClassElementList' here, it's implied and only adds nesting.
         for (self.items) |item| {
             try item.print(writer, indentation);
@@ -4379,7 +4671,7 @@ pub const ClassElement = union(enum) {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'ClassElement' here, it's implied and only adds nesting.
         switch (self) {
             .empty_statement => try printString("empty", writer, indentation),
@@ -4395,7 +4687,7 @@ pub const FieldDefinition = struct {
     property_name: PropertyName,
     initializer: ?Expression,
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("FieldDefinition", writer, indentation);
         try self.property_name.print(writer, indentation + 1);
         if (self.initializer) |initializer| try initializer.print(writer, indentation + 1);
@@ -4408,7 +4700,7 @@ pub const ClassStaticBlock = struct {
 
     statement_list: StatementList,
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("ClassStaticBlock", writer, indentation);
         try self.statement_list.print(writer, indentation + 1);
     }
@@ -4430,7 +4722,7 @@ pub const AsyncFunctionDeclaration = struct {
         agent: *Agent,
         env: Environment,
         private_env: ?*PrivateEnvironment,
-    ) !Object {
+    ) Allocator.Error!Object {
         const realm = agent.currentRealm();
 
         // AsyncFunctionDeclaration : async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
@@ -4486,7 +4778,11 @@ pub const AsyncFunctionDeclaration = struct {
         }
     }
 
-    pub fn generateBytecode(self: Self, _: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        _: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // FIXME: This should be called in the various FooDeclarationInstantiation AOs instead.
         const realm = ctx.agent.currentRealm();
         const env = Environment{ .global_environment = realm.global_env };
@@ -4510,7 +4806,7 @@ pub const AsyncFunctionDeclaration = struct {
         ) catch |err| try noexcept(err);
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("AsyncFunctionDeclaration", writer, indentation);
         try printString("identifier:", writer, indentation + 1);
         if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
@@ -4532,7 +4828,11 @@ pub const AsyncFunctionExpression = struct {
 
     /// 15.8.5 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-async-function-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
 
         // Copy `self` so that we can assign the function body's strictness, which is needed for
@@ -4548,7 +4848,7 @@ pub const AsyncFunctionExpression = struct {
         );
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("AsyncFunctionExpression", writer, indentation);
         try printString("identifier:", writer, indentation + 1);
         if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
@@ -4569,7 +4869,11 @@ pub const AsyncArrowFunction = struct {
 
     /// 15.9.5 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-async-arrow-function-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
 
         // Copy `self` so that we can assign the function body's strictness, which is needed for
@@ -4585,7 +4889,7 @@ pub const AsyncArrowFunction = struct {
         );
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("AsyncArrowFunction", writer, indentation);
         try printString("formal_parameters:", writer, indentation + 1);
         try self.formal_parameters.print(writer, indentation + 2);
@@ -4608,12 +4912,16 @@ pub const Script = struct {
         return self.statement_list.containsDirective("use strict");
     }
 
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         ctx.contained_in_strict_mode_code = self.isStrict();
         try self.statement_list.generateBytecode(executable, ctx);
     }
 
-    pub fn print(self: Self, writer: anytype) !void {
+    pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
         const indentation: usize = 0;
         try printString("Script", writer, indentation);
         try printString("strict:", writer, indentation + 1);
@@ -4628,12 +4936,16 @@ pub const Module = struct {
 
     module_item_list: ModuleItemList,
 
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         ctx.contained_in_strict_mode_code = true;
         try self.module_item_list.generateBytecode(executable, ctx);
     }
 
-    pub fn print(self: Self, writer: anytype) !void {
+    pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
         const indentation: usize = 0;
         try printString("Module", writer, indentation);
         try self.module_item_list.print(writer, indentation + 1);
@@ -4648,7 +4960,10 @@ pub const ModuleItemList = struct {
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
-    pub fn varScopedDeclarations(self: Self, allocator: Allocator) ![]const VariableDeclaration {
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VariableDeclaration {
         // ModuleItemList : ModuleItemList ModuleItem
         // 1. Let declarations1 be VarScopedDeclarations of ModuleItemList.
         // 2. Let declarations2 be VarScopedDeclarations of ModuleItem.
@@ -4676,7 +4991,11 @@ pub const ModuleItemList = struct {
 
     /// 16.2.1.11 Runtime Semantics: Evaluation
     /// https://tc39.es/ecma262/#sec-module-semantics-runtime-semantics-evaluation
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         // ModuleItemList : ModuleItemList ModuleItem
         // 1. Let sl be ? Evaluation of ModuleItemList.
         // 2. Let s be Completion(Evaluation of ModuleItem).
@@ -4686,7 +5005,7 @@ pub const ModuleItemList = struct {
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'ModuleItemList' here, it's implied and only adds nesting.
         for (self.items) |item| {
             try item.print(writer, indentation);
@@ -4702,14 +5021,18 @@ pub const ModuleItem = union(enum) {
     export_declaration: ExportDeclaration,
     statement_list_item: StatementListItem,
 
-    pub fn generateBytecode(self: Self, executable: *Executable, ctx: *BytecodeContext) !void {
+    pub fn generateBytecode(
+        self: Self,
+        executable: *Executable,
+        ctx: *BytecodeContext,
+    ) Executable.Error!void {
         switch (self) {
             .statement_list_item => |statement_list_item| try statement_list_item.generateBytecode(executable, ctx),
             else => {},
         }
     }
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'ModuleItem' here, it's implied and only adds nesting.
         switch (self) {
             inline else => |node| try node.print(writer, indentation),
@@ -4724,7 +5047,7 @@ pub const ModuleExportName = union(enum) {
     identifier: Identifier,
     string_literal: StringLiteral,
 
-    pub fn print(self: Self, writer: anytype) !void {
+    pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
         // NOTE: These are always printed inline, so no newline or indentation are added.
         switch (self) {
             .identifier => |identifier| try writer.writeAll(identifier),
@@ -4740,7 +5063,7 @@ pub const ImportDeclaration = struct {
     import_clause: ?ImportClause,
     module_specifier: StringLiteral,
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("ImportDeclaration", writer, indentation);
         if (self.import_clause) |import_clause| try import_clause.print(writer, indentation + 1);
         try printString(self.module_specifier.text, writer, indentation + 1);
@@ -4759,7 +5082,7 @@ pub const ImportClause = union(enum) {
     // TODO: ImportedDefaultBinding , NameSpaceImport
     // TODO: ImportedDefaultBinding , NamedImports
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("ImportClause", writer, indentation);
         switch (self) {
             .imported_default_binding => |imported_default_binding| {
@@ -4781,7 +5104,7 @@ pub const ExportDeclaration = union(enum) {
         export_from_clause: ExportFromClause,
         module_specifier: StringLiteral,
 
-        pub fn print(self: @This(), writer: anytype, indentation: usize) !void {
+        pub fn print(self: @This(), writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
             try self.export_from_clause.print(writer, indentation);
             try printString("from", writer, indentation);
             try printString(self.module_specifier.text, writer, indentation + 1);
@@ -4796,7 +5119,7 @@ pub const ExportDeclaration = union(enum) {
     default_class_declaration: ClassDeclaration,
     default_expression: Expression,
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("ExportDeclaration", writer, indentation);
         switch (self) {
             .default_hoistable_declaration,
@@ -4819,7 +5142,7 @@ pub const ExportFromClause = union(enum) {
     star_as: ModuleExportName,
     named_exports: NamedExports,
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'ExportFromClause' here, it's implied and only adds nesting.
         switch (self) {
             .star => try printString("*", writer, indentation),
@@ -4840,7 +5163,7 @@ pub const NamedExports = struct {
 
     exports_list: ExportsList,
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         try printString("NamedExports", writer, indentation);
         try self.exports_list.print(writer, indentation + 1);
     }
@@ -4852,7 +5175,7 @@ pub const ExportsList = struct {
 
     items: []const ExportSpecifier,
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'ExportsList' here, it's implied and only adds nesting.
         for (self.items) |export_specifier| {
             try export_specifier.print(writer, indentation);
@@ -4867,7 +5190,7 @@ pub const ExportSpecifier = struct {
     name: ModuleExportName,
     alias: ?ModuleExportName,
 
-    pub fn print(self: Self, writer: anytype, indentation: usize) !void {
+    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'ExportSpecifier' here, it's implied and only adds nesting.
         try printIndentation(writer, indentation);
         try self.name.print(writer);

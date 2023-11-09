@@ -69,7 +69,7 @@ pub fn isPrivateReference(self: Self) bool {
 
 /// 6.2.5.5 GetValue ( V )
 /// https://tc39.es/ecma262/#sec-getvalue
-pub fn getValue(self: Self, agent: *Agent) !Value {
+pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
     // 1. If V is not a Reference Record, return V.
     // NOTE: This is handled at the call site.
 
@@ -121,7 +121,7 @@ pub fn getValue(self: Self, agent: *Agent) !Value {
 
 /// 6.2.5.6 PutValue ( V, W )
 /// https://tc39.es/ecma262/#sec-putvalue
-pub fn putValue(self: Self, agent: *Agent, value: Value) !void {
+pub fn putValue(self: Self, agent: *Agent, value: Value) Agent.Error!void {
     // 1. If V is not a Reference Record, throw a ReferenceError exception.
     // NOTE: This is handled at the call site.
 
@@ -201,7 +201,7 @@ pub fn getThisValue(self: Self) Value {
 
 /// 6.2.5.8 InitializeReferencedBinding ( V, W )
 /// https://tc39.es/ecma262/#sec-initializereferencedbinding
-pub fn initializeReferencedBinding(self: Self, agent: *Agent, value: Value) !void {
+pub fn initializeReferencedBinding(self: Self, agent: *Agent, value: Value) Agent.Error!void {
     // 1. Assert: IsUnresolvableReference(V) is false.
     std.debug.assert(!self.isUnresolvableReference());
 

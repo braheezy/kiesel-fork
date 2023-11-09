@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const SafePointer = @import("any-pointer").SafePointer;
 
 const builtins = @import("../builtins.zig");
@@ -44,7 +46,7 @@ pub const PromiseCapability = struct {
 
     /// 27.2.1.1.1 IfAbruptRejectPromise ( value, capability )
     /// https://tc39.es/ecma262/#sec-ifabruptrejectpromise
-    pub fn rejectPromise(self: Self, agent: *Agent, err: Agent.Error) !Object {
+    pub fn rejectPromise(self: Self, agent: *Agent, err: Agent.Error) Agent.Error!Object {
         // 1. Assert: value is a Completion Record.
         switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
@@ -88,7 +90,10 @@ const ResolvingFunctions = struct {
 
 /// 27.2.1.3 CreateResolvingFunctions ( promise )
 /// https://tc39.es/ecma262/#sec-createresolvingfunctions
-pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunctions {
+pub fn createResolvingFunctions(
+    agent: *Agent,
+    promise: *Promise,
+) Allocator.Error!ResolvingFunctions {
     const AlreadyResolved = struct { value: bool };
     const AdditionalFields = struct {
         promise: *Promise,
@@ -104,7 +109,7 @@ pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunc
     const steps_resolve = struct {
         /// 27.2.1.3.2 Promise Resolve Functions
         /// https://tc39.es/ecma262/#sec-promise-resolve-functions
-        fn func(agent_: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        fn func(agent_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
             const resolution = arguments.get(0);
 
             // 1. Let F be the active function object.
@@ -217,7 +222,7 @@ pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunc
     const steps_reject = struct {
         /// 27.2.1.3.1 Promise Reject Functions
         /// https://tc39.es/ecma262/#sec-promise-reject-functions
-        fn func(agent_: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        fn func(agent_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
             const reason = arguments.get(0);
 
             // 1. Let F be the active function object.
@@ -268,7 +273,7 @@ pub fn createResolvingFunctions(agent: *Agent, promise: *Promise) !ResolvingFunc
 
 /// 27.2.1.4 FulfillPromise ( promise, value )
 /// https://tc39.es/ecma262/#sec-fulfillpromise
-pub fn fulfillPromise(agent: *Agent, promise: *Promise, value: Value) !void {
+pub fn fulfillPromise(agent: *Agent, promise: *Promise, value: Value) Allocator.Error!void {
     // 1. Assert: The value of promise.[[PromiseState]] is pending.
     std.debug.assert(promise.fields.promise_state == .pending);
 
@@ -295,7 +300,7 @@ pub fn fulfillPromise(agent: *Agent, promise: *Promise, value: Value) !void {
 
 /// 27.2.1.5 NewPromiseCapability ( C )
 /// https://tc39.es/ecma262/#sec-newpromisecapability
-pub fn newPromiseCapability(agent: *Agent, constructor: Value) !PromiseCapability {
+pub fn newPromiseCapability(agent: *Agent, constructor: Value) Agent.Error!PromiseCapability {
     // 1. If IsConstructor(C) is false, throw a TypeError exception.
     if (!constructor.isConstructor()) {
         return agent.throwException(.type_error, "{} is not a constructor", .{constructor});
@@ -317,7 +322,7 @@ pub fn newPromiseCapability(agent: *Agent, constructor: Value) !PromiseCapabilit
     // 4. Let executorClosure be a new Abstract Closure with parameters (resolve, reject) that
     //    captures resolvingFunctions and performs the following steps when called:
     const executor_closure = struct {
-        fn func(agent_: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        fn func(agent_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
             const resolve = arguments.get(0);
             const reject = arguments.get(1);
             const function = agent_.activeFunctionObject();
@@ -394,7 +399,7 @@ pub fn newPromiseCapability(agent: *Agent, constructor: Value) !PromiseCapabilit
 
 /// 27.2.1.7 RejectPromise ( promise, reason )
 /// https://tc39.es/ecma262/#sec-rejectpromise
-pub fn rejectPromise(agent: *Agent, promise: *Promise, reason: Value) !void {
+pub fn rejectPromise(agent: *Agent, promise: *Promise, reason: Value) Allocator.Error!void {
     // 1. Assert: The value of promise.[[PromiseState]] is pending.
     std.debug.assert(promise.fields.promise_state == .pending);
 
@@ -430,7 +435,7 @@ pub fn triggerPromiseReactions(
     agent: *Agent,
     reactions: []const PromiseReaction,
     argument: Value,
-) !void {
+) Allocator.Error!void {
     // 1. For each element reaction of reactions, do
     for (reactions) |reaction| {
         // a. Let job be NewPromiseReactionJob(reaction, argument).
@@ -445,7 +450,7 @@ pub fn triggerPromiseReactions(
 
 /// 27.2.4.7.1 PromiseResolve ( C, x )
 /// https://tc39.es/ecma262/#sec-promise-resolve
-pub fn promiseResolve(agent: *Agent, constructor: Object, x: Value) !Object {
+pub fn promiseResolve(agent: *Agent, constructor: Object, x: Value) Agent.Error!Object {
     // 1. If IsPromise(x) is true, then
     if (x.isPromise()) {
         // a. Let xConstructor be ? Get(x, "constructor").
@@ -471,7 +476,7 @@ pub fn newPromiseReactionJob(
     agent: *Agent,
     reaction: PromiseReaction,
     argument: Value,
-) !struct { job: Job, realm: ?*Realm } {
+) Allocator.Error!struct { job: Job, realm: ?*Realm } {
     const Captures = struct {
         agent: *Agent,
         reaction: PromiseReaction,
@@ -483,7 +488,7 @@ pub fn newPromiseReactionJob(
     // 1. Let job be a new Job Abstract Closure with no parameters that captures reaction and
     //    argument and performs the following steps when called:
     const func = struct {
-        fn func(captures_: SafePointer) !Value {
+        fn func(captures_: SafePointer) Agent.Error!Value {
             const agent_ = captures_.cast(*Captures).agent;
             const reaction_ = captures_.cast(*Captures).reaction;
             const argument_ = captures_.cast(*Captures).argument;
@@ -587,7 +592,7 @@ pub fn newPromiseResolveThenableJob(
     promise_to_resolve: *Promise,
     thenable: Object,
     then: JobCallback,
-) !struct { job: Job, realm: *Realm } {
+) Allocator.Error!struct { job: Job, realm: *Realm } {
     const Captures = struct {
         agent: *Agent,
         promise_to_resolve: *Promise,
@@ -671,7 +676,7 @@ pub fn performPromiseThen(
     on_fulfilled: Value,
     on_rejected: Value,
     result_capability: ?PromiseCapability,
-) !?Object {
+) Allocator.Error!?Object {
     // 1. Assert: IsPromise(promise) is true.
     // 2. If resultCapability is not present, then
     //     a. Set resultCapability to undefined.
@@ -776,7 +781,7 @@ pub fn performPromiseThen(
 /// 27.2.4 Properties of the Promise Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-constructor
 pub const PromiseConstructor = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
             .length = 1,
             .name = "Promise",
@@ -799,7 +804,7 @@ pub const PromiseConstructor = struct {
         // 27.2.4.8 get Promise [ @@species ]
         // https://tc39.es/ecma262/#sec-get-promise-@@species
         try defineBuiltinAccessor(object, "@@species", struct {
-            fn getter(_: *Agent, this_value: Value, _: ArgumentsList) !Value {
+            fn getter(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
                 // 1. Return the this value.
                 return this_value;
             }
@@ -817,7 +822,12 @@ pub const PromiseConstructor = struct {
 
     /// 27.2.3.1 Promise ( executor )
     /// https://tc39.es/ecma262/#sec-promise-executor
-    fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, new_target: ?Object) !Value {
+    fn behaviour(
+        agent: *Agent,
+        _: Value,
+        arguments: ArgumentsList,
+        new_target: ?Object,
+    ) Agent.Error!Value {
         const executor = arguments.get(0);
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
@@ -885,7 +895,7 @@ pub const PromiseConstructor = struct {
 
     /// 27.2.4.6 Promise.reject ( r )
     /// https://tc39.es/ecma262/#sec-promise.reject
-    fn reject(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+    fn reject(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
         const reason = arguments.get(0);
 
         // 1. Let C be the this value.
@@ -903,7 +913,7 @@ pub const PromiseConstructor = struct {
 
     /// 27.2.4.7 Promise.resolve ( x )
     /// https://tc39.es/ecma262/#sec-promise.resolve
-    fn resolve(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+    fn resolve(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
         const resolution = arguments.get(0);
 
         // 1. Let C be the this value.
@@ -922,7 +932,7 @@ pub const PromiseConstructor = struct {
 /// 27.2.5 Properties of the Promise Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-prototype-object
 pub const PromisePrototype = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
@@ -945,7 +955,7 @@ pub const PromisePrototype = struct {
 
     /// 27.2.5.1 Promise.prototype.catch ( onRejected )
     /// https://tc39.es/ecma262/#sec-promise.prototype.catch
-    fn @"catch"(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+    fn @"catch"(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
         const on_rejected = arguments.get(0);
 
         // 1. Let promise be the this value.
@@ -957,7 +967,7 @@ pub const PromisePrototype = struct {
 
     /// 27.2.5.3 Promise.prototype.finally ( onFinally )
     /// https://tc39.es/ecma262/#sec-promise.prototype.finally
-    fn finally(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+    fn finally(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
         const realm = agent.currentRealm();
         const on_finally = arguments.get(0);
 
@@ -998,7 +1008,7 @@ pub const PromisePrototype = struct {
             // a. Let thenFinallyClosure be a new Abstract Closure with parameters (value) that
             //    captures onFinally and C and performs the following steps when called:
             const then_finally_closure = struct {
-                fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) !Value {
+                fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) Agent.Error!Value {
                     const function = agent_.activeFunctionObject();
                     const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
                     const on_finally_ = captures_.on_finally;
@@ -1017,7 +1027,7 @@ pub const PromisePrototype = struct {
                     // iii. Let returnValue be a new Abstract Closure with no parameters that captures
                     //      value and performs the following steps when called:
                     const return_value = struct {
-                        fn func(agent__: *Agent, _: Value, _: ArgumentsList) !Value {
+                        fn func(agent__: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
                             const function_ = agent__.activeFunctionObject();
                             const value_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Value).*;
 
@@ -1056,7 +1066,7 @@ pub const PromisePrototype = struct {
             // c. Let catchFinallyClosure be a new Abstract Closure with parameters (reason) that
             //    captures onFinally and C and performs the following steps when called:
             const catch_finally_closure = struct {
-                fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) !Value {
+                fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) Agent.Error!Value {
                     const function = agent_.activeFunctionObject();
                     const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
                     const on_finally_ = captures_.on_finally;
@@ -1075,7 +1085,7 @@ pub const PromisePrototype = struct {
                     // iii. Let throwReason be a new Abstract Closure with no parameters that captures
                     //      reason and performs the following steps when called:
                     const throw_reason = struct {
-                        fn func(agent__: *Agent, _: Value, _: ArgumentsList) !Value {
+                        fn func(agent__: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
                             const function_ = agent__.activeFunctionObject();
                             const reason_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Value).*;
 
@@ -1119,7 +1129,7 @@ pub const PromisePrototype = struct {
 
     /// 27.2.5.4 Promise.prototype.then ( onFulfilled, onRejected )
     /// https://tc39.es/ecma262/#sec-promise.prototype.then
-    fn then(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+    fn then(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
         const realm = agent.currentRealm();
         const on_fulfilled = arguments.get(0);
         const on_rejected = arguments.get(1);

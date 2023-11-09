@@ -80,7 +80,7 @@ pub fn format(
     comptime fmt: []const u8,
     options: std.fmt.FormatOptions,
     writer: anytype,
-) !void {
+) @TypeOf(writer).Error!void {
     _ = self;
     _ = fmt;
     _ = options;
@@ -127,7 +127,7 @@ pub fn sameValue(self: Self, other: Self) bool {
 
 /// 7.1.1.1 OrdinaryToPrimitive ( O, hint )
 /// https://tc39.es/ecma262/#sec-ordinarytoprimitive
-pub fn ordinaryToPrimitive(self: Self, hint: PreferredType) !Value {
+pub fn ordinaryToPrimitive(self: Self, hint: PreferredType) Agent.Error!Value {
     const method_names = switch (hint) {
         // 1. If hint is string, then
         //     a. Let methodNames be « "toString", "valueOf" ».
@@ -162,14 +162,14 @@ pub fn ordinaryToPrimitive(self: Self, hint: PreferredType) !Value {
 
 /// 7.2.5 IsExtensible ( O )
 /// https://tc39.es/ecma262/#sec-isextensible-o
-pub fn isExtensible(self: Self) !bool {
+pub fn isExtensible(self: Self) Agent.Error!bool {
     // 1. Return ? O.[[IsExtensible]]().
     return self.internalMethods().isExtensible(self);
 }
 
 /// 7.3.2 Get ( O, P )
 /// https://tc39.es/ecma262/#sec-get-o-p
-pub fn get(self: Self, property_key: PropertyKey) !Value {
+pub fn get(self: Self, property_key: PropertyKey) Agent.Error!Value {
     // 1. Return ? O.[[Get]](P, O).
     return self.internalMethods().get(self, property_key, Value.from(self));
 }
@@ -181,7 +181,7 @@ pub fn set(
     property_key: PropertyKey,
     value: Value,
     throw: enum { throw, ignore },
-) !void {
+) Agent.Error!void {
     // 1. Let success be ? O.[[Set]](P, V, O).
     const success = try self.internalMethods().set(self, property_key, value, Value.from(self));
 
@@ -194,7 +194,7 @@ pub fn set(
 
 /// 7.3.5 CreateDataProperty ( O, P, V )
 /// https://tc39.es/ecma262/#sec-createdataproperty
-pub fn createDataProperty(self: Self, property_key: PropertyKey, value: Value) !bool {
+pub fn createDataProperty(self: Self, property_key: PropertyKey, value: Value) Agent.Error!bool {
     // 1. Let newDesc be the PropertyDescriptor {
     //      [[Value]]: V, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true
     //    }.
@@ -211,7 +211,7 @@ pub fn createDataProperty(self: Self, property_key: PropertyKey, value: Value) !
 
 /// 7.3.6 CreateMethodProperty ( O, P, V )
 /// https://tc39.es/ecma262/#sec-createmethodproperty
-pub fn createMethodProperty(self: Self, property_key: PropertyKey, value: Value) !void {
+pub fn createMethodProperty(self: Self, property_key: PropertyKey, value: Value) Agent.Error!void {
     // 1. Assert: O is an ordinary, extensible object with no non-configurable properties.
     std.debug.assert(self.extensible().* and blk: {
         for (self.propertyStorage().hash_map.values()) |descriptor| {
@@ -238,7 +238,11 @@ pub fn createMethodProperty(self: Self, property_key: PropertyKey, value: Value)
 
 /// 7.3.7 CreateDataPropertyOrThrow ( O, P, V )
 /// https://tc39.es/ecma262/#sec-createdatapropertyorthrow
-pub fn createDataPropertyOrThrow(self: Self, property_key: PropertyKey, value: Value) !void {
+pub fn createDataPropertyOrThrow(
+    self: Self,
+    property_key: PropertyKey,
+    value: Value,
+) Agent.Error!void {
     // 1. Let success be ? CreateDataProperty(O, P, V).
     const success = try self.createDataProperty(property_key, value);
 
@@ -255,7 +259,7 @@ pub fn createNonEnumerableDataPropertyOrThrow(
     self: Self,
     property_key: PropertyKey,
     value: Value,
-) !void {
+) Agent.Error!void {
     // 1. Assert: O is an ordinary, extensible object with no non-configurable properties.
     std.debug.assert(self.extensible().* and blk: {
         for (self.propertyStorage().hash_map.values()) |descriptor| {
@@ -286,7 +290,7 @@ pub fn definePropertyOrThrow(
     self: Self,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
-) !void {
+) Agent.Error!void {
     // 1. Let success be ? O.[[DefineOwnProperty]](P, desc).
     const success = try self.internalMethods().defineOwnProperty(
         self,
@@ -303,7 +307,7 @@ pub fn definePropertyOrThrow(
 
 /// 7.3.10 DeletePropertyOrThrow ( O, P )
 /// https://tc39.es/ecma262/#sec-deletepropertyorthrow
-pub fn deletePropertyOrThrow(self: Self, property_key: PropertyKey) !void {
+pub fn deletePropertyOrThrow(self: Self, property_key: PropertyKey) Agent.Error!void {
     // 1. Let success be ? O.[[Delete]](P).
     const success = try self.internalMethods().delete(self, property_key);
 
@@ -316,14 +320,14 @@ pub fn deletePropertyOrThrow(self: Self, property_key: PropertyKey) !void {
 
 /// 7.3.12 HasProperty ( O, P )
 /// https://tc39.es/ecma262/#sec-hasproperty
-pub fn hasProperty(self: Self, property_key: PropertyKey) !bool {
+pub fn hasProperty(self: Self, property_key: PropertyKey) Agent.Error!bool {
     // 1. Return ? O.[[HasProperty]](P).
     return self.internalMethods().hasProperty(self, property_key);
 }
 
 /// 7.3.13 HasOwnProperty ( O, P )
 /// https://tc39.es/ecma262/#sec-hasownproperty
-pub fn hasOwnProperty(self: Self, property_key: PropertyKey) !bool {
+pub fn hasOwnProperty(self: Self, property_key: PropertyKey) Agent.Error!bool {
     // 1. Let desc be ? O.[[GetOwnProperty]](P).
     const descriptor = try self.internalMethods().getOwnProperty(self, property_key);
 
@@ -338,7 +342,7 @@ pub fn construct(
     self: Self,
     arguments: anytype,
     maybe_new_target: ?Self,
-) !Self {
+) Agent.Error!Self {
     // 1. If newTarget is not present, set newTarget to F.
     const new_target = maybe_new_target orelse self;
 
@@ -351,7 +355,7 @@ pub fn construct(
 
 /// 7.3.16 SetIntegrityLevel ( O, level )
 /// https://tc39.es/ecma262/#sec-setintegritylevel
-pub fn setIntegrityLevel(self: Self, level: IntegrityLevel) !bool {
+pub fn setIntegrityLevel(self: Self, level: IntegrityLevel) Agent.Error!bool {
     // 1. Let status be ? O.[[PreventExtensions]]().
     const status = try self.internalMethods().preventExtensions(self);
 
@@ -420,7 +424,7 @@ pub fn setIntegrityLevel(self: Self, level: IntegrityLevel) !bool {
 
 /// 7.3.17 TestIntegrityLevel ( O, level )
 /// https://tc39.es/ecma262/#sec-testintegritylevel
-pub fn testIntegrityLevel(self: Self, level: IntegrityLevel) !bool {
+pub fn testIntegrityLevel(self: Self, level: IntegrityLevel) Agent.Error!bool {
     // 1. Let extensible be ? IsExtensible(O).
     const extensible_ = try self.isExtensible();
 
@@ -459,14 +463,14 @@ pub fn testIntegrityLevel(self: Self, level: IntegrityLevel) !bool {
 
 /// 7.3.19 LengthOfArrayLike ( obj )
 /// https://tc39.es/ecma262/#sec-lengthofarraylike
-pub fn lengthOfArrayLike(self: Self) !u53 {
+pub fn lengthOfArrayLike(self: Self) Agent.Error!u53 {
     // 1. Return ℝ(? ToLength(? Get(obj, "length"))).
     return (try self.get(PropertyKey.from("length"))).toLength(self.agent());
 }
 
 /// 7.3.23 SpeciesConstructor ( O, defaultConstructor )
 /// https://tc39.es/ecma262/#sec-speciesconstructor
-pub fn speciesConstructor(self: Self, default_constructor: Self) !Self {
+pub fn speciesConstructor(self: Self, default_constructor: Self) Agent.Error!Self {
     // 1. Let C be ? Get(O, "constructor").
     const constructor = try self.get(PropertyKey.from("constructor"));
 
@@ -502,7 +506,7 @@ pub fn speciesConstructor(self: Self, default_constructor: Self) !Self {
 pub fn enumerableOwnProperties(
     self: Self,
     comptime kind: PropertyKind,
-) !std.ArrayList(Value) {
+) Agent.Error!std.ArrayList(Value) {
     // 1. Let ownKeys be ? O.[[OwnPropertyKeys]]().
     const own_keys = try self.internalMethods().ownPropertyKeys(self);
     defer own_keys.deinit();
@@ -559,7 +563,7 @@ pub fn enumerableOwnProperties(
 
 /// 7.3.25 GetFunctionRealm ( obj )
 /// https://tc39.es/ecma262/#sec-getfunctionrealm
-pub fn getFunctionRealm(self: Self) !*Realm {
+pub fn getFunctionRealm(self: Self) error{ExceptionThrown}!*Realm {
     // 1. If obj has a [[Realm]] internal slot, then
     if (self.internalMethods().call != null) {
         // a. Return obj.[[Realm]].
@@ -599,7 +603,11 @@ pub fn getFunctionRealm(self: Self) !*Realm {
 
 /// 7.3.26 CopyDataProperties ( target, source, excludedItems )
 /// https://tc39.es/ecma262/#sec-copydataproperties
-pub fn copyDataProperties(self: *Self, source: Value, excluded_items: []const PropertyKey) !void {
+pub fn copyDataProperties(
+    self: *Self,
+    source: Value,
+    excluded_items: []const PropertyKey,
+) Agent.Error!void {
     // 1. If source is either undefined or null, return unused.
     if (source == .undefined or source == .null) return;
 
@@ -646,7 +654,7 @@ pub fn copyDataProperties(self: *Self, source: Value, excluded_items: []const Pr
 
 /// 7.3.33 DefineField ( receiver, fieldRecord )
 /// https://tc39.es/ecma262/#sec-definefield
-pub fn defineField(self: *Self, field: ClassFieldDefinition) !void {
+pub fn defineField(self: *Self, field: ClassFieldDefinition) Agent.Error!void {
     // 1. Let fieldName be fieldRecord.[[Name]].
 
     // 2. Let initializer be fieldRecord.[[Initializer]].
@@ -679,7 +687,7 @@ pub fn defineField(self: *Self, field: ClassFieldDefinition) !void {
 
 /// 7.3.34 InitializeInstanceElements ( O, constructor )
 /// https://tc39.es/ecma262/#sec-initializeinstanceelements
-pub fn initializeInstanceElements(self: *Self, constructor: Self) !void {
+pub fn initializeInstanceElements(self: *Self, constructor: Self) Agent.Error!void {
     // TODO: 1. Let methods be the value of constructor.[[PrivateMethods]].
     // TODO: 2. For each PrivateElement method of methods, do
     //     a. Perform ? PrivateMethodOrAccessorAdd(O, method).

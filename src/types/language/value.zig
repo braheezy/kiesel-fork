@@ -78,7 +78,7 @@ pub const Value = union(enum) {
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
-    ) !void {
+    ) @TypeOf(writer).Error!void {
         _ = options;
         if (std.mem.eql(u8, fmt, "pretty")) {
             return prettyPrintValue(self, writer) catch |err| {
@@ -144,7 +144,7 @@ pub const Value = union(enum) {
 
     /// 6.2.6.5 ToPropertyDescriptor ( Obj )
     /// https://tc39.es/ecma262/#sec-topropertydescriptor
-    pub fn toPropertyDescriptor(self: Self, agent: *Agent) !PropertyDescriptor {
+    pub fn toPropertyDescriptor(self: Self, agent: *Agent) Agent.Error!PropertyDescriptor {
         // 1. If Obj is not an Object, throw a TypeError exception.
         if (self != .object) {
             return agent.throwException(.type_error, "{} is not an Object", .{self});
@@ -256,7 +256,7 @@ pub const Value = union(enum) {
 
     /// 7.1.1 ToPrimitive ( input [ , preferredType ] )
     /// https://tc39.es/ecma262/#sec-toprimitive
-    pub fn toPrimitive(self: Self, agent: *Agent, preferred_type: ?PreferredType) !Value {
+    pub fn toPrimitive(self: Self, agent: *Agent, preferred_type: ?PreferredType) Agent.Error!Value {
         // 1. If input is an Object, then
         if (self == .object) {
             // a. Let exoticToPrim be ? GetMethod(input, @@toPrimitive).
@@ -340,7 +340,7 @@ pub const Value = union(enum) {
 
     /// 7.1.3 ToNumeric ( value )
     /// https://tc39.es/ecma262/#sec-tonumeric
-    pub fn toNumeric(self: Self, agent: *Agent) !Numeric {
+    pub fn toNumeric(self: Self, agent: *Agent) Agent.Error!Numeric {
         // 1. Let primValue be ? ToPrimitive(value, number).
         const primitive_value = try self.toPrimitive(agent, .number);
 
@@ -353,7 +353,7 @@ pub const Value = union(enum) {
 
     /// 7.1.4 ToNumber ( argument )
     /// https://tc39.es/ecma262/#sec-tonumber
-    pub fn toNumber(self: Self, agent: *Agent) !Number {
+    pub fn toNumber(self: Self, agent: *Agent) Agent.Error!Number {
         switch (self) {
             // 1. If argument is a Number, return argument.
             .number => |number| return number,
@@ -397,7 +397,7 @@ pub const Value = union(enum) {
 
     /// 7.1.5 ToIntegerOrInfinity ( argument )
     /// https://tc39.es/ecma262/#sec-tointegerorinfinity
-    pub fn toIntegerOrInfinity(self: Self, agent: *Agent) !f64 {
+    pub fn toIntegerOrInfinity(self: Self, agent: *Agent) Agent.Error!f64 {
         // 1. Let number be ? ToNumber(argument).
         const number = try self.toNumber(agent);
 
@@ -418,7 +418,7 @@ pub const Value = union(enum) {
 
     /// 7.1.6 ToInt32 ( argument )
     /// https://tc39.es/ecma262/#sec-toint32
-    pub fn toInt32(self: Self, agent: *Agent) !i32 {
+    pub fn toInt32(self: Self, agent: *Agent) Agent.Error!i32 {
         // OPTIMIZATION: We may already have an i32 :^)
         if (self == .number and self.number == .i32) return self.number.i32;
 
@@ -440,7 +440,7 @@ pub const Value = union(enum) {
 
     /// 7.1.7 ToUint32 ( argument )
     /// https://tc39.es/ecma262/#sec-touint32
-    pub fn toUint32(self: Self, agent: *Agent) !u32 {
+    pub fn toUint32(self: Self, agent: *Agent) Agent.Error!u32 {
         // OPTIMIZATION: We may already have a positive i32 :^)
         if (self == .number and self.number == .i32 and self.number.i32 >= 0)
             return @intCast(self.number.i32);
@@ -463,7 +463,7 @@ pub const Value = union(enum) {
 
     /// 7.1.8 ToInt16 ( argument )
     /// https://tc39.es/ecma262/#sec-toint16
-    pub fn toInt16(self: Self, agent: *Agent) !i16 {
+    pub fn toInt16(self: Self, agent: *Agent) Agent.Error!i16 {
         // 1. Let number be ? ToNumber(argument).
         const number = try self.toNumber(agent);
 
@@ -482,7 +482,7 @@ pub const Value = union(enum) {
 
     /// 7.1.9 ToUint16 ( argument )
     /// https://tc39.es/ecma262/#sec-touint16
-    pub fn toUint16(self: Self, agent: *Agent) !u16 {
+    pub fn toUint16(self: Self, agent: *Agent) Agent.Error!u16 {
         // 1. Let number be ? ToNumber(argument).
         const number = try self.toNumber(agent);
 
@@ -501,7 +501,7 @@ pub const Value = union(enum) {
 
     /// 7.1.10 ToInt8 ( argument )
     /// https://tc39.es/ecma262/#sec-toint8
-    pub fn toInt8(self: Self, agent: *Agent) !i8 {
+    pub fn toInt8(self: Self, agent: *Agent) Agent.Error!i8 {
         // 1. Let number be ? ToNumber(argument).
         const number = try self.toNumber(agent);
 
@@ -520,7 +520,7 @@ pub const Value = union(enum) {
 
     /// 7.1.11 ToUint8 ( argument )
     /// https://tc39.es/ecma262/#sec-touint8
-    pub fn toUint8(self: Self, agent: *Agent) !u8 {
+    pub fn toUint8(self: Self, agent: *Agent) Agent.Error!u8 {
         // 1. Let number be ? ToNumber(argument).
         const number = try self.toNumber(agent);
 
@@ -539,7 +539,7 @@ pub const Value = union(enum) {
 
     /// 7.1.12 ToUint8Clamp ( argument )
     /// https://tc39.es/ecma262/#sec-touint8clamp
-    pub fn toUint8Clamp(self: Self, agent: *Agent) !u8 {
+    pub fn toUint8Clamp(self: Self, agent: *Agent) Agent.Error!u8 {
         // 1. Let number be ? ToNumber(argument).
         const number = try self.toNumber(agent);
 
@@ -566,7 +566,7 @@ pub const Value = union(enum) {
 
     /// 7.1.13 ToBigInt ( argument )
     /// https://tc39.es/ecma262/#sec-tobigint
-    pub fn toBigInt(self: Self, agent: *Agent) !BigInt {
+    pub fn toBigInt(self: Self, agent: *Agent) Agent.Error!BigInt {
         // 1. Let prim be ? ToPrimitive(argument, number).
         const primitive = try self.toPrimitive(agent, .number);
 
@@ -606,7 +606,7 @@ pub const Value = union(enum) {
 
     /// 7.1.15 ToBigInt64 ( argument )
     /// https://tc39.es/ecma262/#sec-tobigint64
-    pub fn toBigInt64(self: Self, agent: *Agent) !i64 {
+    pub fn toBigInt64(self: Self, agent: *Agent) Agent.Error!i64 {
         const pow_2_63 = agent.pre_allocated.pow_2_63;
         const pow_2_64 = agent.pre_allocated.pow_2_64;
 
@@ -630,7 +630,7 @@ pub const Value = union(enum) {
 
     /// 7.1.16 ToBigUint64 ( argument )
     /// https://tc39.es/ecma262/#sec-tobiguint64
-    pub fn toBigUint64(self: Self, agent: *Agent) !u64 {
+    pub fn toBigUint64(self: Self, agent: *Agent) Agent.Error!u64 {
         const pow_2_64 = agent.pre_allocated.pow_2_64;
 
         // 1. Let n be ? ToBigInt(argument).
@@ -647,7 +647,7 @@ pub const Value = union(enum) {
 
     /// 7.1.17 ToString ( argument )
     /// https://tc39.es/ecma262/#sec-tostring
-    pub fn toString(self: Self, agent: *Agent) !String {
+    pub fn toString(self: Self, agent: *Agent) Agent.Error!String {
         return switch (self) {
             // 1. If argument is a String, return argument.
             .string => |string| string,
@@ -691,7 +691,7 @@ pub const Value = union(enum) {
 
     /// 7.1.18 ToObject ( argument )
     /// https://tc39.es/ecma262/#sec-toobject
-    pub fn toObject(self: Self, agent: *Agent) !Object {
+    pub fn toObject(self: Self, agent: *Agent) Agent.Error!Object {
         const realm = agent.currentRealm();
         return switch (self) {
             .undefined => agent.throwException(.type_error, "Cannot convert undefined to Object", .{}),
@@ -723,7 +723,7 @@ pub const Value = union(enum) {
 
     /// 7.1.19 ToPropertyKey ( argument )
     /// https://tc39.es/ecma262/#sec-topropertykey
-    pub fn toPropertyKey(self: Self, agent: *Agent) !PropertyKey {
+    pub fn toPropertyKey(self: Self, agent: *Agent) Agent.Error!PropertyKey {
         // 1. Let key be ? ToPrimitive(argument, string).
         const key = try self.toPrimitive(agent, .string);
 
@@ -740,7 +740,7 @@ pub const Value = union(enum) {
 
     /// 7.1.20 ToLength ( argument )
     /// https://tc39.es/ecma262/#sec-tolength
-    pub fn toLength(self: Self, agent: *Agent) !u53 {
+    pub fn toLength(self: Self, agent: *Agent) Agent.Error!u53 {
         // 1. Let len be ? ToIntegerOrInfinity(argument).
         const length = try self.toIntegerOrInfinity(agent);
 
@@ -753,7 +753,7 @@ pub const Value = union(enum) {
 
     /// 7.1.22 ToIndex ( value )
     /// https://tc39.es/ecma262/#sec-toindex
-    pub fn toIndex(self: Self, agent: *Agent) !u53 {
+    pub fn toIndex(self: Self, agent: *Agent) Agent.Error!u53 {
         // 1. Let integer be ? ToIntegerOrInfinity(value).
         const integer = try self.toIntegerOrInfinity(agent);
 
@@ -767,7 +767,7 @@ pub const Value = union(enum) {
 
     /// 7.2.1 RequireObjectCoercible ( argument )
     /// https://tc39.es/ecma262/#sec-requireobjectcoercible
-    pub fn requireObjectCoercible(self: Self, agent: *Agent) !Self {
+    pub fn requireObjectCoercible(self: Self, agent: *Agent) error{ExceptionThrown}!Self {
         switch (self) {
             .undefined => return agent.throwException(.type_error, "Cannot convert undefined to Object", .{}),
             .null => return agent.throwException(.type_error, "Cannot convert null to Object", .{}),
@@ -777,7 +777,7 @@ pub const Value = union(enum) {
 
     /// 7.2.2 IsArray ( argument )
     /// https://tc39.es/ecma262/#sec-isarray
-    pub fn isArray(self: Self) !bool {
+    pub fn isArray(self: Self) error{ExceptionThrown}!bool {
         // 1. If argument is not an Object, return false.
         if (self != .object) return false;
 
@@ -844,7 +844,7 @@ pub const Value = union(enum) {
 
     /// 7.2.8 IsRegExp ( argument )
     /// https://tc39.es/ecma262/#sec-isregexp
-    pub fn isRegExp(self: Self) !bool {
+    pub fn isRegExp(self: Self) Agent.Error!bool {
         // 1. If argument is not an Object, return false.
         if (self != .object) return false;
 
@@ -865,7 +865,7 @@ pub const Value = union(enum) {
 
     /// 7.3.3 GetV ( V, P )
     /// https://tc39.es/ecma262/#sec-getv
-    pub fn get(self: Self, agent: *Agent, property_key: PropertyKey) !Value {
+    pub fn get(self: Self, agent: *Agent, property_key: PropertyKey) Agent.Error!Value {
         // 1. Let O be ? ToObject(V).
         const object = try self.toObject(agent);
 
@@ -875,7 +875,7 @@ pub const Value = union(enum) {
 
     /// 7.3.11 GetMethod ( V, P )
     /// https://tc39.es/ecma262/#sec-getmethod
-    pub fn getMethod(self: Self, agent: *Agent, property_key: PropertyKey) !?Object {
+    pub fn getMethod(self: Self, agent: *Agent, property_key: PropertyKey) Agent.Error!?Object {
         // 1. Let func be ? GetV(V, P).
         const function = try self.get(agent, property_key);
 
@@ -898,7 +898,7 @@ pub const Value = union(enum) {
         agent: *Agent,
         this_value: Value,
         arguments: anytype,
-    ) !Value {
+    ) Agent.Error!Value {
         // 1. If argumentsList is not present, set argumentsList to a new empty List.
         // NOTE: This is done via the NoArgs variant of the function.
         const arguments_list = ArgumentsList.from(arguments);
@@ -912,15 +912,15 @@ pub const Value = union(enum) {
         return self.object.internalMethods().call.?(self.object, this_value, arguments_list);
     }
 
-    pub inline fn callNoArgs(self: Self, agent: *Agent, this_value: Value) !Value {
+    pub inline fn callNoArgs(self: Self, agent: *Agent, this_value: Value) Agent.Error!Value {
         return self.call(agent, this_value, .{});
     }
 
-    pub inline fn callAssumeCallable(self: Self, this_value: Value, arguments: anytype) !Value {
+    pub inline fn callAssumeCallable(self: Self, this_value: Value, arguments: anytype) Agent.Error!Value {
         return self.object.internalMethods().call.?(self.object, this_value, ArgumentsList.from(arguments));
     }
 
-    pub inline fn callAssumeCallableNoArgs(self: Self, this_value: Value) !Value {
+    pub inline fn callAssumeCallableNoArgs(self: Self, this_value: Value) Agent.Error!Value {
         return self.callAssumeCallable(this_value, .{});
     }
 
@@ -928,7 +928,7 @@ pub const Value = union(enum) {
     /// https://tc39.es/ecma262/#sec-createlistfromarraylike
     pub fn createListFromArrayLike(self: Self, agent: *Agent, args: struct {
         element_types: ?[]const std.meta.Tag(Value) = null,
-    }) ![]Value {
+    }) Agent.Error![]Value {
         // 1. If elementTypes is not present, set elementTypes to « Undefined, Null, Boolean,
         //    String, Symbol, Number, BigInt, Object ».
         const element_types = args.element_types orelse std.enums.values(std.meta.Tag(Value));
@@ -978,7 +978,12 @@ pub const Value = union(enum) {
 
     /// 7.3.21 Invoke ( V, P [ , argumentsList ] )
     /// https://tc39.es/ecma262/#sec-invoke
-    pub fn invoke(self: Self, agent: *Agent, property_key: PropertyKey, arguments: anytype) !Value {
+    pub fn invoke(
+        self: Self,
+        agent: *Agent,
+        property_key: PropertyKey,
+        arguments: anytype,
+    ) Agent.Error!Value {
         // 1. If argumentsList is not present, set argumentsList to a new empty List.
 
         // 2. Let func be ? GetV(V, P).
@@ -1033,7 +1038,11 @@ pub const Value = union(enum) {
 
     /// 10.1.15 RequireInternalSlot ( O, internalSlot )
     /// https://tc39.es/ecma262/#sec-requireinternalslot
-    pub fn requireInternalSlot(self: Self, agent: *Agent, comptime T: type) !*T {
+    pub fn requireInternalSlot(
+        self: Self,
+        agent: *Agent,
+        comptime T: type,
+    ) error{ExceptionThrown}!*T {
         const name = comptime blk: {
             var name: []const u8 = undefined;
 
@@ -1065,7 +1074,7 @@ pub const Value = union(enum) {
 
     /// 13.10.2 InstanceofOperator ( V, target )
     /// https://tc39.es/ecma262/#sec-instanceofoperator
-    pub fn instanceofOperator(self: Self, agent: *Agent, target: Self) !bool {
+    pub fn instanceofOperator(self: Self, agent: *Agent, target: Self) Agent.Error!bool {
         // 1. If target is not an Object, throw a TypeError exception.
         if (target != .object) {
             return agent.throwException(
@@ -1126,8 +1135,7 @@ pub fn stringToNumber(string: String) Number {
 
 /// 7.1.14 StringToBigInt ( str )
 /// https://tc39.es/ecma262/#sec-stringtobigint
-pub fn stringToBigInt(allocator: Allocator, string: String) !?BigInt {
-
+pub fn stringToBigInt(allocator: Allocator, string: String) Allocator.Error!?BigInt {
     // 1. Let text be StringToCodePoints(str).
 
     // 2. Let literal be ParseText(text, StringIntegerLiteral).
@@ -1216,7 +1224,7 @@ pub fn isLessThan(
     x: Value,
     y: Value,
     order: enum { left_first, right_first },
-) !?bool {
+) Agent.Error!?bool {
     var px: Value = undefined;
     var py: Value = undefined;
 
@@ -1335,7 +1343,7 @@ pub fn isLessThan(
 
 /// 7.2.14 IsLooselyEqual ( x, y )
 /// https://tc39.es/ecma262/#sec-islooselyequal
-pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) !bool {
+pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) Agent.Error!bool {
     // 1. If Type(x) is Type(y), then
     if (std.meta.activeTag(x) == std.meta.activeTag(y)) {
         // a. Return IsStrictlyEqual(x, y).
@@ -1448,7 +1456,7 @@ pub fn isStrictlyEqual(x: Value, y: Value) bool {
 
 /// 7.3.18 CreateArrayFromList ( elements )
 /// https://tc39.es/ecma262/#sec-createarrayfromlist
-pub fn createArrayFromList(agent: *Agent, elements: []const Value) !Object {
+pub fn createArrayFromList(agent: *Agent, elements: []const Value) Allocator.Error!Object {
     // 1. Let array be ! ArrayCreate(0).
     const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
 
@@ -1474,8 +1482,8 @@ pub fn createArrayFromListMapToValue(
     agent: *Agent,
     comptime T: type,
     elements: []const T,
-    mapFn: fn (*Agent, T) Agent.Error!Value,
-) !Object {
+    mapFn: fn (*Agent, T) Allocator.Error!Value,
+) Allocator.Error!Object {
     // 1. Let array be ! ArrayCreate(0).
     const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
 
@@ -1502,7 +1510,7 @@ pub fn createArrayFromListMapToValue(
 
 /// 9.2.12 CoerceOptionsToObject ( options )
 /// https://tc39.es/ecma402/#sec-coerceoptionstoobject
-pub fn coerceOptionsToObject(agent: *Agent, options: Value) !Object {
+pub fn coerceOptionsToObject(agent: *Agent, options: Value) Agent.Error!Object {
     // 1. If options is undefined, then
     if (options == .undefined) {
         // a. Return OrdinaryObjectCreate(null).
@@ -1535,7 +1543,7 @@ pub fn getOption(
     },
     comptime values: ?[]const @"type".T(),
     comptime default: ?@"type".T(),
-) !@"type".T() {
+) Agent.Error!@"type".T() {
     const agent = options.agent();
 
     // 1. Let value be ? Get(options, property).

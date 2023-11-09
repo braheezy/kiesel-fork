@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const SafePointer = @import("any-pointer").SafePointer;
 
 const ast = @import("../language/ast.zig");
@@ -31,7 +33,7 @@ const sameValue = types.sameValue;
 
 /// 10.4.4.1 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-getownproperty-p
-fn getOwnProperty(object: Object, property_key: PropertyKey) !?PropertyDescriptor {
+fn getOwnProperty(object: Object, property_key: PropertyKey) Allocator.Error!?PropertyDescriptor {
     // 1. Let desc be OrdinaryGetOwnProperty(args, P).
     var descriptor = ordinaryGetOwnProperty(object, property_key);
 
@@ -60,7 +62,7 @@ fn defineOwnProperty(
     object: Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
-) !bool {
+) Allocator.Error!bool {
     // 1. Let map be args.[[ParameterMap]].
     const map = object.as(Arguments).fields.parameter_map;
 
@@ -123,7 +125,7 @@ fn defineOwnProperty(
 
 /// 10.4.4.3 [[Get]] ( P, Receiver )
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-get-p-receiver
-fn get(object: Object, property_key: PropertyKey, receiver: Value) !Value {
+fn get(object: Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value {
     // 1. Let map be args.[[ParameterMap]].
     const map = object.as(Arguments).fields.parameter_map;
 
@@ -145,7 +147,12 @@ fn get(object: Object, property_key: PropertyKey, receiver: Value) !Value {
 
 /// 10.4.4.4 [[Set]] ( P, V, Receiver )
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-set-p-v-receiver
-pub fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value) !bool {
+pub fn set(
+    object: Object,
+    property_key: PropertyKey,
+    value: Value,
+    receiver: Value,
+) Agent.Error!bool {
     // 1. If SameValue(args, Receiver) is false, then
     //     a. Let isMapped be false.
     // 2. Else,
@@ -171,7 +178,7 @@ pub fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Va
 
 /// 10.4.4.5 [[Delete]] ( P )
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-delete-p
-fn delete(object: Object, property_key: PropertyKey) !bool {
+fn delete(object: Object, property_key: PropertyKey) Agent.Error!bool {
     // 1. Let map be args.[[ParameterMap]].
     const map = object.as(Arguments).fields.parameter_map;
 
@@ -193,7 +200,10 @@ fn delete(object: Object, property_key: PropertyKey) !bool {
 
 /// 10.4.4.6 CreateUnmappedArgumentsObject ( argumentsList )
 /// https://tc39.es/ecma262/#sec-createunmappedargumentsobject
-pub fn createUnmappedArgumentsObject(agent: *Agent, arguments_list: []const Value) !Object {
+pub fn createUnmappedArgumentsObject(
+    agent: *Agent,
+    arguments_list: []const Value,
+) Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // 1. Let len be the number of elements in argumentsList.
@@ -263,7 +273,7 @@ pub fn createMappedArgumentsObject(
     formals: ast.FormalParameters,
     arguments_list: []const Value,
     env: Environment,
-) !Object {
+) Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // 1. Assert: formals does not contain a rest parameter, any binding patterns, or any
@@ -402,7 +412,7 @@ pub fn createMappedArgumentsObject(
 
 /// 10.4.4.7.1 MakeArgGetter ( name, env )
 /// https://tc39.es/ecma262/#sec-makearggetter
-fn makeArgGetter(agent: *Agent, name: []const u8, env: Environment) !Object {
+fn makeArgGetter(agent: *Agent, name: []const u8, env: Environment) Allocator.Error!Object {
     const Captures = struct {
         name: []const u8,
         env: Environment,
@@ -413,7 +423,7 @@ fn makeArgGetter(agent: *Agent, name: []const u8, env: Environment) !Object {
     // 1. Let getterClosure be a new Abstract Closure with no parameters that captures name and env
     //    and performs the following steps when called:
     const getter_closure = struct {
-        fn func(agent_: *Agent, _: Value, _: ArgumentsList) !Value {
+        fn func(agent_: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
             const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
             const name_ = captures_.name;
@@ -438,7 +448,7 @@ fn makeArgGetter(agent: *Agent, name: []const u8, env: Environment) !Object {
 
 /// 10.4.4.7.2 MakeArgSetter ( name, env )
 /// https://tc39.es/ecma262/#sec-makeargsetter
-fn makeArgSetter(agent: *Agent, name: []const u8, env: Environment) !Object {
+fn makeArgSetter(agent: *Agent, name: []const u8, env: Environment) Allocator.Error!Object {
     const Captures = struct {
         name: []const u8,
         env: Environment,
@@ -449,7 +459,7 @@ fn makeArgSetter(agent: *Agent, name: []const u8, env: Environment) !Object {
     // 1. Let setterClosure be a new Abstract Closure with parameters (value) that captures name
     //    and env and performs the following steps when called:
     const setter_closure = struct {
-        fn func(agent_: *Agent, _: Value, arguments: ArgumentsList) !Value {
+        fn func(agent_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
             const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
             const name_ = captures_.name;

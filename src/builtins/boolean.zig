@@ -1,6 +1,10 @@
 //! 20.3 Boolean Objects
 //! https://tc39.es/ecma262/#sec-boolean-objects
 
+const std = @import("std");
+
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -21,7 +25,7 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// 20.3.2 Properties of the Boolean Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-boolean-constructor
 pub const BooleanConstructor = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
             .length = 1,
             .name = "Boolean",
@@ -51,7 +55,12 @@ pub const BooleanConstructor = struct {
 
     /// 20.3.1.1 Boolean ( value )
     /// https://tc39.es/ecma262/#sec-boolean-constructor-boolean-value
-    fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, new_target: ?Object) !Value {
+    fn behaviour(
+        agent: *Agent,
+        _: Value,
+        arguments: ArgumentsList,
+        new_target: ?Object,
+    ) Agent.Error!Value {
         const value = arguments.get(0);
 
         // 1. Let b be ToBoolean(value).
@@ -79,7 +88,7 @@ pub const BooleanConstructor = struct {
 /// 20.3.3 Properties of the Boolean Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-boolean-prototype-object
 pub const BooleanPrototype = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try Boolean.create(realm.agent, .{
             .fields = .{
                 .boolean_data = false,
@@ -95,7 +104,7 @@ pub const BooleanPrototype = struct {
 
     /// 20.3.3.3.1 ThisBooleanValue ( value )
     /// https://tc39.es/ecma262/#sec-thisbooleanvalue
-    fn thisBooleanValue(agent: *Agent, value: Value) !bool {
+    fn thisBooleanValue(agent: *Agent, value: Value) error{ExceptionThrown}!bool {
         switch (value) {
             // 1. If value is a Boolean, return value.
             .boolean => |boolean| return boolean,
@@ -123,7 +132,7 @@ pub const BooleanPrototype = struct {
 
     /// 20.3.3.2 Boolean.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-boolean.prototype.tostring
-    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Let b be ? ThisBooleanValue(this value).
         const b = try thisBooleanValue(agent, this_value);
 
@@ -133,7 +142,7 @@ pub const BooleanPrototype = struct {
 
     /// 20.3.3.3 Boolean.prototype.valueOf ( )
     /// https://tc39.es/ecma262/#sec-boolean.prototype.valueof
-    fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+    fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return ? ThisBooleanValue(this value).
         return Value.from(try thisBooleanValue(agent, this_value));
     }

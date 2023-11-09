@@ -1,6 +1,10 @@
 //! 27.4 AsyncGeneratorFunction Objects
 //! https://tc39.es/ecma262/#sec-asyncgeneratorfunction-objects
 
+const std = @import("std");
+
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -19,7 +23,7 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 /// 27.4.2 Properties of the AsyncGeneratorFunction Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgeneratorfunction
 pub const AsyncGeneratorFunctionConstructor = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
             .length = 1,
             .name = "AsyncGeneratorFunction",
@@ -41,7 +45,12 @@ pub const AsyncGeneratorFunctionConstructor = struct {
 
     /// 27.4.1.1 AsyncGeneratorFunction ( ...parameterArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-asyncgeneratorfunction
-    fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, new_target: ?Object) !Value {
+    fn behaviour(
+        agent: *Agent,
+        _: Value,
+        arguments: ArgumentsList,
+        new_target: ?Object,
+    ) Agent.Error!Value {
         const parameter_args = ArgumentsList.from(arguments.values[0..arguments.count() -| 1]);
         const maybe_body_arg = arguments.getOrNull(arguments.count() -| 1);
 
@@ -66,19 +75,19 @@ pub const AsyncGeneratorFunctionConstructor = struct {
 /// 27.4.3 Properties of the AsyncGeneratorFunction Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgeneratorfunction-prototype
 pub const AsyncGeneratorFunctionPrototype = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try createNoinit(realm);
         init(realm, object);
         return object;
     }
 
-    pub fn createNoinit(realm: *Realm) !Object {
+    pub fn createNoinit(realm: *Realm) Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) !void {
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 27.4.3.1 AsyncGeneratorFunction.prototype.constructor
         // https://tc39.es/ecma262/#sec-asyncgeneratorfunction-prototype-constructor
         try defineBuiltinProperty(object, "constructor", PropertyDescriptor{

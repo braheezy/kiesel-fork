@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -34,7 +36,7 @@ pub const ordinary_internal_methods = struct {
 
 /// 10.1.1 [[GetPrototypeOf]] ( )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-getprototypeof
-fn getPrototypeOf(object: Object) !?Object {
+fn getPrototypeOf(object: Object) error{}!?Object {
     // 1. Return OrdinaryGetPrototypeOf(O).
     return ordinaryGetPrototypeOf(object);
 }
@@ -48,7 +50,7 @@ pub fn ordinaryGetPrototypeOf(object: Object) ?Object {
 
 /// 10.1.2 [[SetPrototypeOf]] ( V )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-setprototypeof-v
-fn setPrototypeOf(object: Object, prototype: ?Object) !bool {
+fn setPrototypeOf(object: Object, prototype: ?Object) error{}!bool {
     // 1. Return OrdinarySetPrototypeOf(O, V).
     return ordinarySetPrototypeOf(object, prototype);
 }
@@ -107,7 +109,7 @@ pub fn ordinarySetPrototypeOf(object: Object, prototype: ?Object) bool {
 
 /// 10.1.3 [[IsExtensible]] ( )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-isextensible
-fn isExtensible(object: Object) !bool {
+fn isExtensible(object: Object) error{}!bool {
     // 1. Return OrdinaryIsExtensible(O).
     return ordinaryIsExtensible(object);
 }
@@ -121,7 +123,7 @@ pub fn ordinaryIsExtensible(object: Object) bool {
 
 /// 10.1.4 [[PreventExtensions]] ( )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-preventextensions
-fn preventExtensions(object: Object) !bool {
+fn preventExtensions(object: Object) error{}!bool {
     // 1. Return OrdinaryPreventExtensions(O).
     return ordinaryPreventExtensions(object);
 }
@@ -138,7 +140,7 @@ pub fn ordinaryPreventExtensions(object: Object) bool {
 
 /// 10.1.5 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-getownproperty-p
-fn getOwnProperty(object: Object, property_key: PropertyKey) !?PropertyDescriptor {
+fn getOwnProperty(object: Object, property_key: PropertyKey) error{}!?PropertyDescriptor {
     // 1. Return OrdinaryGetOwnProperty(O, P).
     return ordinaryGetOwnProperty(object, property_key);
 }
@@ -189,7 +191,7 @@ fn defineOwnProperty(
     object: Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
-) !bool {
+) Agent.Error!bool {
     // 1. Return ? OrdinaryDefineOwnProperty(O, P, Desc).
     return ordinaryDefineOwnProperty(object, property_key, property_descriptor);
 }
@@ -200,7 +202,7 @@ pub fn ordinaryDefineOwnProperty(
     object: Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
-) !bool {
+) Agent.Error!bool {
     // 1. Let current be ? O.[[GetOwnProperty]](P).
     const current = try object.internalMethods().getOwnProperty(object, property_key);
 
@@ -242,7 +244,7 @@ fn validateAndApplyPropertyDescriptor(
     extensible: bool,
     descriptor: PropertyDescriptor,
     maybe_current: ?PropertyDescriptor,
-) !bool {
+) Allocator.Error!bool {
     // 1. Assert: IsPropertyKey(P) is true.
 
     // 2. If current is undefined, then
@@ -400,14 +402,14 @@ fn validateAndApplyPropertyDescriptor(
 
 /// 10.1.7 [[HasProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-hasproperty-p
-fn hasProperty(object: Object, property_key: PropertyKey) !bool {
+fn hasProperty(object: Object, property_key: PropertyKey) Agent.Error!bool {
     // 1. Return ? OrdinaryHasProperty(O, P).
     return ordinaryHasProperty(object, property_key);
 }
 
 /// 10.1.7.1 OrdinaryHasProperty ( O, P )
 /// https://tc39.es/ecma262/#sec-ordinaryhasproperty
-pub fn ordinaryHasProperty(object: Object, property_key: PropertyKey) !bool {
+pub fn ordinaryHasProperty(object: Object, property_key: PropertyKey) Agent.Error!bool {
     // 1. Let hasOwn be ? O.[[GetOwnProperty]](P).
     const has_own = try object.internalMethods().getOwnProperty(object, property_key);
 
@@ -429,14 +431,14 @@ pub fn ordinaryHasProperty(object: Object, property_key: PropertyKey) !bool {
 
 /// 10.1.8 [[Get]] ( P, Receiver )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-get-p-receiver
-fn get(object: Object, property_key: PropertyKey, receiver: Value) !Value {
+fn get(object: Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value {
     // 1. Return ? OrdinaryGet(O, P, Receiver).
     return ordinaryGet(object, property_key, receiver);
 }
 
 /// 10.1.8.1 OrdinaryGet ( O, P, Receiver )
 /// https://tc39.es/ecma262/#sec-ordinaryget
-pub fn ordinaryGet(object: Object, property_key: PropertyKey, receiver: Value) !Value {
+pub fn ordinaryGet(object: Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value {
     // 1. Let desc be ? O.[[GetOwnProperty]](P).
     const descriptor = try object.internalMethods().getOwnProperty(object, property_key)
 
@@ -471,7 +473,7 @@ pub fn ordinaryGet(object: Object, property_key: PropertyKey, receiver: Value) !
 
 /// 10.1.9 [[Set]] ( P, V, Receiver )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-set-p-v-receiver
-fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value) !bool {
+fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value) Agent.Error!bool {
     // 1. Return ? OrdinarySet(O, P, V, Receiver).
     return ordinarySet(object, property_key, value, receiver);
 }
@@ -483,7 +485,7 @@ pub fn ordinarySet(
     property_key: PropertyKey,
     value: Value,
     receiver: Value,
-) !bool {
+) Agent.Error!bool {
     // 1. Let ownDesc be ? O.[[GetOwnProperty]](P).
     const own_descriptor = try object.internalMethods().getOwnProperty(object, property_key);
 
@@ -499,7 +501,7 @@ pub fn ordinarySetWithOwnDescriptor(
     value: Value,
     receiver_value: Value,
     maybe_own_descriptor: ?PropertyDescriptor,
-) !bool {
+) Agent.Error!bool {
     var own_descriptor: PropertyDescriptor = undefined;
 
     // 1. If ownDesc is undefined, then
@@ -592,14 +594,14 @@ pub fn ordinarySetWithOwnDescriptor(
 
 /// 10.1.10 [[Delete]] ( P )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-delete-p
-fn delete(object: Object, property_key: PropertyKey) !bool {
+fn delete(object: Object, property_key: PropertyKey) Agent.Error!bool {
     // 1. Return ? OrdinaryDelete(O, P).
     return ordinaryDelete(object, property_key);
 }
 
 /// 10.1.10.1 OrdinaryDelete ( O, P )
 /// https://tc39.es/ecma262/#sec-ordinarydelete
-pub fn ordinaryDelete(object: Object, property_key: PropertyKey) !bool {
+pub fn ordinaryDelete(object: Object, property_key: PropertyKey) Agent.Error!bool {
     // 1. Let desc be ? O.[[GetOwnProperty]](P).
     const descriptor = try object.internalMethods().getOwnProperty(object, property_key);
 
@@ -621,14 +623,14 @@ pub fn ordinaryDelete(object: Object, property_key: PropertyKey) !bool {
 
 /// 10.1.11 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-ownpropertykeys
-fn ownPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
+fn ownPropertyKeys(object: Object) Allocator.Error!std.ArrayList(PropertyKey) {
     // 1. Return OrdinaryOwnPropertyKeys(O).
     return ordinaryOwnPropertyKeys(object);
 }
 
 /// 10.1.11.1 OrdinaryOwnPropertyKeys ( O )
 /// https://tc39.es/ecma262/#sec-ordinaryownpropertykeys
-pub fn ordinaryOwnPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
+pub fn ordinaryOwnPropertyKeys(object: Object) Allocator.Error!std.ArrayList(PropertyKey) {
     const agent = object.agent();
     const property_storage_hash_map = object.propertyStorage().hash_map;
 
@@ -674,13 +676,17 @@ pub fn ordinaryOwnPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
     return keys;
 }
 
-pub fn ordinaryObjectCreate(agent: *Agent, prototype: ?Object) !Object {
+pub fn ordinaryObjectCreate(agent: *Agent, prototype: ?Object) Allocator.Error!Object {
     return ordinaryObjectCreateWithType(builtins.Object, agent, prototype);
 }
 
 /// 10.1.12 OrdinaryObjectCreate ( proto [ , additionalInternalSlotsList ] )
 /// https://tc39.es/ecma262/#sec-ordinaryobjectcreate
-pub fn ordinaryObjectCreateWithType(comptime T: type, agent: *Agent, prototype: ?Object) !Object {
+pub fn ordinaryObjectCreateWithType(
+    comptime T: type,
+    agent: *Agent,
+    prototype: ?Object,
+) Allocator.Error!Object {
     // 1. Let internalSlotsList be « [[Prototype]], [[Extensible]] ».
     // 2. If additionalInternalSlotsList is present, set internalSlotsList to the list-concatenation
     //    of internalSlotsList and additionalInternalSlotsList.
@@ -703,7 +709,7 @@ pub fn ordinaryCreateFromConstructor(
     agent: *Agent,
     constructor: Object,
     comptime intrinsic_default_proto: []const u8,
-) !Object {
+) Agent.Error!Object {
     // 1. Assert: intrinsicDefaultProto is this specification's name of an intrinsic
     //    object. The corresponding object must be an intrinsic that is intended to be used
     //    as the [[Prototype]] value of an object.
@@ -723,7 +729,7 @@ pub fn ordinaryCreateFromConstructor(
 pub fn getPrototypeFromConstructor(
     constructor: Object,
     comptime intrinsic_default_proto: []const u8,
-) !Object {
+) Agent.Error!Object {
     // 1. Assert: intrinsicDefaultProto is this specification's name of an intrinsic object. The
     //    corresponding object must be an intrinsic that is intended to be used as the
     //    [[Prototype]] value of an object.

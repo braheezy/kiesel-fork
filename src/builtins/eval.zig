@@ -20,7 +20,7 @@ const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 
 /// 19.2.1.1 PerformEval ( x, strictCaller, direct )
 /// https://tc39.es/ecma262/#sec-performeval
-pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) !Value {
+pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) Agent.Error!Value {
     // 1. Assert: If direct is false, then strictCaller is also false.
     if (!direct) std.debug.assert(!strict_caller);
 

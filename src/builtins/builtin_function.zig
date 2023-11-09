@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const SafePointer = @import("any-pointer").SafePointer;
 
 const ecmascript_function = @import("ecmascript_function.zig");
@@ -90,7 +92,11 @@ pub const BuiltinFunction = MakeObject(.{
 
 /// 10.3.1 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-built-in-function-objects-call-thisargument-argumentslist
-pub fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) !Value {
+pub fn call(
+    object: Object,
+    this_argument: Value,
+    arguments_list: ArgumentsList,
+) Agent.Error!Value {
     const agent = object.agent();
     const function = object.as(BuiltinFunction);
 
@@ -100,7 +106,11 @@ pub fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList)
 
 /// 10.3.2 [[Construct]] ( argumentsList, newTarget )
 /// https://tc39.es/ecma262/#sec-built-in-function-objects-construct-argumentslist-newtarget
-pub fn construct(object: Object, arguments_list: ArgumentsList, new_target: Object) !Object {
+pub fn construct(
+    object: Object,
+    arguments_list: ArgumentsList,
+    new_target: Object,
+) Agent.Error!Object {
     const agent = object.agent();
     const function = object.as(BuiltinFunction);
 
@@ -116,7 +126,7 @@ pub fn builtinCallOrConstruct(
     this_argument: ?Value,
     arguments_list: ArgumentsList,
     new_target: ?Object,
-) !Value {
+) Agent.Error!Value {
     // 1. Let callerContext be the running execution context.
     const caller_context = agent.runningExecutionContext();
     _ = caller_context;
@@ -177,7 +187,7 @@ pub fn createBuiltinFunction(
         prefix: ?[]const u8 = null,
         additional_fields: SafePointer = SafePointer.null_pointer,
     },
-) !Object {
+) Allocator.Error!Object {
     // 1. If realm is not present, set realm to the current Realm Record.
     const realm = args.realm orelse agent.currentRealm();
 

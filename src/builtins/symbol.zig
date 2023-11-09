@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -25,7 +27,7 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// 20.4.2 Properties of the Symbol Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-symbol-constructor
 pub const SymbolConstructor = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const agent = realm.agent;
         const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
             .length = 0,
@@ -177,7 +179,12 @@ pub const SymbolConstructor = struct {
 
     /// 20.4.1.1 Symbol ( [ description ] )
     /// https://tc39.es/ecma262/#sec-symbol-description
-    fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, new_target: ?Object) !Value {
+    fn behaviour(
+        agent: *Agent,
+        _: Value,
+        arguments: ArgumentsList,
+        new_target: ?Object,
+    ) Agent.Error!Value {
         const description = arguments.get(0);
 
         // 1. If NewTarget is not undefined, throw a TypeError exception.
@@ -205,7 +212,7 @@ pub const SymbolConstructor = struct {
 
     // 20.4.2.2 Symbol.for ( key )
     // https://tc39.es/ecma262/#sec-symbol.for
-    fn @"for"(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn @"for"(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const key = arguments.get(0);
 
         // 1. Let stringKey be ? ToString(key).
@@ -236,7 +243,7 @@ pub const SymbolConstructor = struct {
 
     // 20.4.2.6 Symbol.keyFor ( sym )
     // https://tc39.es/ecma262/#sec-symbol.keyfor
-    fn keyFor(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn keyFor(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const symbol = arguments.get(0);
 
         // 1. If sym is not a Symbol, throw a TypeError exception.
@@ -252,7 +259,7 @@ pub const SymbolConstructor = struct {
 /// 20.4.3 Properties of the Symbol Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-symbol-prototype-object
 pub const SymbolPrototype = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
@@ -279,7 +286,7 @@ pub const SymbolPrototype = struct {
 
     /// 20.4.3.4.1 ThisSymbolValue ( value )
     /// https://tc39.es/ecma262/#sec-thissymbolvalue
-    fn thisSymbolValue(agent: *Agent, value: Value) !types.Symbol {
+    fn thisSymbolValue(agent: *Agent, value: Value) error{ExceptionThrown}!types.Symbol {
         switch (value) {
             // 1. If value is a Symbol, return value.
             .symbol => |symbol| return symbol,
@@ -307,7 +314,7 @@ pub const SymbolPrototype = struct {
 
     /// 20.4.3.3 Symbol.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-symbol.prototype.tostring
-    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Let sym be ? ThisSymbolValue(this value).
         const symbol = try thisSymbolValue(agent, this_value);
 
@@ -317,14 +324,14 @@ pub const SymbolPrototype = struct {
 
     /// 20.4.3.4 Symbol.prototype.valueOf ( )
     /// https://tc39.es/ecma262/#sec-symbol.prototype.valueof
-    fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+    fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return ? ThisSymbolValue(this value).
         return Value.from(try thisSymbolValue(agent, this_value));
     }
 
     /// 20.4.3.5 Symbol.prototype [ @@toPrimitive ] ( hint )
     /// https://tc39.es/ecma262/#sec-symbol.prototype-@@toprimitive
-    fn @"@@toPrimitive"(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+    fn @"@@toPrimitive"(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return ? ThisSymbolValue(this value).
         // NOTE: The argument is ignored.
         return Value.from(try thisSymbolValue(agent, this_value));

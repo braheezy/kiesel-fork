@@ -1,6 +1,10 @@
 //! 27.5 Generator Objects
 //! https://tc39.es/ecma262/#sec-generator-objects
 
+const std = @import("std");
+
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -16,7 +20,7 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 /// 27.5.1 Properties of the Generator Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-generator-prototype
 pub const GeneratorPrototype = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),
         });

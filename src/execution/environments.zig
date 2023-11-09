@@ -44,7 +44,7 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn hasBinding(self: Self, name: []const u8) !bool {
+    pub fn hasBinding(self: Self, name: []const u8) Agent.Error!bool {
         return switch (self) {
             inline .function_environment,
             .module_environment,
@@ -53,7 +53,12 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn createMutableBinding(self: Self, agent: *Agent, name: []const u8, deletable: bool) !void {
+    pub fn createMutableBinding(
+        self: Self,
+        agent: *Agent,
+        name: []const u8,
+        deletable: bool,
+    ) Agent.Error!void {
         return switch (self) {
             inline .function_environment,
             .module_environment,
@@ -62,7 +67,12 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn createImmutableBinding(self: Self, agent: *Agent, name: []const u8, strict: bool) !void {
+    pub fn createImmutableBinding(
+        self: Self,
+        agent: *Agent,
+        name: []const u8,
+        strict: bool,
+    ) Agent.Error!void {
         return switch (self) {
             inline .function_environment,
             .module_environment,
@@ -71,7 +81,12 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn initializeBinding(self: Self, agent: *Agent, name: []const u8, value: Value) !void {
+    pub fn initializeBinding(
+        self: Self,
+        agent: *Agent,
+        name: []const u8,
+        value: Value,
+    ) Agent.Error!void {
         return switch (self) {
             inline .function_environment,
             .module_environment,
@@ -80,7 +95,13 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn setMutableBinding(self: Self, agent: *Agent, name: []const u8, value: Value, strict: bool) !void {
+    pub fn setMutableBinding(
+        self: Self,
+        agent: *Agent,
+        name: []const u8,
+        value: Value,
+        strict: bool,
+    ) Agent.Error!void {
         return switch (self) {
             inline .function_environment,
             .module_environment,
@@ -89,14 +110,19 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn getBindingValue(self: Self, agent: *Agent, name: []const u8, strict: bool) !Value {
+    pub fn getBindingValue(
+        self: Self,
+        agent: *Agent,
+        name: []const u8,
+        strict: bool,
+    ) Agent.Error!Value {
         return switch (self) {
             .function_environment => |env| env.declarative_environment.getBindingValue(agent, name, strict),
             inline else => |env| env.getBindingValue(agent, name, strict),
         };
     }
 
-    pub fn deleteBinding(self: Self, name: []const u8) !bool {
+    pub fn deleteBinding(self: Self, name: []const u8) Agent.Error!bool {
         return switch (self) {
             .function_environment => |env| env.declarative_environment.deleteBinding(name),
             inline else => |env| env.deleteBinding(name),
@@ -125,7 +151,7 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn getThisBinding(self: Self) !Value {
+    pub fn getThisBinding(self: Self) error{ExceptionThrown}!Value {
         return switch (self) {
             .declarative_environment,
             .object_environment,
@@ -135,14 +161,14 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn bindThisValue(self: Self, value: Value) !Value {
+    pub fn bindThisValue(self: Self, value: Value) error{ExceptionThrown}!Value {
         return switch (self) {
             .function_environment => |env| env.bindThisValue(value),
             else => unreachable,
         };
     }
 
-    pub fn getSuperBase(self: Self) !Value {
+    pub fn getSuperBase(self: Self) Agent.Error!Value {
         return switch (self) {
             .function_environment => |env| env.getSuperBase(),
             else => unreachable,
@@ -154,7 +180,7 @@ pub const Environment = union(enum) {
         name: []const u8,
         module: *SourceTextModule,
         binding_name: []const u8,
-    ) !Value {
+    ) error{}!Value {
         return switch (self) {
             .module_environment => |env| env.createImportBinding(name, module, binding_name),
             else => unreachable,
@@ -164,7 +190,11 @@ pub const Environment = union(enum) {
 
 /// 9.1.2.1 GetIdentifierReference ( env, name, strict )
 /// https://tc39.es/ecma262/#sec-getidentifierreference
-pub fn getIdentifierReference(maybe_env: ?Environment, name: []const u8, strict: bool) !Reference {
+pub fn getIdentifierReference(
+    maybe_env: ?Environment,
+    name: []const u8,
+    strict: bool,
+) Agent.Error!Reference {
     // 1. If env is null, then
     if (maybe_env == null) {
         // a. Return the Reference Record {
@@ -210,7 +240,7 @@ pub fn getIdentifierReference(maybe_env: ?Environment, name: []const u8, strict:
 pub fn newDeclarativeEnvironment(
     allocator: Allocator,
     outer_env: ?Environment,
-) !*DeclarativeEnvironment {
+) Allocator.Error!*DeclarativeEnvironment {
     // 1. Let env be a new Declarative Environment Record containing no bindings.
     const env = try allocator.create(DeclarativeEnvironment);
 
@@ -232,7 +262,7 @@ pub fn newObjectEnvironment(
     binding_object: Object,
     is_with_environment: bool,
     outer_env: ?Environment,
-) !*ObjectEnvironment {
+) Allocator.Error!*ObjectEnvironment {
     // 1. Let env be a new Object Environment Record.
     const env = try allocator.create(ObjectEnvironment);
 
@@ -257,7 +287,7 @@ pub fn newFunctionEnvironment(
     allocator: Allocator,
     function: *ECMAScriptFunction,
     new_target: ?Object,
-) !*FunctionEnvironment {
+) Allocator.Error!*FunctionEnvironment {
     // 1. Let env be a new Function Environment Record containing no bindings.
     const env = try allocator.create(FunctionEnvironment);
 
@@ -291,7 +321,7 @@ pub fn newGlobalEnvironment(
     allocator: Allocator,
     global_object: Object,
     this_value: Object,
-) !*GlobalEnvironment {
+) Allocator.Error!*GlobalEnvironment {
     // 1. Let objRec be NewObjectEnvironment(G, false, null).
     const object_record = try newObjectEnvironment(allocator, global_object, false, null);
 
@@ -324,7 +354,10 @@ pub fn newGlobalEnvironment(
 
 /// 9.1.2.6 NewModuleEnvironment ( E )
 /// https://tc39.es/ecma262/#sec-newmoduleenvironment
-pub fn newModuleEnvironment(allocator: Allocator, outer_env: Environment) !*ModuleEnvironment {
+pub fn newModuleEnvironment(
+    allocator: Allocator,
+    outer_env: Environment,
+) Allocator.Error!*ModuleEnvironment {
     // 1. Let env be a new Module Environment Record containing no bindings.
     const env = try allocator.create(ModuleEnvironment);
 
@@ -344,7 +377,7 @@ pub fn newModuleEnvironment(allocator: Allocator, outer_env: Environment) !*Modu
 pub fn newPrivateEnvironment(
     allocator: Allocator,
     outer_private_environment: ?*PrivateEnvironment,
-) !*PrivateEnvironment {
+) Allocator.Error!*PrivateEnvironment {
     // 1. Let names be a new empty List.
     const names = std.ArrayList(void).init(allocator);
 

@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
@@ -31,7 +33,7 @@ pub const Iterator = struct {
 
     /// 7.4.4 IteratorNext ( iteratorRecord [ , value ] )
     /// https://tc39.es/ecma262/#sec-iteratornext
-    pub fn next(self: Self, value_: ?Value) !Object {
+    pub fn next(self: Self, value_: ?Value) Agent.Error!Object {
         const agent = self.iterator.agent();
 
         // 1. If value is not present, then
@@ -56,21 +58,21 @@ pub const Iterator = struct {
 
     /// 7.4.5 IteratorComplete ( iterResult )
     /// https://tc39.es/ecma262/#sec-iteratorcomplete
-    pub fn complete(iter_result: Object) !bool {
+    pub fn complete(iter_result: Object) Agent.Error!bool {
         // 1. Return ToBoolean(? Get(iterResult, "done")).
         return (try iter_result.get(PropertyKey.from("done"))).toBoolean();
     }
 
     /// 7.4.6 IteratorValue ( iterResult )
     /// https://tc39.es/ecma262/#sec-iteratorvalue
-    pub fn value(iter_result: Object) !Value {
+    pub fn value(iter_result: Object) Agent.Error!Value {
         // Return ? Get(iterResult, "value").
         return iter_result.get(PropertyKey.from("value"));
     }
 
     /// 7.4.7 IteratorStep ( iteratorRecord )
     /// https://tc39.es/ecma262/#sec-iteratorstep
-    pub fn step(self: Self) !?Object {
+    pub fn step(self: Self) Agent.Error!?Object {
         // 1. Let result be ? IteratorNext(iteratorRecord).
         const result = try next(self, null);
 
@@ -131,7 +133,7 @@ pub const Iterator = struct {
 
     /// 7.4.13 IteratorToList ( iteratorRecord )
     /// https://tc39.es/ecma262/#sec-iteratortolist
-    pub fn toList(self: Self) ![]const Value {
+    pub fn toList(self: Self) Agent.Error![]const Value {
         const agent = self.iterator.agent();
 
         // 1. Let values be a new empty List.
@@ -158,7 +160,7 @@ pub const Iterator = struct {
 
 /// 7.4.2 GetIteratorFromMethod ( obj, method )
 /// https://tc39.es/ecma262/#sec-normalcompletion
-pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: Object) !Iterator {
+pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: Object) Agent.Error!Iterator {
     // 1. Let iterator be ? Call(method, obj).
     const iterator = try Value.from(method).callNoArgs(agent, object);
 
@@ -185,7 +187,11 @@ pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: Object) !Iter
 
 /// 7.4.3 GetIterator ( obj, kind )
 /// https://tc39.es/ecma262/#sec-getiterator
-pub fn getIterator(agent: *Agent, object: Value, kind: enum { sync, @"async" }) !Iterator {
+pub fn getIterator(
+    agent: *Agent,
+    object: Value,
+    kind: enum { sync, @"async" },
+) Agent.Error!Iterator {
     // 1. If kind is async, then
     const method = if (kind == .@"async") blk: {
         // a. Let method be ? GetMethod(obj, @@asyncIterator).
@@ -241,7 +247,7 @@ pub fn getIterator(agent: *Agent, object: Value, kind: enum { sync, @"async" }) 
 
 /// 7.4.11 CreateIterResultObject ( value, done )
 /// https://tc39.es/ecma262/#sec-createiterresultobject
-pub fn createIterResultObject(agent: *Agent, value: Value, done: bool) !Object {
+pub fn createIterResultObject(agent: *Agent, value: Value, done: bool) Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // 1. Let obj be OrdinaryObjectCreate(%Object.prototype%).

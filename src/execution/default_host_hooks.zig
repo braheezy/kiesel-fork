@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const SafePointer = @import("any-pointer").SafePointer;
 
 const builtins = @import("../builtins.zig");
@@ -42,13 +44,15 @@ pub fn hostCallJobCallback(
 
 /// 9.5.5 HostEnqueuePromiseJob ( job, realm )
 /// https://tc39.es/ecma262/#sec-hostenqueuepromisejob
-pub fn hostEnqueuePromiseJob(agent: *Agent, job: Job, realm: ?*Realm) !void {
+pub fn hostEnqueuePromiseJob(agent: *Agent, job: Job, realm: ?*Realm) Allocator.Error!void {
     try agent.queued_promise_jobs.append(.{ .job = job, .realm = realm });
 }
 
 /// 13.3.12.1.1 HostGetImportMetaProperties ( moduleRecord )
 /// https://tc39.es/ecma262/#sec-hostgetimportmetaproperties
-pub fn hostGetImportMetaProperties(module: *SourceTextModule) !Agent.HostHooks.ImportMetaProperties {
+pub fn hostGetImportMetaProperties(
+    module: *SourceTextModule,
+) error{}!Agent.HostHooks.ImportMetaProperties {
     // The default implementation of HostGetImportMetaProperties is to return a new empty List.
     const agent = module.realm.agent;
     return Agent.HostHooks.ImportMetaProperties.init(agent.gc_allocator);
@@ -68,14 +72,14 @@ pub fn hostLoadImportedModule(
     specifier: String,
     _: SafePointer,
     payload: ImportedModulePayload,
-) error{OutOfMemory}!void {
+) Allocator.Error!void {
     const result = agent.throwException(.internal_error, "Module loading is disabled", .{});
     try finishLoadingImportedModule(agent, referrer, specifier, payload, result);
 }
 
 /// 19.2.1.2 HostEnsureCanCompileStrings ( calleeRealm )
 /// https://tc39.es/ecma262/#sec-hostensurecancompilestrings
-pub fn hostEnsureCanCompileStrings(_: *Realm) !void {
+pub fn hostEnsureCanCompileStrings(_: *Realm) error{}!void {
     // The default implementation of HostEnsureCanCompileStrings is to return NormalCompletion(unused).
 }
 
@@ -91,7 +95,7 @@ pub fn hostHasSourceTextAvailable(_: Object) bool {
 pub fn hostResizeArrayBuffer(
     _: *builtins.ArrayBuffer,
     _: u53,
-) Agent.Error!Agent.HostHooks.ResizeArrayBufferHandled {
+) error{}!Agent.HostHooks.ResizeArrayBufferHandled {
     // The default implementation of HostResizeArrayBuffer is to return NormalCompletion(unhandled).
     return .unhandled;
 }

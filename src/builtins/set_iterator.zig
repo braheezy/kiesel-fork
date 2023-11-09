@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -27,7 +29,7 @@ pub fn createSetIterator(
     agent: *Agent,
     set_value: Value,
     comptime kind: Object.PropertyKind,
-) !Object {
+) Agent.Error!Object {
     const realm = agent.currentRealm();
 
     // 1. Perform ? RequireInternalSlot(set, [[SetData]]).
@@ -46,7 +48,7 @@ pub fn createSetIterator(
 /// 24.2.5.2 The %SetIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%setiteratorprototype%-object
 pub const SetIteratorPrototype = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),
         });
@@ -67,7 +69,7 @@ pub const SetIteratorPrototype = struct {
 
     /// 24.2.5.2.1 %SetIteratorPrototype%.next ( )
     /// https://tc39.es/ecma262/#sec-%setiteratorprototype%.next
-    fn next(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+    fn next(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return ? GeneratorResume(this value, empty, "%SetIteratorPrototype%").
         // NOTE: In the absence of generators this implements one loop iteration of the
         //       CreateSetIterator closure. State is kept track of through the SetIterator

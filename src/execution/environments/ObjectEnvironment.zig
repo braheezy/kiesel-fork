@@ -26,7 +26,7 @@ outer_env: ?Environment,
 
 /// 9.1.1.2.1 HasBinding ( N )
 /// https://tc39.es/ecma262/#sec-object-environment-records-hasbinding-n
-pub fn hasBinding(self: Self, name: []const u8) !bool {
+pub fn hasBinding(self: Self, name: []const u8) Agent.Error!bool {
     const agent = self.binding_object.agent();
 
     // 1. Let bindingObject be envRec.[[BindingObject]].
@@ -59,7 +59,12 @@ pub fn hasBinding(self: Self, name: []const u8) !bool {
 
 /// 9.1.1.2.2 CreateMutableBinding ( N, D )
 /// https://tc39.es/ecma262/#sec-object-environment-records-createmutablebinding-n-d
-pub fn createMutableBinding(self: Self, _: *Agent, name: []const u8, deletable: bool) !void {
+pub fn createMutableBinding(
+    self: Self,
+    _: *Agent,
+    name: []const u8,
+    deletable: bool,
+) Agent.Error!void {
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Perform ? DefinePropertyOrThrow(bindingObject, N, PropertyDescriptor {
     //      [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: D
@@ -84,7 +89,12 @@ pub fn createImmutableBinding(_: Self, _: *Agent, _: []const u8, _: bool) noretu
 
 /// 9.1.1.2.4 InitializeBinding ( N, V )
 /// https://tc39.es/ecma262/#sec-object-environment-records-initializebinding-n-v
-pub fn initializeBinding(self: Self, agent: *Agent, name: []const u8, value: Value) !void {
+pub fn initializeBinding(
+    self: Self,
+    agent: *Agent,
+    name: []const u8,
+    value: Value,
+) Agent.Error!void {
     // 1. Perform ? envRec.SetMutableBinding(N, V, false).
     try self.setMutableBinding(agent, name, value, false);
 
@@ -93,7 +103,13 @@ pub fn initializeBinding(self: Self, agent: *Agent, name: []const u8, value: Val
 
 /// 9.1.1.2.5 SetMutableBinding ( N, V, S )
 /// https://tc39.es/ecma262/#sec-object-environment-records-setmutablebinding-n-v-s
-pub fn setMutableBinding(self: Self, agent: *Agent, name: []const u8, value: Value, strict: bool) !void {
+pub fn setMutableBinding(
+    self: Self,
+    agent: *Agent,
+    name: []const u8,
+    value: Value,
+    strict: bool,
+) Agent.Error!void {
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Let stillExists be ? HasProperty(bindingObject, N).
     const still_exists = try self.binding_object.hasProperty(PropertyKey.from(name));
@@ -111,7 +127,12 @@ pub fn setMutableBinding(self: Self, agent: *Agent, name: []const u8, value: Val
 
 /// 9.1.1.2.6 GetBindingValue ( N, S )
 /// https://tc39.es/ecma262/#sec-object-environment-records-getbindingvalue-n-s
-pub fn getBindingValue(self: Self, agent: *Agent, name: []const u8, strict: bool) !Value {
+pub fn getBindingValue(
+    self: Self,
+    agent: *Agent,
+    name: []const u8,
+    strict: bool,
+) Agent.Error!Value {
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Let value be ? HasProperty(bindingObject, N).
     const value = try self.binding_object.hasProperty(PropertyKey.from(name));
@@ -129,7 +150,7 @@ pub fn getBindingValue(self: Self, agent: *Agent, name: []const u8, strict: bool
 
 /// 9.1.1.2.7 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-object-environment-records-deletebinding-n
-pub fn deleteBinding(self: Self, name: []const u8) !bool {
+pub fn deleteBinding(self: Self, name: []const u8) Agent.Error!bool {
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Return ? bindingObject.[[Delete]](N).
     return self.binding_object.internalMethods().delete(

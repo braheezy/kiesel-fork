@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const SafePointer = @import("any-pointer").SafePointer;
 
 const builtins = @import("../builtins.zig");
@@ -29,7 +31,7 @@ const sameValue = types.sameValue;
 
 /// 10.5.1 [[GetPrototypeOf]] ( )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-getprototypeof
-fn getPrototypeOf(object: Object) !?Object {
+fn getPrototypeOf(object: Object) Agent.Error!?Object {
     const agent = object.agent();
     const proxy = object.as(Proxy);
 
@@ -96,7 +98,7 @@ fn getPrototypeOf(object: Object) !?Object {
 
 /// 10.5.2 [[SetPrototypeOf]] ( V )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-setprototypeof-v
-pub fn setPrototypeOf(object: Object, prototype: ?Object) !bool {
+pub fn setPrototypeOf(object: Object, prototype: ?Object) Agent.Error!bool {
     const agent = object.agent();
     const proxy = object.as(Proxy);
 
@@ -155,7 +157,7 @@ pub fn setPrototypeOf(object: Object, prototype: ?Object) !bool {
 
 /// 10.5.3 [[IsExtensible]] ( )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-isextensible
-fn isExtensible(object: Object) !bool {
+fn isExtensible(object: Object) Agent.Error!bool {
     const agent = object.agent();
     const proxy = object.as(Proxy);
 
@@ -202,7 +204,7 @@ fn isExtensible(object: Object) !bool {
 
 /// 10.5.4 [[PreventExtensions]] ( )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-preventextensions
-fn preventExtensions(object: Object) !bool {
+fn preventExtensions(object: Object) Agent.Error!bool {
     const agent = object.agent();
     const proxy = object.as(Proxy);
 
@@ -252,7 +254,7 @@ fn preventExtensions(object: Object) !bool {
 
 /// 10.5.5 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-getownproperty-p
-fn getOwnProperty(object: Object, property_key: PropertyKey) !?PropertyDescriptor {
+fn getOwnProperty(object: Object, property_key: PropertyKey) Agent.Error!?PropertyDescriptor {
     const agent = object.agent();
     const proxy = object.as(Proxy);
 
@@ -386,7 +388,7 @@ fn defineOwnProperty(
     object: Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
-) !bool {
+) Agent.Error!bool {
     const agent = object.agent();
     const proxy = object.as(Proxy);
 
@@ -502,7 +504,7 @@ fn defineOwnProperty(
 
 /// 10.5.7 [[HasProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-hasproperty-p
-fn hasProperty(object: Object, property_key: PropertyKey) !bool {
+fn hasProperty(object: Object, property_key: PropertyKey) Agent.Error!bool {
     const agent = object.agent();
     const proxy = object.as(Proxy);
 
@@ -567,7 +569,7 @@ fn hasProperty(object: Object, property_key: PropertyKey) !bool {
 
 /// 10.5.8 [[Get]] ( P, Receiver )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-get-p-receiver
-fn get(object: Object, property_key: PropertyKey, receiver: Value) !Value {
+fn get(object: Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value {
     const agent = object.agent();
     const proxy = object.as(Proxy);
 
@@ -632,7 +634,7 @@ fn get(object: Object, property_key: PropertyKey, receiver: Value) !Value {
 
 /// 10.5.9 [[Set]] ( P, V, Receiver )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-set-p-v-receiver
-fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value) !bool {
+fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value) Agent.Error!bool {
     const agent = object.agent();
     const proxy = object.as(Proxy);
 
@@ -700,7 +702,7 @@ fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value)
 
 /// 10.5.10 [[Delete]] ( P )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-delete-p
-fn delete(object: Object, property_key: PropertyKey) !bool {
+fn delete(object: Object, property_key: PropertyKey) Agent.Error!bool {
     const agent = object.agent();
     const proxy = object.as(Proxy);
 
@@ -765,7 +767,7 @@ fn delete(object: Object, property_key: PropertyKey) !bool {
 
 /// 10.5.11 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-ownpropertykeys
-fn ownPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
+fn ownPropertyKeys(object: Object) Agent.Error!std.ArrayList(PropertyKey) {
     const agent = object.agent();
     const proxy = object.as(Proxy);
 
@@ -925,7 +927,7 @@ fn ownPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
 
 /// 10.5.12 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-call-thisargument-argumentslist
-fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) !Value {
+fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) Agent.Error!Value {
     const agent = object.agent();
     const proxy = object.as(Proxy);
 
@@ -960,7 +962,11 @@ fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) !Va
 
 /// 10.5.13 [[Construct]] ( argumentsList, newTarget )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-construct-argumentslist-newtarget
-pub fn construct(object: Object, arguments_list: ArgumentsList, new_target: Object) !Object {
+pub fn construct(
+    object: Object,
+    arguments_list: ArgumentsList,
+    new_target: Object,
+) Agent.Error!Object {
     const agent = object.agent();
     const proxy = object.as(Proxy);
 
@@ -1010,7 +1016,7 @@ pub fn construct(object: Object, arguments_list: ArgumentsList, new_target: Obje
 
 /// 10.5.14 ValidateNonRevokedProxy ( proxy )
 /// https://tc39.es/ecma262/#sec-validatenonrevokedproxy
-pub fn validateNonRevokedProxy(proxy: *Proxy) !void {
+pub fn validateNonRevokedProxy(proxy: *Proxy) error{ExceptionThrown}!void {
     const agent = proxy.object().agent();
 
     // 1. If proxy.[[ProxyTarget]] is null, throw a TypeError exception.
@@ -1026,7 +1032,7 @@ pub fn validateNonRevokedProxy(proxy: *Proxy) !void {
 
 /// 10.5.15 ProxyCreate ( target, handler )
 /// https://tc39.es/ecma262/#sec-proxycreate
-fn proxyCreate(agent: *Agent, target: Value, handler: Value) !Object {
+fn proxyCreate(agent: *Agent, target: Value, handler: Value) Agent.Error!Object {
     // 1. If target is not an Object, throw a TypeError exception.
     if (target != .object) {
         return agent.throwException(.type_error, "{} is not an Object", .{target});
@@ -1084,7 +1090,7 @@ fn proxyCreate(agent: *Agent, target: Value, handler: Value) !Object {
 /// 28.2.2 Properties of the Proxy Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-proxy-constructor
 pub const ProxyConstructor = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
             .length = 2,
             .name = "Proxy",
@@ -1099,7 +1105,12 @@ pub const ProxyConstructor = struct {
 
     /// 28.2.1.1 Proxy ( target, handler )
     /// https://tc39.es/ecma262/#sec-proxy-target-handler
-    fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, new_target: ?Object) !Value {
+    fn behaviour(
+        agent: *Agent,
+        _: Value,
+        arguments: ArgumentsList,
+        new_target: ?Object,
+    ) Agent.Error!Value {
         const target = arguments.get(0);
         const handler = arguments.get(1);
 
@@ -1114,7 +1125,7 @@ pub const ProxyConstructor = struct {
 
     /// 28.2.2.1 Proxy.revocable ( target, handler )
     /// https://tc39.es/ecma262/#sec-proxy.revocable
-    fn revocable(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn revocable(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const realm = agent.currentRealm();
         const target = arguments.get(0);
         const handler = arguments.get(1);
@@ -1129,7 +1140,7 @@ pub const ProxyConstructor = struct {
         // 2. Let revokerClosure be a new Abstract Closure with no parameters that captures nothing
         //    and performs the following steps when called:
         const revoker_closure = struct {
-            fn func(agent_: *Agent, _: Value, _: ArgumentsList) !Value {
+            fn func(agent_: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
                 // a. Let F be the active function object.
                 const function = agent_.activeFunctionObject();
 

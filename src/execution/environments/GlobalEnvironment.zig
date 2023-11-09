@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const environments = @import("../environments.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
@@ -34,7 +36,7 @@ outer_env: ?Environment,
 
 /// 9.1.1.4.1 HasBinding ( N )
 /// https://tc39.es/ecma262/#sec-global-environment-records-hasbinding-n
-pub fn hasBinding(self: Self, name: []const u8) !bool {
+pub fn hasBinding(self: Self, name: []const u8) Agent.Error!bool {
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, return true.
     if (self.declarative_record.hasBinding(name)) return true;
@@ -46,7 +48,12 @@ pub fn hasBinding(self: Self, name: []const u8) !bool {
 
 /// 9.1.1.4.2 CreateMutableBinding ( N, D )
 /// https://tc39.es/ecma262/#sec-global-environment-records-createmutablebinding-n-d
-pub fn createMutableBinding(self: *Self, agent: *Agent, name: []const u8, deletable: bool) !void {
+pub fn createMutableBinding(
+    self: *Self,
+    agent: *Agent,
+    name: []const u8,
+    deletable: bool,
+) Agent.Error!void {
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, throw a TypeError exception.
     if (self.declarative_record.hasBinding(name)) {
@@ -59,7 +66,12 @@ pub fn createMutableBinding(self: *Self, agent: *Agent, name: []const u8, deleta
 
 /// 9.1.1.4.3 CreateImmutableBinding ( N, S )
 /// https://tc39.es/ecma262/#sec-global-environment-records-createimmutablebinding-n-s
-pub fn createImmutableBinding(self: *Self, agent: *Agent, name: []const u8, strict: bool) !void {
+pub fn createImmutableBinding(
+    self: *Self,
+    agent: *Agent,
+    name: []const u8,
+    strict: bool,
+) Agent.Error!void {
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, throw a TypeError exception.
     if (self.declarative_record.hasBinding(name)) {
@@ -72,7 +84,12 @@ pub fn createImmutableBinding(self: *Self, agent: *Agent, name: []const u8, stri
 
 /// 9.1.1.4.4 InitializeBinding ( N, V )
 /// https://tc39.es/ecma262/#sec-global-environment-records-initializebinding-n-v
-pub fn initializeBinding(self: Self, agent: *Agent, name: []const u8, value: Value) !void {
+pub fn initializeBinding(
+    self: Self,
+    agent: *Agent,
+    name: []const u8,
+    value: Value,
+) Agent.Error!void {
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, then
     if (self.declarative_record.hasBinding(name)) {
@@ -88,7 +105,13 @@ pub fn initializeBinding(self: Self, agent: *Agent, name: []const u8, value: Val
 
 /// 9.1.1.4.5 SetMutableBinding ( N, V, S )
 /// https://tc39.es/ecma262/#sec-global-environment-records-setmutablebinding-n-v-s
-pub fn setMutableBinding(self: Self, agent: *Agent, name: []const u8, value: Value, strict: bool) !void {
+pub fn setMutableBinding(
+    self: Self,
+    agent: *Agent,
+    name: []const u8,
+    value: Value,
+    strict: bool,
+) Agent.Error!void {
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, then
     if (self.declarative_record.hasBinding(name)) {
@@ -103,7 +126,12 @@ pub fn setMutableBinding(self: Self, agent: *Agent, name: []const u8, value: Val
 
 /// 9.1.1.4.6 GetBindingValue ( N, S )
 /// https://tc39.es/ecma262/#sec-global-environment-records-getbindingvalue-n-s
-pub fn getBindingValue(self: Self, agent: *Agent, name: []const u8, strict: bool) !Value {
+pub fn getBindingValue(
+    self: Self,
+    agent: *Agent,
+    name: []const u8,
+    strict: bool,
+) Agent.Error!Value {
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, then
     if (self.declarative_record.hasBinding(name)) {
@@ -118,7 +146,7 @@ pub fn getBindingValue(self: Self, agent: *Agent, name: []const u8, strict: bool
 
 /// 9.1.1.4.7 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-global-environment-records-deletebinding-n
-pub fn deleteBinding(self: *Self, name: []const u8) !bool {
+pub fn deleteBinding(self: *Self, name: []const u8) Agent.Error!bool {
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, then
     if (self.declarative_record.hasBinding(name)) {
@@ -183,7 +211,12 @@ pub fn getThisBinding(self: Self) Object {
 
 /// 9.1.1.4.17 CreateGlobalVarBinding ( N, D )
 /// https://tc39.es/ecma262/#sec-createglobalvarbinding
-pub fn createGlobalVarBinding(self: *Self, agent: *Agent, name: []const u8, deletable: bool) !void {
+pub fn createGlobalVarBinding(
+    self: *Self,
+    agent: *Agent,
+    name: []const u8,
+    deletable: bool,
+) Agent.Error!void {
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
     // 2. Let globalObject be ObjRec.[[BindingObject]].
     const global_object = self.object_record.binding_object;

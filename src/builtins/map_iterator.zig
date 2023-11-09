@@ -1,6 +1,10 @@
 //! 24.1.5 Map Iterator Objects
 //! https://tc39.es/ecma262/#sec-map-iterator-objects
 
+const std = @import("std");
+
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -25,7 +29,7 @@ pub fn createMapIterator(
     agent: *Agent,
     map_value: Value,
     comptime kind: Object.PropertyKind,
-) !Object {
+) Agent.Error!Object {
     const realm = agent.currentRealm();
 
     // 1. Perform ? RequireInternalSlot(map, [[MapData]]).
@@ -44,7 +48,7 @@ pub fn createMapIterator(
 /// 24.1.5.2 The %MapIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%mapiteratorprototype%-object
 pub const MapIteratorPrototype = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),
         });
@@ -65,7 +69,7 @@ pub const MapIteratorPrototype = struct {
 
     /// 24.1.5.2.1 %MapIteratorPrototype%.next ( )
     /// https://tc39.es/ecma262/#sec-%mapiteratorprototype%.next
-    fn next(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+    fn next(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return ? GeneratorResume(this value, empty, "%MapIteratorPrototype%").
         // NOTE: In the absence of generators this implements one loop iteration of the
         //       CreateMapIterator closure. State is kept track of through the MapIterator

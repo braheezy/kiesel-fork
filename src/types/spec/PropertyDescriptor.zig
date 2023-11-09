@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const language = @import("../language.zig");
@@ -67,7 +69,7 @@ pub inline fn isGenericDescriptor(self: Self) bool {
 
 /// 6.2.6.4 FromPropertyDescriptor ( Desc )
 /// https://tc39.es/ecma262/#sec-frompropertydescriptor
-pub fn fromPropertyDescriptor(self: Self, agent: *Agent) !Object {
+pub fn fromPropertyDescriptor(self: Self, agent: *Agent) Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // 1. If Desc is undefined, return undefined.

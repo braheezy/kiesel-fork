@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -23,14 +25,14 @@ const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// Recursively convert a `std.json.Value` to a JS `Value`.
-fn convertJsonValue(agent: *Agent, value: std.json.Value) !Value {
+fn convertJsonValue(agent: *Agent, value: std.json.Value) Allocator.Error!Value {
     return switch (value) {
         .null => .null,
         inline .bool, .integer, .float => |x| Value.from(x),
         .string => |x| Value.from(try agent.gc_allocator.dupe(u8, x)),
         .number_string => |x| Value.from(std.fmt.parseFloat(f64, x) catch unreachable),
         .array => |x| blk: {
-            const array = try arrayCreate(agent, 0, null);
+            const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
             for (x.items, 0..) |value_i, i| {
                 array.createDataPropertyOrThrow(
                     PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i))),
@@ -64,7 +66,7 @@ fn internalizeJSONProperty(
     holder: Object,
     name: PropertyKey,
     reviver: Object,
-) !Value {
+) Agent.Error!Value {
     // 1. Let val be ? Get(holder, name).
     const value = try holder.get(name);
 
@@ -175,7 +177,7 @@ fn serializeJSONProperty(
     state: *JSONSerialization,
     key: PropertyKey,
     holder: Object,
-) !?String {
+) Agent.Error!?String {
     // 1. Let value be ? Get(holder, key).
     var value = try holder.get(key);
 
@@ -270,7 +272,7 @@ fn serializeJSONProperty(
 
 /// 25.5.2.3 QuoteJSONString ( value )
 /// https://tc39.es/ecma262/#sec-quotejsonstring
-fn quoteJSONString(agent: *Agent, value: String) !String {
+fn quoteJSONString(agent: *Agent, value: String) Allocator.Error!String {
     // 1. Let product be the String value consisting solely of the code unit 0x0022 (QUOTATION MARK).
     var product = std.ArrayList(u8).init(agent.gc_allocator);
     try product.append('"');
@@ -325,7 +327,7 @@ fn quoteJSONString(agent: *Agent, value: String) !String {
 
 /// 25.5.2.4 UnicodeEscape ( C )
 /// https://tc39.es/ecma262/#sec-unicodeescape
-fn unicodeEscape(agent: *Agent, c: u16) ![]const u8 {
+fn unicodeEscape(agent: *Agent, c: u16) Allocator.Error![]const u8 {
     // 1. Let n be the numeric value of C.
     // 2. Assert: n ≤ 0xFFFF.
     // 3. Let hex be the String representation of n, formatted as a lowercase hexadecimal number.
@@ -594,7 +596,7 @@ fn serializeJSONArray(
 }
 
 pub const JSON = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
@@ -616,7 +618,7 @@ pub const JSON = struct {
 
     /// 25.5.1 JSON.parse ( text [ , reviver ] )
     /// https://tc39.es/ecma262/#sec-json.parse
-    fn parse(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn parse(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const realm = agent.currentRealm();
         const text = arguments.get(0);
         const reviver = arguments.get(1);
@@ -680,7 +682,7 @@ pub const JSON = struct {
 
     /// 25.5.2 JSON.stringify ( value [ , replacer [ , space ] ] )
     /// https://tc39.es/ecma262/#sec-json.stringify
-    fn stringify(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn stringify(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const realm = agent.currentRealm();
         const value = arguments.get(0);
         const replacer = arguments.get(1);

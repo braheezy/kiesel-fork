@@ -32,6 +32,8 @@ pub const FunctionOrClass = union(enum) {
 
 pub const IndexType = u16;
 
+pub const Error = error{IndexOutOfRange} || Allocator.Error;
+
 pub fn init(allocator: Allocator) Self {
     return .{
         .allocator = allocator,
@@ -49,19 +51,19 @@ pub fn deinit(self: Self) void {
     self.functions_and_classes.deinit();
 }
 
-pub fn addInstruction(self: *Self, instruction: Instruction) !void {
+pub fn addInstruction(self: *Self, instruction: Instruction) Allocator.Error!void {
     try self.instructions.append(instruction);
 }
 
-pub fn addConstant(self: *Self, constant: Value) !void {
+pub fn addConstant(self: *Self, constant: Value) Allocator.Error!void {
     try self.constants.append(constant);
 }
 
-pub fn addIdentifier(self: *Self, identifier: ast.Identifier) !void {
+pub fn addIdentifier(self: *Self, identifier: ast.Identifier) Allocator.Error!void {
     try self.identifiers.append(identifier);
 }
 
-pub fn addFunctionOrClass(self: *Self, function_or_class: FunctionOrClass) !void {
+pub fn addFunctionOrClass(self: *Self, function_or_class: FunctionOrClass) Allocator.Error!void {
     try self.functions_and_classes.append(function_or_class);
 }
 
@@ -69,7 +71,7 @@ pub fn addInstructionWithConstant(
     self: *Self,
     instruction: Instruction,
     constant: Value,
-) !void {
+) Error!void {
     std.debug.assert(instruction.hasConstantIndex());
     try self.addInstruction(instruction);
     try self.addConstant(constant);
@@ -80,7 +82,7 @@ pub fn addInstructionWithIdentifier(
     self: *Self,
     instruction: Instruction,
     identifier: ast.Identifier,
-) !void {
+) Error!void {
     std.debug.assert(instruction.hasIdentifierIndex());
     try self.addInstruction(instruction);
     try self.addIdentifier(identifier);
@@ -91,7 +93,7 @@ pub fn addInstructionWithFunctionOrClass(
     self: *Self,
     instruction: Instruction,
     function_or_class: FunctionOrClass,
-) !void {
+) Error!void {
     std.debug.assert(instruction.asFunctionOrClassIndex());
     try self.addInstruction(instruction);
     try self.addFunctionOrClass(function_or_class);
@@ -102,7 +104,7 @@ pub const JumpIndex = struct {
     executable: *Self,
     index: usize,
 
-    pub fn setTarget(self: JumpIndex, index: usize) !void {
+    pub fn setTarget(self: JumpIndex, index: usize) Error!void {
         const instructions = self.executable.instructions.items;
         if (index >= std.math.maxInt(IndexType)) return error.IndexOutOfRange;
         const bytes = std.mem.toBytes(@as(IndexType, @intCast(index)));
@@ -110,28 +112,31 @@ pub const JumpIndex = struct {
         instructions[self.index + 1] = @enumFromInt(bytes[1]);
     }
 
-    pub fn setTargetHere(self: JumpIndex) !void {
+    pub fn setTargetHere(self: JumpIndex) Error!void {
         const instructions = self.executable.instructions.items;
         try self.setTarget(instructions.len);
     }
 };
 
-pub fn addJumpIndex(self: *Self) !JumpIndex {
-    try self.addIndex(0);
+pub fn addJumpIndex(self: *Self) Allocator.Error!JumpIndex {
+    self.addIndex(0) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.IndexOutOfRange => unreachable,
+    };
     return .{
         .executable = self,
         .index = self.instructions.items.len - @sizeOf(IndexType),
     };
 }
 
-pub fn addIndex(self: *Self, index: usize) !void {
+pub fn addIndex(self: *Self, index: usize) Error!void {
     if (index >= std.math.maxInt(IndexType)) return error.IndexOutOfRange;
     const bytes = std.mem.toBytes(@as(IndexType, @intCast(index)));
     try self.instructions.append(@enumFromInt(bytes[0]));
     try self.instructions.append(@enumFromInt(bytes[1]));
 }
 
-pub fn print(self: Self, writer: anytype) !void {
+pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
     const file = if (@TypeOf(writer.context) == std.fs.File)
         writer.context
     else
@@ -228,7 +233,7 @@ pub fn print(self: Self, writer: anytype) !void {
     try writer.print("{}: <end>\n", .{self.instructions.items.len});
 }
 
-pub fn optimize(self: *Self) !void {
+pub fn optimize(self: *Self) Allocator.Error!void {
     try self.deduplicateConstants();
     try self.deduplicateIdentifiers();
 }
@@ -239,7 +244,7 @@ fn deduplicate(
     comptime has_index_getter: []const u8,
     items: []const T,
     eql: fn (T, T) bool,
-) !std.ArrayList(T) {
+) Allocator.Error!std.ArrayList(T) {
     var deduplicated_list = std.ArrayList(T).init(self.allocator);
     var iterator = InstructionIterator{ .instructions = self.instructions.items };
     while (iterator.next()) |instruction| if (@field(Instruction, has_index_getter)(instruction)) {
@@ -257,7 +262,7 @@ fn deduplicate(
     return deduplicated_list;
 }
 
-fn deduplicateConstants(self: *Self) !void {
+fn deduplicateConstants(self: *Self) Allocator.Error!void {
     const deduplicated_constants = try self.deduplicate(
         Value,
         "hasConstantIndex",
@@ -272,7 +277,7 @@ fn deduplicateConstants(self: *Self) !void {
     self.constants = deduplicated_constants;
 }
 
-fn deduplicateIdentifiers(self: *Self) !void {
+fn deduplicateIdentifiers(self: *Self) Allocator.Error!void {
     const deduplicated_identifiers = try self.deduplicate(
         ast.Identifier,
         "hasIdentifierIndex",

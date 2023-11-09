@@ -3,6 +3,7 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
 const Xoroshiro128 = std.rand.Xoroshiro128;
 
 const SafePointer = @import("any-pointer").SafePointer;
@@ -44,7 +45,7 @@ host_defined: SafePointer = SafePointer.null_pointer,
 
 /// 9.3.1 CreateRealm ( )
 /// https://tc39.es/ecma262/#sec-createrealm
-pub fn create(agent: *Agent) !*Self {
+pub fn create(agent: *Agent) Allocator.Error!*Self {
     // 1. Let realmRec be a new Realm Record.
     var realm = try agent.gc_allocator.create(Self);
 
@@ -74,7 +75,7 @@ pub fn create(agent: *Agent) !*Self {
 
 /// 9.3.2 CreateIntrinsics ( realmRec )
 /// https://tc39.es/ecma262/#sec-createintrinsics
-fn createIntrinsics(self: *Self) !void {
+fn createIntrinsics(self: *Self) Allocator.Error!void {
     // 1. Set realmRec.[[Intrinsics]] to a new Record.
     self.intrinsics = Intrinsics{ .realm = self };
 
@@ -104,7 +105,7 @@ pub fn setRealmGlobalObject(
     self: *Self,
     maybe_global_object: ?Object,
     maybe_this_value: ?Object,
-) !void {
+) Allocator.Error!void {
     // 1. If globalObj is undefined, then
     //     a. Let intrinsics be realmRec.[[Intrinsics]].
     //     b. Set globalObj to OrdinaryObjectCreate(intrinsics.[[%Object.prototype%]]).
@@ -135,7 +136,7 @@ pub fn setRealmGlobalObject(
 
 /// 9.3.4 SetDefaultGlobalBindings ( realmRec )
 /// https://tc39.es/ecma262/#sec-setdefaultglobalbindings
-pub fn setDefaultGlobalBindings(self: *Self) !Object {
+pub fn setDefaultGlobalBindings(self: *Self) Agent.Error!Object {
     // 1. Let global be realmRec.[[GlobalObject]].
     const global = self.global_object;
 
@@ -163,7 +164,7 @@ pub fn setDefaultGlobalBindings(self: *Self) !Object {
 pub fn initializeHostDefinedRealm(
     agent: *Agent,
     args: struct { global_object: ?Object = null },
-) !void {
+) Agent.Error!void {
     // 1. Let realm be CreateRealm().
     const realm = try create(agent);
 

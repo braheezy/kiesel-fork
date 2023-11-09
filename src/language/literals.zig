@@ -10,7 +10,7 @@ const startsWithLineTerminator = tokenizer.startsWithLineTerminator;
 pub fn parseNumericLiteral(
     str: []const u8,
     consume: enum { partial, complete },
-) !ast.NumericLiteral {
+) error{InvalidNumericLiteral}!ast.NumericLiteral {
     var state: enum {
         start,
         prefix,
@@ -188,7 +188,7 @@ pub fn parseNumericLiteral(
 pub fn parseStringLiteral(
     str: []const u8,
     consume: enum { partial, complete },
-) !ast.StringLiteral {
+) error{InvalidStringLiteral}!ast.StringLiteral {
     var state: enum {
         start,
         opening_quote,
@@ -277,7 +277,7 @@ pub fn parseStringLiteral(
 pub fn parseRegularExpressionLiteral(
     str: []const u8,
     consume: enum { partial, complete },
-) !ast.RegularExpressionLiteral {
+) error{InvalidRegularExpressionLiteral}!ast.RegularExpressionLiteral {
     var state: enum {
         start,
         opening_slash,
@@ -338,7 +338,7 @@ pub fn parseRegularExpressionLiteral(
 pub fn parseTemplateLiteral(
     str: []const u8,
     consume: enum { partial, complete },
-) !ast.TemplateLiteral {
+) error{InvalidTemplateLiteral}!ast.TemplateLiteral {
     // TODO: This needs more work to handle nested templates correctly, actually parse expressions, etc.
     var state: enum {
         start,

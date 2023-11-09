@@ -3,13 +3,17 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const SafePointer = @import("any-pointer").SafePointer;
 
 const ast = @import("ast.zig");
 const bytecode = @import("bytecode.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
+const utils = @import("../utils.zig");
 
+const Agent = execution.Agent;
 const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
 const Object = types.Object;
@@ -18,6 +22,7 @@ const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
 const Realm = execution.Realm;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const newModuleEnvironment = execution.newModuleEnvironment;
+const noexcept = utils.noexcept;
 
 const Self = @This();
 
@@ -54,7 +59,7 @@ pub fn parse(
     realm: *Realm,
     host_defined: SafePointer,
     ctx: Parser.ParseContext,
-) !*Self {
+) Parser.Error!*Self {
     const agent = realm.agent;
 
     // 1. Let body be ParseText(sourceText, Module).
@@ -89,7 +94,7 @@ pub fn parse(
 }
 
 /// 16.2.1.6.4 InitializeEnvironment ( )
-pub fn initializeEnvironment(self: *Self) !void {
+pub fn initializeEnvironment(self: *Self) Allocator.Error!void {
     const agent = self.realm.agent;
 
     // TODO: 1. For each ExportEntry Record e of module.[[IndirectExportEntries]], do
@@ -162,10 +167,10 @@ pub fn initializeEnvironment(self: *Self) !void {
             // i. If declaredVarNames does not contain dn, then
             if (!declared_var_names.contains(var_name)) {
                 // 1. Perform ! env.CreateMutableBinding(dn, false).
-                try env.createMutableBinding(agent, var_name, false);
+                env.createMutableBinding(agent, var_name, false) catch |err| try noexcept(err);
 
                 // 2. Perform ! env.InitializeBinding(dn, undefined).
-                try env.initializeBinding(agent, var_name, .undefined);
+                env.initializeBinding(agent, var_name, .undefined) catch |err| try noexcept(err);
 
                 // 3. Append dn to declaredVarNames.
                 try declared_var_names.putNoClobber(var_name, {});
@@ -186,7 +191,7 @@ pub fn initializeEnvironment(self: *Self) !void {
 
 /// 16.2.1.6.5 ExecuteModule ( [ capability ] )
 /// https://tc39.es/ecma262/#sec-source-text-module-record-execute-module
-pub fn executeModule(self: *Self, capability: ?PromiseCapability) !void {
+pub fn executeModule(self: *Self, capability: ?PromiseCapability) Agent.Error!void {
     const agent = self.realm.agent;
 
     // 1. Let moduleContext be a new ECMAScript code execution context.

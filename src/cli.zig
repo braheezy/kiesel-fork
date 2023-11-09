@@ -59,7 +59,7 @@ const ScriptOrModuleHostDefined = struct {
 };
 
 pub const Kiesel = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const kiesel_object = try ordinaryObjectCreate(realm.agent, try realm.intrinsics.@"%Object.prototype%"());
         const gc_object = try ordinaryObjectCreate(realm.agent, try realm.intrinsics.@"%Object.prototype%"());
         try defineBuiltinFunction(gc_object, "collect", collect, 0, realm);
@@ -76,19 +76,19 @@ pub const Kiesel = struct {
         return kiesel_object;
     }
 
-    fn collect(_: *Agent, _: Value, _: ArgumentsList) !Value {
+    fn collect(_: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
         gc.collect();
         return .undefined;
     }
 
-    fn createRealm(agent: *Agent, _: Value, _: ArgumentsList) !Value {
+    fn createRealm(agent: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
         const realm = try Realm.create(agent);
         try realm.setRealmGlobalObject(null, null);
         const global = try realm.setDefaultGlobalBindings();
         return Value.from(global);
     }
 
-    fn detachArrayBuffer(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn detachArrayBuffer(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const array_buffer = arguments.get(0);
         if (array_buffer != .object or !array_buffer.object.is(kiesel.builtins.ArrayBuffer)) {
             return agent.throwException(.type_error, "Argument must be an ArrayBuffer", .{});
@@ -102,7 +102,7 @@ pub const Kiesel = struct {
     }
 
     /// Algorithm from https://github.com/tc39/test262/blob/main/INTERPRETING.md
-    fn evalScript(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn evalScript(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const source_text = try arguments.get(0).toString(agent);
 
         // 1. Let hostDefined be any host-defined values for the provided sourceText (obtained in
@@ -144,7 +144,7 @@ pub const Kiesel = struct {
         return status;
     }
 
-    fn print(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn print(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const stdout = std.io.getStdOut().writer();
         const value = arguments.get(0);
         const options = try coerceOptionsToObject(agent, arguments.get(1));
@@ -156,7 +156,7 @@ pub const Kiesel = struct {
         return .undefined;
     }
 
-    fn readFile_(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn readFile_(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const path = try arguments.get(0).toString(agent);
         const bytes = readFile(
             agent.gc_allocator,
@@ -176,7 +176,7 @@ pub const Kiesel = struct {
         return Value.from(bytes);
     }
 
-    fn readLine(agent: *Agent, _: Value, _: ArgumentsList) !Value {
+    fn readLine(agent: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
         const stdin = std.io.getStdIn().reader();
         const bytes = stdin.readUntilDelimiterOrEofAlloc(
             agent.gc_allocator,
@@ -195,7 +195,7 @@ pub const Kiesel = struct {
         return Value.from(bytes);
     }
 
-    fn readStdin(agent: *Agent, _: Value, _: ArgumentsList) !Value {
+    fn readStdin(agent: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
         const stdin = std.io.getStdIn().reader();
         const bytes = stdin.readAllAlloc(
             agent.gc_allocator,
@@ -213,7 +213,7 @@ pub const Kiesel = struct {
         return Value.from(bytes);
     }
 
-    fn sleep(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn sleep(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const milliseconds = try arguments.get(0).toNumber(agent);
         if (milliseconds.asFloat() < 0 or !milliseconds.isFinite()) {
             return agent.throwException(
@@ -227,7 +227,7 @@ pub const Kiesel = struct {
         return .undefined;
     }
 
-    fn writeFile(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn writeFile(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const path = try arguments.get(0).toString(agent);
         const contents = try arguments.get(1).toString(agent);
 
@@ -250,12 +250,14 @@ pub const Kiesel = struct {
     }
 };
 
+const RunError = Allocator.Error || std.os.WriteError;
+
 fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: struct {
     base_dir: std.fs.Dir,
     file_name: ?[]const u8 = null,
     module: bool = false,
     print_promise_rejection_warnings: bool = true,
-}) !?Value {
+}) RunError!?Value {
     const stdout = std.io.getStdOut().writer();
     const stderr = std.io.getStdErr().writer();
     const agent = realm.agent;
@@ -357,13 +359,21 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
     };
 }
 
-fn readFile(allocator: Allocator, base_dir: std.fs.Dir, sub_path: []const u8) ![]const u8 {
+const ReadFileError = Allocator.Error || std.fs.File.OpenError || std.os.ReadError;
+
+fn readFile(allocator: Allocator, base_dir: std.fs.Dir, sub_path: []const u8) ReadFileError![]const u8 {
     const file = try base_dir.openFile(sub_path, .{});
     defer file.close();
     return file.readToEndAlloc(allocator, std.math.maxInt(usize));
 }
 
-fn getHistoryPath(allocator: Allocator) ![]const u8 {
+const GetHistoryPathError =
+    Allocator.Error ||
+    std.fs.GetAppDataDirError ||
+    std.os.MakeDirError ||
+    std.fs.File.OpenError;
+
+fn getHistoryPath(allocator: Allocator) GetHistoryPathError![]const u8 {
     const app_data_dir = try std.fs.getAppDataDir(allocator, "kiesel");
     defer allocator.free(app_data_dir);
 
@@ -381,10 +391,29 @@ fn getHistoryPath(allocator: Allocator) ![]const u8 {
     return history_path;
 }
 
+// FIXME: This should be public in std.unicode
+const Utf8DecodeError = error{
+    DanglingSurrogateHalf,
+    ExpectedSecondSurrogateHalf,
+    UnexpectedSecondSurrogateHalf,
+    CodepointTooLarge,
+    Utf8CannotEncodeSurrogateHalf,
+};
+
+const ReplError =
+    GetHistoryPathError ||
+    std.os.ReadError ||
+    std.os.WriteError ||
+    std.os.TermiosGetError ||
+    std.os.TermiosSetError ||
+    Utf8DecodeError || // Windows
+    error{InitFailed} || // Windows
+    error{ NothingRead, StreamTooLong, EndOfStream };
+
 fn repl(allocator: Allocator, realm: *Realm, options: struct {
     module: bool = false,
     print_promise_rejection_warnings: bool = true,
-}) !void {
+}) ReplError!void {
     const stdout = std.io.getStdOut().writer();
 
     var linenoise = Linenoise.init(allocator);
@@ -399,7 +428,7 @@ fn repl(allocator: Allocator, realm: *Realm, options: struct {
     while (true) {
         if (linenoise.linenoise("> ") catch |err| switch (err) {
             error.CtrlC => continue,
-            else => return err,
+            else => |err_| return err_,
         }) |source_text| {
             defer allocator.free(source_text);
 
@@ -428,7 +457,7 @@ fn repl(allocator: Allocator, realm: *Realm, options: struct {
 fn replBasic(allocator: Allocator, realm: *Realm, options: struct {
     module: bool = false,
     print_promise_rejection_warnings: bool = true,
-}) !void {
+}) ReplError!void {
     const stdin = std.io.getStdIn().reader();
     const stdout = std.io.getStdOut().writer();
 
@@ -541,7 +570,7 @@ pub fn main() !u8 {
             specifier: String,
             _: SafePointer,
             payload: ImportedModulePayload,
-        ) !void {
+        ) Allocator.Error!void {
             const result = if (parseSourceTextModule(agent_, referrer, specifier)) |source_text_module|
                 Module{ .source_text_module = source_text_module }
             else |err| switch (err) {
@@ -559,7 +588,7 @@ pub fn main() !u8 {
             agent_: *Agent,
             referrer: ImportedModuleReferrer,
             specifier: String,
-        ) !*SourceTextModule {
+        ) (ReadFileError || error{ExceptionThrown})!*SourceTextModule {
             const realm = agent_.currentRealm();
             const base_dir = switch (referrer) {
                 inline .script, .module => |x| x.host_defined.cast(*ScriptOrModuleHostDefined).base_dir,

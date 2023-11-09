@@ -1,6 +1,10 @@
 //! 21.2 BigInt Objects
 //! https://tc39.es/ecma262/#sec-bigint-objects
 
+const std = @import("std");
+
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -21,7 +25,7 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 /// 21.2.2 Properties of the BigInt Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-bigint-constructor
 pub const BigIntConstructor = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
             .length = 1,
             .name = "BigInt",
@@ -51,7 +55,12 @@ pub const BigIntConstructor = struct {
 
     /// 21.2.1.1 BigInt ( value )
     /// https://tc39.es/ecma262/#sec-bigint-constructor-number-value
-    fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, new_target: ?Object) !Value {
+    fn behaviour(
+        agent: *Agent,
+        _: Value,
+        arguments: ArgumentsList,
+        new_target: ?Object,
+    ) Agent.Error!Value {
         const value = arguments.get(0);
 
         // 1. If NewTarget is not undefined, throw a TypeError exception.
@@ -72,7 +81,7 @@ pub const BigIntConstructor = struct {
 
 /// 21.2.1.1.1 NumberToBigInt ( number )
 /// https://tc39.es/ecma262/#sec-numbertobigint
-fn numberToBigInt(agent: *Agent, number: Number) !types.BigInt {
+fn numberToBigInt(agent: *Agent, number: Number) Agent.Error!types.BigInt {
     // 1. If IsIntegralNumber(number) is false, throw a RangeError exception.
     if (!Value.from(number).isIntegralNumber()) {
         return agent.throwException(
@@ -95,7 +104,7 @@ fn numberToBigInt(agent: *Agent, number: Number) !types.BigInt {
 /// 21.2.3 Properties of the BigInt Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-bigint-prototype-object
 pub const BigIntPrototype = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
@@ -118,7 +127,7 @@ pub const BigIntPrototype = struct {
 
     /// 21.2.3.4.1 ThisBigIntValue ( value )
     /// https://tc39.es/ecma262/#sec-thisbigintvalue
-    fn thisBigIntValue(agent: *Agent, value: Value) !types.BigInt {
+    fn thisBigIntValue(agent: *Agent, value: Value) error{ExceptionThrown}!types.BigInt {
         switch (value) {
             // 1. If value is a BigInt, return value.
             .big_int => |big_int| return big_int,
@@ -143,14 +152,14 @@ pub const BigIntPrototype = struct {
 
     /// 21.2.3.2 BigInt.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
     /// https://tc39.es/ecma262/#sec-bigint.prototype.tolocalestring
-    fn toLocaleString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+    fn toLocaleString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         const x = try thisBigIntValue(agent, this_value);
         return Value.from(try x.toString(agent.gc_allocator, 10));
     }
 
     /// 21.2.3.3 BigInt.prototype.toString ( [ radix ] )
     /// https://tc39.es/ecma262/#sec-bigint.prototype.tostring
-    fn toString(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+    fn toString(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
         const radix = arguments.get(0);
 
         // 1. Let x be ? ThisBigIntValue(this value).
@@ -171,7 +180,7 @@ pub const BigIntPrototype = struct {
 
     /// 21.2.3.4 BigInt.prototype.valueOf ( )
     /// https://tc39.es/ecma262/#sec-bigint.prototype.valueof
-    fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+    fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return ? ThisBigIntValue(this value).
         return Value.from(try thisBigIntValue(agent, this_value));
     }

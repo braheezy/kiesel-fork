@@ -20,7 +20,7 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 
 /// '!' in the spec, ensures that the error is not a throw completion (`error.ExceptionThrown`).
 /// OOM is still propagated. The name is a nod to C++, of course :^)
-pub fn noexcept(err: error{ ExceptionThrown, OutOfMemory }) !noreturn {
+pub fn noexcept(err: error{ ExceptionThrown, OutOfMemory }) Allocator.Error!noreturn {
     switch (err) {
         error.ExceptionThrown => @panic("Throw completion was returned from '!' function call"),
         error.OutOfMemory => return error.OutOfMemory,
@@ -40,7 +40,10 @@ pub fn TemporaryChange(comptime T: type) type {
     };
 }
 
-pub fn temporaryChange(field: anytype, new_value: @TypeOf(field.*)) TemporaryChange(@TypeOf(field.*)) {
+pub fn temporaryChange(
+    field: anytype,
+    new_value: @TypeOf(field.*),
+) TemporaryChange(@TypeOf(field.*)) {
     const T = @TypeOf(field);
     if (!comptime std.meta.trait.is(.Pointer)(T)) {
         @compileError("temporaryChange() called with incompatible type " ++ @typeName(T));
@@ -90,7 +93,7 @@ pub fn trim(haystack: []const u8, needles: []const []const u8) []const u8 {
     return trimLeft(trimRight(haystack, needles), needles);
 }
 
-pub fn formatParseError(allocator: Allocator, parse_error: ptk.Error) ![]const u8 {
+pub fn formatParseError(allocator: Allocator, parse_error: ptk.Error) Allocator.Error![]const u8 {
     return std.fmt.allocPrint(allocator, "{s} ({s}:{}:{})", .{
         parse_error.message,
         parse_error.location.source orelse "<unknown>",
@@ -103,7 +106,7 @@ pub fn formatParseErrorHint(
     allocator: Allocator,
     parse_error: ptk.Error,
     source_text: []const u8,
-) ![]const u8 {
+) Allocator.Error![]const u8 {
     // NOTE: parse-toolkit only uses '\n' to advance the line counter - for \r\n newlines this
     //       doesn't matter, and LS/PS are rare enough to not matter for now.
     var line_iterator = std.mem.splitScalar(u8, source_text, '\n');
@@ -141,7 +144,7 @@ pub fn defineBuiltinAccessor(
     getter: ?*const Behaviour.RegularFn,
     setter: ?*const Behaviour.RegularFn,
     realm: *Realm,
-) !void {
+) Allocator.Error!void {
     std.debug.assert(getter != null or setter != null);
     const getter_function = if (getter) |behaviour| blk: {
         const function_name = std.fmt.comptimePrint("get {s}", .{comptime getFunctionName(name)});
@@ -175,7 +178,7 @@ pub fn defineBuiltinFunction(
     behaviour: *const Behaviour.RegularFn,
     length: u32,
     realm: *Realm,
-) !void {
+) Allocator.Error!void {
     const function_name = comptime getFunctionName(name);
     const function = try createBuiltinFunction(realm.agent, .{ .regular = behaviour }, .{
         .length = length,
@@ -196,7 +199,7 @@ pub fn defineBuiltinFunctionWithAttributes(
         enumerable: bool,
         configurable: bool,
     },
-) !void {
+) Allocator.Error!void {
     const function_name = comptime getFunctionName(name);
     const function = try createBuiltinFunction(realm.agent, .{ .regular = behaviour }, .{
         .length = length,
@@ -211,7 +214,11 @@ pub fn defineBuiltinFunctionWithAttributes(
     });
 }
 
-pub fn defineBuiltinProperty(object: Object, comptime name: []const u8, value: anytype) !void {
+pub fn defineBuiltinProperty(
+    object: Object,
+    comptime name: []const u8,
+    value: anytype,
+) Allocator.Error!void {
     const T = @TypeOf(value);
     const property_key = getPropertyKey(name, object.agent());
     const property_descriptor = if (T == Value)

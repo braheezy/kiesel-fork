@@ -23,7 +23,7 @@ pub const String = union(enum) {
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
-    ) !void {
+    ) @TypeOf(writer).Error!void {
         _ = fmt;
         _ = options;
         switch (self) {
@@ -39,7 +39,7 @@ pub const String = union(enum) {
         return std.unicode.calcUtf16LeLen(self.utf8) catch unreachable;
     }
 
-    pub inline fn utf16CodeUnits(self: Self, allocator: Allocator) ![]const u16 {
+    pub inline fn utf16CodeUnits(self: Self, allocator: Allocator) Allocator.Error![]const u16 {
         return std.unicode.utf8ToUtf16LeWithNull(allocator, self.utf8) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             error.InvalidUtf8 => unreachable,
@@ -50,7 +50,12 @@ pub const String = union(enum) {
         return std.mem.eql(u8, a.utf8, b.utf8);
     }
 
-    pub inline fn substring(self: Self, allocator: Allocator, start: usize, end: usize) ![]const u8 {
+    pub inline fn substring(
+        self: Self,
+        allocator: Allocator,
+        start: usize,
+        end: usize,
+    ) Allocator.Error![]const u8 {
         const code_units = try self.utf16CodeUnits(allocator);
         defer allocator.free(code_units);
         return std.unicode.utf16leToUtf8Alloc(allocator, code_units[start..end]) catch |err| switch (err) {

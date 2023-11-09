@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const ast = @import("../language/ast.zig");
 const builtin_function = @import("./builtin_function.zig");
 const builtins = @import("../builtins.zig");
@@ -113,7 +115,7 @@ pub const ECMAScriptFunction = MakeObject(.{
 
 /// 10.2.1 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-ecmascript-function-objects-call-thisargument-argumentslist
-fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) !Value {
+fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) Agent.Error!Value {
     const agent = object.agent();
 
     const function = object.as(ECMAScriptFunction);
@@ -164,7 +166,11 @@ fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) !Va
 
 /// 10.2.1.1 PrepareForOrdinaryCall ( F, newTarget )
 /// https://tc39.es/ecma262/#sec-prepareforordinarycall
-fn prepareForOrdinaryCall(agent: *Agent, function: *ECMAScriptFunction, new_target: ?Object) !*ExecutionContext {
+fn prepareForOrdinaryCall(
+    agent: *Agent,
+    function: *ECMAScriptFunction,
+    new_target: ?Object,
+) Allocator.Error!*ExecutionContext {
     // 1. Let callerContext be the running execution context.
     // NOTE: This is only used to suspend the context, which we don't do yet.
 
@@ -212,7 +218,7 @@ pub fn ordinaryCallBindThis(
     function: *ECMAScriptFunction,
     callee_context: *ExecutionContext,
     this_argument: Value,
-) !void {
+) Allocator.Error!void {
     // 1. Let thisMode be F.[[ThisMode]].
     const this_mode = function.fields.this_mode;
 
@@ -267,7 +273,7 @@ pub fn ordinaryCallEvaluateBody(
     agent: *Agent,
     function: *ECMAScriptFunction,
     arguments_list: ArgumentsList,
-) !Completion {
+) Agent.Error!Completion {
     // 1. Return ? EvaluateBody of F.[[ECMAScriptCode]] with arguments F and argumentsList.
     const function_body = function.fields.ecmascript_code;
 
@@ -302,7 +308,7 @@ fn evaluateFunctionBody(
     agent: *Agent,
     function: *ECMAScriptFunction,
     arguments_list: ArgumentsList,
-) !Completion {
+) Agent.Error!Completion {
     // FunctionBody : FunctionStatementList
     const function_body = function.fields.ecmascript_code;
 
@@ -319,7 +325,7 @@ fn evaluateGeneratorBody(
     agent: *Agent,
     function: *ECMAScriptFunction,
     arguments_list: ArgumentsList,
-) !Completion {
+) Agent.Error!Completion {
     // GeneratorBody : FunctionBody
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
     try functionDeclarationInstantiation(agent, function, arguments_list);
@@ -346,7 +352,7 @@ fn evaluateAsyncGeneratorBody(
     agent: *Agent,
     function: *ECMAScriptFunction,
     arguments_list: ArgumentsList,
-) !Completion {
+) Agent.Error!Completion {
     // AsyncGeneratorBody : FunctionBody
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
     try functionDeclarationInstantiation(agent, function, arguments_list);
@@ -373,7 +379,7 @@ fn evaluateAsyncFunctionBody(
     agent: *Agent,
     function: *ECMAScriptFunction,
     arguments_list: ArgumentsList,
-) !Completion {
+) Allocator.Error!Completion {
     // AsyncFunctionBody : FunctionBody
     const realm = agent.currentRealm();
 
@@ -408,7 +414,11 @@ fn evaluateAsyncFunctionBody(
 
 /// 10.2.2 [[Construct]] ( argumentsList, newTarget )
 /// https://tc39.es/ecma262/#sec-ecmascript-function-objects-construct-argumentslist-newtarget
-pub fn construct(object: Object, arguments_list: ArgumentsList, new_target: Object) !Object {
+pub fn construct(
+    object: Object,
+    arguments_list: ArgumentsList,
+    new_target: Object,
+) Agent.Error!Object {
     const agent = object.agent();
     const function = object.as(ECMAScriptFunction);
 
@@ -512,7 +522,7 @@ pub fn ordinaryFunctionCreate(
     this_mode: enum { lexical_this, non_lexical_this },
     env: Environment,
     private_env: ?*PrivateEnvironment,
-) !Object {
+) Allocator.Error!Object {
     // 7. If the source text matched by Body is strict mode code, let Strict be true; else let
     //    Strict be false.
     const strict = body.strict.?;
@@ -589,7 +599,7 @@ pub fn ordinaryFunctionCreate(
 
 /// 10.2.4 AddRestrictedFunctionProperties ( F, realm )
 /// https://tc39.es/ecma262/#sec-addrestrictedfunctionproperties
-pub fn addRestrictedFunctionProperties(function: Object, realm: *Realm) !void {
+pub fn addRestrictedFunctionProperties(function: Object, realm: *Realm) Allocator.Error!void {
     // 1. Assert: realm.[[Intrinsics]].[[%ThrowTypeError%]] exists and has been initialized.
     // 2. Let thrower be realm.[[Intrinsics]].[[%ThrowTypeError%]].
     const thrower = try realm.intrinsics.@"%ThrowTypeError%"();
@@ -628,7 +638,7 @@ pub fn makeConstructor(
         writable_prototype: bool = true,
         prototype: ?Object = null,
     },
-) !void {
+) Allocator.Error!void {
     const agent = function.agent();
     const realm = agent.currentRealm();
 
@@ -725,7 +735,7 @@ pub fn defineMethodProperty(
     property_key: PropertyKey,
     closure: Object,
     enumerable: bool,
-) !void {
+) Allocator.Error!void {
     // 1. Assert: homeObject is an ordinary, extensible object with no non-configurable properties.
 
     // TODO: 2. If key is a Private Name, then
@@ -760,7 +770,7 @@ pub fn setFunctionName(
     function: Object,
     name_property_key: PropertyKey,
     prefix: ?[]const u8,
-) !void {
+) Allocator.Error!void {
     const agent = function.agent();
 
     // 1. Assert: F is an extensible object that does not have a "name" own property.
@@ -827,7 +837,7 @@ pub fn setFunctionName(
 
 /// 10.2.10 SetFunctionLength ( F, length )
 /// https://tc39.es/ecma262/#sec-setfunctionlength
-pub fn setFunctionLength(function: Object, length: f64) !void {
+pub fn setFunctionLength(function: Object, length: f64) Allocator.Error!void {
     std.debug.assert(
         std.math.isPositiveInf(length) or
             (std.math.isFinite(length) and std.math.trunc(length) == length and length >= 0),
@@ -853,7 +863,11 @@ pub fn setFunctionLength(function: Object, length: f64) !void {
 
 /// 10.2.11 FunctionDeclarationInstantiation ( func, argumentsList )
 /// https://tc39.es/ecma262/#sec-functiondeclarationinstantiation
-fn functionDeclarationInstantiation(agent: *Agent, function: *ECMAScriptFunction, arguments_list: ArgumentsList) !void {
+fn functionDeclarationInstantiation(
+    agent: *Agent,
+    function: *ECMAScriptFunction,
+    arguments_list: ArgumentsList,
+) Agent.Error!void {
     // 1. Let calleeContext be the running execution context.
     var callee_context = agent.runningExecutionContext();
 
@@ -976,7 +990,7 @@ fn functionDeclarationInstantiation(agent: *Agent, function: *ECMAScriptFunction
     // 21. For each String paramName of parameterNames, do
     for (parameter_names) |parameter_name| {
         // a. Let alreadyDeclared be ! env.HasBinding(paramName).
-        const already_declared = try env.hasBinding(parameter_name);
+        const already_declared = env.hasBinding(parameter_name) catch |err| try noexcept(err);
 
         // b. NOTE: Early errors ensure that duplicate parameter names can only occur in non-strict
         //    functions that do not have parameter default values or rest parameters.
@@ -984,12 +998,16 @@ fn functionDeclarationInstantiation(agent: *Agent, function: *ECMAScriptFunction
         // c. If alreadyDeclared is false, then
         if (!already_declared) {
             // i. Perform ! env.CreateMutableBinding(paramName, false).
-            try env.createMutableBinding(agent, parameter_name, false);
+            env.createMutableBinding(agent, parameter_name, false) catch |err| try noexcept(err);
 
             // ii. If hasDuplicates is true, then
             if (has_duplicates) {
                 // 1. Perform ! env.InitializeBinding(paramName, undefined).
-                try env.initializeBinding(agent, parameter_name, .undefined);
+                env.initializeBinding(
+                    agent,
+                    parameter_name,
+                    .undefined,
+                ) catch |err| try noexcept(err);
             }
         }
     }
@@ -1020,7 +1038,7 @@ fn functionDeclarationInstantiation(agent: *Agent, function: *ECMAScriptFunction
         // c. If strict is true, then
         if (strict) {
             // i. Perform ! env.CreateImmutableBinding("arguments", false).
-            try env.createImmutableBinding(agent, "arguments", false);
+            env.createImmutableBinding(agent, "arguments", false) catch |err| try noexcept(err);
 
             // ii. NOTE: In strict mode code early errors prevent attempting to assign to this
             //     binding, so its mutability is not observable.
@@ -1028,11 +1046,15 @@ fn functionDeclarationInstantiation(agent: *Agent, function: *ECMAScriptFunction
         // d. Else,
         else {
             // i. Perform ! env.CreateMutableBinding("arguments", false).
-            try env.createMutableBinding(agent, "arguments", false);
+            env.createMutableBinding(agent, "arguments", false) catch |err| try noexcept(err);
         }
 
         // e. Perform ! env.InitializeBinding("arguments", ao).
-        try env.initializeBinding(agent, "arguments", Value.from(arguments_object));
+        env.initializeBinding(
+            agent,
+            "arguments",
+            Value.from(arguments_object),
+        ) catch |err| try noexcept(err);
 
         // f. Let parameterBindings be the list-concatenation of parameterNames and « "arguments" ».
         var parameter_bindings = try std.ArrayList([]const u8).initCapacity(
@@ -1115,10 +1137,10 @@ fn functionDeclarationInstantiation(agent: *Agent, function: *ECMAScriptFunction
                 try instantiated_var_names.putNoClobber(var_name, {});
 
                 // 2. Perform ! env.CreateMutableBinding(n, false).
-                try env.createMutableBinding(agent, var_name, false);
+                env.createMutableBinding(agent, var_name, false) catch |err| try noexcept(err);
 
                 // 3. Perform ! env.InitializeBinding(n, undefined).
-                try env.initializeBinding(agent, var_name, .undefined);
+                env.initializeBinding(agent, var_name, .undefined) catch |err| try noexcept(err);
             }
         }
 
@@ -1154,7 +1176,7 @@ fn functionDeclarationInstantiation(agent: *Agent, function: *ECMAScriptFunction
                 try instantiated_var_names.putNoClobber(var_name, {});
 
                 // 2. Perform ! varEnv.CreateMutableBinding(n, false).
-                try var_env.createMutableBinding(agent, var_name, false);
+                var_env.createMutableBinding(agent, var_name, false) catch |err| try noexcept(err);
 
                 // 3. If parameterBindings does not contain n, or if functionNames contains n, then
                 //     a. Let initialValue be undefined.
@@ -1164,10 +1186,10 @@ fn functionDeclarationInstantiation(agent: *Agent, function: *ECMAScriptFunction
                     function_names.contains(var_name))
                     .undefined
                 else
-                    try env.getBindingValue(agent, var_name, false);
+                    env.getBindingValue(agent, var_name, false) catch |err| try noexcept(err);
 
                 // 5. Perform ! varEnv.InitializeBinding(n, initialValue).
-                try var_env.initializeBinding(agent, var_name, initial_value);
+                var_env.initializeBinding(agent, var_name, initial_value) catch |err| try noexcept(err);
 
                 // 6. NOTE: A var with the same name as a formal parameter initially has the same
                 //    value as the corresponding initialized parameter.

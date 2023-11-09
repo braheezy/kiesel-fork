@@ -1,6 +1,10 @@
 //! 6.1.7.4 Well-Known Intrinsic Objects
 //! https://tc39.es/ecma262/#sec-well-known-intrinsic-objects
 
+const std = @import("std");
+
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../../builtins.zig");
 const types = @import("../../types.zig");
 
@@ -97,7 +101,7 @@ inline fn lazyIntrinsic(
     self: *Self,
     comptime name: []const u8,
     comptime T: type,
-) error{OutOfMemory}!Object {
+) Allocator.Error!Object {
     const intrinsic = &@field(self.lazy_intrinsics, name);
     if (intrinsic.* == null) {
         // Intrinsics that have a dependency on themselves need to use two-stage initialization
@@ -113,19 +117,19 @@ inline fn lazyIntrinsic(
     return intrinsic.*.?;
 }
 
-pub fn @"%AggregateError%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%AggregateError%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%AggregateError%", builtins.AggregateErrorConstructor);
 }
-pub fn @"%AggregateError.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%AggregateError.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%AggregateError.prototype%", builtins.AggregateErrorPrototype);
 }
-pub fn @"%Array%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Array%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Array%", builtins.ArrayConstructor);
 }
-pub fn @"%Array.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Array.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Array.prototype%", builtins.ArrayPrototype);
 }
-pub fn @"%Array.prototype.values%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Array.prototype.values%"(self: *Self) Allocator.Error!Object {
     const intrinsic = &self.lazy_intrinsics.@"%Array.prototype.values%";
     if (intrinsic.* == null) {
         const array_prototype = try @"%Array.prototype%"(self);
@@ -134,136 +138,136 @@ pub fn @"%Array.prototype.values%"(self: *Self) error{OutOfMemory}!Object {
     }
     return intrinsic.*.?;
 }
-pub fn @"%ArrayBuffer%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%ArrayBuffer%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%ArrayBuffer%", builtins.ArrayBufferConstructor);
 }
-pub fn @"%ArrayBuffer.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%ArrayBuffer.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%ArrayBuffer.prototype%", builtins.ArrayBufferPrototype);
 }
-pub fn @"%ArrayIteratorPrototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%ArrayIteratorPrototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%ArrayIteratorPrototype%", builtins.ArrayIteratorPrototype);
 }
-pub fn @"%AsyncFunction%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%AsyncFunction%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%AsyncFunction%", builtins.AsyncFunctionConstructor);
 }
-pub fn @"%AsyncFunction.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%AsyncFunction.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%AsyncFunction.prototype%", builtins.AsyncFunctionPrototype);
 }
-pub fn @"%AsyncGeneratorFunction%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%AsyncGeneratorFunction%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%AsyncGeneratorFunction%", builtins.AsyncGeneratorFunctionConstructor);
 }
-pub fn @"%AsyncGeneratorFunction.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%AsyncGeneratorFunction.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%AsyncGeneratorFunction.prototype%", builtins.AsyncGeneratorFunctionPrototype);
 }
-pub fn @"%AsyncGeneratorFunction.prototype.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%AsyncGeneratorFunction.prototype.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%AsyncGeneratorFunction.prototype.prototype%", builtins.AsyncGeneratorPrototype);
 }
-pub fn @"%AsyncIteratorPrototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%AsyncIteratorPrototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%AsyncIteratorPrototype%", builtins.AsyncIteratorPrototype);
 }
-pub fn @"%BigInt%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%BigInt%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%BigInt%", builtins.BigIntConstructor);
 }
-pub fn @"%BigInt.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%BigInt.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%BigInt.prototype%", builtins.BigIntPrototype);
 }
-pub fn @"%Boolean%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Boolean%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Boolean%", builtins.BooleanConstructor);
 }
-pub fn @"%Boolean.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Boolean.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Boolean.prototype%", builtins.BooleanPrototype);
 }
-pub fn @"%DataView%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%DataView%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%DataView%", builtins.DataViewConstructor);
 }
-pub fn @"%DataView.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%DataView.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%DataView.prototype%", builtins.DataViewPrototype);
 }
-pub fn @"%Date%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Date%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Date%", builtins.DateConstructor);
 }
-pub fn @"%Date.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Date.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Date.prototype%", builtins.DatePrototype);
 }
-pub fn @"%decodeURI%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%decodeURI%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%decodeURI%", builtins.global_functions.DecodeURI);
 }
-pub fn @"%decodeURIComponent%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%decodeURIComponent%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%decodeURIComponent%", builtins.global_functions.DecodeURIComponent);
 }
-pub fn @"%encodeURI%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%encodeURI%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%encodeURI%", builtins.global_functions.EncodeURI);
 }
-pub fn @"%encodeURIComponent%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%encodeURIComponent%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%encodeURIComponent%", builtins.global_functions.EncodeURIComponent);
 }
-pub fn @"%Error%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Error%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Error%", builtins.ErrorConstructor);
 }
-pub fn @"%Error.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Error.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Error.prototype%", builtins.ErrorPrototype);
 }
-pub fn @"%eval%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%eval%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%eval%", builtins.global_functions.Eval);
 }
-pub fn @"%EvalError%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%EvalError%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%EvalError%", builtins.EvalErrorConstructor);
 }
-pub fn @"%EvalError.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%EvalError.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%EvalError.prototype%", builtins.EvalErrorPrototype);
 }
-pub fn @"%Function%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Function%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Function%", builtins.FunctionConstructor);
 }
-pub fn @"%Function.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Function.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Function.prototype%", builtins.FunctionPrototype);
 }
-pub fn @"%GeneratorFunction%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%GeneratorFunction%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%GeneratorFunction%", builtins.GeneratorFunctionConstructor);
 }
-pub fn @"%GeneratorFunction.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%GeneratorFunction.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%GeneratorFunction.prototype%", builtins.GeneratorFunctionPrototype);
 }
-pub fn @"%GeneratorFunction.prototype.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%GeneratorFunction.prototype.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%GeneratorFunction.prototype.prototype%", builtins.GeneratorPrototype);
 }
-pub fn @"%isFinite%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%isFinite%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%isFinite%", builtins.global_functions.IsFinite);
 }
-pub fn @"%isNaN%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%isNaN%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%isNaN%", builtins.global_functions.IsNaN);
 }
-pub fn @"%IteratorPrototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%IteratorPrototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%IteratorPrototype%", builtins.IteratorPrototype);
 }
-pub fn @"%JSON%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%JSON%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%JSON%", builtins.JSON);
 }
-pub fn @"%Map%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Map%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Map%", builtins.MapConstructor);
 }
-pub fn @"%Map.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Map.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Map.prototype%", builtins.MapPrototype);
 }
-pub fn @"%MapIteratorPrototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%MapIteratorPrototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%MapIteratorPrototype%", builtins.MapIteratorPrototype);
 }
-pub fn @"%Math%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Math%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Math%", builtins.Math);
 }
-pub fn @"%Number%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Number%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Number%", builtins.NumberConstructor);
 }
-pub fn @"%Number.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Number.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Number.prototype%", builtins.NumberPrototype);
 }
-pub fn @"%Object%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Object%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Object%", builtins.ObjectConstructor);
 }
-pub fn @"%Object.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Object.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Object.prototype%", builtins.ObjectPrototype);
 }
-pub fn @"%Object.prototype.toString%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Object.prototype.toString%"(self: *Self) Allocator.Error!Object {
     const intrinsic = &self.lazy_intrinsics.@"%Object.prototype.toString%";
     if (intrinsic.* == null) {
         const object_prototype = try @"%Object.prototype%"(self);
@@ -272,87 +276,87 @@ pub fn @"%Object.prototype.toString%"(self: *Self) error{OutOfMemory}!Object {
     }
     return intrinsic.*.?;
 }
-pub fn @"%parseFloat%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%parseFloat%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%parseFloat%", builtins.global_functions.ParseFloat);
 }
-pub fn @"%parseInt%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%parseInt%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%parseInt%", builtins.global_functions.ParseInt);
 }
-pub fn @"%Promise%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Promise%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Promise%", builtins.PromiseConstructor);
 }
-pub fn @"%Promise.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Promise.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Promise.prototype%", builtins.PromisePrototype);
 }
-pub fn @"%Proxy%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Proxy%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Proxy%", builtins.ProxyConstructor);
 }
-pub fn @"%RangeError%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%RangeError%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%RangeError%", builtins.RangeErrorConstructor);
 }
-pub fn @"%RangeError.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%RangeError.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%RangeError.prototype%", builtins.RangeErrorPrototype);
 }
-pub fn @"%ReferenceError%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%ReferenceError%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%ReferenceError%", builtins.ReferenceErrorConstructor);
 }
-pub fn @"%ReferenceError.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%ReferenceError.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%ReferenceError.prototype%", builtins.ReferenceErrorPrototype);
 }
-pub fn @"%Reflect%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Reflect%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Reflect%", builtins.Reflect);
 }
-pub fn @"%RegExp%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%RegExp%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%RegExp%", builtins.RegExpConstructor);
 }
-pub fn @"%RegExp.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%RegExp.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%RegExp.prototype%", builtins.RegExpPrototype);
 }
-pub fn @"%RegExpStringIteratorPrototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%RegExpStringIteratorPrototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%RegExpStringIteratorPrototype%", builtins.RegExpStringIteratorPrototype);
 }
-pub fn @"%Set%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Set%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Set%", builtins.SetConstructor);
 }
-pub fn @"%Set.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Set.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Set.prototype%", builtins.SetPrototype);
 }
-pub fn @"%SetIteratorPrototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%SetIteratorPrototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%SetIteratorPrototype%", builtins.SetIteratorPrototype);
 }
-pub fn @"%String%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%String%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%String%", builtins.StringConstructor);
 }
-pub fn @"%String.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%String.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%String.prototype%", builtins.StringPrototype);
 }
-pub fn @"%StringIteratorPrototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%StringIteratorPrototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%StringIteratorPrototype%", builtins.StringIteratorPrototype);
 }
-pub fn @"%Symbol%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Symbol%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Symbol%", builtins.SymbolConstructor);
 }
-pub fn @"%Symbol.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%Symbol.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Symbol.prototype%", builtins.SymbolPrototype);
 }
-pub fn @"%SyntaxError%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%SyntaxError%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%SyntaxError%", builtins.SyntaxErrorConstructor);
 }
-pub fn @"%SyntaxError.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%SyntaxError.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%SyntaxError.prototype%", builtins.SyntaxErrorPrototype);
 }
-pub fn @"%ThrowTypeError%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%ThrowTypeError%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%ThrowTypeError%", builtins.ThrowTypeError);
 }
-pub fn @"%TypeError%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%TypeError%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%TypeError%", builtins.TypeErrorConstructor);
 }
-pub fn @"%TypeError.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%TypeError.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%TypeError.prototype%", builtins.TypeErrorPrototype);
 }
-pub fn @"%URIError%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%URIError%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%URIError%", builtins.URIErrorConstructor);
 }
-pub fn @"%URIError.prototype%"(self: *Self) error{OutOfMemory}!Object {
+pub fn @"%URIError.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%URIError.prototype%", builtins.URIErrorPrototype);
 }

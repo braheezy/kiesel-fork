@@ -22,25 +22,25 @@ pub fn format(
     comptime fmt: []const u8,
     options: std.fmt.FormatOptions,
     writer: anytype,
-) !void {
+) @TypeOf(writer).Error!void {
     _ = fmt;
     _ = options;
     try writer.print("{}", .{self.value});
     try writer.writeAll("n");
 }
 
-pub inline fn from(allocator: Allocator, value: anytype) !Self {
+pub inline fn from(allocator: Allocator, value: anytype) Allocator.Error!Self {
     return if (@typeInfo(@TypeOf(value)) == .ComptimeInt and value == 0)
         .{ .value = try Value.init(allocator) }
     else
         .{ .value = try Value.initSet(allocator, value) };
 }
 
-pub inline fn clone(self: Self) !Self {
+pub inline fn clone(self: Self) Allocator.Error!Self {
     return .{ .value = try self.value.clone() };
 }
 
-pub fn asFloat(self: Self, agent: *Agent) !f64 {
+pub fn asFloat(self: Self, agent: *Agent) Allocator.Error!f64 {
     // NOTE: We could also use to(i1024) here, which should cover the largest possible int for
     //       an f64, but that fails to codegen on the Zig side for at least aarch64-macos and
     //       wasm32-wasi. Going via toString() and parsing that into a float isn't great but
@@ -53,7 +53,7 @@ pub fn asFloat(self: Self, agent: *Agent) !f64 {
 
 /// 6.1.6.2.1 BigInt::unaryMinus ( x )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-unaryMinus
-pub fn unaryMinus(self: Self) !Self {
+pub fn unaryMinus(self: Self) Allocator.Error!Self {
     // 1.If x is 0ℤ, return 0ℤ.
     if (self.value.eqlZero()) return self;
 
@@ -65,7 +65,7 @@ pub fn unaryMinus(self: Self) !Self {
 
 /// 6.1.6.2.2 BigInt::bitwiseNOT ( x )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-bitwiseNOT
-pub fn bitwiseNOT(self: Self, agent: *Agent) !Self {
+pub fn bitwiseNOT(self: Self, agent: *Agent) Allocator.Error!Self {
     const one = agent.pre_allocated.one;
 
     // 1. Return -x - 1ℤ.
@@ -77,7 +77,7 @@ pub fn bitwiseNOT(self: Self, agent: *Agent) !Self {
 
 /// 6.1.6.2.3 BigInt::exponentiate ( base, exponent )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-exponentiate
-pub fn exponentiate(base: Self, agent: *Agent, exponent: Self) !Self {
+pub fn exponentiate(base: Self, agent: *Agent, exponent: Self) Agent.Error!Self {
     const one = agent.pre_allocated.one;
 
     // 1. If exponent < 0ℤ, throw a RangeError exception.
@@ -102,7 +102,7 @@ pub fn exponentiate(base: Self, agent: *Agent, exponent: Self) !Self {
 
 /// 6.1.6.2.4 BigInt::multiply ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-multiply
-pub fn multiply(x: Self, agent: *Agent, y: Self) !Self {
+pub fn multiply(x: Self, agent: *Agent, y: Self) Allocator.Error!Self {
     // 1. Return x × y.
     var result = try from(agent.gc_allocator, 0);
     try result.value.mul(&x.value, &y.value);
@@ -111,7 +111,7 @@ pub fn multiply(x: Self, agent: *Agent, y: Self) !Self {
 
 /// 6.1.6.2.5 BigInt::divide ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-divide
-pub fn divide(x: Self, agent: *Agent, y: Self) !Self {
+pub fn divide(x: Self, agent: *Agent, y: Self) Agent.Error!Self {
     // 1. If y is 0ℤ, throw a RangeError exception.
     if (y.value.eqlZero()) return agent.throwException(.range_error, "Division by zero", .{});
 
@@ -125,7 +125,7 @@ pub fn divide(x: Self, agent: *Agent, y: Self) !Self {
 
 /// 6.1.6.2.6 BigInt::remainder ( n, d )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-remainder
-pub fn remainder(n: Self, agent: *Agent, d: Self) !Self {
+pub fn remainder(n: Self, agent: *Agent, d: Self) Agent.Error!Self {
     // 1. If d is 0ℤ, throw a RangeError exception.
     if (d.value.eqlZero()) return agent.throwException(.range_error, "Division by zero", .{});
 
@@ -143,7 +143,7 @@ pub fn remainder(n: Self, agent: *Agent, d: Self) !Self {
 
 /// 6.1.6.2.7 BigInt::add ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-add
-pub fn add(x: Self, agent: *Agent, y: Self) !Self {
+pub fn add(x: Self, agent: *Agent, y: Self) Allocator.Error!Self {
     // 1. Return x + y.
     var result = try from(agent.gc_allocator, 0);
     try result.value.add(&x.value, &y.value);
@@ -152,7 +152,7 @@ pub fn add(x: Self, agent: *Agent, y: Self) !Self {
 
 /// 6.1.6.2.8 BigInt::subtract ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-subtract
-pub fn subtract(x: Self, agent: *Agent, y: Self) !Self {
+pub fn subtract(x: Self, agent: *Agent, y: Self) Allocator.Error!Self {
     // 1. Return x - y.
     var result = try from(agent.gc_allocator, 0);
     try result.value.sub(&x.value, &y.value);
@@ -161,7 +161,7 @@ pub fn subtract(x: Self, agent: *Agent, y: Self) !Self {
 
 /// 6.1.6.2.9 BigInt::leftShift ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-leftShift
-pub fn leftShift(_: Self, agent: *Agent, _: Self) !Self {
+pub fn leftShift(_: Self, agent: *Agent, _: Self) error{ExceptionThrown}!Self {
     // 1. If y < 0ℤ, then
     //     a. Return ℤ(floor(ℝ(x) / 2**(-ℝ(y)))).
     // 2. Return x × 2ℤ^y.
@@ -171,7 +171,7 @@ pub fn leftShift(_: Self, agent: *Agent, _: Self) !Self {
 
 /// 6.1.6.2.10 BigInt::signedRightShift ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-signedRightShift
-pub fn signedRightShift(x: Self, agent: *Agent, y: Self) !Self {
+pub fn signedRightShift(x: Self, agent: *Agent, y: Self) Agent.Error!Self {
     const error_message = std.fmt.comptimePrint(
         "Cannot right-shift BigInt by more than {} bits",
         .{std.math.maxInt(usize)},
@@ -188,7 +188,7 @@ pub fn signedRightShift(x: Self, agent: *Agent, y: Self) !Self {
 
 /// 6.1.6.2.11 BigInt::unsignedRightShift ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-unsignedRightShift
-pub fn unsignedRightShift(_: Self, agent: *Agent, _: Self) !Self {
+pub fn unsignedRightShift(_: Self, agent: *Agent, _: Self) error{ExceptionThrown}!Self {
     // 1. Throw a TypeError exception.
     return agent.throwException(
         .type_error,
@@ -213,7 +213,7 @@ pub fn equal(x: Self, y: Self) bool {
 
 /// 6.1.6.2.18 BigInt::bitwiseAND ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-bitwiseAND
-pub fn bitwiseAND(x: Self, agent: *Agent, y: Self) !Self {
+pub fn bitwiseAND(x: Self, agent: *Agent, y: Self) Allocator.Error!Self {
     // 1. Return BigIntBitwiseOp(&, x, y).
     var result = try from(agent.gc_allocator, 0);
     try result.value.bitAnd(&x.value, &y.value);
@@ -222,7 +222,7 @@ pub fn bitwiseAND(x: Self, agent: *Agent, y: Self) !Self {
 
 /// 6.1.6.2.19 BigInt::bitwiseXOR ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-bitwiseXOR
-pub fn bitwiseXOR(x: Self, agent: *Agent, y: Self) !Self {
+pub fn bitwiseXOR(x: Self, agent: *Agent, y: Self) Allocator.Error!Self {
     // 1. Return BigIntBitwiseOp(^, x, y).
     var result = try from(agent.gc_allocator, 0);
     try result.value.bitXor(&x.value, &y.value);
@@ -231,7 +231,7 @@ pub fn bitwiseXOR(x: Self, agent: *Agent, y: Self) !Self {
 
 /// 6.1.6.2.20 BigInt::bitwiseOR ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-bitwiseOR
-pub fn bitwiseOR(x: Self, agent: *Agent, y: Self) !Self {
+pub fn bitwiseOR(x: Self, agent: *Agent, y: Self) Allocator.Error!Self {
     // 1. Return BigIntBitwiseOp(|, x, y).
     var result = try from(agent.gc_allocator, 0);
     try result.value.bitOr(&x.value, &y.value);
@@ -240,7 +240,7 @@ pub fn bitwiseOR(x: Self, agent: *Agent, y: Self) !Self {
 
 /// 6.1.6.2.21 BigInt::toString ( x, radix )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-tostring
-pub fn toString(self: Self, allocator: Allocator, radix: u8) !String {
+pub fn toString(self: Self, allocator: Allocator, radix: u8) Allocator.Error!String {
     // 1. If x < 0ℤ, return the string-concatenation of "-" and BigInt::toString(-x, radix).
     // 2. Return the String value consisting of the representation of x using radix radix.
     return String.from(self.value.toString(allocator, radix, .lower) catch |err| switch (err) {

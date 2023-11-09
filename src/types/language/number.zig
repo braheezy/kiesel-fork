@@ -25,7 +25,7 @@ pub const Number = union(enum) {
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
-    ) !void {
+    ) @TypeOf(writer).Error!void {
         _ = fmt;
         _ = options;
         switch (self) {
@@ -584,7 +584,7 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.20 Number::toString ( x, radix )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-tostring
-    pub fn toString(self: Self, allocator: Allocator, radix: u8) !String {
+    pub fn toString(self: Self, allocator: Allocator, radix: u8) Allocator.Error!String {
         // 1. If x is NaN, return "NaN".
         if (self.isNan()) return String.from("NaN");
 

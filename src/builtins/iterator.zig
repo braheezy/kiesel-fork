@@ -1,3 +1,7 @@
+const std = @import("std");
+
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -13,7 +17,7 @@ const defineBuiltinFunction = utils.defineBuiltinFunction;
 /// 27.1.2 The %IteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%iteratorprototype%-object
 pub const IteratorPrototype = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
@@ -25,7 +29,7 @@ pub const IteratorPrototype = struct {
 
     /// 27.1.2.1 %IteratorPrototype% [ @@iterator ] ( )
     /// https://tc39.es/ecma262/#sec-%iteratorprototype%-@@iterator
-    fn @"@@iterator"(_: *Agent, this_value: Value, _: ArgumentsList) !Value {
+    fn @"@@iterator"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }

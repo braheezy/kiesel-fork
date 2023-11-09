@@ -60,10 +60,7 @@ pub const Options = struct {
     } = .{},
 };
 
-pub const Error = error{
-    ExceptionThrown,
-    OutOfMemory,
-};
+pub const Error = Allocator.Error || error{ExceptionThrown};
 
 /// 6.1.5.1 Well-Known Symbols
 /// https://tc39.es/ecma262/#sec-well-known-symbols
@@ -106,8 +103,10 @@ pub const HostHooks = struct {
         agent: *Self,
         job: Job,
         realm: ?*Realm,
-    ) error{OutOfMemory}!void,
-    hostGetImportMetaProperties: *const fn (module: *SourceTextModule) error{OutOfMemory}!ImportMetaProperties,
+    ) Allocator.Error!void,
+    hostGetImportMetaProperties: *const fn (
+        module: *SourceTextModule,
+    ) Allocator.Error!ImportMetaProperties,
     hostFinalizeImportMeta: *const fn (import_meta: Object, module: *SourceTextModule) void,
     hostLoadImportedModule: *const fn (
         agent: *Self,
@@ -115,7 +114,7 @@ pub const HostHooks = struct {
         specifier: String,
         host_defined: SafePointer,
         payload: ImportedModulePayload,
-    ) error{OutOfMemory}!void,
+    ) Allocator.Error!void,
     hostEnsureCanCompileStrings: *const fn (callee_realm: *Realm) Error!void,
     hostHasSourceTextAvailable: *const fn (func: Object) bool,
     hostResizeArrayBuffer: *const fn (
@@ -133,7 +132,7 @@ pub const QueuedPromiseJob = struct {
     realm: ?*Realm,
 };
 
-pub fn init(gc_allocator: Allocator, options: Options) !Self {
+pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
     var self = Self{
         .gc_allocator = gc_allocator,
         .options = options,
@@ -193,7 +192,7 @@ pub fn deinit(self: *Self) void {
     self.queued_promise_jobs.deinit();
 }
 
-pub fn createSymbol(self: *Self, description: ?String) !Symbol {
+pub fn createSymbol(self: *Self, description: ?String) error{Overflow}!Symbol {
     const id = blk: {
         const next_symbol_id = try std.math.add(usize, self.symbol_id, 1);
         defer self.symbol_id = next_symbol_id;
@@ -308,7 +307,7 @@ pub fn resolveBinding(
     name: []const u8,
     maybe_env: ?Environment,
     strict: bool,
-) !Reference {
+) Error!Reference {
     // 1. If env is not present or env is undefined, then
     //     a. Set env to the running execution context's LexicalEnvironment.
     // 2. Assert: env is an Environment Record.

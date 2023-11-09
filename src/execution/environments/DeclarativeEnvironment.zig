@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const environments = @import("../environments.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
@@ -36,7 +38,12 @@ pub fn hasBinding(self: Self, name: []const u8) bool {
 
 /// 9.1.1.2.2 CreateMutableBinding ( N, D )
 /// https://tc39.es/ecma262/#sec-object-environment-records-createmutablebinding-n-d
-pub fn createMutableBinding(self: *Self, _: *Agent, name: []const u8, deletable: bool) !void {
+pub fn createMutableBinding(
+    self: *Self,
+    _: *Agent,
+    name: []const u8,
+    deletable: bool,
+) Allocator.Error!void {
     // 1. Assert: envRec does not already have a binding for N.
     // 2. Create a mutable binding in envRec for N and record that it is uninitialized. If D is
     //    true, record that the newly created binding may be deleted by a subsequent DeleteBinding
@@ -53,7 +60,12 @@ pub fn createMutableBinding(self: *Self, _: *Agent, name: []const u8, deletable:
 
 /// 9.1.1.1.3 CreateImmutableBinding ( N, S )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-createimmutablebinding-n-s
-pub fn createImmutableBinding(self: *Self, _: *Agent, name: []const u8, strict: bool) !void {
+pub fn createImmutableBinding(
+    self: *Self,
+    _: *Agent,
+    name: []const u8,
+    strict: bool,
+) Allocator.Error!void {
     // 1. Assert: envRec does not already have a binding for N.
     // 2. Create an immutable binding in envRec for N and record that it is uninitialized. If S is
     //    true, record that the newly created binding is a strict binding.
@@ -84,7 +96,13 @@ pub fn initializeBinding(self: Self, _: *Agent, name: []const u8, value: Value) 
 
 /// 9.1.1.1.5 SetMutableBinding ( N, V, S )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-setmutablebinding-n-v-s
-pub fn setMutableBinding(self: *Self, agent: *Agent, name: []const u8, value: Value, strict: bool) !void {
+pub fn setMutableBinding(
+    self: *Self,
+    agent: *Agent,
+    name: []const u8,
+    value: Value,
+    strict: bool,
+) Agent.Error!void {
     const maybe_binding = self.bindings.getPtr(name);
 
     // 1. If envRec does not have a binding for N, then
@@ -142,7 +160,12 @@ pub fn setMutableBinding(self: *Self, agent: *Agent, name: []const u8, value: Va
 
 /// 9.1.1.1.6 GetBindingValue ( N, S )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-getbindingvalue-n-s
-pub fn getBindingValue(self: Self, agent: *Agent, name: []const u8, _: bool) !Value {
+pub fn getBindingValue(
+    self: Self,
+    agent: *Agent,
+    name: []const u8,
+    _: bool,
+) error{ExceptionThrown}!Value {
     // 1. Assert: envRec has a binding for N.
     const binding = self.bindings.get(name).?;
 

@@ -10,6 +10,7 @@ const bytecode = @import("bytecode.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
+const Agent = execution.Agent;
 const ExecutionContext = execution.ExecutionContext;
 const Parser = @import("Parser.zig");
 const Realm = execution.Realm;
@@ -36,7 +37,7 @@ pub fn parse(
     realm: *Realm,
     host_defined: SafePointer,
     ctx: Parser.ParseContext,
-) !*Self {
+) Parser.Error!*Self {
     const agent = realm.agent;
 
     // 1. Let script be ParseText(sourceText, Script).
@@ -57,7 +58,7 @@ pub fn parse(
 
 /// 16.1.6 ScriptEvaluation ( scriptRecord )
 /// https://tc39.es/ecma262/#sec-runtime-semantics-scriptevaluation
-pub fn evaluate(self: *Self) !Value {
+pub fn evaluate(self: *Self) Agent.Error!Value {
     const agent = self.realm.agent;
 
     // 1. Let globalEnv be scriptRecord.[[Realm]].[[GlobalEnv]].

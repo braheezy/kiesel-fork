@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const ast = @import("../language/ast.zig");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
@@ -46,7 +48,7 @@ fn GrammarSymbol(comptime T: type) type {
 /// 20.2.2 Properties of the Function Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-constructor
 pub const FunctionConstructor = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
             // 20.2.2.1 Function.length
             // https://tc39.es/ecma262/#sec-function.length
@@ -78,7 +80,12 @@ pub const FunctionConstructor = struct {
 
     /// 20.2.1.1 Function ( ...parameterArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-function-p1-p2-pn-body
-    fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, new_target: ?Object) !Value {
+    fn behaviour(
+        agent: *Agent,
+        _: Value,
+        arguments: ArgumentsList,
+        new_target: ?Object,
+    ) Agent.Error!Value {
         const parameter_args = ArgumentsList.from(arguments.values[0..arguments.count() -| 1]);
         const maybe_body_arg = arguments.getOrNull(arguments.count() -| 1);
 
@@ -114,7 +121,7 @@ pub fn createDynamicFunction(
     },
     parameter_args: ArgumentsList,
     body_arg: Value,
-) !Object {
+) Agent.Error!Object {
     const realm = agent.currentRealm();
 
     // 1. Let currentRealm be the current Realm Record.
@@ -450,13 +457,13 @@ pub fn createDynamicFunction(
 /// 20.2.3 Properties of the Function Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-prototype-object
 pub const FunctionPrototype = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try createNoinit(realm);
         init(realm, object);
         return object;
     }
 
-    pub fn createNoinit(realm: *Realm) !Object {
+    pub fn createNoinit(realm: *Realm) Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .regular = behaviour }, .{
             .length = 0,
             .name = "",
@@ -465,20 +472,20 @@ pub const FunctionPrototype = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) !void {
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "apply", apply, 2, realm);
         try defineBuiltinFunction(object, "bind", bind, 1, realm);
         try defineBuiltinFunction(object, "call", call, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
     }
 
-    fn behaviour(_: *Agent, _: Value, _: ArgumentsList) !Value {
+    fn behaviour(_: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
         return .undefined;
     }
 
     /// 20.2.3.1 Function.prototype.apply ( thisArg, argArray )
     /// https://tc39.es/ecma262/#sec-function.prototype.apply
-    fn apply(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+    fn apply(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
         const this_arg = arguments.get(0);
         const arg_array = arguments.get(1);
 
@@ -509,7 +516,7 @@ pub const FunctionPrototype = struct {
 
     /// 20.2.3.2 Function.prototype.bind ( thisArg, ...args )
     /// https://tc39.es/ecma262/#sec-function.prototype.bind
-    fn bind(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+    fn bind(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
         const this_arg = arguments.get(0);
         const args = if (arguments.count() <= 1) &[_]Value{} else arguments.values[1..];
 
@@ -582,7 +589,7 @@ pub const FunctionPrototype = struct {
 
     /// 20.2.3.3 Function.prototype.call ( thisArg, ...args )
     /// https://tc39.es/ecma262/#sec-function.prototype.call
-    fn call(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+    fn call(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
         const this_arg = arguments.get(0);
         const args = if (arguments.count() <= 1) &[_]Value{} else arguments.values[1..];
 
@@ -602,7 +609,7 @@ pub const FunctionPrototype = struct {
 
     /// 20.2.3.5 Function.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-function.prototype.tostring
-    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Let func be the this value.
         const func = this_value;
 

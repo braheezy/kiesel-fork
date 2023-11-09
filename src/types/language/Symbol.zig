@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
 
@@ -24,7 +26,7 @@ pub fn format(
     comptime fmt: []const u8,
     options: std.fmt.FormatOptions,
     writer: anytype,
-) !void {
+) @TypeOf(writer).Error!void {
     _ = fmt;
     _ = options;
     try writer.writeAll("Symbol(");
@@ -38,7 +40,7 @@ pub fn format(
 
 /// 20.4.3.3.1 SymbolDescriptiveString ( sym )
 /// https://tc39.es/ecma262/#sec-symboldescriptivestring
-pub fn descriptiveString(self: Self, agent: *Agent) ![]const u8 {
+pub fn descriptiveString(self: Self, agent: *Agent) Allocator.Error![]const u8 {
     // 1. Let desc be sym's [[Description]] value.
     // 2. If desc is undefined, set desc to the empty String.
     // 3. Assert: desc is a String.

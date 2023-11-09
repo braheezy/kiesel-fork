@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -23,7 +25,7 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 /// 22.1.5.1 The %StringIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%stringiteratorprototype%-object
 pub const StringIteratorPrototype = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),
         });
@@ -44,7 +46,7 @@ pub const StringIteratorPrototype = struct {
 
     /// 22.1.5.1.1 %StringIteratorPrototype%.next ( )
     /// https://tc39.es/ecma262/#sec-%stringiteratorprototype%.next
-    fn next(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+    fn next(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return ? GeneratorResume(this value, empty, "%StringIteratorPrototype%").
         // NOTE: In the absence of generators this implements one loop iteration of the
         //       CreateArrayIterator closure. State is kept track of through the ArrayIterator

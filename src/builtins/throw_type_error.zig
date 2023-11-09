@@ -1,6 +1,10 @@
 //! 10.2.4.1 %ThrowTypeError% ( )
 //! https://tc39.es/ecma262/#sec-%throwtypeerror%
 
+const std = @import("std");
+
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -16,7 +20,7 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 pub const ThrowTypeError = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try createBuiltinFunction(realm.agent, .{ .regular = behaviour }, .{
             .length = 0,
             .name = "",
@@ -49,7 +53,7 @@ pub const ThrowTypeError = struct {
         return object;
     }
 
-    fn behaviour(agent: *Agent, _: Value, _: ArgumentsList) !Value {
+    fn behaviour(agent: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Throw a TypeError exception.
         return agent.throwException(.type_error, "Forbidden property access", .{});
     }

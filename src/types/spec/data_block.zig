@@ -11,7 +11,7 @@ pub const DataBlock = std.ArrayList(u8);
 
 /// 6.2.9.1 CreateByteDataBlock ( size )
 /// https://tc39.es/ecma262/#sec-createbytedatablock
-pub fn createByteDataBlock(agent: *Agent, size: u64) !DataBlock {
+pub fn createByteDataBlock(agent: *Agent, size: u64) Agent.Error!DataBlock {
     // 1. If size > 2**53 - 1, throw a RangeError exception.
     if (size > std.math.maxInt(u53)) {
         return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
@@ -37,7 +37,13 @@ pub fn createByteDataBlock(agent: *Agent, size: u64) !DataBlock {
 
 /// 6.2.9.3 CopyDataBlockBytes ( toBlock, toIndex, fromBlock, fromIndex, count )
 /// https://tc39.es/ecma262/#sec-copydatablockbytes
-pub fn copyDataBlockBytes(to_block: *DataBlock, to_index: u53, from_block: *DataBlock, from_index: u53, count: u53) void {
+pub fn copyDataBlockBytes(
+    to_block: *DataBlock,
+    to_index: u53,
+    from_block: *DataBlock,
+    from_index: u53,
+    count: u53,
+) void {
     // 1. Assert: fromBlock and toBlock are distinct values.
     std.debug.assert(from_block != to_block);
 

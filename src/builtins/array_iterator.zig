@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -27,7 +29,7 @@ pub fn createArrayIterator(
     agent: *Agent,
     array: Object,
     comptime kind: Object.PropertyKind,
-) !Object {
+) Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // 1. Let closure be a new Abstract Closure with no parameters that captures kind and array and
@@ -45,7 +47,7 @@ pub fn createArrayIterator(
 /// 23.1.5.2 The %ArrayIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%arrayiteratorprototype%-object
 pub const ArrayIteratorPrototype = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),
         });
@@ -66,7 +68,7 @@ pub const ArrayIteratorPrototype = struct {
 
     /// 23.1.5.2.1 %ArrayIteratorPrototype%.next ( )
     /// https://tc39.es/ecma262/#sec-%arrayiteratorprototype%.next
-    fn next(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+    fn next(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return ? GeneratorResume(this value, empty, "%ArrayIteratorPrototype%").
         // NOTE: In the absence of generators this implements one loop iteration of the
         //       CreateArrayIterator closure. State is kept track of through the ArrayIterator

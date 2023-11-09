@@ -37,7 +37,7 @@ state: struct {
 const RuleSet = ptk.RuleSet(Tokenizer.TokenType);
 const ParserCore = ptk.ParserCore(Tokenizer, .{ .whitespace, .comment });
 
-pub const AcceptError = error{OutOfMemory} || ParserCore.AcceptError;
+pub const AcceptError = Allocator.Error || ParserCore.AcceptError;
 
 pub const Error = error{
     ParseError,
@@ -67,7 +67,9 @@ const PrecedenceAndAssociativityAltFlag = enum {
     unary_minus,
 };
 
-fn getPrecedenceAndAssociativity(token_type: Tokenizer.TokenType) struct { Precedence, ?Associativity } {
+fn getPrecedenceAndAssociativity(
+    token_type: Tokenizer.TokenType,
+) struct { Precedence, ?Associativity } {
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_Precedence#table
     return switch (token_type) {
         .@"(" => .{ 18, null },
@@ -144,7 +146,9 @@ fn getPrecedenceAndAssociativity(token_type: Tokenizer.TokenType) struct { Prece
     };
 }
 
-fn getPrecedenceAndAssociativityAlt(flag: PrecedenceAndAssociativityAltFlag) struct { Precedence, ?Associativity } {
+fn getPrecedenceAndAssociativityAlt(
+    flag: PrecedenceAndAssociativityAltFlag,
+) struct { Precedence, ?Associativity } {
     return switch (flag) {
         .prefix_increment,
         .prefix_decrement,
@@ -236,17 +240,22 @@ pub fn parseNode(
     return ast_node.?;
 }
 
-fn emitError(self: *Self, comptime fmt: []const u8, args: anytype) !void {
+fn emitError(self: *Self, comptime fmt: []const u8, args: anytype) Allocator.Error!void {
     try self.diagnostics.emit(self.core.tokenizer.current_location, .@"error", fmt, args);
 }
 
-fn emitErrorAt(self: *Self, location: ptk.Location, comptime fmt: []const u8, args: anytype) !void {
+fn emitErrorAt(
+    self: *Self,
+    location: ptk.Location,
+    comptime fmt: []const u8,
+    args: anytype,
+) Allocator.Error!void {
     try self.diagnostics.emit(location, .@"error", fmt, args);
 }
 
 /// 5.1.5.8 [no LineTerminator here]
 /// https://tc39.es/ecma262/#sec-no-lineterminator-here
-fn noLineTerminatorHere(self: *Self) !void {
+fn noLineTerminatorHere(self: *Self) AcceptError!void {
     // Same as peek() but without immediately restoring the state; we need to look at what's
     // between the current and next token.
     const state = self.core.saveState();
@@ -265,7 +274,7 @@ fn noLineTerminatorHere(self: *Self) !void {
 
 /// 12.10 Automatic Semicolon Insertion
 /// https://tc39.es/ecma262/#sec-automatic-semicolon-insertion
-pub fn acceptOrInsertSemicolon(self: *Self) !void {
+pub fn acceptOrInsertSemicolon(self: *Self) AcceptError!void {
     // Next token is ';', consume semicolon
     if (self.core.accept(RuleSet.is(.@";"))) |_|
         return
@@ -403,7 +412,11 @@ pub fn acceptPrimaryExpression(self: *Self) AcceptError!ast.PrimaryExpression {
         return error.UnexpectedToken;
 }
 
-pub fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) AcceptError!ast.Expression {
+pub fn acceptSecondaryExpression(
+    self: *Self,
+    primary_expression: ast.Expression,
+    ctx: AcceptContext,
+) AcceptError!ast.Expression {
     if (self.acceptMemberExpression(primary_expression)) |member_expression|
         return .{ .member_expression = member_expression }
     else |_| if (self.acceptCallExpression(primary_expression)) |call_expression|
@@ -430,7 +443,10 @@ pub fn acceptSecondaryExpression(self: *Self, primary_expression: ast.Expression
         return error.UnexpectedToken;
 }
 
-pub fn acceptMemberExpression(self: *Self, primary_expression: ast.Expression) AcceptError!ast.MemberExpression {
+pub fn acceptMemberExpression(
+    self: *Self,
+    primary_expression: ast.Expression,
+) AcceptError!ast.MemberExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -543,7 +559,10 @@ pub fn acceptNewExpression(self: *Self) AcceptError!ast.NewExpression {
     return .{ .expression = expression, .arguments = arguments };
 }
 
-pub fn acceptCallExpression(self: *Self, primary_expression: ast.Expression) AcceptError!ast.CallExpression {
+pub fn acceptCallExpression(
+    self: *Self,
+    primary_expression: ast.Expression,
+) AcceptError!ast.CallExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -603,7 +622,10 @@ pub fn acceptArguments(self: *Self) AcceptError!ast.Arguments {
     return arguments.toOwnedSlice();
 }
 
-pub fn acceptOptionalExpression(self: *Self, primary_expression: ast.Expression) AcceptError!ast.OptionalExpression {
+pub fn acceptOptionalExpression(
+    self: *Self,
+    primary_expression: ast.Expression,
+) AcceptError!ast.OptionalExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -622,7 +644,10 @@ pub fn acceptOptionalExpression(self: *Self, primary_expression: ast.Expression)
     return .{ .expression = expression, .property = property };
 }
 
-pub fn acceptUpdateExpression(self: *Self, primary_expression: ?ast.Expression) AcceptError!ast.UpdateExpression {
+pub fn acceptUpdateExpression(
+    self: *Self,
+    primary_expression: ?ast.Expression,
+) AcceptError!ast.UpdateExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -838,7 +863,11 @@ pub fn acceptUnaryExpression(self: *Self) AcceptError!ast.UnaryExpression {
     return .{ .operator = operator, .expression = expression };
 }
 
-pub fn acceptBinaryExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) AcceptError!ast.BinaryExpression {
+pub fn acceptBinaryExpression(
+    self: *Self,
+    primary_expression: ast.Expression,
+    ctx: AcceptContext,
+) AcceptError!ast.BinaryExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -883,7 +912,11 @@ pub fn acceptBinaryExpression(self: *Self, primary_expression: ast.Expression, c
     };
 }
 
-pub fn acceptRelationalExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) AcceptError!ast.RelationalExpression {
+pub fn acceptRelationalExpression(
+    self: *Self,
+    primary_expression: ast.Expression,
+    ctx: AcceptContext,
+) AcceptError!ast.RelationalExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -909,7 +942,11 @@ pub fn acceptRelationalExpression(self: *Self, primary_expression: ast.Expressio
     };
 }
 
-pub fn acceptEqualityExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) AcceptError!ast.EqualityExpression {
+pub fn acceptEqualityExpression(
+    self: *Self,
+    primary_expression: ast.Expression,
+    ctx: AcceptContext,
+) AcceptError!ast.EqualityExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -933,7 +970,11 @@ pub fn acceptEqualityExpression(self: *Self, primary_expression: ast.Expression,
     };
 }
 
-pub fn acceptLogicalExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) AcceptError!ast.LogicalExpression {
+pub fn acceptLogicalExpression(
+    self: *Self,
+    primary_expression: ast.Expression,
+    ctx: AcceptContext,
+) AcceptError!ast.LogicalExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -956,7 +997,11 @@ pub fn acceptLogicalExpression(self: *Self, primary_expression: ast.Expression, 
     };
 }
 
-pub fn acceptConditionalExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) AcceptError!ast.ConditionalExpression {
+pub fn acceptConditionalExpression(
+    self: *Self,
+    primary_expression: ast.Expression,
+    ctx: AcceptContext,
+) AcceptError!ast.ConditionalExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -976,7 +1021,11 @@ pub fn acceptConditionalExpression(self: *Self, primary_expression: ast.Expressi
     };
 }
 
-pub fn acceptAssignmentExpression(self: *Self, primary_expression: ast.Expression, ctx: AcceptContext) AcceptError!ast.AssignmentExpression {
+pub fn acceptAssignmentExpression(
+    self: *Self,
+    primary_expression: ast.Expression,
+    ctx: AcceptContext,
+) AcceptError!ast.AssignmentExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1036,7 +1085,10 @@ pub fn acceptAssignmentExpression(self: *Self, primary_expression: ast.Expressio
     };
 }
 
-pub fn acceptSequenceExpression(self: *Self, primary_expression: ast.Expression) AcceptError!ast.SequenceExpression {
+pub fn acceptSequenceExpression(
+    self: *Self,
+    primary_expression: ast.Expression,
+) AcceptError!ast.SequenceExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1050,7 +1102,7 @@ pub fn acceptSequenceExpression(self: *Self, primary_expression: ast.Expression)
     return .{ .expressions = try expressions.toOwnedSlice() };
 }
 
-pub fn acceptExpression(self: *Self, ctx: AcceptContext) (ParserCore.AcceptError || error{OutOfMemory})!ast.Expression {
+pub fn acceptExpression(self: *Self, ctx: AcceptContext) AcceptError!ast.Expression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1088,7 +1140,7 @@ pub fn acceptExpression(self: *Self, ctx: AcceptContext) (ParserCore.AcceptError
     return expression;
 }
 
-pub fn acceptStatement(self: *Self) (ParserCore.AcceptError || error{OutOfMemory})!*ast.Statement {
+pub fn acceptStatement(self: *Self) AcceptError!*ast.Statement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1123,7 +1175,7 @@ pub fn acceptStatement(self: *Self) (ParserCore.AcceptError || error{OutOfMemory
     return statement;
 }
 
-pub fn acceptDeclaration(self: *Self) !*ast.Declaration {
+pub fn acceptDeclaration(self: *Self) AcceptError!*ast.Declaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1214,7 +1266,10 @@ pub fn acceptStatementListItem(self: *Self) AcceptError!ast.StatementListItem {
     return statement_list_item;
 }
 
-pub fn acceptLexicalDeclaration(self: *Self, for_initializer: bool) AcceptError!ast.LexicalDeclaration {
+pub fn acceptLexicalDeclaration(
+    self: *Self,
+    for_initializer: bool,
+) AcceptError!ast.LexicalDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1256,7 +1311,10 @@ pub fn acceptLexicalBinding(self: *Self) AcceptError!ast.LexicalBinding {
     return .{ .binding_identifier = binding_identifier, .initializer = initializer };
 }
 
-pub fn acceptVariableStatement(self: *Self, for_initializer: bool) AcceptError!ast.VariableStatement {
+pub fn acceptVariableStatement(
+    self: *Self,
+    for_initializer: bool,
+) AcceptError!ast.VariableStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1543,7 +1601,7 @@ pub fn acceptTryStatement(self: *Self) AcceptError!ast.TryStatement {
     };
 }
 
-pub fn acceptDebuggerStatement(self: *Self) !void {
+pub fn acceptDebuggerStatement(self: *Self) AcceptError!void {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1635,7 +1693,10 @@ pub fn acceptFunctionExpression(self: *Self) AcceptError!ast.FunctionExpression 
     };
 }
 
-pub fn acceptFunctionBody(self: *Self, @"type": ast.FunctionBody.Type) AcceptError!ast.FunctionBody {
+pub fn acceptFunctionBody(
+    self: *Self,
+    @"type": ast.FunctionBody.Type,
+) AcceptError!ast.FunctionBody {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 

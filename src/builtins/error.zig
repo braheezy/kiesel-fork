@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -30,7 +32,7 @@ const Self = @This();
 /// 20.5.2 Properties of the Error Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-error-constructor
 pub const ErrorConstructor = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
             .length = 1,
             .name = "Error",
@@ -60,7 +62,12 @@ pub const ErrorConstructor = struct {
 
     /// 20.5.1.1 Error ( message [ , options ] )
     /// https://tc39.es/ecma262/#sec-error-message
-    fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, maybe_new_target: ?Object) !Value {
+    fn behaviour(
+        agent: *Agent,
+        _: Value,
+        arguments: ArgumentsList,
+        maybe_new_target: ?Object,
+    ) Agent.Error!Value {
         const message = arguments.get(0);
         const options = arguments.get(1);
 
@@ -108,7 +115,12 @@ pub const ErrorConstructor = struct {
 ///
 /// NOTE: Ignoring non-string values matches SpiderMonkey, V8 only remembers the original name and
 ///       message and doesn't act on property changes.
-fn internalSet(object: Object, property_key: PropertyKey, value: Value, receiver: Value) !bool {
+fn internalSet(
+    object: Object,
+    property_key: PropertyKey,
+    value: Value,
+    receiver: Value,
+) Agent.Error!bool {
     if (property_key == .string and value == .string) {
         if (property_key.string.eql(String.from("name"))) {
             object.as(Error).fields.error_data.name = value.string;
@@ -122,7 +134,7 @@ fn internalSet(object: Object, property_key: PropertyKey, value: Value, receiver
 /// 20.5.3 Properties of the Error Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-error-prototype-object
 pub const ErrorPrototype = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
@@ -150,7 +162,7 @@ pub const ErrorPrototype = struct {
 
     /// 20.5.3.4 Error.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-error.prototype.tostring
-    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
         if (this_value != .object) {
@@ -238,7 +250,7 @@ pub const URIErrorPrototype = MakeNativeErrorPrototype("URIError");
 /// https://tc39.es/ecma262/#sec-properties-of-the-nativeerror-constructors
 fn MakeNativeErrorConstructor(comptime name: []const u8) type {
     return struct {
-        pub fn create(realm: *Realm) !Object {
+        pub fn create(realm: *Realm) Allocator.Error!Object {
             const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
                 .length = 1,
                 .name = name,
@@ -270,7 +282,12 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
 
         /// 20.5.6.1.1 NativeError ( message [ , options ] )
         /// https://tc39.es/ecma262/#sec-nativeerror
-        fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, maybe_new_target: ?Object) !Value {
+        fn behaviour(
+            agent: *Agent,
+            _: Value,
+            arguments: ArgumentsList,
+            maybe_new_target: ?Object,
+        ) Agent.Error!Value {
             const message = arguments.get(0);
             const options = arguments.get(1);
 
@@ -325,7 +342,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
 /// https://tc39.es/ecma262/#sec-properties-of-the-nativeerror-prototype-objects
 fn MakeNativeErrorPrototype(comptime name: []const u8) type {
     return struct {
-        pub fn create(realm: *Realm) !Object {
+        pub fn create(realm: *Realm) Allocator.Error!Object {
             const object = try builtins.Object.create(realm.agent, .{
                 .prototype = try realm.intrinsics.@"%Error.prototype%"(),
             });
@@ -366,7 +383,7 @@ fn MakeNativeError() type {
 /// 20.5.7.1 The AggregateError Constructor
 /// https://tc39.es/ecma262/#sec-aggregate-error-constructor
 pub const AggregateErrorConstructor = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
             .length = 2,
             .name = "AggregateError",
@@ -396,7 +413,12 @@ pub const AggregateErrorConstructor = struct {
 
     /// 20.5.7.1.1 AggregateError ( errors, message [ , options ] )
     /// https://tc39.es/ecma262/#sec-aggregate-error
-    fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, maybe_new_target: ?Object) !Value {
+    fn behaviour(
+        agent: *Agent,
+        _: Value,
+        arguments: ArgumentsList,
+        maybe_new_target: ?Object,
+    ) Agent.Error!Value {
         const errors = arguments.get(0);
         const message = arguments.get(1);
         const options = arguments.get(2);
@@ -462,7 +484,7 @@ pub const AggregateErrorConstructor = struct {
 /// 20.5.7.3 Properties of the AggregateError Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-aggregate-error-prototype-objects
 pub const AggregateErrorPrototype = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Error.prototype%"(),
         });
@@ -499,7 +521,7 @@ pub const AggregateError = MakeObject(.{
 
 /// 20.5.8.1 InstallErrorCause ( O, options )
 /// https://tc39.es/ecma262/#sec-installerrorcause
-fn installErrorCause(agent: *Agent, object: Object, options: Value) !void {
+fn installErrorCause(agent: *Agent, object: Object, options: Value) Agent.Error!void {
     // 1. If options is an Object and ? HasProperty(options, "cause") is true, then
     if (options == .object and try options.object.hasProperty(PropertyKey.from("cause"))) {
         // a. Let cause be ? Get(options, "cause").

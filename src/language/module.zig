@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const SafePointer = @import("any-pointer").SafePointer;
 
 const builtins = @import("../builtins.zig");
@@ -46,7 +48,7 @@ fn continueDynamicImport(
     agent: *Agent,
     promise_capability: PromiseCapability,
     module_completion: Agent.Error!Module,
-) !void {
+) Allocator.Error!void {
     // 1. If moduleCompletion is an abrupt completion, then
     // 2. Let module be moduleCompletion.[[Value]].
     const module = module_completion catch |err| switch (err) {
@@ -100,7 +102,7 @@ fn continueDynamicImport(
     // 3. Let rejectedClosure be a new Abstract Closure with parameters (reason) that captures
     //    promiseCapability and performs the following steps when called:
     const rejected_closure = struct {
-        fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) !Value {
+        fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
             const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*RejectedClosureCaptures);
             const promise_capability_ = captures_.promise_capability;
@@ -139,7 +141,7 @@ fn continueDynamicImport(
     // 6. Let linkAndEvaluateClosure be a new Abstract Closure with no parameters that captures
     //    module, promiseCapability, and onRejected and performs the following steps when called:
     const link_and_evaluate_closure = struct {
-        fn func(agent_: *Agent, _: Value, _: ArgumentsList) !Value {
+        fn func(agent_: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
             const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*LinkAndEvaluateClosureCaptures);
             const promise_capability_ = captures_.promise_capability;
@@ -195,7 +197,7 @@ fn continueDynamicImport(
 
             // d. Let fulfilledClosure be a new Abstract Closure with no parameters that captures module and promiseCapability and performs the following steps when called:
             const fulfilled_closure = struct {
-                fn func(agent__: *Agent, _: Value, _: ArgumentsList) !Value {
+                fn func(agent__: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
                     const function_ = agent__.activeFunctionObject();
                     const captures__ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*FulfilledClosureCaptures);
                     const promise_capability__ = captures__.promise_capability;
@@ -266,7 +268,7 @@ pub fn finishLoadingImportedModule(
     specifier: String,
     payload: ImportedModulePayload,
     result: Agent.Error!Module,
-) error{OutOfMemory}!void {
+) Allocator.Error!void {
     _ = specifier;
     _ = referrer;
     // 1. If result is a normal completion, then
@@ -294,7 +296,7 @@ pub fn finishLoadingImportedModule(
 
 /// 16.2.1.10 GetModuleNamespace ( module )
 /// https://tc39.es/ecma262/#sec-getmodulenamespace
-pub fn getModuleNamespace(agent: *Agent, module: Module) !Object {
+pub fn getModuleNamespace(agent: *Agent, module: Module) Allocator.Error!Object {
     // TODO: 1. Assert: If module is a Cyclic Module Record, then module.[[Status]] is not new or unlinked.
 
     // 2. Let namespace be module.[[Namespace]].

@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const immutable_prototype = @import("immutable_prototype.zig");
@@ -31,35 +33,35 @@ const setImmutablePrototype = immutable_prototype.setImmutablePrototype;
 
 /// 10.4.6.1 [[GetPrototypeOf]] ( )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-getprototypeof
-fn getPrototypeOf(_: Object) !?Object {
+fn getPrototypeOf(_: Object) error{}!?Object {
     // 1. Return null.
     return null;
 }
 
 /// 10.4.6.2 [[SetPrototypeOf]] ( V )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-setprototypeof-v
-fn setPrototypeOf(object: Object, prototype: ?Object) !bool {
+fn setPrototypeOf(object: Object, prototype: ?Object) Allocator.Error!bool {
     // 1. Return ! SetImmutablePrototype(O, V).
     return setImmutablePrototype(object, prototype) catch |err| try noexcept(err);
 }
 
 /// 10.4.6.3 [[IsExtensible]] ( )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-isextensible
-fn isExtensible(_: Object) !bool {
+fn isExtensible(_: Object) error{}!bool {
     // 1. Return false.
     return false;
 }
 
 /// 10.4.6.4 [[PreventExtensions]] ( )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-preventextensions
-fn preventExtensions(_: Object) !bool {
+fn preventExtensions(_: Object) error{}!bool {
     // 1. Return true.
     return true;
 }
 
 /// 10.4.6.5 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-getownproperty-p
-fn getOwnProperty(object: Object, property_key: PropertyKey) !?PropertyDescriptor {
+fn getOwnProperty(object: Object, property_key: PropertyKey) Agent.Error!?PropertyDescriptor {
     const agent = object.agent();
 
     // 1. If P is a Symbol, return OrdinaryGetOwnProperty(O, P).
@@ -88,7 +90,7 @@ fn defineOwnProperty(
     object: Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
-) !bool {
+) Agent.Error!bool {
     // 1. If P is a Symbol, return ! OrdinaryDefineOwnProperty(O, P, Desc).
     if (property_key == .symbol) {
         return ordinaryDefineOwnProperty(object, property_key, property_descriptor);
@@ -121,11 +123,13 @@ fn defineOwnProperty(
 
 /// 10.4.6.7 [[HasProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-hasproperty-p
-fn hasProperty(object: Object, property_key: PropertyKey) !bool {
+fn hasProperty(object: Object, property_key: PropertyKey) Allocator.Error!bool {
     const agent = object.agent();
 
     // 1. If P is a Symbol, return ! OrdinaryHasProperty(O, P).
-    if (property_key == .symbol) return ordinaryHasProperty(object, property_key);
+    if (property_key == .symbol) {
+        return ordinaryHasProperty(object, property_key) catch |err| try noexcept(err);
+    }
 
     // 2. Let exports be O.[[Exports]].
     const exports = object.as(ModuleNamespace).fields.exports;
@@ -141,13 +145,13 @@ fn hasProperty(object: Object, property_key: PropertyKey) !bool {
 
 /// 10.4.6.8 [[Get]] ( P, Receiver )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-get-p-receiver
-fn get(object: Object, property_key: PropertyKey, receiver: Value) !Value {
+fn get(object: Object, property_key: PropertyKey, receiver: Value) Allocator.Error!Value {
     const agent = object.agent();
 
     // 1. If P is a Symbol, then
     if (property_key == .symbol) {
         // a. Return ! OrdinaryGet(O, P, Receiver).
-        return ordinaryGet(object, property_key, receiver);
+        return ordinaryGet(object, property_key, receiver) catch |err| try noexcept(err);
     }
 
     // 2. Let exports be O.[[Exports]].
@@ -168,20 +172,20 @@ fn get(object: Object, property_key: PropertyKey, receiver: Value) !Value {
 
 /// 10.4.6.9 [[Set]] ( P, V, Receiver )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-set-p-v-receiver
-fn set(_: Object, _: PropertyKey, _: Value, _: Value) !bool {
+fn set(_: Object, _: PropertyKey, _: Value, _: Value) error{}!bool {
     // 1. Return false.
     return false;
 }
 
 /// 10.4.6.10 [[Delete]] ( P )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-delete-p
-fn delete(object: Object, property_key: PropertyKey) !bool {
+fn delete(object: Object, property_key: PropertyKey) Allocator.Error!bool {
     const agent = object.agent();
 
     // 1. If P is a Symbol, then
     if (property_key == .symbol) {
         // a. Return ! OrdinaryDelete(O, P).
-        return ordinaryDelete(object, property_key);
+        return ordinaryDelete(object, property_key) catch |err| try noexcept(err);
     }
 
     // 2. Let exports be O.[[Exports]].
@@ -198,7 +202,7 @@ fn delete(object: Object, property_key: PropertyKey) !bool {
 
 /// 10.4.6.11 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-ownpropertykeys
-fn ownPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
+fn ownPropertyKeys(object: Object) Allocator.Error!std.ArrayList(PropertyKey) {
     // 1. Let exports be O.[[Exports]].
     const exports = object.as(ModuleNamespace).fields.exports;
 
@@ -214,7 +218,11 @@ fn ownPropertyKeys(object: Object) !std.ArrayList(PropertyKey) {
 
 /// 10.4.6.12 ModuleNamespaceCreate ( module, exports )
 /// https://tc39.es/ecma262/#sec-modulenamespacecreate
-pub fn moduleNamespaceCreate(agent: *Agent, module: Module, exports: []const []const u8) !Object {
+pub fn moduleNamespaceCreate(
+    agent: *Agent,
+    module: Module,
+    exports: []const []const u8,
+) Allocator.Error!Object {
     // 1. Assert: module.[[Namespace]] is empty.
     switch (module) {
         .source_text_module => |source_text_module| std.debug.assert(source_text_module.namespace == null),

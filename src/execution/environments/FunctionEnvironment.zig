@@ -5,8 +5,10 @@ const std = @import("std");
 
 const builtins = @import("../../builtins.zig");
 const environments = @import("../environments.zig");
+const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
 
+const Agent = execution.Agent;
 const DeclarativeEnvironment = environments.DeclarativeEnvironment;
 const ECMAScriptFunction = builtins.ECMAScriptFunction;
 const Environment = environments.Environment;
@@ -38,7 +40,7 @@ declarative_environment: *DeclarativeEnvironment,
 
 /// 9.1.1.3.1 BindThisValue ( V )
 /// https://tc39.es/ecma262/#sec-bindthisvalue
-pub fn bindThisValue(self: *Self, value: Value) !Value {
+pub fn bindThisValue(self: *Self, value: Value) error{ExceptionThrown}!Value {
     const agent = self.function_object.object().agent();
 
     // 1. Assert: envRec.[[ThisBindingStatus]] is not lexical.
@@ -82,7 +84,7 @@ pub fn hasSuperBinding(self: Self) bool {
 
 /// 9.1.1.3.4 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-function-environment-records-getthisbinding
-pub fn getThisBinding(self: Self) !Value {
+pub fn getThisBinding(self: Self) error{ExceptionThrown}!Value {
     const agent = self.function_object.object().agent();
 
     // 1. Assert: envRec.[[ThisBindingStatus]] is not lexical.
@@ -103,7 +105,7 @@ pub fn getThisBinding(self: Self) !Value {
 
 /// 9.1.1.3.5 GetSuperBase ( )
 /// https://tc39.es/ecma262/#sec-getsuperbase
-pub fn getSuperBase(self: Self) !Value {
+pub fn getSuperBase(self: Self) Agent.Error!Value {
     // 1. Let home be envRec.[[FunctionObject]].[[HomeObject]].
     const home = self.function_object.fields.home_object;
 

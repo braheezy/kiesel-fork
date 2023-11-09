@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -33,7 +35,12 @@ pub const Order = enum {
 
 /// 25.1.3.1 AllocateArrayBuffer ( constructor, byteLength )
 /// https://tc39.es/ecma262/#sec-allocatearraybuffer
-pub fn allocateArrayBuffer(agent: *Agent, constructor: Object, byte_length: u64, max_byte_length: ?u53) !Object {
+pub fn allocateArrayBuffer(
+    agent: *Agent,
+    constructor: Object,
+    byte_length: u64,
+    max_byte_length: ?u53,
+) Agent.Error!Object {
     // 1. Let slots be « [[ArrayBufferData]], [[ArrayBufferByteLength]], [[ArrayBufferDetachKey]] ».
 
     // 2. If maxByteLength is present and maxByteLength is not empty, let allocatingResizableBuffer
@@ -106,7 +113,11 @@ pub fn isDetachedBuffer(array_buffer: *const ArrayBuffer) bool {
 
 /// 25.1.3.4 DetachArrayBuffer ( arrayBuffer [ , key ] )
 /// https://tc39.es/ecma262/#sec-detacharraybuffer
-pub fn detachArrayBuffer(agent: *Agent, array_buffer: *ArrayBuffer, maybe_key: ?Value) !void {
+pub fn detachArrayBuffer(
+    agent: *Agent,
+    array_buffer: *ArrayBuffer,
+    maybe_key: ?Value,
+) error{ExceptionThrown}!void {
     // TODO: 1. Assert: IsSharedArrayBuffer(arrayBuffer) is false.
 
     // 2. If key is not present, set key to undefined.
@@ -129,7 +140,7 @@ pub fn detachArrayBuffer(agent: *Agent, array_buffer: *ArrayBuffer, maybe_key: ?
 
 /// 25.1.3.6 GetArrayBufferMaxByteLengthOption ( options )
 /// https://tc39.es/ecma262/#sec-getarraybuffermaxbytelengthoption
-pub fn getArrayBufferMaxByteLengthOption(agent: *Agent, options: Value) !?u53 {
+pub fn getArrayBufferMaxByteLengthOption(agent: *Agent, options: Value) Agent.Error!?u53 {
     // 1. If options is not an Object, return empty.
     if (options != .object) return null;
 
@@ -230,7 +241,7 @@ pub fn numericToRawBytes(
     comptime T: type,
     value: Value,
     is_little_endian: bool,
-) ![@sizeOf(T)]u8 {
+) Allocator.Error![@sizeOf(T)]u8 {
     // 1. If type is float32, then
     var raw_bytes = if (T == f32) blk: {
         // a. Let rawBytes be a List whose elements are the 4 bytes that are the result of
@@ -306,7 +317,7 @@ pub fn setValueInBuffer(
     is_typed_array: bool,
     order: Order,
     maybe_is_little_endian: ?bool,
-) !void {
+) Allocator.Error!void {
     // 1. Assert: IsDetachedBuffer(arrayBuffer) is false.
     std.debug.assert(!isDetachedBuffer(array_buffer));
 
@@ -349,7 +360,7 @@ pub fn setValueInBuffer(
 /// 25.1.5 Properties of the ArrayBuffer Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-constructor
 pub const ArrayBufferConstructor = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
             .length = 1,
             .name = "ArrayBuffer",
@@ -379,7 +390,7 @@ pub const ArrayBufferConstructor = struct {
         // 25.1.5.3 get ArrayBuffer [ @@species ]
         // https://tc39.es/ecma262/#sec-get-arraybuffer-@@species
         try defineBuiltinAccessor(object, "@@species", struct {
-            fn getter(_: *Agent, this_value: Value, _: ArgumentsList) !Value {
+            fn getter(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
                 // 1. Return the this value.
                 return this_value;
             }
@@ -390,7 +401,12 @@ pub const ArrayBufferConstructor = struct {
 
     /// 25.1.4.1 ArrayBuffer ( length [ , options ] )
     /// https://tc39.es/ecma262/#sec-arraybuffer-length
-    fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, new_target: ?Object) !Value {
+    fn behaviour(
+        agent: *Agent,
+        _: Value,
+        arguments: ArgumentsList,
+        new_target: ?Object,
+    ) Agent.Error!Value {
         const length = arguments.get(0);
         const options = arguments.get(1);
 
@@ -422,7 +438,7 @@ pub const ArrayBufferConstructor = struct {
 
     /// 25.1.5.1 ArrayBuffer.isView ( arg )
     /// https://tc39.es/ecma262/#sec-arraybuffer.isview
-    fn isView(_: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn isView(_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const arg = arguments.get(0);
 
         // 1. If arg is not an Object, return false.
@@ -439,7 +455,7 @@ pub const ArrayBufferConstructor = struct {
 /// 25.1.6 Properties of the ArrayBuffer Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-prototype-object
 pub const ArrayBufferPrototype = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
@@ -464,7 +480,7 @@ pub const ArrayBufferPrototype = struct {
 
     /// 25.1.6.1 get ArrayBuffer.prototype.byteLength
     /// https://tc39.es/ecma262/#sec-get-arraybuffer.prototype.bytelength
-    fn byteLength(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+    fn byteLength(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
         const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
@@ -483,7 +499,7 @@ pub const ArrayBufferPrototype = struct {
 
     /// 25.1.6.3 get ArrayBuffer.prototype.maxByteLength
     /// https://tc39.es/ecma262/#sec-get-arraybuffer.prototype.maxbytelength
-    fn maxByteLength(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+    fn maxByteLength(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
         const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
@@ -511,7 +527,7 @@ pub const ArrayBufferPrototype = struct {
 
     /// 25.1.6.4 get ArrayBuffer.prototype.resizable
     /// https://tc39.es/ecma262/#sec-get-arraybuffer.prototype.resizable
-    fn resizable(agent: *Agent, this_value: Value, _: ArgumentsList) !Value {
+    fn resizable(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
         const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
@@ -524,7 +540,7 @@ pub const ArrayBufferPrototype = struct {
 
     /// 25.1.6.5 ArrayBuffer.prototype.resize ( newLength )
     /// https://tc39.es/ecma262/#sec-arraybuffer.prototype.resize
-    fn resize(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+    fn resize(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
         const new_length = arguments.get(0);
 
         // 1. Let O be the this value.
@@ -585,7 +601,7 @@ pub const ArrayBufferPrototype = struct {
 
     /// 25.1.6.6 ArrayBuffer.prototype.slice ( start, end )
     /// https://tc39.es/ecma262/#sec-arraybuffer.prototype.slice
-    fn slice(agent: *Agent, this_value: Value, arguments: ArgumentsList) !Value {
+    fn slice(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
         const realm = agent.currentRealm();
         const start = arguments.get(0);
         const end = arguments.get(1);

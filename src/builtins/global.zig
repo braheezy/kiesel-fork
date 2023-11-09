@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -26,7 +28,7 @@ const NameAndPropertyDescriptor = struct {
     PropertyDescriptor,
 };
 
-pub fn globalObjectProperties(realm: *Realm) ![40]NameAndPropertyDescriptor {
+pub fn globalObjectProperties(realm: *Realm) Allocator.Error![40]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
     return [_]NameAndPropertyDescriptor{
         // 19.1.1 globalThis
@@ -193,7 +195,7 @@ pub fn globalObjectProperties(realm: *Realm) ![40]NameAndPropertyDescriptor {
 
 fn GlobalFunction(comptime options: struct { name: []const u8, length: u32 }) type {
     return struct {
-        pub fn create(realm: *Realm) !Object {
+        pub fn create(realm: *Realm) Allocator.Error!Object {
             return createBuiltinFunction(realm.agent, .{ .regular = @field(Self, options.name) }, .{
                 .length = options.length,
                 .name = options.name,
@@ -217,7 +219,7 @@ pub const global_functions = struct {
 
 /// 19.2.1 eval ( x )
 /// https://tc39.es/ecma262/#sec-eval-x
-fn eval(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+fn eval(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
     const x = arguments.get(0);
 
     // 1. Return ? PerformEval(x, false, false).
@@ -226,7 +228,7 @@ fn eval(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
 
 /// 19.2.2 isFinite ( number )
 /// https://tc39.es/ecma262/#sec-isfinite-number
-fn isFinite(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+fn isFinite(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
     const number = arguments.get(0);
 
     // 1. Let num be ? ToNumber(number).
@@ -239,7 +241,7 @@ fn isFinite(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
 
 /// 19.2.3 isNaN ( number )
 /// https://tc39.es/ecma262/#sec-isnan-number
-fn isNaN(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+fn isNaN(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
     const number = arguments.get(0);
 
     // 1. Let num be ? ToNumber(number).
@@ -252,7 +254,7 @@ fn isNaN(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
 
 /// 19.2.4 parseFloat ( string )
 /// https://tc39.es/ecma262/#sec-parsefloat-string
-fn parseFloat(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+fn parseFloat(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
     const string_value = arguments.get(0);
 
     // 1. Let inputString be ? ToString(string).
@@ -281,7 +283,7 @@ fn parseFloat(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
 
 /// 19.2.5 parseInt ( string, radix )
 /// https://tc39.es/ecma262/#sec-parseint-string-radix
-fn parseInt(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+fn parseInt(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
     const string_value = arguments.get(0);
     const radix_value = arguments.get(1);
 
@@ -366,7 +368,7 @@ fn parseInt(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
 
 /// 19.2.6.1 decodeURI ( encodedURI )
 /// https://tc39.es/ecma262/#sec-decodeuri-encodeduri
-fn decodeURI(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+fn decodeURI(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
     const encoded_uri = arguments.get(0);
 
     // 1. Let uriString be ? ToString(encodedURI).
@@ -381,7 +383,7 @@ fn decodeURI(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
 
 /// 19.2.6.2 decodeURIComponent ( encodedURIComponent )
 /// https://tc39.es/ecma262/#sec-decodeuricomponent-encodeduricomponent
-fn decodeURIComponent(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+fn decodeURIComponent(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
     const encoded_uri_component = arguments.get(0);
 
     // 1. Let componentString be ? ToString(encodedURIComponent).
@@ -396,7 +398,7 @@ fn decodeURIComponent(agent: *Agent, _: Value, arguments: ArgumentsList) !Value 
 
 /// 19.2.6.3 encodeURI ( uri )
 /// https://tc39.es/ecma262/#sec-encodeuri-uri
-fn encodeURI(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+fn encodeURI(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
     const uri = arguments.get(0);
 
     // 1. Let uriString be ? ToString(uri).
@@ -411,7 +413,7 @@ fn encodeURI(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
 
 /// 19.2.6.4 encodeURIComponent ( uriComponent )
 /// https://tc39.es/ecma262/#sec-encodeuricomponent-uricomponent
-fn encodeURIComponent(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+fn encodeURIComponent(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
     const uri_component = arguments.get(0);
 
     // 1. Let componentString be ? ToString(uriComponent).
@@ -426,7 +428,11 @@ fn encodeURIComponent(agent: *Agent, _: Value, arguments: ArgumentsList) !Value 
 
 /// 19.2.6.5 Encode ( string, extraUnescaped )
 /// https://tc39.es/ecma262/#sec-encode
-fn encode(agent: *Agent, string: String, comptime extra_unescaped: []const u8) ![]const u8 {
+fn encode(
+    agent: *Agent,
+    string: String,
+    comptime extra_unescaped: []const u8,
+) Allocator.Error![]const u8 {
     // 3. Let alwaysUnescaped be the string-concatenation of the ASCII word characters and
     //    "-.!~*'()".
     const always_unescaped = String.ascii_word_characters ++ "-.!~*'()";
@@ -444,7 +450,7 @@ fn encode(agent: *Agent, string: String, comptime extra_unescaped: []const u8) !
 
 /// 19.2.6.6 Decode ( string, preserveEscapeSet )
 /// https://tc39.es/ecma262/#sec-decode
-fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u8) ![]const u8 {
+fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u8) Agent.Error![]const u8 {
     const input = string.utf8;
 
     // 1. Let len be the length of string.

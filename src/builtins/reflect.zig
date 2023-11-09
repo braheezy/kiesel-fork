@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const Allocator = std.mem.Allocator;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -20,7 +22,7 @@ const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 pub const Reflect = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
@@ -53,7 +55,7 @@ pub const Reflect = struct {
 
     /// 28.1.1 Reflect.apply ( target, thisArgument, argumentsList )
     /// https://tc39.es/ecma262/#sec-reflect.apply
-    fn apply(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn apply(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const target = arguments.get(0);
         const this_argument = arguments.get(1);
         const arguments_list = arguments.get(2);
@@ -74,7 +76,7 @@ pub const Reflect = struct {
 
     /// 28.1.2 Reflect.construct ( target, argumentsList [ , newTarget ] )
     /// https://tc39.es/ecma262/#sec-reflect.construct
-    fn construct(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn construct(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const target = arguments.get(0);
         const arguments_list = arguments.get(1);
         var new_target = arguments.get(2);
@@ -102,7 +104,7 @@ pub const Reflect = struct {
 
     /// 28.1.3 Reflect.defineProperty ( target, propertyKey, attributes )
     /// https://tc39.es/ecma262/#sec-reflect.defineproperty
-    fn defineProperty(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn defineProperty(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const target = arguments.get(0);
         const property_key = arguments.get(1);
         const attributes = arguments.get(2);
@@ -126,7 +128,7 @@ pub const Reflect = struct {
 
     /// 28.1.4 Reflect.deleteProperty ( target, propertyKey )
     /// https://tc39.es/ecma262/#sec-reflect.deleteproperty
-    fn deleteProperty(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn deleteProperty(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const target = arguments.get(0);
         const property_key = arguments.get(1);
 
@@ -144,7 +146,7 @@ pub const Reflect = struct {
 
     /// 28.1.5 Reflect.get ( target, propertyKey [ , receiver ] )
     /// https://tc39.es/ecma262/#sec-reflect.get
-    fn get(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn get(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const target = arguments.get(0);
         const property_key = arguments.get(1);
 
@@ -166,7 +168,11 @@ pub const Reflect = struct {
 
     /// 28.1.6 Reflect.getOwnPropertyDescriptor ( target, propertyKey )
     /// https://tc39.es/ecma262/#sec-reflect.getownpropertydescriptor
-    fn getOwnPropertyDescriptor(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn getOwnPropertyDescriptor(
+        agent: *Agent,
+        _: Value,
+        arguments: ArgumentsList,
+    ) Agent.Error!Value {
         const target = arguments.get(0);
         const property_key = arguments.get(1);
 
@@ -190,7 +196,7 @@ pub const Reflect = struct {
 
     /// 28.1.7 Reflect.getPrototypeOf ( target )
     /// https://tc39.es/ecma262/#sec-reflect.getprototypeof
-    fn getPrototypeOf(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn getPrototypeOf(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const target = arguments.get(0);
 
         // 1. If target is not an Object, throw a TypeError exception.
@@ -206,7 +212,7 @@ pub const Reflect = struct {
 
     /// 28.1.8 Reflect.has ( target, propertyKey )
     /// https://tc39.es/ecma262/#sec-reflect.has
-    fn has(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn has(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const target = arguments.get(0);
         const property_key = arguments.get(1);
 
@@ -224,7 +230,7 @@ pub const Reflect = struct {
 
     /// 28.1.9 Reflect.isExtensible ( target )
     /// https://tc39.es/ecma262/#sec-reflect.isextensible
-    fn isExtensible(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn isExtensible(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const target = arguments.get(0);
 
         // 1. If target is not an Object, throw a TypeError exception.
@@ -238,7 +244,7 @@ pub const Reflect = struct {
 
     /// 28.1.10 Reflect.ownKeys ( target )
     /// https://tc39.es/ecma262/#sec-reflect.ownkeys
-    fn ownKeys(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn ownKeys(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const target = arguments.get(0);
 
         // 1. If target is not an Object, throw a TypeError exception.
@@ -253,7 +259,7 @@ pub const Reflect = struct {
         // 3. Return CreateArrayFromList(keys).
         return Value.from(
             try createArrayFromListMapToValue(agent, PropertyKey, keys.items, struct {
-                fn mapFn(agent_: *Agent, property_key: PropertyKey) !Value {
+                fn mapFn(agent_: *Agent, property_key: PropertyKey) Allocator.Error!Value {
                     return property_key.toValue(agent_);
                 }
             }.mapFn),
@@ -262,7 +268,7 @@ pub const Reflect = struct {
 
     /// 28.1.11 Reflect.preventExtensions ( target )
     /// https://tc39.es/ecma262/#sec-reflect.preventextensions
-    fn preventExtensions(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn preventExtensions(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const target = arguments.get(0);
 
         // 1. If target is not an Object, throw a TypeError exception.
@@ -276,7 +282,7 @@ pub const Reflect = struct {
 
     /// 28.1.12 Reflect.set ( target, propertyKey, V [ , receiver ] )
     /// https://tc39.es/ecma262/#sec-reflect.set
-    fn set(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn set(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const target = arguments.get(0);
         const property_key = arguments.get(1);
         const value = arguments.get(2);
@@ -301,7 +307,7 @@ pub const Reflect = struct {
 
     /// 28.1.13 Reflect.setPrototypeOf ( target, proto )
     /// https://tc39.es/ecma262/#sec-reflect.setprototypeof
-    fn setPrototypeOf(agent: *Agent, _: Value, arguments: ArgumentsList) !Value {
+    fn setPrototypeOf(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const target = arguments.get(0);
         const prototype = arguments.get(1);
 

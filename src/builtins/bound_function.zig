@@ -15,7 +15,7 @@ const Value = types.Value;
 
 /// 10.4.1.1 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-bound-function-exotic-objects-call-thisargument-argumentslist
-fn call(object: Object, _: Value, arguments_list: ArgumentsList) !Value {
+fn call(object: Object, _: Value, arguments_list: ArgumentsList) Agent.Error!Value {
     const agent = object.agent();
     const function = object.as(BoundFunction);
 
@@ -42,7 +42,11 @@ fn call(object: Object, _: Value, arguments_list: ArgumentsList) !Value {
 
 /// 10.4.1.2 [[Construct]] ( argumentsList, newTarget )
 /// https://tc39.es/ecma262/#sec-bound-function-exotic-objects-construct-argumentslist-newtarget
-fn construct(object: Object, arguments_list: ArgumentsList, new_target: Object) !Object {
+fn construct(
+    object: Object,
+    arguments_list: ArgumentsList,
+    new_target: Object,
+) Agent.Error!Object {
     const agent = object.agent();
     const function = object.as(BoundFunction);
 
@@ -77,7 +81,7 @@ pub fn boundFunctionCreate(
     target_function: Object,
     bound_this: Value,
     bound_args: []const Value,
-) !Object {
+) Agent.Error!Object {
     // 1. Let proto be ? targetFunction.[[GetPrototypeOf]]().
     const prototype = try target_function.internalMethods().getPrototypeOf(target_function);
 
