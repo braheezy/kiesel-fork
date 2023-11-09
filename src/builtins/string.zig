@@ -565,7 +565,7 @@ pub const StringPrototype = struct {
         const substring = try string.substring(agent.gc_allocator, start, end);
 
         // 14. If substring is searchStr, return true.
-        if (types.String.from(substring).eql(search_str)) return Value.from(true);
+        if (substring.eql(search_str)) return Value.from(true);
 
         // 15. Return false.
         return Value.from(false);
@@ -901,7 +901,7 @@ pub const StringPrototype = struct {
         const substring = try string.substring(agent.gc_allocator, start, end);
 
         // 14. If substring is searchStr, return true.
-        if (types.String.from(substring).eql(search_str)) return Value.from(true);
+        if (substring.eql(search_str)) return Value.from(true);
 
         // 15. Return false.
         return Value.from(false);

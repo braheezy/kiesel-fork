@@ -812,7 +812,7 @@ pub const JSON = struct {
                 break :blk if (string.utf16Length() <= 10)
                     string
                 else
-                    String.from(try string.substring(agent.gc_allocator, 0, 10));
+                    try string.substring(agent.gc_allocator, 0, 10);
             },
 
             // 9. Else,

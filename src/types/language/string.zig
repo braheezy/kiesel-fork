@@ -55,16 +55,16 @@ pub const String = union(enum) {
         allocator: Allocator,
         start: usize,
         end: usize,
-    ) Allocator.Error![]const u8 {
+    ) Allocator.Error!String {
         const code_units = try self.utf16CodeUnits(allocator);
         defer allocator.free(code_units);
-        return std.unicode.utf16leToUtf8Alloc(allocator, code_units[start..end]) catch |err| switch (err) {
+        return from(std.unicode.utf16leToUtf8Alloc(allocator, code_units[start..end]) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             error.DanglingSurrogateHalf,
             error.ExpectedSecondSurrogateHalf,
             error.UnexpectedSecondSurrogateHalf,
             => @panic("Surrogate pairs are not handled in String.substring()"),
-        };
+        });
     }
 
     /// 6.1.4.1 StringIndexOf ( string, searchValue, fromIndex )

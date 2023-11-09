@@ -528,7 +528,7 @@ const Match = struct {
 
 /// 22.2.7.6 GetMatchString ( S, match )
 /// https://tc39.es/ecma262/#sec-getmatchstring
-fn getMatchString(agent: *Agent, string: String, match: Match) Allocator.Error![]const u8 {
+fn getMatchString(agent: *Agent, string: String, match: Match) Allocator.Error!String {
     // 1. Assert: match.[[StartIndex]] ≤ match.[[EndIndex]] ≤ the length of S.
     std.debug.assert(match.start_index <= match.end_index);
     std.debug.assert(match.end_index <= string.utf16Length());
