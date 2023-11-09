@@ -14,9 +14,8 @@
             .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/7bd15f643c13c685d5221ce956a73fb401133961.tar.gz",
             .hash = "1220165d3b16ff06b8ee31be922b64a185285c192cf5c9b79d09428250e592507c1b",
         },
-        // FIXME: This points to https://github.com/joachimschmidt557/linenoize/pull/17, update when merged
         .linenoise = .{
-            .url = "https://github.com/joachimschmidt557/linenoize/archive/36c6bea5375426239a06e0aec99a448af72201d1.tar.gz",
+            .url = "https://github.com/joachimschmidt557/linenoize/archive/f178d492e753460a183f437f89bed246523e88cc.tar.gz",
             .hash = "1220be133956a58d7e19a2dfb5c65e5afe0452530106a5b06f2239a352067234524c",
         },
         .parser_toolkit = .{
