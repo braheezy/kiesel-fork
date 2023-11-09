@@ -333,6 +333,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "search", search, 1, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
         try defineBuiltinFunction(object, "startsWith", startsWith, 1, realm);
+        try defineBuiltinFunction(object, "substring", substring, 2, realm);
         try defineBuiltinFunction(object, "toLowerCase", toLowerCase, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "toUpperCase", toUpperCase, 0, realm);
@@ -562,10 +563,10 @@ pub const StringPrototype = struct {
         const start = std.math.sub(usize, end, search_length) catch return Value.from(false);
 
         // 13. Let substring be the substring of S from start to end.
-        const substring = try string.substring(agent.gc_allocator, start, end);
+        const substring_ = try string.substring(agent.gc_allocator, start, end);
 
         // 14. If substring is searchStr, return true.
-        if (substring.eql(search_str)) return Value.from(true);
+        if (substring_.eql(search_str)) return Value.from(true);
 
         // 15. Return false.
         return Value.from(false);
@@ -898,13 +899,53 @@ pub const StringPrototype = struct {
         if (end > len) return Value.from(false);
 
         // 13. Let substring be the substring of S from start to end.
-        const substring = try string.substring(agent.gc_allocator, start, end);
+        const substring_ = try string.substring(agent.gc_allocator, start, end);
 
         // 14. If substring is searchStr, return true.
-        if (substring.eql(search_str)) return Value.from(true);
+        if (substring_.eql(search_str)) return Value.from(true);
 
         // 15. Return false.
         return Value.from(false);
+    }
+
+    /// 22.1.3.25 String.prototype.substring ( start, end )
+    /// https://tc39.es/ecma262/#sec-string.prototype.substring
+    fn substring(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const start = arguments.get(0);
+        const end = arguments.get(1);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 3. Let len be the length of S.
+        const len = string.utf16Length();
+
+        // 4. Let intStart be ? ToIntegerOrInfinity(start).
+        var int_start = try start.toIntegerOrInfinity(agent);
+
+        // 5. If end is undefined, let intEnd be len; else let intEnd be ? ToIntegerOrInfinity(end).
+        var int_end = if (end == .undefined)
+            @as(f64, @floatFromInt(len))
+        else
+            try end.toIntegerOrInfinity(agent);
+
+        // 6. Let finalStart be the result of clamping intStart between 0 and len.
+        const final_start = std.math.clamp(std.math.lossyCast(usize, int_start), 0, len);
+
+        // 7. Let finalEnd be the result of clamping intEnd between 0 and len.
+        const final_end = std.math.clamp(std.math.lossyCast(usize, int_end), 0, len);
+
+        // 8. Let from be min(finalStart, finalEnd).
+        const from = @min(final_start, final_end);
+
+        // 9. Let to be max(finalStart, finalEnd).
+        const to = @max(final_start, final_end);
+
+        // 10. Return the substring of S from from to to.
+        return Value.from(try string.substring(agent.gc_allocator, from, to));
     }
 
     /// 22.1.3.28 String.prototype.toLowerCase ( )
