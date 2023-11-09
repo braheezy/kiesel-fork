@@ -88,6 +88,16 @@ pub const String = union(enum) {
             null;
     }
 
+    pub fn lastIndexOf(self: Self, search_value: String, from_index: usize) ?usize {
+        const len = self.utf16Length();
+        if (search_value.utf16Length() == 0 and from_index <= len) return from_index;
+        if (from_index >= len) return null;
+        return if (std.mem.lastIndexOf(u8, self.utf8[from_index..], search_value.utf8)) |index|
+            index + from_index
+        else
+            null;
+    }
+
     pub fn codePointAt(self: Self, index: usize) u21 {
         var it = std.unicode.Utf8View.initUnchecked(self.utf8).iterator();
         var i: usize = 0;
