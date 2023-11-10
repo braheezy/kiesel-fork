@@ -7,8 +7,8 @@
             .hash = "1220d00cd17f9b1f840ea4bee9b552547e1ca5938517018078046c83b71f332d3b5e",
         },
         .libgc = .{
-            .url = "https://github.com/linusg/zig-libgc/archive/9013b9601c01127ae28206e155faa935e06af6ba.tar.gz",
-            .hash = "122078afb2452cc02a9b6b52fde9fb91fda951e5f507a52002058b8d93a268e95bf6",
+            .url = "https://github.com/linusg/zig-libgc/archive/f82848668aa5ee09a7ed6615057aaaccde5756cc.tar.gz",
+            .hash = "122037118faa2dd8b2357389435196ed3e880fc697335a71153f13a265b3ff092cef",
         },
         .libregexp = .{
             .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/7bd15f643c13c685d5221ce956a73fb401133961.tar.gz",
