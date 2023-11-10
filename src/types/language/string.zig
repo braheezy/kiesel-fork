@@ -54,7 +54,7 @@ pub const String = union(enum) {
         return std.mem.eql(u8, a.utf8, b.utf8);
     }
 
-    pub inline fn substring(
+    pub fn substring(
         self: Self,
         allocator: Allocator,
         start: usize,
