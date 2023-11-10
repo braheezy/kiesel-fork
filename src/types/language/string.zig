@@ -35,6 +35,10 @@ pub const String = union(enum) {
         return .{ .utf8 = utf8 };
     }
 
+    pub inline fn isEmpty(self: Self) bool {
+        return self.utf8.len == 0;
+    }
+
     pub inline fn utf16Length(self: Self) usize {
         return std.unicode.calcUtf16LeLen(self.utf8) catch unreachable;
     }
@@ -74,7 +78,7 @@ pub const String = union(enum) {
         const len = self.utf16Length();
 
         // 2. If searchValue is the empty String and fromIndex ≤ len, return fromIndex.
-        if (search_value.utf16Length() == 0 and from_index <= len) return from_index;
+        if (search_value.isEmpty() and from_index <= len) return from_index;
 
         // 3. Let searchLen be the length of searchValue.
         // 4. For each integer i such that fromIndex ≤ i ≤ len - searchLen, in ascending order, do
@@ -90,7 +94,7 @@ pub const String = union(enum) {
 
     pub fn lastIndexOf(self: Self, search_value: String, from_index: usize) ?usize {
         const len = self.utf16Length();
-        if (search_value.utf16Length() == 0 and from_index <= len) return from_index;
+        if (search_value.isEmpty() and from_index <= len) return from_index;
         if (from_index >= len) return null;
         return if (std.mem.lastIndexOf(u8, self.utf8[from_index..], search_value.utf8)) |index|
             index + from_index

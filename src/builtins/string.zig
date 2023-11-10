@@ -686,7 +686,7 @@ pub const StringPrototype = struct {
         );
 
         // 10. If searchStr is the empty String, return 𝔽(start).
-        if (search_str.utf16Length() == 0) return Value.from(start);
+        if (search_str.isEmpty()) return Value.from(start);
 
         // 11. For each integer i such that 0 ≤ i ≤ start, in descending order, do
         //     a. Let candidate be the substring of S from i to i + searchLen.
@@ -779,7 +779,7 @@ pub const StringPrototype = struct {
         // 5. If n = 0, return the empty String.
         if (n == 0) return Value.from("");
 
-        if (string.utf16Length() == 0) return Value.from("");
+        if (string.isEmpty()) return Value.from("");
 
         const n_usize = std.math.lossyCast(usize, n);
         const new_len = std.math.mul(

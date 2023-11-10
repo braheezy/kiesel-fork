@@ -409,7 +409,7 @@ fn serializeJSONObject(
                         agent,
                         String.from((try property_key.toStringOrSymbol(agent)).string),
                     )).utf8,
-                    if (state.gap.utf16Length() != 0) " " else "",
+                    if (!state.gap.isEmpty()) " " else "",
                     str_property.?.utf8,
                 },
             );
@@ -427,7 +427,7 @@ fn serializeJSONObject(
     // 10. Else,
     else blk: {
         // a. If state.[[Gap]] is the empty String, then
-        if (state.gap.utf16Length() == 0) {
+        if (state.gap.isEmpty()) {
             // i. Let properties be the String value formed by concatenating all the element
             //    Strings of partial with each adjacent pair of Strings separated with the code
             //    unit 0x002C (COMMA). A comma is not inserted either before the first String or
@@ -545,7 +545,7 @@ fn serializeJSONArray(
     // 10. Else,
     else blk: {
         // a. If state.[[Gap]] is the empty String, then
-        if (state.gap.utf16Length() == 0) {
+        if (state.gap.isEmpty()) {
             // i. Let properties be the String value formed by concatenating all the element
             //    Strings of partial with each adjacent pair of Strings separated with the code
             //    unit 0x002C (COMMA). A comma is not inserted either before the first String or

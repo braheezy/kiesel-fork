@@ -126,7 +126,7 @@ pub const RegExpStringIteratorPrototype = struct {
         const match_str = try (try match.?.get(PropertyKey.from(0))).toString(agent);
 
         // v. If matchStr is the empty String, then
-        if (match_str.utf16Length() == 0) {
+        if (match_str.isEmpty()) {
             // 1. Let thisIndex be ℝ(? ToLength(? Get(R, "lastIndex"))).
             const this_index = try (try reg_exp.get(PropertyKey.from("lastIndex"))).toLength(agent);
 

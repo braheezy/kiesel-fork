@@ -1090,7 +1090,7 @@ pub const RegExpPrototype = struct {
         //    by F would be parsed as a SingleLineComment rather than a RegularExpressionLiteral.
         //    If P is the empty String, this specification can be met by letting S be "(?:)".
         // 6. Return S.
-        if (pattern.utf16Length() == 0) return String.from("(?:)");
+        if (pattern.isEmpty()) return String.from("(?:)");
         var output = try allocator.alloc(
             u8,
             std.mem.replacementSize(u8, pattern.utf8, "/", "\\/"),

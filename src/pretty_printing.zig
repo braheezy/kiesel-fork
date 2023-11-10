@@ -181,7 +181,7 @@ fn prettyPrintError(
     const tty_config = getTtyConfigForWriter(writer);
 
     try tty_config.setColor(writer, .red);
-    if (error_data.message.utf16Length() == 0) {
+    if (error_data.message.isEmpty()) {
         try writer.print("{}", .{error_data.name});
     } else {
         try writer.print("{}: {}", .{ error_data.name, error_data.message });
