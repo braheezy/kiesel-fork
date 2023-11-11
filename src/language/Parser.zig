@@ -1781,6 +1781,12 @@ pub fn acceptMethodDefinition(
         else |_| {}
     }
 
+    const start_offset = blk: {
+        defer self.core.restoreState(state);
+        const next_token = (self.core.nextToken() catch null) orelse break :blk 0;
+        break :blk self.core.tokenizer.offset - next_token.text.len;
+    };
+
     const property_name = try self.acceptPropertyName();
     if (method_type == null and
         property_name == .literal_property_name and
@@ -1802,8 +1808,6 @@ pub fn acceptMethodDefinition(
         }
     }
     _ = try self.core.accept(RuleSet.is(.@"("));
-    // We need to do this after consuming the '(' token to skip preceeding whitespace.
-    const start_offset = self.core.tokenizer.offset - (comptime "(".len);
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
