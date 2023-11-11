@@ -15,6 +15,7 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
 const Completion = types.Completion;
+const Iterator = types.Iterator;
 const Job = execution.Job;
 const JobCallback = execution.JobCallback;
 const MakeObject = types.MakeObject;
@@ -27,6 +28,7 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
+const getIterator = types.getIterator;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const sameValue = types.sameValue;
 
@@ -668,6 +670,74 @@ pub fn newPromiseResolveThenableJob(
     return .{ .job = job, .realm = then_realm };
 }
 
+/// 27.2.4.1.1 GetPromiseResolve ( promiseConstructor )
+fn getPromiseResolve(agent: *Agent, promise_constructor: Object) Agent.Error!Object {
+    // 1. Let promiseResolve be ? Get(promiseConstructor, "resolve").
+    const prommise_resolve = try promise_constructor.get(PropertyKey.from("resolve"));
+
+    // 2. If IsCallable(promiseResolve) is false, throw a TypeError exception.
+    if (!prommise_resolve.isCallable()) {
+        return agent.throwException(.type_error, "{} is not callable", .{prommise_resolve});
+    }
+
+    // 3. Return promiseResolve.
+    return prommise_resolve.object;
+}
+
+/// 27.2.4.5.1 PerformPromiseRace ( iteratorRecord, constructor, resultCapability, promiseResolve )
+/// https://tc39.es/ecma262/#sec-performpromiserace
+fn performPromiseRace(
+    agent: *Agent,
+    iterator: *Iterator,
+    constructor: Object,
+    result_capability: PromiseCapability,
+    promise_resolve: Object,
+) Agent.Error!Value {
+    // 1. Repeat,
+    while (true) {
+        // a. Let next be Completion(IteratorStep(iteratorRecord)).
+        const next = iterator.step() catch |err| {
+            // b. If next is an abrupt completion, set iteratorRecord.[[Done]] to true.
+            iterator.done = true;
+
+            // c. ReturnIfAbrupt(next).
+            return err;
+        };
+
+        // d. If next is false, then
+        if (next == null) {
+            // i. Set iteratorRecord.[[Done]] to true.
+            iterator.done = true;
+
+            // ii. Return resultCapability.[[Promise]].
+            return Value.from(result_capability.promise);
+        }
+
+        // e. Let nextValue be Completion(IteratorValue(next)).
+        const next_value = Iterator.value(next.?) catch |err| {
+            // f. If nextValue is an abrupt completion, set iteratorRecord.[[Done]] to true.
+            iterator.done = true;
+
+            // g. ReturnIfAbrupt(nextValue).
+            return err;
+        };
+
+        // h. Let nextPromise be ? Call(promiseResolve, constructor, « nextValue »).
+        const next_promise = try Value.from(promise_resolve).callAssumeCallable(
+            Value.from(constructor),
+            .{next_value},
+        );
+
+        // i. Perform ? Invoke(nextPromise, "then", « resultCapability.[[Resolve]],
+        //    resultCapability.[[Reject]] »).
+        _ = try next_promise.invoke(
+            agent,
+            PropertyKey.from("then"),
+            .{ Value.from(result_capability.resolve), Value.from(result_capability.reject) },
+        );
+    }
+}
+
 /// 27.2.5.4.1 PerformPromiseThen ( promise, onFulfilled, onRejected [ , resultCapability ] )
 /// https://tc39.es/ecma262/#sec-performpromisethen
 pub fn performPromiseThen(
@@ -789,6 +859,7 @@ pub const PromiseConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "race", race, 1, realm);
         try defineBuiltinFunction(object, "reject", reject, 1, realm);
         try defineBuiltinFunction(object, "resolve", resolve, 1, realm);
 
@@ -891,6 +962,53 @@ pub const PromiseConstructor = struct {
 
         // 11. Return promise.
         return Value.from(promise);
+    }
+
+    /// 27.2.4.5 Promise.race ( iterable )
+    /// https://tc39.es/ecma262/#sec-promise.race
+    fn race(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const iterable = arguments.get(0);
+
+        // 1. Let C be the this value.
+        const constructor = this_value;
+
+        // 2. Let promiseCapability be ? NewPromiseCapability(C).
+        const promise_capability = try newPromiseCapability(agent, constructor);
+
+        // 3. Let promiseResolve be Completion(GetPromiseResolve(C)).
+        const promise_resolve = getPromiseResolve(agent, constructor.object) catch |err| {
+            // 4. IfAbruptRejectPromise(promiseResolve, promiseCapability).
+            return Value.from(try promise_capability.rejectPromise(agent, err));
+        };
+
+        // 5. Let iteratorRecord be Completion(GetIterator(iterable, sync)).
+        var iterator = getIterator(agent, iterable, .sync) catch |err| {
+            // 6. IfAbruptRejectPromise(iteratorRecord, promiseCapability).
+            return Value.from(try promise_capability.rejectPromise(agent, err));
+        };
+
+        // 7. Let result be Completion(PerformPromiseRace(iteratorRecord, C, promiseCapability, promiseResolve)).
+        var result = performPromiseRace(
+            agent,
+            &iterator,
+            constructor.object,
+            promise_capability,
+            promise_resolve,
+        );
+
+        // 8. If result is an abrupt completion, then
+        if (std.meta.isError(result)) {
+            // a. If iteratorRecord.[[Done]] is false, set result to Completion(IteratorClose(iteratorRecord, result)).
+            if (!iterator.done) result = iterator.close(result);
+
+            // b. IfAbruptRejectPromise(result, promiseCapability).
+            if (result) |_| {} else |err| {
+                return Value.from(try promise_capability.rejectPromise(agent, err));
+            }
+        }
+
+        // 9. Return ? result.
+        return result;
     }
 
     /// 27.2.4.6 Promise.reject ( r )
