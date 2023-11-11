@@ -30,7 +30,9 @@ const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const sameValue = types.sameValue;
 
 /// 27.2.1.1 PromiseCapability Records
@@ -877,6 +879,328 @@ fn performPromiseAll(
     }
 }
 
+/// 27.2.4.2.1 PerformPromiseAllSettled ( iteratorRecord, constructor, resultCapability, promiseResolve )
+/// https://tc39.es/ecma262/#sec-performpromiseallsettled
+fn performPromiseAllSettled(
+    agent: *Agent,
+    iterator: *Iterator,
+    constructor: Object,
+    result_capability: PromiseCapability,
+    promise_resolve: Object,
+) Agent.Error!Value {
+    // 1. Let values be a new empty List.
+    var values = try agent.gc_allocator.create(std.ArrayList(Value));
+    values.* = std.ArrayList(Value).init(agent.gc_allocator);
+
+    // 2. Let remainingElementsCount be the Record { [[Value]]: 1 }.
+    var remaining_elements_count = try agent.gc_allocator.create(RemainingElements);
+    remaining_elements_count.* = .{ .value = 1 };
+
+    // 3. Let index be 0.
+    var index: usize = 0;
+
+    // 4. Repeat,
+    while (true) {
+        // a. Let next be Completion(IteratorStep(iteratorRecord)).
+        const next = iterator.step() catch |err| {
+            // b. If next is an abrupt completion, set iteratorRecord.[[Done]] to true.
+            iterator.done = true;
+
+            // c. ReturnIfAbrupt(next).
+            return err;
+        };
+
+        // d. If next is false, then
+        if (next == null) {
+            // i. Set iteratorRecord.[[Done]] to true.
+            iterator.done = true;
+
+            // ii. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
+            remaining_elements_count.value -= 1;
+
+            // iii. If remainingElementsCount.[[Value]] = 0, then
+            if (remaining_elements_count.value == 0) {
+                // 1. Let valuesArray be CreateArrayFromList(values).
+                const values_array = try createArrayFromList(agent, values.items);
+
+                // 2. Perform ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
+                _ = try Value.from(result_capability.resolve).callAssumeCallable(
+                    .undefined,
+                    .{Value.from(values_array)},
+                );
+            }
+
+            // iv. Return resultCapability.[[Promise]].
+            return Value.from(result_capability.promise);
+        }
+
+        // e. Let nextValue be Completion(IteratorValue(next)).
+        const next_value = Iterator.value(next.?) catch |err| {
+            // f. If nextValue is an abrupt completion, set iteratorRecord.[[Done]] to true.
+            iterator.done = true;
+
+            // g. ReturnIfAbrupt(nextValue).
+            return err;
+        };
+
+        // h. Append undefined to values.
+        try values.append(.undefined);
+
+        // i. Let nextPromise be ? Call(promiseResolve, constructor, « nextValue »).
+        const next_promise = try Value.from(promise_resolve).callAssumeCallable(
+            Value.from(constructor),
+            .{next_value},
+        );
+
+        const AlreadyCalled = struct { value: bool };
+        const AdditionalFields = struct {
+            /// [[AlreadyCalled]]
+            already_called: *AlreadyCalled,
+
+            /// [[Index]]
+            index: usize,
+
+            /// [[Values]]
+            values: *std.ArrayList(Value),
+
+            /// [[Capability]]
+            capability: PromiseCapability,
+
+            /// [[RemainingElements]]
+            remaining_elements: *RemainingElements,
+        };
+
+        // j. Let stepsFulfilled be the algorithm steps defined in Promise.allSettled Resolve
+        //    Element Functions.
+        const steps_fulfilled = struct {
+            /// 27.2.4.2.2 Promise.allSettled Resolve Element Functions
+            /// https://tc39.es/ecma262/#sec-promise.allsettled-resolve-element-
+            fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) Agent.Error!Value {
+                const realm = agent_.currentRealm();
+                const x = arguments_.get(0);
+
+                // 1. Let F be the active function object.
+                const function = agent_.activeFunctionObject();
+
+                const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
+
+                // 2. Let alreadyCalled be F.[[AlreadyCalled]].
+                const already_called_ = additional_fields_.already_called;
+
+                // 3. If alreadyCalled.[[Value]] is true, return undefined.
+                if (already_called_.value) return .undefined;
+
+                // 4. Set alreadyCalled.[[Value]] to true.
+                already_called_.value = true;
+
+                // 5. Let index be F.[[Index]].
+                const index_ = additional_fields_.index;
+
+                // 6. Let values be F.[[Values]].
+                const values_ = additional_fields_.values;
+
+                // 7. Let promiseCapability be F.[[Capability]].
+                const promise_capability = additional_fields_.capability;
+
+                // 8. Let remainingElementsCount be F.[[RemainingElements]].
+                const remaining_elements_count_ = additional_fields_.remaining_elements;
+
+                // 9. Let obj be OrdinaryObjectCreate(%Object.prototype%).
+                const object = try ordinaryObjectCreate(
+                    agent_,
+                    try realm.intrinsics.@"%Object.prototype%"(),
+                );
+
+                // 10. Perform ! CreateDataPropertyOrThrow(obj, "status", "fulfilled").
+                object.createDataPropertyOrThrow(
+                    PropertyKey.from("status"),
+                    Value.from("fulfilled"),
+                ) catch |err| try noexcept(err);
+
+                // 11. Perform ! CreateDataPropertyOrThrow(obj, "value", x).
+                object.createDataPropertyOrThrow(
+                    PropertyKey.from("value"),
+                    x,
+                ) catch |err| try noexcept(err);
+
+                // 12. Set values[index] to obj.
+                values_.items[index_] = Value.from(object);
+
+                // 13. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
+                remaining_elements_count_.value -= 1;
+
+                // 14. If remainingElementsCount.[[Value]] = 0, then
+                if (remaining_elements_count_.value == 0) {
+                    // a. Let valuesArray be CreateArrayFromList(values).
+                    const values_array = try createArrayFromList(agent_, values_.items);
+
+                    // b. Return ? Call(promiseCapability.[[Resolve]], undefined, « valuesArray »).
+                    return Value.from(promise_capability.resolve).callAssumeCallable(
+                        .undefined,
+                        .{Value.from(values_array)},
+                    );
+                }
+
+                // 15. Return undefined.
+                return .undefined;
+            }
+        }.func;
+
+        // k. Let lengthFulfilled be the number of non-optional parameters of the function
+        //    definition in Promise.allSettled Resolve Element Functions.
+        const length_fulfilled = 1;
+
+        // l. Let onFulfilled be CreateBuiltinFunction(stepsFulfilled, lengthFulfilled, "",
+        //    « [[AlreadyCalled]], [[Index]], [[Values]], [[Capability]], [[RemainingElements]] »).
+        const on_fulfilled_additional_fields = try agent.gc_allocator.create(AdditionalFields);
+        const on_fulfilled = try createBuiltinFunction(agent, .{ .regular = steps_fulfilled }, .{
+            .length = length_fulfilled,
+            .name = "",
+            .additional_fields = SafePointer.make(*AdditionalFields, on_fulfilled_additional_fields),
+        });
+
+        // m. Let alreadyCalled be the Record { [[Value]]: false }.
+        var already_called = try agent.gc_allocator.create(AlreadyCalled);
+        already_called.* = .{ .value = false };
+
+        on_fulfilled_additional_fields.* = .{
+            // n. Set onFulfilled.[[AlreadyCalled]] to alreadyCalled.
+            .already_called = already_called,
+
+            // o. Set onFulfilled.[[Index]] to index.
+            .index = index,
+
+            // p. Set onFulfilled.[[Values]] to values.
+            .values = values,
+
+            // q. Set onFulfilled.[[Capability]] to resultCapability.
+            .capability = result_capability,
+
+            // r. Set onFulfilled.[[RemainingElements]] to remainingElementsCount.
+            .remaining_elements = remaining_elements_count,
+        };
+
+        // s. Let stepsRejected be the algorithm steps defined in Promise.allSettled Reject Element
+        //    Functions.
+        const steps_rejected = struct {
+            /// 27.2.4.2.3 Promise.allSettled Reject Element Functions
+            /// https://tc39.es/ecma262/#sec-promise.allsettled-reject-element-functions
+            fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) Agent.Error!Value {
+                const realm = agent_.currentRealm();
+                const x = arguments_.get(0);
+
+                // 1. Let F be the active function object.
+                const function = agent_.activeFunctionObject();
+
+                const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
+
+                // 2. Let alreadyCalled be F.[[AlreadyCalled]].
+                const already_called_ = additional_fields_.already_called;
+
+                // 3. If alreadyCalled.[[Value]] is true, return undefined.
+                if (already_called_.value) return .undefined;
+
+                // 4. Set alreadyCalled.[[Value]] to true.
+                already_called_.value = true;
+
+                // 5. Let index be F.[[Index]].
+                const index_ = additional_fields_.index;
+
+                // 6. Let values be F.[[Values]].
+                const values_ = additional_fields_.values;
+
+                // 7. Let promiseCapability be F.[[Capability]].
+                const promise_capability = additional_fields_.capability;
+
+                // 8. Let remainingElementsCount be F.[[RemainingElements]].
+                const remaining_elements_count_ = additional_fields_.remaining_elements;
+
+                // 9. Let obj be OrdinaryObjectCreate(%Object.prototype%).
+                const object = try ordinaryObjectCreate(
+                    agent_,
+                    try realm.intrinsics.@"%Object.prototype%"(),
+                );
+
+                // 10. Perform ! CreateDataPropertyOrThrow(obj, "status", "rejected").
+                object.createDataPropertyOrThrow(
+                    PropertyKey.from("status"),
+                    Value.from("rejected"),
+                ) catch |err| try noexcept(err);
+
+                // 11. Perform ! CreateDataPropertyOrThrow(obj, "reason", x).
+                object.createDataPropertyOrThrow(
+                    PropertyKey.from("reason"),
+                    x,
+                ) catch |err| try noexcept(err);
+
+                // 12. Set values[index] to obj.
+                values_.items[index_] = Value.from(object);
+
+                // 13. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
+                remaining_elements_count_.value -= 1;
+
+                // 14. If remainingElementsCount.[[Value]] = 0, then
+                if (remaining_elements_count_.value == 0) {
+                    // a. Let valuesArray be CreateArrayFromList(values).
+                    const values_array = try createArrayFromList(agent_, values_.items);
+
+                    // b. Return ? Call(promiseCapability.[[Resolve]], undefined, « valuesArray »).
+                    return Value.from(promise_capability.resolve).callAssumeCallable(
+                        .undefined,
+                        .{Value.from(values_array)},
+                    );
+                }
+
+                // 15. Return undefined.
+                return .undefined;
+            }
+        }.func;
+
+        // t. Let lengthRejected be the number of non-optional parameters of the function
+        //    definition in Promise.allSettled Reject Element Functions.
+        const length_rejected = 1;
+
+        // u. Let onRejected be CreateBuiltinFunction(stepsRejected, lengthRejected, "",
+        //    « [[AlreadyCalled]], [[Index]], [[Values]], [[Capability]], [[RemainingElements]] »).
+        const on_rejected_additional_fields = try agent.gc_allocator.create(AdditionalFields);
+        const on_rejected = try createBuiltinFunction(agent, .{ .regular = steps_rejected }, .{
+            .length = length_rejected,
+            .name = "",
+            .additional_fields = SafePointer.make(*AdditionalFields, on_rejected_additional_fields),
+        });
+
+        on_rejected_additional_fields.* = .{
+            // v. Set onRejected.[[AlreadyCalled]] to alreadyCalled.
+            .already_called = already_called,
+
+            // w. Set onRejected.[[Index]] to index.
+            .index = index,
+
+            // x. Set onRejected.[[Values]] to values.
+            .values = values,
+
+            // y. Set onRejected.[[Capability]] to resultCapability.
+            .capability = result_capability,
+
+            // z. Set onRejected.[[RemainingElements]] to remainingElementsCount.
+            .remaining_elements = remaining_elements_count,
+        };
+
+        // aa. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] + 1.
+        remaining_elements_count.value += 1;
+
+        // ab. Perform ? Invoke(nextPromise, "then", « onFulfilled, onRejected »).
+        _ = try next_promise.invoke(
+            agent,
+            PropertyKey.from("then"),
+            .{ Value.from(on_fulfilled), Value.from(on_rejected) },
+        );
+
+        // ac. Set index to index + 1.
+        index += 1;
+    }
+}
+
 /// 27.2.4.5.1 PerformPromiseRace ( iteratorRecord, constructor, resultCapability, promiseResolve )
 /// https://tc39.es/ecma262/#sec-performpromiserace
 fn performPromiseRace(
@@ -1053,6 +1377,7 @@ pub const PromiseConstructor = struct {
         });
 
         try defineBuiltinFunction(object, "all", all, 1, realm);
+        try defineBuiltinFunction(object, "allSettled", allSettled, 1, realm);
         try defineBuiltinFunction(object, "race", race, 1, realm);
         try defineBuiltinFunction(object, "reject", reject, 1, realm);
         try defineBuiltinFunction(object, "resolve", resolve, 1, realm);
@@ -1183,6 +1508,53 @@ pub const PromiseConstructor = struct {
 
         // 7. Let result be Completion(PerformPromiseAll(iteratorRecord, C, promiseCapability, promiseResolve)).
         var result = performPromiseAll(
+            agent,
+            &iterator,
+            constructor.object,
+            promise_capability,
+            promise_resolve,
+        );
+
+        // 8. If result is an abrupt completion, then
+        if (std.meta.isError(result)) {
+            // a. If iteratorRecord.[[Done]] is false, set result to Completion(IteratorClose(iteratorRecord, result)).
+            if (!iterator.done) result = iterator.close(result);
+
+            // b. IfAbruptRejectPromise(result, promiseCapability).
+            if (result) |_| {} else |err| {
+                return Value.from(try promise_capability.rejectPromise(agent, err));
+            }
+        }
+
+        // 9. Return ? result.
+        return result;
+    }
+
+    /// 27.2.4.2 Promise.allSettled ( iterable )
+    /// https://tc39.es/ecma262/#sec-promise.allsettled
+    fn allSettled(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const iterable = arguments.get(0);
+
+        // 1. Let C be the this value.
+        const constructor = this_value;
+
+        // 2. Let promiseCapability be ? NewPromiseCapability(C).
+        const promise_capability = try newPromiseCapability(agent, constructor);
+
+        // 3. Let promiseResolve be Completion(GetPromiseResolve(C)).
+        const promise_resolve = getPromiseResolve(agent, constructor.object) catch |err| {
+            // 4. IfAbruptRejectPromise(promiseResolve, promiseCapability).
+            return Value.from(try promise_capability.rejectPromise(agent, err));
+        };
+
+        // 5. Let iteratorRecord be Completion(GetIterator(iterable, sync)).
+        var iterator = getIterator(agent, iterable, .sync) catch |err| {
+            // 6. IfAbruptRejectPromise(iteratorRecord, promiseCapability).
+            return Value.from(try promise_capability.rejectPromise(agent, err));
+        };
+
+        // 7. Let result be Completion(PerformPromiseAllSettled(iteratorRecord, C, promiseCapability, promiseResolve)).
+        var result = performPromiseAllSettled(
             agent,
             &iterator,
             constructor.object,
