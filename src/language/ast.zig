@@ -4566,6 +4566,33 @@ pub const ClassBody = struct {
         return null;
     }
 
+    /// 15.7.5 Static Semantics: NonConstructorElements
+    /// https://tc39.es/ecma262/#sec-static-semantics-nonconstructorelements
+    pub fn nonConstructorElements(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const ClassElement {
+        // ClassElementList : ClassElement
+        // 1. If ClassElementKind of ClassElement is non-constructor-method, then
+        //     a. Return « ClassElement ».
+        // 2. Return a new empty List.
+        // ClassElementList : ClassElementList ClassElement
+        // 1. Let list be NonConstructorElements of ClassElementList.
+        // 2. If ClassElementKind of ClassElement is non-constructor-method, then
+        //     a. Append ClassElement to the end of list.
+        // 3. Return list.
+        var class_elements = try std.ArrayList(ClassElement).initCapacity(
+            allocator,
+            self.class_element_list.items.len,
+        );
+        for (self.class_element_list.items) |class_element| {
+            if (class_element.classElementKind() == .non_constructor_method) {
+                class_elements.appendAssumeCapacity(class_element);
+            }
+        }
+        return class_elements.toOwnedSlice();
+    }
+
     pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
         // Omit printing 'ClassBody' here, it's implied and only adds nesting.
         try self.class_element_list.print(writer, indentation);

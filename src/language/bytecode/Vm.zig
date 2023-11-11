@@ -1537,8 +1537,9 @@ fn classDefinitionEvaluation(
     try prototype.createMethodProperty(PropertyKey.from("constructor"), Value.from(function));
 
     // 19. If ClassBody[opt] is not present, let elements be a new empty List.
-    // TODO: 20. Else, let elements be NonConstructorElements of ClassBody.
-    const elements = class_tail.class_body.class_element_list.items;
+    // 20. Else, let elements be NonConstructorElements of ClassBody.
+    const elements = try class_tail.class_body.nonConstructorElements(agent.gc_allocator);
+    agent.gc_allocator.free(elements);
 
     // TODO: 21-22.
 
