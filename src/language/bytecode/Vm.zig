@@ -1373,6 +1373,7 @@ fn classDefinitionEvaluation(
         // g. Else if IsConstructor(superclass) is false, then
         else if (!superclass.isConstructor()) {
             // i. Throw a TypeError exception.
+            return agent.throwException(.type_error, "{} is not a constructor", .{superclass});
         }
         // h. Else,
         else {
