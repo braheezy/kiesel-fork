@@ -203,6 +203,7 @@ pub fn createSymbol(self: *Self, description: ?String) error{Overflow}!Symbol {
 
 const ExceptionType = enum {
     // NativeError types
+    aggregate_error,
     eval_error,
     range_error,
     reference_error,
@@ -215,6 +216,7 @@ const ExceptionType = enum {
 
     pub fn typeName(self: @This()) []const u8 {
         return switch (self) {
+            .aggregate_error => "AggregateError",
             .eval_error => "EvalError",
             .range_error => "RangeError",
             .reference_error => "ReferenceError",
