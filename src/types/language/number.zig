@@ -106,14 +106,14 @@ pub const Number = union(enum) {
 
     pub inline fn isPositiveZero(self: Self) bool {
         return switch (self) {
-            .f64 => |x| x == 0 and !std.math.signbit(x),
+            .f64 => |x| std.math.isPositiveZero(x),
             .i32 => |x| x == 0,
         };
     }
 
     pub inline fn isNegativeZero(self: Self) bool {
         return switch (self) {
-            .f64 => |x| x == 0 and std.math.signbit(x),
+            .f64 => |x| std.math.isNegativeZero(x),
             .i32 => false,
         };
     }
