@@ -5,6 +5,8 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const SafePointer = @import("any-pointer").SafePointer;
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const immutable_prototype = @import("immutable_prototype.zig");
@@ -19,6 +21,7 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
+const addEntriesFromIterable = builtins.addEntriesFromIterable;
 const createArrayFromList = types.createArrayFromList;
 const createArrayFromListMapToValue = types.createArrayFromListMapToValue;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -48,6 +51,7 @@ pub const ObjectConstructor = struct {
         try defineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm);
         try defineBuiltinFunction(object, "entries", entries, 1, realm);
         try defineBuiltinFunction(object, "freeze", freeze, 1, realm);
+        try defineBuiltinFunction(object, "fromEntries", fromEntries, 1, realm);
         try defineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 2, realm);
         try defineBuiltinFunction(object, "getOwnPropertyDescriptors", getOwnPropertyDescriptors, 1, realm);
         try defineBuiltinFunction(object, "getOwnPropertyNames", getOwnPropertyNames, 1, realm);
@@ -312,6 +316,60 @@ pub const ObjectConstructor = struct {
 
         // 4. Return O.
         return object;
+    }
+
+    /// 20.1.2.7 Object.fromEntries ( iterable )
+    /// https://tc39.es/ecma262/multipage/fundamental-objects.html#sec-object.fromentries
+    fn fromEntries(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const realm = agent.currentRealm();
+        const iterable = arguments.get(0);
+
+        // 1. Perform ? RequireObjectCoercible(iterable).
+        _ = try iterable.requireObjectCoercible(agent);
+
+        // 2. Let obj be OrdinaryObjectCreate(%Object.prototype%).
+        // 3. Assert: obj is an extensible ordinary object with no own properties.
+        const object = try ordinaryObjectCreate(
+            agent,
+            try realm.intrinsics.@"%Object.prototype%"(),
+        );
+
+        const Captures = struct {
+            object: types.Object,
+        };
+        const captures = try agent.gc_allocator.create(Captures);
+        captures.* = .{ .object = object };
+
+        // 4. Let closure be a new Abstract Closure with parameters (key, value) that captures obj
+        //    and performs the following steps when called:
+        const closure = struct {
+            fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) Agent.Error!Value {
+                const function = agent_.activeFunctionObject();
+                const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+                const object_ = captures_.object;
+                const key = arguments_.get(0);
+                const value = arguments_.get(1);
+
+                // a. Let propertyKey be ? ToPropertyKey(key).
+                const property_key = try key.toPropertyKey(agent_);
+
+                // b. Perform ! CreateDataPropertyOrThrow(obj, propertyKey, value).
+                object_.createDataPropertyOrThrow(property_key, value) catch |err| try noexcept(err);
+
+                // c. Return undefined.
+                return .undefined;
+            }
+        }.func;
+
+        // 5. Let adder be CreateBuiltinFunction(closure, 2, "", « »).
+        const adder = try createBuiltinFunction(agent, .{ .regular = closure }, .{
+            .length = 2,
+            .name = "",
+            .additional_fields = SafePointer.make(*Captures, captures),
+        });
+
+        // 6. Return ? AddEntriesFromIterable(obj, iterable, adder).
+        return Value.from(try addEntriesFromIterable(agent, object, iterable, adder));
     }
 
     /// 20.1.2.8 Object.getOwnPropertyDescriptor ( O, P )
