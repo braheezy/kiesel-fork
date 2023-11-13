@@ -387,7 +387,7 @@ pub fn parseTemplateLiteral(
                 else
                     .character;
             },
-            .backslash => state = .character,
+            .backslash, .expression_end => state = .character,
             .expression_start, .expression_character => state = .expression_character,
             .closing_backtick => switch (consume) {
                 .partial => return .{ .text = str[0..i] },
