@@ -1126,7 +1126,7 @@ pub const RegExpPrototype = struct {
         const match = try regExpExec(agent, reg_exp.object, string);
 
         // 5. If match is not null, return true; else return false.
-        return Value.from(match == null);
+        return Value.from(match != null);
     }
 
     /// 22.2.6.17 RegExp.prototype.toString ( )
