@@ -5,15 +5,23 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const icu4zig = @import("icu4zig");
+
+const abstract_operations = @import("intl/abstract_operations.zig");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
+const Agent = execution.Agent;
+const ArgumentsList = builtins.ArgumentsList;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
+const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
+const createArrayFromListMapToValue = types.createArrayFromListMapToValue;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 comptime {
@@ -27,6 +35,8 @@ pub const Intl = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "getCanonicalLocales", getCanonicalLocales, 1, realm);
+
         // 8.1.1 Intl[ @@toStringTag ]
         // https://tc39.es/ecma402/#sec-Intl-toStringTag
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
@@ -37,5 +47,22 @@ pub const Intl = struct {
         });
 
         return object;
+    }
+
+    fn getCanonicalLocales(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const locales = arguments.get(0);
+
+        // 1. Let ll be ? CanonicalizeLocaleList(locales).
+        const locale_list = try canonicalizeLocaleList(agent, locales);
+        defer locale_list.deinit();
+
+        // 2. Return CreateArrayFromList(ll).
+        return Value.from(
+            try createArrayFromListMapToValue(agent, icu4zig.Locale, locale_list.items, struct {
+                fn mapFn(agent_: *Agent, locale: icu4zig.Locale) Allocator.Error!Value {
+                    return Value.from(try locale.toString(agent_.gc_allocator));
+                }
+            }.mapFn),
+        );
     }
 };
