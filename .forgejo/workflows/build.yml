@@ -16,7 +16,10 @@ jobs:
         run: |
           cat > build.sh << EOF
           #!/bin/bash
-          zig build -Dtarget=\$1 -Doptimize=ReleaseSafe
+          zig build \
+            -Dtarget=\$1 \
+            -Doptimize=ReleaseSafe \
+            -Denable-intl=false
           # Doesn't apply to Wasm build
           if [ -f zig-out/bin/kiesel ]; then
             mv zig-out/bin/kiesel zig-out/bin/\$2
