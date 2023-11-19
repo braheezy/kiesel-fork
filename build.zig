@@ -4,6 +4,15 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const enable_intl = b.option(
+        bool,
+        "enable-intl",
+        "Enable the Intl built-in object (requires Rust-based icu4x build)",
+    ) orelse true;
+
+    const options = b.addOptions();
+    options.addOption(bool, "enable_intl", enable_intl);
+
     const any_pointer = b.dependency("any_pointer", .{});
     const libgc = b.dependency("libgc", .{
         .target = target,
@@ -17,22 +26,30 @@ pub fn build(b: *std.Build) void {
     const parser_toolkit = b.dependency("parser_toolkit", .{});
     const zig_args = b.dependency("zig_args", .{});
 
+    var dependencies = std.ArrayList(std.Build.ModuleDependency).init(b.allocator);
+    defer dependencies.deinit();
+    dependencies.appendSlice(&.{
+        .{
+            .module = options.createModule(),
+            .name = "build-options",
+        },
+        .{
+            .module = any_pointer.module("any-pointer"),
+            .name = "any-pointer",
+        },
+        .{
+            .module = libgc.module("gc"),
+            .name = "gc",
+        },
+        .{
+            .module = parser_toolkit.module("parser-toolkit"),
+            .name = "ptk",
+        },
+    }) catch @panic("OOM");
+
     const kiesel_module = b.addModule("kiesel", .{
         .source_file = .{ .path = "src/main.zig" },
-        .dependencies = &.{
-            std.Build.ModuleDependency{
-                .module = any_pointer.module("any-pointer"),
-                .name = "any-pointer",
-            },
-            std.Build.ModuleDependency{
-                .module = libgc.module("gc"),
-                .name = "gc",
-            },
-            std.Build.ModuleDependency{
-                .module = parser_toolkit.module("parser-toolkit"),
-                .name = "ptk",
-            },
-        },
+        .dependencies = dependencies.items,
     });
 
     _ = std.process.Child.run(.{
