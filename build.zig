@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const build_icu4zig = @import("icu4zig");
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -46,6 +48,16 @@ pub fn build(b: *std.Build) void {
             .name = "ptk",
         },
     }) catch @panic("OOM");
+    if (enable_intl) {
+        const icu4zig = b.dependency("icu4zig", .{
+            .target = target,
+            .optimize = optimize,
+        });
+        dependencies.append(.{
+            .module = icu4zig.module("icu4zig"),
+            .name = "icu4zig",
+        }) catch @panic("OOM");
+    }
 
     const kiesel_module = b.addModule("kiesel", .{
         .source_file = .{ .path = "src/main.zig" },
@@ -70,6 +82,17 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .single_threaded = true,
     });
+    if (enable_intl) {
+        const icu4zig = b.dependency("icu4zig", .{
+            .target = target,
+            .optimize = optimize,
+        });
+        const icu4x = icu4zig.builder.dependency("icu4x", .{
+            .target = target,
+            .optimize = optimize,
+        });
+        build_icu4zig.link(exe, icu4x);
+    }
     exe.linkLibrary(libgc.artifact("gc"));
     exe.linkLibrary(libregexp.artifact("regexp"));
     exe.addModule("kiesel", kiesel_module);

@@ -58,6 +58,10 @@ zig build run
 NOTE: Kiesel targets the master branch of Zig. This means that the build breaks
 semi-regularly, which I will usually fix as soon as I notice.
 
+By default code for the `Intl` will be built, which depends on `cargo` being
+available for the ICU4X library. If you don't have `cargo` installed or want to
+disable `Intl` functionality, build with `-Denable-int=false`.
+
 ## Usage
 
 ```text

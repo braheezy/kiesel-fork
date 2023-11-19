@@ -6,6 +6,10 @@
             .url = "https://github.com/MasterQ32/any-pointer/archive/88bd1b406d58bc9e82159581ea3e71a004011058.tar.gz",
             .hash = "1220d00cd17f9b1f840ea4bee9b552547e1ca5938517018078046c83b71f332d3b5e",
         },
+        .icu4zig = .{
+            .url = "https://codeberg.org/linusg/icu4zig/archive/24d7e62b8d488edb59d03bcaa0b1054947f9bc45.tar.gz",
+            .hash = "12200675871eaf2e1b695c5bfd49b3684d69b03e2cb2adb4072945873dc7a9731909",
+        },
         .libgc = .{
             .url = "https://github.com/linusg/zig-libgc/archive/c6ec34eb781faa5002153ed56e766a2b3a3c0b4c.tar.gz",
             .hash = "12209cbf98bc9a69f5d69c51c8bd5bd5695b4758c0f352ac854259eeca680cce23b3",
