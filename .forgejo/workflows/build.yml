@@ -12,15 +12,23 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: https://github.com/goto-bus-stop/setup-zig@v2
-      - uses: https://github.com/dtolnay/rust-toolchain@stable
+      - uses: https://github.com/dtolnay/rust-toolchain@nightly
+        with:
+          components: "rust-src"
       - name: Create build.sh script
         run: |
           cat > build.sh << EOF
           #!/bin/bash
+          # https://github.com/ziglang/zig/issues/15107#issuecomment-1817993587
+          if [[ \$1 =~ 'windows' ]]; then
+            enable_intl='false'
+          else
+            enable_intl='true'
+          fi
           zig build \
             -Dtarget=\$1 \
             -Doptimize=ReleaseSafe \
-            -Denable-intl=false
+            -Denable-intl=\$enable_intl
           # Doesn't apply to Wasm build
           if [ -f zig-out/bin/kiesel ]; then
             mv zig-out/bin/kiesel zig-out/bin/\$2
@@ -72,12 +80,6 @@ jobs:
         run: |
           ./build.sh x86_64-windows-gnu kiesel-windows-x86_64.exe
           ./upload.sh zig-out/bin/kiesel-windows-x86_64.exe
-      # Experimental, so far cross compilation is known to only work for this target.
-      - name: Build and upload kiesel-linux-x86_64-intl
-        run: |
-          zig build -Dtarget=x86_64-linux-gnu -Doptimize=ReleaseSafe -Denable-intl=true
-          mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-x86_64-intl
-          ./upload.sh zig-out/bin/kiesel-linux-x86_64-intl
       - name: Update version.txt
         run: |
           git rev-parse main > version.txt
