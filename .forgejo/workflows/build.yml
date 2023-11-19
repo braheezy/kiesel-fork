@@ -12,6 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: https://github.com/goto-bus-stop/setup-zig@v2
+      - uses: https://github.com/dtolnay/rust-toolchain@stable
       - name: Create build.sh script
         run: |
           cat > build.sh << EOF
@@ -71,6 +72,12 @@ jobs:
         run: |
           ./build.sh x86_64-windows-gnu kiesel-windows-x86_64.exe
           ./upload.sh zig-out/bin/kiesel-windows-x86_64.exe
+      # Experimental, so far cross compilation is known to only work for this target.
+      - name: Build and upload kiesel-linux-x86_64-intl
+        run: |
+          zig build -Dtarget=x86_64-linux-gnu -Doptimize=ReleaseSafe -Denable-intl=true
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-x86_64-intl
+          ./upload.sh zig-out/bin/kiesel-linux-x86_64-intl
       - name: Update version.txt
         run: |
           git rev-parse main > version.txt
