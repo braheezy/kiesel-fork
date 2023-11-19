@@ -5,6 +5,7 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -28,9 +29,11 @@ const NameAndPropertyDescriptor = struct {
     PropertyDescriptor,
 };
 
-pub fn globalObjectProperties(realm: *Realm) Allocator.Error![40]NameAndPropertyDescriptor {
+const num_properties = 40 + if (build_options.enable_intl) 1 else 0;
+
+pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
-    return [_]NameAndPropertyDescriptor{
+    return .{
         // 19.1.1 globalThis
         // https://tc39.es/ecma262/#sec-globalthis
         .{ "globalThis", .{ .value = Value.from(realm.global_env.global_this_value), .writable = true, .enumerable = false, .configurable = true } },
@@ -190,7 +193,9 @@ pub fn globalObjectProperties(realm: *Realm) Allocator.Error![40]NameAndProperty
         // 19.4.4 Reflect
         // https://tc39.es/ecma262/#sec-reflect
         .{ "Reflect", .{ .value = Value.from(try realm.intrinsics.@"%Reflect%"()), .writable = true, .enumerable = false, .configurable = true } },
-    };
+    } ++ if (build_options.enable_intl) .{
+        .{ "Intl", .{ .value = Value.from(try realm.intrinsics.@"%Intl%"()), .writable = true, .enumerable = false, .configurable = true } },
+    } else .{};
 }
 
 fn GlobalFunction(comptime options: struct { name: []const u8, length: u32 }) type {

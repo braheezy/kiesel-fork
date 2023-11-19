@@ -54,6 +54,7 @@ lazy_intrinsics: struct {
     @"%GeneratorFunction%": ?Object = null,
     @"%GeneratorFunction.prototype%": ?Object = null,
     @"%GeneratorFunction.prototype.prototype%": ?Object = null,
+    @"%Intl%": ?Object = null,
     @"%isFinite%": ?Object = null,
     @"%isNaN%": ?Object = null,
     @"%IteratorPrototype%": ?Object = null,
@@ -230,6 +231,9 @@ pub fn @"%GeneratorFunction.prototype%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%GeneratorFunction.prototype.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%GeneratorFunction.prototype.prototype%", builtins.GeneratorPrototype);
+}
+pub fn @"%Intl%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Intl%", builtins.Intl);
 }
 pub fn @"%isFinite%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%isFinite%", builtins.global_functions.IsFinite);
