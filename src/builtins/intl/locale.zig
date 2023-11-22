@@ -391,6 +391,7 @@ pub const LocalePrototype = struct {
 
         try defineBuiltinFunction(object, "maximize", maximize, 0, realm);
         try defineBuiltinFunction(object, "minimize", minimize, 0, realm);
+        try defineBuiltinFunction(object, "toString", toString, 0, realm);
 
         // 14.3.2 Intl.Locale.prototype[ @@toStringTag ]
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype-@@tostringtag
@@ -460,6 +461,17 @@ pub const LocalePrototype = struct {
         ) catch |err| try noexcept(err);
         object.as(Locale).fields = .{ .locale = minimal };
         return Value.from(object);
+    }
+
+    /// 14.3.5 Intl.Locale.prototype.toString ( )
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.toString
+    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let loc be the this value.
+        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
+        const locale = try this_value.requireInternalSlot(agent, Locale);
+
+        // 3. Return loc.[[Locale]].
+        return Value.from(try locale.fields.locale.toString(agent.gc_allocator));
     }
 };
 
