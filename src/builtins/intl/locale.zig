@@ -394,6 +394,7 @@ pub const LocalePrototype = struct {
         try defineBuiltinFunction(object, "minimize", minimize, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinAccessor(object, "baseName", baseName, null, realm);
+        try defineBuiltinAccessor(object, "calendar", calendar, null, realm);
 
         // 14.3.2 Intl.Locale.prototype[ @@toStringTag ]
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype-@@tostringtag
@@ -486,6 +487,25 @@ pub const LocalePrototype = struct {
         // 3. Let locale be loc.[[Locale]].
         // 4. Return the longest prefix of locale matched by the unicode_language_id Unicode locale nonterminal.
         return Value.from(try locale.fields.locale.basename(agent.gc_allocator));
+    }
+
+    /// 14.3.7 get Intl.Locale.prototype.calendar
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.calendar
+    fn calendar(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let loc be the this value.
+        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
+        const locale = try this_value.requireInternalSlot(agent, Locale);
+
+        // 3. Return loc.[[Calendar]].
+        return Value.from(
+            locale.fields.locale.getUnicodeExtension(
+                agent.gc_allocator,
+                "ca",
+            ) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                error.LocaleParserExtensionError => unreachable,
+            } orelse return .undefined,
+        );
     }
 };
 
