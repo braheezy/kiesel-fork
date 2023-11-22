@@ -22,6 +22,7 @@ const String = types.String;
 const Value = types.Value;
 const coerceOptionsToObject = types.coerceOptionsToObject;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getOption = types.getOption;
@@ -392,6 +393,7 @@ pub const LocalePrototype = struct {
         try defineBuiltinFunction(object, "maximize", maximize, 0, realm);
         try defineBuiltinFunction(object, "minimize", minimize, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
+        try defineBuiltinAccessor(object, "baseName", baseName, null, realm);
 
         // 14.3.2 Intl.Locale.prototype[ @@toStringTag ]
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype-@@tostringtag
@@ -472,6 +474,18 @@ pub const LocalePrototype = struct {
 
         // 3. Return loc.[[Locale]].
         return Value.from(try locale.fields.locale.toString(agent.gc_allocator));
+    }
+
+    /// 14.3.6 get Intl.Locale.prototype.baseName
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.baseName
+    fn baseName(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let loc be the this value.
+        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
+        const locale = try this_value.requireInternalSlot(agent, Locale);
+
+        // 3. Let locale be loc.[[Locale]].
+        // 4. Return the longest prefix of locale matched by the unicode_language_id Unicode locale nonterminal.
+        return Value.from(try locale.fields.locale.basename(agent.gc_allocator));
     }
 };
 
