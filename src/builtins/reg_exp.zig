@@ -1091,7 +1091,7 @@ pub const RegExpPrototype = struct {
         //    If P is the empty String, this specification can be met by letting S be "(?:)".
         // 6. Return S.
         if (pattern.isEmpty()) return String.from("(?:)");
-        var output = try allocator.alloc(
+        const output = try allocator.alloc(
             u8,
             std.mem.replacementSize(u8, pattern.utf8, "/", "\\/"),
         );

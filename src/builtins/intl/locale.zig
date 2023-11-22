@@ -141,7 +141,7 @@ fn applyUnicodeExtensionToTag(agent: *Agent, tag: icu4zig.Locale, options: Unico
     try parts.append(str[0 .. start + 2]);
     var it = std.mem.splitScalar(u8, unicode_extensions, '-');
     outer: while (it.next()) |key| {
-        var value: ?[]const u8 = blk: {
+        const value: ?[]const u8 = blk: {
             var value_parts = std.ArrayList([]const u8).init(agent.gc_allocator);
             defer value_parts.deinit();
             while (it.peek()) |next| {

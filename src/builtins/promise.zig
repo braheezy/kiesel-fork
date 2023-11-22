@@ -1060,7 +1060,7 @@ fn performPromiseAllSettled(
         });
 
         // m. Let alreadyCalled be the Record { [[Value]]: false }.
-        var already_called = try agent.gc_allocator.create(AlreadyCalled);
+        const already_called = try agent.gc_allocator.create(AlreadyCalled);
         already_called.* = .{ .value = false };
 
         on_fulfilled_additional_fields.* = .{

@@ -11,24 +11,26 @@
             .hash = "1220f83454b44ef9328a103c02fdbc70f9c56051971edbbd16222bcaebaa2d16d7b8",
         },
         .libgc = .{
-            .url = "https://github.com/linusg/zig-libgc/archive/c6ec34eb781faa5002153ed56e766a2b3a3c0b4c.tar.gz",
-            .hash = "12209cbf98bc9a69f5d69c51c8bd5bd5695b4758c0f352ac854259eeca680cce23b3",
+            .url = "https://github.com/linusg/zig-libgc/archive/5fa0f1d475f6f55e10de9ef6f9fc2c37332aa8ea.tar.gz",
+            .hash = "12203905cfc8550c114ef2b761edda2ea627d39298a08b951148c8be07dc49e7a388",
         },
         .libregexp = .{
             .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/7bd15f643c13c685d5221ce956a73fb401133961.tar.gz",
             .hash = "1220165d3b16ff06b8ee31be922b64a185285c192cf5c9b79d09428250e592507c1b",
         },
         .linenoise = .{
-            .url = "https://github.com/joachimschmidt557/linenoize/archive/f178d492e753460a183f437f89bed246523e88cc.tar.gz",
-            .hash = "1220be133956a58d7e19a2dfb5c65e5afe0452530106a5b06f2239a352067234524c",
+            // FIXME: This points to https://github.com/joachimschmidt557/linenoize/pull/18, update once merged
+            .url = "https://github.com/joachimschmidt557/linenoize/archive/17802a5edd366b176a41b8d1f3d8f9c9dd2be7d7.tar.gz",
+            .hash = "1220082226fa11124853da0dbd04cf9b3d61d8a2abe1052372eb3dc109d77df81118",
         },
         .parser_toolkit = .{
-            .url = "https://github.com/MasterQ32/parser-toolkit/archive/33d8f6f3793f972aa1b33d3b85b5a4f17654585e.tar.gz",
-            .hash = "1220122d27fddf43498a981807a6ae28987ce4dd9e4e8c834be0b04aa6a4a87bc00e",
+            // FIXME: This points to https://github.com/MasterQ32/parser-toolkit/pull/10, update once merged
+            .url = "https://github.com/MasterQ32/parser-toolkit/archive/2434e2c3a7cd6613306e210a8223106a0c34f55b.tar.gz",
+            .hash = "12207450343aa027d9478b85b67b2f390360851d17dbf00e95376d133140276479c2",
         },
         .zig_args = .{
-            .url = "https://github.com/MasterQ32/zig-args/archive/7989929d055ef7618e60de84cc54644046516fdb.tar.gz",
-            .hash = "12207752d975a7f5d7cc65662ed1c6b117da8dec6d1bd7af9a39e1b65d90bf86e833",
+            .url = "https://github.com/MasterQ32/zig-args/archive/3797c1473b48e445d721d40c8fbbe9a7422095ae.tar.gz",
+            .hash = "122012fa395ee8ac94592f3a535ed3899a4485e96ee3d4ec8f82c761bf304b34b870",
         },
     },
     .paths = .{

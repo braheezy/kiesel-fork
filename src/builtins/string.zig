@@ -850,7 +850,7 @@ pub const StringPrototype = struct {
         const len_f64: f64 = @floatFromInt(len);
 
         // 4. Let intStart be ? ToIntegerOrInfinity(start).
-        var int_start = try start.toIntegerOrInfinity(agent);
+        const int_start = try start.toIntegerOrInfinity(agent);
 
         // 5. If intStart = -∞, let from be 0.
         const from_f64 = if (std.math.isNegativeInf(int_start)) blk: {
@@ -973,10 +973,10 @@ pub const StringPrototype = struct {
         const len = string.utf16Length();
 
         // 4. Let intStart be ? ToIntegerOrInfinity(start).
-        var int_start = try start.toIntegerOrInfinity(agent);
+        const int_start = try start.toIntegerOrInfinity(agent);
 
         // 5. If end is undefined, let intEnd be len; else let intEnd be ? ToIntegerOrInfinity(end).
-        var int_end = if (end == .undefined)
+        const int_end = if (end == .undefined)
             @as(f64, @floatFromInt(len))
         else
             try end.toIntegerOrInfinity(agent);

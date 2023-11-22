@@ -47,7 +47,7 @@ pub fn parse(
     // 3. Return Script Record {
     //      [[Realm]]: realm, [[ECMAScriptCode]]: script, [[LoadedModules]]: « », [[HostDefined]]: hostDefined
     //    }.
-    var self = try agent.gc_allocator.create(Self);
+    const self = try agent.gc_allocator.create(Self);
     self.* = .{
         .realm = realm,
         .ecmascript_code = script,

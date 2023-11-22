@@ -608,7 +608,7 @@ pub const ArrayBufferPrototype = struct {
 
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
-        const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
+        var object = try this_value.requireInternalSlot(agent, ArrayBuffer);
 
         // TODO: 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
 
@@ -698,10 +698,10 @@ pub const ArrayBufferPrototype = struct {
         }
 
         // 24. Let fromBuf be O.[[ArrayBufferData]].
-        var from_buf = &object.fields.array_buffer_data.?;
+        const from_buf = &object.fields.array_buffer_data.?;
 
         // 25. Let toBuf be new.[[ArrayBufferData]].
-        var to_buf = &new.fields.array_buffer_data.?;
+        const to_buf = &new.fields.array_buffer_data.?;
 
         // 26. Let currentLen be O.[[ArrayBufferByteLength]].
         const current_len: u53 = @intCast(object.fields.array_buffer_data.?.items.len);

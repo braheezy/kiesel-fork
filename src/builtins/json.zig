@@ -799,7 +799,7 @@ pub const JSON = struct {
                 if (space_mv < 1)
                     break :blk String.from("")
                 else {
-                    var s = try agent.gc_allocator.alloc(u8, @intFromFloat(space_mv));
+                    const s = try agent.gc_allocator.alloc(u8, @intFromFloat(space_mv));
                     @memset(s, ' ');
                     break :blk String.from(s);
                 }

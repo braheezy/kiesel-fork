@@ -28,7 +28,7 @@ pub fn createByteDataBlock(agent: *Agent, size: u64) Agent.Error!DataBlock {
     };
 
     // 3. Set all of the bytes of db to 0.
-    var slice = data_block.addManyAsSliceAssumeCapacity(size_casted);
+    const slice = data_block.addManyAsSliceAssumeCapacity(size_casted);
     @memset(slice, 0);
 
     // 4. Return db.

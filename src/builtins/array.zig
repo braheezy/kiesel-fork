@@ -1752,7 +1752,7 @@ pub const ArrayPrototype = struct {
         if (len == 0) return Value.from(-1);
 
         // 4. If fromIndex is present, let n be ? ToIntegerOrInfinity(fromIndex); else let n be len - 1.
-        var n = if (arguments.count() > 1)
+        const n = if (arguments.count() > 1)
             try from_index.toIntegerOrInfinity(agent)
         else
             @as(f64, @floatFromInt(len)) - 1;
@@ -2500,7 +2500,7 @@ pub const ArrayPrototype = struct {
         else blk: {
             break :blk @min(relative_start, len_f64);
         };
-        var actual_start: u53 = @intFromFloat(actual_start_f64);
+        const actual_start: u53 = @intFromFloat(actual_start_f64);
 
         // 7. Let itemCount be the number of elements in items.
         const item_count: u53 = @intCast(items.len);
@@ -2826,7 +2826,7 @@ pub const ArrayPrototype = struct {
         else blk: {
             break :blk @min(relative_start, len_f64);
         };
-        var actual_start: u53 = @intFromFloat(actual_start_f64);
+        const actual_start: u53 = @intFromFloat(actual_start_f64);
 
         // 7. Let insertCount be the number of elements in items.
         const insert_count: u53 = @intCast(items.len);
@@ -3139,10 +3139,10 @@ fn insertionSort(agent: *Agent, items: []Value, sort_compare: SortCompare) Agent
     const compare_fn = sort_compare.compare_fn;
     var i: usize = 1;
     while (i < items.len) : (i += 1) {
-        var x = items[i];
+        const x = items[i];
         var j = i;
         while (j > 0) : (j -= 1) {
-            var y = items[j - 1];
+            const y = items[j - 1];
             if (try sortCompare(agent, x, y, compare_fn) != .lt) break;
             items[j] = y;
         }

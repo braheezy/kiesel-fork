@@ -98,7 +98,7 @@ pub const Iterator = struct {
         const iterator = self.iterator;
 
         // 3. Let innerResult be Completion(GetMethod(iterator, "return")).
-        var inner_result_object = Value.from(iterator).getMethod(
+        const inner_result_object = Value.from(iterator).getMethod(
             agent,
             PropertyKey.from("return"),
         );

@@ -65,9 +65,9 @@ exception: ?Value = null,
 reference: ?Reference = null,
 
 pub fn init(agent: *Agent) Allocator.Error!Self {
-    var stack = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 32);
-    var reference_stack = std.ArrayList(?Reference).init(agent.gc_allocator);
-    var exception_jump_target_stack = std.ArrayList(usize).init(agent.gc_allocator);
+    const stack = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 32);
+    const reference_stack = std.ArrayList(?Reference).init(agent.gc_allocator);
+    const exception_jump_target_stack = std.ArrayList(usize).init(agent.gc_allocator);
     return .{
         .agent = agent,
         .ip = 0,

@@ -79,7 +79,7 @@ pub fn parse(
     //       [[IndirectExportEntries]]: indirectExportEntries, [[StarExportEntries]]: starExportEntries,
     //       [[DFSIndex]]: empty, [[DFSAncestorIndex]]: empty
     //     }.
-    var self = try agent.gc_allocator.create(Self);
+    const self = try agent.gc_allocator.create(Self);
     self.* = .{
         .realm = realm,
         .environment = null,

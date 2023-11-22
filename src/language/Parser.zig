@@ -207,7 +207,7 @@ pub fn parseNode(
     ctx: ParseContext,
 ) Error!T {
     var tokenizer = Tokenizer.init(source_text, ctx.file_name);
-    var core = ParserCore.init(&tokenizer);
+    const core = ParserCore.init(&tokenizer);
     var parser = Self{
         .allocator = allocator,
         .core = core,
