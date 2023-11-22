@@ -396,6 +396,7 @@ pub const LocalePrototype = struct {
         try defineBuiltinAccessor(object, "baseName", baseName, null, realm);
         try defineBuiltinAccessor(object, "calendar", calendar, null, realm);
         try defineBuiltinAccessor(object, "caseFirst", caseFirst, null, realm);
+        try defineBuiltinAccessor(object, "collation", collation, null, realm);
 
         // 14.3.2 Intl.Locale.prototype[ @@toStringTag ]
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype-@@tostringtag
@@ -521,6 +522,25 @@ pub const LocalePrototype = struct {
             locale.fields.locale.getUnicodeExtension(
                 agent.gc_allocator,
                 "kf",
+            ) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                error.LocaleParserExtensionError => unreachable,
+            } orelse return .undefined,
+        );
+    }
+
+    /// 14.3.9 get Intl.Locale.prototype.collation
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.collation
+    fn collation(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let loc be the this value.
+        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
+        const locale = try this_value.requireInternalSlot(agent, Locale);
+
+        // 3. Return loc.[[Collation]].
+        return Value.from(
+            locale.fields.locale.getUnicodeExtension(
+                agent.gc_allocator,
+                "co",
             ) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 error.LocaleParserExtensionError => unreachable,
