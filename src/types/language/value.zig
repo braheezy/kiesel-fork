@@ -1592,7 +1592,7 @@ pub fn getOption(
         //     a. Assert: type is string.
         .string => blk: {
             // b. Set value to ? ToString(value).
-            break :blk value.toBoolean();
+            break :blk try value.toString(agent);
         },
     };
 
@@ -1603,7 +1603,8 @@ pub fn getOption(
         } else {
             return agent.throwException(
                 .range_error,
-                std.fmt.comptimePrint("Invalid value for option '{s}'", .{property}),
+                "Invalid value for option '{s}'",
+                .{property},
             );
         }
     }
