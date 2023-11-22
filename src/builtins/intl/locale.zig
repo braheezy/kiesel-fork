@@ -22,8 +22,10 @@ const String = types.String;
 const Value = types.Value;
 const coerceOptionsToObject = types.coerceOptionsToObject;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getOption = types.getOption;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 const UnicodeExtensions = struct {
@@ -387,6 +389,8 @@ pub const LocalePrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "maximize", maximize, 0, realm);
+
         // 14.3.2 Intl.Locale.prototype[ @@toStringTag ]
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype-@@tostringtag
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
@@ -397,6 +401,35 @@ pub const LocalePrototype = struct {
         });
 
         return object;
+    }
+
+    /// 14.3.3 Intl.Locale.prototype.maximize ( )
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.maximize
+    fn maximize(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        const realm = agent.currentRealm();
+
+        // 1. Let loc be the this value.
+        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
+        const locale = try this_value.requireInternalSlot(agent, Locale);
+
+        // 3. Let maximal be the result of the Add Likely Subtags algorithm applied to
+        //    loc.[[Locale]]. If an error is signaled, set maximal to loc.[[Locale]].
+        const data_provider = icu4zig.DataProvider.init();
+        defer data_provider.deinit();
+        const locale_expander = icu4zig.LocaleExpander.init(data_provider);
+        defer locale_expander.deinit();
+        var maximal = locale.fields.locale.clone();
+        _ = locale_expander.maximize(&maximal);
+
+        // 4. Return ! Construct(%Locale%, maximal).
+        const object = ordinaryCreateFromConstructor(
+            Locale,
+            agent,
+            try realm.intrinsics.@"%Intl.Locale%"(),
+            "%Intl.Locale.prototype%",
+        ) catch |err| try noexcept(err);
+        object.as(Locale).fields = .{ .locale = maximal };
+        return Value.from(object);
     }
 };
 
