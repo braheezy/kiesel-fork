@@ -1542,8 +1542,12 @@ pub fn getOption(
         }
     },
     comptime values: ?[]const @"type".T(),
-    comptime default: ?@"type".T(),
-) Agent.Error!@"type".T() {
+    comptime default: anytype,
+) Agent.Error!if (@TypeOf(default) == @TypeOf(null)) ?@"type".T() else @"type".T() {
+    if (@TypeOf(default) != @TypeOf(null) and @TypeOf(default) != @"type".T() and default != .required) {
+        @compileError("Invalid value for default parameter");
+    }
+
     const agent = options.agent();
 
     // 1. Let value be ? Get(options, property).
@@ -1552,7 +1556,7 @@ pub fn getOption(
     // 2. If value is undefined, then
     if (value == .undefined) {
         // a. If default is required, throw a RangeError exception.
-        if (default == null) {
+        if (@TypeOf(default) == @TypeOf(.required)) {
             return agent.throwException(
                 .range_error,
                 "Required option '{s}' must not be undefined",
@@ -1561,7 +1565,7 @@ pub fn getOption(
         }
 
         // b. Return default.
-        return default.?;
+        return default;
     }
 
     const coerced_value = switch (@"type") {
