@@ -390,6 +390,7 @@ pub const LocalePrototype = struct {
         });
 
         try defineBuiltinFunction(object, "maximize", maximize, 0, realm);
+        try defineBuiltinFunction(object, "minimize", minimize, 0, realm);
 
         // 14.3.2 Intl.Locale.prototype[ @@toStringTag ]
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype-@@tostringtag
@@ -429,6 +430,35 @@ pub const LocalePrototype = struct {
             "%Intl.Locale.prototype%",
         ) catch |err| try noexcept(err);
         object.as(Locale).fields = .{ .locale = maximal };
+        return Value.from(object);
+    }
+
+    /// 14.3.4 Intl.Locale.prototype.minimize ( )
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.minimize
+    fn minimize(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        const realm = agent.currentRealm();
+
+        // 1. Let loc be the this value.
+        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
+        const locale = try this_value.requireInternalSlot(agent, Locale);
+
+        // 2. Let minimal be the result of the Remove Likely Subtags algorithm applied to
+        //    loc.[[Locale]]. If an error is signaled, set minimal to loc.[[Locale]].
+        const data_provider = icu4zig.DataProvider.init();
+        defer data_provider.deinit();
+        const locale_expander = icu4zig.LocaleExpander.init(data_provider);
+        defer locale_expander.deinit();
+        var minimal = locale.fields.locale.clone();
+        _ = locale_expander.minimize(&minimal);
+
+        // 4. Return ! Construct(%Locale%, minimal).
+        const object = ordinaryCreateFromConstructor(
+            Locale,
+            agent,
+            try realm.intrinsics.@"%Intl.Locale%"(),
+            "%Intl.Locale.prototype%",
+        ) catch |err| try noexcept(err);
+        object.as(Locale).fields = .{ .locale = minimal };
         return Value.from(object);
     }
 };
