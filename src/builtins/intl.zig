@@ -30,6 +30,10 @@ comptime {
 }
 
 pub const Intl = struct {
+    pub const Locale = @import("./intl/locale.zig").Locale;
+    pub const LocaleConstructor = @import("./intl/locale.zig").LocaleConstructor;
+    pub const LocalePrototype = @import("./intl/locale.zig").LocalePrototype;
+
     pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
@@ -42,6 +46,15 @@ pub const Intl = struct {
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
             .value = Value.from("Intl"),
             .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
+        // 8.2.5 Intl.Locale ( . . . )
+        // https://tc39.es/ecma402/#sec-intl.locale-intro
+        try defineBuiltinProperty(object, "Locale", PropertyDescriptor{
+            .value = Value.from(try realm.intrinsics.@"%Intl.Locale%"()),
+            .writable = true,
             .enumerable = false,
             .configurable = true,
         });

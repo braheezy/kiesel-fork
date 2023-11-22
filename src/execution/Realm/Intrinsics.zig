@@ -55,6 +55,8 @@ lazy_intrinsics: struct {
     @"%GeneratorFunction.prototype%": ?Object = null,
     @"%GeneratorFunction.prototype.prototype%": ?Object = null,
     @"%Intl%": ?Object = null,
+    @"%Intl.Locale%": ?Object = null,
+    @"%Intl.Locale.prototype%": ?Object = null,
     @"%isFinite%": ?Object = null,
     @"%isNaN%": ?Object = null,
     @"%IteratorPrototype%": ?Object = null,
@@ -234,6 +236,12 @@ pub fn @"%GeneratorFunction.prototype.prototype%"(self: *Self) Allocator.Error!O
 }
 pub fn @"%Intl%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Intl%", builtins.Intl);
+}
+pub fn @"%Intl.Locale%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Intl.Locale%", builtins.Intl.LocaleConstructor);
+}
+pub fn @"%Intl.Locale.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Intl.Locale.prototype%", builtins.Intl.LocalePrototype);
 }
 pub fn @"%isFinite%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%isFinite%", builtins.global_functions.IsFinite);

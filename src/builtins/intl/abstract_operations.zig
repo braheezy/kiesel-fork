@@ -5,11 +5,13 @@ const std = @import("std");
 
 const icu4zig = @import("icu4zig");
 
+const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
 
 const Agent = execution.Agent;
 const PropertyKey = types.PropertyKey;
+const String = types.String;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 
@@ -29,8 +31,9 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
 
     // 3. If Type(locales) is String or Type(locales) is Object and locales has an
     //    [[InitializedLocale]] internal slot, then
-    // TODO: Handle Intl.Locale object
-    const object = if (locales == .string) blk: {
+    const object = if (locales == .string or
+        locales == .object and locales.object.is(builtins.Intl.Locale))
+    blk: {
         // a. Let O be CreateArrayFromList(« locales »).
         break :blk try createArrayFromList(agent, &.{locales});
     }
@@ -68,9 +71,12 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
                 );
             }
 
-            // TODO: iii. If Type(kValue) is Object and kValue has an [[InitializedLocale]] internal slot, then
-            const tag = if (false) {
+            // iii. If Type(kValue) is Object and kValue has an [[InitializedLocale]] internal slot, then
+            const tag = if (k_value == .object and k_value.object.is(builtins.Intl.Locale)) blk: {
                 // 1. Let tag be kValue.[[Locale]].
+                break :blk String.from(
+                    try k_value.object.as(builtins.Intl.Locale).fields.locale.toString(agent.gc_allocator),
+                );
             }
             // iv. Else,
             else blk: {

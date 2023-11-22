@@ -5,6 +5,7 @@ const Color = std.io.tty.Color;
 
 const AnyPointer = @import("any-pointer").AnyPointer;
 
+const build_options = @import("build-options");
 const builtins = @import("builtins.zig");
 const types = @import("types.zig");
 
@@ -131,6 +132,17 @@ fn prettyPrintArrayIterator(
     }
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
+fn prettyPrintAsyncGenerator(
+    _: *const builtins.AsyncGenerator,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("AsyncGenerator()");
     try tty_config.setColor(writer, .reset);
 }
 
@@ -423,14 +435,20 @@ fn prettyPrintStringIterator(
     try tty_config.setColor(writer, .reset);
 }
 
-fn prettyPrintAsyncGenerator(
-    _: *const builtins.AsyncGenerator,
+fn prettyPrintIntlLocale(
+    intl_locale: *const builtins.Intl.Locale,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
+    const agent = intl_locale.data.agent;
+    const locale = intl_locale.fields.locale;
     const tty_config = getTtyConfigForWriter(writer);
 
     try tty_config.setColor(writer, .white);
-    try writer.writeAll("AsyncGenerator()");
+    try writer.writeAll("Intl.Locale(");
+    try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}", .{Value.from(locale.toString(agent.gc_allocator) catch return)});
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
 }
 
@@ -588,7 +606,9 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.String, prettyPrintPrimitiveWrapper },
             .{ builtins.StringIterator, prettyPrintStringIterator },
             .{ builtins.Symbol, prettyPrintPrimitiveWrapper },
-        }) |entry| {
+        } ++ if (build_options.enable_intl) .{
+            .{ builtins.Intl.Locale, prettyPrintIntlLocale },
+        } else .{}) |entry| {
             const T, const prettyPrintFn = entry;
             if (object.is(T)) return prettyPrintFn(object.as(T), writer);
         }

@@ -31,6 +31,7 @@ pub const PropertyStorage = @import("Object/PropertyStorage.zig");
 const Self = @This();
 
 pub const Tag = enum(u32) {
+    // ECMA-262
     arguments,
     array,
     array_buffer,
@@ -57,6 +58,11 @@ pub const Tag = enum(u32) {
     string,
     string_iterator,
     symbol,
+
+    // ECMA-402
+    intl_locale,
+
+    // Custom
     _,
 };
 
