@@ -387,6 +387,15 @@ pub const LocalePrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        // 14.3.2 Intl.Locale.prototype[ @@toStringTag ]
+        // https://tc39.es/ecma402/#sec-Intl.Locale.prototype-@@tostringtag
+        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+            .value = Value.from("Intl.Locale"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
         return object;
     }
 };
