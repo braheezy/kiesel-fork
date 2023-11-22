@@ -400,6 +400,7 @@ pub const LocalePrototype = struct {
         try defineBuiltinAccessor(object, "hourCycle", hourCycle, null, realm);
         try defineBuiltinAccessor(object, "numeric", numeric, null, realm);
         try defineBuiltinAccessor(object, "numberingSystem", numberingSystem, null, realm);
+        try defineBuiltinAccessor(object, "language", language, null, realm);
 
         // 14.3.2 Intl.Locale.prototype[ @@toStringTag ]
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype-@@tostringtag
@@ -605,6 +606,17 @@ pub const LocalePrototype = struct {
                 error.LocaleParserExtensionError => unreachable,
             } orelse return .undefined,
         );
+    }
+
+    /// 14.3.13 get Intl.Locale.prototype.language
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.language
+    fn language(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let loc be the this value.
+        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
+        const locale = try this_value.requireInternalSlot(agent, Locale);
+
+        // 3. Return GetLocaleLanguage(loc.[[Locale]]).
+        return Value.from(try locale.fields.locale.language(agent.gc_allocator));
     }
 };
 
