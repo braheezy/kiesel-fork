@@ -399,6 +399,7 @@ pub const LocalePrototype = struct {
         try defineBuiltinAccessor(object, "collation", collation, null, realm);
         try defineBuiltinAccessor(object, "hourCycle", hourCycle, null, realm);
         try defineBuiltinAccessor(object, "numeric", numeric, null, realm);
+        try defineBuiltinAccessor(object, "numberingSystem", numberingSystem, null, realm);
 
         // 14.3.2 Intl.Locale.prototype[ @@toStringTag ]
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype-@@tostringtag
@@ -585,6 +586,25 @@ pub const LocalePrototype = struct {
             error.LocaleParserExtensionError => unreachable,
         } orelse return Value.from(false);
         return Value.from(value.len == 0 or std.mem.eql(u8, value, "true"));
+    }
+
+    /// 14.3.12 get Intl.Locale.prototype.numberingSystem
+    /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.numberingSystem
+    fn numberingSystem(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let loc be the this value.
+        // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
+        const locale = try this_value.requireInternalSlot(agent, Locale);
+
+        // 3. Return loc.[[NumberingSystem]].
+        return Value.from(
+            locale.fields.locale.getUnicodeExtension(
+                agent.gc_allocator,
+                "nu",
+            ) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                error.LocaleParserExtensionError => unreachable,
+            } orelse return .undefined,
+        );
     }
 };
 
