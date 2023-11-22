@@ -121,9 +121,22 @@ pub fn build(b: *std.Build) void {
     });
     unit_tests.linkLibrary(libgc.artifact("gc"));
     unit_tests.linkLibrary(libregexp.artifact("regexp"));
+    unit_tests.addModule("build-options", options.createModule());
     unit_tests.addModule("any-pointer", any_pointer.module("any-pointer"));
     unit_tests.addModule("gc", libgc.module("gc"));
     unit_tests.addModule("ptk", parser_toolkit.module("parser-toolkit"));
+    if (enable_intl) {
+        const icu4zig = b.dependency("icu4zig", .{
+            .target = target,
+            .optimize = optimize,
+        });
+        const icu4x = icu4zig.builder.dependency("icu4x", .{
+            .target = target,
+            .optimize = optimize,
+        });
+        build_icu4zig.link(unit_tests, icu4x);
+        unit_tests.addModule("icu4zig", icu4zig.module("icu4zig"));
+    }
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
     const test_step = b.step("test", "Run unit tests");
