@@ -3,11 +3,13 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const execution = @import("../../../execution.zig");
+const utils = @import("../../../utils.zig");
 
 const Agent = execution.Agent;
 const String = @import("../string.zig").String;
 const Symbol = @import("../Symbol.zig");
 const Value = @import("../value.zig").Value;
+const isZigString = utils.isZigString;
 
 /// A property key is either a String or a Symbol. All Strings and Symbols, including the empty
 /// String, are valid as property keys.
@@ -27,7 +29,7 @@ pub const PropertyKey = union(enum) {
 
     pub inline fn from(value: anytype) Self {
         const T = @TypeOf(value);
-        if (comptime std.meta.trait.isZigString(T)) {
+        if (isZigString(T)) {
             // FIXME: This should use CanonicalNumericIndexString to reject numeric strings that
             //        are not canonical.
             if (std.fmt.parseUnsigned(IntegerIndex, value, 10)) |integer_index| {

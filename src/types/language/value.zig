@@ -18,6 +18,7 @@ const PropertyKey = Object.PropertyKey;
 const String = @import("string.zig").String;
 const Symbol = @import("Symbol.zig");
 const arrayCreate = builtins.arrayCreate;
+const isZigString = utils.isZigString;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const prettyPrintValue = pretty_printing.prettyPrintValue;
@@ -121,11 +122,15 @@ pub const Value = union(enum) {
 
     pub inline fn from(value: anytype) Value {
         const T = @TypeOf(value);
+        const is_number = switch (@typeInfo(T)) {
+            .Int, .ComptimeInt, .Float, .ComptimeFloat => true,
+            else => false,
+        };
         if (T == bool) {
             return .{ .boolean = value };
-        } else if (comptime std.meta.trait.isZigString(T)) {
+        } else if (isZigString(T)) {
             return .{ .string = String.from(value) };
-        } else if (comptime std.meta.trait.isNumber(T)) {
+        } else if (is_number) {
             return .{ .number = Number.from(value) };
         } else if (T == BigInt) {
             return .{ .big_int = value };

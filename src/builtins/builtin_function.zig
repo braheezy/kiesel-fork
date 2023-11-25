@@ -31,9 +31,10 @@ pub const ArgumentsList = struct {
 
     pub inline fn from(values: anytype) Self {
         const T = @TypeOf(values);
-        if (comptime std.meta.trait.isTuple(T)) {
+        const type_info = @typeInfo(T);
+        if (type_info == .Struct and type_info.Struct.is_tuple) {
             return .{ .values = &values };
-        } else if (comptime std.meta.trait.isSlice(T)) {
+        } else if (type_info == .Pointer and type_info.Pointer.size == .Slice) {
             return .{ .values = values };
         } else {
             @compileError("ArgumentsList.from() called with incompatible type " ++ @typeName(T));
