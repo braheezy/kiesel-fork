@@ -34,6 +34,10 @@ lazy_intrinsics: struct {
     @"%AsyncIteratorPrototype%": ?Object = null,
     @"%BigInt%": ?Object = null,
     @"%BigInt.prototype%": ?Object = null,
+    @"%BigInt64Array%": ?Object = null,
+    @"%BigInt64Array.prototype%": ?Object = null,
+    @"%BigUint64Array%": ?Object = null,
+    @"%BigUint64Array.prototype%": ?Object = null,
     @"%Boolean%": ?Object = null,
     @"%Boolean.prototype%": ?Object = null,
     @"%DataView%": ?Object = null,
@@ -49,11 +53,21 @@ lazy_intrinsics: struct {
     @"%eval%": ?Object = null,
     @"%EvalError%": ?Object = null,
     @"%EvalError.prototype%": ?Object = null,
+    @"%Float32Array%": ?Object = null,
+    @"%Float32Array.prototype%": ?Object = null,
+    @"%Float64Array%": ?Object = null,
+    @"%Float64Array.prototype%": ?Object = null,
     @"%Function%": ?Object = null,
     @"%Function.prototype%": ?Object = null,
     @"%GeneratorFunction%": ?Object = null,
     @"%GeneratorFunction.prototype%": ?Object = null,
     @"%GeneratorFunction.prototype.prototype%": ?Object = null,
+    @"%Int8Array%": ?Object = null,
+    @"%Int8Array.prototype%": ?Object = null,
+    @"%Int16Array%": ?Object = null,
+    @"%Int16Array.prototype%": ?Object = null,
+    @"%Int32Array%": ?Object = null,
+    @"%Int32Array.prototype%": ?Object = null,
     @"%Intl%": ?Object = null,
     @"%Intl.Locale%": ?Object = null,
     @"%Intl.Locale.prototype%": ?Object = null,
@@ -94,8 +108,18 @@ lazy_intrinsics: struct {
     @"%SyntaxError%": ?Object = null,
     @"%SyntaxError.prototype%": ?Object = null,
     @"%ThrowTypeError%": ?Object = null,
+    @"%TypedArray%": ?Object = null,
+    @"%TypedArray.prototype%": ?Object = null,
     @"%TypeError%": ?Object = null,
     @"%TypeError.prototype%": ?Object = null,
+    @"%Uint8Array%": ?Object = null,
+    @"%Uint8Array.prototype%": ?Object = null,
+    @"%Uint8ClampedArray%": ?Object = null,
+    @"%Uint8ClampedArray.prototype%": ?Object = null,
+    @"%Uint16Array%": ?Object = null,
+    @"%Uint16Array.prototype%": ?Object = null,
+    @"%Uint32Array%": ?Object = null,
+    @"%Uint32Array.prototype%": ?Object = null,
     @"%URIError%": ?Object = null,
     @"%URIError.prototype%": ?Object = null,
 } = .{},
@@ -174,6 +198,18 @@ pub fn @"%BigInt%"(self: *Self) Allocator.Error!Object {
 pub fn @"%BigInt.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%BigInt.prototype%", builtins.BigIntPrototype);
 }
+pub fn @"%BigInt64Array%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%BigInt%", builtins.BigInt64ArrayConstructor);
+}
+pub fn @"%BigInt64Array.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%BigInt%", builtins.BigInt64ArrayPrototype);
+}
+pub fn @"%BigUint64Array%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%BigInt%", builtins.BigUint64ArrayConstructor);
+}
+pub fn @"%BigUint64Array.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%BigInt%", builtins.BigUint64ArrayPrototype);
+}
 pub fn @"%Boolean%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Boolean%", builtins.BooleanConstructor);
 }
@@ -219,6 +255,18 @@ pub fn @"%EvalError%"(self: *Self) Allocator.Error!Object {
 pub fn @"%EvalError.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%EvalError.prototype%", builtins.EvalErrorPrototype);
 }
+pub fn @"%Float32Array%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Float32Array%", builtins.Float32ArrayConstructor);
+}
+pub fn @"%Float32Array.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Float32Array.prototype%", builtins.Float32ArrayPrototype);
+}
+pub fn @"%Float64Array%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Float64Array%", builtins.Float64ArrayConstructor);
+}
+pub fn @"%Float64Array.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Float64Array.prototype%", builtins.Float64ArrayPrototype);
+}
 pub fn @"%Function%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Function%", builtins.FunctionConstructor);
 }
@@ -233,6 +281,24 @@ pub fn @"%GeneratorFunction.prototype%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%GeneratorFunction.prototype.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%GeneratorFunction.prototype.prototype%", builtins.GeneratorPrototype);
+}
+pub fn @"%Int8Array%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Int8Array%", builtins.Int8ArrayConstructor);
+}
+pub fn @"%Int8Array.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Int8Array.prototype%", builtins.Int8ArrayPrototype);
+}
+pub fn @"%Int16Array%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Int16Array%", builtins.Int16ArrayConstructor);
+}
+pub fn @"%Int16Array.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Int16Array.prototype%", builtins.Int16ArrayPrototype);
+}
+pub fn @"%Int32Array%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Int32Array%", builtins.Int32ArrayConstructor);
+}
+pub fn @"%Int32Array.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Int32Array.prototype%", builtins.Int32ArrayPrototype);
 }
 pub fn @"%Intl%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Intl%", builtins.Intl);
@@ -360,11 +426,41 @@ pub fn @"%SyntaxError.prototype%"(self: *Self) Allocator.Error!Object {
 pub fn @"%ThrowTypeError%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%ThrowTypeError%", builtins.ThrowTypeError);
 }
+pub fn @"%TypedArray%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%TypedArray%", builtins.TypedArrayConstructor);
+}
+pub fn @"%TypedArray.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%TypedArray.prototype%", builtins.TypedArrayPrototype);
+}
 pub fn @"%TypeError%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%TypeError%", builtins.TypeErrorConstructor);
 }
 pub fn @"%TypeError.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%TypeError.prototype%", builtins.TypeErrorPrototype);
+}
+pub fn @"%Uint8Array%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Uint8Array%", builtins.Uint8ArrayConstructor);
+}
+pub fn @"%Uint8Array.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Uint8Array.prototype%", builtins.Uint8ArrayPrototype);
+}
+pub fn @"%Uint8ClampedArray%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Uint8ClampedArray%", builtins.Uint8ClampedArrayConstructor);
+}
+pub fn @"%Uint8ClampedArray.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Uint8ClampedArray.prototype%", builtins.Uint8ClampedArrayPrototype);
+}
+pub fn @"%Uint16Array%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Uint16Array%", builtins.Uint16ArrayConstructor);
+}
+pub fn @"%Uint16Array.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Uint16Array.prototype%", builtins.Uint16ArrayPrototype);
+}
+pub fn @"%Uint32Array%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Uint32Array%", builtins.Uint32ArrayConstructor);
+}
+pub fn @"%Uint32Array.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Uint32Array.prototype%", builtins.Uint32ArrayPrototype);
 }
 pub fn @"%URIError%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%URIError%", builtins.URIErrorConstructor);

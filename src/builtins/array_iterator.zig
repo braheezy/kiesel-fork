@@ -22,6 +22,9 @@ const createArrayFromList = types.createArrayFromList;
 const createIterResultObject = types.createIterResultObject;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
+const isTypedArrayOutOfBounds = builtins.isTypedArrayOutOfBounds;
+const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferWitnessRecord;
+const typedArrayLength = builtins.typedArrayLength;
 
 /// 23.1.5.1 CreateArrayIterator ( array, kind )
 /// https://tc39.es/ecma262/#sec-createarrayiterator
@@ -89,11 +92,21 @@ pub const ArrayIteratorPrototype = struct {
         const kind = array_iterator.fields.state.kind;
         const index = array_iterator.fields.state.index;
 
-        // TODO: i. If array has a [[TypedArrayName]] internal slot, then
-        const len = if (false) {
-            // 1. Let iieoRecord be MakeIntegerIndexedObjectWithBufferWitnessRecord(array, seq-cst).
-            // 2. If IsIntegerIndexedObjectOutOfBounds(iieoRecord) is true, throw a TypeError exception.
-            // 3. Let len be IntegerIndexedObjectLength(iieoRecord).
+        // i. If array has a [[TypedArrayName]] internal slot, then
+        const len = if (array.is(builtins.TypedArray)) blk: {
+            // 1. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(array, seq-cst).
+            const ta = makeTypedArrayWithBufferWitnessRecord(
+                array.as(builtins.TypedArray),
+                .seq_cst,
+            );
+
+            // 2. If IsTypedArrayOutOfBounds(taRecord) is true, throw a TypeError exception.
+            if (isTypedArrayOutOfBounds(ta)) {
+                return agent.throwException(.type_error, "Typed array is out of bounds", .{});
+            }
+
+            // 3. Let len be TypedArrayLength(taRecord).
+            break :blk typedArrayLength(ta);
         }
         // ii. Else,
         else blk: {

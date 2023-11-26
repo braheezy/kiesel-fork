@@ -29,7 +29,7 @@ const NameAndPropertyDescriptor = struct {
     PropertyDescriptor,
 };
 
-const num_properties = 40 + if (build_options.enable_intl) 1 else 0;
+const num_properties = 51 + if (build_options.enable_intl) 1 else 0;
 
 pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
@@ -102,6 +102,14 @@ pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]Nam
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-bigint
         .{ "BigInt", .{ .value = Value.from(try realm.intrinsics.@"%BigInt%"()), .writable = true, .enumerable = false, .configurable = true } },
 
+        // 19.3.5 BigInt64Array ( . . . )
+        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-bigint64array
+        .{ "BigInt64Array", .{ .value = Value.from(try realm.intrinsics.@"%BigInt64Array%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.3.6 BigUint64Array ( . . . )
+        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-biguint64array
+        .{ "BigUint64Array", .{ .value = Value.from(try realm.intrinsics.@"%BigUint64Array%"()), .writable = true, .enumerable = false, .configurable = true } },
+
         // 19.3.7 Boolean ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-boolean
         .{ "Boolean", .{ .value = Value.from(try realm.intrinsics.@"%Boolean%"()), .writable = true, .enumerable = false, .configurable = true } },
@@ -122,9 +130,29 @@ pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]Nam
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-evalerror
         .{ "EvalError", .{ .value = Value.from(try realm.intrinsics.@"%EvalError%"()), .writable = true, .enumerable = false, .configurable = true } },
 
+        // 19.3.13 Float32Array ( . . . )
+        // https://tc39.es/ecma262/#sec-float32array
+        .{ "Float32Array", .{ .value = Value.from(try realm.intrinsics.@"%Float32Array%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.3.14 Float64Array ( . . . )
+        // https://tc39.es/ecma262/#sec-float64array
+        .{ "Float64Array", .{ .value = Value.from(try realm.intrinsics.@"%Float64Array%"()), .writable = true, .enumerable = false, .configurable = true } },
+
         // 19.3.15 Function ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-function
         .{ "Function", .{ .value = Value.from(try realm.intrinsics.@"%Function%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.3.16 Int8Array ( . . . )
+        // https://tc39.es/ecma262/#sec-int8array
+        .{ "Int8Array", .{ .value = Value.from(try realm.intrinsics.@"%Int8Array%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.3.17 Int16Array ( . . . )
+        // https://tc39.es/ecma262/#sec-int16array
+        .{ "Int16Array", .{ .value = Value.from(try realm.intrinsics.@"%Int16Array%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.3.18 Int32Array ( . . . )
+        // https://tc39.es/ecma262/#sec-int32array
+        .{ "Int32Array", .{ .value = Value.from(try realm.intrinsics.@"%Int32Array%"()), .writable = true, .enumerable = false, .configurable = true } },
 
         // 19.3.19 Map ( . . . )
         // https://tc39.es/ecma262/#sec-map
@@ -177,6 +205,22 @@ pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]Nam
         // 19.3.32 TypeError ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-typeerror
         .{ "TypeError", .{ .value = Value.from(try realm.intrinsics.@"%TypeError%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.3.33 Uint8Array ( . . . )
+        // https://tc39.es/ecma262/#sec-uint8array
+        .{ "Uint8Array", .{ .value = Value.from(try realm.intrinsics.@"%Uint8Array%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.3.34 Uint8ClampedArray ( . . . )
+        // https://tc39.es/ecma262/#sec-uint8clampedarray
+        .{ "Uint8ClampedArray", .{ .value = Value.from(try realm.intrinsics.@"%Uint8ClampedArray%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.3.35 Uint16Array ( . . . )
+        // https://tc39.es/ecma262/#sec-uint16array
+        .{ "Uint16Array", .{ .value = Value.from(try realm.intrinsics.@"%Uint16Array%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.3.36 Uint32Array ( . . . )
+        // https://tc39.es/ecma262/#sec-uint32array
+        .{ "Uint32Array", .{ .value = Value.from(try realm.intrinsics.@"%Uint32Array%"()), .writable = true, .enumerable = false, .configurable = true } },
 
         // 19.3.37 URIError ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-urierror

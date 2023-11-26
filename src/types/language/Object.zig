@@ -58,6 +58,7 @@ pub const Tag = enum(u32) {
     string,
     string_iterator,
     symbol,
+    typed_array,
 
     // ECMA-402
     intl_locale,

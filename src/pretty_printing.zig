@@ -15,6 +15,7 @@ const Value = types.Value;
 const getArrayLength = @import("builtins/array.zig").getArrayLength;
 const getFunctionName = @import("builtins/ecmascript_function.zig").getFunctionName;
 const ordinaryOwnPropertyKeys = builtins.ordinaryOwnPropertyKeys;
+const typedArrayElementSize = builtins.typedArrayElementSize;
 
 const SeenObjects = std.AutoHashMap(AnyPointer, usize);
 const State = struct {
@@ -435,6 +436,58 @@ fn prettyPrintStringIterator(
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytype) !void {
+    const typed_array_name = typed_array.fields.typed_array_name;
+    const viewed_array_buffer = typed_array.fields.viewed_array_buffer;
+    const array_length = typed_array.fields.array_length;
+    const byte_length = typed_array.fields.byte_length.value; // TODO: Handle .auto
+    const byte_offset = typed_array.fields.byte_offset;
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try tty_config.setColor(writer, .white);
+    try writer.print("{s}(", .{typed_array_name});
+    try tty_config.setColor(writer, .reset);
+    if (viewed_array_buffer.fields.array_buffer_data) |data| {
+        if (array_length != .auto) {
+            try writer.print("length: {pretty}", .{Value.from(array_length.value)});
+        }
+        if (data.items.len != 0) {
+            if (array_length != .auto) try writer.writeAll(", ");
+            try writer.writeAll("data: ");
+            try tty_config.setColor(writer, .white);
+            try writer.writeAll("[");
+            try tty_config.setColor(writer, .reset);
+            try writer.writeAll(" ");
+            inline for (builtins.typed_array_element_types) |entry| {
+                const name, const T = entry;
+                if (std.mem.eql(u8, typed_array_name, name)) {
+                    const element_size = @sizeOf(T);
+                    var i = byte_offset;
+                    while (i < byte_length) : (i += element_size) {
+                        const bytes: *[element_size]u8 = @ptrCast(
+                            data.items[@intCast(i)..@intCast(i + element_size)],
+                        );
+                        const value = Value.from(std.mem.bytesAsValue(T, bytes).*);
+                        if (i != 0) try writer.writeAll(", ");
+                        try writer.print("{pretty}", .{value});
+                    }
+                    break;
+                }
+            }
+            try writer.writeAll(" ");
+            try tty_config.setColor(writer, .white);
+            try writer.writeAll("]");
+            try tty_config.setColor(writer, .reset);
+        }
+    } else {
+        // Underlying ArrayBuffer has been detached, mirror behavior of .length getter
+        try writer.print("length: {pretty}", .{Value.from(0)});
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintIntlLocale(
     intl_locale: *const builtins.Intl.Locale,
     writer: anytype,
@@ -606,6 +659,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.String, prettyPrintPrimitiveWrapper },
             .{ builtins.StringIterator, prettyPrintStringIterator },
             .{ builtins.Symbol, prettyPrintPrimitiveWrapper },
+            .{ builtins.TypedArray, prettyPrintTypedArray },
         } ++ if (build_options.enable_intl) .{
             .{ builtins.Intl.Locale, prettyPrintIntlLocale },
         } else .{}) |entry| {
