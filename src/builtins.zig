@@ -157,6 +157,7 @@ pub const arrayCreate = array.arrayCreate;
 pub const arraySetLength = array.arraySetLength;
 pub const arraySpeciesCreate = array.arraySpeciesCreate;
 pub const boundFunctionCreate = bound_function.boundFunctionCreate;
+pub const cloneArrayBuffer = array_buffer.cloneArrayBuffer;
 pub const createArrayIterator = array_iterator.createArrayIterator;
 pub const createBuiltinFunction = builtin_function.createBuiltinFunction;
 pub const createDynamicFunction = function.createDynamicFunction;

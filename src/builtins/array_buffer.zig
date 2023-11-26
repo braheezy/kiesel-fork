@@ -138,6 +138,40 @@ pub fn detachArrayBuffer(
     // 6. Return unused.
 }
 
+/// 25.1.3.5 CloneArrayBuffer ( srcBuffer, srcByteOffset, srcLength )
+/// https://tc39.es/ecma262/#sec-clonearraybuffer
+pub fn cloneArrayBuffer(
+    agent: *Agent,
+    src_buffer: *const ArrayBuffer,
+    src_byte_offset: u53,
+    src_length: u53,
+) Agent.Error!Object {
+    const realm = agent.currentRealm();
+
+    // 1. Assert: IsDetachedBuffer(srcBuffer) is false.
+    std.debug.assert(!isDetachedBuffer(src_buffer));
+
+    // 2. Let targetBuffer be ? AllocateArrayBuffer(%ArrayBuffer%, srcLength).
+    const target_buffer = try allocateArrayBuffer(
+        agent,
+        try realm.intrinsics.@"%ArrayBuffer%"(),
+        src_length,
+        null,
+    );
+
+    // 3. Let srcBlock be srcBuffer.[[ArrayBufferData]].
+    const src_block = &src_buffer.fields.array_buffer_data.?;
+
+    // 4. Let targetBlock be targetBuffer.[[ArrayBufferData]].
+    const target_block = &target_buffer.as(ArrayBuffer).fields.array_buffer_data.?;
+
+    // 5. Perform CopyDataBlockBytes(targetBlock, 0, srcBlock, srcByteOffset, srcLength).
+    copyDataBlockBytes(target_block, 0, src_block, src_byte_offset, src_length);
+
+    // 6. Return targetBuffer.
+    return target_buffer;
+}
+
 /// 25.1.3.6 GetArrayBufferMaxByteLengthOption ( options )
 /// https://tc39.es/ecma262/#sec-getarraybuffermaxbytelengthoption
 pub fn getArrayBufferMaxByteLengthOption(agent: *Agent, options: Value) Agent.Error!?u53 {
