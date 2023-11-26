@@ -590,6 +590,29 @@ pub const TypedArrayPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        // 23.2.3.38 get %TypedArray%.prototype [ @@toStringTag ]
+        // https://tc39.es/ecma262/#sec-get-%typedarray%.prototype-@@tostringtag
+        try defineBuiltinAccessor(object, "@@toStringTag", struct {
+            fn getter(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+                // 1. Let O be the this value.
+                // 2. If O is not an Object, return undefined.
+                const object_ = switch (this_value) {
+                    .object => |object_| object_,
+                    else => return .undefined,
+                };
+
+                // 3. If O does not have a [[TypedArrayName]] internal slot, return undefined.
+                if (!object_.is(TypedArray)) return .undefined;
+
+                // 4. Let name be O.[[TypedArrayName]].
+                const name = object_.as(TypedArray).fields.typed_array_name;
+
+                // 5. Assert: name is a String.
+                // 6. Return name.
+                return Value.from(name);
+            }
+        }.getter, null, realm);
+
         return object;
     }
 };
