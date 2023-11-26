@@ -23,8 +23,10 @@ const Value = types.Value;
 const allocateArrayBuffer = builtins.allocateArrayBuffer;
 const arrayBufferByteLength = builtins.arrayBufferByteLength;
 const cloneArrayBuffer = builtins.cloneArrayBuffer;
+const createArrayIterator = builtins.createArrayIterator;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIteratorFromMethod = types.getIteratorFromMethod;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
@@ -590,6 +592,8 @@ pub const TypedArrayPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "entries", entries, 0, realm);
+
         // 23.2.3.38 get %TypedArray%.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-get-%typedarray%.prototype-@@tostringtag
         try defineBuiltinAccessor(object, "@@toStringTag", struct {
@@ -615,7 +619,39 @@ pub const TypedArrayPrototype = struct {
 
         return object;
     }
+
+    /// 23.2.3.7 %TypedArray%.prototype.entries ( )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.entries
+    fn entries(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let O be the this value.
+        // 2. Perform ? ValidateTypedArray(O, seq-cst).
+        const object = @constCast(
+            (try validateTypedArray(agent, this_value, .seq_cst)).object,
+        ).object();
+
+        // 3. Return CreateArrayIterator(O, key+value).
+        return Value.from(try createArrayIterator(agent, object, .@"key+value"));
+    }
 };
+
+/// 23.2.4.4 ValidateTypedArray ( O, order )
+/// https://tc39.es/ecma262/#sec-validatetypedarray
+fn validateTypedArray(agent: *Agent, object: Value, order: Order) Agent.Error!TypedArrayWithBufferWitness {
+    // 1. Perform ? RequireInternalSlot(O, [[TypedArrayName]]).
+    // 2. Assert: O has a [[ViewedArrayBuffer]] internal slot.
+    const typed_array = try object.requireInternalSlot(agent, TypedArray);
+
+    // 3. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(O, order).
+    const ta = makeTypedArrayWithBufferWitnessRecord(typed_array, order);
+
+    // 4. If IsTypedArrayOutOfBounds(taRecord) is true, throw a TypeError exception.
+    if (isTypedArrayOutOfBounds(ta)) {
+        return agent.throwException(.type_error, "Typed array is out of bounds", .{});
+    }
+
+    // 5. Return taRecord.
+    return ta;
+}
 
 /// 23.2.4.5 TypedArrayElementSize ( O )
 /// https://tc39.es/ecma262/#sec-typedarrayelementsize
