@@ -1273,11 +1273,22 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
 /// 23.2.7 Properties of the TypedArray Prototype Objects
 /// https://tc39.es/ecma262/#sec-properties-of-typedarray-prototype-objects
 fn MakeTypedArrayPrototype(comptime name: []const u8) type {
-    _ = name;
     return struct {
         pub fn create(realm: *Realm) !Object {
             const object = try builtins.Object.create(realm.agent, .{
                 .prototype = try realm.intrinsics.@"%TypedArray.prototype%"(),
+            });
+
+            // 23.2.7.1 TypedArray.prototype.BYTES_PER_ELEMENT
+            // https://tc39.es/ecma262/#sec-typedarray.prototype.bytes_per_element
+            try defineBuiltinProperty(object, "BYTES_PER_ELEMENT", PropertyDescriptor{
+                .value = Value.from(comptime inline for (typed_array_element_types) |entry| {
+                    const name_, const T = entry;
+                    if (std.mem.eql(u8, name, name_)) break @sizeOf(T);
+                }),
+                .writable = false,
+                .enumerable = false,
+                .configurable = false,
             });
 
             return object;
