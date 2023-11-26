@@ -24,6 +24,7 @@ const allocateArrayBuffer = builtins.allocateArrayBuffer;
 const arrayBufferByteLength = builtins.arrayBufferByteLength;
 const cloneArrayBuffer = builtins.cloneArrayBuffer;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIteratorFromMethod = types.getIteratorFromMethod;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
@@ -548,6 +549,15 @@ pub const TypedArrayConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
+
+        // 23.2.2.4 get %TypedArray% [ @@species ]
+        // https://tc39.es/ecma262/#sec-get-%typedarray%-@@species
+        try defineBuiltinAccessor(object, "@@species", struct {
+            fn getter(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+                // 1. Return the this value.
+                return this_value;
+            }
+        }.getter, null, realm);
 
         // 23.2.3.5 %TypedArray%.prototype.constructor
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype.constructor
