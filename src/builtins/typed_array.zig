@@ -596,6 +596,11 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinFunction(object, "keys", keys, 0, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
 
+        // 23.2.3.37 %TypedArray%.prototype [ @@iterator ] ( )
+        // https://tc39.es/ecma262/#sec-%typedarray%.prototype-@@iterator
+        const @"%TypedArray.prototype.values%" = object.propertyStorage().get(PropertyKey.from("values")).?;
+        try defineBuiltinProperty(object, "@@iterator", @"%TypedArray.prototype.values%");
+
         // 23.2.3.38 get %TypedArray%.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-get-%typedarray%.prototype-@@tostringtag
         try defineBuiltinAccessor(object, "@@toStringTag", struct {
