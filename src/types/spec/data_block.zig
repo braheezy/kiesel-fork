@@ -40,7 +40,7 @@ pub fn createByteDataBlock(agent: *Agent, size: u64) Agent.Error!DataBlock {
 pub fn copyDataBlockBytes(
     to_block: *DataBlock,
     to_index: u53,
-    from_block: *DataBlock,
+    from_block: *const DataBlock,
     from_index: u53,
     count: u53,
 ) void {

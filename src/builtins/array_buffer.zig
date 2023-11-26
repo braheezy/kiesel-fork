@@ -608,7 +608,7 @@ pub const ArrayBufferPrototype = struct {
 
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
-        var object = try this_value.requireInternalSlot(agent, ArrayBuffer);
+        const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
 
         // TODO: 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
 
