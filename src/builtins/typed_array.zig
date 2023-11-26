@@ -594,6 +594,7 @@ pub const TypedArrayPrototype = struct {
 
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
         try defineBuiltinFunction(object, "keys", keys, 0, realm);
+        try defineBuiltinFunction(object, "values", values, 0, realm);
 
         // 23.2.3.38 get %TypedArray%.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-get-%typedarray%.prototype-@@tostringtag
@@ -645,6 +646,19 @@ pub const TypedArrayPrototype = struct {
 
         // 3. Return CreateArrayIterator(O, key).
         return Value.from(try createArrayIterator(agent, object, .key));
+    }
+
+    /// 23.2.3.35 %TypedArray%.prototype.values ( )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.values
+    fn values(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let O be the this value.
+        // 2. Perform ? ValidateTypedArray(O, seq-cst).
+        const object = @constCast(
+            (try validateTypedArray(agent, this_value, .seq_cst)).object,
+        ).object();
+
+        // 3. Return CreateArrayIterator(O, value).
+        return Value.from(try createArrayIterator(agent, object, .value));
     }
 };
 
