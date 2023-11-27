@@ -152,8 +152,8 @@ pub const MapConstructor = struct {
         return Value.from(try addEntriesFromIterable(agent, map, iterable, adder.object));
     }
 
-    // 24.1.2.2 get Map [ @@species ]
-    // https://tc39.es/ecma262/#sec-get-map-@@species
+    /// 24.1.2.2 get Map [ @@species ]
+    /// https://tc39.es/ecma262/#sec-get-map-@@species
     fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;

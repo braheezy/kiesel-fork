@@ -302,8 +302,8 @@ pub fn ordinaryCallEvaluateBody(
     };
 }
 
-// 15.2.3 Runtime Semantics: EvaluateFunctionBody
-// https://tc39.es/ecma262/#sec-runtime-semantics-evaluatefunctionbody
+/// 15.2.3 Runtime Semantics: EvaluateFunctionBody
+/// https://tc39.es/ecma262/#sec-runtime-semantics-evaluatefunctionbody
 fn evaluateFunctionBody(
     agent: *Agent,
     function: *ECMAScriptFunction,
@@ -319,8 +319,8 @@ fn evaluateFunctionBody(
     return generateAndRunBytecode(agent, function_body);
 }
 
-// 15.5.2 Runtime Semantics: EvaluateGeneratorBody
-// https://tc39.es/ecma262/#sec-runtime-semantics-evaluategeneratorbody
+/// 15.5.2 Runtime Semantics: EvaluateGeneratorBody
+/// https://tc39.es/ecma262/#sec-runtime-semantics-evaluategeneratorbody
 fn evaluateGeneratorBody(
     agent: *Agent,
     function: *ECMAScriptFunction,

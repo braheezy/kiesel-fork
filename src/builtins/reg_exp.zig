@@ -749,8 +749,8 @@ pub const RegExpConstructor = struct {
         return Value.from(try regExpInitialize(agent, object, p, f));
     }
 
-    // 22.2.5.2 get RegExp [ @@species ]
-    // https://tc39.es/ecma262/#sec-get-regexp-@@species
+    /// 22.2.5.2 get RegExp [ @@species ]
+    /// https://tc39.es/ecma262/#sec-get-regexp-@@species
     fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;

@@ -114,8 +114,8 @@ pub const SetConstructor = struct {
         return Value.from(set);
     }
 
-    // 24.2.2.2 get Set [ @@species ]
-    // https://tc39.es/ecma262/#sec-get-set-@@species
+    /// 24.2.2.2 get Set [ @@species ]
+    /// https://tc39.es/ecma262/#sec-get-set-@@species
     fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;

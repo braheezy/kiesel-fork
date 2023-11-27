@@ -1914,8 +1914,8 @@ pub const PromiseConstructor = struct {
         return Value.from(try promiseResolve(agent, constructor.object, resolution));
     }
 
-    // 27.2.4.8 get Promise [ @@species ]
-    // https://tc39.es/ecma262/#sec-get-promise-@@species
+    /// 27.2.4.8 get Promise [ @@species ]
+    /// https://tc39.es/ecma262/#sec-get-promise-@@species
     fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;

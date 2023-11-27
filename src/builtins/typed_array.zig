@@ -602,8 +602,8 @@ pub const TypedArrayConstructor = struct {
         );
     }
 
-    // 23.2.2.4 get %TypedArray% [ @@species ]
-    // https://tc39.es/ecma262/#sec-get-%typedarray%-@@species
+    /// 23.2.2.4 get %TypedArray% [ @@species ]
+    /// https://tc39.es/ecma262/#sec-get-%typedarray%-@@species
     fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
@@ -802,8 +802,8 @@ pub const TypedArrayPrototype = struct {
         return Value.from(try createArrayIterator(agent, object, .value));
     }
 
-    // 23.2.3.38 get %TypedArray%.prototype [ @@toStringTag ]
-    // https://tc39.es/ecma262/#sec-get-%typedarray%.prototype-@@tostringtag
+    /// 23.2.3.38 get %TypedArray%.prototype [ @@toStringTag ]
+    /// https://tc39.es/ecma262/#sec-get-%typedarray%.prototype-@@tostringtag
     fn @"@@toStringTag"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. If O is not an Object, return undefined.

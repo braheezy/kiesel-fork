@@ -567,8 +567,8 @@ fn defineMethod(
     return .{ .key = property_key, .closure = closure };
 }
 
-// 15.4.5 Runtime Semantics: MethodDefinitionEvaluation
-// https://tc39.es/ecma262/#sec-runtime-semantics-methoddefinitionevaluation
+/// 15.4.5 Runtime Semantics: MethodDefinitionEvaluation
+/// https://tc39.es/ecma262/#sec-runtime-semantics-methoddefinitionevaluation
 fn methodDefinitionEvaluation(
     agent: *Agent,
     // Like ast.MethodDefinition but with an evaluated ast.PropertyName
@@ -1418,7 +1418,6 @@ fn classDefinitionEvaluation(
         // a. Let defaultConstructor be a new Abstract Closure with no parameters that captures
         //    nothing and performs the following steps when called:
         const default_constructor = struct {
-            // agent: *Agent, _: Value, arguments: ArgumentsList, new_target: ?Object
             fn func(
                 agent_: *Agent,
                 _: Value,

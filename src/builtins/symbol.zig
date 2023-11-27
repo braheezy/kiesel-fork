@@ -210,8 +210,8 @@ pub const SymbolConstructor = struct {
         });
     }
 
-    // 20.4.2.2 Symbol.for ( key )
-    // https://tc39.es/ecma262/#sec-symbol.for
+    /// 20.4.2.2 Symbol.for ( key )
+    /// https://tc39.es/ecma262/#sec-symbol.for
     fn @"for"(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const key = arguments.get(0);
 
@@ -241,8 +241,8 @@ pub const SymbolConstructor = struct {
         return Value.from(new_symbol);
     }
 
-    // 20.4.2.6 Symbol.keyFor ( sym )
-    // https://tc39.es/ecma262/#sec-symbol.keyfor
+    /// 20.4.2.6 Symbol.keyFor ( sym )
+    /// https://tc39.es/ecma262/#sec-symbol.keyfor
     fn keyFor(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const symbol = arguments.get(0);
 

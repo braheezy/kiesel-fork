@@ -705,8 +705,8 @@ pub const ArrayConstructor = struct {
         return Value.from(array);
     }
 
-    // 23.1.2.5 get Array [ @@species ]
-    // https://tc39.es/ecma262/#sec-get-array-@@species
+    /// 23.1.2.5 get Array [ @@species ]
+    /// https://tc39.es/ecma262/#sec-get-array-@@species
     fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;

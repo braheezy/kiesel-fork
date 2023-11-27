@@ -4085,8 +4085,8 @@ pub const MethodDefinition = struct {
     property_name: PropertyName,
     method: Method,
 
-    // 15.4.5 Runtime Semantics: MethodDefinitionEvaluation
-    // https://tc39.es/ecma262/#sec-runtime-semantics-methoddefinitionevaluation
+    /// 15.4.5 Runtime Semantics: MethodDefinitionEvaluation
+    /// https://tc39.es/ecma262/#sec-runtime-semantics-methoddefinitionevaluation
     pub fn generateBytecode(
         self: Self,
         executable: *Executable,

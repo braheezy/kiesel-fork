@@ -230,8 +230,8 @@ pub const NumberConstructor = struct {
         return Value.from(false);
     }
 
-    // 21.1.2.5 Number.isSafeInteger ( number )
-    // https://tc39.es/ecma262/#sec-number.issafeinteger
+    /// 21.1.2.5 Number.isSafeInteger ( number )
+    /// https://tc39.es/ecma262/#sec-number.issafeinteger
     fn isSafeInteger(_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const number = arguments.get(0);
 

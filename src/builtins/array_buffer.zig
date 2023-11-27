@@ -477,8 +477,8 @@ pub const ArrayBufferConstructor = struct {
         return Value.from(false);
     }
 
-    // 25.1.5.3 get ArrayBuffer [ @@species ]
-    // https://tc39.es/ecma262/#sec-get-arraybuffer-@@species
+    /// 25.1.5.3 get ArrayBuffer [ @@species ]
+    /// https://tc39.es/ecma262/#sec-get-arraybuffer-@@species
     fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
