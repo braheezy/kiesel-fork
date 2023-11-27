@@ -620,6 +620,7 @@ pub const TypedArrayPrototype = struct {
 
         try defineBuiltinAccessor(object, "buffer", buffer, null, realm);
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
+        try defineBuiltinAccessor(object, "byteOffset", byteOffset, null, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
         try defineBuiltinFunction(object, "keys", keys, 0, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
@@ -664,6 +665,27 @@ pub const TypedArrayPrototype = struct {
 
         // 6. Return 𝔽(size).
         return Value.from(size);
+    }
+
+    /// 23.2.3.4 get %TypedArray%.prototype.byteOffset
+    /// https://tc39.es/ecma262/#sec-get-%typedarray%.prototype.byteoffset
+    fn byteOffset(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[TypedArrayName]]).
+        // 3. Assert: O has a [[ViewedArrayBuffer]] internal slot.
+        const typed_array = try this_value.requireInternalSlot(agent, TypedArray);
+
+        // 4. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(O, seq-cst).
+        const ta = makeTypedArrayWithBufferWitnessRecord(typed_array, .seq_cst);
+
+        // 5. If IsTypedArrayOutOfBounds(taRecord) is true, return +0𝔽.
+        if (isTypedArrayOutOfBounds(ta)) return Value.from(0);
+
+        // 6. Let offset be O.[[ByteOffset]].
+        const offset = typed_array.fields.byte_offset;
+
+        // 7. Return 𝔽(offset).
+        return Value.from(offset);
     }
 
     /// 23.2.3.7 %TypedArray%.prototype.entries ( )
