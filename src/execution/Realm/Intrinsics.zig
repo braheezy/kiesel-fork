@@ -22,6 +22,7 @@ lazy_intrinsics: struct {
     @"%AggregateError.prototype%": ?Object = null,
     @"%Array%": ?Object = null,
     @"%Array.prototype%": ?Object = null,
+    @"%Array.prototype.toString%": ?Object = null,
     @"%Array.prototype.values%": ?Object = null,
     @"%ArrayBuffer%": ?Object = null,
     @"%ArrayBuffer.prototype%": ?Object = null,
@@ -155,6 +156,15 @@ pub fn @"%Array%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%Array.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Array.prototype%", builtins.ArrayPrototype);
+}
+pub fn @"%Array.prototype.toString%"(self: *Self) Allocator.Error!Object {
+    const intrinsic = &self.lazy_intrinsics.@"%Array.prototype.toString%";
+    if (intrinsic.* == null) {
+        const array_prototype = try @"%Array.prototype%"(self);
+        const property_descriptor = array_prototype.data.property_storage.get(PropertyKey.from("toString"));
+        intrinsic.* = property_descriptor.?.value.?.object;
+    }
+    return intrinsic.*.?;
 }
 pub fn @"%Array.prototype.values%"(self: *Self) Allocator.Error!Object {
     const intrinsic = &self.lazy_intrinsics.@"%Array.prototype.values%";

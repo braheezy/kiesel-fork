@@ -387,6 +387,7 @@ pub const ArrayConstructor = struct {
         );
 
         // Ensure prototype function intrinsics
+        _ = try realm.intrinsics.@"%Array.prototype.toString%"();
         _ = try realm.intrinsics.@"%Array.prototype.values%"();
 
         return object;
