@@ -622,6 +622,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinAccessor(object, "byteOffset", byteOffset, null, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
+        try defineBuiltinFunction(object, "join", join, 1, realm);
         try defineBuiltinFunction(object, "keys", keys, 0, realm);
         try defineBuiltinAccessor(object, "length", length, null, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
@@ -700,6 +701,54 @@ pub const TypedArrayPrototype = struct {
 
         // 3. Return CreateArrayIterator(O, key+value).
         return Value.from(try createArrayIterator(agent, object, .@"key+value"));
+    }
+
+    /// 23.2.3.18 %TypedArray%.prototype.join ( separator )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.join
+    fn join(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const separator = arguments.get(0);
+
+        // 1. Let O be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
+        const ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const object = this_value.object;
+
+        // 3. Let len be TypedArrayLength(taRecord).
+        const len = typedArrayLength(ta);
+
+        // 4. If separator is undefined, let sep be ",".
+        // 5. Else, let sep be ? ToString(separator).
+        const sep = if (separator == .undefined) "," else (try separator.toString(agent)).utf8;
+
+        // 6. Let R be the empty String.
+        if (len > std.math.maxInt(usize)) return error.OutOfMemory;
+        var elements = try std.ArrayList([]const u8).initCapacity(agent.gc_allocator, @intCast(len));
+        defer elements.deinit();
+
+        // 7. Let k be 0.
+        var k: u53 = 0;
+
+        // 8. Repeat, while k < len,
+        while (k < len) : (k += 1) {
+            // a. If k > 0, set R to the string-concatenation of R and sep.
+
+            // b. Let element be ! Get(O, ! ToString(𝔽(k))).
+            const element = object.get(PropertyKey.from(k)) catch |err| try noexcept(err);
+
+            // c. If element is undefined, let next be the empty String; otherwise, let next be
+            //    ! ToString(element).
+            const next = if (element == .undefined) "" else (try element.toString(agent)).utf8;
+
+            // d. Set R to the string-concatenation of R and next.
+            try elements.append(next);
+
+            // e. Set k to k + 1.
+        }
+
+        // 9. Return R.
+        return Value.from(
+            try std.mem.join(agent.gc_allocator, sep, elements.items),
+        );
     }
 
     /// 23.2.3.19 %TypedArray%.prototype.keys ( )
