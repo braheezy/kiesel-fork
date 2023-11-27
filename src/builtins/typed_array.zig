@@ -1123,6 +1123,7 @@ fn initializeTypedArrayFromArrayBuffer(
     typed_array.fields.viewed_array_buffer = buffer;
 
     // 11. Set O.[[ByteOffset]] to offset.
+    typed_array.fields.byte_offset = offset;
 
     // 12. Return unused.
 }
