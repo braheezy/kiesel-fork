@@ -367,6 +367,7 @@ pub const ArrayConstructor = struct {
         try defineBuiltinFunction(object, "from", from, 1, realm);
         try defineBuiltinFunction(object, "isArray", isArray, 1, realm);
         try defineBuiltinFunction(object, "of", of, 0, realm);
+        try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
 
         // 23.1.2.4 Array.prototype
         // https://tc39.es/ecma262/#sec-array.prototype
@@ -376,15 +377,6 @@ pub const ArrayConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 23.1.2.5 get Array [ @@species ]
-        // https://tc39.es/ecma262/#sec-get-array-@@species
-        try defineBuiltinAccessor(object, "@@species", struct {
-            fn getter(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
-                // 1. Return the this value.
-                return this_value;
-            }
-        }.getter, null, realm);
 
         // 23.1.3.3 Array.prototype.constructor
         // https://tc39.es/ecma262/#sec-array.prototype.constructor
@@ -710,6 +702,13 @@ pub const ArrayConstructor = struct {
 
         // 9. Return A.
         return Value.from(array);
+    }
+
+    // 23.1.2.5 get Array [ @@species ]
+    // https://tc39.es/ecma262/#sec-get-array-@@species
+    fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Return the this value.
+        return this_value;
     }
 };
 

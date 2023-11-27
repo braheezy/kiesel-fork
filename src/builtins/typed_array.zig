@@ -543,6 +543,8 @@ pub const TypedArrayConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
+
         // 23.2.2.3 %TypedArray%.prototype
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -551,15 +553,6 @@ pub const TypedArrayConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 23.2.2.4 get %TypedArray% [ @@species ]
-        // https://tc39.es/ecma262/#sec-get-%typedarray%-@@species
-        try defineBuiltinAccessor(object, "@@species", struct {
-            fn getter(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
-                // 1. Return the this value.
-                return this_value;
-            }
-        }.getter, null, realm);
 
         // 23.2.3.5 %TypedArray%.prototype.constructor
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype.constructor
@@ -582,6 +575,13 @@ pub const TypedArrayConstructor = struct {
             .{},
         );
     }
+
+    // 23.2.2.4 get %TypedArray% [ @@species ]
+    // https://tc39.es/ecma262/#sec-get-%typedarray%-@@species
+    fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Return the this value.
+        return this_value;
+    }
 };
 
 /// 23.2.3 Properties of the %TypedArray% Prototype Object
@@ -595,34 +595,12 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
         try defineBuiltinFunction(object, "keys", keys, 0, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
+        try defineBuiltinAccessor(object, "@@toStringTag", @"@@toStringTag", null, realm);
 
         // 23.2.3.37 %TypedArray%.prototype [ @@iterator ] ( )
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype-@@iterator
         const @"%TypedArray.prototype.values%" = object.propertyStorage().get(PropertyKey.from("values")).?;
         try defineBuiltinProperty(object, "@@iterator", @"%TypedArray.prototype.values%");
-
-        // 23.2.3.38 get %TypedArray%.prototype [ @@toStringTag ]
-        // https://tc39.es/ecma262/#sec-get-%typedarray%.prototype-@@tostringtag
-        try defineBuiltinAccessor(object, "@@toStringTag", struct {
-            fn getter(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
-                // 1. Let O be the this value.
-                // 2. If O is not an Object, return undefined.
-                const object_ = switch (this_value) {
-                    .object => |object_| object_,
-                    else => return .undefined,
-                };
-
-                // 3. If O does not have a [[TypedArrayName]] internal slot, return undefined.
-                if (!object_.is(TypedArray)) return .undefined;
-
-                // 4. Let name be O.[[TypedArrayName]].
-                const name = object_.as(TypedArray).fields.typed_array_name;
-
-                // 5. Assert: name is a String.
-                // 6. Return name.
-                return Value.from(name);
-            }
-        }.getter, null, realm);
 
         return object;
     }
@@ -664,6 +642,27 @@ pub const TypedArrayPrototype = struct {
 
         // 3. Return CreateArrayIterator(O, value).
         return Value.from(try createArrayIterator(agent, object, .value));
+    }
+
+    // 23.2.3.38 get %TypedArray%.prototype [ @@toStringTag ]
+    // https://tc39.es/ecma262/#sec-get-%typedarray%.prototype-@@tostringtag
+    fn @"@@toStringTag"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let O be the this value.
+        // 2. If O is not an Object, return undefined.
+        const object_ = switch (this_value) {
+            .object => |object_| object_,
+            else => return .undefined,
+        };
+
+        // 3. If O does not have a [[TypedArrayName]] internal slot, return undefined.
+        if (!object_.is(TypedArray)) return .undefined;
+
+        // 4. Let name be O.[[TypedArrayName]].
+        const name = object_.as(TypedArray).fields.typed_array_name;
+
+        // 5. Assert: name is a String.
+        // 6. Return name.
+        return Value.from(name);
     }
 };
 

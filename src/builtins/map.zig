@@ -94,6 +94,8 @@ pub const MapConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
+
         // 24.1.2.1 Map.prototype
         // https://tc39.es/ecma262/#sec-map.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -102,15 +104,6 @@ pub const MapConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 24.1.2.2 get Map [ @@species ]
-        // https://tc39.es/ecma262/#sec-get-map-@@species
-        try defineBuiltinAccessor(object, "@@species", struct {
-            fn getter(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
-                // 1. Return the this value.
-                return this_value;
-            }
-        }.getter, null, realm);
 
         // 24.1.3.2 Map.prototype.constructor
         // https://tc39.es/ecma262/#sec-map.prototype.constructor
@@ -157,6 +150,13 @@ pub const MapConstructor = struct {
 
         // 7. Return ? AddEntriesFromIterable(map, iterable, adder).
         return Value.from(try addEntriesFromIterable(agent, map, iterable, adder.object));
+    }
+
+    // 24.1.2.2 get Map [ @@species ]
+    // https://tc39.es/ecma262/#sec-get-map-@@species
+    fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Return the this value.
+        return this_value;
     }
 };
 

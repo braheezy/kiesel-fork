@@ -403,6 +403,7 @@ pub const ArrayBufferConstructor = struct {
         });
 
         try defineBuiltinFunction(object, "isView", isView, 1, realm);
+        try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
 
         // 25.1.5.2 ArrayBuffer.prototype
         // https://tc39.es/ecma262/#sec-arraybuffer.prototype
@@ -420,15 +421,6 @@ pub const ArrayBufferConstructor = struct {
             "constructor",
             Value.from(object),
         );
-
-        // 25.1.5.3 get ArrayBuffer [ @@species ]
-        // https://tc39.es/ecma262/#sec-get-arraybuffer-@@species
-        try defineBuiltinAccessor(object, "@@species", struct {
-            fn getter(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
-                // 1. Return the this value.
-                return this_value;
-            }
-        }.getter, null, realm);
 
         return object;
     }
@@ -483,6 +475,13 @@ pub const ArrayBufferConstructor = struct {
 
         // 3. Return false.
         return Value.from(false);
+    }
+
+    // 25.1.5.3 get ArrayBuffer [ @@species ]
+    // https://tc39.es/ecma262/#sec-get-arraybuffer-@@species
+    fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Return the this value.
+        return this_value;
     }
 };
 

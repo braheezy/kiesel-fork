@@ -39,6 +39,8 @@ pub const SetConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
+
         // 24.2.2.1 Set.prototype
         // https://tc39.es/ecma262/#sec-set.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -47,15 +49,6 @@ pub const SetConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 24.2.2.2 get Set [ @@species ]
-        // https://tc39.es/ecma262/#sec-get-set-@@species
-        try defineBuiltinAccessor(object, "@@species", struct {
-            fn getter(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
-                // 1. Return the this value.
-                return this_value;
-            }
-        }.getter, null, realm);
 
         // 24.2.3.3 Set.prototype.constructor
         // https://tc39.es/ecma262/#sec-set.prototype.constructor
@@ -119,6 +112,13 @@ pub const SetConstructor = struct {
         }
 
         return Value.from(set);
+    }
+
+    // 24.2.2.2 get Set [ @@species ]
+    // https://tc39.es/ecma262/#sec-get-set-@@species
+    fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Return the this value.
+        return this_value;
     }
 };
 

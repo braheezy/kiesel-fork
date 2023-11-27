@@ -1597,6 +1597,7 @@ pub const PromiseConstructor = struct {
         try defineBuiltinFunction(object, "race", race, 1, realm);
         try defineBuiltinFunction(object, "reject", reject, 1, realm);
         try defineBuiltinFunction(object, "resolve", resolve, 1, realm);
+        try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
 
         // 27.2.4.4 Promise.prototype
         // https://tc39.es/ecma262/#sec-promise.prototype
@@ -1606,15 +1607,6 @@ pub const PromiseConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 27.2.4.8 get Promise [ @@species ]
-        // https://tc39.es/ecma262/#sec-get-promise-@@species
-        try defineBuiltinAccessor(object, "@@species", struct {
-            fn getter(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
-                // 1. Return the this value.
-                return this_value;
-            }
-        }.getter, null, realm);
 
         // 27.2.5.2 Promise.prototype.constructor
         try defineBuiltinProperty(
@@ -1920,6 +1912,13 @@ pub const PromiseConstructor = struct {
 
         // 3. Return ? PromiseResolve(C, x).
         return Value.from(try promiseResolve(agent, constructor.object, resolution));
+    }
+
+    // 27.2.4.8 get Promise [ @@species ]
+    // https://tc39.es/ecma262/#sec-get-promise-@@species
+    fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Return the this value.
+        return this_value;
     }
 };
 
