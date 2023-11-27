@@ -623,6 +623,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinAccessor(object, "byteOffset", byteOffset, null, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
         try defineBuiltinFunction(object, "keys", keys, 0, realm);
+        try defineBuiltinAccessor(object, "length", length, null, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
         try defineBuiltinAccessor(object, "@@toStringTag", @"@@toStringTag", null, realm);
 
@@ -712,6 +713,27 @@ pub const TypedArrayPrototype = struct {
 
         // 3. Return CreateArrayIterator(O, key).
         return Value.from(try createArrayIterator(agent, object, .key));
+    }
+
+    /// 23.2.3.21 get %TypedArray%.prototype.length
+    /// https://tc39.es/ecma262/#sec-get-%typedarray%.prototype.length
+    fn length(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[TypedArrayName]]).
+        // 3. Assert: O has [[ViewedArrayBuffer]] and [[ArrayLength]] internal slots.
+        const typed_array = try this_value.requireInternalSlot(agent, TypedArray);
+
+        // 4. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(O, seq-cst).
+        const ta = makeTypedArrayWithBufferWitnessRecord(typed_array, .seq_cst);
+
+        // 5. If IsTypedArrayOutOfBounds(taRecord) is true, return +0𝔽.
+        if (isTypedArrayOutOfBounds(ta)) return Value.from(0);
+
+        // 6. Let length be TypedArrayLength(taRecord).
+        const length_ = typedArrayLength(ta);
+
+        // 7. Return 𝔽(length).
+        return Value.from(length_);
     }
 
     /// 23.2.3.35 %TypedArray%.prototype.values ( )
