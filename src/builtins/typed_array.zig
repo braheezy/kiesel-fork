@@ -340,6 +340,32 @@ pub fn makeTypedArrayWithBufferWitnessRecord(
     return .{ .object = object, .cached_buffer_byte_length = byte_length };
 }
 
+/// 10.4.5.11 TypedArrayByteLength ( taRecord )
+/// https://tc39.es/ecma262/#sec-typedarraybytelength
+pub fn typedArrayByteLength(ta: TypedArrayWithBufferWitness) u53 {
+
+    // 1. If IsTypedArrayOutOfBounds(taRecord) is true, return 0.
+    if (isTypedArrayOutOfBounds(ta)) return 0;
+
+    // 2. Let length be TypedArrayLength(taRecord).
+    const length = typedArrayLength(ta);
+
+    // 3. If length = 0, return 0.
+    if (length == 0) return 0;
+
+    // 4. Let O be taRecord.[[Object]].
+    const typed_array = ta.object;
+
+    // 5. If O.[[ByteLength]] is not auto, return O.[[ByteLength]].
+    if (typed_array.fields.byte_length != .auto) return typed_array.fields.byte_length.value;
+
+    // 6. Let elementSize be TypedArrayElementSize(O).
+    const element_size = typedArrayElementSize(typed_array);
+
+    // 7. Return length × elementSize.
+    return length * element_size;
+}
+
 /// 10.4.5.12 TypedArrayLength ( taRecord )
 /// https://tc39.es/ecma262/#sec-typedarraylength
 pub fn typedArrayLength(ta: TypedArrayWithBufferWitness) u53 {
@@ -593,6 +619,7 @@ pub const TypedArrayPrototype = struct {
         });
 
         try defineBuiltinAccessor(object, "buffer", buffer, null, realm);
+        try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
         try defineBuiltinFunction(object, "keys", keys, 0, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
@@ -619,6 +646,24 @@ pub const TypedArrayPrototype = struct {
 
         // 5. Return buffer.
         return Value.from(buffer_.object());
+    }
+
+    /// 23.2.3.3 get %TypedArray%.prototype.byteLength
+    /// https://tc39.es/ecma262/#sec-get-%typedarray%.prototype.bytelength
+    fn byteLength(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[TypedArrayName]]).
+        // 3. Assert: O has a [[ViewedArrayBuffer]] internal slot.
+        const typed_array = try this_value.requireInternalSlot(agent, TypedArray);
+
+        // 4. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(O, seq-cst).
+        const ta = makeTypedArrayWithBufferWitnessRecord(typed_array, .seq_cst);
+
+        // 5. Let size be TypedArrayByteLength(taRecord).
+        const size = typedArrayByteLength(ta);
+
+        // 6. Return 𝔽(size).
+        return Value.from(size);
     }
 
     /// 23.2.3.7 %TypedArray%.prototype.entries ( )
