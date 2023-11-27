@@ -592,6 +592,7 @@ pub const TypedArrayPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinAccessor(object, "buffer", buffer, null, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
         try defineBuiltinFunction(object, "keys", keys, 0, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
@@ -603,6 +604,21 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinProperty(object, "@@iterator", @"%TypedArray.prototype.values%");
 
         return object;
+    }
+
+    /// 23.2.3.2 get %TypedArray%.prototype.buffer
+    /// https://tc39.es/ecma262/#sec-get-%typedarray%.prototype.buffer
+    fn buffer(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[TypedArrayName]]).
+        // 3. Assert: O has a [[ViewedArrayBuffer]] internal slot.
+        const typed_array = try this_value.requireInternalSlot(agent, TypedArray);
+
+        // 4. Let buffer be O.[[ViewedArrayBuffer]].
+        const buffer_ = typed_array.fields.viewed_array_buffer;
+
+        // 5. Return buffer.
+        return Value.from(buffer_.object());
     }
 
     /// 23.2.3.7 %TypedArray%.prototype.entries ( )
