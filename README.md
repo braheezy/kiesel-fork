@@ -15,11 +15,12 @@ _Kiesel_ is a JavaScript engine written from scratch for the purpose of
 [Zig programming language](https://ziglang.org), with the eventual goal of full
 support for the latest [ECMAScript](https://tc39.es/ecma262/) standard. It
 features a custom bytecode VM and runtime, and aims to implement as much as
-possible in pure Zig - currently with two exceptions:
+possible in pure Zig - currently with the following exceptions:
 
 - [bdwgc](https://github.com/ivmai/bdwgc) for garbage collected allocations
 - [libregexp](https://github.com/bellard/quickjs/blob/master/libregexp.h) for
   regular expressions
+- [ICU4X](https://github.com/unicode-org/icu4x) for `Intl`-related functionality
 
 A simple CLI (REPL/file interpreter) is available but being easy to embed in
 other projects is also a goal.
