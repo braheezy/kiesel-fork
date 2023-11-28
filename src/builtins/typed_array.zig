@@ -569,6 +569,7 @@ pub const TypedArrayConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "of", of, 0, realm);
         try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
 
         // 23.2.2.3 %TypedArray%.prototype
@@ -600,6 +601,41 @@ pub const TypedArrayConstructor = struct {
             "TypedArray abstract superclass cannot be constructed",
             .{},
         );
+    }
+
+    /// 23.2.2.2 %TypedArray%.of ( ...items )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.of
+    fn of(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        // 1. Let len be the number of elements in items.
+        const len = arguments.count();
+
+        // 2. Let C be the this value.
+        const constructor = this_value;
+
+        // 3. If IsConstructor(C) is false, throw a TypeError exception.
+        if (!constructor.isConstructor()) {
+            return agent.throwException(.type_error, "{} is not a constructor", .{constructor});
+        }
+
+        // 4. Let newObj be ? TypedArrayCreateFromConstructor(C, « 𝔽(len) »).
+        const new_object = try typedArrayCreateFromConstructor(agent, constructor.object, .{Value.from(len)});
+
+        // 5. Let k be 0.
+        // 6. Repeat, while k < len,
+        for (arguments.values, 0..) |k_value, k| {
+            // a. Let kValue be items[k].
+
+            // b. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(k)));
+
+            // c. Perform ? Set(newObj, Pk, kValue, true).
+            try new_object.set(property_key, k_value, .throw);
+
+            // d. Set k to k + 1.
+        }
+
+        // 7. Return newObj.
+        return Value.from(new_object);
     }
 
     /// 23.2.2.4 get %TypedArray% [ @@species ]
@@ -823,6 +859,43 @@ pub const TypedArrayPrototype = struct {
         return Value.from(name);
     }
 };
+
+/// 23.2.4.2 TypedArrayCreateFromConstructor ( constructor, argumentList )
+/// https://tc39.es/ecma262/#sec-typedarraycreatefromconstructor
+fn typedArrayCreateFromConstructor(
+    agent: *Agent,
+    constructor: Object,
+    argument_list: anytype,
+) Agent.Error!Object {
+    // 1. Let newTypedArray be ? Construct(constructor, argumentList).
+    const new_typed_array = try constructor.construct(argument_list, null);
+
+    // 2. Let taRecord be ? ValidateTypedArray(newTypedArray, seq-cst).
+    const ta = try validateTypedArray(agent, Value.from(new_typed_array), .seq_cst);
+
+    // 3. If the number of elements in argumentList is 1 and argumentList[0] is a Number, then
+    if (argument_list.len == 1 and argument_list[0] == .number) {
+        // a. If IsTypedArrayOutOfBounds(taRecord) is true, throw a TypeError exception.
+        if (isTypedArrayOutOfBounds(ta)) {
+            return agent.throwException(.type_error, "Typed array is out of bounds", .{});
+        }
+
+        // b. Let length be TypedArrayLength(taRecord).
+        const length = typedArrayLength(ta);
+
+        // c. If length < ℝ(argumentList[0]), throw a TypeError exception.
+        if (@as(f64, @floatFromInt(length)) < argument_list[0].number.asFloat()) {
+            return agent.throwException(
+                .type_error,
+                "Typed array must have at least length {}, got {}",
+                .{ length, argument_list[0] },
+            );
+        }
+    }
+
+    // 4. Return newTypedArray.
+    return new_typed_array;
+}
 
 /// 23.2.4.4 ValidateTypedArray ( O, order )
 /// https://tc39.es/ecma262/#sec-validatetypedarray
