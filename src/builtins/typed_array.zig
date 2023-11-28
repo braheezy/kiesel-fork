@@ -658,6 +658,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinAccessor(object, "byteOffset", byteOffset, null, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
+        try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
         try defineBuiltinFunction(object, "join", join, 1, realm);
         try defineBuiltinFunction(object, "keys", keys, 0, realm);
         try defineBuiltinAccessor(object, "length", length, null, realm);
@@ -741,6 +742,49 @@ pub const TypedArrayPrototype = struct {
 
         // 3. Return CreateArrayIterator(O, key+value).
         return Value.from(try createArrayIterator(agent, object, .@"key+value"));
+    }
+
+    /// 23.2.3.15 %TypedArray%.prototype.forEach ( callbackfn [ , thisArg ] )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.foreach
+    fn forEach(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const callback_fn = arguments.get(0);
+        const this_arg = arguments.get(1);
+
+        // 1. Let O be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
+        const ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const object = this_value.object;
+
+        // 3. Let len be TypedArrayLength(taRecord).
+        const len = typedArrayLength(ta);
+
+        // 4. If IsCallable(callbackfn) is false, throw a TypeError exception.
+        if (!callback_fn.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
+        }
+
+        // 5. Let k be 0.
+        var k: u53 = 0;
+
+        // 6. Repeat, while k < len,
+        while (k < len) : (k += 1) {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
+
+            // b. Let kValue be ! Get(O, Pk).
+            const k_value = object.get(property_key) catch |err| try noexcept(err);
+
+            // c. Perform ? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »).
+            _ = try callback_fn.callAssumeCallable(
+                this_arg,
+                .{ k_value, Value.from(k), Value.from(object) },
+            );
+
+            // d. Set k to k + 1.
+        }
+
+        // 7. Return undefined.
+        return .undefined;
     }
 
     /// 23.2.3.18 %TypedArray%.prototype.join ( separator )
