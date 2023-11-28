@@ -662,6 +662,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinFunction(object, "join", join, 1, realm);
         try defineBuiltinFunction(object, "keys", keys, 0, realm);
         try defineBuiltinAccessor(object, "length", length, null, realm);
+        try defineBuiltinFunction(object, "map", map, 1, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
         try defineBuiltinAccessor(object, "@@toStringTag", @"@@toStringTag", null, realm);
 
@@ -869,6 +870,55 @@ pub const TypedArrayPrototype = struct {
         return Value.from(length_);
     }
 
+    /// 23.2.3.22 %TypedArray%.prototype.map ( callbackfn [ , thisArg ] )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.map
+    fn map(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const callback_fn = arguments.get(0);
+        const this_arg = arguments.get(1);
+
+        // 1. Let O be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
+        const ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const object = this_value.object;
+
+        // 3. Let len be TypedArrayLength(taRecord).
+        const len = typedArrayLength(ta);
+
+        // 4. If IsCallable(callbackfn) is false, throw a TypeError exception.
+        if (!callback_fn.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
+        }
+
+        // 5. Let A be ? TypedArraySpeciesCreate(O, « 𝔽(len) »).
+        const array = try typedArraySpeciesCreate(agent, object.as(TypedArray), .{Value.from(len)});
+
+        // 6. Let k be 0.
+        var k: u53 = 0;
+
+        // 7. Repeat, while k < len,
+        while (k < len) : (k += 1) {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
+
+            // b. Let kValue be ! Get(O, Pk).
+            const k_value = object.get(property_key) catch |err| try noexcept(err);
+
+            // c. Let mappedValue be ? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »).
+            const mapped_value = try callback_fn.callAssumeCallable(
+                this_arg,
+                .{ k_value, Value.from(k), Value.from(object) },
+            );
+
+            // d. Perform ? Set(A, Pk, mappedValue, true).
+            try array.set(property_key, mapped_value, .throw);
+
+            // e. Set k to k + 1.
+        }
+
+        // 8. Return A.
+        return Value.from(array);
+    }
+
     /// 23.2.3.35 %TypedArray%.prototype.values ( )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.values
     fn values(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
@@ -903,6 +953,46 @@ pub const TypedArrayPrototype = struct {
         return Value.from(name);
     }
 };
+
+/// 23.2.4.1 TypedArraySpeciesCreate ( exemplar, argumentList )
+/// https://tc39.es/ecma262/#typedarray-species-create
+fn typedArraySpeciesCreate(
+    agent: *Agent,
+    exemplar: *const TypedArray,
+    argument_list: anytype,
+) Agent.Error!Object {
+    const realm = agent.currentRealm();
+
+    // 1. Let defaultConstructor be the intrinsic object associated with the constructor name
+    //    exemplar.[[TypedArrayName]] in Table 71.
+    const default_constructor = inline for (typed_array_element_types) |entry| {
+        const name, _ = entry;
+        if (std.mem.eql(u8, exemplar.fields.typed_array_name, name)) {
+            break try @field(Realm.Intrinsics, "%" ++ name ++ "%")(&realm.intrinsics);
+        }
+    } else unreachable;
+
+    // 2. Let constructor be ? SpeciesConstructor(exemplar, defaultConstructor).
+    const constructor = try @constCast(exemplar).object().speciesConstructor(default_constructor);
+
+    // 3. Let result be ? TypedArrayCreateFromConstructor(constructor, argumentList).
+    const result = try typedArrayCreateFromConstructor(agent, constructor, argument_list);
+
+    // 4. Assert: result has [[TypedArrayName]] and [[ContentType]] internal slots.
+    std.debug.assert(result.is(TypedArray));
+
+    // 5. If result.[[ContentType]] is not exemplar.[[ContentType]], throw a TypeError exception.
+    if (result.as(TypedArray).fields.content_type != exemplar.fields.content_type) {
+        return agent.throwException(
+            .type_error,
+            "Cannot convert between BigInt and Number typed arrays",
+            .{},
+        );
+    }
+
+    // 6. Return result.
+    return result;
+}
 
 /// 23.2.4.2 TypedArrayCreateFromConstructor ( constructor, argumentList )
 /// https://tc39.es/ecma262/#sec-typedarraycreatefromconstructor
