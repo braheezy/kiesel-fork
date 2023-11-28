@@ -93,7 +93,7 @@ pub const typed_array_element_types = .{
 
 /// 10.4.5.1 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-typedarray-getownproperty
-fn getOwnProperty(object: Object, property_key: PropertyKey) Agent.Error!?PropertyDescriptor {
+fn getOwnProperty(object: Object, property_key: PropertyKey) error{}!?PropertyDescriptor {
     const agent = object.agent();
 
     // 1. If P is a String, then
@@ -231,7 +231,7 @@ fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value)
 
 /// 10.4.5.6 [[Delete]] ( P )
 /// https://tc39.es/ecma262/#sec-typedarray-delete
-fn delete(object: Object, property_key: PropertyKey) Agent.Error!bool {
+fn delete(object: Object, property_key: PropertyKey) Allocator.Error!bool {
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
     //     b. If numericIndex is not undefined, then
@@ -561,7 +561,7 @@ fn typedArraySetElement(agent: *Agent, typed_array: *const TypedArray, index: f6
 /// 23.2.2 Properties of the %TypedArray% Intrinsic Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-%typedarray%-intrinsic-object
 pub const TypedArrayConstructor = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
             .length = 0,
             .name = "TypedArray",
@@ -613,7 +613,7 @@ pub const TypedArrayConstructor = struct {
 /// 23.2.3 Properties of the %TypedArray% Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-%typedarrayprototype%-object
 pub const TypedArrayPrototype = struct {
-    pub fn create(realm: *Realm) !Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
@@ -826,7 +826,11 @@ pub const TypedArrayPrototype = struct {
 
 /// 23.2.4.4 ValidateTypedArray ( O, order )
 /// https://tc39.es/ecma262/#sec-validatetypedarray
-fn validateTypedArray(agent: *Agent, object: Value, order: Order) Agent.Error!TypedArrayWithBufferWitness {
+fn validateTypedArray(
+    agent: *Agent,
+    object: Value,
+    order: Order,
+) error{ExceptionThrown}!TypedArrayWithBufferWitness {
     // 1. Perform ? RequireInternalSlot(O, [[TypedArrayName]]).
     // 2. Assert: O has a [[ViewedArrayBuffer]] internal slot.
     const typed_array = try object.requireInternalSlot(agent, TypedArray);
@@ -872,7 +876,7 @@ fn allocateTypedArray(
     new_target: Object,
     comptime default_prototype: []const u8,
     length: ?u53,
-) !Object {
+) Agent.Error!Object {
     // 1. Let proto be ? GetPrototypeFromConstructor(newTarget, defaultProto).
     const prototype = try getPrototypeFromConstructor(new_target, default_prototype);
 
@@ -1298,7 +1302,11 @@ fn initializeTypedArrayFromArrayLike(
 
 /// 23.2.5.1.6 AllocateTypedArrayBuffer ( O, length )
 /// https://tc39.es/ecma262/#sec-allocatetypedarraybuffer
-fn allocateTypedArrayBuffer(agent: *Agent, typed_array: *TypedArray, length: u53) !void {
+fn allocateTypedArrayBuffer(
+    agent: *Agent,
+    typed_array: *TypedArray,
+    length: u53,
+) Agent.Error!void {
     const realm = agent.currentRealm();
 
     // 1. Assert: O.[[ViewedArrayBuffer]] is undefined.
@@ -1342,7 +1350,7 @@ fn allocateTypedArrayBuffer(agent: *Agent, typed_array: *TypedArray, length: u53
 /// https://tc39.es/ecma262/#sec-properties-of-the-typedarray-constructors
 fn MakeTypedArrayConstructor(comptime name: []const u8) type {
     return struct {
-        pub fn create(realm: *Realm) !Object {
+        pub fn create(realm: *Realm) Allocator.Error!Object {
             const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
                 .length = 3,
                 .name = name,
@@ -1534,7 +1542,7 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
 /// https://tc39.es/ecma262/#sec-properties-of-typedarray-prototype-objects
 fn MakeTypedArrayPrototype(comptime name: []const u8) type {
     return struct {
-        pub fn create(realm: *Realm) !Object {
+        pub fn create(realm: *Realm) Allocator.Error!Object {
             const object = try builtins.Object.create(realm.agent, .{
                 .prototype = try realm.intrinsics.@"%TypedArray.prototype%"(),
             });
