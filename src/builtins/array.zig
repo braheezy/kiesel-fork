@@ -3099,10 +3099,16 @@ pub fn findViaPredicate(
     //     a. Let indices be a List of the integers in the interval from 0 (inclusive) to len
     //        (exclusive), in descending order.
     // 4. For each integer k of indices, do
-    var k: u53 = if (direction == .ascending) 0 else len;
-    while (if (direction == .ascending) k < len else k > 0) : (k = if (direction == .ascending) k + 1 else k - 1) {
+    var k: ?u53 = if (direction == .ascending) 0 else std.math.sub(u53, len, 1) catch null;
+    // zig fmt: off
+    while (
+        if (direction == .ascending) k.? < len else k != null
+    ) : (
+        k = if (direction == .ascending) k.? + 1 else std.math.sub(u53, k.?, 1) catch null
+    ) {
+        // zig fmt: on
         // a. Let Pk be ! ToString(𝔽(k)).
-        const property_key = PropertyKey.from(k);
+        const property_key = PropertyKey.from(k.?);
 
         // b. NOTE: If O is a TypedArray, the following invocation of Get will return a normal completion.
         // c. Let kValue be ? Get(O, Pk).
@@ -3111,11 +3117,11 @@ pub fn findViaPredicate(
         // d. Let testResult be ? Call(predicate, thisArg, « kValue, 𝔽(k), O »).
         const test_result = try predicate.callAssumeCallable(
             this_arg,
-            .{ k_value, Value.from(k), Value.from(object) },
+            .{ k_value, Value.from(k.?), Value.from(object) },
         );
 
         // e. If ToBoolean(testResult) is true, return the Record { [[Index]]: 𝔽(k), [[Value]]: kValue }.
-        if (test_result.toBoolean()) return .{ .index = Value.from(k), .value = k_value };
+        if (test_result.toBoolean()) return .{ .index = Value.from(k.?), .value = k_value };
     }
 
     // 5. Return the Record { [[Index]]: -1𝔽, [[Value]]: undefined }.
