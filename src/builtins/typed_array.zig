@@ -659,6 +659,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinAccessor(object, "byteOffset", byteOffset, null, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
         try defineBuiltinFunction(object, "every", every, 1, realm);
+        try defineBuiltinFunction(object, "filter", filter, 1, realm);
         try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
         try defineBuiltinFunction(object, "join", join, 1, realm);
         try defineBuiltinFunction(object, "keys", keys, 0, realm);
@@ -791,6 +792,85 @@ pub const TypedArrayPrototype = struct {
 
         // 7. Return true.
         return Value.from(true);
+    }
+
+    /// 23.2.3.10 %TypedArray%.prototype.filter ( callbackfn [ , thisArg ] )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.filter
+    fn filter(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const callback_fn = arguments.get(0);
+        const this_arg = arguments.get(1);
+
+        // 1. Let O be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
+        const ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const object = this_value.object;
+
+        // 3. Let len be TypedArrayLength(taRecord).
+        const len = typedArrayLength(ta);
+
+        // 4. If IsCallable(callbackfn) is false, throw a TypeError exception.
+        if (!callback_fn.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
+        }
+
+        // 5. Let kept be a new empty List.
+        var kept = std.ArrayList(Value).init(agent.gc_allocator);
+        defer kept.deinit();
+
+        // 6. Let captured be 0.
+        var captured: u53 = 0;
+
+        // 7. Let k be 0.
+        var k: u53 = 0;
+
+        // 7. Repeat, while k < len,
+        while (k < len) : (k += 1) {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
+
+            // b. Let kValue be ! Get(O, Pk).
+            const k_value = object.get(property_key) catch |err| try noexcept(err);
+
+            // c. Let selected be ToBoolean(? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »)).
+            const selected = (try callback_fn.callAssumeCallable(
+                this_arg,
+                .{ k_value, Value.from(k), Value.from(object) },
+            )).toBoolean();
+
+            // d. If selected is true, then
+            if (selected) {
+                // i. Append kValue to kept.
+                try kept.append(k_value);
+
+                // ii. Set captured to captured + 1.
+                captured += 1;
+            }
+
+            // e. Set k to k + 1.
+        }
+
+        // 9. Let A be ? TypedArraySpeciesCreate(O, « 𝔽(captured) »).
+        const typed_array = try typedArraySpeciesCreate(
+            agent,
+            object.as(TypedArray),
+            .{Value.from(captured)},
+        );
+
+        // 10. Let n be 0.
+        // 11. For each element e of kept, do
+        for (kept.items, 0..) |element, n| {
+            // a. Perform ! Set(A, ! ToString(𝔽(n)), e, true).
+            typed_array.set(
+                PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(n))),
+                element,
+                .throw,
+            ) catch |err| try noexcept(err);
+
+            // b. Set n to n + 1.
+        }
+
+        // 12. Return A.
+        return Value.from(typed_array);
     }
 
     /// 23.2.3.15 %TypedArray%.prototype.forEach ( callbackfn [ , thisArg ] )
