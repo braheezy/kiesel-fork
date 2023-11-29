@@ -662,6 +662,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinFunction(object, "every", every, 1, realm);
         try defineBuiltinFunction(object, "filter", filter, 1, realm);
         try defineBuiltinFunction(object, "find", find, 1, realm);
+        try defineBuiltinFunction(object, "findIndex", findIndex, 1, realm);
         try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
         try defineBuiltinFunction(object, "join", join, 1, realm);
         try defineBuiltinFunction(object, "keys", keys, 0, realm);
@@ -894,6 +895,27 @@ pub const TypedArrayPrototype = struct {
 
         // 5. Return findRec.[[Value]].
         return find_record.value;
+    }
+
+    /// 23.2.3.12 %TypedArray%.prototype.findIndex ( predicate [ , thisArg ] )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.findindex
+    fn findIndex(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const predicate = arguments.get(0);
+        const this_arg = arguments.get(1);
+
+        // 1. Let O be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
+        const ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const object = this_value.object;
+
+        // 3. Let len be TypedArrayLength(taRecord).
+        const len = typedArrayLength(ta);
+
+        // 4. Let findRec be ? FindViaPredicate(O, len, ascending, predicate, thisArg).
+        const find_record = try findViaPredicate(object, len, .ascending, predicate, this_arg);
+
+        // 5. Return findRec.[[Index]].
+        return find_record.index;
     }
 
     /// 23.2.3.15 %TypedArray%.prototype.forEach ( callbackfn [ , thisArg ] )
