@@ -209,16 +209,16 @@ pub fn @"%BigInt.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%BigInt.prototype%", builtins.BigIntPrototype);
 }
 pub fn @"%BigInt64Array%"(self: *Self) Allocator.Error!Object {
-    return self.lazyIntrinsic("%BigInt%", builtins.BigInt64ArrayConstructor);
+    return self.lazyIntrinsic("%BigInt64Array%", builtins.BigInt64ArrayConstructor);
 }
 pub fn @"%BigInt64Array.prototype%"(self: *Self) Allocator.Error!Object {
-    return self.lazyIntrinsic("%BigInt%", builtins.BigInt64ArrayPrototype);
+    return self.lazyIntrinsic("%BigInt64Array.prototype%", builtins.BigInt64ArrayPrototype);
 }
 pub fn @"%BigUint64Array%"(self: *Self) Allocator.Error!Object {
-    return self.lazyIntrinsic("%BigInt%", builtins.BigUint64ArrayConstructor);
+    return self.lazyIntrinsic("%BigUint64Array%", builtins.BigUint64ArrayConstructor);
 }
 pub fn @"%BigUint64Array.prototype%"(self: *Self) Allocator.Error!Object {
-    return self.lazyIntrinsic("%BigInt%", builtins.BigUint64ArrayPrototype);
+    return self.lazyIntrinsic("%BigUint64Array.prototype%", builtins.BigUint64ArrayPrototype);
 }
 pub fn @"%Boolean%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Boolean%", builtins.BooleanConstructor);
