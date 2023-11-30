@@ -146,7 +146,7 @@ pub fn arrayCreate(agent: *Agent, length: u64, maybe_prototype: ?Object) Agent.E
     //      [[Value]]: 𝔽(length), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
     _ = ordinaryDefineOwnProperty(array, PropertyKey.from("length"), .{
-        .value = Value.from(length),
+        .value = Value.from(@as(u32, @intCast(length))),
         .writable = true,
         .enumerable = false,
         .configurable = false,
@@ -206,7 +206,7 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: u64) Ag
     }
 
     // 8. Return ? Construct(C, « 𝔽(length) »).
-    return constructor.object.construct(.{Value.from(length)}, null);
+    return constructor.object.construct(.{Value.from(@as(u32, @intCast(length)))}, null);
 }
 
 /// 10.4.2.4 ArraySetLength ( A, Desc )
@@ -666,7 +666,7 @@ pub const ArrayConstructor = struct {
         const len = arguments.count();
 
         // 2. Let lenNumber be 𝔽(len).
-        const len_number = Value.from(len);
+        const len_number = Value.from(@as(u53, @intCast(len)));
 
         // 3. Let C be the this value.
         const constructor = this_value;
@@ -3003,7 +3003,11 @@ pub const ArrayPrototype = struct {
         }
 
         // 5. Perform ? Set(O, "length", 𝔽(len + argCount), true).
-        try object.set(PropertyKey.from("length"), Value.from(len + arg_count), .throw);
+        try object.set(
+            PropertyKey.from("length"),
+            Value.from(len + @as(u53, @intCast(arg_count))),
+            .throw,
+        );
 
         // 6. Return 𝔽(len + argCount).
         return Value.from(len + @as(u53, @intCast(arg_count)));

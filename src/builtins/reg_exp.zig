@@ -339,7 +339,11 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
     // 16. If global is true or sticky is true, then
     if ((re_flags & (libregexp.LRE_FLAG_GLOBAL | libregexp.LRE_FLAG_STICKY)) != 0) {
         // a. Perform ? Set(R, "lastIndex", 𝔽(e), true).
-        try reg_exp.object().set(PropertyKey.from("lastIndex"), Value.from(end_index), .throw);
+        try reg_exp.object().set(
+            PropertyKey.from("lastIndex"),
+            Value.from(@as(u53, @intCast(end_index))),
+            .throw,
+        );
     }
 
     // 17. Let n be the number of elements in r.[[Captures]].
@@ -356,7 +360,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
     // 22. Perform ! CreateDataPropertyOrThrow(A, "index", 𝔽(lastIndex)).
     array.createDataPropertyOrThrow(
         PropertyKey.from("index"),
-        Value.from(last_index),
+        Value.from(@as(u53, @intCast(last_index))),
     ) catch |err| try noexcept(err);
 
     // 23. Perform ! CreateDataPropertyOrThrow(A, "input", S).
@@ -547,7 +551,10 @@ fn getMatchIndexPair(agent: *Agent, string: String, match: Match) Allocator.Erro
     // 2. Return CreateArrayFromList(« 𝔽(match.[[StartIndex]]), 𝔽(match.[[EndIndex]]) »).
     return createArrayFromList(
         agent,
-        &.{ Value.from(match.start_index), Value.from(match.end_index) },
+        &.{
+            Value.from(@as(u53, @intCast(match.start_index))),
+            Value.from(@as(u53, @intCast(match.end_index))),
+        },
     );
 }
 

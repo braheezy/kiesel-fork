@@ -223,7 +223,7 @@ pub fn createUnmappedArgumentsObject(
     //    }).
     object.createDataPropertyOrThrow(
         PropertyKey.from("length"),
-        Value.from(len),
+        Value.from(@as(u53, @intCast(len))),
     ) catch |err| try noexcept(err);
 
     // 5. Let index be 0.
@@ -340,7 +340,7 @@ pub fn createMappedArgumentsObject(
     //       [[Value]]: 𝔽(len), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
     object.definePropertyOrThrow(PropertyKey.from("length"), .{
-        .value = Value.from(len),
+        .value = Value.from(@as(u53, @intCast(len))),
         .writable = true,
         .enumerable = false,
         .configurable = true,

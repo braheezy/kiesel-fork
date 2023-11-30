@@ -387,8 +387,10 @@ pub const MapPrototype = struct {
         // 3. Let count be 0.
         // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
         //     a. If p.[[Key]] is not empty, set count to count + 1.
+        const count = map.fields.map_data.count();
+
         // 5. Return 𝔽(count).
-        return Value.from(map.fields.map_data.count());
+        return Value.from(@as(u53, @intCast(count)));
     }
 
     /// 24.1.3.11 Map.prototype.values ( )

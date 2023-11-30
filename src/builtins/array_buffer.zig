@@ -527,7 +527,7 @@ pub const ArrayBufferPrototype = struct {
         const length = object.fields.array_buffer_data.?.items.len;
 
         // 6. Return 𝔽(length).
-        return Value.from(length);
+        return Value.from(@as(u53, @intCast(length)));
     }
 
     /// 25.1.6.3 get ArrayBuffer.prototype.maxByteLength
@@ -555,7 +555,7 @@ pub const ArrayBufferPrototype = struct {
         };
 
         // 7. Return 𝔽(length).
-        return Value.from(length);
+        return Value.from(@as(u53, @intCast(length)));
     }
 
     /// 25.1.6.4 get ArrayBuffer.prototype.resizable

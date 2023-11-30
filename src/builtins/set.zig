@@ -316,8 +316,10 @@ pub const SetPrototype = struct {
         // 3. Let count be 0.
         // 4. For each element e of S.[[SetData]], do
         //     a. If e is not empty, set count to count + 1.
+        const count = set.fields.set_data.count();
+
         // 5. Return 𝔽(count).
-        return Value.from(set.fields.set_data.count());
+        return Value.from(@as(u53, @intCast(count)));
     }
 
     /// 24.2.3.10 Set.prototype.values ( )

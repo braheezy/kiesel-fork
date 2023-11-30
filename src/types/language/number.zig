@@ -48,8 +48,11 @@ pub const Number = union(enum) {
         const T = @TypeOf(number);
         switch (@typeInfo(T)) {
             .Int, .ComptimeInt => {
-                if (@as(f64, @floatFromInt(number)) <= @as(f64, @floatFromInt(std.math.maxInt(i32)))) {
-                    return .{ .i32 = @intCast(number) };
+                if (@typeInfo(T) == .Int and @typeInfo(T).Int.bits > 53) {
+                    @compileError("Number.from() is only safe up to 53 bit integers");
+                }
+                if (std.math.cast(i32, number)) |x| {
+                    return .{ .i32 = x };
                 }
                 return .{ .f64 = @floatFromInt(number) };
             },

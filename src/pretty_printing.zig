@@ -9,11 +9,13 @@ const build_options = @import("build-options");
 const builtins = @import("builtins.zig");
 const types = @import("types.zig");
 
+const BigInt = types.BigInt;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Value = types.Value;
 const getArrayLength = @import("builtins/array.zig").getArrayLength;
 const getFunctionName = @import("builtins/ecmascript_function.zig").getFunctionName;
+const isBigIntElementType = builtins.isBigIntElementType;
 const ordinaryOwnPropertyKeys = builtins.ordinaryOwnPropertyKeys;
 const typedArrayElementSize = builtins.typedArrayElementSize;
 
@@ -84,7 +86,7 @@ fn prettyPrintArrayBuffer(
     try writer.writeAll("ArrayBuffer(");
     try tty_config.setColor(writer, .reset);
     if (array_buffer.fields.array_buffer_data) |data| {
-        try writer.print("byteLength: {pretty}", .{Value.from(data.items.len)});
+        try writer.print("byteLength: {pretty}", .{Value.from(@as(u53, @intCast(data.items.len)))});
         if (array_buffer.fields.array_buffer_max_byte_length) |max_byte_length| {
             try writer.print(", maxByteLength: {pretty}", .{Value.from(max_byte_length)});
         }
@@ -437,6 +439,7 @@ fn prettyPrintStringIterator(
 }
 
 fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytype) !void {
+    const agent = typed_array.data.agent;
     const typed_array_name = typed_array.fields.typed_array_name;
     const viewed_array_buffer = typed_array.fields.viewed_array_buffer;
     const array_length = typed_array.fields.array_length;
@@ -467,9 +470,13 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
                         const bytes: *[element_size]u8 = @ptrCast(
                             data.items[@intCast(i)..@intCast(i + element_size)],
                         );
-                        const value = Value.from(std.mem.bytesAsValue(T, bytes).*);
+                        const value = std.mem.bytesAsValue(T, bytes).*;
+                        const numeric = if (isBigIntElementType(T))
+                            Value.from(BigInt.from(agent.gc_allocator, value) catch return)
+                        else
+                            Value.from(value);
                         if (i != 0) try writer.writeAll(", ");
-                        try writer.print("{pretty}", .{value});
+                        try writer.print("{pretty}", .{numeric});
                     }
                     break;
                 }

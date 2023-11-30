@@ -819,7 +819,8 @@ pub const DateConstructor = struct {
     fn now(_: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
         // This function returns the time value designating the UTC date and time of the occurrence
         // of the call to it.
-        return Value.from(std.time.milliTimestamp());
+        const timestamp = std.time.milliTimestamp();
+        return Value.from(@as(f64, @floatFromInt(timestamp)));
     }
 
     /// 21.4.3.2 Date.parse ( string )

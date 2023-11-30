@@ -106,7 +106,7 @@ pub fn stringCreate(agent: *Agent, value: types.String, prototype: Object) Alloc
     //      [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
     //    }).
     string.definePropertyOrThrow(PropertyKey.from("length"), .{
-        .value = Value.from(length),
+        .value = Value.from(@as(u53, @intCast(length))),
         .writable = false,
         .enumerable = false,
         .configurable = false,
@@ -644,7 +644,8 @@ pub const StringPrototype = struct {
         const start = std.math.clamp(std.math.lossyCast(usize, pos), 0, len);
 
         // 8. Return 𝔽(StringIndexOf(S, searchStr, start)).
-        return Value.from(string.indexOf(search_str, start) orelse return Value.from(-1));
+        const index = string.indexOf(search_str, start) orelse return Value.from(-1);
+        return Value.from(@as(u53, @intCast(index)));
     }
 
     /// 22.1.3.11 String.prototype.lastIndexOf ( searchString [ , position ] )
@@ -686,13 +687,14 @@ pub const StringPrototype = struct {
         );
 
         // 10. If searchStr is the empty String, return 𝔽(start).
-        if (search_str.isEmpty()) return Value.from(start);
+        if (search_str.isEmpty()) return Value.from(@as(u53, @intCast(start)));
 
         // 11. For each integer i such that 0 ≤ i ≤ start, in descending order, do
         //     a. Let candidate be the substring of S from i to i + searchLen.
         //     b. If candidate is searchStr, return 𝔽(i).
         // 12. Return -1𝔽.
-        return Value.from(string.lastIndexOf(search_str, start) orelse return Value.from(-1));
+        const index = string.lastIndexOf(search_str, start) orelse return Value.from(-1);
+        return Value.from(@as(u53, @intCast(index)));
     }
 
     /// 22.1.3.14 String.prototype.matchAll ( regexp )

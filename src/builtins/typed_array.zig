@@ -625,7 +625,11 @@ pub const TypedArrayConstructor = struct {
         }
 
         // 4. Let newObj be ? TypedArrayCreateFromConstructor(C, « 𝔽(len) »).
-        const new_object = try typedArrayCreateFromConstructor(agent, constructor.object, .{Value.from(len)});
+        const new_object = try typedArrayCreateFromConstructor(
+            agent,
+            constructor.object,
+            .{Value.from(@as(u53, @intCast(len)))},
+        );
 
         // 5. Let k be 0.
         // 6. Repeat, while k < len,

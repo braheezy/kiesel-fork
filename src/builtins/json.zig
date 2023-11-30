@@ -28,7 +28,9 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 fn convertJsonValue(agent: *Agent, value: std.json.Value) Allocator.Error!Value {
     return switch (value) {
         .null => .null,
-        inline .bool, .integer, .float => |x| Value.from(x),
+        .bool => |x| Value.from(x),
+        .float => |x| Value.from(x),
+        .integer => |x| Value.from(@as(f64, @floatFromInt(x))),
         .string => |x| Value.from(try agent.gc_allocator.dupe(u8, x)),
         .number_string => |x| Value.from(std.fmt.parseFloat(f64, x) catch unreachable),
         .array => |x| blk: {
