@@ -198,7 +198,7 @@ pub fn isFixedLengthArrayBuffer(array_buffer: *const ArrayBuffer) bool {
 
 /// 25.1.3.11 IsBigIntElementType ( type )
 /// https://tc39.es/ecma262/#sec-isbigintelementtype
-pub fn isBigIntElementType(comptime T: type) bool {
+pub inline fn isBigIntElementType(comptime T: type) bool {
     // 1. If type is either biguint64 or bigint64, return true.
     // 2. Return false.
     return T == u64 or T == i64;
@@ -361,7 +361,7 @@ pub fn setValueInBuffer(
 
     // 3. Assert: value is a BigInt if IsBigIntElementType(type) is true; otherwise, value is a
     //    Number.
-    std.debug.assert(value == if (comptime isBigIntElementType(T)) .big_int else .number);
+    std.debug.assert(value == if (isBigIntElementType(T)) .big_int else .number);
 
     // 4. Let block be arrayBuffer.[[ArrayBufferData]].
     const block = array_buffer.fields.array_buffer_data.?;

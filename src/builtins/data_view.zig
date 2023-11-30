@@ -207,7 +207,7 @@ fn getViewValue(
         .unordered,
         is_little_endian,
     );
-    return if (comptime isBigIntElementType(T))
+    return if (isBigIntElementType(T))
         Value.from(try BigInt.from(agent.gc_allocator, value))
     else
         Value.from(value);
@@ -232,7 +232,7 @@ fn setViewValue(
 
     // 4. If IsBigIntElementType(type) is true, let numberValue be ? ToBigInt(value).
     // 5. Otherwise, let numberValue be ? ToNumber(value).
-    const number_value = if (comptime isBigIntElementType(T))
+    const number_value = if (isBigIntElementType(T))
         Value.from(try value.toBigInt(agent))
     else
         Value.from(try value.toNumber(agent));

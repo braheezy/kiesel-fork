@@ -512,7 +512,7 @@ fn typedArrayGetElement(agent: *Agent, typed_array: *const TypedArray, index: u5
                 .unordered,
                 null,
             );
-            return if (comptime isBigIntElementType(T))
+            return if (isBigIntElementType(T))
                 Value.from(try BigInt.from(agent.gc_allocator, value))
             else
                 Value.from(value);
@@ -1535,7 +1535,7 @@ fn initializeTypedArrayFromTypedArray(
                         .unordered,
                         null,
                     );
-                    break :blk_value if (comptime isBigIntElementType(T))
+                    break :blk_value if (isBigIntElementType(T))
                         Value.from(try BigInt.from(agent.gc_allocator, value))
                     else
                         Value.from(value);
