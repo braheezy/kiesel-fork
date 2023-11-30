@@ -13,6 +13,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const BigInt = types.BigInt;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const Order = @import("../builtins/array_buffer.zig").Order;
@@ -32,6 +33,7 @@ const findViaPredicate = builtins.findViaPredicate;
 const getIteratorFromMethod = types.getIteratorFromMethod;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const getValueFromBuffer = builtins.getValueFromBuffer;
+const isBigIntElementType = builtins.isBigIntElementType;
 const isDetachedBuffer = builtins.isDetachedBuffer;
 const isFixedLengthArrayBuffer = builtins.isFixedLengthArrayBuffer;
 const noexcept = utils.noexcept;
@@ -94,7 +96,7 @@ pub const typed_array_element_types = .{
 
 /// 10.4.5.1 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-typedarray-getownproperty
-fn getOwnProperty(object: Object, property_key: PropertyKey) error{}!?PropertyDescriptor {
+fn getOwnProperty(object: Object, property_key: PropertyKey) Allocator.Error!?PropertyDescriptor {
     const agent = object.agent();
 
     // 1. If P is a String, then
@@ -102,7 +104,7 @@ fn getOwnProperty(object: Object, property_key: PropertyKey) error{}!?PropertyDe
     //     b. If numericIndex is not undefined, then
     if (property_key == .integer_index) {
         // i. Let value be TypedArrayGetElement(O, numericIndex).
-        const value = typedArrayGetElement(
+        const value = try typedArrayGetElement(
             agent,
             object.as(TypedArray),
             property_key.integer_index,
@@ -482,7 +484,7 @@ fn isValidIntegerIndex(typed_array: *const TypedArray, index: f64) bool {
 
 /// 10.4.5.15 TypedArrayGetElement ( O, index )
 /// https://tc39.es/ecma262/#sec-typedarraygetelement
-fn typedArrayGetElement(agent: *Agent, typed_array: *const TypedArray, index: u53) Value {
+fn typedArrayGetElement(agent: *Agent, typed_array: *const TypedArray, index: u53) Allocator.Error!Value {
     // 1. If IsValidIntegerIndex(O, index) is false, return undefined.
     if (!isValidIntegerIndex(typed_array, @floatFromInt(index))) return .undefined;
 
@@ -501,7 +503,7 @@ fn typedArrayGetElement(agent: *Agent, typed_array: *const TypedArray, index: u5
         if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
             // 6. Return GetValueFromBuffer(O.[[ViewedArrayBuffer]], byteIndexInBuffer,
             //    elementType, true, unordered).
-            return Value.from(getValueFromBuffer(
+            const value = getValueFromBuffer(
                 agent,
                 typed_array.fields.viewed_array_buffer,
                 byte_index_in_buffer,
@@ -509,7 +511,11 @@ fn typedArrayGetElement(agent: *Agent, typed_array: *const TypedArray, index: u5
                 true,
                 .unordered,
                 null,
-            ));
+            );
+            return if (comptime isBigIntElementType(T))
+                Value.from(try BigInt.from(agent.gc_allocator, value))
+            else
+                Value.from(value);
         }
     } else unreachable;
 }
@@ -1520,7 +1526,7 @@ fn initializeTypedArrayFromTypedArray(
                 const name, const T = entry;
                 if (std.mem.eql(u8, src_type, name)) {
                     // i. Let value be GetValueFromBuffer(srcData, srcByteIndex, srcType, true, unordered).
-                    break :blk_value Value.from(getValueFromBuffer(
+                    const value = getValueFromBuffer(
                         agent,
                         src_data,
                         src_byte_index,
@@ -1528,7 +1534,11 @@ fn initializeTypedArrayFromTypedArray(
                         true,
                         .unordered,
                         null,
-                    ));
+                    );
+                    break :blk_value if (comptime isBigIntElementType(T))
+                        Value.from(try BigInt.from(agent.gc_allocator, value))
+                    else
+                        Value.from(value);
                 }
             } else unreachable;
 
