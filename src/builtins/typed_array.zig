@@ -682,6 +682,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinFunction(object, "map", map, 1, realm);
         try defineBuiltinFunction(object, "some", some, 1, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
+        try defineBuiltinFunction(object, "with", with, 2, realm);
         try defineBuiltinAccessor(object, "@@toStringTag", @"@@toStringTag", null, realm);
 
         // 23.2.3.34 %TypedArray%.prototype.toString ( )
@@ -1205,6 +1206,79 @@ pub const TypedArrayPrototype = struct {
         return Value.from(try createArrayIterator(agent, object, .value));
     }
 
+    /// 23.2.3.36 %TypedArray%.prototype.with ( index, value )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.with
+    fn with(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const index = arguments.get(0);
+        const value = arguments.get(1);
+
+        // 1. Let O be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
+        const ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const typed_array = ta.object;
+
+        // 3. Let len be TypedArrayLength(taRecord).
+        const len = typedArrayLength(ta);
+
+        // 4. Let relativeIndex be ? ToIntegerOrInfinity(index).
+        const relative_index = try index.toIntegerOrInfinity(agent);
+
+        // 5. If relativeIndex ≥ 0, let actualIndex be relativeIndex.
+        // 6. Else, let actualIndex be len + relativeIndex.
+        const actual_index_f64 = if (relative_index >= 0)
+            relative_index
+        else
+            @as(f64, @floatFromInt(len)) + relative_index;
+
+        // 7. If O.[[ContentType]] is bigint, let numericValue be ? ToBigInt(value).
+        // 8. Else, let numericValue be ? ToNumber(value).
+        const numeric_value = if (typed_array.fields.content_type == .bigint)
+            Value.from(try value.toBigInt(agent))
+        else
+            Value.from(try value.toNumber(agent));
+
+        // 9. If IsValidIntegerIndex(O, 𝔽(actualIndex)) is false, throw a RangeError exception.
+        if (!isValidIntegerIndex(typed_array, actual_index_f64)) {
+            return agent.throwException(
+                .range_error,
+                "Invalid index {d} for typed array of length {}",
+                .{ actual_index_f64, len },
+            );
+        }
+        const actual_index: u53 = @intFromFloat(actual_index_f64);
+
+        // 10. Let A be ? TypedArrayCreateSameType(O, « 𝔽(len) »).
+        const new_typed_array = try typedArrayCreateSameType(
+            agent,
+            typed_array,
+            .{Value.from(len)},
+        );
+
+        // 11. Let k be 0.
+        var k: u53 = 0;
+
+        // 12. Repeat, while k < len,
+        while (k < len) : (k += 1) {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
+
+            // b. If k is actualIndex, let fromValue be numericValue.
+            // c. Else, let fromValue be ! Get(O, Pk).
+            const from_value = if (k == actual_index)
+                numeric_value
+            else
+                @constCast(typed_array).object().get(property_key) catch |err| try noexcept(err);
+
+            // d. Perform ! Set(A, Pk, fromValue, true).
+            new_typed_array.set(property_key, from_value, .throw) catch |err| try noexcept(err);
+
+            // e. Set k to k + 1.
+        }
+
+        // 13. Return A.
+        return Value.from(new_typed_array);
+    }
+
     /// 23.2.3.38 get %TypedArray%.prototype [ @@toStringTag ]
     /// https://tc39.es/ecma262/#sec-get-%typedarray%.prototype-@@tostringtag
     fn @"@@toStringTag"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
@@ -1302,6 +1376,37 @@ fn typedArrayCreateFromConstructor(
 
     // 4. Return newTypedArray.
     return new_typed_array;
+}
+
+/// 23.2.4.3 TypedArrayCreateSameType ( exemplar, argumentList )
+/// https://tc39.es/ecma262/#sec-typedarray-create-same-type
+fn typedArrayCreateSameType(
+    agent: *Agent,
+    exemplar: *const TypedArray,
+    argument_list: anytype,
+) Agent.Error!Object {
+    const realm = agent.currentRealm();
+
+    // 1. Let constructor be the intrinsic object associated with the constructor name
+    //    exemplar.[[TypedArrayName]] in Table 71.
+    const constructor = inline for (typed_array_element_types) |entry| {
+        const name, _ = entry;
+        if (std.mem.eql(u8, exemplar.fields.typed_array_name, name)) {
+            break try @field(Realm.Intrinsics, "%" ++ name ++ "%")(&realm.intrinsics);
+        }
+    } else unreachable;
+
+    // 2. Let result be ? TypedArrayCreateFromConstructor(constructor, argumentList).
+    const result = try typedArrayCreateFromConstructor(agent, constructor, argument_list);
+
+    // 3. Assert: result has [[TypedArrayName]] and [[ContentType]] internal slots.
+    std.debug.assert(result.is(TypedArray));
+
+    // 4. Assert: result.[[ContentType]] is exemplar.[[ContentType]].
+    std.debug.assert(result.as(TypedArray).fields.content_type == exemplar.fields.content_type);
+
+    // 5. Return result.
+    return result;
 }
 
 /// 23.2.4.4 ValidateTypedArray ( O, order )
