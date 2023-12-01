@@ -681,6 +681,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinAccessor(object, "length", length, null, realm);
         try defineBuiltinFunction(object, "map", map, 1, realm);
         try defineBuiltinFunction(object, "some", some, 1, realm);
+        try defineBuiltinFunction(object, "toReversed", toReversed, 0, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
         try defineBuiltinFunction(object, "with", with, 2, realm);
         try defineBuiltinAccessor(object, "@@toStringTag", @"@@toStringTag", null, realm);
@@ -1191,6 +1192,48 @@ pub const TypedArrayPrototype = struct {
 
         // 7. Return false.
         return Value.from(false);
+    }
+
+    /// 23.2.3.32 %TypedArray%.prototype.toReversed ( )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.toreversed
+    fn toReversed(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let O be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
+        const ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const typed_array = ta.object;
+
+        // 3. Let length be TypedArrayLength(taRecord).
+        const len = typedArrayLength(ta);
+
+        // 4. Let A be ? TypedArrayCreateSameType(O, « 𝔽(length) »).
+        const new_typed_array = try typedArrayCreateSameType(
+            agent,
+            typed_array,
+            .{Value.from(len)},
+        );
+
+        // 5. Let k be 0.
+        var k: u53 = 0;
+
+        // 6. Repeat, while k < length,
+        while (k < len) : (k += 1) {
+            // a. Let from be ! ToString(𝔽(length - k - 1)).
+            const from = PropertyKey.from(len - k - 1);
+
+            // b. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
+
+            // c. Let fromValue be ! Get(O, from).
+            const from_value = @constCast(typed_array).object().get(from) catch |err| try noexcept(err);
+
+            // d. Perform ! Set(A, Pk, fromValue, true).
+            new_typed_array.set(property_key, from_value, .throw) catch |err| try noexcept(err);
+
+            // e. Set k to k + 1.
+        }
+
+        // 7. Return A.
+        return Value.from(new_typed_array);
     }
 
     /// 23.2.3.35 %TypedArray%.prototype.values ( )
