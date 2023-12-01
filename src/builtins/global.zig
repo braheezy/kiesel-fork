@@ -29,7 +29,7 @@ const NameAndPropertyDescriptor = struct {
     PropertyDescriptor,
 };
 
-const num_properties = 51 + if (build_options.enable_intl) 1 else 0;
+const num_properties = 52 + if (build_options.enable_intl) 1 else 0;
 
 pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
@@ -225,6 +225,10 @@ pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]Nam
         // 19.3.37 URIError ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-urierror
         .{ "URIError", .{ .value = Value.from(try realm.intrinsics.@"%URIError%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.4.1 Atomics
+        // https://tc39.es/ecma262/#sec-atomics
+        .{ "Atomics", .{ .value = Value.from(try realm.intrinsics.@"%Atomics%"()), .writable = true, .enumerable = false, .configurable = true } },
 
         // 19.4.2 JSON
         // https://tc39.es/ecma262/#sec-json
