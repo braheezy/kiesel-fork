@@ -304,7 +304,7 @@ fn ownPropertyKeys(object: Object) Allocator.Error!std.ArrayList(PropertyKey) {
 
 /// 10.4.5.8 TypedArray With Buffer Witness Records
 /// https://tc39.es/ecma262/#sec-typedarray-with-buffer-witness-records
-const TypedArrayWithBufferWitness = struct {
+pub const TypedArrayWithBufferWitness = struct {
     pub const CachedBufferByteLength = union(enum) {
         detached,
         value: u53,
@@ -1454,7 +1454,7 @@ fn typedArrayCreateSameType(
 
 /// 23.2.4.4 ValidateTypedArray ( O, order )
 /// https://tc39.es/ecma262/#sec-validatetypedarray
-fn validateTypedArray(
+pub fn validateTypedArray(
     agent: *Agent,
     object: Value,
     order: Order,
@@ -1477,7 +1477,7 @@ fn validateTypedArray(
 
 /// 23.2.4.5 TypedArrayElementSize ( O )
 /// https://tc39.es/ecma262/#sec-typedarrayelementsize
-fn typedArrayElementSize(typed_array: *const TypedArray) u53 {
+pub fn typedArrayElementSize(typed_array: *const TypedArray) u53 {
     // 1. Return the Element Size value specified in Table 70 for O.[[TypedArrayName]].
     // FIXME: Would be nice to completely do this at comptime based on the struct type, but once
     //        they are unique (for type comparison) we cannot cast to the generic TypedArray anymore.

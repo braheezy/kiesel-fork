@@ -163,6 +163,7 @@ pub const ThrowTypeError = throw_type_error.ThrowTypeError;
 pub const TypedArray = typed_array.TypedArray;
 pub const TypedArrayConstructor = typed_array.TypedArrayConstructor;
 pub const TypedArrayPrototype = typed_array.TypedArrayPrototype;
+pub const TypedArrayWithBufferWitness = typed_array.TypedArrayWithBufferWitness;
 pub const TypeError = @"error".TypeError;
 pub const TypeErrorConstructor = @"error".TypeErrorConstructor;
 pub const TypeErrorPrototype = @"error".TypeErrorPrototype;
@@ -252,6 +253,7 @@ pub const triggerPromiseReactions = promise.triggerPromiseReactions;
 pub const typedArrayElementSize = typed_array.typedArrayElementSize;
 pub const typedArrayLength = typed_array.typedArrayLength;
 pub const validateNonRevokedProxy = proxy.validateNonRevokedProxy;
+pub const validateTypedArray = typed_array.validateTypedArray;
 
 test {
     _ = builtin_function;
