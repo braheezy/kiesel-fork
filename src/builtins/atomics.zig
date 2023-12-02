@@ -24,6 +24,7 @@ const getValueFromBuffer = builtins.getValueFromBuffer;
 const isBigIntElementType = builtins.isBigIntElementType;
 const isTypedArrayOutOfBounds = builtins.isTypedArrayOutOfBounds;
 const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferWitnessRecord;
+const setValueInBuffer = builtins.setValueInBuffer;
 const typedArrayElementSize = builtins.typedArrayElementSize;
 const typedArrayLength = builtins.typedArrayLength;
 const validateTypedArray = builtins.validateTypedArray;
@@ -166,6 +167,7 @@ pub const Atomics = struct {
         });
 
         try defineBuiltinFunction(object, "load", load, 2, realm);
+        try defineBuiltinFunction(object, "store", store, 3, realm);
 
         // 25.4.17 Atomics [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-atomics-@@tostringtag
@@ -220,5 +222,57 @@ pub const Atomics = struct {
                     Value.from(value);
             }
         } else unreachable;
+    }
+
+    /// 25.4.11 Atomics.store ( typedArray, index, value )
+    /// https://tc39.es/ecma262/#sec-atomics.store
+    fn store(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const typed_array_value = arguments.get(0);
+        const index = arguments.get(1);
+        const value = arguments.get(2);
+
+        // 1. Let byteIndexInBuffer be ? ValidateAtomicAccessOnIntegerTypedArray(typedArray, index).
+        const byte_index_in_buffer = try validateAtomicAccessOnIntegerTypedArray(
+            agent,
+            typed_array_value,
+            index,
+            null,
+        );
+        const typed_array = typed_array_value.object.as(builtins.TypedArray);
+
+        // 2. If typedArray.[[ContentType]] is bigint, let v be ? ToBigInt(value).
+        // 3. Otherwise, let v be 𝔽(? ToIntegerOrInfinity(value)).
+        const numeric_value = if (typed_array.fields.content_type == .bigint)
+            Value.from(try value.toBigInt(agent))
+        else
+            Value.from(try value.toIntegerOrInfinity(agent));
+
+        // 4. Perform ? RevalidateAtomicAccess(typedArray, byteIndexInBuffer).
+        try revalidateAtomicAccess(agent, typed_array, byte_index_in_buffer);
+
+        // 5. Let buffer be typedArray.[[ViewedArrayBuffer]].
+        const buffer = typed_array.fields.viewed_array_buffer;
+
+        // 6. Let elementType be TypedArrayElementType(typedArray).
+        inline for (builtins.typed_array_element_types) |entry| {
+            const name, const T = entry;
+            if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
+                // 7. Perform SetValueInBuffer(buffer, byteIndexInBuffer, elementType, v, true, seq-cst).
+                try setValueInBuffer(
+                    agent,
+                    buffer,
+                    byte_index_in_buffer,
+                    T,
+                    numeric_value,
+                    true,
+                    .seq_cst,
+                    null,
+                );
+                break;
+            }
+        } else unreachable;
+
+        // 8. Return v.
+        return numeric_value;
     }
 };
