@@ -10,8 +10,8 @@
 
 ## Introduction
 
-_Kiesel_ is a JavaScript engine written from scratch for the purpose of
-[me](https://linus.dev) learning the
+_Kiesel_ (/ˈkiːzəl/) is a JavaScript engine written from scratch for the purpose
+of [me](https://linus.dev) learning the
 [Zig programming language](https://ziglang.org), with the eventual goal of full
 support for the latest [ECMAScript](https://tc39.es/ecma262/) standard. It
 features a custom bytecode VM and runtime, and aims to implement as much as
