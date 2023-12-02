@@ -166,6 +166,7 @@ pub const Atomics = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "isLockFree", isLockFree, 1, realm);
         try defineBuiltinFunction(object, "load", load, 2, realm);
         try defineBuiltinFunction(object, "store", store, 3, realm);
 
@@ -179,6 +180,26 @@ pub const Atomics = struct {
         });
 
         return object;
+    }
+
+    /// 25.4.8 Atomics.isLockFree ( size )
+    /// https://tc39.es/ecma262/#sec-atomics.islockfree
+    fn isLockFree(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const size = arguments.get(0);
+
+        // 1. Let n be ? ToIntegerOrInfinity(size).
+        const n = try size.toIntegerOrInfinity(agent);
+
+        // NOTE: Everyone but LibJS hardcodes these, so we might as well :^)
+        // 2. Let AR be the Agent Record of the surrounding agent.
+        // 3. If n = 1, return AR.[[IsLockFree1]].
+        // 4. If n = 2, return AR.[[IsLockFree2]].
+        // 5. If n = 4, return true.
+        // 6. If n = 8, return AR.[[IsLockFree8]].
+        if (n == 1 or n == 2 or n == 4 or n == 8) return Value.from(true);
+
+        // 7. Return false.
+        return Value.from(false);
     }
 
     /// 25.4.9 Atomics.load ( typedArray, index )
