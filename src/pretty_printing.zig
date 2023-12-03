@@ -465,10 +465,10 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
                 const name, const T = entry;
                 if (std.mem.eql(u8, typed_array_name, name)) {
                     const element_size = @sizeOf(T);
-                    var i = byte_offset;
+                    var i: u53 = 0;
                     while (i < byte_length) : (i += element_size) {
                         const bytes: *[element_size]u8 = @ptrCast(
-                            data.items[@intCast(i)..@intCast(i + element_size)],
+                            data.items[@intCast(byte_offset + i)..@intCast(byte_offset + i + element_size)],
                         );
                         const value = std.mem.bytesAsValue(T, bytes).*;
                         const numeric = if (isBigIntElementType(T))
