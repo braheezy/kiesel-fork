@@ -681,6 +681,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinAccessor(object, "length", length, null, realm);
         try defineBuiltinFunction(object, "map", map, 1, realm);
         try defineBuiltinFunction(object, "some", some, 1, realm);
+        try defineBuiltinFunction(object, "subarray", subarray, 2, realm);
         try defineBuiltinFunction(object, "toReversed", toReversed, 0, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
         try defineBuiltinFunction(object, "with", with, 2, realm);
@@ -1192,6 +1193,102 @@ pub const TypedArrayPrototype = struct {
 
         // 7. Return false.
         return Value.from(false);
+    }
+
+    /// 23.2.3.30 %TypedArray%.prototype.subarray ( begin, end )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.subarray
+    fn subarray(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const begin = arguments.get(0);
+        const end = arguments.get(1);
+
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[TypedArrayName]]).
+        // 3. Assert: O has a [[ViewedArrayBuffer]] internal slot.
+        const typed_array = try this_value.requireInternalSlot(agent, TypedArray);
+
+        // 4. Let buffer be O.[[ViewedArrayBuffer]].
+        const buffer_ = typed_array.fields.viewed_array_buffer;
+
+        // 5. Let srcRecord be MakeTypedArrayWithBufferWitnessRecord(O, seq-cst).
+        const src = makeTypedArrayWithBufferWitnessRecord(typed_array, .seq_cst);
+
+        // 6. If IsTypedArrayOutOfBounds(srcRecord) is true, then
+        const src_length: f64 = if (isTypedArrayOutOfBounds(src)) blk: {
+            // a. Let srcLength be 0.
+            break :blk 0;
+        }
+        // 7. Else,
+        else blk: {
+            // a. Let srcLength be TypedArrayLength(srcRecord).
+            break :blk @floatFromInt(typedArrayLength(src));
+        };
+
+        // 8. Let relativeBegin be ? ToIntegerOrInfinity(begin).
+        const relative_begin = try begin.toIntegerOrInfinity(agent);
+
+        // 9. If relativeBegin = -∞, let beginIndex be 0.
+        const begin_index_f64 = if (std.math.isNegativeInf(relative_begin)) blk: {
+            break :blk 0;
+        }
+        // 10. Else if relativeBegin < 0, let beginIndex be max(srcLength + relativeBegin, 0).
+        else if (relative_begin < 0) blk: {
+            break :blk @max(src_length + relative_begin, 0);
+        }
+        // 11. Else, let beginIndex be min(relativeBegin, srcLength).
+        else blk: {
+            break :blk @min(relative_begin, src_length);
+        };
+        const begin_index: u53 = @intFromFloat(begin_index_f64);
+
+        // 12. Let elementSize be TypedArrayElementSize(O).
+        const element_size = typedArrayElementSize(typed_array);
+
+        // 13. Let srcByteOffset be O.[[ByteOffset]].
+        const src_byte_offset = typed_array.fields.byte_offset;
+
+        // 14. Let beginByteOffset be srcByteOffset + beginIndex × elementSize.
+        const begin_byte_offset = src_byte_offset + begin_index * element_size;
+
+        // 15. If O.[[ArrayLength]] is auto and end is undefined, then
+        const arguments_list = if (typed_array.fields.array_length == .auto and end == .undefined) blk_args: {
+            // a. Let argumentsList be « buffer, 𝔽(beginByteOffset) ».
+            break :blk_args &.{ Value.from(buffer_.object()), Value.from(begin_byte_offset) };
+        }
+        // 16. Else,
+        else blk_args: {
+            // a. If end is undefined, let relativeEnd be srcLength; else let relativeEnd be
+            //    ? ToIntegerOrInfinity(end).
+            const relative_end = if (end == .undefined)
+                src_length
+            else
+                try end.toIntegerOrInfinity(agent);
+
+            // b. If relativeEnd = -∞, let endIndex be 0.
+            const end_index = if (std.math.isNegativeInf(relative_end)) blk: {
+                break :blk 0;
+            }
+            // c. Else if relativeEnd < 0, let endIndex be max(srcLength + relativeEnd, 0).
+            else if (relative_end < 0) blk: {
+                break :blk @max(src_length + relative_end, 0);
+            }
+            // d. Else, let endIndex be min(relativeEnd, srcLength).
+            else blk: {
+                break :blk @min(relative_end, src_length);
+            };
+
+            // e. Let newLength be max(endIndex - beginIndex, 0).
+            const new_length = @max(end_index - begin_index_f64, 0);
+
+            // f. Let argumentsList be « buffer, 𝔽(beginByteOffset), 𝔽(newLength) ».
+            break :blk_args &.{
+                Value.from(buffer_.object()),
+                Value.from(begin_byte_offset),
+                Value.from(new_length),
+            };
+        };
+
+        // 17. Return ? TypedArraySpeciesCreate(O, argumentsList).
+        return Value.from(try typedArraySpeciesCreate(agent, typed_array, arguments_list));
     }
 
     /// 23.2.3.32 %TypedArray%.prototype.toReversed ( )
