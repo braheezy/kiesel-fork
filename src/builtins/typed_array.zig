@@ -682,6 +682,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinFunction(object, "map", map, 1, realm);
         try defineBuiltinFunction(object, "some", some, 1, realm);
         try defineBuiltinFunction(object, "subarray", subarray, 2, realm);
+        try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toReversed", toReversed, 0, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
         try defineBuiltinFunction(object, "with", with, 2, realm);
@@ -1289,6 +1290,56 @@ pub const TypedArrayPrototype = struct {
 
         // 17. Return ? TypedArraySpeciesCreate(O, argumentsList).
         return Value.from(try typedArraySpeciesCreate(agent, typed_array, arguments_list));
+    }
+
+    /// 23.2.3.31 %TypedArray%.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.tolocalestring
+    fn toLocaleString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let array be ? ToObject(this value).
+        const ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const array = this_value.object;
+
+        // 2. Let len be ? LengthOfArrayLike(array).
+        const len = typedArrayLength(ta);
+
+        // 3. Let separator be the implementation-defined list-separator String value appropriate
+        //    for the host environment's current locale (such as ", ").
+        const separator = ", ";
+
+        // 4. Let R be the empty String.
+        if (len > std.math.maxInt(usize)) return error.OutOfMemory;
+        var elements = try std.ArrayList([]const u8).initCapacity(agent.gc_allocator, @intCast(len));
+        defer elements.deinit();
+
+        // 5. Let k be 0.
+        var k: u53 = 0;
+
+        // 6. Repeat, while k < len,
+        while (k < len) : (k += 1) {
+            // a. If k > 0, then
+            // i. Set R to the string-concatenation of R and separator.
+
+            // b. Let nextElement be ? Get(array, ! ToString(𝔽(k))).
+            const next_element = array.get(PropertyKey.from(k)) catch |err| try noexcept(err);
+
+            // c. If nextElement is neither undefined nor null, then
+            // i. Let S be ? ToString(? Invoke(nextElement, "toLocaleString")).
+            const string = try (try next_element.invoke(
+                agent,
+                PropertyKey.from("toLocaleString"),
+                .{},
+            )).toString(agent);
+
+            // ii. Set R to the string-concatenation of R and S.
+            try elements.append(string.utf8);
+
+            // d. Set k to k + 1.
+        }
+
+        // 7. Return R.
+        return Value.from(
+            try std.mem.join(agent.gc_allocator, separator, elements.items),
+        );
     }
 
     /// 23.2.3.32 %TypedArray%.prototype.toReversed ( )
