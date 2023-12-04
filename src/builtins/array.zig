@@ -395,17 +395,12 @@ pub const ArrayConstructor = struct {
 
     /// 23.1.1.1 Array ( ...values )
     /// https://tc39.es/ecma262/#sec-array
-    fn behaviour(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-        maybe_new_target: ?Object,
-    ) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
         // 1. If NewTarget is undefined, let newTarget be the active function object; else let newTarget be NewTarget.
-        const new_target = maybe_new_target orelse agent.activeFunctionObject();
+        const new_target_ = new_target orelse agent.activeFunctionObject();
 
         // 2. Let proto be ? GetPrototypeFromConstructor(newTarget, "%Array.prototype%").
-        const prototype = try getPrototypeFromConstructor(new_target, "%Array.prototype%");
+        const prototype = try getPrototypeFromConstructor(new_target_, "%Array.prototype%");
 
         // 3. Let numberOfArgs be the number of elements in values.
         const number_of_args = arguments.count();

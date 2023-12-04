@@ -703,12 +703,7 @@ pub const DateConstructor = struct {
 
     /// 21.4.2.1 Date ( ...values )
     /// https://tc39.es/ecma262/#sec-date
-    fn behaviour(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-        new_target: ?Object,
-    ) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
         // 1. If NewTarget is undefined, then
         if (new_target == null) {
             // a. Let now be the time value (UTC) identifying the current time.

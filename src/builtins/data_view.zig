@@ -321,12 +321,7 @@ pub const DataViewConstructor = struct {
 
     /// 25.3.2.1 DataView ( buffer [ , byteOffset [ , byteLength ] ] )
     /// https://tc39.es/ecma262/#sec-dataview-buffer-byteoffset-bytelength
-    fn behaviour(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-        new_target: ?Object,
-    ) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
         const buffer_value = arguments.get(0);
         const byte_offset = arguments.get(1);
         const byte_length = arguments.get(2);

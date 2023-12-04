@@ -673,12 +673,7 @@ pub const RegExpConstructor = struct {
 
     /// 22.2.4.1 RegExp ( pattern, flags )
     /// https://tc39.es/ecma262/#sec-regexp-pattern-flags
-    fn behaviour(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-        new_target: ?Object,
-    ) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
         const pattern = arguments.get(0);
         const flags = arguments.get(1);
 

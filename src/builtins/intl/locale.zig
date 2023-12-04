@@ -205,12 +205,7 @@ pub const LocaleConstructor = struct {
 
     /// 14.1.1 Intl.Locale ( tag [ , options ] )
     /// https://tc39.es/ecma402/#sec-Intl.Locale
-    fn behaviour(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-        new_target: ?Object,
-    ) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
         const tag_value = arguments.get(0);
         const options_value = arguments.get(1);
 

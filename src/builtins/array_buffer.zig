@@ -427,12 +427,7 @@ pub const ArrayBufferConstructor = struct {
 
     /// 25.1.4.1 ArrayBuffer ( length [ , options ] )
     /// https://tc39.es/ecma262/#sec-arraybuffer-length
-    fn behaviour(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-        new_target: ?Object,
-    ) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
         const length = arguments.get(0);
         const options = arguments.get(1);
 

@@ -144,12 +144,7 @@ pub const NumberConstructor = struct {
 
     /// 21.1.1.1 Number ( value )
     /// https://tc39.es/ecma262/#sec-number-constructor-number-value
-    fn behaviour(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-        new_target: ?Object,
-    ) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
         const value = arguments.get(0);
 
         const n = blk: {

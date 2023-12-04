@@ -1620,12 +1620,7 @@ pub const PromiseConstructor = struct {
 
     /// 27.2.3.1 Promise ( executor )
     /// https://tc39.es/ecma262/#sec-promise-executor
-    fn behaviour(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-        new_target: ?Object,
-    ) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
         const executor = arguments.get(0);
 
         // 1. If NewTarget is undefined, throw a TypeError exception.

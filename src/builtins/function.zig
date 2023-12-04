@@ -80,12 +80,7 @@ pub const FunctionConstructor = struct {
 
     /// 20.2.1.1 Function ( ...parameterArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-function-p1-p2-pn-body
-    fn behaviour(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-        new_target: ?Object,
-    ) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
         const parameter_args = ArgumentsList.from(arguments.values[0..arguments.count() -| 1]);
         const maybe_body_arg = arguments.getOrNull(arguments.count() -| 1);
 

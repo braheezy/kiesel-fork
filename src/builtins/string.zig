@@ -188,12 +188,7 @@ pub const StringConstructor = struct {
 
     /// 22.1.1.1 String ( value )
     /// https://tc39.es/ecma262/#sec-string-constructor-string-value
-    fn behaviour(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-        new_target: ?Object,
-    ) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
         const value = arguments.get(0);
 
         const s = blk: {

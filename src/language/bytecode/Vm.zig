@@ -1420,7 +1420,6 @@ fn classDefinitionEvaluation(
         const default_constructor = struct {
             fn func(
                 agent_: *Agent,
-                _: Value,
                 arguments_list: ArgumentsList,
                 new_target: ?Object,
             ) Agent.Error!Value {

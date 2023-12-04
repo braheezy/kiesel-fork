@@ -93,12 +93,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.1.1 Object ( [ value ] )
     /// https://tc39.es/ecma262/#sec-object-value
-    fn behaviour(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-        new_target: ?Object_,
-    ) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object_) Agent.Error!Value {
         const realm = agent.currentRealm();
         const value = arguments.get(0);
 

@@ -601,7 +601,7 @@ pub const TypedArrayConstructor = struct {
 
     /// 23.2.1.1 %TypedArray% ( )
     /// https://tc39.es/ecma262/#sec-%typedarray%
-    fn behaviour(agent: *Agent, _: Value, _: ArgumentsList, _: ?Object) Agent.Error!Value {
+    fn behaviour(agent: *Agent, _: ArgumentsList, _: ?Object) Agent.Error!Value {
         // 1. Throw a TypeError exception.
         return agent.throwException(
             .type_error,
@@ -2174,7 +2174,7 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
 
         /// 23.2.5.1 TypedArray ( ...args )
         /// https://tc39.es/ecma262/#sec-typedarray
-        fn behaviour(agent: *Agent, _: Value, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
+        fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
             // 1. If NewTarget is undefined, throw a TypeError exception.
             if (new_target == null) {
                 return agent.throwException(

@@ -179,12 +179,7 @@ pub const SymbolConstructor = struct {
 
     /// 20.4.1.1 Symbol ( [ description ] )
     /// https://tc39.es/ecma262/#sec-symbol-description
-    fn behaviour(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-        new_target: ?Object,
-    ) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
         const description = arguments.get(0);
 
         // 1. If NewTarget is not undefined, throw a TypeError exception.

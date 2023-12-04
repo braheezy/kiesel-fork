@@ -56,7 +56,7 @@ pub const ArgumentsList = struct {
 
 pub const Behaviour = union(enum) {
     pub const RegularFn = fn (*Agent, Value, ArgumentsList) Agent.Error!Value;
-    pub const ConstructorFn = fn (*Agent, Value, ArgumentsList, ?Object) Agent.Error!Value;
+    pub const ConstructorFn = fn (*Agent, ArgumentsList, ?Object) Agent.Error!Value;
 
     regular: *const RegularFn,
     constructor: *const ConstructorFn,
@@ -162,7 +162,7 @@ pub fn builtinCallOrConstruct(
     //     specified for it via algorithm steps or other means.
     const result = switch (function.fields.behaviour) {
         .regular => |regularFn| regularFn(agent, this_argument.?, arguments_list),
-        .constructor => |constructorFn| constructorFn(agent, this_argument orelse undefined, arguments_list, new_target),
+        .constructor => |constructorFn| constructorFn(agent, arguments_list, new_target),
     };
 
     // 12. Remove calleeContext from the execution context stack and restore callerContext as the

@@ -62,24 +62,19 @@ pub const ErrorConstructor = struct {
 
     /// 20.5.1.1 Error ( message [ , options ] )
     /// https://tc39.es/ecma262/#sec-error-message
-    fn behaviour(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-        maybe_new_target: ?Object,
-    ) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
         const message = arguments.get(0);
         const options = arguments.get(1);
 
         // 1. If NewTarget is undefined, let newTarget be the active function object; else let
         //    newTarget be NewTarget.
-        const new_target = maybe_new_target orelse agent.activeFunctionObject();
+        const new_target_ = new_target orelse agent.activeFunctionObject();
 
         // 2. Let O be ? OrdinaryCreateFromConstructor(newTarget, "%Error.prototype%", « [[ErrorData]] »).
         const object = try ordinaryCreateFromConstructor(
             Error,
             agent,
-            new_target,
+            new_target_,
             "%Error.prototype%",
         );
 
@@ -284,9 +279,8 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
         /// https://tc39.es/ecma262/#sec-nativeerror
         fn behaviour(
             agent: *Agent,
-            _: Value,
             arguments: ArgumentsList,
-            maybe_new_target: ?Object,
+            new_target: ?Object,
         ) Agent.Error!Value {
             const message = arguments.get(0);
             const options = arguments.get(1);
@@ -295,7 +289,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
 
             // 1. If NewTarget is undefined, let newTarget be the active function object; else let
             //    newTarget be NewTarget.
-            const new_target = maybe_new_target orelse agent.activeFunctionObject();
+            const new_target_ = new_target orelse agent.activeFunctionObject();
 
             // 2. Let O be ? OrdinaryCreateFromConstructor(
             //      newTarget, "%NativeError.prototype%", « [[ErrorData]] »
@@ -303,7 +297,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
             const object = try ordinaryCreateFromConstructor(
                 T,
                 agent,
-                new_target,
+                new_target_,
                 "%" ++ name ++ ".prototype%",
             );
 
@@ -413,25 +407,20 @@ pub const AggregateErrorConstructor = struct {
 
     /// 20.5.7.1.1 AggregateError ( errors, message [ , options ] )
     /// https://tc39.es/ecma262/#sec-aggregate-error
-    fn behaviour(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-        maybe_new_target: ?Object,
-    ) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
         const errors = arguments.get(0);
         const message = arguments.get(1);
         const options = arguments.get(2);
 
         // 1. If NewTarget is undefined, let newTarget be the active function object; else let
         //    newTarget be NewTarget.
-        const new_target = maybe_new_target orelse agent.activeFunctionObject();
+        const new_target_ = new_target orelse agent.activeFunctionObject();
 
         // 2. Let O be ? OrdinaryCreateFromConstructor(newTarget, "%AggregateError.prototype%", « [[ErrorData]] »).
         const object = try ordinaryCreateFromConstructor(
             AggregateError,
             agent,
-            new_target,
+            new_target_,
             "%AggregateError.prototype%",
         );
 

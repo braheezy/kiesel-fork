@@ -1105,12 +1105,7 @@ pub const ProxyConstructor = struct {
 
     /// 28.2.1.1 Proxy ( target, handler )
     /// https://tc39.es/ecma262/#sec-proxy-target-handler
-    fn behaviour(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-        new_target: ?Object,
-    ) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
         const target = arguments.get(0);
         const handler = arguments.get(1);
 

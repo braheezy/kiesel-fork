@@ -118,12 +118,7 @@ pub const MapConstructor = struct {
 
     /// 24.1.1.1 Map ( [ iterable ] )
     /// https://tc39.es/ecma262/#sec-map-iterable
-    fn behaviour(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-        new_target: ?Object,
-    ) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
         const iterable = arguments.get(0);
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
