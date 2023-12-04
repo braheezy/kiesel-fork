@@ -347,17 +347,21 @@ pub fn hasOwnProperty(self: Self, property_key: PropertyKey) Agent.Error!bool {
 /// https://tc39.es/ecma262/#sec-construct
 pub fn construct(
     self: Self,
-    arguments: anytype,
-    maybe_new_target: ?Self,
+    arguments_list: []const Value,
+    new_target: ?Self,
 ) Agent.Error!Self {
     // 1. If newTarget is not present, set newTarget to F.
-    const new_target = maybe_new_target orelse self;
+    const new_target_ = new_target orelse self;
 
     // 2. If argumentsList is not present, set argumentsList to a new empty List.
-    const arguments_list = ArgumentsList.from(arguments);
+    // NOTE: This is done via the NoArgs variant of the function.
 
     // 3. Return ? F.[[Construct]](argumentsList, newTarget).
-    return self.internalMethods().construct.?(self, arguments_list, new_target);
+    return self.internalMethods().construct.?(self, ArgumentsList.from(arguments_list), new_target_);
+}
+
+pub inline fn constructNoArgs(self: Self) Agent.Error!Self {
+    return self.construct(&.{}, null);
 }
 
 /// 7.3.16 SetIntegrityLevel ( O, level )

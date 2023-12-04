@@ -732,7 +732,7 @@ pub const StringPrototype = struct {
             // d. If matcher is not undefined, then
             if (matcher != null) {
                 // i. Return ? Call(matcher, regexp, « O »).
-                return Value.from(matcher.?).callAssumeCallable(regexp, .{object});
+                return Value.from(matcher.?).callAssumeCallable(regexp, &.{object});
             }
         }
 
@@ -746,7 +746,7 @@ pub const StringPrototype = struct {
         return Value.from(rx).invoke(
             agent,
             PropertyKey.from(agent.well_known_symbols.@"@@matchAll"),
-            .{Value.from(string)},
+            &.{Value.from(string)},
         );
     }
 
@@ -812,7 +812,7 @@ pub const StringPrototype = struct {
             // b. If searcher is not undefined, then
             if (searcher != null) {
                 // i. Return ? Call(searcher, regexp, « O »).
-                return Value.from(searcher.?).callAssumeCallable(regexp, .{object});
+                return Value.from(searcher.?).callAssumeCallable(regexp, &.{object});
             }
         }
 
@@ -826,7 +826,7 @@ pub const StringPrototype = struct {
         return Value.from(rx).invoke(
             agent,
             PropertyKey.from(agent.well_known_symbols.@"@@search"),
-            .{Value.from(string)},
+            &.{Value.from(string)},
         );
     }
 

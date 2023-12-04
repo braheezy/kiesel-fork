@@ -586,7 +586,7 @@ pub fn ordinarySetWithOwnDescriptor(
     const setter = own_descriptor.set orelse return false;
 
     // 6. Perform ? Call(setter, Receiver, « V »).
-    _ = try Value.from(setter).callAssumeCallable(receiver_value, .{value});
+    _ = try Value.from(setter).callAssumeCallable(receiver_value, &.{value});
 
     // 7. Return true.
     return true;

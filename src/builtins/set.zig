@@ -100,7 +100,7 @@ pub const SetConstructor = struct {
             const next_value = try Iterator.value(next);
 
             // d. Let status be Completion(Call(adder, set, « nextValue »)).
-            _ = adder.callAssumeCallable(Value.from(set), .{next_value}) catch |err| {
+            _ = adder.callAssumeCallable(Value.from(set), &.{next_value}) catch |err| {
                 // e. IfAbruptCloseIterator(status, iteratorRecord).
                 return iterator.close(@as(Agent.Error!Value, err));
             };
@@ -272,7 +272,7 @@ pub const SetPrototype = struct {
                 // i. Perform ? Call(callbackfn, thisArg, « e, e, S »).
                 _ = try callback_fn.callAssumeCallable(
                     this_arg,
-                    .{ value, value, Value.from(set.object()) },
+                    &.{ value, value, Value.from(set.object()) },
                 );
 
                 // ii. NOTE: The number of elements in entries may have increased during execution

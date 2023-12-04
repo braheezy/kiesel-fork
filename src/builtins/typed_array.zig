@@ -628,7 +628,7 @@ pub const TypedArrayConstructor = struct {
         const new_object = try typedArrayCreateFromConstructor(
             agent,
             constructor.object,
-            .{Value.from(@as(u53, @intCast(len)))},
+            &.{Value.from(@as(u53, @intCast(len)))},
         );
 
         // 5. Let k be 0.
@@ -800,7 +800,7 @@ pub const TypedArrayPrototype = struct {
             // c. Let testResult be ToBoolean(? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »)).
             const test_result = (try callback_fn.callAssumeCallable(
                 this_arg,
-                .{ k_value, Value.from(k), Value.from(object) },
+                &.{ k_value, Value.from(k), Value.from(object) },
             )).toBoolean();
 
             // d. If testResult is false, return false.
@@ -853,7 +853,7 @@ pub const TypedArrayPrototype = struct {
             // c. Let selected be ToBoolean(? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »)).
             const selected = (try callback_fn.callAssumeCallable(
                 this_arg,
-                .{ k_value, Value.from(k), Value.from(object) },
+                &.{ k_value, Value.from(k), Value.from(object) },
             )).toBoolean();
 
             // d. If selected is true, then
@@ -872,7 +872,7 @@ pub const TypedArrayPrototype = struct {
         const typed_array = try typedArraySpeciesCreate(
             agent,
             object.as(TypedArray),
-            .{Value.from(captured)},
+            &.{Value.from(captured)},
         );
 
         // 10. Let n be 0.
@@ -1009,7 +1009,7 @@ pub const TypedArrayPrototype = struct {
             // c. Perform ? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »).
             _ = try callback_fn.callAssumeCallable(
                 this_arg,
-                .{ k_value, Value.from(k), Value.from(object) },
+                &.{ k_value, Value.from(k), Value.from(object) },
             );
 
             // d. Set k to k + 1.
@@ -1121,7 +1121,11 @@ pub const TypedArrayPrototype = struct {
         }
 
         // 5. Let A be ? TypedArraySpeciesCreate(O, « 𝔽(len) »).
-        const array = try typedArraySpeciesCreate(agent, object.as(TypedArray), .{Value.from(len)});
+        const array = try typedArraySpeciesCreate(
+            agent,
+            object.as(TypedArray),
+            &.{Value.from(len)},
+        );
 
         // 6. Let k be 0.
         var k: u53 = 0;
@@ -1137,7 +1141,7 @@ pub const TypedArrayPrototype = struct {
             // c. Let mappedValue be ? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »).
             const mapped_value = try callback_fn.callAssumeCallable(
                 this_arg,
-                .{ k_value, Value.from(k), Value.from(object) },
+                &.{ k_value, Value.from(k), Value.from(object) },
             );
 
             // d. Perform ? Set(A, Pk, mappedValue, true).
@@ -1183,7 +1187,7 @@ pub const TypedArrayPrototype = struct {
             // c. Let testResult be ToBoolean(? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »)).
             const test_result = (try callback_fn.callAssumeCallable(
                 this_arg,
-                .{ k_value, Value.from(k), Value.from(object) },
+                &.{ k_value, Value.from(k), Value.from(object) },
             )).toBoolean();
 
             // d. If testResult is true, return true.
@@ -1324,10 +1328,9 @@ pub const TypedArrayPrototype = struct {
 
             // c. If nextElement is neither undefined nor null, then
             // i. Let S be ? ToString(? Invoke(nextElement, "toLocaleString")).
-            const string = try (try next_element.invoke(
+            const string = try (try next_element.invokeNoArgs(
                 agent,
                 PropertyKey.from("toLocaleString"),
-                .{},
             )).toString(agent);
 
             // ii. Set R to the string-concatenation of R and S.
@@ -1357,7 +1360,7 @@ pub const TypedArrayPrototype = struct {
         const new_typed_array = try typedArrayCreateSameType(
             agent,
             typed_array,
-            .{Value.from(len)},
+            &.{Value.from(len)},
         );
 
         // 5. Let k be 0.
@@ -1442,7 +1445,7 @@ pub const TypedArrayPrototype = struct {
         const new_typed_array = try typedArrayCreateSameType(
             agent,
             typed_array,
-            .{Value.from(len)},
+            &.{Value.from(len)},
         );
 
         // 11. Let k be 0.
@@ -1497,7 +1500,7 @@ pub const TypedArrayPrototype = struct {
 fn typedArraySpeciesCreate(
     agent: *Agent,
     exemplar: *const TypedArray,
-    argument_list: anytype,
+    argument_list: []const Value,
 ) Agent.Error!Object {
     const realm = agent.currentRealm();
 
@@ -1537,7 +1540,7 @@ fn typedArraySpeciesCreate(
 fn typedArrayCreateFromConstructor(
     agent: *Agent,
     constructor: Object,
-    argument_list: anytype,
+    argument_list: []const Value,
 ) Agent.Error!Object {
     // 1. Let newTypedArray be ? Construct(constructor, argumentList).
     const new_typed_array = try constructor.construct(argument_list, null);
@@ -1574,7 +1577,7 @@ fn typedArrayCreateFromConstructor(
 fn typedArrayCreateSameType(
     agent: *Agent,
     exemplar: *const TypedArray,
-    argument_list: anytype,
+    argument_list: []const Value,
 ) Agent.Error!Object {
     const realm = agent.currentRealm();
 

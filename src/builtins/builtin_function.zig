@@ -29,16 +29,8 @@ pub const ArgumentsList = struct {
 
     values: []const Value,
 
-    pub inline fn from(values: anytype) Self {
-        const T = @TypeOf(values);
-        const type_info = @typeInfo(T);
-        if (type_info == .Struct and type_info.Struct.is_tuple) {
-            return .{ .values = &values };
-        } else if (type_info == .Pointer and type_info.Pointer.size == .Slice) {
-            return .{ .values = values };
-        } else {
-            @compileError("ArgumentsList.from() called with incompatible type " ++ @typeName(T));
-        }
+    pub inline fn from(values: []const Value) Self {
+        return .{ .values = values };
     }
 
     pub inline fn count(self: Self) usize {

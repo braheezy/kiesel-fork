@@ -62,7 +62,7 @@ pub const PromiseCapability = struct {
                 agent.exception = null;
 
                 // a. Perform ? Call(capability.[[Reject]], undefined, « value.[[Value]] »).
-                _ = try Value.from(self.reject).callAssumeCallable(.undefined, .{exception});
+                _ = try Value.from(self.reject).callAssumeCallable(.undefined, &.{exception});
 
                 // b. Return capability.[[Promise]].
                 return self.promise;
@@ -377,7 +377,7 @@ pub fn newPromiseCapability(agent: *Agent, constructor: Value) Agent.Error!Promi
     const resolving_functions = &additional_fields.resolving_functions;
 
     // 6. Let promise be ? Construct(C, « executor »).
-    const promise = try constructor.object.construct(.{Value.from(executor)}, null);
+    const promise = try constructor.object.construct(&.{Value.from(executor)}, null);
 
     // 7. If IsCallable(resolvingFunctions.[[Resolve]]) is false, throw a TypeError exception.
     if (!resolving_functions.resolve.isCallable()) {
@@ -469,7 +469,7 @@ pub fn promiseResolve(agent: *Agent, constructor: Object, x: Value) Agent.Error!
     const promise_capability = try newPromiseCapability(agent, Value.from(constructor));
 
     // 3. Perform ? Call(promiseCapability.[[Resolve]], undefined, « x »).
-    _ = try Value.from(promise_capability.resolve).callAssumeCallable(.undefined, .{x});
+    _ = try Value.from(promise_capability.resolve).callAssumeCallable(.undefined, &.{x});
 
     // 4. Return promiseCapability.[[Promise]].
     return promise_capability.promise;
@@ -549,7 +549,7 @@ pub fn newPromiseReactionJob(
                 // i. Return ? Call(promiseCapability.[[Reject]], undefined, « handlerResult.[[Value]] »).
                 return Value.from(promise_capability.?.reject).callAssumeCallable(
                     .undefined,
-                    .{handler_result.value.?},
+                    &.{handler_result.value.?},
                 );
             }
             // i. Else,
@@ -557,7 +557,7 @@ pub fn newPromiseReactionJob(
                 // i. Return ? Call(promiseCapability.[[Resolve]], undefined, « handlerResult.[[Value]] »).
                 return Value.from(promise_capability.?.resolve).callAssumeCallable(
                     .undefined,
-                    .{handler_result.value.?},
+                    &.{handler_result.value.?},
                 );
             }
         }
@@ -642,7 +642,7 @@ pub fn newPromiseResolveThenableJob(
                     //    « thenCallResult.[[Value]] »).
                     return Value.from(resolving_functions.reject).callAssumeCallable(
                         .undefined,
-                        .{agent_.exception.?},
+                        &.{agent_.exception.?},
                     );
                 },
             };
@@ -738,7 +738,7 @@ fn performPromiseAll(
                 // 2. Perform ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
                 _ = try Value.from(result_capability.resolve).callAssumeCallable(
                     .undefined,
-                    .{Value.from(values_array)},
+                    &.{Value.from(values_array)},
                 );
             }
 
@@ -761,7 +761,7 @@ fn performPromiseAll(
         // i. Let nextPromise be ? Call(promiseResolve, constructor, « nextValue »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
             Value.from(constructor),
-            .{next_value},
+            &.{next_value},
         );
 
         const AdditionalFields = struct {
@@ -825,7 +825,7 @@ fn performPromiseAll(
                     // b. Return ? Call(promiseCapability.[[Resolve]], undefined, « valuesArray »).
                     return Value.from(promise_capability.resolve).callAssumeCallable(
                         .undefined,
-                        .{Value.from(values_array)},
+                        &.{Value.from(values_array)},
                     );
                 }
 
@@ -871,7 +871,7 @@ fn performPromiseAll(
         _ = try next_promise.invoke(
             agent,
             PropertyKey.from("then"),
-            .{ Value.from(on_fulfilled), Value.from(result_capability.reject) },
+            &.{ Value.from(on_fulfilled), Value.from(result_capability.reject) },
         );
 
         // t. Set index to index + 1.
@@ -926,7 +926,7 @@ fn performPromiseAllSettled(
                 // 2. Perform ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
                 _ = try Value.from(result_capability.resolve).callAssumeCallable(
                     .undefined,
-                    .{Value.from(values_array)},
+                    &.{Value.from(values_array)},
                 );
             }
 
@@ -949,7 +949,7 @@ fn performPromiseAllSettled(
         // i. Let nextPromise be ? Call(promiseResolve, constructor, « nextValue »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
             Value.from(constructor),
-            .{next_value},
+            &.{next_value},
         );
 
         const AlreadyCalled = struct { value: bool };
@@ -1037,7 +1037,7 @@ fn performPromiseAllSettled(
                     // b. Return ? Call(promiseCapability.[[Resolve]], undefined, « valuesArray »).
                     return Value.from(promise_capability.resolve).callAssumeCallable(
                         .undefined,
-                        .{Value.from(values_array)},
+                        &.{Value.from(values_array)},
                     );
                 }
 
@@ -1147,7 +1147,7 @@ fn performPromiseAllSettled(
                     // b. Return ? Call(promiseCapability.[[Resolve]], undefined, « valuesArray »).
                     return Value.from(promise_capability.resolve).callAssumeCallable(
                         .undefined,
-                        .{Value.from(values_array)},
+                        &.{Value.from(values_array)},
                     );
                 }
 
@@ -1193,7 +1193,7 @@ fn performPromiseAllSettled(
         _ = try next_promise.invoke(
             agent,
             PropertyKey.from("then"),
-            .{ Value.from(on_fulfilled), Value.from(on_rejected) },
+            &.{ Value.from(on_fulfilled), Value.from(on_rejected) },
         );
 
         // ac. Set index to index + 1.
@@ -1280,7 +1280,7 @@ fn performPromiseAny(
         // i. Let nextPromise be ? Call(promiseResolve, constructor, « nextValue »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
             Value.from(constructor),
-            .{next_value},
+            &.{next_value},
         );
 
         const AdditionalFields = struct {
@@ -1362,7 +1362,7 @@ fn performPromiseAny(
                     // c. Return ? Call(promiseCapability.[[Reject]], undefined, « error »).
                     return Value.from(promise_capability.reject).callAssumeCallable(
                         .undefined,
-                        .{Value.from(error_)},
+                        &.{Value.from(error_)},
                     );
                 }
 
@@ -1408,7 +1408,7 @@ fn performPromiseAny(
         _ = try next_promise.invoke(
             agent,
             PropertyKey.from("then"),
-            .{ Value.from(result_capability.resolve), Value.from(on_rejected) },
+            &.{ Value.from(result_capability.resolve), Value.from(on_rejected) },
         );
 
         // t. Set index to index + 1.
@@ -1457,7 +1457,7 @@ fn performPromiseRace(
         // h. Let nextPromise be ? Call(promiseResolve, constructor, « nextValue »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
             Value.from(constructor),
-            .{next_value},
+            &.{next_value},
         );
 
         // i. Perform ? Invoke(nextPromise, "then", « resultCapability.[[Resolve]],
@@ -1465,7 +1465,7 @@ fn performPromiseRace(
         _ = try next_promise.invoke(
             agent,
             PropertyKey.from("then"),
-            .{ Value.from(result_capability.resolve), Value.from(result_capability.reject) },
+            &.{ Value.from(result_capability.resolve), Value.from(result_capability.reject) },
         );
     }
 }
@@ -1665,7 +1665,7 @@ pub const PromiseConstructor = struct {
         //    resolvingFunctions.[[Reject]] »)).
         _ = executor.callAssumeCallable(
             .undefined,
-            .{ Value.from(resolving_functions.resolve), Value.from(resolving_functions.reject) },
+            &.{ Value.from(resolving_functions.resolve), Value.from(resolving_functions.reject) },
         ) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
 
@@ -1677,7 +1677,7 @@ pub const PromiseConstructor = struct {
                 // a. Perform ? Call(resolvingFunctions.[[Reject]], undefined, « completion.[[Value]] »).
                 _ = try Value.from(resolving_functions.reject).callAssumeCallable(
                     .undefined,
-                    .{exception},
+                    &.{exception},
                 );
             },
         };
@@ -1886,7 +1886,7 @@ pub const PromiseConstructor = struct {
         const promise_capability = try newPromiseCapability(agent, constructor);
 
         // 3. Perform ? Call(promiseCapability.[[Reject]], undefined, « r »).
-        _ = try Value.from(promise_capability.reject).call(agent, undefined, .{reason});
+        _ = try Value.from(promise_capability.reject).call(agent, undefined, &.{reason});
 
         // 4. Return promiseCapability.[[Promise]].
         return Value.from(promise_capability.promise);
@@ -1950,7 +1950,7 @@ pub const PromisePrototype = struct {
         const promise = this_value;
 
         // 2. Return ? Invoke(promise, "then", « undefined, onRejected »).
-        return promise.invoke(agent, PropertyKey.from("then"), .{ .undefined, on_rejected });
+        return promise.invoke(agent, PropertyKey.from("then"), &.{ .undefined, on_rejected });
     }
 
     /// 27.2.5.3 Promise.prototype.finally ( onFinally )
@@ -2037,7 +2037,7 @@ pub const PromisePrototype = struct {
                     return Value.from(new_promise).invoke(
                         agent_,
                         PropertyKey.from("then"),
-                        .{Value.from(value_thunk)},
+                        &.{Value.from(value_thunk)},
                     );
                 }
             }.func;
@@ -2096,7 +2096,7 @@ pub const PromisePrototype = struct {
                     return Value.from(new_promise).invoke(
                         agent_,
                         PropertyKey.from("then"),
-                        .{Value.from(thrower)},
+                        &.{Value.from(thrower)},
                     );
                 }
             }.func;
@@ -2112,7 +2112,7 @@ pub const PromisePrototype = struct {
         }
 
         // 7. Return ? Invoke(promise, "then", « thenFinally, catchFinally »).
-        return promise.invoke(agent, PropertyKey.from("then"), .{ then_finally, catch_finally });
+        return promise.invoke(agent, PropertyKey.from("then"), &.{ then_finally, catch_finally });
     }
 
     /// 27.2.5.4 Promise.prototype.then ( onFulfilled, onRejected )

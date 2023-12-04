@@ -57,7 +57,7 @@ fn getPrototypeOf(object: Object) Agent.Error!?Object {
     // 7. Let handlerProto be ? Call(trap, handler, « target »).
     const handler_prototype = try Value.from(trap.?).callAssumeCallable(
         Value.from(handler),
-        .{Value.from(target)},
+        &.{Value.from(target)},
     );
 
     // 8. If handlerProto is not an Object and handlerProto is not null, throw a TypeError exception.
@@ -124,7 +124,7 @@ pub fn setPrototypeOf(object: Object, prototype: ?Object) Agent.Error!bool {
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, V »)).
     const boolean_trap_result = (try Value.from(trap.?).callAssumeCallable(
         Value.from(handler),
-        .{ Value.from(target), if (prototype != null) Value.from(prototype.?) else .null },
+        &.{ Value.from(target), if (prototype != null) Value.from(prototype.?) else .null },
     )).toBoolean();
 
     // 8. If booleanTrapResult is false, return false.
@@ -183,7 +183,7 @@ fn isExtensible(object: Object) Agent.Error!bool {
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target »)).
     const boolean_trap_result = (try Value.from(trap.?).callAssumeCallable(
         Value.from(handler),
-        .{Value.from(target)},
+        &.{Value.from(target)},
     )).toBoolean();
 
     // 8. Let targetResult be ? IsExtensible(target).
@@ -230,7 +230,7 @@ fn preventExtensions(object: Object) Agent.Error!bool {
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target »)).
     const boolean_trap_result = (try Value.from(trap.?).callAssumeCallable(
         Value.from(handler),
-        .{Value.from(target)},
+        &.{Value.from(target)},
     )).toBoolean();
 
     // 8. If booleanTrapResult is true, then
@@ -280,7 +280,7 @@ fn getOwnProperty(object: Object, property_key: PropertyKey) Agent.Error!?Proper
     // 7. Let trapResultObj be ? Call(trap, handler, « target, P »).
     const trap_result_obj = try Value.from(trap.?).callAssumeCallable(
         Value.from(handler),
-        .{ Value.from(target), try property_key.toValue(agent) },
+        &.{ Value.from(target), try property_key.toValue(agent) },
     );
 
     // 8. If trapResultObj is not an Object and trapResultObj is not undefined, throw a TypeError exception.
@@ -417,7 +417,7 @@ fn defineOwnProperty(
     // 8. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, P, descObj »)).
     const boolean_trap_result = (try Value.from(trap.?).callAssumeCallable(
         Value.from(handler),
-        .{
+        &.{
             Value.from(target),
             try property_key.toValue(agent),
             Value.from(property_descriptor_object),
@@ -530,7 +530,7 @@ fn hasProperty(object: Object, property_key: PropertyKey) Agent.Error!bool {
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, P »)).
     const boolean_trap_result = (try Value.from(trap.?).callAssumeCallable(
         Value.from(handler),
-        .{ Value.from(target), try property_key.toValue(agent) },
+        &.{ Value.from(target), try property_key.toValue(agent) },
     )).toBoolean();
 
     // 8. If booleanTrapResult is false, then
@@ -595,7 +595,7 @@ fn get(object: Object, property_key: PropertyKey, receiver: Value) Agent.Error!V
     // 7. Let trapResult be ? Call(trap, handler, « target, P, Receiver »).
     const trap_result = try Value.from(trap.?).callAssumeCallable(
         Value.from(handler),
-        .{ Value.from(target), try property_key.toValue(agent), receiver },
+        &.{ Value.from(target), try property_key.toValue(agent), receiver },
     );
 
     // 8. Let targetDesc be ? target.[[GetOwnProperty]](P).
@@ -660,7 +660,7 @@ fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value)
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, P, V, Receiver »)).
     const boolean_trap_result = (try Value.from(trap.?).callAssumeCallable(
         Value.from(handler),
-        .{ Value.from(target), try property_key.toValue(agent), value, receiver },
+        &.{ Value.from(target), try property_key.toValue(agent), value, receiver },
     )).toBoolean();
 
     // 8. If booleanTrapResult is false, return false.
@@ -728,7 +728,7 @@ fn delete(object: Object, property_key: PropertyKey) Agent.Error!bool {
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, P »)).
     const boolean_trap_result = (try Value.from(trap.?).callAssumeCallable(
         Value.from(handler),
-        .{ Value.from(target), try property_key.toValue(agent) },
+        &.{ Value.from(target), try property_key.toValue(agent) },
     )).toBoolean();
 
     // 8. If booleanTrapResult is false, return false.
@@ -800,7 +800,7 @@ fn ownPropertyKeys(object: Object) Agent.Error!std.ArrayList(PropertyKey) {
     // 7. Let trapResultArray be ? Call(trap, handler, « target »).
     const trap_result_array = try Value.from(trap.?).callAssumeCallable(
         Value.from(handler),
-        .{Value.from(target)},
+        &.{Value.from(target)},
     );
 
     // 8. Let trapResult be ? CreateListFromArrayLike(trapResultArray, « String, Symbol »).
@@ -956,7 +956,7 @@ fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) Age
     // 8. Return ? Call(trap, handler, « target, thisArgument, argArray »).
     return Value.from(trap.?).callAssumeCallable(
         Value.from(handler),
-        .{ Value.from(target), this_argument, Value.from(arg_array) },
+        &.{ Value.from(target), this_argument, Value.from(arg_array) },
     );
 }
 
@@ -998,7 +998,7 @@ pub fn construct(
     // 9. Let newObj be ? Call(trap, handler, « target, argArray, newTarget »).
     const new_obj = try Value.from(trap.?).callAssumeCallable(
         Value.from(handler),
-        .{ Value.from(target), Value.from(arg_array), Value.from(new_target) },
+        &.{ Value.from(target), Value.from(arg_array), Value.from(new_target) },
     );
 
     // 10. If newObj is not an Object, throw a TypeError exception.

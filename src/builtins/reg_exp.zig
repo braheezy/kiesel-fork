@@ -232,7 +232,7 @@ pub fn regExpExec(agent: *Agent, reg_exp: Object, string: String) Agent.Error!?O
     // 2. If IsCallable(exec) is true, then
     if (exec.isCallable()) {
         // a. Let result be ? Call(exec, R, « S »).
-        const result = try exec.callAssumeCallable(Value.from(reg_exp), .{Value.from(string)});
+        const result = try exec.callAssumeCallable(Value.from(reg_exp), &.{Value.from(string)});
 
         // b. If result is not an Object and result is not null, throw a TypeError exception.
         if (result != .object and result != .null) {
@@ -964,7 +964,7 @@ pub const RegExpPrototype = struct {
         const flags_ = try (try reg_exp.object.get(PropertyKey.from("flags"))).toString(agent);
 
         // 6. Let matcher be ? Construct(C, « R, flags »).
-        const matcher = try constructor.construct(.{ reg_exp, Value.from(flags_) }, null);
+        const matcher = try constructor.construct(&.{ reg_exp, Value.from(flags_) }, null);
 
         // 7. Let lastIndex be ? ToLength(? Get(R, "lastIndex")).
         const last_index = try (try reg_exp.object.get(PropertyKey.from("lastIndex"))).toLength(agent);

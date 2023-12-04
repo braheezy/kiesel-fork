@@ -249,7 +249,7 @@ pub fn throwException(
         ) catch |err| switch (err) {
             error.OutOfMemory => break :blk Value.from("Out of memory"),
         };
-        const error_object = constructor.construct(.{Value.from(message)}, null) catch |err| switch (err) {
+        const error_object = constructor.construct(&.{Value.from(message)}, null) catch |err| switch (err) {
             error.OutOfMemory => break :blk Value.from("Out of memory"),
             error.ExceptionThrown => unreachable,
         };

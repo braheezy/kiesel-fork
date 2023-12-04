@@ -206,7 +206,7 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: u64) Ag
     }
 
     // 8. Return ? Construct(C, « 𝔽(length) »).
-    return constructor.object.construct(.{Value.from(@as(u32, @intCast(length)))}, null);
+    return constructor.object.construct(&.{Value.from(@as(u32, @intCast(length)))}, null);
 }
 
 /// 10.4.2.4 ArraySetLength ( A, Desc )
@@ -518,7 +518,7 @@ pub const ArrayConstructor = struct {
             // a. If IsConstructor(C) is true, then
             const array = if (constructor.isConstructor()) blk: {
                 // i. Let A be ? Construct(C).
-                break :blk try constructor.object.construct(.{}, null);
+                break :blk try constructor.object.constructNoArgs();
             }
             // b. Else,
             else blk: {
@@ -570,7 +570,7 @@ pub const ArrayConstructor = struct {
                     // 1. Let mappedValue be Completion(Call(mapfn, thisArg, « nextValue, 𝔽(k) »)).
                     break :blk map_fn.callAssumeCallable(
                         this_arg,
-                        .{ next_value, Value.from(k) },
+                        &.{ next_value, Value.from(k) },
                     ) catch |err| {
                         // 2. IfAbruptCloseIterator(mappedValue, iteratorRecord).
                         return iterator.close(@as(Agent.Error!Value, err));
@@ -602,7 +602,7 @@ pub const ArrayConstructor = struct {
         // 9. If IsConstructor(C) is true, then
         const array = if (constructor.isConstructor()) blk: {
             // a. Let A be ? Construct(C, « 𝔽(len) »).
-            break :blk try constructor.object.construct(.{Value.from(len)}, null);
+            break :blk try constructor.object.construct(&.{Value.from(len)}, null);
         }
         // 10. Else,
         else blk: {
@@ -624,7 +624,7 @@ pub const ArrayConstructor = struct {
             // c. If mapping is true, then
             const mapped_value = if (mapping) blk: {
                 // i. Let mappedValue be ? Call(mapfn, thisArg, « kValue, 𝔽(k) »).
-                break :blk try map_fn.callAssumeCallable(this_arg, .{ k_value, Value.from(k) });
+                break :blk try map_fn.callAssumeCallable(this_arg, &.{ k_value, Value.from(k) });
             }
             // d. Else,
             else blk: {
@@ -670,7 +670,7 @@ pub const ArrayConstructor = struct {
         const array = blk: {
             if (constructor.isConstructor()) {
                 // a. Let A be ? Construct(C, « lenNumber »).
-                break :blk try constructor.object.construct(.{len_number}, null);
+                break :blk try constructor.object.construct(&.{len_number}, null);
             }
             // 5. Else,
             else {
@@ -1119,7 +1119,7 @@ pub const ArrayPrototype = struct {
                 // ii. Let testResult be ToBoolean(? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »)).
                 const test_result = (try callback_fn.callAssumeCallable(
                     this_arg,
-                    .{ k_value, Value.from(k), Value.from(object) },
+                    &.{ k_value, Value.from(k), Value.from(object) },
                 )).toBoolean();
 
                 // iii. If testResult is false, return false.
@@ -1242,7 +1242,7 @@ pub const ArrayPrototype = struct {
                 // ii. Let selected be ToBoolean(? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »)).
                 const selected = (try callback_fn.callAssumeCallable(
                     this_arg,
-                    .{ k_value, Value.from(k), Value.from(object) },
+                    &.{ k_value, Value.from(k), Value.from(object) },
                 )).toBoolean();
 
                 // iii. If selected is true, then
@@ -1418,7 +1418,7 @@ pub const ArrayPrototype = struct {
                     // 1. Set element to ? Call(mapperFunction, thisArg, « element, sourceIndex, source »).
                     element = try Value.from(mapper_function.?).callAssumeCallable(
                         this_arg.?,
-                        .{ element, Value.from(source_index), Value.from(source) },
+                        &.{ element, Value.from(source_index), Value.from(source) },
                     );
                 }
 
@@ -1553,7 +1553,7 @@ pub const ArrayPrototype = struct {
                 // ii. Perform ? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »).
                 _ = try callback_fn.callAssumeCallable(
                     this_arg,
-                    .{ k_value, Value.from(k), Value.from(object) },
+                    &.{ k_value, Value.from(k), Value.from(object) },
                 );
             }
 
@@ -1827,7 +1827,7 @@ pub const ArrayPrototype = struct {
                 // ii. Let mappedValue be ? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »).
                 const mapped_value = try callback_fn.callAssumeCallable(
                     this_arg,
-                    .{ k_value, Value.from(k), Value.from(object) },
+                    &.{ k_value, Value.from(k), Value.from(object) },
                 );
 
                 // iii. Perform ? CreateDataPropertyOrThrow(A, Pk, mappedValue).
@@ -2001,7 +2001,7 @@ pub const ArrayPrototype = struct {
                 // ii. Set accumulator to ? Call(callbackfn, undefined, « accumulator, kValue, 𝔽(k), O »).
                 accumulator = try callback_fn.callAssumeCallable(
                     .undefined,
-                    .{ accumulator, k_value, Value.from(k), Value.from(object) },
+                    &.{ accumulator, k_value, Value.from(k), Value.from(object) },
                 );
             }
 
@@ -2097,7 +2097,7 @@ pub const ArrayPrototype = struct {
                 // ii. Set accumulator to ? Call(callbackfn, undefined, « accumulator, kValue, 𝔽(k), O »).
                 accumulator = try callback_fn.callAssumeCallable(
                     .undefined,
-                    .{ accumulator, k_value, Value.from(k.?), Value.from(object) },
+                    &.{ accumulator, k_value, Value.from(k.?), Value.from(object) },
                 );
             }
 
@@ -2384,7 +2384,7 @@ pub const ArrayPrototype = struct {
                 // ii. Let testResult be ToBoolean(? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »)).
                 const test_result = (try callback_fn.callAssumeCallable(
                     this_arg,
-                    .{ k_value, Value.from(k), Value.from(object) },
+                    &.{ k_value, Value.from(k), Value.from(object) },
                 )).toBoolean();
 
                 // iii. If testResult is true, return true.
@@ -2679,10 +2679,9 @@ pub const ArrayPrototype = struct {
             // c. If nextElement is neither undefined nor null, then
             if (next_element != .undefined and next_element != .null) {
                 // i. Let S be ? ToString(? Invoke(nextElement, "toLocaleString")).
-                const string = try (try next_element.invoke(
+                const string = try (try next_element.invokeNoArgs(
                     agent,
                     PropertyKey.from("toLocaleString"),
-                    .{},
                 )).toString(agent);
 
                 // ii. Set R to the string-concatenation of R and S.
@@ -3116,7 +3115,7 @@ pub fn findViaPredicate(
         // d. Let testResult be ? Call(predicate, thisArg, « kValue, 𝔽(k), O »).
         const test_result = try predicate.callAssumeCallable(
             this_arg,
-            .{ k_value, Value.from(k.?), Value.from(object) },
+            &.{ k_value, Value.from(k.?), Value.from(object) },
         );
 
         // e. If ToBoolean(testResult) is true, return the Record { [[Index]]: 𝔽(k), [[Value]]: kValue }.
@@ -3232,7 +3231,7 @@ pub fn compareArrayElements(
         // a. Let v be ? ToNumber(? Call(comparefn, undefined, « x, y »)).
         const value = try (try Value.from(compare_fn).callAssumeCallable(
             .undefined,
-            .{ x, y },
+            &.{ x, y },
         )).toNumber(agent);
 
         // b. If v is NaN, return +0𝔽.

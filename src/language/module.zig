@@ -60,7 +60,7 @@ fn continueDynamicImport(
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « moduleCompletion.[[Value]] »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
                 .undefined,
-                .{exception},
+                &.{exception},
             ) catch |err_| try noexcept(err_);
 
             // b. Return unused.
@@ -85,7 +85,7 @@ fn continueDynamicImport(
             // c. Perform ! Call(state.[[PromiseCapability]].[[Resolve]], undefined, « undefined »).
             _ = Value.from(capability.resolve).callAssumeCallable(
                 .undefined,
-                .{.undefined},
+                &.{.undefined},
             ) catch |err| try noexcept(err);
         }
 
@@ -111,7 +111,7 @@ fn continueDynamicImport(
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « reason »).
             _ = Value.from(promise_capability_.reject).callAssumeCallable(
                 .undefined,
-                .{reason},
+                &.{reason},
             ) catch |err| try noexcept(err);
 
             // b. Return unused.
@@ -157,7 +157,7 @@ fn continueDynamicImport(
                 // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « link.[[Value]] »).
                 _ = Value.from(promise_capability_.reject).callAssumeCallable(
                     .undefined,
-                    .{value},
+                    &.{value},
                 ) catch |err| try noexcept(err);
 
                 // ii. Return unused.
@@ -178,7 +178,7 @@ fn continueDynamicImport(
                 // ii. Perform ! Call(capability.[[Resolve]], undefined, « undefined »).
                 _ = Value.from(capability.resolve).callAssumeCallable(
                     .undefined,
-                    .{.undefined},
+                    &.{.undefined},
                 ) catch |err| try noexcept(err);
 
                 // 11. Return capability.[[Promise]].
@@ -209,7 +209,7 @@ fn continueDynamicImport(
                     // ii. Perform ! Call(promiseCapability.[[Resolve]], undefined, « namespace »).
                     _ = Value.from(promise_capability__.resolve).callAssumeCallable(
                         .undefined,
-                        .{Value.from(namespace)},
+                        &.{Value.from(namespace)},
                     ) catch |err| try noexcept(err);
 
                     // iii. Return unused.

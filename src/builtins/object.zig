@@ -782,7 +782,7 @@ pub const ObjectPrototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Return ? Invoke(O, "toString").
-        return Value.from(object).invoke(agent, PropertyKey.from("toString"), .{});
+        return Value.from(object).invokeNoArgs(agent, PropertyKey.from("toString"));
     }
 
     /// 20.1.3.6 Object.prototype.toString ( )

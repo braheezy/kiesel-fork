@@ -44,7 +44,7 @@ pub const Iterator = struct {
         // 2. Else,
         else blk: {
             // a. Let result be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]], « value »).
-            break :blk try self.next_method.call(agent, Value.from(self.iterator), .{value_.?});
+            break :blk try self.next_method.call(agent, Value.from(self.iterator), &.{value_.?});
         };
 
         // 3. If result is not an Object, throw a TypeError exception.

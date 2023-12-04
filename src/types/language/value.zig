@@ -292,7 +292,7 @@ pub const Value = union(enum) {
                 // iv. Let result be ? Call(exoticToPrim, input, « hint »).
                 const result = try Value.from(exotic_to_primitive).callAssumeCallable(
                     self,
-                    .{Value.from(hint)},
+                    &.{Value.from(hint)},
                 );
 
                 // v. If result is not an Object, return result.
@@ -902,11 +902,10 @@ pub const Value = union(enum) {
         self: Self,
         agent: *Agent,
         this_value: Value,
-        arguments: anytype,
+        arguments_list: []const Value,
     ) Agent.Error!Value {
         // 1. If argumentsList is not present, set argumentsList to a new empty List.
         // NOTE: This is done via the NoArgs variant of the function.
-        const arguments_list = ArgumentsList.from(arguments);
 
         // 2. If IsCallable(F) is false, throw a TypeError exception.
         if (!self.isCallable()) {
@@ -914,19 +913,27 @@ pub const Value = union(enum) {
         }
 
         // 3. Return ? F.[[Call]](V, argumentsList).
-        return self.object.internalMethods().call.?(self.object, this_value, arguments_list);
+        return self.object.internalMethods().call.?(
+            self.object,
+            this_value,
+            ArgumentsList.from(arguments_list),
+        );
     }
 
     pub inline fn callNoArgs(self: Self, agent: *Agent, this_value: Value) Agent.Error!Value {
-        return self.call(agent, this_value, .{});
+        return self.call(agent, this_value, &.{});
     }
 
-    pub inline fn callAssumeCallable(self: Self, this_value: Value, arguments: anytype) Agent.Error!Value {
-        return self.object.internalMethods().call.?(self.object, this_value, ArgumentsList.from(arguments));
+    pub inline fn callAssumeCallable(self: Self, this_value: Value, arguments_list: []const Value) Agent.Error!Value {
+        return self.object.internalMethods().call.?(
+            self.object,
+            this_value,
+            ArgumentsList.from(arguments_list),
+        );
     }
 
     pub inline fn callAssumeCallableNoArgs(self: Self, this_value: Value) Agent.Error!Value {
-        return self.callAssumeCallable(this_value, .{});
+        return self.callAssumeCallable(this_value, &.{});
     }
 
     /// 7.3.20 CreateListFromArrayLike ( obj [ , elementTypes ] )
@@ -987,15 +994,24 @@ pub const Value = union(enum) {
         self: Self,
         agent: *Agent,
         property_key: PropertyKey,
-        arguments: anytype,
+        arguments_list: []const Value,
     ) Agent.Error!Value {
         // 1. If argumentsList is not present, set argumentsList to a new empty List.
+        // NOTE: This is done via the NoArgs variant of the function.
 
         // 2. Let func be ? GetV(V, P).
         const function = try self.get(agent, property_key);
 
         // 3. Return ? Call(func, V, argumentsList).
-        return function.call(agent, self, arguments);
+        return function.call(agent, self, arguments_list);
+    }
+
+    pub inline fn invokeNoArgs(
+        self: Self,
+        agent: *Agent,
+        property_key: PropertyKey,
+    ) Agent.Error!Value {
+        return self.invoke(agent, property_key, &.{});
     }
 
     /// 7.3.22 OrdinaryHasInstance ( C, O )
@@ -1098,7 +1114,7 @@ pub const Value = union(enum) {
         // 3. If instOfHandler is not undefined, then
         if (maybe_instanceof_handler) |instanceof_handler| {
             // a. Return ToBoolean(? Call(instOfHandler, target, « V »)).
-            return (try from(instanceof_handler).call(agent, target, .{self})).toBoolean();
+            return (try from(instanceof_handler).call(agent, target, &.{self})).toBoolean();
         }
 
         // 4. If IsCallable(target) is false, throw a TypeError exception.

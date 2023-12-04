@@ -693,7 +693,7 @@ pub const ArrayBufferPrototype = struct {
         const constructor = try object.object().speciesConstructor(try realm.intrinsics.@"%ArrayBuffer%"());
 
         // 16. Let new be ? Construct(ctor, « 𝔽(newLen) »).
-        const new_object = try constructor.construct(.{Value.from(new_len)}, null);
+        const new_object = try constructor.construct(&.{Value.from(new_len)}, null);
 
         // 17. Perform ? RequireInternalSlot(new, [[ArrayBufferData]]).
         const new = try Value.from(new_object).requireInternalSlot(agent, ArrayBuffer);

@@ -400,7 +400,7 @@ fn evaluateAsyncFunctionBody(
         // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « declResult.[[Value]] »).
         _ = Value.from(promise_capability.reject).callAssumeCallable(
             .undefined,
-            .{exception},
+            &.{exception},
         ) catch |err| try noexcept(err);
     }
     // 4. Else,

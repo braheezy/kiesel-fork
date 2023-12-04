@@ -74,7 +74,7 @@ pub fn addEntriesFromIterable(
         };
 
         // i. Let status be Completion(Call(adder, target, « k, v »)).
-        _ = Value.from(adder).callAssumeCallable(Value.from(target), .{ k, v }) catch |err| {
+        _ = Value.from(adder).callAssumeCallable(Value.from(target), &.{ k, v }) catch |err| {
             // j. IfAbruptCloseIterator(status, iteratorRecord).
             return iterator.close(@as(Agent.Error!Object, err));
         };
@@ -284,7 +284,7 @@ pub const MapPrototype = struct {
                 // i. Perform ? Call(callbackfn, thisArg, « e.[[Value]], e.[[Key]], M »).
                 _ = try callback_fn.callAssumeCallable(
                     this_arg,
-                    .{ value, key, Value.from(map.object()) },
+                    &.{ value, key, Value.from(map.object()) },
                 );
 
                 // ii. NOTE: The number of elements in entries may have increased during execution
