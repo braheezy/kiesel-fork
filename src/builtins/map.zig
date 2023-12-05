@@ -20,12 +20,14 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 const ValueHashMap = types.ValueHashMap;
+const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createMapIterator = builtins.createMapIterator;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const sameValueZero = types.sameValueZero;
 
@@ -94,9 +96,10 @@ pub const MapConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "groupBy", groupBy, 2, realm);
         try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
 
-        // 24.1.2.1 Map.prototype
+        // 24.1.2.2 Map.prototype
         // https://tc39.es/ecma262/#sec-map.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Map.prototype%"()),
@@ -147,7 +150,35 @@ pub const MapConstructor = struct {
         return Value.from(try addEntriesFromIterable(agent, map, iterable, adder.object));
     }
 
-    /// 24.1.2.2 get Map [ @@species ]
+    /// 24.1.2.1 Map.groupBy ( items, callbackfn )
+    /// https://tc39.es/ecma262/#sec-map.groupby
+    fn groupBy(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const realm = agent.currentRealm();
+        const items = arguments.get(0);
+        const callback_fn = arguments.get(1);
+
+        // 1. Let groups be ? GroupBy(items, callbackfn, zero).
+        const groups = try items.groupBy(agent, callback_fn, .zero);
+
+        // 2. Let map be ! Construct(%Map%).
+        const map = (try realm.intrinsics.@"%Map%"()).constructNoArgs() catch |err| try noexcept(err);
+
+        // 3. For each Record { [[Key]], [[Elements]] } g of groups, do
+        var it = groups.iterator();
+        while (it.next()) |entry| {
+            // a. Let elements be CreateArrayFromList(g.[[Elements]]).
+            const elements = try createArrayFromList(agent, entry.value_ptr.items);
+
+            // b. Let entry be the Record { [[Key]]: g.[[Key]], [[Value]]: elements }.
+            // c. Append entry to map.[[MapData]].
+            try map.as(Map).fields.map_data.putNoClobber(entry.key_ptr.*, Value.from(elements));
+        }
+
+        // 4. Return map.
+        return Value.from(map);
+    }
+
+    /// 24.1.2.3 get Map [ @@species ]
     /// https://tc39.es/ecma262/#sec-get-map-@@species
     fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return the this value.
