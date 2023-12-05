@@ -6,18 +6,22 @@ const Allocator = std.mem.Allocator;
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const pretty_printing = @import("../../pretty_printing.zig");
+const types = @import("../../types.zig");
 const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
 const BigInt = @import("BigInt.zig");
+const Iterator = types.Iterator;
 const Number = @import("number.zig").Number;
 const Object = @import("Object.zig");
 const PropertyDescriptor = @import("../spec/PropertyDescriptor.zig");
 const PropertyKey = Object.PropertyKey;
+const PropertyKeyHashMap = Object.PropertyStorage.PropertyKeyHashMap;
 const String = @import("string.zig").String;
 const Symbol = @import("Symbol.zig");
 const arrayCreate = builtins.arrayCreate;
+const getIterator = types.getIterator;
 const isZigString = utils.isZigString;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
@@ -1054,6 +1058,130 @@ pub const Value = union(enum) {
 
             // c. If SameValue(P, O) is true, return true.
             if (prototype.object.sameValue(object.?)) return true;
+        }
+    }
+
+    /// 7.3.35 AddValueToKeyedGroup ( groups, key, value )
+    /// https://tc39.es/ecma262/#sec-add-value-to-keyed-group
+    fn addValueToKeyedGroup(
+        agent: *Agent,
+        groups: anytype,
+        key: anytype,
+        value: Value,
+    ) Allocator.Error!void {
+        // 1. For each Record { [[Key]], [[Elements]] } g of groups, do
+        //     a. If SameValue(g.[[Key]], key) is true, then
+        if (groups.getPtr(key)) |group| {
+            // i. Assert: Exactly one element of groups meets this criterion.
+            // ii. Append value to g.[[Elements]].
+            try group.append(value);
+
+            // iii. Return unused.
+        } else {
+            // 2. Let group be the Record { [[Key]]: key, [[Elements]]: « value » }.
+            // 3. Append group to groups.
+            var group = std.ArrayList(Value).init(agent.gc_allocator);
+            try group.append(value);
+            try groups.putNoClobber(key, group);
+
+            // 4. Return unused.
+        }
+    }
+
+    const KeyCoercion = enum { property, zero };
+
+    fn GroupByContainer(comptime key_coercion: KeyCoercion) type {
+        return switch (key_coercion) {
+            .property => PropertyKeyHashMap(std.ArrayList(Value)),
+            .zero => ValueHashMap(std.ArrayList(Value)),
+        };
+    }
+
+    /// 7.3.36 GroupBy ( items, callbackfn, keyCoercion )
+    /// https://tc39.es/ecma262/#sec-groupby
+    pub fn groupBy(
+        self: Self,
+        agent: *Agent,
+        callback_fn: Value,
+        comptime key_coercion: KeyCoercion,
+    ) Agent.Error!GroupByContainer(key_coercion) {
+        // 1. Perform ? RequireObjectCoercible(items).
+        _ = try self.requireObjectCoercible(agent);
+
+        // 2. If IsCallable(callbackfn) is false, throw a TypeError exception.
+        if (!callback_fn.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
+        }
+
+        // 3. Let groups be a new empty List.
+        var groups = GroupByContainer(key_coercion).init(agent.gc_allocator);
+
+        // 4. Let iteratorRecord be ? GetIterator(items, sync).
+        const iterator = try getIterator(agent, self, .sync);
+
+        // 5. Let k be 0.
+        var k: u53 = 0;
+
+        // 6. Repeat,
+        while (true) : (k += 1) {
+            // a. If k ≥ 2**53 - 1, then
+            if (k == std.math.maxInt(u53)) {
+                // i. Let error be ThrowCompletion(a newly created TypeError object).
+                const @"error" = agent.throwException(
+                    .type_error,
+                    "Cannot group more than 2^53-1 items",
+                    .{},
+                );
+
+                // ii. Return ? IteratorClose(iteratorRecord, error).
+                return iterator.close(@as(Agent.Error!GroupByContainer(key_coercion), @"error"));
+            }
+
+            // b. Let next be ? IteratorStep(iteratorRecord).
+            const next = try iterator.step();
+
+            // c. If next is false, then
+            if (next == null) {
+                // i. Return groups.
+                return groups;
+            }
+
+            // d. Let value be ? IteratorValue(next).
+            const value = try Iterator.value(next.?);
+
+            // e. Let key be Completion(Call(callbackfn, undefined, « value, 𝔽(k) »)).
+            const key = callback_fn.callAssumeCallable(
+                .undefined,
+                &.{ value, Value.from(k) },
+            ) catch |err| {
+                // f. IfAbruptCloseIterator(key, iteratorRecord).
+                return iterator.close(@as(Agent.Error!GroupByContainer(key_coercion), err));
+            };
+
+            // g. If keyCoercion is property, then
+            const coerced_key = if (key_coercion == .property) blk: {
+                // i. Set key to Completion(ToPropertyKey(key)).
+                break :blk key.toPropertyKey(agent) catch |err| {
+                    // ii. IfAbruptCloseIterator(key, iteratorRecord).
+                    return iterator.close(@as(Agent.Error!GroupByContainer(key_coercion), err));
+                };
+            }
+            // h. Else,
+            else blk: {
+                // i. Assert: keyCoercion is zero.
+                std.debug.assert(key_coercion == .zero);
+
+                // ii. If key is -0𝔽, set key to +0𝔽.
+                break :blk if (key == .number and key.number.isNegativeZero())
+                    Value.from(0)
+                else
+                    key;
+            };
+
+            // i. Perform AddValueToKeyedGroup(groups, key, value).
+            try addValueToKeyedGroup(agent, &groups, coerced_key, value);
+
+            // j. Set k to k + 1.
         }
     }
 

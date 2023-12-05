@@ -57,6 +57,7 @@ pub const ObjectConstructor = struct {
         try defineBuiltinFunction(object, "getOwnPropertyNames", getOwnPropertyNames, 1, realm);
         try defineBuiltinFunction(object, "getOwnPropertySymbols", getOwnPropertySymbols, 1, realm);
         try defineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm);
+        try defineBuiltinFunction(object, "groupBy", groupBy, 2, realm);
         try defineBuiltinFunction(object, "hasOwn", hasOwn, 2, realm);
         try defineBuiltinFunction(object, "is", is, 2, realm);
         try defineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm);
@@ -68,7 +69,7 @@ pub const ObjectConstructor = struct {
         try defineBuiltinFunction(object, "setPrototypeOf", setPrototypeOf, 2, realm);
         try defineBuiltinFunction(object, "values", values, 1, realm);
 
-        // 20.1.2.20 Object.prototype
+        // 20.1.2.21 Object.prototype
         // https://tc39.es/ecma262/#sec-object.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Object.prototype%"()),
@@ -513,7 +514,36 @@ pub const ObjectConstructor = struct {
         return Value.from(try obj.internalMethods().getPrototypeOf(obj) orelse return .null);
     }
 
-    /// 20.1.2.13 Object.hasOwn ( O, P )
+    /// 20.1.2.13 Object.groupBy ( items, callbackfn )
+    /// https://tc39.es/ecma262/#sec-object.groupby
+    fn groupBy(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const items = arguments.get(0);
+        const callback_fn = arguments.get(1);
+
+        // 1. Let groups be ? GroupBy(items, callbackfn, property).
+        const groups = try items.groupBy(agent, callback_fn, .property);
+
+        // 2. Let obj be OrdinaryObjectCreate(null).
+        const object = try ordinaryObjectCreate(agent, null);
+
+        // 3. For each Record { [[Key]], [[Elements]] } g of groups, do
+        var it = groups.iterator();
+        while (it.next()) |entry| {
+            // a. Let elements be CreateArrayFromList(g.[[Elements]]).
+            const elements = try createArrayFromList(agent, entry.value_ptr.items);
+
+            // b. Perform ! CreateDataPropertyOrThrow(obj, g.[[Key]], elements).
+            object.createDataPropertyOrThrow(
+                entry.key_ptr.*,
+                Value.from(elements),
+            ) catch |err| try noexcept(err);
+        }
+
+        // 4. Return obj.
+        return Value.from(object);
+    }
+
+    /// 20.1.2.14 Object.hasOwn ( O, P )
     /// https://tc39.es/ecma262/#sec-object.hasown
     fn hasOwn(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const object = arguments.get(0);
@@ -529,7 +559,7 @@ pub const ObjectConstructor = struct {
         return Value.from(try obj.hasOwnProperty(property_key));
     }
 
-    /// 20.1.2.14 Object.is ( value1, value2 )
+    /// 20.1.2.15 Object.is ( value1, value2 )
     /// https://tc39.es/ecma262/#sec-object.is
     fn is(_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const value1 = arguments.get(0);
@@ -539,7 +569,7 @@ pub const ObjectConstructor = struct {
         return Value.from(sameValue(value1, value2));
     }
 
-    /// 20.1.2.15 Object.isExtensible ( O )
+    /// 20.1.2.16 Object.isExtensible ( O )
     /// https://tc39.es/ecma262/#sec-object.isextensible
     fn isExtensible(_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const object = arguments.get(0);
@@ -551,7 +581,7 @@ pub const ObjectConstructor = struct {
         return Value.from(try object.object.isExtensible());
     }
 
-    /// 20.1.2.16 Object.isFrozen ( O )
+    /// 20.1.2.17 Object.isFrozen ( O )
     /// https://tc39.es/ecma262/#sec-object.isfrozen
     fn isFrozen(_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const object = arguments.get(0);
@@ -563,7 +593,7 @@ pub const ObjectConstructor = struct {
         return Value.from(try object.object.testIntegrityLevel(.frozen));
     }
 
-    /// 20.1.2.17 Object.isSealed ( O )
+    /// 20.1.2.18 Object.isSealed ( O )
     /// https://tc39.es/ecma262/#sec-object.issealed
     fn isSealed(_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const object = arguments.get(0);
@@ -575,7 +605,7 @@ pub const ObjectConstructor = struct {
         return Value.from(try object.object.testIntegrityLevel(.sealed));
     }
 
-    /// 20.1.2.18 Object.keys ( O )
+    /// 20.1.2.19 Object.keys ( O )
     /// https://tc39.es/ecma262/#sec-object.keys
     fn keys(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const object = arguments.get(0);
@@ -591,7 +621,7 @@ pub const ObjectConstructor = struct {
         return Value.from(try createArrayFromList(agent, key_list.items));
     }
 
-    /// 20.1.2.19 Object.preventExtensions ( O )
+    /// 20.1.2.20 Object.preventExtensions ( O )
     /// https://tc39.es/ecma262/#sec-object.preventextensions
     fn preventExtensions(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const object = arguments.get(0);
@@ -609,7 +639,7 @@ pub const ObjectConstructor = struct {
         return object;
     }
 
-    /// 20.1.2.21 Object.seal ( O )
+    /// 20.1.2.22 Object.seal ( O )
     /// https://tc39.es/ecma262/#sec-object.seal
     fn seal(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const object = arguments.get(0);
@@ -627,7 +657,7 @@ pub const ObjectConstructor = struct {
         return object;
     }
 
-    /// 20.1.2.22 Object.setPrototypeOf ( O, proto )
+    /// 20.1.2.23 Object.setPrototypeOf ( O, proto )
     /// https://tc39.es/ecma262/#sec-object.seal
     fn setPrototypeOf(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const object = arguments.get(0);
@@ -657,7 +687,7 @@ pub const ObjectConstructor = struct {
         return object;
     }
 
-    /// 20.1.2.23 Object.values ( O )
+    /// 20.1.2.24 Object.values ( O )
     /// https://tc39.es/ecma262/#sec-object.values
     fn values(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
         const object = arguments.get(0);
