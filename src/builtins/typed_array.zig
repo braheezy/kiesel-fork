@@ -688,6 +688,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinFunction(object, "map", map, 1, realm);
         try defineBuiltinFunction(object, "reduce", reduce, 1, realm);
         try defineBuiltinFunction(object, "reduceRight", reduceRight, 1, realm);
+        try defineBuiltinFunction(object, "reverse", reverse, 0, realm);
         try defineBuiltinFunction(object, "some", some, 1, realm);
         try defineBuiltinFunction(object, "subarray", subarray, 2, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
@@ -1496,7 +1497,6 @@ pub const TypedArrayPrototype = struct {
         return accumulator;
     }
 
-
     /// 23.2.3.24 %TypedArray%.prototype.reduceRight ( callbackfn [ , initialValue ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.reduceright
     fn reduceRight(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
@@ -1567,6 +1567,54 @@ pub const TypedArrayPrototype = struct {
 
         // 11. Return accumulator.
         return accumulator;
+    }
+
+    /// 23.2.3.25 %TypedArray%.prototype.reverse ( )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.reverse
+    fn reverse(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let O be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
+        const ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const object = this_value.object;
+
+        // 3. Let len be TypedArrayLength(taRecord).
+        const len = typedArrayLength(ta);
+
+        // 4. Let middle be floor(len / 2).
+        const middle = @divFloor(len, 2);
+
+        // 5. Let lower be 0.
+        var lower: u53 = 0;
+
+        // 6. Repeat, while lower ≠ middle,
+        while (lower != middle) {
+            // a. Let upper be len - lower - 1.
+            const upper = len - lower - 1;
+
+            // b. Let upperP be ! ToString(𝔽(upper)).
+            const upper_property_key = PropertyKey.from(upper);
+
+            // c. Let lowerP be ! ToString(𝔽(lower)).
+            const lower_property_key = PropertyKey.from(lower);
+
+            // d. Let lowerValue be ! Get(O, lowerP).
+            const lower_value = object.get(lower_property_key) catch |err| try noexcept(err);
+
+            // e. Let upperValue be ! Get(O, upperP).
+            const upper_value = object.get(upper_property_key) catch |err| try noexcept(err);
+
+            // f. Perform ! Set(O, lowerP, upperValue, true).
+            object.set(lower_property_key, upper_value, .throw) catch |err| try noexcept(err);
+
+            // g. Perform ! Set(O, upperP, lowerValue, true).
+            object.set(upper_property_key, lower_value, .throw) catch |err| try noexcept(err);
+
+            // h. Set lower to lower + 1.
+            lower += 1;
+        }
+
+        // 7. Return O.
+        return Value.from(object);
     }
 
     /// 23.2.3.28 %TypedArray%.prototype.some ( callbackfn [ , thisArg ] )
