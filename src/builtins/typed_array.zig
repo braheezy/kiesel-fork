@@ -687,6 +687,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinAccessor(object, "length", length, null, realm);
         try defineBuiltinFunction(object, "map", map, 1, realm);
         try defineBuiltinFunction(object, "reduce", reduce, 1, realm);
+        try defineBuiltinFunction(object, "reduceRight", reduceRight, 1, realm);
         try defineBuiltinFunction(object, "some", some, 1, realm);
         try defineBuiltinFunction(object, "subarray", subarray, 2, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
@@ -1489,6 +1490,79 @@ pub const TypedArrayPrototype = struct {
             );
 
             // d. Set k to k + 1.
+        }
+
+        // 11. Return accumulator.
+        return accumulator;
+    }
+
+
+    /// 23.2.3.24 %TypedArray%.prototype.reduceRight ( callbackfn [ , initialValue ] )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.reduceright
+    fn reduceRight(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const callback_fn = arguments.get(0);
+        const initial_value = arguments.getOrNull(1);
+
+        // 1. Let O be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
+        const ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const object = this_value.object;
+
+        // 3. Let len be TypedArrayLength(taRecord).
+        const len = typedArrayLength(ta);
+
+        // 4. If IsCallable(callbackfn) is false, throw a TypeError exception.
+        if (!callback_fn.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
+        }
+
+        // 5. If len = 0 and initialValue is not present, throw a TypeError exception.
+        if (len == 0 and initial_value == null) {
+            return agent.throwException(
+                .type_error,
+                "Cannot reduce empty typed array without initial value",
+                .{},
+            );
+        }
+
+        // 6. Let k be len - 1.
+        var k: ?u53 = std.math.sub(u53, len, 1) catch null;
+
+        // 7. Let accumulator be undefined.
+        var accumulator: Value = undefined;
+
+        // 8. If initialValue is present, then
+        if (initial_value != null) {
+            // a. Set accumulator to initialValue.
+            accumulator = initial_value.?;
+        }
+        // 9. Else,
+        else {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k.?);
+
+            // b. Set accumulator to ! Get(O, Pk).
+            accumulator = object.get(property_key) catch |err| try noexcept(err);
+
+            // c. Set k to k - 1.
+            if (k != null) k = std.math.sub(u53, k.?, 1) catch null;
+        }
+
+        // 10. Repeat, while k ≥ 0,
+        while (k != null) : (k = (std.math.sub(u53, k.?, 1) catch null)) {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k.?);
+
+            // b. Let kValue be ! Get(O, Pk).
+            const k_value = object.get(property_key) catch |err| try noexcept(err);
+
+            // c. Set accumulator to ? Call(callbackfn, undefined, « accumulator, kValue, 𝔽(k), O »).
+            accumulator = try callback_fn.callAssumeCallable(
+                .undefined,
+                &.{ accumulator, k_value, Value.from(k.?), Value.from(object) },
+            );
+
+            // d. Set k to k - 1.
         }
 
         // 11. Return accumulator.
