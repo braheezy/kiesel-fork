@@ -670,6 +670,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinAccessor(object, "byteOffset", byteOffset, null, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
         try defineBuiltinFunction(object, "every", every, 1, realm);
+        try defineBuiltinFunction(object, "fill", fill, 1, realm);
         try defineBuiltinFunction(object, "filter", filter, 1, realm);
         try defineBuiltinFunction(object, "find", find, 1, realm);
         try defineBuiltinFunction(object, "findIndex", findIndex, 1, realm);
@@ -811,6 +812,97 @@ pub const TypedArrayPrototype = struct {
 
         // 7. Return true.
         return Value.from(true);
+    }
+
+    /// 23.2.3.9 %TypedArray%.prototype.fill ( value [ , start [ , end ] ] )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.fill
+    fn fill(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        var value = arguments.get(0);
+        const start = arguments.get(1);
+        const end = arguments.get(2);
+
+        // 1. Let O be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
+        var ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const typed_array = ta.object;
+        const object = this_value.object;
+
+        // 3. Let len be TypedArrayLength(taRecord).
+        var len = typedArrayLength(ta);
+        const len_f64: f64 = @floatFromInt(len);
+
+        // 4. If O.[[ContentType]] is bigint, set value to ? ToBigInt(value).
+        // 5. Otherwise, set value to ? ToNumber(value).
+        value = if (typed_array.fields.content_type == .bigint)
+            Value.from(try value.toBigInt(agent))
+        else
+            Value.from(try value.toNumber(agent));
+
+        // 6. Let relativeStart be ? ToIntegerOrInfinity(start).
+        const relative_start = try start.toIntegerOrInfinity(agent);
+
+        // 7. If relativeStart = -∞, let k be 0.
+        const k_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
+            break :blk 0;
+        }
+        // 8. Else if relativeStart < 0, let k be max(len + relativeStart, 0).
+        else if (relative_start < 0) blk: {
+            break :blk @max(len_f64 + relative_start, 0);
+        }
+        // 9. Else, let k be min(relativeStart, len).
+        else blk: {
+            break :blk @min(relative_start, len_f64);
+        };
+        var k: u53 = @intFromFloat(k_f64);
+
+        // 10. If end is undefined, let relativeEnd be len; else let relativeEnd be
+        //     ? ToIntegerOrInfinity(end).
+        const relative_end = if (end == .undefined)
+            len_f64
+        else
+            try end.toIntegerOrInfinity(agent);
+
+        // 11. If relativeEnd = -∞, let final be 0.
+        const final_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
+            break :blk 0;
+        }
+        // 12. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
+        else if (relative_end < 0) blk: {
+            break :blk @max(len_f64 + relative_end, 0);
+        }
+        // 13. Else, let final be min(relativeEnd, len).
+        else blk: {
+            break :blk @min(relative_end, len_f64);
+        };
+        var final: u53 = @intFromFloat(final_f64);
+
+        // 14. Set taRecord to MakeTypedArrayWithBufferWitnessRecord(O, seq-cst).
+        ta = makeTypedArrayWithBufferWitnessRecord(object.as(TypedArray), .seq_cst);
+
+        // 15. If IsTypedArrayOutOfBounds(taRecord) is true, throw a TypeError exception.
+        if (isTypedArrayOutOfBounds(ta)) {
+            return agent.throwException(.type_error, "Typed array is out of bounds", .{});
+        }
+
+        // 16. Set len to TypedArrayLength(taRecord).
+        len = typedArrayLength(ta);
+
+        // 17. Set final to min(final, len).
+        final = @min(final, len);
+
+        // 18. Repeat, while k < final,
+        while (k < final) : (k += 1) {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
+
+            // b. Perform ! Set(O, Pk, value, true).
+            object.set(property_key, value, .throw) catch |err| try noexcept(err);
+
+            // c. Set k to k + 1.
+        }
+
+        // 19. Return O.
+        return Value.from(object);
     }
 
     /// 23.2.3.10 %TypedArray%.prototype.filter ( callbackfn [ , thisArg ] )
