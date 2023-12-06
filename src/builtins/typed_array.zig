@@ -683,6 +683,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinFunction(object, "indexOf", indexOf, 1, realm);
         try defineBuiltinFunction(object, "join", join, 1, realm);
         try defineBuiltinFunction(object, "keys", keys, 0, realm);
+        try defineBuiltinFunction(object, "lastIndexOf", lastIndexOf, 1, realm);
         try defineBuiltinAccessor(object, "length", length, null, realm);
         try defineBuiltinFunction(object, "map", map, 1, realm);
         try defineBuiltinFunction(object, "some", some, 1, realm);
@@ -1286,6 +1287,65 @@ pub const TypedArrayPrototype = struct {
 
         // 3. Return CreateArrayIterator(O, key).
         return Value.from(try createArrayIterator(agent, object, .key));
+    }
+
+    /// 23.2.3.20 %TypedArray%.prototype.lastIndexOf ( searchElement [ , fromIndex ] )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.lastindexof
+    fn lastIndexOf(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const search_element = arguments.get(0);
+        const from_index = arguments.get(1);
+
+        // 1. Let O be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
+        const ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const object = this_value.object;
+
+        // 3. Let len be TypedArrayLength(taRecord).
+        const len = typedArrayLength(ta);
+
+        // 4. If len = 0, return -1𝔽.
+        if (len == 0) return Value.from(-1);
+
+        // 5. If fromIndex is present, let n be ? ToIntegerOrInfinity(fromIndex); else let n be len - 1.
+        const n = if (arguments.count() > 1)
+            try from_index.toIntegerOrInfinity(agent)
+        else
+            @as(f64, @floatFromInt(len)) - 1;
+
+        // 6. If n = -∞, return -1𝔽.
+        if (std.math.isNegativeInf(n)) return Value.from(-1);
+
+        // 7. If n ≥ 0, then
+        //     a. Let k be min(n, len - 1).
+        // 10. Else,
+        //     a. Let k be len + n.
+        const k_f64 = if (n >= 0)
+            @min(n, @as(f64, @floatFromInt(len)) - 1)
+        else
+            @as(f64, @floatFromInt(len)) + n;
+        if (k_f64 < 0) return Value.from(-1);
+        var k: u53 = @intFromFloat(k_f64);
+
+        // 9. Repeat, while k ≥ 0,
+        while (k >= 0) : (k -|= 1) {
+            // a. Let kPresent be ! HasProperty(O, ! ToString(𝔽(k))).
+            const k_present = object.hasProperty(PropertyKey.from(k)) catch |err| try noexcept(err);
+
+            // b. If kPresent is true, then
+            if (k_present) {
+                // i. Let elementK be ! Get(O, ! ToString(𝔽(k))).
+                const element_k = object.get(PropertyKey.from(k)) catch |err| try noexcept(err);
+
+                // ii. If IsStrictlyEqual(searchElement, elementK) is true, return 𝔽(k).
+                if (isStrictlyEqual(search_element, element_k)) return Value.from(k);
+            }
+
+            // c. Set k to k - 1.
+            if (k == 0) break;
+        }
+
+        // 10. Return -1𝔽.
+        return Value.from(-1);
     }
 
     /// 23.2.3.21 get %TypedArray%.prototype.length
