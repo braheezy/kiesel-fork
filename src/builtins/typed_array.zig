@@ -43,6 +43,7 @@ const ordinaryGet = builtins.ordinaryGet;
 const ordinaryGetOwnProperty = builtins.ordinaryGetOwnProperty;
 const ordinaryHasProperty = builtins.ordinaryHasProperty;
 const ordinarySet = builtins.ordinarySet;
+const sameValueZero = types.sameValueZero;
 const setValueInBuffer = builtins.setValueInBuffer;
 
 /// Table 71: The TypedArray Constructors
@@ -677,6 +678,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinFunction(object, "findLast", findLast, 1, realm);
         try defineBuiltinFunction(object, "findLastIndex", findLastIndex, 1, realm);
         try defineBuiltinFunction(object, "forEach", forEach, 1, realm);
+        try defineBuiltinFunction(object, "includes", includes, 1, realm);
         try defineBuiltinFunction(object, "join", join, 1, realm);
         try defineBuiltinFunction(object, "keys", keys, 0, realm);
         try defineBuiltinAccessor(object, "length", length, null, realm);
@@ -1109,6 +1111,59 @@ pub const TypedArrayPrototype = struct {
 
         // 7. Return undefined.
         return .undefined;
+    }
+
+    /// 23.2.3.16 %TypedArray%.prototype.includes ( searchElement [ , fromIndex ] )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.includes
+    fn includes(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const search_element = arguments.get(0);
+        const from_index = arguments.get(1);
+
+        // 1. Let O be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
+        const ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const object = this_value.object;
+
+        // 3. Let len be TypedArrayLength(taRecord).
+        const len = typedArrayLength(ta);
+
+        // 4. If len = 0, return false.
+        if (len == 0) return Value.from(false);
+
+        // 5. Let n be ? ToIntegerOrInfinity(fromIndex).
+        var n = try from_index.toIntegerOrInfinity(agent);
+
+        // 6. Assert: If fromIndex is undefined, then n is 0.
+        if (from_index == .undefined) std.debug.assert(n == 0);
+
+        // 7. If n = +∞, return false.
+        if (std.math.isPositiveInf(n)) return Value.from(false);
+
+        // 8. Else if n = -∞, set n to 0.
+        if (std.math.isNegativeInf(n)) n = 0;
+
+        // 9. If n ≥ 0, then
+        //     a. Let k be n.
+        // 10. Else,
+        //     a. Let k be len + n.
+        //     b. If k < 0, set k to 0.
+        const k_f64 = if (n >= 0) n else @max(@as(f64, @floatFromInt(len)) + n, 0);
+        if (k_f64 >= std.math.maxInt(u53)) return Value.from(-1);
+        var k: u53 = @intFromFloat(k_f64);
+
+        // 11. Repeat, while k < len,
+        while (k < len) : (k += 1) {
+            // a. Let elementK be ! Get(O, ! ToString(𝔽(k))).
+            const element_k = object.get(PropertyKey.from(k)) catch |err| try noexcept(err);
+
+            // b. If SameValueZero(searchElement, elementK) is true, return true.
+            if (sameValueZero(search_element, element_k)) return Value.from(true);
+
+            // c. Set k to k + 1.
+        }
+
+        // 12. Return false.
+        return Value.from(false);
     }
 
     /// 23.2.3.18 %TypedArray%.prototype.join ( separator )
