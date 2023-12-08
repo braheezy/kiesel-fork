@@ -46,6 +46,7 @@ const ordinaryHasProperty = builtins.ordinaryHasProperty;
 const ordinarySet = builtins.ordinarySet;
 const sameValueZero = types.sameValueZero;
 const setValueInBuffer = builtins.setValueInBuffer;
+const sortIndexedProperties = builtins.sortIndexedProperties;
 
 /// Table 71: The TypedArray Constructors
 /// https://tc39.es/ecma262/#table-the-typedarray-constructors
@@ -691,6 +692,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinFunction(object, "reduceRight", reduceRight, 1, realm);
         try defineBuiltinFunction(object, "reverse", reverse, 0, realm);
         try defineBuiltinFunction(object, "some", some, 1, realm);
+        try defineBuiltinFunction(object, "sort", sort, 1, realm);
         try defineBuiltinFunction(object, "subarray", subarray, 2, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toReversed", toReversed, 0, realm);
@@ -1697,6 +1699,67 @@ pub const TypedArrayPrototype = struct {
         return Value.from(false);
     }
 
+    /// 23.2.3.29 %TypedArray%.prototype.sort ( comparefn )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.sort
+    fn sort(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const compare_fn = arguments.get(0);
+
+        // 1. If comparefn is not undefined and IsCallable(comparefn) is false, throw a TypeError
+        //    exception.
+        if (compare_fn != .undefined and !compare_fn.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{compare_fn});
+        }
+
+        // 2. Let obj be the this value.
+        // 3. Let taRecord be ? ValidateTypedArray(obj, seq-cst).
+        const ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const object = this_value.object;
+
+        // 4. Let len be TypedArrayLength(taRecord).
+        const len = typedArrayLength(ta);
+
+        // 5. NOTE: The following closure performs a numeric comparison rather than the string
+        //    comparison used in 23.1.3.30.
+        // 6. Let SortCompare be a new Abstract Closure with parameters (x, y) that captures
+        //    comparefn and performs the following steps when called:
+        const sortCompare = struct {
+            fn func(agent_: *Agent, x: Value, y: Value, compare_fn_: ?Object) Agent.Error!std.math.Order {
+                // a. Return ? CompareTypedArrayElements(x, y, comparefn).
+                return compareTypedArrayElements(agent_, x, y, compare_fn_);
+            }
+        }.func;
+
+        // 7. Let sortedList be ? SortIndexedProperties(obj, len, SortCompare, read-through-holes).
+        const sorted_list = try sortIndexedProperties(
+            agent,
+            object,
+            len,
+            .{
+                .impl = sortCompare,
+                .compare_fn = if (compare_fn != .undefined) compare_fn.object else null,
+            },
+            .read_through_holes,
+        );
+
+        // 8. Let j be 0.
+        var j: u53 = 0;
+
+        // 9. Repeat, while j < len,
+        while (j < len) : (j += 1) {
+            // a. Perform ! Set(obj, ! ToString(𝔽(j)), sortedList[j], true).
+            object.set(
+                PropertyKey.from(j),
+                sorted_list[@intCast(j)],
+                .throw,
+            ) catch |err| try noexcept(err);
+
+            // b. Set j to j + 1.
+        }
+
+        // 10. Return obj.
+        return Value.from(object);
+    }
+
     /// 23.2.3.30 %TypedArray%.prototype.subarray ( begin, end )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.subarray
     fn subarray(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
@@ -2142,6 +2205,63 @@ pub fn typedArrayElementSize(typed_array: *const TypedArray) u53 {
         .{ "Float32Array", 4 },
         .{ "Float64Array", 8 },
     }).get(typed_array.fields.typed_array_name).?);
+}
+
+/// 23.2.4.7 CompareTypedArrayElements ( x, y, comparefn )
+/// https://tc39.es/ecma262/#sec-comparetypedarrayelements
+pub fn compareTypedArrayElements(
+    agent: *Agent,
+    x: Value,
+    y: Value,
+    maybe_compare_fn: ?Object,
+) Agent.Error!std.math.Order {
+    // 1. Assert: x is a Number and y is a Number, or x is a BigInt and y is a BigInt.
+    std.debug.assert((x == .number and y == .number) or (x == .big_int and y == .big_int));
+
+    // 2. If comparefn is not undefined, then
+    if (maybe_compare_fn) |compare_fn| {
+        // a. Let v be ? ToNumber(? Call(comparefn, undefined, « x, y »)).
+        const value = try (try Value.from(compare_fn).callAssumeCallable(
+            .undefined,
+            &.{ x, y },
+        )).toNumber(agent);
+
+        // b. If v is NaN, return +0𝔽.
+        if (value.isNan()) return .eq;
+
+        // c. Return v.
+        return if (value.isZero()) .eq else if (value.asFloat() < 0) .lt else .gt;
+    }
+
+    if (x == .number and y == .number) {
+        // 3. If x and y are both NaN, return +0𝔽.
+        if (x.number.isNan() and y.number.isNan()) return .eq;
+
+        // 4. If x is NaN, return 1𝔽.
+        if (x.number.isNan()) return .gt;
+
+        // 5. If y is NaN, return -1𝔽.
+        if (y.number.isNan()) return .lt;
+
+        // 6. If x < y, return -1𝔽.
+        if (x.number.lessThan(y.number).?) return .lt;
+
+        // 7. If x > y, return 1𝔽.
+        if (y.number.lessThan(x.number).?) return .gt;
+
+        // 8. If x is -0𝔽 and y is +0𝔽, return -1𝔽.
+        if (x.number.isNegativeZero() and y.number.isPositiveZero()) return .lt;
+
+        // 9. If x is +0𝔽 and y is -0𝔽, return 1𝔽.
+        if (x.number.isPositiveZero() and y.number.isNegativeZero()) return .gt;
+    } else {
+        // 6-7.
+        if (x.big_int.lessThan(y.big_int)) return .lt;
+        if (y.big_int.lessThan(x.big_int)) return .gt;
+    }
+
+    // 10. Return +0𝔽.
+    return .eq;
 }
 
 /// 23.2.5.1.1 AllocateTypedArray ( constructorName, newTarget, defaultProto [ , length ] )

@@ -248,6 +248,7 @@ pub const rejectPromise = promise.rejectPromise;
 pub const setFunctionLength = ecmascript_function.setFunctionLength;
 pub const setFunctionName = ecmascript_function.setFunctionName;
 pub const setValueInBuffer = array_buffer.setValueInBuffer;
+pub const sortIndexedProperties = array.sortIndexedProperties;
 pub const stringCreate = string.stringCreate;
 pub const triggerPromiseReactions = promise.triggerPromiseReactions;
 pub const typedArrayElementSize = typed_array.typedArrayElementSize;
