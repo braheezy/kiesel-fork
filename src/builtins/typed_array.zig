@@ -667,6 +667,7 @@ pub const TypedArrayPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinAccessor(object, "buffer", buffer, null, realm);
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinAccessor(object, "byteOffset", byteOffset, null, realm);
@@ -707,6 +708,39 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinProperty(object, "@@iterator", @"%TypedArray.prototype.values%");
 
         return object;
+    }
+
+    /// 23.2.3.1 %TypedArray%.prototype.at ( index )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.at
+    fn at(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const index = arguments.get(0);
+
+        // 1. Let O be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
+        const ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const object = this_value.object;
+
+        // 3. Let len be TypedArrayLength(taRecord).
+        const len = typedArrayLength(ta);
+
+        // 4. Let relativeIndex be ? ToIntegerOrInfinity(index).
+        const relative_index = try index.toIntegerOrInfinity(agent);
+
+        // 5. If relativeIndex ≥ 0, then
+        //     a. Let k be relativeIndex.
+        // 6. Else,
+        //     a. Let k be len + relativeIndex.
+        const k_f64 = if (relative_index >= 0)
+            relative_index
+        else
+            @as(f64, @floatFromInt(len)) + relative_index;
+
+        // 7. If k < 0 or k ≥ len, return undefined.
+        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return .undefined;
+        const k: u53 = @intFromFloat(k_f64);
+
+        // 8. Return ! Get(O, ! ToString(𝔽(k))).
+        return object.get(PropertyKey.from(k)) catch |err| try noexcept(err);
     }
 
     /// 23.2.3.2 get %TypedArray%.prototype.buffer
