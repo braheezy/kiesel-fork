@@ -696,6 +696,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinFunction(object, "subarray", subarray, 2, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toReversed", toReversed, 0, realm);
+        try defineBuiltinFunction(object, "toSorted", toSorted, 1, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
         try defineBuiltinFunction(object, "with", with, 2, realm);
         try defineBuiltinAccessor(object, "@@toStringTag", @"@@toStringTag", null, realm);
@@ -1944,6 +1945,75 @@ pub const TypedArrayPrototype = struct {
         }
 
         // 7. Return A.
+        return Value.from(new_typed_array);
+    }
+
+    /// 23.2.3.33 %TypedArray%.prototype.toSorted ( comparefn )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.tosorted
+    fn toSorted(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const compare_fn = arguments.get(0);
+
+        // 1. If comparefn is not undefined and IsCallable(comparefn) is false, throw a TypeError
+        //    exception.
+        if (compare_fn != .undefined and !compare_fn.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{compare_fn});
+        }
+
+        // 2. Let O be the this value.
+        // 3. Let taRecord be ? ValidateTypedArray(O, seq-cst).
+        const ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const typed_array = ta.object;
+        const object = this_value.object;
+
+        // 4. Let len be TypedArrayLength(taRecord).
+        const len = typedArrayLength(ta);
+
+        // 5. Let A be ? TypedArrayCreateSameType(O, « 𝔽(len) »).
+        const new_typed_array = try typedArrayCreateSameType(
+            agent,
+            typed_array,
+            &.{Value.from(len)},
+        );
+
+        // 6. NOTE: The following closure performs a numeric comparison rather than the string
+        //    comparison used in 23.1.3.34.
+        // 7. Let SortCompare be a new Abstract Closure with parameters (x, y) that captures
+        //    comparefn and performs the following steps when called:
+        const sortCompare = struct {
+            fn func(agent_: *Agent, x: Value, y: Value, compare_fn_: ?Object) Agent.Error!std.math.Order {
+                // a. Return ? CompareTypedArrayElements(x, y, comparefn).
+                return compareTypedArrayElements(agent_, x, y, compare_fn_);
+            }
+        }.func;
+
+        // 8. Let sortedList be ? SortIndexedProperties(O, len, SortCompare, read-through-holes).
+        const sorted_list = try sortIndexedProperties(
+            agent,
+            object,
+            len,
+            .{
+                .impl = sortCompare,
+                .compare_fn = if (compare_fn != .undefined) compare_fn.object else null,
+            },
+            .read_through_holes,
+        );
+
+        // 9. Let j be 0.
+        var j: u53 = 0;
+
+        // 10. Repeat, while j < len,
+        while (j < len) : (j += 1) {
+            // a. Perform ! Set(A, ! ToString(𝔽(j)), sortedList[j], true).
+            new_typed_array.set(
+                PropertyKey.from(j),
+                sorted_list[@intCast(j)],
+                .throw,
+            ) catch |err| try noexcept(err);
+
+            // b. Set j to j + 1.
+        }
+
+        // 11. Return A.
         return Value.from(new_typed_array);
     }
 
