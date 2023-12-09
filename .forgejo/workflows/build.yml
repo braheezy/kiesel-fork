@@ -15,6 +15,7 @@ jobs:
       - uses: https://github.com/dtolnay/rust-toolchain@nightly
         with:
           components: "rust-src"
+      - uses: https://github.com/Swatinem/rust-cache@v2
       - name: Create build.sh script
         run: |
           cat > build.sh << EOF
