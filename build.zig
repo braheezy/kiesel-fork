@@ -75,17 +75,6 @@ pub fn build(b: *std.Build) void {
         .dependencies = dependencies.items,
     });
 
-    _ = std.process.Child.run(.{
-        .allocator = b.allocator,
-        .argv = &.{
-            "patch",
-            "--forward",
-            "--reject-file=-",
-            libregexp.builder.dependency("quickjs", .{}).path("libregexp.c").getPath(b),
-            "patches/libregexp.patch",
-        },
-    }) catch |err| @panic(@errorName(err));
-
     const exe = b.addExecutable(.{
         .name = "kiesel",
         .root_source_file = .{ .path = "src/cli.zig" },

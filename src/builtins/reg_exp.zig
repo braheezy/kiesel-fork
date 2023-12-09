@@ -8,6 +8,7 @@ const Allocator = std.mem.Allocator;
 const gc = @import("gc");
 
 const libregexp = @cImport({
+    @cInclude("cutils.h"); // For the BOOL typedef
     @cInclude("libregexp.h");
 });
 
@@ -65,8 +66,18 @@ export fn lre_realloc(@"opaque": ?*anyopaque, maybe_ptr: ?*anyopaque, size: usiz
     }
 }
 
-const FLAG_HAS_INDICES: c_int = 1 << 6;
-const FLAG_UNICODE_SETS: c_int = 1 << 7;
+comptime {
+    @setEvalBranchQuota(10_000);
+    for (std.meta.declarations(libregexp)) |declaration| {
+        if (std.mem.startsWith(u8, declaration.name, "LRE_FLAG_")) {
+            const flag = @field(libregexp, declaration.name);
+            std.debug.assert(@TypeOf(flag) == c_int);
+            std.debug.assert(flag <= (1 << 7));
+        }
+    }
+}
+const FLAG_HAS_INDICES: c_int = 1 << 8;
+const FLAG_UNICODE_SETS: c_int = 1 << 9;
 
 pub const ParsedFlags = packed struct(u8) {
     const Self = @This();
@@ -168,7 +179,7 @@ pub fn regExpInitialize(
     if (parsed_flags.i) re_flags |= libregexp.LRE_FLAG_IGNORECASE;
     if (parsed_flags.m) re_flags |= libregexp.LRE_FLAG_MULTILINE;
     if (parsed_flags.s) re_flags |= libregexp.LRE_FLAG_DOTALL;
-    if (parsed_flags.u) re_flags |= libregexp.LRE_FLAG_UTF16;
+    if (parsed_flags.u) re_flags |= libregexp.LRE_FLAG_UNICODE;
     if (parsed_flags.v) re_flags |= FLAG_UNICODE_SETS;
     if (parsed_flags.y) re_flags |= libregexp.LRE_FLAG_STICKY;
 
@@ -1165,7 +1176,7 @@ pub const RegExpPrototype = struct {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0075 (LATIN SMALL LETTER U).
         // 3. Return ? RegExpHasFlag(R, cu).
-        return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_UTF16);
+        return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_UNICODE);
     }
 
     /// 22.2.6.19 get RegExp.prototype.unicodeSets

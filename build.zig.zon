@@ -15,8 +15,8 @@
             .hash = "12203905cfc8550c114ef2b761edda2ea627d39298a08b951148c8be07dc49e7a388",
         },
         .libregexp = .{
-            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/7bd15f643c13c685d5221ce956a73fb401133961.tar.gz",
-            .hash = "1220165d3b16ff06b8ee31be922b64a185285c192cf5c9b79d09428250e592507c1b",
+            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/a963e658269e6d2141ae2eaf2e9e8f0b3f28f577.tar.gz",
+            .hash = "12201eb6a8cb050059471e1823d8cf22d4402725eab2039b2a433973bf2ba14c4450",
         },
         .parser_toolkit = .{
             .url = "https://github.com/MasterQ32/parser-toolkit/archive/5416f1ff721cbfbf91397e557fc400e004804361.tar.gz",
@@ -36,7 +36,6 @@
         "README.md",
         "build.zig",
         "build.zig.zon",
-        "patches/",
         "src/",
     },
 }
