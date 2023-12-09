@@ -218,6 +218,14 @@ pub fn hasVarDeclaration(self: Self, name: []const u8) bool {
     return self.var_names.contains(name);
 }
 
+/// 9.1.1.4.13 HasLexicalDeclaration ( N )
+/// https://tc39.es/ecma262/#sec-haslexicaldeclaration
+pub fn hasLexicalDeclaration(self: Self, name: []const u8) bool {
+    // 1.Let DclRec be envRec.[[DeclarativeRecord]].
+    // 2. Return ! DclRec.HasBinding(N).
+    return self.declarative_record.hasBinding(name);
+}
+
 /// 9.1.1.4.17 CreateGlobalVarBinding ( N, D )
 /// https://tc39.es/ecma262/#sec-createglobalvarbinding
 pub fn createGlobalVarBinding(
