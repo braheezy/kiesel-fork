@@ -324,6 +324,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "includes", includes, 1, realm);
         try defineBuiltinFunction(object, "indexOf", indexOf, 1, realm);
         try defineBuiltinFunction(object, "lastIndexOf", lastIndexOf, 1, realm);
+        try defineBuiltinFunction(object, "match", match, 1, realm);
         try defineBuiltinFunction(object, "matchAll", matchAll, 1, realm);
         try defineBuiltinFunction(object, "repeat", repeat, 1, realm);
         try defineBuiltinFunction(object, "search", search, 1, realm);
@@ -690,6 +691,43 @@ pub const StringPrototype = struct {
         // 12. Return -1𝔽.
         const index = string.lastIndexOf(search_str, start) orelse return Value.from(-1);
         return Value.from(@as(u53, @intCast(index)));
+    }
+
+    /// 22.1.3.13 String.prototype.match ( regexp )
+    /// https://tc39.es/ecma262/#sec-string.prototype.match
+    fn match(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const regexp = arguments.get(0);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. If regexp is neither undefined nor null, then
+        if (regexp != .undefined and regexp != .null) {
+            // a. Let matcher be ? GetMethod(regexp, @@match).
+            const matcher = try regexp.getMethod(
+                agent,
+                PropertyKey.from(agent.well_known_symbols.@"@@match"),
+            );
+
+            // b. If matcher is not undefined, then
+            if (matcher != null) {
+                // i. Return ? Call(matcher, regexp, « O »).
+                return Value.from(matcher.?).callAssumeCallable(regexp, &.{object});
+            }
+        }
+
+        // 3. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 4. Let rx be ? RegExpCreate(regexp, undefined).
+        const rx = try regExpCreate(agent, regexp, .undefined);
+
+        // 5. Return ? Invoke(rx, @@match, « S »).
+        return Value.from(rx).invoke(
+            agent,
+            PropertyKey.from(agent.well_known_symbols.@"@@match"),
+            &.{Value.from(string)},
+        );
     }
 
     /// 22.1.3.14 String.prototype.matchAll ( regexp )
