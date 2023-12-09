@@ -784,6 +784,7 @@ pub const RegExpPrototype = struct {
         try defineBuiltinAccessor(object, "global", global, null, realm);
         try defineBuiltinAccessor(object, "hasIndices", hasIndices, null, realm);
         try defineBuiltinAccessor(object, "ignoreCase", ignoreCase, null, realm);
+        try defineBuiltinFunction(object, "@@match", @"@@match", 1, realm);
         try defineBuiltinFunction(object, "@@matchAll", @"@@matchAll", 1, realm);
         try defineBuiltinAccessor(object, "multiline", multiline, null, realm);
         try defineBuiltinFunction(object, "@@search", @"@@search", 1, realm);
@@ -945,6 +946,92 @@ pub const RegExpPrototype = struct {
         // 2. Let cu be the code unit 0x0069 (LATIN SMALL LETTER I).
         // 3. Return ? RegExpHasFlag(R, cu).
         return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_IGNORECASE);
+    }
+
+    /// 22.2.6.8 RegExp.prototype [ @@match ] ( string )
+    /// https://tc39.es/ecma262/#sec-regexp.prototype-@@match
+    fn @"@@match"(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const string_value = arguments.get(0);
+
+        // 1. Let rx be the this value.
+        // 2. If rx is not an Object, throw a TypeError exception.
+        if (this_value != .object) {
+            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+        }
+        const reg_exp = this_value.object;
+
+        // 3. Let S be ? ToString(string).
+        const string = try string_value.toString(agent);
+
+        // 4. Let flags be ? ToString(? Get(rx, "flags")).
+        const flags_ = try (try reg_exp.get(PropertyKey.from("flags"))).toString(agent);
+
+        // 5. If flags does not contain "g", then
+        if (std.mem.indexOfScalar(u8, flags_.utf8, 'g') == null) {
+            // a. Return ? RegExpExec(rx, S).
+            return if (try regExpExec(agent, reg_exp, string)) |object|
+                Value.from(object)
+            else
+                .null;
+        }
+        // 6. Else,
+        else {
+            // a. If flags contains "u" or flags contains "v", let fullUnicode be true. Otherwise,
+            //    let fullUnicode be false.
+            const full_unicode = std.mem.indexOfScalar(u8, flags_.utf8, 'u') != null or
+                std.mem.indexOfScalar(u8, flags_.utf8, 'v') != null;
+
+            // b. Perform ? Set(rx, "lastIndex", +0𝔽, true).
+            try reg_exp.set(PropertyKey.from("lastIndex"), Value.from(0), .throw);
+
+            // c. Let A be ! ArrayCreate(0).
+            const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
+
+            // d. Let n be 0.
+            var n: u53 = 0;
+
+            // e. Repeat,
+            while (true) : (n += 1) {
+                // i. Let result be ? RegExpExec(rx, S).
+                const result = try regExpExec(agent, reg_exp, string);
+
+                // ii. If result is null, then
+                if (result == null) {
+                    // 1. If n = 0, return null.
+                    if (n == 0) return .null;
+
+                    // 2. Return A.
+                    return Value.from(array);
+                }
+                // iii. Else,
+                else {
+                    // 1. Let matchStr be ? ToString(? Get(result, "0")).
+                    const match_str = try (try result.?.get(PropertyKey.from(0))).toString(agent);
+
+                    // 2. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(n)), matchStr).
+                    array.createDataPropertyOrThrow(
+                        PropertyKey.from(n),
+                        Value.from(match_str),
+                    ) catch |err| try noexcept(err);
+
+                    // 3. If matchStr is the empty String, then
+                    if (match_str.isEmpty()) {
+                        // a. Let thisIndex be ℝ(? ToLength(? Get(rx, "lastIndex"))).
+                        const this_index = try (try reg_exp.get(
+                            PropertyKey.from("lastIndex"),
+                        )).toLength(agent);
+
+                        // b. Let nextIndex be AdvanceStringIndex(S, thisIndex, fullUnicode).
+                        const next_index = advanceStringIndex(string, this_index, full_unicode);
+
+                        // c. Perform ? Set(rx, "lastIndex", 𝔽(nextIndex), true).
+                        try reg_exp.set(PropertyKey.from("lastIndex"), Value.from(next_index), .throw);
+                    }
+
+                    // 4. Set n to n + 1.
+                }
+            }
+        }
     }
 
     /// 22.2.6.9 RegExp.prototype [ @@matchAll ] ( string )
