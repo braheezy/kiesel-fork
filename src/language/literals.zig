@@ -310,7 +310,7 @@ pub fn parseRegularExpressionLiteral(
         else => {
             if (startsWithLineTerminator(str[i..])) return error.InvalidRegularExpressionLiteral;
             switch (state) {
-                .opening_slash, .pattern_character => state = .pattern_character,
+                .opening_slash, .pattern_character, .backslash => state = .pattern_character,
                 .closing_slash, .flag_character => switch (consume) {
                     .partial => return .{
                         .pattern = str[1..closing_slash_index],
