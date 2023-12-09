@@ -209,6 +209,15 @@ pub fn getThisBinding(self: Self) Object {
     return self.global_this_value;
 }
 
+/// 9.1.1.4.12 HasVarDeclaration ( N )
+/// https://tc39.es/ecma262/#sec-hasvardeclaration
+pub fn hasVarDeclaration(self: Self, name: []const u8) bool {
+    // 1. Let varDeclaredNames be envRec.[[VarNames]].
+    // 2. If varDeclaredNames contains N, return true.
+    // 3. Return false.
+    return self.var_names.contains(name);
+}
+
 /// 9.1.1.4.17 CreateGlobalVarBinding ( N, D )
 /// https://tc39.es/ecma262/#sec-createglobalvarbinding
 pub fn createGlobalVarBinding(
