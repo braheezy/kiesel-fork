@@ -827,61 +827,60 @@ pub const RegExpPrototype = struct {
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.flags
     fn flags(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Let R be the this value.
-        const reg_exp = this_value;
-
         // 2. If R is not an Object, throw a TypeError exception.
-        if (reg_exp != .object) {
-            return agent.throwException(.type_error, "{} is not an Object", .{reg_exp});
+        if (this_value != .object) {
+            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
+        const reg_exp = this_value.object;
 
         // 3. Let codeUnits be a new empty List.
         var code_units = try std.ArrayList(u8).initCapacity(agent.gc_allocator, 8);
 
         // 4. Let hasIndices be ToBoolean(? Get(R, "hasIndices")).
         // 5. If hasIndices is true, append the code unit 0x0064 (LATIN SMALL LETTER D) to codeUnits.
-        if ((try reg_exp.object.get(PropertyKey.from("hasIndices"))).toBoolean()) {
+        if ((try reg_exp.get(PropertyKey.from("hasIndices"))).toBoolean()) {
             code_units.appendAssumeCapacity('d');
         }
 
         // 6. Let global be ToBoolean(? Get(R, "global")).
         // 7. If global is true, append the code unit 0x0067 (LATIN SMALL LETTER G) to codeUnits.
-        if ((try reg_exp.object.get(PropertyKey.from("global"))).toBoolean()) {
+        if ((try reg_exp.get(PropertyKey.from("global"))).toBoolean()) {
             code_units.appendAssumeCapacity('g');
         }
 
         // 8. Let ignoreCase be ToBoolean(? Get(R, "ignoreCase")).
         // 9. If ignoreCase is true, append the code unit 0x0069 (LATIN SMALL LETTER I) to codeUnits.
-        if ((try reg_exp.object.get(PropertyKey.from("ignoreCase"))).toBoolean()) {
+        if ((try reg_exp.get(PropertyKey.from("ignoreCase"))).toBoolean()) {
             code_units.appendAssumeCapacity('i');
         }
 
         // 10. Let multiline be ToBoolean(? Get(R, "multiline")).
         // 11. If multiline is true, append the code unit 0x006D (LATIN SMALL LETTER M) to codeUnits.
-        if ((try reg_exp.object.get(PropertyKey.from("multiline"))).toBoolean()) {
+        if ((try reg_exp.get(PropertyKey.from("multiline"))).toBoolean()) {
             code_units.appendAssumeCapacity('m');
         }
 
         // 12. Let dotAll be ToBoolean(? Get(R, "dotAll")).
         // 13. If dotAll is true, append the code unit 0x0073 (LATIN SMALL LETTER S) to codeUnits.
-        if ((try reg_exp.object.get(PropertyKey.from("dotAll"))).toBoolean()) {
+        if ((try reg_exp.get(PropertyKey.from("dotAll"))).toBoolean()) {
             code_units.appendAssumeCapacity('s');
         }
 
         // 14. Let unicode be ToBoolean(? Get(R, "unicode")).
         // 15. If unicode is true, append the code unit 0x0075 (LATIN SMALL LETTER U) to codeUnits.
-        if ((try reg_exp.object.get(PropertyKey.from("unicode"))).toBoolean()) {
+        if ((try reg_exp.get(PropertyKey.from("unicode"))).toBoolean()) {
             code_units.appendAssumeCapacity('u');
         }
 
         // 16. Let unicodeSets be ToBoolean(? Get(R, "unicodeSets")).
         // 17. If unicodeSets is true, append the code unit 0x0076 (LATIN SMALL LETTER V) to codeUnits.
-        if ((try reg_exp.object.get(PropertyKey.from("unicodeSets"))).toBoolean()) {
+        if ((try reg_exp.get(PropertyKey.from("unicodeSets"))).toBoolean()) {
             code_units.appendAssumeCapacity('v');
         }
 
         // 18. Let sticky be ToBoolean(? Get(R, "sticky")).
         // 19. If sticky is true, append the code unit 0x0079 (LATIN SMALL LETTER Y) to codeUnits.
-        if ((try reg_exp.object.get(PropertyKey.from("sticky"))).toBoolean()) {
+        if ((try reg_exp.get(PropertyKey.from("sticky"))).toBoolean()) {
             code_units.appendAssumeCapacity('y');
         }
 
@@ -892,18 +891,19 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.4.1 RegExpHasFlag ( R, codeUnit )
     /// https://tc39.es/ecma262/#sec-regexphasflag
-    fn regExpHasFlag(agent: *Agent, reg_exp: Value, flag: c_int) Agent.Error!Value {
+    fn regExpHasFlag(agent: *Agent, reg_exp_value: Value, flag: c_int) Agent.Error!Value {
         // 1. If R is not an Object, throw a TypeError exception.
-        if (reg_exp != .object) {
-            return agent.throwException(.type_error, "{} is not an Object", .{reg_exp});
+        if (reg_exp_value != .object) {
+            return agent.throwException(.type_error, "{} is not an Object", .{reg_exp_value});
         }
+        const reg_exp = reg_exp_value.object;
 
         // 2. If R does not have an [[OriginalFlags]] internal slot, then
-        if (!reg_exp.object.is(RegExp)) {
+        if (!reg_exp.is(RegExp)) {
             const realm = agent.currentRealm();
 
             // a. If SameValue(R, %RegExp.prototype%) is true, return undefined.
-            if (reg_exp.object.sameValue(try realm.intrinsics.@"%RegExp.prototype%"())) {
+            if (reg_exp.sameValue(try realm.intrinsics.@"%RegExp.prototype%"())) {
                 return .undefined;
             }
 
@@ -912,7 +912,7 @@ pub const RegExpPrototype = struct {
         }
 
         // 3. Let flags be R.[[OriginalFlags]].
-        const re_bytecode = reg_exp.object.as(RegExp).fields.re_bytecode;
+        const re_bytecode = reg_exp.as(RegExp).fields.re_bytecode;
         const re_flags = libregexp.lre_get_flags(@ptrCast(re_bytecode));
 
         // 4. If flags contains codeUnit, return true.
@@ -958,27 +958,26 @@ pub const RegExpPrototype = struct {
         const realm = agent.currentRealm();
 
         // 1. Let R be the this value.
-        const reg_exp = this_value;
-
         // 2. If R is not an Object, throw a TypeError exception.
-        if (reg_exp != .object) {
-            return agent.throwException(.type_error, "{} is not an Object", .{reg_exp});
+        if (this_value != .object) {
+            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
+        const reg_exp = this_value.object;
 
         // 3. Let S be ? ToString(string).
         const string = try string_value.toString(agent);
 
         // 4. Let C be ? SpeciesConstructor(R, %RegExp%).
-        const constructor = try reg_exp.object.speciesConstructor(try realm.intrinsics.@"%RegExp%"());
+        const constructor = try reg_exp.speciesConstructor(try realm.intrinsics.@"%RegExp%"());
 
         // 5. Let flags be ? ToString(? Get(R, "flags")).
-        const flags_ = try (try reg_exp.object.get(PropertyKey.from("flags"))).toString(agent);
+        const flags_ = try (try reg_exp.get(PropertyKey.from("flags"))).toString(agent);
 
         // 6. Let matcher be ? Construct(C, « R, flags »).
-        const matcher = try constructor.construct(&.{ reg_exp, Value.from(flags_) }, null);
+        const matcher = try constructor.construct(&.{ Value.from(reg_exp), Value.from(flags_) }, null);
 
         // 7. Let lastIndex be ? ToLength(? Get(R, "lastIndex")).
-        const last_index = try (try reg_exp.object.get(PropertyKey.from("lastIndex"))).toLength(agent);
+        const last_index = try (try reg_exp.get(PropertyKey.from("lastIndex"))).toLength(agent);
 
         // 8. Perform ? Set(matcher, "lastIndex", lastIndex, true).
         try matcher.set(PropertyKey.from("lastIndex"), Value.from(last_index), .throw);
@@ -1013,35 +1012,34 @@ pub const RegExpPrototype = struct {
         const string_value = arguments.get(0);
 
         // 1. Let rx be the this value.
-        const reg_exp = this_value;
-
         // 2. If rx is not an Object, throw a TypeError exception.
-        if (reg_exp != .object) {
-            return agent.throwException(.type_error, "{} is not an Object", .{reg_exp});
+        if (this_value != .object) {
+            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
+        const reg_exp = this_value.object;
 
         // 3. Let S be ? ToString(string).
         const string = try string_value.toString(agent);
 
         // 4. Let previousLastIndex be ? Get(rx, "lastIndex").
-        const previous_last_index = try reg_exp.object.get(PropertyKey.from("lastIndex"));
+        const previous_last_index = try reg_exp.get(PropertyKey.from("lastIndex"));
 
         // 5. If SameValue(previousLastIndex, +0𝔽) is false, then
         if (!sameValue(previous_last_index, Value.from(0))) {
             // a. Perform ? Set(rx, "lastIndex", +0𝔽, true).
-            try reg_exp.object.set(PropertyKey.from("lastIndex"), Value.from(0), .throw);
+            try reg_exp.set(PropertyKey.from("lastIndex"), Value.from(0), .throw);
         }
 
         // 6. Let result be ? RegExpExec(rx, S).
-        const result = try regExpExec(agent, reg_exp.object, string);
+        const result = try regExpExec(agent, reg_exp, string);
 
         // 7. Let currentLastIndex be ? Get(rx, "lastIndex").
-        const current_last_index = try reg_exp.object.get(PropertyKey.from("lastIndex"));
+        const current_last_index = try reg_exp.get(PropertyKey.from("lastIndex"));
 
         // 8. If SameValue(currentLastIndex, previousLastIndex) is false, then
         if (!sameValue(current_last_index, previous_last_index)) {
             // a. Perform ? Set(rx, "lastIndex", previousLastIndex, true).
-            try reg_exp.object.set(PropertyKey.from("lastIndex"), previous_last_index, .throw);
+            try reg_exp.set(PropertyKey.from("lastIndex"), previous_last_index, .throw);
         }
 
         // 9. If result is null, return -1𝔽.
@@ -1055,19 +1053,18 @@ pub const RegExpPrototype = struct {
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.source
     fn source(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // Let R be the this value.
-        const reg_exp = this_value;
-
         // 2. If R is not an Object, throw a TypeError exception.
-        if (reg_exp != .object) {
-            return agent.throwException(.type_error, "{} is not an Object", .{reg_exp});
+        if (this_value != .object) {
+            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
+        const reg_exp = this_value.object;
 
         // 3. If R does not have an [[OriginalSource]] internal slot, then
-        if (!reg_exp.object.is(RegExp)) {
+        if (!reg_exp.is(RegExp)) {
             const realm = agent.currentRealm();
 
             // a. If SameValue(R, %RegExp.prototype%) is true, return "(?:)".
-            if (reg_exp.object.sameValue(try realm.intrinsics.@"%RegExp.prototype%"())) {
+            if (reg_exp.sameValue(try realm.intrinsics.@"%RegExp.prototype%"())) {
                 return Value.from("(?:)");
             }
 
@@ -1077,10 +1074,10 @@ pub const RegExpPrototype = struct {
 
         // 4. Assert: R has an [[OriginalFlags]] internal slot.
         // 5. Let src be R.[[OriginalSource]].
-        const src = reg_exp.object.as(RegExp).fields.original_source;
+        const src = reg_exp.as(RegExp).fields.original_source;
 
         // 6. Let flags be R.[[OriginalFlags]].
-        const re_bytecode = reg_exp.object.as(RegExp).fields.re_bytecode;
+        const re_bytecode = reg_exp.as(RegExp).fields.re_bytecode;
         const re_flags = libregexp.lre_get_flags(@ptrCast(re_bytecode));
 
         // 7. Return EscapeRegExpPattern(src, flags).
@@ -1125,18 +1122,17 @@ pub const RegExpPrototype = struct {
     /// https://tc39.es/ecma262/#sec-regexp.prototype.test
     fn @"test"(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
         // 1. Let R be the this value.
-        const reg_exp = this_value;
-
         // 2. If R is not an Object, throw a TypeError exception.
-        if (reg_exp != .object) {
-            return agent.throwException(.type_error, "{} is not an Object", .{reg_exp});
+        if (this_value != .object) {
+            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
+        const reg_exp = this_value.object;
 
         // 3. Let string be ? ToString(S).
         const string = try arguments.get(0).toString(agent);
 
         // 4. Let match be ? RegExpExec(R, string).
-        const match = try regExpExec(agent, reg_exp.object, string);
+        const match = try regExpExec(agent, reg_exp, string);
 
         // 5. If match is not null, return true; else return false.
         return Value.from(match != null);
@@ -1146,18 +1142,17 @@ pub const RegExpPrototype = struct {
     /// https://tc39.es/ecma262/#sec-regexp.prototype.tostring
     fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Let R be the this value.
-        const reg_exp = this_value;
-
         // 2. If R is not an Object, throw a TypeError exception.
-        if (reg_exp != .object) {
-            return agent.throwException(.type_error, "{} is not an Object", .{reg_exp});
+        if (this_value != .object) {
+            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
+        const reg_exp = this_value.object;
 
         // 3. Let pattern be ? ToString(? Get(R, "source")).
-        const pattern = try (try reg_exp.object.get(PropertyKey.from("source"))).toString(agent);
+        const pattern = try (try reg_exp.get(PropertyKey.from("source"))).toString(agent);
 
         // 4. Let flags be ? ToString(? Get(R, "flags")).
-        const flags_ = try (try reg_exp.object.get(PropertyKey.from("flags"))).toString(agent);
+        const flags_ = try (try reg_exp.get(PropertyKey.from("flags"))).toString(agent);
 
         // 5. Let result be the string-concatenation of "/", pattern, "/", and flags.
         const result = try std.mem.concat(
