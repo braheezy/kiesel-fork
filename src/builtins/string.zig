@@ -75,6 +75,67 @@ fn defineOwnProperty(
     ) catch |err| try noexcept(err);
 }
 
+/// 10.4.3.3 [[OwnPropertyKeys]] ( )
+/// https://tc39.es/ecma262/#sec-string-exotic-objects-ownpropertykeys
+fn ownPropertyKeys(object: Object) Allocator.Error!std.ArrayList(PropertyKey) {
+    const agent = object.agent();
+    const property_storage_hash_map = object.propertyStorage().hash_map;
+
+    // 2. Let str be O.[[StringData]].
+    // 3. Assert: str is a String.
+    const str = object.as(String).fields.string_data;
+
+    // 4. Let len be the length of str.
+    const len = str.utf16Length();
+
+    // 1. Let keys be a new empty List.
+    var keys = try std.ArrayList(PropertyKey).initCapacity(
+        agent.gc_allocator,
+        property_storage_hash_map.count() + len,
+    );
+
+    // 5. For each integer i such that 0 ≤ i < len, in ascending order,
+    for (0..len) |i| {
+        // a. Append ! ToString(𝔽(i)) to keys.
+        keys.appendAssumeCapacity(PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i))));
+    }
+
+    // 6. For each own property key P of O such that P is an array index and
+    //    ! ToIntegerOrInfinity(P) ≥ len, in ascending numeric index order, do
+    for (object.propertyStorage().hash_map.keys()) |property_key| {
+        if (property_key.isArrayIndex() and property_key.integer_index >= len) {
+            // a. Append P to keys.
+            keys.appendAssumeCapacity(property_key);
+        }
+    }
+    std.mem.sortUnstable(PropertyKey, keys.items[len..], {}, struct {
+        fn lessThanFn(_: void, a: PropertyKey, b: PropertyKey) bool {
+            return a.integer_index < b.integer_index;
+        }
+    }.lessThanFn);
+
+    // 7. For each own property key P of O such that P is a String and P is not an array index, in
+    //    ascending chronological order of property creation, do
+    for (object.propertyStorage().hash_map.keys()) |property_key| {
+        if (property_key == .string or (property_key == .integer_index and !property_key.isArrayIndex())) {
+            // a. Append P to keys.
+            keys.appendAssumeCapacity(property_key);
+        }
+    }
+
+    // 8. For each own property key P of O such that P is a Symbol, in ascending chronological
+    //    order of property creation, do
+    for (object.propertyStorage().hash_map.keys()) |property_key| {
+        if (property_key == .symbol) {
+            // a. Append P to keys.
+            keys.appendAssumeCapacity(property_key);
+        }
+    }
+
+    // 9. Return keys.
+    return keys;
+}
+
 /// 10.4.3.4 StringCreate ( value, prototype )
 /// https://tc39.es/ecma262/#sec-stringcreate
 pub fn stringCreate(agent: *Agent, value: types.String, prototype: Object) Allocator.Error!Object {
@@ -95,7 +156,8 @@ pub fn stringCreate(agent: *Agent, value: types.String, prototype: Object) Alloc
             // 5. Set S.[[DefineOwnProperty]] as specified in 10.4.3.2.
             .defineOwnProperty = defineOwnProperty,
 
-            // TODO: 6. Set S.[[OwnPropertyKeys]] as specified in 10.4.3.3.
+            // 6. Set S.[[OwnPropertyKeys]] as specified in 10.4.3.3.
+            .ownPropertyKeys = ownPropertyKeys,
         },
     });
 
