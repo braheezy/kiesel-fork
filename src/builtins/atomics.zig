@@ -236,6 +236,7 @@ pub const Atomics = struct {
         try defineBuiltinFunction(object, "load", load, 2, realm);
         try defineBuiltinFunction(object, "or", @"or", 3, realm);
         try defineBuiltinFunction(object, "store", store, 3, realm);
+        try defineBuiltinFunction(object, "sub", sub, 3, realm);
         try defineBuiltinFunction(object, "xor", xor, 3, realm);
 
         // 25.4.17 Atomics [ @@toStringTag ]
@@ -424,6 +425,24 @@ pub const Atomics = struct {
 
         // 8. Return v.
         return numeric_value;
+    }
+
+    /// 25.4.12 Atomics.sub ( typedArray, index, value )
+    /// https://tc39.es/ecma262/#sec-atomics.sub
+    fn sub(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const typed_array = arguments.get(0);
+        const index = arguments.get(1);
+        const value = arguments.get(2);
+
+        // 1. Let type be TypedArrayElementType(typedArray).
+        // 2. Let isLittleEndian be the value of the [[LittleEndian]] field of the surrounding
+        //    agent's Agent Record.
+        // 3. Let subtract be a new read-modify-write modification function with parameters
+        //    (xBytes, yBytes) that captures type and isLittleEndian and performs the following
+        //    steps atomically when called:
+        //     a-g.
+        // 4. Return ? AtomicReadModifyWrite(typedArray, index, value, subtract).
+        return atomicReadModifyWrite(agent, typed_array, index, value, .Sub);
     }
 
     /// 25.4.16 Atomics.xor ( typedArray, index, value )
