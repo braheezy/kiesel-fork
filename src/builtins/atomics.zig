@@ -232,6 +232,7 @@ pub const Atomics = struct {
         try defineBuiltinFunction(object, "and", @"and", 3, realm);
         try defineBuiltinFunction(object, "isLockFree", isLockFree, 1, realm);
         try defineBuiltinFunction(object, "load", load, 2, realm);
+        try defineBuiltinFunction(object, "or", @"or", 3, realm);
         try defineBuiltinFunction(object, "store", store, 3, realm);
 
         // 25.4.17 Atomics [ @@toStringTag ]
@@ -321,6 +322,20 @@ pub const Atomics = struct {
                     Value.from(value);
             }
         } else unreachable;
+    }
+
+    /// 25.4.10 Atomics.or ( typedArray, index, value )
+    /// https://tc39.es/ecma262/#sec-atomics.or
+    fn @"or"(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const typed_array = arguments.get(0);
+        const index = arguments.get(1);
+        const value = arguments.get(2);
+
+        // 1. Let or be a new read-modify-write modification function with parameters (xBytes,
+        //    yBytes) that captures nothing and performs the following steps atomically when called:
+        //     a. Return ByteListBitwiseOp(|, xBytes, yBytes).
+        // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, or).
+        return atomicReadModifyWrite(agent, typed_array, index, value, .Or);
     }
 
     /// 25.4.11 Atomics.store ( typedArray, index, value )
