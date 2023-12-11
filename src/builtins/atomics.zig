@@ -229,6 +229,7 @@ pub const Atomics = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "add", add, 3, realm);
         try defineBuiltinFunction(object, "and", @"and", 3, realm);
         try defineBuiltinFunction(object, "exchange", exchange, 3, realm);
         try defineBuiltinFunction(object, "isLockFree", isLockFree, 1, realm);
@@ -247,6 +248,24 @@ pub const Atomics = struct {
         });
 
         return object;
+    }
+
+    /// 25.4.4 Atomics.add ( typedArray, index, value )
+    /// https://tc39.es/ecma262/#sec-atomics.add
+    fn add(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const typed_array = arguments.get(0);
+        const index = arguments.get(1);
+        const value = arguments.get(2);
+
+        // 1. Let type be TypedArrayElementType(typedArray).
+        // 2. Let isLittleEndian be the value of the [[LittleEndian]] field of the surrounding
+        //    agent's Agent Record.
+        // 3. Let add be a new read-modify-write modification function with parameters (xBytes,
+        //    yBytes) that captures type and isLittleEndian and performs the following steps
+        //    atomically when called:
+        //     a-g.
+        // 4. Return ? AtomicReadModifyWrite(typedArray, index, value, add).
+        return atomicReadModifyWrite(agent, typed_array, index, value, .Add);
     }
 
     /// 25.4.5 Atomics.and ( typedArray, index, value )
