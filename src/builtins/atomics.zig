@@ -1,6 +1,7 @@
 //! 25.4 The Atomics Object
 //! https://tc39.es/ecma262/#sec-atomics-object
 
+const builtin = @import("builtin");
 const std = @import("std");
 
 const Allocator = std.mem.Allocator;
@@ -20,6 +21,7 @@ const TypedArrayWithBufferWitness = builtins.TypedArrayWithBufferWitness;
 const Value = types.Value;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
+const getModifySetValueInBuffer = builtins.getModifySetValueInBuffer;
 const getValueFromBuffer = builtins.getValueFromBuffer;
 const isBigIntElementType = builtins.isBigIntElementType;
 const isTypedArrayOutOfBounds = builtins.isTypedArrayOutOfBounds;
@@ -158,6 +160,67 @@ fn revalidateAtomicAccess(
     }
 
     // 6. Return unused.
+}
+
+/// 25.4.3.17 AtomicReadModifyWrite ( typedArray, index, value, op )
+/// https://tc39.es/ecma262/#sec-atomicreadmodifywrite
+fn atomicReadModifyWrite(
+    agent: *Agent,
+    typed_array_value: Value,
+    index: Value,
+    value: Value,
+    comptime op: std.builtin.AtomicRmwOp,
+) Agent.Error!Value {
+    // 1. Let byteIndexInBuffer be ? ValidateAtomicAccessOnIntegerTypedArray(typedArray, index).
+    const byte_index_in_buffer = try validateAtomicAccessOnIntegerTypedArray(
+        agent,
+        typed_array_value,
+        index,
+        null,
+    );
+    const typed_array = typed_array_value.object.as(builtins.TypedArray);
+
+    // 2. If typedArray.[[ContentType]] is bigint, let v be ? ToBigInt(value).
+    // 3. Otherwise, let v be 𝔽(? ToIntegerOrInfinity(value)).
+    const numeric_value = if (typed_array.fields.content_type == .bigint)
+        Value.from(try value.toBigInt(agent))
+    else
+        Value.from(try value.toIntegerOrInfinity(agent));
+
+    // 4. Perform ? RevalidateAtomicAccess(typedArray, byteIndexInBuffer).
+    try revalidateAtomicAccess(agent, typed_array, byte_index_in_buffer);
+
+    // 5. Let buffer be typedArray.[[ViewedArrayBuffer]].
+    const buffer = typed_array.fields.viewed_array_buffer;
+
+    // 6. Let elementType be TypedArrayElementType(typedArray).
+    inline for (builtins.typed_array_element_types) |entry| {
+        const name, const T = entry;
+        if (T == f32 or T == f64) continue;
+        // Bypass 'expected 32-bit integer type or smaller; found 64-bit integer type' for @atomicRmw()
+        if (comptime @bitSizeOf(T) > builtin.target.ptrBitWidth()) {
+            return agent.throwException(
+                .internal_error,
+                "Atomic operation on {s} not supported on this platform",
+                .{name},
+            );
+        }
+        if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
+            // 7. Return GetModifySetValueInBuffer(buffer, byteIndexInBuffer, elementType, v, op).
+            const modified_value = try getModifySetValueInBuffer(
+                agent,
+                buffer,
+                byte_index_in_buffer,
+                T,
+                numeric_value,
+                op,
+            );
+            return if (isBigIntElementType(T))
+                Value.from(try BigInt.from(agent.gc_allocator, modified_value))
+            else
+                Value.from(modified_value);
+        }
+    } else unreachable;
 }
 
 pub const Atomics = struct {

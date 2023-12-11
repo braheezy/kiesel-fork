@@ -391,6 +391,69 @@ pub fn setValueInBuffer(
     // 10. Return unused.
 }
 
+/// 25.1.3.18 GetModifySetValueInBuffer ( arrayBuffer, byteIndex, type, value, op )
+/// https://tc39.es/ecma262/#sec-getmodifysetvalueinbuffer
+pub fn getModifySetValueInBuffer(
+    agent: *Agent,
+    array_buffer: *const ArrayBuffer,
+    byte_index: u53,
+    comptime T: type,
+    value: Value,
+    comptime op: std.builtin.AtomicRmwOp,
+) Allocator.Error!T {
+    // 1. Assert: IsDetachedBuffer(arrayBuffer) is false.
+    std.debug.assert(!isDetachedBuffer(array_buffer));
+
+    // 2. Assert: There are sufficient bytes in arrayBuffer starting at byteIndex to represent a
+    //    value of type.
+    std.debug.assert(array_buffer.fields.array_buffer_data.?.items.len >= byte_index + @sizeOf(T));
+
+    // 3. Assert: value is a BigInt if IsBigIntElementType(type) is true; otherwise, value is a
+    //    Number.
+    std.debug.assert(value == if (isBigIntElementType(T)) .big_int else .number);
+
+    // 4. Let block be arrayBuffer.[[ArrayBufferData]].
+    const block = array_buffer.fields.array_buffer_data.?;
+
+    // 5. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
+    const element_size = @sizeOf(T);
+
+    // 6. Let isLittleEndian be the value of the [[LittleEndian]] field of the surrounding agent's
+    //    Agent Record.
+    const is_little_endian = agent.little_endian;
+
+    // 7. Let rawBytes be NumericToRawBytes(type, value, isLittleEndian).
+    const raw_bytes = try numericToRawBytes(agent, T, value, is_little_endian);
+
+    var previous: T = undefined;
+
+    // TODO: 8. If IsSharedArrayBuffer(arrayBuffer) is true, then
+    if (false) {
+        // a-g.
+    }
+    // 9. Else,
+    else {
+        // a. Let rawBytesRead be a List of length elementSize whose elements are the sequence of
+        //    elementSize bytes starting with block[byteIndex].
+        // b. Let rawBytesModified be op(rawBytesRead, rawBytes).
+        // c. Store the individual bytes of rawBytesModified into block, starting at block[byteIndex].
+        const ptr = std.mem.bytesAsValue(
+            T,
+            block.items[@intCast(byte_index)..@intCast(byte_index + element_size)],
+        );
+        previous = @atomicRmw(
+            T,
+            @as(*T, @alignCast(ptr)),
+            op,
+            std.mem.bytesToValue(T, &raw_bytes),
+            .SeqCst,
+        );
+    }
+
+    // 10. Return RawBytesToNumeric(type, rawBytesRead, isLittleEndian).
+    return rawBytesToNumeric(T, std.mem.asBytes(&previous), is_little_endian);
+}
+
 /// 25.1.5 Properties of the ArrayBuffer Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-constructor
 pub const ArrayBufferConstructor = struct {
