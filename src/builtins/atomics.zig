@@ -234,6 +234,7 @@ pub const Atomics = struct {
         try defineBuiltinFunction(object, "load", load, 2, realm);
         try defineBuiltinFunction(object, "or", @"or", 3, realm);
         try defineBuiltinFunction(object, "store", store, 3, realm);
+        try defineBuiltinFunction(object, "xor", xor, 3, realm);
 
         // 25.4.17 Atomics [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-atomics-@@tostringtag
@@ -388,5 +389,19 @@ pub const Atomics = struct {
 
         // 8. Return v.
         return numeric_value;
+    }
+
+    /// 25.4.16 Atomics.xor ( typedArray, index, value )
+    /// https://tc39.es/ecma262/#sec-atomics.xor
+    fn xor(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const typed_array = arguments.get(0);
+        const index = arguments.get(1);
+        const value = arguments.get(2);
+
+        // 1. Let xor be a new read-modify-write modification function with parameters (xBytes,
+        //    yBytes) that captures nothing and performs the following steps atomically when called:
+        //     a. Return ByteListBitwiseOp(^, xBytes, yBytes).
+        // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, xor).
+        return atomicReadModifyWrite(agent, typed_array, index, value, .Xor);
     }
 };
