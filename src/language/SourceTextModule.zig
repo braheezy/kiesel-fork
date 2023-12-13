@@ -8,6 +8,7 @@ const Allocator = std.mem.Allocator;
 const SafePointer = @import("any-pointer").SafePointer;
 
 const ast = @import("ast.zig");
+const ast_printing = @import("ast_printing.zig");
 const bytecode = @import("bytecode.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -51,6 +52,10 @@ host_defined: SafePointer = SafePointer.null_pointer,
 
 // [[HasTLA]]
 has_tla: bool,
+
+pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
+    try ast_printing.printModule(self.ecmascript_code, writer, 0);
+}
 
 /// 16.2.1.6.1 ParseModule ( sourceText, realm, hostDefined )
 /// https://tc39.es/ecma262/#sec-parsemodule

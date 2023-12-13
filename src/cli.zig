@@ -302,8 +302,8 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
 
     if (agent.options.debug.print_ast) {
         switch (script_or_module) {
-            .script => |script| try script.ecmascript_code.print(stdout),
-            .module => |module| try module.ecmascript_code.print(stdout),
+            .script => |script| try script.print(stdout),
+            .module => |module| try module.print(stdout),
         }
     }
 

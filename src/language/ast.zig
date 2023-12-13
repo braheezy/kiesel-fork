@@ -34,21 +34,6 @@ pub const BytecodeContext = struct {
     break_jumps: std.ArrayList(Executable.JumpIndex),
 };
 
-fn printIndentation(writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-    var i: usize = 0;
-    while (i < indentation) : (i += 1)
-        try writer.print("  ", .{});
-}
-
-fn printString(
-    string: []const u8,
-    writer: anytype,
-    indentation: usize,
-) @TypeOf(writer).Error!void {
-    try printIndentation(writer, indentation);
-    try writer.print("{s}\n", .{string});
-}
-
 const AnalyzeQuery = enum {
     is_reference,
     is_string_literal,
@@ -74,11 +59,6 @@ pub const ParenthesizedExpression = struct {
     ) Executable.Error!void {
         try self.expression.generateBytecode(executable, ctx);
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("ParenthesizedExpression", writer, indentation);
-        try self.expression.print(writer, indentation + 1);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-IdentifierReference
@@ -101,11 +81,6 @@ pub const IdentifierReference = struct {
         try executable.addInstructionWithIdentifier(.resolve_binding, self.identifier);
         const strict = ctx.contained_in_strict_mode_code;
         try executable.addIndex(@intFromBool(strict));
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("IdentifierReference", writer, indentation);
-        try printString(self.identifier, writer, indentation + 1);
     }
 };
 
@@ -160,14 +135,6 @@ pub const PrimaryExpression = union(enum) {
             inline else => |node| try node.generateBytecode(executable, ctx),
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'PrimaryExpression' here, it's implied and only adds nesting.
-        switch (self) {
-            .this => try printString("this", writer, indentation),
-            inline else => |node| try node.print(writer, indentation),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-MemberExpression
@@ -220,17 +187,6 @@ pub const MemberExpression = struct {
                 );
                 try executable.addIndex(@intFromBool(strict));
             },
-        }
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("MemberExpression", writer, indentation);
-        try printString("expression:", writer, indentation + 1);
-        try self.expression.print(writer, indentation + 2);
-        try printString("property:", writer, indentation + 1);
-        switch (self.property) {
-            .expression => |expression| try expression.print(writer, indentation + 2),
-            .identifier => |identifier| try printString(identifier, writer, indentation + 2),
         }
     }
 };
@@ -291,14 +247,6 @@ pub const SuperProperty = union(enum) {
             },
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("SuperProperty", writer, indentation);
-        switch (self) {
-            .expression => |expression| try expression.print(writer, indentation + 1),
-            .identifier => |identifier| try printString(identifier, writer, indentation + 1),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-MetaProperty
@@ -327,14 +275,6 @@ pub const MetaProperty = union(enum) {
                 // 1-5.
                 try executable.addInstruction(.get_or_create_import_meta);
             },
-        }
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("MetaProperty", writer, indentation);
-        switch (self) {
-            .new_target => try printString("new.target", writer, indentation + 1),
-            .import_meta => try printString("import.meta", writer, indentation + 1),
         }
     }
 };
@@ -369,16 +309,6 @@ pub const NewExpression = struct {
 
         try executable.addInstruction(.evaluate_new);
         try executable.addIndex(self.arguments.len);
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("NewExpression", writer, indentation);
-        try printString("expression:", writer, indentation + 1);
-        try self.expression.print(writer, indentation + 2);
-        try printString("arguments:", writer, indentation + 1);
-        for (self.arguments) |argument| {
-            try argument.print(writer, indentation + 2);
-        }
     }
 };
 
@@ -427,16 +357,6 @@ pub const CallExpression = struct {
         // TODO: We should probably also clean this up if something throws beforehand...
         try executable.addInstruction(.pop_reference);
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("CallExpression", writer, indentation);
-        try printString("expression:", writer, indentation + 1);
-        try self.expression.print(writer, indentation + 2);
-        try printString("arguments:", writer, indentation + 1);
-        for (self.arguments) |argument| {
-            try argument.print(writer, indentation + 2);
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-SuperCall
@@ -460,13 +380,6 @@ pub const SuperCall = struct {
         try executable.addInstruction(.evaluate_super_call);
         try executable.addIndex(self.arguments.len);
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("SuperCall", writer, indentation);
-        for (self.arguments) |argument| {
-            try argument.print(writer, indentation + 1);
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ImportCall
@@ -486,11 +399,6 @@ pub const ImportCall = struct {
         if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
         try executable.addInstruction(.load);
         try executable.addInstruction(.evaluate_import_call);
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("ImportCall", writer, indentation);
-        try self.expression.print(writer, indentation + 1);
     }
 };
 
@@ -597,23 +505,6 @@ pub const OptionalExpression = struct {
 
         try end_jump.setTargetHere();
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("OptionalExpression", writer, indentation);
-        try printString("expression:", writer, indentation + 1);
-        try self.expression.print(writer, indentation + 2);
-        try printString("property:", writer, indentation + 1);
-        switch (self.property) {
-            .expression => |expression| try expression.print(writer, indentation + 2),
-            .identifier => |identifier| try printString(identifier, writer, indentation + 2),
-            .arguments => |arguments| {
-                try printString("arguments:", writer, indentation + 2);
-                for (arguments) |argument| {
-                    try argument.print(writer, indentation + 3);
-                }
-            },
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-Literal
@@ -666,28 +557,6 @@ pub const Literal = union(enum) {
                 const value = try string_literal.stringValue(executable.allocator);
                 try executable.addInstructionWithConstant(.store_constant, value);
             },
-        }
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("Literal", writer, indentation);
-        switch (self) {
-            .null => try printString("null", writer, indentation + 1),
-            .boolean => |boolean| try printString(
-                if (boolean) "true" else "false",
-                writer,
-                indentation + 1,
-            ),
-            .numeric => |numeric_literal| try printString(
-                numeric_literal.text,
-                writer,
-                indentation + 1,
-            ),
-            .string => |string_literal| try printString(
-                string_literal.text,
-                writer,
-                indentation + 1,
-            ),
         }
     }
 };
@@ -895,18 +764,6 @@ pub const ArrayLiteral = struct {
         }
         try executable.addInstruction(.store);
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("ArrayLiteral", writer, indentation);
-        for (self.element_list) |element| switch (element) {
-            .elision => try printString("<elision>", writer, indentation + 1),
-            .expression => |expression| try expression.print(writer, indentation + 1),
-            .spread => |expression| {
-                try printString("...", writer, indentation + 1);
-                try expression.print(writer, indentation + 1);
-            },
-        };
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ObjectLiteral
@@ -940,11 +797,6 @@ pub const ObjectLiteral = struct {
 
         // 3. Return obj.
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("ObjectLiteral", writer, indentation);
-        try self.property_definition_list.print(writer, indentation + 1);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-PropertyDefinitionList
@@ -970,13 +822,6 @@ pub const PropertyDefinitionList = struct {
         }
 
         // 3. Return unused.
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'PropertyDefinitionList' here, it's implied and only adds nesting.
-        for (self.items) |property_definition| {
-            try property_definition.print(writer, indentation);
-        }
     }
 };
 
@@ -1074,28 +919,6 @@ pub const PropertyDefinition = union(enum) {
             },
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'PropertyDefinition' here, it's implied and only adds nesting.
-        switch (self) {
-            .spread => |expression| {
-                try printString("...", writer, indentation);
-                try expression.print(writer, indentation);
-            },
-            .identifier_reference => |identifier_reference| {
-                try identifier_reference.print(writer, indentation);
-            },
-            .property_name_and_expression => |property_name_and_expression| {
-                try printString("property_name_and_expression:", writer, indentation);
-                try property_name_and_expression.property_name.print(writer, indentation + 1);
-                try property_name_and_expression.expression.print(writer, indentation + 1);
-            },
-            .method_definition => |method_definition| {
-                try printString("MethodDefinition", writer, indentation);
-                try method_definition.print(writer, indentation);
-            },
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-PropertyName
@@ -1157,18 +980,6 @@ pub const PropertyName = union(enum) {
             },
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("PropertyName", writer, indentation);
-        switch (self) {
-            .literal_property_name => |literal| switch (literal) {
-                .identifier => |identifier| try printString(identifier, writer, indentation + 1),
-                .string_literal => |string_literal| try printString(string_literal.text, writer, indentation + 1),
-                .numeric_literal => |numeric_literal| try printString(numeric_literal.text, writer, indentation + 1),
-            },
-            .computed_property_name => |expression| try expression.print(writer, indentation + 1),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-RegularExpressionLiteral
@@ -1212,14 +1023,6 @@ pub const RegularExpressionLiteral = struct {
         // 3. Return ! RegExpCreate(pattern, flags).
         try executable.addInstruction(.reg_exp_create);
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("RegularExpressionLiteral", writer, indentation);
-        try printString("pattern:", writer, indentation + 1);
-        try printString(self.pattern, writer, indentation + 2);
-        try printString("flags:", writer, indentation + 1);
-        try printString(self.flags, writer, indentation + 2);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-TemplateLiteral
@@ -1244,11 +1047,6 @@ pub const TemplateLiteral = struct {
         );
 
         // TODO: SubstitutionTemplate : TemplateHead Expression TemplateSpans
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("TemplateLiteral", writer, indentation);
-        try printString(self.text, writer, indentation + 1);
     }
 };
 
@@ -1382,16 +1180,6 @@ pub const UpdateExpression = struct {
             // 6. Return newValue.
         } else unreachable;
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("UpdateExpression", writer, indentation);
-        try printString("type:", writer, indentation + 1);
-        try printString(@tagName(self.type), writer, indentation + 2);
-        try printString("operator:", writer, indentation + 1);
-        try printString(@tagName(self.operator), writer, indentation + 2);
-        try printString("expression:", writer, indentation + 1);
-        try self.expression.print(writer, indentation + 2);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-UnaryExpression
@@ -1521,14 +1309,6 @@ pub const UnaryExpression = struct {
             },
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("UnaryExpression", writer, indentation);
-        try printString("operator:", writer, indentation + 1);
-        try printString(@tagName(self.operator), writer, indentation + 2);
-        try printString("expression:", writer, indentation + 1);
-        try self.expression.print(writer, indentation + 2);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ExponentiationExpression
@@ -1585,13 +1365,6 @@ pub const BinaryExpression = struct {
         try executable.addInstruction(.apply_string_or_numeric_binary_operator);
         try executable.addIndex(@intFromEnum(self.operator));
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("BinaryExpression", writer, indentation);
-        try self.lhs_expression.print(writer, indentation + 1);
-        try printString(@tagName(self.operator), writer, indentation + 1);
-        try self.rhs_expression.print(writer, indentation + 1);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-RelationalExpression
@@ -1646,13 +1419,6 @@ pub const RelationalExpression = struct {
             .instanceof => try executable.addInstruction(.instanceof_operator),
             .in => try executable.addInstruction(.has_property),
         }
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("RelationalExpression", writer, indentation);
-        try self.lhs_expression.print(writer, indentation + 1);
-        try printString(@tagName(self.operator), writer, indentation + 1);
-        try self.rhs_expression.print(writer, indentation + 1);
     }
 };
 
@@ -1720,13 +1486,6 @@ pub const EqualityExpression = struct {
                 try executable.addInstruction(.logical_not);
             },
         }
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("EqualityExpression", writer, indentation);
-        try self.lhs_expression.print(writer, indentation + 1);
-        try printString(@tagName(self.operator), writer, indentation + 1);
-        try self.rhs_expression.print(writer, indentation + 1);
     }
 };
 
@@ -1841,13 +1600,6 @@ pub const LogicalExpression = struct {
             },
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("LogicalExpression", writer, indentation);
-        try self.lhs_expression.print(writer, indentation + 1);
-        try printString(@tagName(self.operator), writer, indentation + 1);
-        try self.rhs_expression.print(writer, indentation + 1);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ConditionalExpression
@@ -1898,16 +1650,6 @@ pub const ConditionalExpression = struct {
         if (self.alternate_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
         try end_jump.setTargetHere();
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("ConditionalExpression", writer, indentation);
-        try printString("test:", writer, indentation + 1);
-        try self.test_expression.print(writer, indentation + 2);
-        try printString("consequent:", writer, indentation + 1);
-        try self.consequent_expression.print(writer, indentation + 2);
-        try printString("alternate:", writer, indentation + 1);
-        try self.alternate_expression.print(writer, indentation + 2);
     }
 };
 
@@ -2152,13 +1894,6 @@ pub const AssignmentExpression = struct {
             try executable.addInstruction(.pop_reference);
         } else unreachable;
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("AssignmentExpression", writer, indentation);
-        try self.lhs_expression.print(writer, indentation + 1);
-        try printString(@tagName(self.operator), writer, indentation + 1);
-        try self.rhs_expression.print(writer, indentation + 1);
-    }
 };
 
 pub const SequenceExpression = struct {
@@ -2180,13 +1915,6 @@ pub const SequenceExpression = struct {
         for (self.expressions) |expression| {
             try expression.generateBytecode(executable, ctx);
             if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        }
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("SequenceExpression", writer, indentation);
-        for (self.expressions) |expression| {
-            try expression.print(writer, indentation + 1);
         }
     }
 };
@@ -2275,13 +2003,6 @@ pub const Expression = union(enum) {
     ) Executable.Error!void {
         switch (self) {
             inline else => |node| try node.generateBytecode(executable, ctx),
-        }
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("Expression", writer, indentation);
-        switch (self) {
-            inline else => |node| try node.print(writer, indentation + 1),
         }
     }
 };
@@ -2376,15 +2097,6 @@ pub const Statement = union(enum) {
             inline else => |node| try node.generateBytecode(executable, ctx),
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("Statement", writer, indentation);
-        switch (self) {
-            .empty_statement => try printString("empty", writer, indentation + 1),
-            .debugger_statement => try printString("debugger", writer, indentation + 1),
-            inline else => |node| try node.print(writer, indentation + 1),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-Declaration
@@ -2409,13 +2121,6 @@ pub const Declaration = union(enum) {
     ) Executable.Error!void {
         switch (self) {
             inline else => |node| try node.generateBytecode(executable, ctx),
-        }
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("Declaration", writer, indentation);
-        switch (self) {
-            inline else => |node| try node.print(writer, indentation + 1),
         }
     }
 };
@@ -2449,13 +2154,6 @@ pub const HoistableDeclaration = union(enum) {
             inline else => |node| try node.generateBytecode(executable, ctx),
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'HoistableDeclaration' here, it's implied and only adds nesting.
-        switch (self) {
-            inline else => |node| try node.print(writer, indentation),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-BreakableStatement
@@ -2473,16 +2171,6 @@ pub const BreakableStatement = union(enum) {
             .iteration_statement => |iteration_statement| try iteration_statement.generateBytecode(executable, ctx),
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'BreakableStatement' here, it's implied and only adds nesting.
-        switch (self) {
-            .iteration_statement => |iteration_statement| try iteration_statement.print(
-                writer,
-                indentation,
-            ),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-BlockStatement
@@ -2497,11 +2185,6 @@ pub const BlockStatement = struct {
         ctx: *BytecodeContext,
     ) Executable.Error!void {
         try self.block.generateBytecode(executable, ctx);
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'BlockStatement' here, it's implied and only adds nesting.
-        try self.block.print(writer, indentation);
     }
 };
 
@@ -2529,11 +2212,6 @@ pub const Block = struct {
         // 5. Let blockValue be Completion(Evaluation of StatementList).
         // 7. Return ? blockValue.
         try self.statement_list.generateBytecode(executable, ctx);
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("Block", writer, indentation);
-        try self.statement_list.print(writer, indentation + 1);
     }
 };
 
@@ -2587,13 +2265,6 @@ pub const StatementList = struct {
             try item.generateBytecode(executable, ctx);
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'StatementList' here, it's implied and only adds nesting.
-        for (self.items) |item| {
-            try item.print(writer, indentation);
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-StatementListItem
@@ -2645,13 +2316,6 @@ pub const StatementListItem = union(enum) {
             inline else => |node| try node.generateBytecode(executable, ctx),
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'StatementListItem' here, it's implied and only adds nesting.
-        switch (self) {
-            inline else => |node| try node.print(writer, indentation),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-LexicalDeclaration
@@ -2679,12 +2343,6 @@ pub const LexicalDeclaration = struct {
 
         // 2. Return empty.
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("LexicalDeclaration", writer, indentation);
-        try printString(@tagName(self.type), writer, indentation + 1);
-        try self.binding_list.print(writer, indentation + 1);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-BindingList
@@ -2705,13 +2363,6 @@ pub const BindingList = struct {
         // 2. Return ? Evaluation of LexicalBinding.
         for (self.items) |lexical_binding| {
             try lexical_binding.generateBytecode(executable, ctx);
-        }
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'BindingList' here, it's implied and only adds nesting.
-        for (self.items) |lexical_binding| {
-            try lexical_binding.print(writer, indentation);
         }
     }
 };
@@ -2737,16 +2388,6 @@ pub const LexicalBinding = struct {
         };
         try variable_declaration.generateBytecode(executable, ctx);
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("LexicalBinding", writer, indentation);
-        try printString("binding_identifier:", writer, indentation + 1);
-        try printString(self.binding_identifier, writer, indentation + 2);
-        if (self.initializer) |initializer| {
-            try printString("initializer:", writer, indentation + 1);
-            try initializer.print(writer, indentation + 2);
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-VariableStatement
@@ -2767,11 +2408,6 @@ pub const VariableStatement = struct {
         try self.variable_declaration_list.generateBytecode(executable, ctx);
 
         // 2. Return empty.
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("VariableStatement", writer, indentation);
-        try self.variable_declaration_list.print(writer, indentation + 1);
     }
 };
 
@@ -2807,13 +2443,6 @@ pub const VariableDeclarationList = struct {
         // 2. Return ? Evaluation of VariableDeclaration.
         for (self.items) |variable_declaration| {
             try variable_declaration.generateBytecode(executable, ctx);
-        }
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'VariableDeclarationList' here, it's implied and only adds nesting.
-        for (self.items) |variable_declaration| {
-            try variable_declaration.print(writer, indentation);
         }
     }
 };
@@ -2863,16 +2492,6 @@ pub const VariableDeclaration = struct {
         // 6. Return empty.
         try executable.addInstruction(.store);
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("VariableDeclaration", writer, indentation);
-        try printString("binding_identifier:", writer, indentation + 1);
-        try printString(self.binding_identifier, writer, indentation + 2);
-        if (self.initializer) |initializer| {
-            try printString("initializer:", writer, indentation + 1);
-            try initializer.print(writer, indentation + 2);
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-BindingElement
@@ -2908,15 +2527,6 @@ pub const BindingElement = struct {
         // 1. Return false.
         return self.initializer != null;
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("BindingElement", writer, indentation);
-        try printString(self.identifier, writer, indentation + 1);
-        if (self.initializer) |initializer| {
-            try printString("initializer:", writer, indentation + 1);
-            try initializer.print(writer, indentation + 2);
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-BindingRestElement
@@ -2935,11 +2545,6 @@ pub const BindingRestElement = struct {
 
         // TODO: BindingRestElement : ... BindingPattern
         // 1. Return ContainsExpression of BindingPattern.
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("BindingRestElement", writer, indentation);
-        try printString(self.identifier, writer, indentation + 1);
     }
 };
 
@@ -2966,11 +2571,6 @@ pub const ExpressionStatement = struct {
 
         // 2. Return ? GetValue(exprRef).
         if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'ExpressionStatement' here, it's implied and only adds nesting.
-        try self.expression.print(writer, indentation);
     }
 };
 
@@ -3043,18 +2643,6 @@ pub const IfStatement = struct {
 
         try end_jump.setTargetHere();
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("IfStatement", writer, indentation);
-        try printString("test:", writer, indentation + 1);
-        try self.test_expression.print(writer, indentation + 2);
-        try printString("consequent:", writer, indentation + 1);
-        try self.consequent_statement.print(writer, indentation + 2);
-        if (self.alternate_statement) |alternate_statement| {
-            try printString("alternate:", writer, indentation + 1);
-            try alternate_statement.print(writer, indentation + 2);
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-IterationStatement
@@ -3090,13 +2678,6 @@ pub const IterationStatement = union(enum) {
                 // 1. Return ? ForLoopEvaluation of ForStatement with argument labelSet.
                 try for_statement.generateBytecode(executable, ctx);
             },
-        }
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'IterationStatement' here, it's implied and only adds nesting.
-        switch (self) {
-            inline else => |node| try node.print(writer, indentation),
         }
     }
 };
@@ -3165,14 +2746,6 @@ pub const DoWhileStatement = struct {
         while (ctx.break_jumps.popOrNull()) |jump_index| {
             try jump_index.setTargetHere();
         }
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("DoWhileStatement", writer, indentation);
-        try printString("consequent:", writer, indentation + 1);
-        try self.consequent_statement.print(writer, indentation + 2);
-        try printString("test:", writer, indentation + 1);
-        try self.test_expression.print(writer, indentation + 2);
     }
 };
 
@@ -3243,14 +2816,6 @@ pub const WhileStatement = struct {
         while (ctx.break_jumps.popOrNull()) |jump_index| {
             try jump_index.setTargetHere();
         }
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("WhileStatement", writer, indentation);
-        try printString("test:", writer, indentation + 1);
-        try self.test_expression.print(writer, indentation + 2);
-        try printString("consequent:", writer, indentation + 1);
-        try self.consequent_statement.print(writer, indentation + 2);
     }
 };
 
@@ -3397,26 +2962,6 @@ pub const ForStatement = struct {
             try jump_index.setTargetHere();
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("ForStatement", writer, indentation);
-        if (self.initializer) |initializer| {
-            try printString("initializer:", writer, indentation + 1);
-            switch (initializer) {
-                inline else => |node| try node.print(writer, indentation + 2),
-            }
-        }
-        if (self.test_expression) |test_expression| {
-            try printString("test:", writer, indentation + 1);
-            try test_expression.print(writer, indentation + 2);
-        }
-        if (self.increment_expression) |increment_expression| {
-            try printString("increment:", writer, indentation + 1);
-            try increment_expression.print(writer, indentation + 2);
-        }
-        try printString("consequent:", writer, indentation + 1);
-        try self.consequent_statement.print(writer, indentation + 2);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ContinueStatement
@@ -3449,11 +2994,6 @@ pub const ContinueStatement = struct {
             try ctx.continue_jumps.append(jump_index);
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("ContinueStatement", writer, indentation);
-        if (self.label) |label| try printString(label, writer, indentation + 1);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-BreakStatement
@@ -3485,11 +3025,6 @@ pub const BreakStatement = struct {
             const jump_index = try executable.addJumpIndex();
             try ctx.break_jumps.append(jump_index);
         }
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("BreakStatement", writer, indentation);
-        if (self.label) |label| try printString(label, writer, indentation + 1);
     }
 };
 
@@ -3526,11 +3061,6 @@ pub const ReturnStatement = struct {
             try executable.addInstruction(.@"return");
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("ReturnStatement", writer, indentation);
-        if (self.expression) |expression| try expression.print(writer, indentation + 1);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ThrowStatement
@@ -3555,11 +3085,6 @@ pub const ThrowStatement = struct {
 
         // 3. Return ThrowCompletion(exprValue).
         try executable.addInstruction(.throw);
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("ThrowStatement", writer, indentation);
-        try self.expression.print(writer, indentation + 1);
     }
 };
 
@@ -3695,23 +3220,6 @@ pub const TryStatement = struct {
             // 6. Return ? UpdateEmpty(F, undefined).
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("TryStatement", writer, indentation);
-        try printString("try:", writer, indentation + 1);
-        try self.try_block.print(writer, indentation + 2);
-        if (self.catch_block) |catch_block| {
-            try printString("catch:", writer, indentation + 1);
-            if (self.catch_parameter) |catch_parameter| {
-                try printString(catch_parameter, writer, indentation + 2);
-            }
-            try catch_block.print(writer, indentation + 2);
-        }
-        if (self.finally_block) |finally_block| {
-            try printString("finally:", writer, indentation + 1);
-            try finally_block.print(writer, indentation + 2);
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-FormalParameters
@@ -3800,39 +3308,16 @@ pub const FormalParameters = struct {
         else
             return self.items.len;
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'FormalParameters' here, it's implied and only adds nesting.
-        for (self.items) |item| {
-            switch (item) {
-                inline else => |node| try node.print(writer, indentation),
-            }
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-FunctionRestParameter
 pub const FunctionRestParameter = struct {
-    const Self = @This();
-
     binding_rest_element: BindingRestElement,
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("FunctionRestParameter", writer, indentation);
-        try self.binding_rest_element.print(writer, indentation + 1);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-FormalParameter
 pub const FormalParameter = struct {
-    const Self = @This();
-
     binding_element: BindingElement,
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("FormalParameter", writer, indentation);
-        try self.binding_element.print(writer, indentation + 1);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-FunctionDeclaration
@@ -3914,16 +3399,6 @@ pub const FunctionDeclaration = struct {
 
         // 1. Return empty.
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("FunctionDeclaration", writer, indentation);
-        try printString("identifier:", writer, indentation + 1);
-        try printString(self.identifier, writer, indentation + 2);
-        try printString("formal_parameters:", writer, indentation + 1);
-        try self.formal_parameters.print(writer, indentation + 2);
-        try printString("function_body:", writer, indentation + 1);
-        try self.function_body.print(writer, indentation + 2);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-FunctionExpression
@@ -3955,16 +3430,6 @@ pub const FunctionExpression = struct {
             .instantiate_ordinary_function_expression,
             .{ .function_expression = function_expression },
         );
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("FunctionExpression", writer, indentation);
-        try printString("identifier:", writer, indentation + 1);
-        if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
-        try printString("formal_parameters:", writer, indentation + 1);
-        try self.formal_parameters.print(writer, indentation + 2);
-        try printString("function_body:", writer, indentation + 1);
-        try self.function_body.print(writer, indentation + 2);
     }
 };
 
@@ -4014,11 +3479,6 @@ pub const FunctionBody = struct {
         defer tmp.restore();
         try self.statement_list.generateBytecode(executable, ctx);
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'FunctionBody' here, it's implied and only adds nesting.
-        try self.statement_list.print(writer, indentation);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ArrowFunction
@@ -4049,14 +3509,6 @@ pub const ArrowFunction = struct {
             .instantiate_arrow_function_expression,
             .{ .arrow_function = arrow_function },
         );
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("ArrowFunction", writer, indentation);
-        try printString("formal_parameters:", writer, indentation + 1);
-        try self.formal_parameters.print(writer, indentation + 2);
-        try printString("function_body:", writer, indentation + 1);
-        try self.function_body.print(writer, indentation + 2);
     }
 };
 
@@ -4117,16 +3569,6 @@ pub const MethodDefinition = struct {
             },
         );
         try executable.addIndex(@intFromEnum(std.meta.activeTag(self.method)));
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("MethodDefinition", writer, indentation);
-        try printString("type:", writer, indentation + 1);
-        try printString(@tagName(std.meta.activeTag(self.method)), writer, indentation + 2);
-        try self.property_name.print(writer, indentation + 1);
-        switch (self.method) {
-            inline else => |expression| try expression.print(writer, indentation + 1),
-        }
     }
 };
 
@@ -4218,16 +3660,6 @@ pub const GeneratorDeclaration = struct {
             .ignore,
         ) catch |err| try noexcept(err);
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("GeneratorDeclaration", writer, indentation);
-        try printString("identifier:", writer, indentation + 1);
-        try printString(self.identifier, writer, indentation + 2);
-        try printString("formal_parameters:", writer, indentation + 1);
-        try self.formal_parameters.print(writer, indentation + 2);
-        try printString("function_body:", writer, indentation + 1);
-        try self.function_body.print(writer, indentation + 2);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-GeneratorExpression
@@ -4259,16 +3691,6 @@ pub const GeneratorExpression = struct {
             .instantiate_generator_function_expression,
             .{ .generator_expression = generator_expression },
         );
-    }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("GeneratorExpression", writer, indentation);
-        try printString("identifier:", writer, indentation + 1);
-        if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
-        try printString("formal_parameters:", writer, indentation + 1);
-        try self.formal_parameters.print(writer, indentation + 2);
-        try printString("function_body:", writer, indentation + 1);
-        try self.function_body.print(writer, indentation + 2);
     }
 };
 
@@ -4404,16 +3826,6 @@ pub const AsyncGeneratorDeclaration = struct {
             .ignore,
         ) catch |err| try noexcept(err);
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("AsyncGeneratorDeclaration", writer, indentation);
-        try printString("identifier:", writer, indentation + 1);
-        if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
-        try printString("formal_parameters:", writer, indentation + 1);
-        try self.formal_parameters.print(writer, indentation + 2);
-        try printString("function_body:", writer, indentation + 1);
-        try self.function_body.print(writer, indentation + 2);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-AsyncGeneratorExpression
@@ -4446,16 +3858,6 @@ pub const AsyncGeneratorExpression = struct {
             .{ .async_generator_expression = async_generator_expression },
         );
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("AsyncGeneratorExpression", writer, indentation);
-        try printString("identifier:", writer, indentation + 1);
-        if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
-        try printString("formal_parameters:", writer, indentation + 1);
-        try self.formal_parameters.print(writer, indentation + 2);
-        try printString("function_body:", writer, indentation + 1);
-        try self.function_body.print(writer, indentation + 2);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ClassDeclaration
@@ -4484,13 +3886,6 @@ pub const ClassDeclaration = struct {
         // 2. Return empty.
         try executable.addInstruction(.store);
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("ClassDeclaration", writer, indentation);
-        try printString("identifier:", writer, indentation + 1);
-        if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
-        try self.class_tail.print(writer, indentation + 1);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ClassExpression
@@ -4515,30 +3910,12 @@ pub const ClassExpression = struct {
             .{ .class_expression = self },
         );
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("ClassExpression", writer, indentation);
-        try printString("identifier:", writer, indentation + 1);
-        if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
-        try self.class_tail.print(writer, indentation + 1);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ClassTail
 pub const ClassTail = struct {
-    const Self = @This();
-
     class_heritage: ?*Expression,
     class_body: ClassBody,
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'ClassTail' here, it's implied and only adds nesting.
-        if (self.class_heritage) |class_heritage| {
-            try printString("extends:", writer, indentation);
-            try class_heritage.print(writer, indentation + 1);
-        }
-        try self.class_body.print(writer, indentation);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ClassBody
@@ -4592,25 +3969,11 @@ pub const ClassBody = struct {
         }
         return class_elements.toOwnedSlice();
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'ClassBody' here, it's implied and only adds nesting.
-        try self.class_element_list.print(writer, indentation);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ClassElementList
 pub const ClassElementList = struct {
-    const Self = @This();
-
     items: []const ClassElement,
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'ClassElementList' here, it's implied and only adds nesting.
-        for (self.items) |item| {
-            try item.print(writer, indentation);
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ClassElement
@@ -4697,40 +4060,17 @@ pub const ClassElement = union(enum) {
             },
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'ClassElement' here, it's implied and only adds nesting.
-        switch (self) {
-            .empty_statement => try printString("empty", writer, indentation),
-            inline else => |node| try node.print(writer, indentation),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-FieldDefinition
 pub const FieldDefinition = struct {
-    const Self = @This();
-
     property_name: PropertyName,
     initializer: ?Expression,
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("FieldDefinition", writer, indentation);
-        try self.property_name.print(writer, indentation + 1);
-        if (self.initializer) |initializer| try initializer.print(writer, indentation + 1);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ClassStaticBlock
 pub const ClassStaticBlock = struct {
-    const Self = @This();
-
     statement_list: StatementList,
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("ClassStaticBlock", writer, indentation);
-        try self.statement_list.print(writer, indentation + 1);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-AsyncFunctionDeclaration
@@ -4832,16 +4172,6 @@ pub const AsyncFunctionDeclaration = struct {
             .ignore,
         ) catch |err| try noexcept(err);
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("AsyncFunctionDeclaration", writer, indentation);
-        try printString("identifier:", writer, indentation + 1);
-        if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
-        try printString("formal_parameters:", writer, indentation + 1);
-        try self.formal_parameters.print(writer, indentation + 2);
-        try printString("function_body:", writer, indentation + 1);
-        try self.function_body.print(writer, indentation + 2);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-AsyncFunctionExpression
@@ -4874,16 +4204,6 @@ pub const AsyncFunctionExpression = struct {
             .{ .async_function_expression = async_function_expression },
         );
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("AsyncFunctionExpression", writer, indentation);
-        try printString("identifier:", writer, indentation + 1);
-        if (self.identifier) |identifier| try printString(identifier, writer, indentation + 2);
-        try printString("formal_parameters:", writer, indentation + 1);
-        try self.formal_parameters.print(writer, indentation + 2);
-        try printString("function_body:", writer, indentation + 1);
-        try self.function_body.print(writer, indentation + 2);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-AsyncArrowFunction
@@ -4915,14 +4235,6 @@ pub const AsyncArrowFunction = struct {
             .{ .async_arrow_function = async_arrow_function },
         );
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("AsyncArrowFunction", writer, indentation);
-        try printString("formal_parameters:", writer, indentation + 1);
-        try self.formal_parameters.print(writer, indentation + 2);
-        try printString("function_body:", writer, indentation + 1);
-        try self.function_body.print(writer, indentation + 2);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-Script
@@ -4947,14 +4259,6 @@ pub const Script = struct {
         ctx.contained_in_strict_mode_code = self.isStrict();
         try self.statement_list.generateBytecode(executable, ctx);
     }
-
-    pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
-        const indentation: usize = 0;
-        try printString("Script", writer, indentation);
-        try printString("strict:", writer, indentation + 1);
-        try printString(if (self.isStrict()) "true" else "false", writer, indentation + 2);
-        try self.statement_list.print(writer, indentation + 1);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-Module
@@ -4970,12 +4274,6 @@ pub const Module = struct {
     ) Executable.Error!void {
         ctx.contained_in_strict_mode_code = true;
         try self.module_item_list.generateBytecode(executable, ctx);
-    }
-
-    pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
-        const indentation: usize = 0;
-        try printString("Module", writer, indentation);
-        try self.module_item_list.print(writer, indentation + 1);
     }
 };
 
@@ -5031,13 +4329,6 @@ pub const ModuleItemList = struct {
             try item.generateBytecode(executable, ctx);
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'ModuleItemList' here, it's implied and only adds nesting.
-        for (self.items) |item| {
-            try item.print(writer, indentation);
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ModuleItem
@@ -5058,49 +4349,22 @@ pub const ModuleItem = union(enum) {
             else => {},
         }
     }
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'ModuleItem' here, it's implied and only adds nesting.
-        switch (self) {
-            inline else => |node| try node.print(writer, indentation),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ModuleExportName
 pub const ModuleExportName = union(enum) {
-    const Self = @This();
-
     identifier: Identifier,
     string_literal: StringLiteral,
-
-    pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
-        // NOTE: These are always printed inline, so no newline or indentation are added.
-        switch (self) {
-            .identifier => |identifier| try writer.writeAll(identifier),
-            .string_literal => |string_literal| try writer.writeAll(string_literal.text),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ImportDeclaration
 pub const ImportDeclaration = struct {
-    const Self = @This();
-
     import_clause: ?ImportClause,
     module_specifier: StringLiteral,
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("ImportDeclaration", writer, indentation);
-        if (self.import_clause) |import_clause| try import_clause.print(writer, indentation + 1);
-        try printString(self.module_specifier.text, writer, indentation + 1);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ImportClause
 pub const ImportClause = union(enum) {
-    const Self = @This();
-
     imported_default_binding: struct {
         binding_identifier: Identifier,
     },
@@ -5108,34 +4372,13 @@ pub const ImportClause = union(enum) {
     // TODO: NamedImports
     // TODO: ImportedDefaultBinding , NameSpaceImport
     // TODO: ImportedDefaultBinding , NamedImports
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("ImportClause", writer, indentation);
-        switch (self) {
-            .imported_default_binding => |imported_default_binding| {
-                try printString(
-                    imported_default_binding.binding_identifier,
-                    writer,
-                    indentation + 1,
-                );
-            },
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ExportDeclaration
 pub const ExportDeclaration = union(enum) {
-    const Self = @This();
-
     pub const ExportFrom = struct {
         export_from_clause: ExportFromClause,
         module_specifier: StringLiteral,
-
-        pub fn print(self: @This(), writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-            try self.export_from_clause.print(writer, indentation);
-            try printString("from", writer, indentation);
-            try printString(self.module_specifier.text, writer, indentation + 1);
-        }
     };
 
     export_from: ExportFrom,
@@ -5145,86 +4388,27 @@ pub const ExportDeclaration = union(enum) {
     default_hoistable_declaration: HoistableDeclaration,
     default_class_declaration: ClassDeclaration,
     default_expression: Expression,
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("ExportDeclaration", writer, indentation);
-        switch (self) {
-            .default_hoistable_declaration,
-            .default_class_declaration,
-            .default_expression,
-            => try printString("default", writer, indentation + 1),
-            else => {},
-        }
-        switch (self) {
-            inline else => |node| try node.print(writer, indentation + 1),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ExportFromClause
 pub const ExportFromClause = union(enum) {
-    const Self = @This();
-
     star,
     star_as: ModuleExportName,
     named_exports: NamedExports,
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'ExportFromClause' here, it's implied and only adds nesting.
-        switch (self) {
-            .star => try printString("*", writer, indentation),
-            .star_as => |module_export_name| {
-                try printIndentation(writer, indentation);
-                try writer.writeAll("* as ");
-                try module_export_name.print(writer);
-                try writer.writeAll("\n");
-            },
-            .named_exports => |named_exports| try named_exports.print(writer, indentation),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-NamedExports
 pub const NamedExports = struct {
-    const Self = @This();
-
     exports_list: ExportsList,
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        try printString("NamedExports", writer, indentation);
-        try self.exports_list.print(writer, indentation + 1);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ExportsList
 pub const ExportsList = struct {
-    const Self = @This();
-
     items: []const ExportSpecifier,
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'ExportsList' here, it's implied and only adds nesting.
-        for (self.items) |export_specifier| {
-            try export_specifier.print(writer, indentation);
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ExportSpecifier
 pub const ExportSpecifier = struct {
-    const Self = @This();
-
     name: ModuleExportName,
     alias: ?ModuleExportName,
-
-    pub fn print(self: Self, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
-        // Omit printing 'ExportSpecifier' here, it's implied and only adds nesting.
-        try printIndentation(writer, indentation);
-        try self.name.print(writer);
-        if (self.alias) |alias| {
-            try writer.writeAll(" as ");
-            try alias.print(writer);
-        }
-        try writer.writeAll("\n");
-    }
 };

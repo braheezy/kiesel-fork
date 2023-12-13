@@ -6,6 +6,7 @@ const std = @import("std");
 const SafePointer = @import("any-pointer").SafePointer;
 
 const ast = @import("ast.zig");
+const ast_printing = @import("ast_printing.zig");
 const bytecode = @import("bytecode.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -29,6 +30,10 @@ ecmascript_code: ast.Script,
 
 /// [[HostDefined]]
 host_defined: SafePointer = SafePointer.null_pointer,
+
+pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
+    try ast_printing.printScript(self.ecmascript_code, writer, 0);
+}
 
 /// 16.1.5 ParseScript ( sourceText, realm, hostDefined )
 /// https://tc39.es/ecma262/#sec-parse-script
