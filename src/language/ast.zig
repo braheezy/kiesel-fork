@@ -3,7 +3,6 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const builtins = @import("../builtins.zig");
-const bytecode = @import("bytecode.zig");
 const execution = @import("../execution.zig");
 const reg_exp = @import("../builtins/reg_exp.zig");
 const tokenizer = @import("tokenizer.zig");
@@ -14,7 +13,6 @@ const line_terminators = tokenizer.line_terminators;
 const Agent = execution.Agent;
 const BigInt = types.BigInt;
 const Environment = execution.Environment;
-const Executable = bytecode.Executable;
 const Object = types.Object;
 const PrivateEnvironment = execution.PrivateEnvironment;
 const PropertyKey = types.PropertyKey;
@@ -25,14 +23,6 @@ const noexcept = utils.noexcept;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const setFunctionName = builtins.setFunctionName;
-const temporaryChange = utils.temporaryChange;
-
-pub const BytecodeContext = struct {
-    agent: *Agent,
-    contained_in_strict_mode_code: bool = false,
-    continue_jumps: std.ArrayList(Executable.JumpIndex),
-    break_jumps: std.ArrayList(Executable.JumpIndex),
-};
 
 const AnalyzeQuery = enum {
     is_reference,
@@ -51,37 +41,11 @@ pub const ParenthesizedExpression = struct {
             .is_string_literal => false,
         };
     }
-
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        try self.expression.generateBytecode(executable, ctx);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-IdentifierReference
 pub const IdentifierReference = struct {
-    const Self = @This();
-
     identifier: Identifier,
-
-    /// 13.1.3 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-identifiers-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // IdentifierReference : Identifier
-        // IdentifierReference : yield
-        // IdentifierReference : await
-        // 1. Return ? ResolveBinding(StringValue of Identifier).
-        try executable.addInstructionWithIdentifier(.resolve_binding, self.identifier);
-        const strict = ctx.contained_in_strict_mode_code;
-        try executable.addIndex(@intFromBool(strict));
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-Identifier
@@ -120,27 +84,10 @@ pub const PrimaryExpression = union(enum) {
             },
         };
     }
-
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        switch (self) {
-            // PrimaryExpression : this
-            .this => {
-                // 1. Return ? ResolveThisBinding().
-                try executable.addInstruction(.resolve_this_binding);
-            },
-            inline else => |node| try node.generateBytecode(executable, ctx),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-MemberExpression
 pub const MemberExpression = struct {
-    const Self = @This();
-
     pub const Property = union(enum) {
         expression: *Expression,
         identifier: Identifier,
@@ -148,258 +95,40 @@ pub const MemberExpression = struct {
 
     expression: *Expression,
     property: Property,
-
-    /// 13.3.2.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-property-accessors-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // 1. Let baseReference be ? Evaluation of MemberExpression.
-        try self.expression.generateBytecode(executable, ctx);
-
-        // 2. Let baseValue be ? GetValue(baseReference).
-        if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
-
-        // 3. If the source text matched by this MemberExpression is strict mode code, let strict
-        //    be true; else let strict be false.
-        const strict = ctx.contained_in_strict_mode_code;
-
-        switch (self.property) {
-            // MemberExpression : MemberExpression [ Expression ]
-            .expression => |expression| {
-                // 4. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
-                try expression.generateBytecode(executable, ctx);
-                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.load);
-                try executable.addInstruction(.evaluate_property_access_with_expression_key);
-                try executable.addIndex(@intFromBool(strict));
-            },
-
-            // MemberExpression : MemberExpression . IdentifierName
-            .identifier => |identifier| {
-                // 4. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
-                try executable.addInstructionWithIdentifier(
-                    .evaluate_property_access_with_identifier_key,
-                    identifier,
-                );
-                try executable.addIndex(@intFromBool(strict));
-            },
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-SuperProperty
 pub const SuperProperty = union(enum) {
-    const Self = @This();
-
     expression: *Expression,
     identifier: Identifier,
-
-    /// 13.3.7.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        switch (self) {
-            // SuperProperty : super [ Expression ]
-            .expression => |expression| {
-                // 1. Let env be GetThisEnvironment().
-                // 2. Let actualThis be ? env.GetThisBinding().
-                try executable.addInstruction(.load_this_value_for_make_super_property_reference);
-
-                // 3. Let propertyNameReference be ? Evaluation of Expression.
-                try expression.generateBytecode(executable, ctx);
-
-                // 4. Let propertyNameValue be ? GetValue(propertyNameReference).
-                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.load);
-
-                // 6. If the source text matched by this SuperProperty is strict mode code, let
-                //    strict be true; else let strict be false.
-                const strict = ctx.contained_in_strict_mode_code;
-
-                // 7. Return ? MakeSuperPropertyReference(actualThis, propertyKey, strict).
-                try executable.addInstruction(.make_super_property_reference);
-                try executable.addIndex(@intFromBool(strict));
-            },
-
-            // SuperProperty : super . IdentifierName
-            .identifier => |identifier| {
-                // 1. Let env be GetThisEnvironment().
-                // 2. Let actualThis be ? env.GetThisBinding().
-                try executable.addInstruction(.load_this_value_for_make_super_property_reference);
-
-                // 3. Let propertyKey be StringValue of IdentifierName.
-                try executable.addInstructionWithConstant(.load_constant, Value.from(identifier));
-
-                // 4. If the source text matched by this SuperProperty is strict mode code, let
-                //    strict be true; else let strict be false.
-                const strict = ctx.contained_in_strict_mode_code;
-
-                // 5. Return ? MakeSuperPropertyReference(actualThis, propertyKey, strict).
-                try executable.addInstruction(.make_super_property_reference);
-                try executable.addIndex(@intFromBool(strict));
-            },
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-MetaProperty
 pub const MetaProperty = union(enum) {
-    const Self = @This();
-
     new_target,
     import_meta,
-
-    /// 13.3.12.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-meta-properties-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        _: *BytecodeContext,
-    ) Executable.Error!void {
-        switch (self) {
-            // NewTarget : new . target
-            .new_target => {
-                // 1. Return GetNewTarget().
-                try executable.addInstruction(.get_new_target);
-            },
-
-            // ImportMeta : import . meta
-            .import_meta => {
-                // 1-5.
-                try executable.addInstruction(.get_or_create_import_meta);
-            },
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-NewExpression
 pub const NewExpression = struct {
-    const Self = @This();
-
     expression: *Expression,
     arguments: Arguments,
-
-    /// 13.3.5.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-new-operator-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // NewExpression : new NewExpression
-        // 1. Return ? EvaluateNew(NewExpression, empty).
-        // MemberExpression : new MemberExpression Arguments
-        // 1. Return ? EvaluateNew(MemberExpression, Arguments).
-        try self.expression.generateBytecode(executable, ctx);
-        if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
-
-        for (self.arguments) |argument| {
-            try argument.generateBytecode(executable, ctx);
-            if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
-        }
-
-        try executable.addInstruction(.evaluate_new);
-        try executable.addIndex(self.arguments.len);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-CallExpression
 pub const CallExpression = struct {
-    const Self = @This();
-
     expression: *Expression,
     arguments: Arguments,
-
-    /// 13.3.6.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-function-calls-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // CallExpression : CallExpression Arguments
-        // 1. Let ref be ? Evaluation of CallExpression.
-        try self.expression.generateBytecode(executable, ctx);
-
-        try executable.addInstruction(.push_reference);
-
-        // 2. Let func be ? GetValue(ref).
-        if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
-
-        // TODO: 3. Let thisCall be this CallExpression.
-        // TODO: 4. Let tailCall be IsInTailPosition(thisCall).
-
-        try executable.addInstruction(.load_this_value_for_evaluate_call);
-
-        for (self.arguments) |argument| {
-            try argument.generateBytecode(executable, ctx);
-            if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
-        }
-
-        const strict = ctx.contained_in_strict_mode_code;
-
-        // 5. Return ? EvaluateCall(func, ref, Arguments, tailCall).
-        try executable.addInstruction(.evaluate_call);
-        try executable.addIndex(self.arguments.len);
-        try executable.addIndex(@intFromBool(strict));
-
-        // TODO: We should probably also clean this up if something throws beforehand...
-        try executable.addInstruction(.pop_reference);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-SuperCall
 pub const SuperCall = struct {
-    const Self = @This();
-
     arguments: Arguments,
-
-    /// 13.3.7.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        for (self.arguments) |argument| {
-            try argument.generateBytecode(executable, ctx);
-            if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
-        }
-        try executable.addInstruction(.evaluate_super_call);
-        try executable.addIndex(self.arguments.len);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ImportCall
 pub const ImportCall = struct {
-    const Self = @This();
-
     expression: *Expression,
-
-    /// 13.3.10.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-import-call-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        try self.expression.generateBytecode(executable, ctx);
-        if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
-        try executable.addInstruction(.evaluate_import_call);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-Arguments
@@ -407,8 +136,6 @@ pub const Arguments = []const Expression;
 
 /// https://tc39.es/ecma262/#prod-OptionalExpression
 pub const OptionalExpression = struct {
-    const Self = @This();
-
     pub const Property = union(enum) {
         arguments: Arguments,
         expression: *Expression,
@@ -417,94 +144,6 @@ pub const OptionalExpression = struct {
 
     expression: *Expression,
     property: Property,
-
-    /// 13.3.9.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-optional-chaining-evaluation
-    /// 13.3.9.2 Runtime Semantics: ChainEvaluation
-    /// https://tc39.es/ecma262/#sec-optional-chaining-chain-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // 1. Let baseReference be ? Evaluation of OptionalExpression.
-        try self.expression.generateBytecode(executable, ctx);
-
-        if (self.property == .arguments) try executable.addInstruction(.push_reference);
-
-        // 2. Let baseValue be ? GetValue(baseReference).
-        if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
-
-        // 3. If baseValue is either undefined or null, then
-        try executable.addInstruction(.load);
-        try executable.addInstructionWithConstant(.load_constant, .undefined);
-        try executable.addInstruction(.is_loosely_equal);
-
-        try executable.addInstruction(.jump_conditional);
-        const consequent_jump = try executable.addJumpIndex();
-        const alternate_jump = try executable.addJumpIndex();
-
-        // a. Return undefined.
-        try consequent_jump.setTargetHere();
-        try executable.addInstruction(.store); // Drop baseValue from the stack
-        try executable.addInstructionWithConstant(.store_constant, .undefined);
-        try executable.addInstruction(.jump);
-        const end_jump = try executable.addJumpIndex();
-
-        // 4. Return ? ChainEvaluation of OptionalChain with arguments baseValue and baseReference.
-        try alternate_jump.setTargetHere();
-
-        // 1. If the source text matched by this OptionalChain is strict mode code, let strict be
-        //    true; else let strict be false.
-        const strict = ctx.contained_in_strict_mode_code;
-
-        switch (self.property) {
-            // OptionalChain : ?. Arguments
-            .arguments => |arguments| {
-                try executable.addInstruction(.load_this_value_for_evaluate_call);
-
-                for (arguments) |argument| {
-                    try argument.generateBytecode(executable, ctx);
-                    if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                    try executable.addInstruction(.load);
-                }
-
-                // TODO: 1. Let thisChain be this OptionalChain.
-                // TODO: 2. Let tailCall be IsInTailPosition(thisChain).
-
-                // 3. Return ? EvaluateCall(baseValue, baseReference, Arguments, tailCall).
-                try executable.addInstruction(.evaluate_call);
-                try executable.addIndex(arguments.len);
-                try executable.addIndex(@intFromBool(strict));
-
-                // TODO: We should probably also clean this up if something throws beforehand...
-                try executable.addInstruction(.pop_reference);
-            },
-
-            // OptionalChain : ?. [ Expression ]
-            .expression => |expression| {
-                // 2. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
-                try expression.generateBytecode(executable, ctx);
-                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.load);
-                try executable.addInstruction(.evaluate_property_access_with_expression_key);
-                try executable.addIndex(@intFromBool(strict));
-            },
-
-            // OptionalChain : ?. IdentifierName
-            .identifier => |identifier| {
-                // 2. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
-                try executable.addInstructionWithIdentifier(
-                    .evaluate_property_access_with_identifier_key,
-                    identifier,
-                );
-                try executable.addIndex(@intFromBool(strict));
-            },
-        }
-
-        try end_jump.setTargetHere();
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-Literal
@@ -521,43 +160,6 @@ pub const Literal = union(enum) {
             .is_reference => false,
             .is_string_literal => self == .string,
         };
-    }
-
-    /// 13.2.3.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-literals-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        _: *BytecodeContext,
-    ) Executable.Error!void {
-        switch (self) {
-            // Literal : NullLiteral
-            .null => {
-                // 1. Return null.
-                try executable.addInstructionWithConstant(.store_constant, .null);
-            },
-
-            // Literal : BooleanLiteral
-            .boolean => |boolean| {
-                // 1. If BooleanLiteral is the token false, return false.
-                // 2. If BooleanLiteral is the token true, return true.
-                try executable.addInstructionWithConstant(.store_constant, Value.from(boolean));
-            },
-
-            // Literal : NumericLiteral
-            .numeric => |numeric_literal| {
-                // 1. Return the NumericValue of NumericLiteral as defined in 12.9.3.
-                const value = try numeric_literal.numericValue(executable.allocator);
-                try executable.addInstructionWithConstant(.store_constant, value);
-            },
-
-            // Literal : StringLiteral
-            .string => |string_literal| {
-                // 1. Return the SV of StringLiteral as defined in 12.9.4.2.
-                const value = try string_literal.stringValue(executable.allocator);
-                try executable.addInstructionWithConstant(.store_constant, value);
-            },
-        }
     }
 };
 
@@ -699,8 +301,6 @@ pub const StringLiteral = struct {
 
 /// https://tc39.es/ecma262/#prod-ArrayLiteral
 pub const ArrayLiteral = struct {
-    const Self = @This();
-
     pub const Element = union(enum) {
         elision,
         expression: Expression,
@@ -708,127 +308,20 @@ pub const ArrayLiteral = struct {
     };
 
     element_list: []const Element,
-
-    /// 13.2.4.2 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-array-initializer-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        try executable.addInstruction(.array_create);
-        try executable.addInstruction(.load);
-        for (self.element_list, 0..) |element, i| {
-            switch (element) {
-                // Elision : ,
-                .elision => {
-                    try executable.addInstruction(.store);
-                    try executable.addInstruction(.array_set_length);
-                    try executable.addIndex(i + 1);
-                    try executable.addInstruction(.load);
-                },
-
-                // ElementList : Elision[opt] AssignmentExpression
-                .expression => |expression| {
-                    // 1. If Elision is present, then
-                    // NOTE: This is handled above.
-
-                    // 2. Let initResult be ? Evaluation of AssignmentExpression.
-                    try expression.generateBytecode(executable, ctx);
-
-                    // 3. Let initValue be ? GetValue(initResult).
-                    if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                    try executable.addInstruction(.load);
-
-                    // 4. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), initValue).
-                    try executable.addInstruction(.array_push_value);
-                    try executable.addInstruction(.load);
-
-                    // 5. Return nextIndex + 1.
-                },
-
-                // SpreadElement : ... AssignmentExpression
-                .spread => |expression| {
-                    // 1. Let spreadRef be ? Evaluation of AssignmentExpression.
-                    try expression.generateBytecode(executable, ctx);
-
-                    // 2. Let spreadObj be ? GetValue(spreadRef).
-                    if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                    try executable.addInstruction(.load);
-
-                    // 3-4.
-                    try executable.addInstruction(.array_spread_value);
-                    try executable.addInstruction(.load);
-                },
-            }
-        }
-        try executable.addInstruction(.store);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ObjectLiteral
 pub const ObjectLiteral = struct {
-    const Self = @This();
-
     property_definition_list: PropertyDefinitionList,
-
-    /// 13.2.5.4 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-object-initializer-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // ObjectLiteral : { }
-        if (self.property_definition_list.items.len == 0) {
-            // 1. Return OrdinaryObjectCreate(%Object.prototype%).
-            try executable.addInstruction(.object_create);
-            return;
-        }
-
-        // ObjectLiteral :
-        //     { PropertyDefinitionList }
-        //     { PropertyDefinitionList , }
-        // 1. Let obj be OrdinaryObjectCreate(%Object.prototype%).
-        try executable.addInstruction(.object_create);
-
-        // 2. Perform ? PropertyDefinitionEvaluation of PropertyDefinitionList with argument obj.
-        try self.property_definition_list.generateBytecode(executable, ctx);
-
-        // 3. Return obj.
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-PropertyDefinitionList
 pub const PropertyDefinitionList = struct {
-    const Self = @This();
-
     items: []const PropertyDefinition,
-
-    /// 13.2.5.5 Runtime Semantics: PropertyDefinitionEvaluation
-    /// https://tc39.es/ecma262/#sec-runtime-semantics-propertydefinitionevaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // PropertyDefinitionList : PropertyDefinitionList , PropertyDefinition
-        // 1. Perform ? PropertyDefinitionEvaluation of PropertyDefinitionList with argument object.
-        // 2. Perform ? PropertyDefinitionEvaluation of PropertyDefinition with argument object.
-        for (self.items) |property_definition| {
-            // Load object onto the stack again before each property definition is evaluated
-            try executable.addInstruction(.load);
-            try property_definition.generateBytecode(executable, ctx);
-        }
-
-        // 3. Return unused.
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-PropertyDefinition
 pub const PropertyDefinition = union(enum) {
-    const Self = @This();
-
     pub const PropertyNameAndExpression = struct {
         property_name: PropertyName,
         expression: Expression,
@@ -838,148 +331,16 @@ pub const PropertyDefinition = union(enum) {
     identifier_reference: IdentifierReference,
     property_name_and_expression: PropertyNameAndExpression,
     method_definition: MethodDefinition,
-
-    /// 13.2.5.5 Runtime Semantics: PropertyDefinitionEvaluation
-    /// https://tc39.es/ecma262/#sec-runtime-semantics-propertydefinitionevaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        switch (self) {
-            // PropertyDefinition : ... AssignmentExpression
-            .spread => |expression| {
-                // 1. Let exprValue be ? Evaluation of AssignmentExpression.
-                try expression.generateBytecode(executable, ctx);
-
-                // 2. Let fromValue be ? GetValue(exprValue).
-                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.load);
-
-                // 3. Let excludedNames be a new empty List.
-                // 4. Perform ? CopyDataProperties(object, fromValue, excludedNames).
-                try executable.addInstruction(.object_spread_value);
-
-                // 5. Return unused.
-            },
-
-            // PropertyDefinition : IdentifierReference
-            .identifier_reference => |identifier_reference| {
-                // 1. Let propName be StringValue of IdentifierReference.
-                const prop_name = identifier_reference.identifier;
-                try executable.addInstructionWithConstant(.load_constant, Value.from(prop_name));
-
-                // 2. Let exprValue be ? Evaluation of IdentifierReference.
-                try identifier_reference.generateBytecode(executable, ctx);
-
-                // 3. Let propValue be ? GetValue(exprValue).
-                try executable.addInstruction(.get_value);
-                try executable.addInstruction(.load);
-
-                // 4. Assert: object is an ordinary, extensible object with no non-configurable properties.
-                // 5. Perform ! CreateDataPropertyOrThrow(object, propName, propValue).
-                try executable.addInstruction(.object_set_property);
-
-                // 6. Return unused.
-            },
-
-            // PropertyDefinition : PropertyName : AssignmentExpression
-            .property_name_and_expression => |property_name_and_expression| {
-                // 1. Let propKey be ? Evaluation of PropertyName.
-                try property_name_and_expression.property_name.generateBytecode(executable, ctx);
-                try executable.addInstruction(.load);
-
-                // TODO: 2-4.
-
-                // TODO: 5. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and isProtoSetter is false, then
-                // 6. Else,
-
-                // a. Let exprValueRef be ? Evaluation of AssignmentExpression.
-                try property_name_and_expression.expression.generateBytecode(executable, ctx);
-
-                // b. Let propValue be ? GetValue(exprValueRef).
-                if (property_name_and_expression.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.load);
-
-                // TODO: 7. If isProtoSetter is true, then
-
-                // 8. Assert: object is an ordinary, extensible object with no non-configurable properties.
-                // 9. Perform ! CreateDataPropertyOrThrow(object, propKey, propValue).
-                try executable.addInstruction(.object_set_property);
-
-                // 10. Return unused.
-            },
-
-            // PropertyDefinition : MethodDefinition
-            .method_definition => |method_definition| {
-                // 1. Perform ? MethodDefinitionEvaluation of MethodDefinition with arguments object and true.
-                try method_definition.generateBytecode(executable, ctx);
-
-                // 2. Return unused.
-            },
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-PropertyName
 pub const PropertyName = union(enum) {
-    const Self = @This();
-
     literal_property_name: union(enum) {
         identifier: Identifier,
         string_literal: StringLiteral,
         numeric_literal: NumericLiteral,
     },
     computed_property_name: Expression,
-
-    /// 13.2.5.4 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-object-initializer-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        switch (self) {
-            .literal_property_name => |literal| switch (literal) {
-                // LiteralPropertyName : IdentifierName
-                .identifier => |identifier| {
-                    // 1. Return StringValue of IdentifierName.
-                    try executable.addInstructionWithConstant(.store_constant, Value.from(identifier));
-                },
-
-                // LiteralPropertyName : StringLiteral
-                .string_literal => |string_literal| {
-                    // 1. Return the SV of StringLiteral.
-                    try executable.addInstructionWithConstant(
-                        .store_constant,
-                        try string_literal.stringValue(executable.allocator),
-                    );
-                },
-
-                // LiteralPropertyName : NumericLiteral
-                .numeric_literal => |numeric_literal| {
-                    // 1. Let nbr be the NumericValue of NumericLiteral.
-                    // 2. Return ! ToString(nbr).
-                    try executable.addInstructionWithConstant(
-                        .store_constant,
-                        try numeric_literal.numericValue(executable.allocator),
-                    );
-                },
-            },
-
-            // ComputedPropertyName : [ AssignmentExpression ]
-            .computed_property_name => |expression| {
-                // 1. Let exprValue be ? Evaluation of AssignmentExpression.
-                try expression.generateBytecode(executable, ctx);
-
-                // 2. Let propName be ? GetValue(exprValue).
-                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-                // 3. Return ? ToPropertyKey(propName).
-                // NOTE: This is done in object_set_property
-            },
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-RegularExpressionLiteral
@@ -1006,54 +367,15 @@ pub const RegularExpressionLiteral = struct {
         // which would be wasteful to call here. At the very least we'd have to reuse the bytecode.
         return .valid;
     }
-
-    /// 13.2.7.3 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-regular-expression-literals-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        _: *BytecodeContext,
-    ) Executable.Error!void {
-        // 1. Let pattern be CodePointsToString(BodyText of RegularExpressionLiteral).
-        try executable.addInstructionWithConstant(.load_constant, Value.from(self.pattern));
-
-        // 2. Let flags be CodePointsToString(FlagText of RegularExpressionLiteral).
-        try executable.addInstructionWithConstant(.load_constant, Value.from(self.flags));
-
-        // 3. Return ! RegExpCreate(pattern, flags).
-        try executable.addInstruction(.reg_exp_create);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-TemplateLiteral
 pub const TemplateLiteral = struct {
-    const Self = @This();
-
     text: []const u8,
-
-    /// 13.2.8.6 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-template-literals-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        _: *BytecodeContext,
-    ) Executable.Error!void {
-        // TemplateLiteral : NoSubstitutionTemplate
-        // 1. Return the TV of NoSubstitutionTemplate as defined in 12.9.6.
-        // TODO: Handle escapes
-        try executable.addInstructionWithConstant(
-            .store_constant,
-            Value.from(self.text[1 .. self.text.len - 1]),
-        );
-
-        // TODO: SubstitutionTemplate : TemplateHead Expression TemplateSpans
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-UpdateExpression
 pub const UpdateExpression = struct {
-    const Self = @This();
-
     pub const Type = enum {
         prefix,
         postfix,
@@ -1067,125 +389,10 @@ pub const UpdateExpression = struct {
     type: Type,
     operator: Operator,
     expression: *Expression,
-
-    /// 13.4.2.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-postfix-increment-operator-runtime-semantics-evaluation
-    /// 13.4.3.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-postfix-decrement-operator-runtime-semantics-evaluation
-    /// 13.4.4.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-prefix-increment-operator-runtime-semantics-evaluation
-    /// 13.4.5.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-prefix-decrement-operator-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // UpdateExpression : LeftHandSideExpression ++
-        if (self.type == .postfix and self.operator == .@"++") {
-            // 1. Let lhs be ? Evaluation of LeftHandSideExpression.
-            try self.expression.generateBytecode(executable, ctx);
-            try executable.addInstruction(.push_reference);
-
-            // 2. Let oldValue be ? ToNumeric(? GetValue(lhs)).
-            if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.to_numeric);
-
-            try executable.addInstruction(.load);
-
-            // 3. If oldValue is a Number, then
-            //     a. Let newValue be Number::add(oldValue, 1𝔽).
-            // 4. Else,
-            //     a. Assert: oldValue is a BigInt.
-            //     b. Let newValue be BigInt::add(oldValue, 1ℤ).
-            try executable.addInstruction(.increment);
-
-            // 5. Perform ? PutValue(lhs, newValue).
-            try executable.addInstruction(.put_value);
-            try executable.addInstruction(.pop_reference);
-
-            // 6. Return oldValue.
-            try executable.addInstruction(.store);
-        }
-        // UpdateExpression : LeftHandSideExpression --
-        else if (self.type == .postfix and self.operator == .@"--") {
-            // 1. Let lhs be ? Evaluation of LeftHandSideExpression.
-            try self.expression.generateBytecode(executable, ctx);
-            try executable.addInstruction(.push_reference);
-
-            // 2. Let oldValue be ? ToNumeric(? GetValue(lhs)).
-            if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.to_numeric);
-
-            try executable.addInstruction(.load);
-
-            // 3. If oldValue is a Number, then
-            //     a. Let newValue be Number::subtract(oldValue, 1𝔽).
-            // 4. Else,
-            //     a. Assert: oldValue is a BigInt.
-            //     b. Let newValue be BigInt::subtract(oldValue, 1ℤ).
-            try executable.addInstruction(.decrement);
-
-            // 5. Perform ? PutValue(lhs, newValue).
-            try executable.addInstruction(.put_value);
-            try executable.addInstruction(.pop_reference);
-
-            // 6. Return oldValue.
-            try executable.addInstruction(.store);
-        }
-        // UpdateExpression : ++ UnaryExpression
-        else if (self.type == .prefix and self.operator == .@"++") {
-            // 1. Let expr be ? Evaluation of UnaryExpression.
-            try self.expression.generateBytecode(executable, ctx);
-            try executable.addInstruction(.push_reference);
-
-            // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
-            if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.to_numeric);
-
-            // 3. If oldValue is a Number, then
-            //     a. Let newValue be Number::add(oldValue, 1𝔽).
-            // 4. Else,
-            //     a. Assert: oldValue is a BigInt.
-            //     b. Let newValue be BigInt::add(oldValue, 1ℤ).
-            try executable.addInstruction(.increment);
-
-            // 5. Perform ? PutValue(expr, newValue).
-            try executable.addInstruction(.put_value);
-            try executable.addInstruction(.pop_reference);
-
-            // 6. Return newValue.
-        }
-        // UpdateExpression : -- UnaryExpression
-        else if (self.type == .prefix and self.operator == .@"--") {
-            // 1. Let expr be ? Evaluation of UnaryExpression.
-            try self.expression.generateBytecode(executable, ctx);
-            try executable.addInstruction(.push_reference);
-
-            // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
-            if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.to_numeric);
-
-            // 3. If oldValue is a Number, then
-            //     a. Let newValue be Number::subtract(oldValue, 1𝔽).
-            // 4. Else,
-            //     a. Assert: oldValue is a BigInt.
-            //     b. Let newValue be BigInt::subtract(oldValue, 1ℤ).
-            try executable.addInstruction(.decrement);
-
-            // 5. Perform ? PutValue(expr, newValue).
-            try executable.addInstruction(.put_value);
-            try executable.addInstruction(.pop_reference);
-
-            // 6. Return newValue.
-        } else unreachable;
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-UnaryExpression
 pub const UnaryExpression = struct {
-    const Self = @This();
-
     pub const Operator = enum {
         delete,
         void,
@@ -1198,117 +405,6 @@ pub const UnaryExpression = struct {
 
     operator: Operator,
     expression: *Expression,
-
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        switch (self.operator) {
-            // 13.5.1.2 Runtime Semantics: Evaluation
-            // https://tc39.es/ecma262/#sec-delete-operator-runtime-semantics-evaluation
-            // UnaryExpression : delete UnaryExpression
-            .delete => {
-                // 1. Let ref be ? Evaluation of UnaryExpression.
-                try self.expression.generateBytecode(executable, ctx);
-
-                if (!self.expression.analyze(.is_reference))
-                    // 2. If ref is not a Reference Record, return true.
-                    try executable.addInstructionWithConstant(.store_constant, Value.from(true))
-                else
-                    // 3-5.
-                    try executable.addInstruction(.delete);
-            },
-
-            // 13.5.2.1 Runtime Semantics: Evaluation
-            // https://tc39.es/ecma262/#sec-void-operator-runtime-semantics-evaluation
-            // UnaryExpression : void UnaryExpression
-            .void => {
-                // 1. Let expr be ? Evaluation of UnaryExpression.
-                try self.expression.generateBytecode(executable, ctx);
-
-                // 2. Perform ? GetValue(expr).
-                if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-                // 3. Return undefined.
-                try executable.addInstructionWithConstant(.store_constant, .undefined);
-            },
-
-            // 13.5.3.1 Runtime Semantics: Evaluation
-            // https://tc39.es/ecma262/#sec-typeof-operator-runtime-semantics-evaluation
-            // UnaryExpression : typeof UnaryExpression
-            .typeof => {
-                // NOTE: get_value is intentionally omitted here, typeof needs to do it conditionally.
-                try self.expression.generateBytecode(executable, ctx);
-                try executable.addInstruction(.typeof);
-            },
-
-            // 13.5.4.1 Runtime Semantics: Evaluation
-            // https://tc39.es/ecma262/#sec-unary-plus-operator-runtime-semantics-evaluation
-            // UnaryExpression : + UnaryExpression
-            .@"+" => {
-                // 1. Let expr be ? Evaluation of UnaryExpression.
-                try self.expression.generateBytecode(executable, ctx);
-
-                // 2. Return ? ToNumber(? GetValue(expr)).
-                if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.to_number);
-            },
-
-            // 13.5.5.1 Runtime Semantics: Evaluation
-            // https://tc39.es/ecma262/#sec-unary-minus-operator-runtime-semantics-evaluation
-            // UnaryExpression : - UnaryExpression
-            .@"-" => {
-                // 1. Let expr be ? Evaluation of UnaryExpression.
-                try self.expression.generateBytecode(executable, ctx);
-
-                // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
-                if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.to_numeric);
-
-                // 3. If oldValue is a Number, then
-                //     a. Return Number::unaryMinus(oldValue).
-                // 4. Else,
-                //     a. Assert: oldValue is a BigInt.
-                //     b. Return BigInt::unaryMinus(oldValue).
-                try executable.addInstruction(.unary_minus);
-            },
-
-            // 13.5.6.1 Runtime Semantics: Evaluation
-            // https://tc39.es/ecma262/#sec-bitwise-not-operator-runtime-semantics-evaluation
-            // UnaryExpression : ~ UnaryExpression
-            .@"~" => {
-                // 1. Let expr be ? Evaluation of UnaryExpression.
-                try self.expression.generateBytecode(executable, ctx);
-
-                // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
-                if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.to_numeric);
-
-                // 3. If oldValue is a Number, then
-                //     a. Return Number::bitwiseNOT(oldValue).
-                // 4. Else,
-                //     a. Assert: oldValue is a BigInt.
-                //     b. Return BigInt::bitwiseNOT(oldValue).
-                try executable.addInstruction(.bitwise_not);
-            },
-
-            // 13.5.7.1 Runtime Semantics: Evaluation
-            // https://tc39.es/ecma262/#sec-logical-not-operator-runtime-semantics-evaluation
-            // UnaryExpression : ! UnaryExpression
-            .@"!" => {
-                // 1. Let expr be ? Evaluation of UnaryExpression.
-                try self.expression.generateBytecode(executable, ctx);
-
-                // 2. Let oldValue be ToBoolean(? GetValue(expr)).
-                if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-                // 3. If oldValue is true, return false.
-                // 4. Return true.
-                try executable.addInstruction(.logical_not);
-            },
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ExponentiationExpression
@@ -1319,8 +415,6 @@ pub const UnaryExpression = struct {
 /// https://tc39.es/ecma262/#prod-BitwiseXORExpression
 /// https://tc39.es/ecma262/#prod-BitwiseORExpression
 pub const BinaryExpression = struct {
-    const Self = @This();
-
     pub const Operator = enum {
         @"**",
         @"*",
@@ -1339,38 +433,10 @@ pub const BinaryExpression = struct {
     operator: Operator,
     lhs_expression: *Expression,
     rhs_expression: *Expression,
-
-    /// 13.15.4 EvaluateStringOrNumericBinaryExpression ( leftOperand, opText, rightOperand )
-    /// https://tc39.es/ecma262/#sec-evaluatestringornumericbinaryexpression
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // 1. Let lref be ? Evaluation of leftOperand.
-        try self.lhs_expression.generateBytecode(executable, ctx);
-
-        // 2. Let lval be ? GetValue(lref).
-        if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
-
-        // 3. Let rref be ? Evaluation of rightOperand.
-        try self.rhs_expression.generateBytecode(executable, ctx);
-
-        // 4. Let rval be ? GetValue(rref).
-        if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
-
-        // 5. Return ? ApplyStringOrNumericBinaryOperator(lval, opText, rval).
-        try executable.addInstruction(.apply_string_or_numeric_binary_operator);
-        try executable.addIndex(@intFromEnum(self.operator));
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-RelationalExpression
 pub const RelationalExpression = struct {
-    const Self = @This();
-
     pub const Operator = enum {
         @"<",
         @">",
@@ -1383,49 +449,10 @@ pub const RelationalExpression = struct {
     operator: Operator,
     lhs_expression: *Expression,
     rhs_expression: *Expression,
-
-    /// 13.10.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-relational-operators-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // RelationalExpression : RelationalExpression < ShiftExpression
-        // RelationalExpression : RelationalExpression > ShiftExpression
-        // RelationalExpression : RelationalExpression <= ShiftExpression
-        // RelationalExpression : RelationalExpression >= ShiftExpression
-        // RelationalExpression : RelationalExpression instanceof ShiftExpression
-        // RelationalExpression : RelationalExpression in ShiftExpression
-        // 1. Let lref be ? Evaluation of RelationalExpression.
-        try self.lhs_expression.generateBytecode(executable, ctx);
-
-        // 2. Let lval be ? GetValue(lref).
-        if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
-
-        // 3. Let rref be ? Evaluation of ShiftExpression.
-        try self.rhs_expression.generateBytecode(executable, ctx);
-
-        // 4. Let rval be ? GetValue(rref).
-        if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
-
-        switch (self.operator) {
-            .@"<" => try executable.addInstruction(.less_than),
-            .@">" => try executable.addInstruction(.greater_than),
-            .@"<=" => try executable.addInstruction(.less_than_equals),
-            .@">=" => try executable.addInstruction(.greater_than_equals),
-            .instanceof => try executable.addInstruction(.instanceof_operator),
-            .in => try executable.addInstruction(.has_property),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-EqualityExpression
 pub const EqualityExpression = struct {
-    const Self = @This();
-
     pub const Operator = enum {
         @"==",
         @"!=",
@@ -1436,63 +463,10 @@ pub const EqualityExpression = struct {
     operator: Operator,
     lhs_expression: *Expression,
     rhs_expression: *Expression,
-
-    /// 13.11.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-equality-operators-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // EqualityExpression : EqualityExpression == RelationalExpression
-        // EqualityExpression : EqualityExpression != RelationalExpression
-        // EqualityExpression : EqualityExpression === RelationalExpression
-        // EqualityExpression : EqualityExpression !== RelationalExpression
-        // 1. Let lref be ? Evaluation of EqualityExpression.
-        try self.lhs_expression.generateBytecode(executable, ctx);
-
-        // 2. Let lval be ? GetValue(lref).
-        if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
-
-        // 3. Let rref be ? Evaluation of RelationalExpression.
-        try self.rhs_expression.generateBytecode(executable, ctx);
-
-        // 4. Let rval be ? GetValue(rref).
-        if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
-
-        switch (self.operator) {
-            .@"==" => {
-                // 5. Return ? IsLooselyEqual(rval, lval).
-                try executable.addInstruction(.is_loosely_equal);
-            },
-            .@"!=" => {
-                // 5. Let r be ? IsLooselyEqual(rval, lval).
-                try executable.addInstruction(.is_loosely_equal);
-
-                // 6. If r is true, return false. Otherwise, return true.
-                try executable.addInstruction(.logical_not);
-            },
-            .@"===" => {
-                // 5. Return IsStrictlyEqual(rval, lval).
-                try executable.addInstruction(.is_strictly_equal);
-            },
-            .@"!==" => {
-                // 5. Let r be IsStrictlyEqual(rval, lval).
-                try executable.addInstruction(.is_strictly_equal);
-
-                // 6. If r is true, return false. Otherwise, return true.
-                try executable.addInstruction(.logical_not);
-            },
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-LogicalExpression
 pub const LogicalExpression = struct {
-    const Self = @This();
-
     pub const Operator = enum {
         @"&&",
         @"||",
@@ -1502,161 +476,17 @@ pub const LogicalExpression = struct {
     operator: Operator,
     lhs_expression: *Expression,
     rhs_expression: *Expression,
-
-    /// 13.13.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-binary-logical-operators-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        switch (self.operator) {
-            // LogicalANDExpression : LogicalANDExpression && BitwiseORExpression
-            .@"&&" => {
-                // 1. Let lref be ? Evaluation of LogicalANDExpression.
-                try self.lhs_expression.generateBytecode(executable, ctx);
-
-                // 2. Let lval be ? GetValue(lref).
-                if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-                // 3. Let lbool be ToBoolean(lval).
-                // 4. If lbool is false, return lval.
-                try executable.addInstruction(.jump_conditional);
-                const consequent_jump = try executable.addJumpIndex();
-                const alternate_jump = try executable.addJumpIndex();
-                try consequent_jump.setTargetHere();
-
-                // 5. Let rref be ? Evaluation of BitwiseORExpression.
-                try self.rhs_expression.generateBytecode(executable, ctx);
-
-                // 6. Return ? GetValue(rref).
-                if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-                try alternate_jump.setTargetHere();
-            },
-
-            // LogicalORExpression : LogicalORExpression || LogicalANDExpression
-            .@"||" => {
-                // 1. Let lref be ? Evaluation of LogicalORExpression.
-                try self.lhs_expression.generateBytecode(executable, ctx);
-
-                // 2. Let lval be ? GetValue(lref).
-                if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-                // 3. Let lbool be ToBoolean(lval).
-                // 4. If lbool is true, return lval.
-                try executable.addInstruction(.jump_conditional);
-                const consequent_jump = try executable.addJumpIndex();
-                const alternate_jump = try executable.addJumpIndex();
-                try alternate_jump.setTargetHere();
-
-                // 5. Let rref be ? Evaluation of LogicalANDExpression.
-                try self.rhs_expression.generateBytecode(executable, ctx);
-
-                // 6. Return ? GetValue(rref).
-                if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-                try consequent_jump.setTargetHere();
-            },
-
-            // CoalesceExpression : CoalesceExpressionHead ?? BitwiseORExpression
-            .@"??" => {
-                // 1. Let lref be ? Evaluation of CoalesceExpressionHead.
-                try self.lhs_expression.generateBytecode(executable, ctx);
-
-                // 2. Let lval be ? GetValue(lref).
-                if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-                try executable.addInstruction(.load);
-
-                try executable.addInstruction(.load);
-                try executable.addInstructionWithConstant(.load_constant, .undefined);
-                try executable.addInstruction(.is_loosely_equal);
-
-                try executable.addInstruction(.jump_conditional);
-                const consequent_jump = try executable.addJumpIndex();
-                const alternate_jump = try executable.addJumpIndex();
-
-                // 3. If lval is either undefined or null, then
-                try consequent_jump.setTargetHere();
-                try executable.addInstruction(.store); // Drop lval from the stack
-
-                // a. Let rref be ? Evaluation of BitwiseORExpression.
-                try self.rhs_expression.generateBytecode(executable, ctx);
-
-                // b. Return ? GetValue(rref).
-                if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-                try executable.addInstruction(.jump);
-                const end_jump = try executable.addJumpIndex();
-
-                // 4. Else,
-                try alternate_jump.setTargetHere();
-
-                // a. Return lval.
-                try executable.addInstruction(.store);
-
-                try end_jump.setTargetHere();
-            },
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ConditionalExpression
 pub const ConditionalExpression = struct {
-    const Self = @This();
-
     test_expression: *Expression,
     consequent_expression: *Expression,
     alternate_expression: *Expression,
-
-    /// 13.14.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-conditional-operator-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // ConditionalExpression : ShortCircuitExpression ? AssignmentExpression : AssignmentExpression
-        // 1. Let lref be ? Evaluation of ShortCircuitExpression.
-        try self.test_expression.generateBytecode(executable, ctx);
-
-        // 2. Let lval be ToBoolean(? GetValue(lref)).
-        if (self.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-        try executable.addInstruction(.jump_conditional);
-        const consequent_jump = try executable.addJumpIndex();
-        const alternate_jump = try executable.addJumpIndex();
-
-        // 3. If lval is true, then
-        try consequent_jump.setTargetHere();
-
-        // a. Let trueRef be ? Evaluation of the first AssignmentExpression.
-        try self.consequent_expression.generateBytecode(executable, ctx);
-
-        // b. Return ? GetValue(trueRef).
-        if (self.consequent_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-        try executable.addInstruction(.jump);
-        const end_jump = try executable.addJumpIndex();
-
-        // 4. Else,
-        try alternate_jump.setTargetHere();
-
-        // a. Let falseRef be ? Evaluation of the second AssignmentExpression.
-        try self.alternate_expression.generateBytecode(executable, ctx);
-
-        // b. Return ? GetValue(falseRef).
-        if (self.alternate_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-        try end_jump.setTargetHere();
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-AssignmentExpression
 pub const AssignmentExpression = struct {
-    const Self = @This();
-
     pub const Operator = enum {
         @"=",
         @"*=",
@@ -1679,244 +509,10 @@ pub const AssignmentExpression = struct {
     operator: Operator,
     lhs_expression: *Expression,
     rhs_expression: *Expression,
-
-    /// 13.15.2 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-assignment-operators-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // AssignmentExpression : LeftHandSideExpression = AssignmentExpression
-        if (self.operator == .@"=") {
-            // 1. If LeftHandSideExpression is neither an ObjectLiteral nor an ArrayLiteral, then
-
-            // a. Let lref be ? Evaluation of LeftHandSideExpression.
-            try self.lhs_expression.generateBytecode(executable, ctx);
-            try executable.addInstruction(.push_reference);
-
-            // TODO: b. If IsAnonymousFunctionDefinition(AssignmentExpression) and IsIdentifierRef of
-            //          LeftHandSideExpression are both true, then
-            if (false) {
-                // i. Let rval be ? NamedEvaluation of AssignmentExpression with argument lref.[[ReferencedName]].
-            }
-            // c. Else,
-            else {
-                // i. Let rref be ? Evaluation of AssignmentExpression.
-                try self.rhs_expression.generateBytecode(executable, ctx);
-
-                // ii. Let rval be ? GetValue(rref).
-                if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            }
-
-            // d. Perform ? PutValue(lref, rval).
-            // e. Return rval.
-            try executable.addInstruction(.put_value);
-            try executable.addInstruction(.pop_reference);
-        }
-        // AssignmentExpression : LeftHandSideExpression AssignmentOperator AssignmentExpression
-        else if (self.operator != .@"&&=" and self.operator != .@"||=" and self.operator != .@"??=") {
-            // 1. Let lref be ? Evaluation of LeftHandSideExpression.
-            try self.lhs_expression.generateBytecode(executable, ctx);
-            try executable.addInstruction(.push_reference);
-
-            // 2. Let lval be ? GetValue(lref).
-            if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
-
-            // 3. Let rref be ? Evaluation of AssignmentExpression.
-            try self.rhs_expression.generateBytecode(executable, ctx);
-
-            // 4. Let rval be ? GetValue(rref).
-            if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
-
-            // 5. Let assignmentOpText be the source text matched by AssignmentOperator.
-            // 6. Let opText be the sequence of Unicode code points associated with assignmentOpText
-            //    in the following table:
-            const operator: BinaryExpression.Operator = switch (self.operator) {
-                .@"*=" => .@"*",
-                .@"/=" => .@"/",
-                .@"%=" => .@"%",
-                .@"+=" => .@"+",
-                .@"-=" => .@"-",
-                .@"<<=" => .@"<<",
-                .@">>=" => .@">>",
-                .@">>>=" => .@">>>",
-                .@"&=" => .@"&",
-                .@"^=" => .@"^",
-                .@"|=" => .@"|",
-                .@"**=" => .@"**",
-                else => unreachable,
-            };
-
-            // 7. Let r be ? ApplyStringOrNumericBinaryOperator(lval, opText, rval).
-            try executable.addInstruction(.apply_string_or_numeric_binary_operator);
-            try executable.addIndex(@intFromEnum(operator));
-
-            // 8. Perform ? PutValue(lref, r).
-            // 9. Return r.
-            try executable.addInstruction(.put_value);
-            try executable.addInstruction(.pop_reference);
-        }
-        // AssignmentExpression : LeftHandSideExpression &&= AssignmentExpression
-        else if (self.operator == .@"&&=") {
-            // 1. Let lref be ? Evaluation of LeftHandSideExpression.
-            try self.lhs_expression.generateBytecode(executable, ctx);
-            try executable.addInstruction(.push_reference);
-
-            // 2. Let lval be ? GetValue(lref).
-            if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
-
-            // 3. Let lbool be ToBoolean(lval).
-            try executable.addInstruction(.jump_conditional);
-            const consequent_jump = try executable.addJumpIndex();
-            const alternate_jump = try executable.addJumpIndex();
-
-            try consequent_jump.setTargetHere();
-
-            // TODO: 5. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and IsIdentifierRef
-            //          of LeftHandSideExpression is true, then
-            if (false) {
-                // a. Let rval be ? NamedEvaluation of AssignmentExpression with argument lref.[[ReferencedName]].
-            }
-            // 6. Else,
-            else {
-                // a. Let rref be ? Evaluation of AssignmentExpression.
-                try self.rhs_expression.generateBytecode(executable, ctx);
-
-                // b. Let rval be ? GetValue(rref).
-                if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            }
-
-            // 7. Perform ? PutValue(lref, rval).
-            // 8. Return rval.
-            try executable.addInstruction(.put_value);
-
-            try executable.addInstruction(.jump);
-            const end_jump = try executable.addJumpIndex();
-
-            // 4. If lbool is false, return lval.
-            try alternate_jump.setTargetHere();
-            try executable.addInstruction(.store); // Restore lval as the result value
-
-            try end_jump.setTargetHere();
-            try executable.addInstruction(.pop_reference);
-        }
-        // AssignmentExpression : LeftHandSideExpression ||= AssignmentExpression
-        else if (self.operator == .@"||=") {
-            // 1. Let lref be ? Evaluation of LeftHandSideExpression.
-            try self.lhs_expression.generateBytecode(executable, ctx);
-            try executable.addInstruction(.push_reference);
-
-            // 2. Let lval be ? GetValue(lref).
-            if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-            // 3. Let lbool be ToBoolean(lval).
-            try executable.addInstruction(.jump_conditional);
-            const consequent_jump = try executable.addJumpIndex();
-            const alternate_jump = try executable.addJumpIndex();
-
-            try alternate_jump.setTargetHere();
-
-            // TODO: 5. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and IsIdentifierRef
-            //          of LeftHandSideExpression is true, then
-            if (false) {
-                // a. Let rval be ? NamedEvaluation of AssignmentExpression with argument lref.[[ReferencedName]].
-            }
-            // 6. Else,
-            else {
-                // a. Let rref be ? Evaluation of AssignmentExpression.
-                try self.rhs_expression.generateBytecode(executable, ctx);
-
-                // b. Let rval be ? GetValue(rref).
-                if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            }
-
-            // 7. Perform ? PutValue(lref, rval).
-            // 8. Return rval.
-            try executable.addInstruction(.put_value);
-
-            // 4. If lbool is true, return lval.
-            try consequent_jump.setTargetHere();
-
-            try executable.addInstruction(.pop_reference);
-        }
-        // AssignmentExpression : LeftHandSideExpression ??= AssignmentExpression
-        else if (self.operator == .@"??=") {
-            // 1. Let lref be ? Evaluation of LeftHandSideExpression.
-            try self.lhs_expression.generateBytecode(executable, ctx);
-            try executable.addInstruction(.push_reference);
-
-            // 2. Let lval be ? GetValue(lref).
-            if (self.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-            try executable.addInstruction(.load);
-
-            // 3. If lval is neither undefined nor null, return lval.
-            try executable.addInstruction(.load);
-            try executable.addInstructionWithConstant(.load_constant, .undefined);
-            try executable.addInstruction(.is_loosely_equal);
-
-            try executable.addInstruction(.jump_conditional);
-            const consequent_jump = try executable.addJumpIndex();
-            const alternate_jump = try executable.addJumpIndex();
-
-            try consequent_jump.setTargetHere();
-            try executable.addInstruction(.store); // Drop lval from the stack
-
-            // TODO: 4. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and
-            //          IsIdentifierRef of LeftHandSideExpression is true, then
-            if (false) {
-                // a. Let rval be ? NamedEvaluation of AssignmentExpression with argument lref.[[ReferencedName]].
-            }
-            // 5. Else,
-            else {
-                // a. Let rref be ? Evaluation of AssignmentExpression.
-                try self.rhs_expression.generateBytecode(executable, ctx);
-
-                // b. Let rval be ? GetValue(rref).
-                if (self.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            }
-
-            // 6. Perform ? PutValue(lref, rval).
-            // 7. Return rval.
-            try executable.addInstruction(.put_value);
-
-            try executable.addInstruction(.jump);
-            const end_jump = try executable.addJumpIndex();
-
-            try alternate_jump.setTargetHere();
-            try executable.addInstruction(.store); // Restore lval as the result value
-
-            try end_jump.setTargetHere();
-            try executable.addInstruction(.pop_reference);
-        } else unreachable;
-    }
 };
 
 pub const SequenceExpression = struct {
-    const Self = @This();
-
     expressions: []const Expression,
-
-    /// 13.16.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-comma-operator-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // 1. Let lref be ? Evaluation of Expression.
-        // 2. Perform ? GetValue(lref).
-        // 3. Let rref be ? Evaluation of AssignmentExpression.
-        // 4. Return ? GetValue(rref).
-        for (self.expressions) |expression| {
-            try expression.generateBytecode(executable, ctx);
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-Expression
@@ -1995,16 +591,6 @@ pub const Expression = union(enum) {
             },
         };
     }
-
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        switch (self) {
-            inline else => |node| try node.generateBytecode(executable, ctx),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-Statement
@@ -2073,30 +659,6 @@ pub const Statement = union(enum) {
             .try_statement => |try_statement| return try_statement.varScopedDeclarations(allocator),
         }
     }
-
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        switch (self) {
-            // EmptyStatement : ;
-            .empty_statement => {
-                // 1. Return empty.
-            },
-
-            // DebuggerStatement : debugger ;
-            .debugger_statement => {
-                // 1.If an implementation-defined debugging facility is available and enabled, then
-                //     a. Perform an implementation-defined debugging action.
-                //     b. Return a new implementation-defined Completion Record.
-                // 2. Else,
-                //     a. Return empty.
-            },
-
-            inline else => |node| try node.generateBytecode(executable, ctx),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-Declaration
@@ -2113,106 +675,29 @@ pub const Declaration = union(enum) {
             .is_string_literal => false,
         };
     }
-
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        switch (self) {
-            inline else => |node| try node.generateBytecode(executable, ctx),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-HoistableDeclaration
 pub const HoistableDeclaration = union(enum) {
-    const Self = @This();
-
     function_declaration: FunctionDeclaration,
     generator_declaration: GeneratorDeclaration,
     async_function_declaration: AsyncFunctionDeclaration,
     async_generator_declaration: AsyncGeneratorDeclaration,
-
-    /// 14.1.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-statement-semantics-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // HoistableDeclaration :
-        //     GeneratorDeclaration
-        //     AsyncFunctionDeclaration
-        //     AsyncGeneratorDeclaration
-        // 1. Return empty.
-        // NOTE: Until the FooDeclarationInstantiation are fully implemented these also involve
-        //       bytecode generation.
-        // HoistableDeclaration : FunctionDeclaration
-        // 1. Return ? Evaluation of FunctionDeclaration.
-        switch (self) {
-            inline else => |node| try node.generateBytecode(executable, ctx),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-BreakableStatement
 pub const BreakableStatement = union(enum) {
-    const Self = @This();
-
     iteration_statement: IterationStatement,
-
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        switch (self) {
-            .iteration_statement => |iteration_statement| try iteration_statement.generateBytecode(executable, ctx),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-BlockStatement
 pub const BlockStatement = struct {
-    const Self = @This();
-
     block: Block,
-
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        try self.block.generateBytecode(executable, ctx);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-Block
 pub const Block = struct {
-    const Self = @This();
-
     statement_list: StatementList,
-
-    /// 14.2.2 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-block-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // Block : { }
-        if (self.statement_list.items.len == 0) {
-            // 1. Return empty.
-            return;
-        }
-
-        // Block : { StatementList }
-        // TODO: 1-4, 6
-        // 5. Let blockValue be Completion(Evaluation of StatementList).
-        // 7. Return ? blockValue.
-        try self.statement_list.generateBytecode(executable, ctx);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-StatementList
@@ -2250,20 +735,6 @@ pub const StatementList = struct {
             if (std.mem.eql(u8, raw_string_value, directive)) return true;
         }
         return false;
-    }
-
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // StatementList : StatementList StatementListItem
-        // 1. Let sl be ? Evaluation of StatementList.
-        // 2. Let s be Completion(Evaluation of StatementListItem).
-        // 3. Return ? UpdateEmpty(s, sl).
-        for (self.items) |item| {
-            try item.generateBytecode(executable, ctx);
-        }
     }
 };
 
@@ -2306,22 +777,10 @@ pub const StatementListItem = union(enum) {
             inline else => |node| node.analyze(query),
         };
     }
-
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        switch (self) {
-            inline else => |node| try node.generateBytecode(executable, ctx),
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-LexicalDeclaration
 pub const LexicalDeclaration = struct {
-    const Self = @This();
-
     pub const Type = enum {
         let,
         @"const",
@@ -2329,86 +788,22 @@ pub const LexicalDeclaration = struct {
 
     type: Type,
     binding_list: BindingList,
-
-    /// 14.3.1.2 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-let-and-const-declarations-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // LexicalDeclaration : LetOrConst BindingList ;
-        // 1. Perform ? Evaluation of BindingList.
-        try self.binding_list.generateBytecode(executable, ctx);
-
-        // 2. Return empty.
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-BindingList
 pub const BindingList = struct {
-    const Self = @This();
-
     items: []const LexicalBinding,
-
-    /// 14.3.1.2 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-let-and-const-declarations-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // BindingList : BindingList , LexicalBinding
-        // 1. Perform ? Evaluation of BindingList.
-        // 2. Return ? Evaluation of LexicalBinding.
-        for (self.items) |lexical_binding| {
-            try lexical_binding.generateBytecode(executable, ctx);
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-LexicalBinding
 pub const LexicalBinding = struct {
-    const Self = @This();
-
     binding_identifier: Identifier,
     initializer: ?Expression,
-
-    /// 14.3.1.2 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-let-and-const-declarations-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // TODO: Implement this properly, we just codegen a VariableDeclaration for now
-        const variable_declaration = VariableDeclaration{
-            .binding_identifier = self.binding_identifier,
-            .initializer = self.initializer,
-        };
-        try variable_declaration.generateBytecode(executable, ctx);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-VariableStatement
 pub const VariableStatement = struct {
-    const Self = @This();
-
     variable_declaration_list: VariableDeclarationList,
-
-    /// 14.3.2.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-variable-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // VariableStatement : var VariableDeclarationList ;
-        // 1. Perform ? Evaluation of VariableDeclarationList.
-        try self.variable_declaration_list.generateBytecode(executable, ctx);
-
-        // 2. Return empty.
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-VariableDeclarationList
@@ -2430,68 +825,12 @@ pub const VariableDeclarationList = struct {
         // 2. Return the list-concatenation of declarations1 and « VariableDeclaration ».
         return self.items;
     }
-
-    /// 14.3.2.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-variable-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // VariableDeclarationList : VariableDeclarationList , VariableDeclaration
-        // 1. Perform ? Evaluation of VariableDeclarationList.
-        // 2. Return ? Evaluation of VariableDeclaration.
-        for (self.items) |variable_declaration| {
-            try variable_declaration.generateBytecode(executable, ctx);
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-VariableDeclaration
 pub const VariableDeclaration = struct {
-    const Self = @This();
-
     binding_identifier: Identifier,
     initializer: ?Expression,
-
-    /// 14.3.2.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-variable-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // VariableDeclaration : BindingIdentifier
-        // 1. Return empty.
-        if (self.initializer == null) return;
-
-        // VariableDeclaration : BindingIdentifier Initializer
-        // 1. Let bindingId be StringValue of BindingIdentifier.
-        // 2. Let lhs be ? ResolveBinding(bindingId).
-        try executable.addInstruction(.load);
-        try executable.addInstructionWithIdentifier(.resolve_binding, self.binding_identifier);
-        const strict = ctx.contained_in_strict_mode_code;
-        try executable.addIndex(@intFromBool(strict));
-        try executable.addInstruction(.push_reference);
-
-        // TODO: 3. If IsAnonymousFunctionDefinition(Initializer) is true, then
-        // 4. Else,
-
-        // a. Let rhs be ? Evaluation of Initializer.
-        try self.initializer.?.generateBytecode(executable, ctx);
-
-        // b. Let value be ? GetValue(rhs).
-        // FIXME: This clobbers the result value and we don't have a good way of restoring it.
-        //        Should probably use the stack more and have explicit result store instructions.
-        if (self.initializer.?.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-        // 5. Perform ? PutValue(lhs, value).
-        try executable.addInstruction(.put_value);
-        try executable.addInstruction(.pop_reference);
-
-        // 6. Return empty.
-        try executable.addInstruction(.store);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-BindingElement
@@ -2557,21 +896,6 @@ pub const ExpressionStatement = struct {
     pub fn analyze(self: Self, query: AnalyzeQuery) bool {
         return self.expression.analyze(query);
     }
-
-    /// 14.5.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-expression-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // ExpressionStatement : Expression ;
-        // 1. Let exprRef be ? Evaluation of Expression.
-        try self.expression.generateBytecode(executable, ctx);
-
-        // 2. Return ? GetValue(exprRef).
-        if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-IfStatement
@@ -2603,83 +927,13 @@ pub const IfStatement = struct {
         // 1. Return the VarScopedDeclarations of Statement.
         return self.consequent_statement.varScopedDeclarations(allocator);
     }
-
-    /// 14.6.2 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-if-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // 1. Let exprRef be ? Evaluation of Expression.
-        try self.test_expression.generateBytecode(executable, ctx);
-
-        // 2. Let exprValue be ToBoolean(? GetValue(exprRef)).
-        if (self.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.jump_conditional);
-        const consequent_jump = try executable.addJumpIndex();
-        const alternate_jump = try executable.addJumpIndex();
-
-        // 3. If exprValue is true, then
-        try consequent_jump.setTargetHere();
-        try executable.addInstructionWithConstant(.store_constant, .undefined);
-
-        // a. Let stmtCompletion be Completion(Evaluation of the first Statement).
-        try self.consequent_statement.generateBytecode(executable, ctx);
-        try executable.addInstruction(.jump);
-        const end_jump = try executable.addJumpIndex();
-
-        // 4. Else,
-        try alternate_jump.setTargetHere();
-        try executable.addInstructionWithConstant(.store_constant, .undefined);
-
-        if (self.alternate_statement) |alternate_statement| {
-            // a. Let stmtCompletion be Completion(Evaluation of the second Statement).
-            try alternate_statement.generateBytecode(executable, ctx);
-        }
-
-        // 5. Return ? UpdateEmpty(stmtCompletion, undefined).
-        // NOTE: This is handled by the store_constant before the consequent/alternate statements.
-
-        try end_jump.setTargetHere();
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-IterationStatement
 pub const IterationStatement = union(enum) {
-    const Self = @This();
-
     do_while_statement: DoWhileStatement,
     while_statement: WhileStatement,
     for_statement: ForStatement,
-
-    /// 14.7.1.2 Runtime Semantics: LoopEvaluation
-    /// https://tc39.es/ecma262/#sec-runtime-semantics-loopevaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        switch (self) {
-            // IterationStatement : DoWhileStatement
-            .do_while_statement => |do_while_statement| {
-                // 1. Return ? DoWhileLoopEvaluation of DoWhileStatement with argument labelSet.
-                try do_while_statement.generateBytecode(executable, ctx);
-            },
-
-            // IterationStatement : WhileStatement
-            .while_statement => |while_statement| {
-                // 1. Return ? WhileLoopEvaluation of WhileStatement with argument labelSet.
-                try while_statement.generateBytecode(executable, ctx);
-            },
-
-            // IterationStatement : ForStatement
-            .for_statement => |for_statement| {
-                // 1. Return ? ForLoopEvaluation of ForStatement with argument labelSet.
-                try for_statement.generateBytecode(executable, ctx);
-            },
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-DoWhileStatement
@@ -2699,54 +953,6 @@ pub const DoWhileStatement = struct {
         // 1. Return the VarScopedDeclarations of Statement.
         return self.consequent_statement.varScopedDeclarations(allocator);
     }
-
-    /// 14.7.2.2 Runtime Semantics: DoWhileLoopEvaluation
-    /// https://tc39.es/ecma262/#sec-runtime-semantics-dowhileloopevaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // DoWhileStatement : do Statement while ( Expression ) ;
-        // 1. Let V be undefined.
-        try executable.addInstructionWithConstant(.load_constant, .undefined);
-
-        // 2. Repeat,
-        const start_index = executable.instructions.items.len;
-
-        // a. Let stmtResult be Completion(Evaluation of Statement).
-        // b. If LoopContinues(stmtResult, labelSet) is false, return ? UpdateEmpty(stmtResult, V).
-        try executable.addInstruction(.store);
-        try self.consequent_statement.generateBytecode(executable, ctx);
-        const continue_index = executable.instructions.items.len;
-        try executable.addInstruction(.load);
-
-        // c. If stmtResult.[[Value]] is not empty, set V to stmtResult.[[Value]].
-        // NOTE: This is done by the store/load sequence around each consequent execution.
-
-        // d. Let exprRef be ? Evaluation of Expression.
-        try self.test_expression.generateBytecode(executable, ctx);
-
-        // e. Let exprValue be ? GetValue(exprRef).
-        if (self.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-        // f. If ToBoolean(exprValue) is false, return V.
-        try executable.addInstruction(.jump_conditional);
-        const consequent_jump = try executable.addJumpIndex();
-        const end_jump = try executable.addJumpIndex();
-
-        try consequent_jump.setTarget(start_index);
-
-        try end_jump.setTargetHere();
-        try executable.addInstruction(.store);
-
-        while (ctx.continue_jumps.popOrNull()) |jump_index| {
-            try jump_index.setTarget(continue_index);
-        }
-        while (ctx.break_jumps.popOrNull()) |jump_index| {
-            try jump_index.setTargetHere();
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-WhileStatement
@@ -2765,57 +971,6 @@ pub const WhileStatement = struct {
         // WhileStatement : while ( Expression ) Statement
         // 1. Return the VarScopedDeclarations of Statement.
         return self.consequent_statement.varScopedDeclarations(allocator);
-    }
-
-    /// 14.7.3.2 Runtime Semantics: WhileLoopEvaluation
-    /// https://tc39.es/ecma262/#sec-runtime-semantics-whileloopevaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // WhileStatement : while ( Expression ) Statement
-        // 1. Let V be undefined.
-        try executable.addInstructionWithConstant(.load_constant, .undefined);
-
-        // 2. Repeat,
-        const start_index = executable.instructions.items.len;
-
-        // a. Let exprRef be ? Evaluation of Expression.
-        try self.test_expression.generateBytecode(executable, ctx);
-
-        // b. Let exprValue be ? GetValue(exprRef).
-        if (self.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-        // c. If ToBoolean(exprValue) is false, return V.
-        try executable.addInstruction(.jump_conditional);
-        const consequent_jump = try executable.addJumpIndex();
-        const end_jump = try executable.addJumpIndex();
-
-        // d. Let stmtResult be Completion(Evaluation of Statement).
-        // e. If LoopContinues(stmtResult, labelSet) is false, return ? UpdateEmpty(stmtResult, V).
-        try consequent_jump.setTargetHere();
-        try executable.addInstruction(.store);
-        try self.consequent_statement.generateBytecode(executable, ctx);
-        const continue_index = executable.instructions.items.len;
-        try executable.addInstruction(.load);
-
-        try executable.addInstruction(.jump);
-        const start_jump = try executable.addJumpIndex();
-        try start_jump.setTarget(start_index);
-
-        // f. If stmtResult.[[Value]] is not empty, set V to stmtResult.[[Value]].
-        // NOTE: This is done by the store/load sequence around each consequent execution.
-
-        try end_jump.setTargetHere();
-        try executable.addInstruction(.store);
-
-        while (ctx.continue_jumps.popOrNull()) |jump_index| {
-            try jump_index.setTarget(continue_index);
-        }
-        while (ctx.break_jumps.popOrNull()) |jump_index| {
-            try jump_index.setTargetHere();
-        }
     }
 };
 
@@ -2857,235 +1012,26 @@ pub const ForStatement = struct {
         // 1. Return the VarScopedDeclarations of Statement.
         return self.consequent_statement.varScopedDeclarations(allocator);
     }
-
-    /// 14.7.4.2 Runtime Semantics: ForLoopEvaluation
-    /// https://tc39.es/ecma262/#sec-runtime-semantics-forloopevaluation
-    /// 14.7.4.3 ForBodyEvaluation ( test, increment, stmt, perIterationBindings, labelSet )
-    /// https://tc39.es/ecma262/#sec-forbodyevaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        if (self.initializer) |initializer| switch (initializer) {
-            // ForStatement : for ( Expression[opt] ; Expression[opt] ; Expression[opt] ) Statement
-            .expression => |expression| {
-                // 1. If the first Expression is present, then
-                //     a. Let exprRef be ? Evaluation of the first Expression.
-                //     b. Perform ? GetValue(exprRef).
-                try expression.generateBytecode(executable, ctx);
-                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-                // 2. If the second Expression is present, let test be the second Expression;
-                //    otherwise, let test be empty.
-                // 3. If the third Expression is present, let increment be the third Expression;
-                //    otherwise, let increment be empty.
-                // 4. Return ? ForBodyEvaluation(test, increment, Statement, « », labelSet).
-            },
-
-            // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
-            .variable_statement => |variable_statement| {
-                // 1. Perform ? Evaluation of VariableDeclarationList.
-                try variable_statement.generateBytecode(executable, ctx);
-
-                // 2. If the first Expression is present, let test be the first Expression;
-                //    otherwise, let test be empty.
-                // 3. If the second Expression is present, let increment be the second Expression;
-                //    otherwise, let increment be empty.
-                // 4. Return ? ForBodyEvaluation(test, increment, Statement, « », labelSet).
-            },
-
-            // ForStatement : for ( LexicalDeclaration Expression[opt] ; Expression[opt] ) Statement
-            .lexical_declaration => |lexical_declaration| {
-                // TODO: Implement this fully once lexical declarations behave different than var decls
-                try lexical_declaration.generateBytecode(executable, ctx);
-            },
-        };
-
-        // 1. Let V be undefined.
-        try executable.addInstructionWithConstant(.load_constant, .undefined);
-
-        // TODO: 2. Perform ? CreatePerIterationEnvironment(perIterationBindings).
-
-        // 3. Repeat,
-        const start_index = executable.instructions.items.len;
-
-        var end_jump: Executable.JumpIndex = undefined;
-
-        // a. If test is not empty, then
-        if (self.test_expression) |test_expression| {
-            // i. Let testRef be ? Evaluation of test.
-            try test_expression.generateBytecode(executable, ctx);
-
-            // ii. Let testValue be ? GetValue(testRef).
-            if (test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-            // iii. If ToBoolean(testValue) is false, return V.
-            try executable.addInstruction(.jump_conditional);
-            const consequent_jump = try executable.addJumpIndex();
-            end_jump = try executable.addJumpIndex();
-            try consequent_jump.setTargetHere();
-        }
-
-        // b. Let result be Completion(Evaluation of stmt).
-        // c. If LoopContinues(result, labelSet) is false, return ? UpdateEmpty(result, V).
-        try executable.addInstruction(.store);
-        try self.consequent_statement.generateBytecode(executable, ctx);
-        const continue_index = executable.instructions.items.len;
-        try executable.addInstruction(.load);
-
-        // d. If result.[[Value]] is not empty, set V to result.[[Value]].
-        // NOTE: This is done by the store/load sequence around each consequent execution.
-
-        // TODO: e. Perform ? CreatePerIterationEnvironment(perIterationBindings).
-
-        // f. If increment is not empty, then
-        if (self.increment_expression) |increment_expression| {
-            // i. Let incRef be ? Evaluation of increment.
-            try increment_expression.generateBytecode(executable, ctx);
-
-            // ii. Perform ? GetValue(incRef).
-            if (increment_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        }
-
-        try executable.addInstruction(.jump);
-        const start_jump = try executable.addJumpIndex();
-        try start_jump.setTarget(start_index);
-
-        if (self.test_expression != null) try end_jump.setTargetHere();
-        try executable.addInstruction(.store);
-
-        while (ctx.continue_jumps.popOrNull()) |jump_index| {
-            try jump_index.setTarget(continue_index);
-        }
-        while (ctx.break_jumps.popOrNull()) |jump_index| {
-            try jump_index.setTargetHere();
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ContinueStatement
 pub const ContinueStatement = struct {
-    const Self = @This();
-
     label: ?Identifier,
-
-    /// 14.8.2 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-continue-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // TODO: ContinueStatement : continue LabelIdentifier ;
-        if (self.label) |label| {
-            _ = label;
-            // 1. Let label be the StringValue of LabelIdentifier.
-            // 2. Return Completion Record { [[Type]]: continue, [[Value]]: empty, [[Target]]: label }.
-            try executable.addInstruction(.jump);
-            const jump_index = try executable.addJumpIndex();
-            try ctx.continue_jumps.append(jump_index);
-        }
-        // ContinueStatement : continue ;
-        else {
-            // 1. Return Completion Record { [[Type]]: continue, [[Value]]: empty, [[Target]]: empty }.
-            try executable.addInstruction(.jump);
-            const jump_index = try executable.addJumpIndex();
-            try ctx.continue_jumps.append(jump_index);
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-BreakStatement
 pub const BreakStatement = struct {
-    const Self = @This();
-
     label: ?Identifier,
-
-    /// 14.9.2 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-break-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // TODO: BreakStatement : break LabelIdentifier ;
-        if (self.label) |label| {
-            _ = label;
-            // 1. Let label be the StringValue of LabelIdentifier.
-            // 2. Return Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: label }.
-            try executable.addInstruction(.jump);
-            const jump_index = try executable.addJumpIndex();
-            try ctx.break_jumps.append(jump_index);
-        }
-        // BreakStatement : break ;
-        else {
-            // 1. Return Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: empty }.
-            try executable.addInstruction(.jump);
-            const jump_index = try executable.addJumpIndex();
-            try ctx.break_jumps.append(jump_index);
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ReturnStatement
 pub const ReturnStatement = struct {
-    const Self = @This();
-
     expression: ?Expression,
-
-    /// 14.10.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-return-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // ReturnStatement : return Expression ;
-        if (self.expression) |expression| {
-            // 1. Let exprRef be ? Evaluation of Expression.
-            try expression.generateBytecode(executable, ctx);
-
-            // 2. Let exprValue be ? GetValue(exprRef).
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-            // TODO: 3. If GetGeneratorKind() is async, set exprValue to ? Await(exprValue).
-
-            // 4. Return Completion Record { [[Type]]: return, [[Value]]: exprValue, [[Target]]: empty }.
-            try executable.addInstruction(.@"return");
-        }
-        // ReturnStatement : return ;
-        else {
-            // 1. Return Completion Record { [[Type]]: return, [[Value]]: undefined, [[Target]]: empty }.
-            try executable.addInstructionWithConstant(.store_constant, .undefined);
-            try executable.addInstruction(.@"return");
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ThrowStatement
 pub const ThrowStatement = struct {
-    const Self = @This();
-
     expression: Expression,
-
-    /// 14.14.1 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-throw-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // ThrowStatement : throw Expression ;
-        // 1. Let exprRef be ? Evaluation of Expression.
-        try self.expression.generateBytecode(executable, ctx);
-
-        // 2. Let exprValue be ? GetValue(exprRef).
-        if (self.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-        // 3. Return ThrowCompletion(exprValue).
-        try executable.addInstruction(.throw);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-TryStatement
@@ -3127,98 +1073,6 @@ pub const TryStatement = struct {
             try var_declarations.appendSlice(try finally_block.statement_list.varScopedDeclarations(allocator));
         }
         return var_declarations.toOwnedSlice();
-    }
-
-    /// 14.15.3 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-try-statement-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // TryStatement : try Block Catch
-        if (self.finally_block == null) {
-            try executable.addInstruction(.push_exception_jump_target);
-            const exception_jump_to_catch = try executable.addJumpIndex();
-
-            // 1. Let B be Completion(Evaluation of Block).
-            try executable.addInstructionWithConstant(.store_constant, .undefined);
-            try self.try_block.generateBytecode(executable, ctx);
-            try executable.addInstruction(.pop_exception_jump_target);
-            try executable.addInstruction(.jump);
-            const end_jump = try executable.addJumpIndex();
-
-            // 2. If B.[[Type]] is throw, let C be Completion(CatchClauseEvaluation of Catch with
-            //    argument B.[[Value]]).
-            // TODO: Create a new lexical environment
-            try exception_jump_to_catch.setTargetHere();
-            try executable.addInstruction(.pop_exception_jump_target);
-            if (self.catch_parameter) |catch_parameter| try executable.addInstructionWithIdentifier(
-                .create_catch_binding,
-                catch_parameter,
-            );
-            try executable.addInstructionWithConstant(.store_constant, .undefined);
-            try self.catch_block.?.generateBytecode(executable, ctx);
-
-            // 3. Else, let C be B.
-            // 4. Return ? UpdateEmpty(C, undefined).
-            try end_jump.setTargetHere();
-        }
-        // TryStatement : try Block Finally
-        else if (self.catch_block == null) {
-            try executable.addInstruction(.push_exception_jump_target);
-            const exception_jump_to_finally = try executable.addJumpIndex();
-
-            // 1. Let B be Completion(Evaluation of Block).
-            try executable.addInstructionWithConstant(.store_constant, .undefined);
-            try self.try_block.generateBytecode(executable, ctx);
-
-            // 2. Let F be Completion(Evaluation of Finally).
-            try exception_jump_to_finally.setTargetHere();
-            try executable.addInstruction(.pop_exception_jump_target);
-            try executable.addInstructionWithConstant(.store_constant, .undefined);
-            try self.finally_block.?.generateBytecode(executable, ctx);
-            try executable.addInstruction(.rethrow_exception_if_any);
-
-            // 3. If F.[[Type]] is normal, set F to B.
-            // 4. Return ? UpdateEmpty(F, undefined).
-        }
-        // TryStatement : try Block Catch Finally
-        else {
-            try executable.addInstruction(.push_exception_jump_target);
-            const exception_jump_to_catch = try executable.addJumpIndex();
-
-            // 1. Let B be Completion(Evaluation of Block).
-            try executable.addInstructionWithConstant(.store_constant, .undefined);
-            try self.try_block.generateBytecode(executable, ctx);
-            try executable.addInstruction(.jump);
-            const finally_jump = try executable.addJumpIndex();
-
-            // 2. If B.[[Type]] is throw, let C be Completion(CatchClauseEvaluation of Catch with argument B.[[Value]]).
-            // 3. Else, let C be B.
-            // TODO: Create a new lexical environment
-            try exception_jump_to_catch.setTargetHere();
-            try executable.addInstruction(.pop_exception_jump_target);
-            try executable.addInstruction(.push_exception_jump_target);
-            const exception_jump_to_finally = try executable.addJumpIndex();
-            if (self.catch_parameter) |catch_parameter| try executable.addInstructionWithIdentifier(
-                .create_catch_binding,
-                catch_parameter,
-            );
-            try executable.addInstructionWithConstant(.store_constant, .undefined);
-            try self.catch_block.?.generateBytecode(executable, ctx);
-
-            // 4. Let F be Completion(Evaluation of Finally).
-            try finally_jump.setTargetHere();
-            try exception_jump_to_finally.setTargetHere();
-            try executable.addInstruction(.pop_exception_jump_target);
-            try executable.addInstructionWithConstant(.store_constant, .undefined);
-            try self.finally_block.?.generateBytecode(executable, ctx);
-            try executable.addInstruction(.rethrow_exception_if_any);
-
-            // 5. If F.[[Type]] is normal, set F to C.
-            // 6. Return ? UpdateEmpty(F, undefined).
-        }
     }
 };
 
@@ -3331,7 +1185,7 @@ pub const FunctionDeclaration = struct {
 
     /// 15.2.4 Runtime Semantics: InstantiateOrdinaryFunctionObject
     /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateordinaryfunctionobject
-    fn instantiateOrdinaryFunctionObject(
+    pub fn instantiateOrdinaryFunctionObject(
         self: Self,
         agent: *Agent,
         env: Environment,
@@ -3366,71 +1220,14 @@ pub const FunctionDeclaration = struct {
         // 6. Return F.
         return function;
     }
-
-    /// 15.2.6 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        _: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // FIXME: This should be called in the various FooDeclarationInstantiation AOs instead.
-        //        It's enough to get ECMAScript Functions Objects up and running however :^)
-        const realm = ctx.agent.currentRealm();
-        const env = Environment{ .global_environment = realm.global_env };
-        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
-
-        // Copy `self` so that we can assign the function body's strictness, which is needed for
-        // the deferred bytecode generation.
-        // FIXME: This should ideally happen at parse time.
-        var function_declaration = self;
-        function_declaration.function_body.strict = strict;
-
-        const function = try function_declaration.instantiateOrdinaryFunctionObject(
-            ctx.agent,
-            env,
-            null,
-        );
-        realm.global_env.object_record.binding_object.set(
-            PropertyKey.from(self.identifier),
-            Value.from(function),
-            .ignore,
-        ) catch |err| try noexcept(err);
-
-        // 1. Return empty.
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-FunctionExpression
 pub const FunctionExpression = struct {
-    const Self = @This();
-
     identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
     source_text: []const u8,
-
-    /// 15.2.6 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
-
-        // Copy `self` so that we can assign the function body's strictness, which is needed for
-        // the deferred bytecode generation.
-        // FIXME: This should ideally happen at parse time.
-        var function_expression = self;
-        function_expression.function_body.strict = strict;
-
-        // 1. Return InstantiateOrdinaryFunctionExpression of FunctionExpression.
-        try executable.addInstructionWithFunctionOrClass(
-            .instantiate_ordinary_function_expression,
-            .{ .function_expression = function_expression },
-        );
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-FunctionBody
@@ -3469,53 +1266,17 @@ pub const FunctionBody = struct {
         //    true; otherwise, return false.
         return self.statement_list.containsDirective("use strict");
     }
-
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        const tmp = temporaryChange(&ctx.contained_in_strict_mode_code, self.strict.?);
-        defer tmp.restore();
-        try self.statement_list.generateBytecode(executable, ctx);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ArrowFunction
 pub const ArrowFunction = struct {
-    const Self = @This();
-
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
     source_text: []const u8,
-
-    /// 15.3.5 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
-
-        // Copy `self` so that we can assign the function body's strictness, which is needed for
-        // the deferred bytecode generation.
-        // FIXME: This should ideally happen at parse time.
-        var arrow_function = self;
-        arrow_function.function_body.strict = strict;
-
-        // 1. Return InstantiateArrowFunctionExpression of ArrowFunction.
-        try executable.addInstructionWithFunctionOrClass(
-            .instantiate_arrow_function_expression,
-            .{ .arrow_function = arrow_function },
-        );
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-MethodDefinition
 pub const MethodDefinition = struct {
-    const Self = @This();
-
     pub const Type = enum {
         method,
         get,
@@ -3536,40 +1297,6 @@ pub const MethodDefinition = struct {
 
     property_name: PropertyName,
     method: Method,
-
-    /// 15.4.5 Runtime Semantics: MethodDefinitionEvaluation
-    /// https://tc39.es/ecma262/#sec-runtime-semantics-methoddefinitionevaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        const strict = ctx.contained_in_strict_mode_code or switch (self.method) {
-            inline else => |expression| expression.function_body.functionBodyContainsUseStrict(),
-        };
-
-        // Copy `method` so that we can assign the function body's strictness,
-        // which is needed for the deferred bytecode generation.
-        // FIXME: This should ideally happen at parse time.
-        var method = self.method;
-        switch (method) {
-            inline else => |*expression| expression.function_body.strict = strict,
-        }
-
-        try self.property_name.generateBytecode(executable, ctx);
-        try executable.addInstruction(.load);
-
-        try executable.addInstructionWithFunctionOrClass(
-            .object_define_method,
-            switch (method) {
-                .method, .get, .set => |function_expression| .{ .function_expression = function_expression },
-                .generator => |generator_expression| .{ .generator_expression = generator_expression },
-                .@"async" => |async_function_expression| .{ .async_function_expression = async_function_expression },
-                .async_generator => |async_generator_expression| .{ .async_generator_expression = async_generator_expression },
-            },
-        );
-        try executable.addIndex(@intFromEnum(std.meta.activeTag(self.method)));
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-GeneratorDeclaration
@@ -3583,7 +1310,7 @@ pub const GeneratorDeclaration = struct {
 
     /// 15.5.3 Runtime Semantics: InstantiateGeneratorFunctionObject
     /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiategeneratorfunctionobject
-    fn instantiateGeneratorFunctionObject(
+    pub fn instantiateGeneratorFunctionObject(
         self: Self,
         agent: *Agent,
         env: Environment,
@@ -3632,66 +1359,14 @@ pub const GeneratorDeclaration = struct {
         // 7. Return F.
         return function;
     }
-
-    pub fn generateBytecode(
-        self: Self,
-        _: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // FIXME: This should be called in the various FooDeclarationInstantiation AOs instead.
-        const realm = ctx.agent.currentRealm();
-        const env = Environment{ .global_environment = realm.global_env };
-        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
-
-        // Copy `self` so that we can assign the function body's strictness, which is needed for
-        // the deferred bytecode generation.
-        // FIXME: This should ideally happen at parse time.
-        var generator_declaration = self;
-        generator_declaration.function_body.strict = strict;
-
-        const function = try generator_declaration.instantiateGeneratorFunctionObject(
-            ctx.agent,
-            env,
-            null,
-        );
-        realm.global_env.object_record.binding_object.set(
-            PropertyKey.from(self.identifier),
-            Value.from(function),
-            .ignore,
-        ) catch |err| try noexcept(err);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-GeneratorExpression
 pub const GeneratorExpression = struct {
-    const Self = @This();
-
     identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
     source_text: []const u8,
-
-    /// 15.5.5 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-generator-function-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
-
-        // Copy `self` so that we can assign the function body's strictness, which is needed for
-        // the deferred bytecode generation.
-        // FIXME: This should ideally happen at parse time.
-        var generator_expression = self;
-        generator_expression.function_body.strict = strict;
-
-        // 1. Return InstantiateGeneratorFunctionExpression of GeneratorExpression.
-        try executable.addInstructionWithFunctionOrClass(
-            .instantiate_generator_function_expression,
-            .{ .generator_expression = generator_expression },
-        );
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-AsyncGeneratorDeclaration
@@ -3705,7 +1380,7 @@ pub const AsyncGeneratorDeclaration = struct {
 
     /// 15.6.3 Runtime Semantics: InstantiateAsyncGeneratorFunctionObject
     /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncgeneratorfunctionobject
-    fn instantiateAsyncGeneratorFunctionObject(
+    pub fn instantiateAsyncGeneratorFunctionObject(
         self: Self,
         agent: *Agent,
         env: Environment,
@@ -3798,118 +1473,28 @@ pub const AsyncGeneratorDeclaration = struct {
             return function;
         }
     }
-
-    pub fn generateBytecode(
-        self: Self,
-        _: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // FIXME: This should be called in the various FooDeclarationInstantiation AOs instead.
-        const realm = ctx.agent.currentRealm();
-        const env = Environment{ .global_environment = realm.global_env };
-        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
-
-        // Copy `self` so that we can assign the function body's strictness, which is needed for
-        // the deferred bytecode generation.
-        // FIXME: This should ideally happen at parse time.
-        var async_generator_declaration = self;
-        async_generator_declaration.function_body.strict = strict;
-
-        const function = try async_generator_declaration.instantiateAsyncGeneratorFunctionObject(
-            ctx.agent,
-            env,
-            null,
-        );
-        realm.global_env.object_record.binding_object.set(
-            PropertyKey.from(self.identifier.?),
-            Value.from(function),
-            .ignore,
-        ) catch |err| try noexcept(err);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-AsyncGeneratorExpression
 pub const AsyncGeneratorExpression = struct {
-    const Self = @This();
-
     identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
     source_text: []const u8,
-
-    /// 15.6.5 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-asyncgenerator-definitions-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
-
-        // Copy `self` so that we can assign the function body's strictness, which is needed for
-        // the deferred bytecode generation.
-        // FIXME: This should ideally happen at parse time.
-        var async_generator_expression = self;
-        async_generator_expression.function_body.strict = strict;
-
-        // 1. Return InstantiateAsyncGeneratorFunctionExpression of AsyncGeneratorExpression.
-        try executable.addInstructionWithFunctionOrClass(
-            .instantiate_async_generator_function_expression,
-            .{ .async_generator_expression = async_generator_expression },
-        );
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ClassDeclaration
 pub const ClassDeclaration = struct {
-    const Self = @This();
-
     identifier: ?Identifier,
     class_tail: ClassTail,
     source_text: []const u8,
-
-    /// 15.7.16 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-class-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        _: *BytecodeContext,
-    ) Executable.Error!void {
-        // ClassDeclaration : class BindingIdentifier ClassTail
-        // 1. Perform ? BindingClassDeclarationEvaluation of this ClassDeclaration.
-        try executable.addInstruction(.load);
-        try executable.addInstructionWithFunctionOrClass(
-            .binding_class_declaration_evaluation,
-            .{ .class_declaration = self },
-        );
-
-        // 2. Return empty.
-        try executable.addInstruction(.store);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ClassExpression
 pub const ClassExpression = struct {
-    const Self = @This();
-
     identifier: ?Identifier,
     class_tail: ClassTail,
     source_text: []const u8,
-
-    /// 15.7.16 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-class-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        _: *BytecodeContext,
-    ) Executable.Error!void {
-        // ClassExpression : class ClassTail
-        // ClassExpression : class BindingIdentifier ClassTail
-        try executable.addInstructionWithFunctionOrClass(
-            .class_definition_evaluation,
-            .{ .class_expression = self },
-        );
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ClassTail
@@ -4084,7 +1669,7 @@ pub const AsyncFunctionDeclaration = struct {
 
     /// 15.8.2 Runtime Semantics: InstantiateAsyncFunctionObject
     /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncfunctionobject
-    fn instantiateAsyncFunctionObject(
+    pub fn instantiateAsyncFunctionObject(
         self: Self,
         agent: *Agent,
         env: Environment,
@@ -4144,97 +1729,21 @@ pub const AsyncFunctionDeclaration = struct {
             return function;
         }
     }
-
-    pub fn generateBytecode(
-        self: Self,
-        _: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // FIXME: This should be called in the various FooDeclarationInstantiation AOs instead.
-        const realm = ctx.agent.currentRealm();
-        const env = Environment{ .global_environment = realm.global_env };
-        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
-
-        // Copy `self` so that we can assign the function body's strictness, which is needed for
-        // the deferred bytecode generation.
-        // FIXME: This should ideally happen at parse time.
-        var async_function_declaration = self;
-        async_function_declaration.function_body.strict = strict;
-
-        const function = try async_function_declaration.instantiateAsyncFunctionObject(
-            ctx.agent,
-            env,
-            null,
-        );
-        realm.global_env.object_record.binding_object.set(
-            PropertyKey.from(self.identifier.?),
-            Value.from(function),
-            .ignore,
-        ) catch |err| try noexcept(err);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-AsyncFunctionExpression
 pub const AsyncFunctionExpression = struct {
-    const Self = @This();
-
     identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
     source_text: []const u8,
-
-    /// 15.8.5 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-async-function-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
-
-        // Copy `self` so that we can assign the function body's strictness, which is needed for
-        // the deferred bytecode generation.
-        // FIXME: This should ideally happen at parse time.
-        var async_function_expression = self;
-        async_function_expression.function_body.strict = strict;
-
-        // 1. Return InstantiateAsyncFunctionExpression of AsyncFunctionExpression.
-        try executable.addInstructionWithFunctionOrClass(
-            .instantiate_async_function_expression,
-            .{ .async_function_expression = async_function_expression },
-        );
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-AsyncArrowFunction
 pub const AsyncArrowFunction = struct {
-    const Self = @This();
-
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
     source_text: []const u8,
-
-    /// 15.9.5 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-async-arrow-function-definitions-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        const strict = ctx.contained_in_strict_mode_code or self.function_body.functionBodyContainsUseStrict();
-
-        // Copy `self` so that we can assign the function body's strictness, which is needed for
-        // the deferred bytecode generation.
-        // FIXME: This should ideally happen at parse time.
-        var async_arrow_function = self;
-        async_arrow_function.function_body.strict = strict;
-
-        // 1. Return InstantiateAsyncArrowFunctionExpression of AsyncArrowFunction.
-        try executable.addInstructionWithFunctionOrClass(
-            .instantiate_async_arrow_function_expression,
-            .{ .async_arrow_function = async_arrow_function },
-        );
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-Script
@@ -4250,31 +1759,11 @@ pub const Script = struct {
         //    Strict Directive, return true; otherwise, return false.
         return self.statement_list.containsDirective("use strict");
     }
-
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        ctx.contained_in_strict_mode_code = self.isStrict();
-        try self.statement_list.generateBytecode(executable, ctx);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-Module
 pub const Module = struct {
-    const Self = @This();
-
     module_item_list: ModuleItemList,
-
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        ctx.contained_in_strict_mode_code = true;
-        try self.module_item_list.generateBytecode(executable, ctx);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ModuleItemList
@@ -4313,42 +1802,13 @@ pub const ModuleItemList = struct {
         };
         return variable_declarations.toOwnedSlice();
     }
-
-    /// 16.2.1.11 Runtime Semantics: Evaluation
-    /// https://tc39.es/ecma262/#sec-module-semantics-runtime-semantics-evaluation
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        // ModuleItemList : ModuleItemList ModuleItem
-        // 1. Let sl be ? Evaluation of ModuleItemList.
-        // 2. Let s be Completion(Evaluation of ModuleItem).
-        // 3. Return ? UpdateEmpty(s, sl).
-        for (self.items) |item| {
-            try item.generateBytecode(executable, ctx);
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ModuleItem
 pub const ModuleItem = union(enum) {
-    const Self = @This();
-
     import_declaration: ImportDeclaration,
     export_declaration: ExportDeclaration,
     statement_list_item: StatementListItem,
-
-    pub fn generateBytecode(
-        self: Self,
-        executable: *Executable,
-        ctx: *BytecodeContext,
-    ) Executable.Error!void {
-        switch (self) {
-            .statement_list_item => |statement_list_item| try statement_list_item.generateBytecode(executable, ctx),
-            else => {},
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-ModuleExportName

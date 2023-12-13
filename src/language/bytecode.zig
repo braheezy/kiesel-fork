@@ -1,13 +1,13 @@
 const std = @import("std");
 
 const ast = @import("ast.zig");
+const codegen = @import("bytecode/codegen.zig");
 const execution = @import("../execution.zig");
+const instructions = @import("bytecode/instructions.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
 const Completion = types.Completion;
-
-const instructions = @import("bytecode/instructions.zig");
 
 pub const Executable = @import("bytecode/Executable.zig");
 pub const Instruction = instructions.Instruction;
@@ -33,13 +33,19 @@ pub fn generateAndRunBytecode(agent: *Agent, ast_node: anytype) Agent.Error!Comp
     var break_jumps = std.ArrayList(Executable.JumpIndex).init(agent.gc_allocator);
     defer break_jumps.deinit();
 
-    var ctx = ast.BytecodeContext{
+    var ctx = codegen.Context{
         .agent = agent,
         .contained_in_strict_mode_code = false,
         .continue_jumps = continue_jumps,
         .break_jumps = break_jumps,
     };
-    ast_node.generateBytecode(&executable, &ctx) catch |err| switch (err) {
+
+    const ast_node_name = comptime blk: {
+        var it = std.mem.splitBackwardsScalar(u8, @typeName(@TypeOf(ast_node)), '.');
+        break :blk it.first();
+    };
+    const codegenFn = @field(codegen, "codegen" ++ ast_node_name);
+    codegenFn(ast_node, &executable, &ctx) catch |err| switch (err) {
         error.IndexOutOfRange => return agent.throwException(
             .internal_error,
             "Bytecode generation failed",
