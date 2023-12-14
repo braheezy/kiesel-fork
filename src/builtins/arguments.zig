@@ -221,10 +221,12 @@ pub fn createUnmappedArgumentsObject(
     // 4. Perform ! DefinePropertyOrThrow(obj, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(len), [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    object.createDataPropertyOrThrow(
-        PropertyKey.from("length"),
-        Value.from(@as(u53, @intCast(len))),
-    ) catch |err| try noexcept(err);
+    object.definePropertyOrThrow(PropertyKey.from("length"), .{
+        .value = Value.from(@as(u53, @intCast(len))),
+        .writable = true,
+        .enumerable = false,
+        .configurable = true,
+    }) catch |err| try noexcept(err);
 
     // 5. Let index be 0.
     // 6. Repeat, while index < len,
