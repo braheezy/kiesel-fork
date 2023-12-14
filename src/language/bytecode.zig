@@ -21,12 +21,8 @@ test {
     _ = Vm;
 }
 
-pub fn generateAndRunBytecode(agent: *Agent, ast_node: anytype) Agent.Error!Completion {
-    var vm = try Vm.init(agent);
-    defer vm.deinit();
-
+pub fn generateBytecode(agent: *Agent, ast_node: anytype) Agent.Error!Executable {
     var executable = Executable.init(agent.gc_allocator);
-    defer executable.deinit();
 
     var continue_jumps = std.ArrayList(Executable.JumpIndex).init(agent.gc_allocator);
     defer continue_jumps.deinit();
@@ -71,5 +67,14 @@ pub fn generateAndRunBytecode(agent: *Agent, ast_node: anytype) Agent.Error!Comp
         stdout.writeAll("\n") catch {};
     }
 
+    return executable;
+}
+
+pub fn generateAndRunBytecode(agent: *Agent, ast_node: anytype) Agent.Error!Completion {
+    const executable = try generateBytecode(agent, ast_node);
+    defer executable.deinit();
+
+    var vm = try Vm.init(agent);
+    defer vm.deinit();
     return vm.run(executable);
 }

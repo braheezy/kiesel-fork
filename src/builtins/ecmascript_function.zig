@@ -20,6 +20,7 @@ const ClassConstructorFields = builtins.ClassConstructorFields;
 const ClassFieldDefinition = types.ClassFieldDefinition;
 const Completion = types.Completion;
 const Environment = execution.Environment;
+const Executable = bytecode.Executable;
 const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
@@ -31,11 +32,13 @@ const ScriptOrModule = execution.ScriptOrModule;
 const String = types.String;
 const Symbol = types.Symbol;
 const Value = types.Value;
+const Vm = bytecode.Vm;
 const arrayCreate = builtins.arrayCreate;
 const containsSlice = utils.containsSlice;
 const createMappedArgumentsObject = builtins.createMappedArgumentsObject;
 const createUnmappedArgumentsObject = builtins.createUnmappedArgumentsObject;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
+const generateBytecode = bytecode.generateBytecode;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const newFunctionEnvironment = execution.newFunctionEnvironment;
 const newPromiseCapability = builtins.newPromiseCapability;
@@ -109,6 +112,8 @@ pub const ECMAScriptFunction = MakeObject(.{
 
         /// [[IsClassConstructor]]
         is_class_constructor: bool,
+
+        cached_executable: ?Executable = null,
     },
     .tag = .ecmascript_function,
 });
@@ -310,13 +315,21 @@ fn evaluateFunctionBody(
     arguments_list: ArgumentsList,
 ) Agent.Error!Completion {
     // FunctionBody : FunctionStatementList
-    const function_body = function.fields.ecmascript_code;
-
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
     try functionDeclarationInstantiation(agent, function, arguments_list);
 
     // 2. Return ? Evaluation of FunctionStatementList.
-    return generateAndRunBytecode(agent, function_body);
+    const executable = function.fields.cached_executable orelse blk: {
+        const executable = try generateBytecode(
+            agent,
+            function.fields.ecmascript_code,
+        );
+        function.fields.cached_executable = executable;
+        break :blk executable;
+    };
+    var vm = try Vm.init(agent);
+    defer vm.deinit();
+    return vm.run(executable);
 }
 
 /// 15.5.2 Runtime Semantics: EvaluateGeneratorBody
