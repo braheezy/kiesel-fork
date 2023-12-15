@@ -52,6 +52,7 @@ pub const ParseContext = struct {
 const AcceptContext = struct {
     precedence: Precedence = 0,
     associativity: ?Associativity = null,
+    forbidden: []const Tokenizer.TokenType = &.{},
 };
 
 const Precedence = u5;
@@ -1130,11 +1131,17 @@ pub fn acceptExpression(self: *Self, ctx: AcceptContext) AcceptError!ast.Express
         const new_ctx = AcceptContext{
             .precedence = getPrecedence(next_token.type),
             .associativity = getAssociativity(next_token.type),
+            .forbidden = ctx.forbidden,
         };
         if (new_ctx.precedence < ctx.precedence) break;
         if (new_ctx.precedence == ctx.precedence and
             ctx.associativity != null and
             ctx.associativity.? == .left_to_right) break;
+        if (std.mem.indexOfScalar(
+            Tokenizer.TokenType,
+            new_ctx.forbidden,
+            next_token.type,
+        ) != null) break;
         expression = self.acceptSecondaryExpression(expression, new_ctx) catch break;
     }
     return expression;
