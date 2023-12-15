@@ -185,12 +185,14 @@ pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: Object) Agent
     return iterator_record;
 }
 
+pub const IteratorKind = enum { sync, @"async" };
+
 /// 7.4.3 GetIterator ( obj, kind )
 /// https://tc39.es/ecma262/#sec-getiterator
 pub fn getIterator(
     agent: *Agent,
     object: Value,
-    kind: enum { sync, @"async" },
+    kind: IteratorKind,
 ) Agent.Error!Iterator {
     // 1. If kind is async, then
     const method = if (kind == .@"async") blk: {

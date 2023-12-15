@@ -6,6 +6,7 @@ pub const ClassStaticBlockDefinition = @import("spec/ClassStaticBlockDefinition.
 pub const Completion = @import("spec/Completion.zig");
 pub const DataBlock = data_block.DataBlock;
 pub const Iterator = iterator.Iterator;
+pub const IteratorKind = iterator.IteratorKind;
 pub const PropertyDescriptor = @import("spec/PropertyDescriptor.zig");
 pub const Reference = @import("spec/Reference.zig");
 pub const copyDataBlockBytes = data_block.copyDataBlockBytes;
