@@ -1455,14 +1455,14 @@ pub fn acceptForStatement(self: *Self) AcceptError!ast.ForStatement {
 
     _ = try self.core.accept(RuleSet.is(.@"for"));
     _ = try self.core.accept(RuleSet.is(.@"("));
-    var initializer: ?ast.ForStatement.Initializer = null;
-    if (self.acceptVariableStatement(true)) |variable_statement|
-        initializer = .{ .variable_statement = variable_statement }
+    const initializer: ?ast.ForStatement.Initializer = if (self.acceptVariableStatement(true)) |variable_statement|
+        .{ .variable_statement = variable_statement }
     else |_| if (self.acceptLexicalDeclaration(true)) |lexical_declaration|
-        initializer = .{ .lexical_declaration = lexical_declaration }
-    else |_| if (self.acceptExpression(.{})) |expression|
-        initializer = .{ .expression = expression }
-    else |_| {}
+        .{ .lexical_declaration = lexical_declaration }
+    else |_| if (self.acceptExpression(.{ .forbidden = &.{.in} })) |expression|
+        .{ .expression = expression }
+    else |_|
+        null;
     _ = try self.core.accept(RuleSet.is(.@";"));
     const test_expression = self.acceptExpression(.{}) catch null;
     _ = try self.core.accept(RuleSet.is(.@";"));
