@@ -218,14 +218,14 @@ pub const LocaleConstructor = struct {
             );
         }
 
-        // 2. Let relevantExtensionKeys be %Locale%.[[RelevantExtensionKeys]].
+        // 2. Let relevantExtensionKeys be %Intl.Locale%.[[RelevantExtensionKeys]].
         // 3. Let internalSlotsList be « [[InitializedLocale]], [[Locale]], [[Calendar]],
         //    [[Collation]], [[HourCycle]], [[NumberingSystem]] ».
         // TODO: 4. If relevantExtensionKeys contains "kf", then
         //     a. Append [[CaseFirst]] to internalSlotsList.
         // TODO: 5. If relevantExtensionKeys contains "kn", then
         //     a. Append [[Numeric]] to internalSlotsList.
-        // 6. Let locale be ? OrdinaryCreateFromConstructor(NewTarget, "%Locale.prototype%",
+        // 6. Let locale be ? OrdinaryCreateFromConstructor(NewTarget, "%Intl.Locale.prototype%",
         //    internalSlotsList).
         const locale = try ordinaryCreateFromConstructor(
             Locale,
@@ -429,7 +429,7 @@ pub const LocalePrototype = struct {
         var maximal = locale.fields.locale.clone();
         _ = locale_expander.maximize(&maximal);
 
-        // 4. Return ! Construct(%Locale%, maximal).
+        // 4. Return ! Construct(%Intl.Locale%, maximal).
         const object = ordinaryCreateFromConstructor(
             Locale,
             agent,
@@ -458,7 +458,7 @@ pub const LocalePrototype = struct {
         var minimal = locale.fields.locale.clone();
         _ = locale_expander.minimize(&minimal);
 
-        // 4. Return ! Construct(%Locale%, minimal).
+        // 4. Return ! Construct(%Intl.Locale%, minimal).
         const object = ordinaryCreateFromConstructor(
             Locale,
             agent,
