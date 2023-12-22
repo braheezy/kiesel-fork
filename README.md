@@ -32,10 +32,9 @@ is still at an early stage and the engine's usefulness thus limited. While there
 are various things that already work well, there's an equal amount of things
 that don't :^)
 
-Issues are disabled for the time being, if you want to report a bug (not missing
-feature, many features are missing!), please get in touch with me directly. Pull
-requests containing small fixes are welcome, if you want to work on features
-please also get in touch beforehand.
+Please refrain from filing issues for missing features - many are missing!
+Similarly, please get in touch before starting to work on something larger than
+a bug fix.
 
 Further reading:
 
