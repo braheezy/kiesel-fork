@@ -15,8 +15,8 @@
             .hash = "12203905cfc8550c114ef2b761edda2ea627d39298a08b951148c8be07dc49e7a388",
         },
         .libregexp = .{
-            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/a963e658269e6d2141ae2eaf2e9e8f0b3f28f577.tar.gz",
-            .hash = "12201eb6a8cb050059471e1823d8cf22d4402725eab2039b2a433973bf2ba14c4450",
+            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/e99e5bc145c133ed2e36f63321d4ef780afeb6dc.tar.gz",
+            .hash = "12203189e7e7790d90dd6beb66f2496894fd56bd64a8d39df6316b5d24c1d420c99d",
         },
         .parser_toolkit = .{
             .url = "https://github.com/MasterQ32/parser-toolkit/archive/5416f1ff721cbfbf91397e557fc400e004804361.tar.gz",

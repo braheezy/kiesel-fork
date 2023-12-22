@@ -72,12 +72,11 @@ comptime {
         if (std.mem.startsWith(u8, declaration.name, "LRE_FLAG_")) {
             const flag = @field(libregexp, declaration.name);
             std.debug.assert(@TypeOf(flag) == c_int);
-            std.debug.assert(flag <= (1 << 7));
+            std.debug.assert(flag <= (1 << 8));
         }
     }
 }
-const FLAG_HAS_INDICES: c_int = 1 << 8;
-const FLAG_UNICODE_SETS: c_int = 1 << 9;
+const FLAG_HAS_INDICES: c_int = 1 << 9;
 
 pub const ParsedFlags = packed struct(u8) {
     const Self = @This();
@@ -172,7 +171,6 @@ pub fn regExpInitialize(
         return agent.throwException(.syntax_error, "Invalid RegExp flags '{s}'", .{f.utf8});
     };
 
-    // NOTE: "v" is not supported by libregexp, but we parse and store it regardless
     var re_flags: c_int = 0;
     if (parsed_flags.d) re_flags |= FLAG_HAS_INDICES;
     if (parsed_flags.g) re_flags |= libregexp.LRE_FLAG_GLOBAL;
@@ -180,7 +178,7 @@ pub fn regExpInitialize(
     if (parsed_flags.m) re_flags |= libregexp.LRE_FLAG_MULTILINE;
     if (parsed_flags.s) re_flags |= libregexp.LRE_FLAG_DOTALL;
     if (parsed_flags.u) re_flags |= libregexp.LRE_FLAG_UNICODE;
-    if (parsed_flags.v) re_flags |= FLAG_UNICODE_SETS;
+    if (parsed_flags.v) re_flags |= libregexp.LRE_FLAG_UNICODE_SETS;
     if (parsed_flags.y) re_flags |= libregexp.LRE_FLAG_STICKY;
 
     // TODO: 11. If u is true or v is true, then
@@ -1267,7 +1265,7 @@ pub const RegExpPrototype = struct {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0076 (LATIN SMALL LETTER V).
         // 3. Return ? RegExpHasFlag(R, cu).
-        return regExpHasFlag(agent, this_value, FLAG_UNICODE_SETS);
+        return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_UNICODE_SETS);
     }
 };
 
