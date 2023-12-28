@@ -8,6 +8,7 @@ const utils = @import("../../utils.zig");
 const Agent = execution.Agent;
 const Environment = execution.Environment;
 const Executable = @import("Executable.zig");
+const IteratorKind = types.IteratorKind;
 const PropertyKey = types.PropertyKey;
 const Value = types.Value;
 const noexcept = utils.noexcept;
@@ -1733,6 +1734,12 @@ pub fn codegenIterationStatement(
             // 1. Return ? ForLoopEvaluation of ForStatement with argument labelSet.
             try codegenForStatement(for_statement, executable, ctx);
         },
+
+        // IterationStatement : ForInOfStatement
+        .for_in_of_statement => |for_in_of_statement| {
+            // 1. Return ? ForInOfLoopEvaluation of ForInOfStatement with argument labelSet.
+            try codegenForInOfStatement(for_in_of_statement, executable, ctx);
+        },
     }
 }
 
@@ -1937,6 +1944,296 @@ pub fn codegenForStatement(
     }
     while (ctx.break_jumps.popOrNull()) |jump_index| {
         try jump_index.setTargetHere();
+    }
+}
+
+const ForInOfIterationKind = enum { enumerate, iterate, async_iterate };
+const ForInOfLhsKind = enum { assignment, var_binding, lexical_binding };
+
+/// 14.7.5.5 Runtime Semantics: ForInOfLoopEvaluation
+/// https://tc39.es/ecma262/#sec-runtime-semantics-forinofloopevaluation
+pub fn codegenForInOfStatement(
+    node: ast.ForInOfStatement,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    const iteration_kind: ForInOfIterationKind = switch (node.type) {
+        .in => .enumerate,
+        .of => .iterate,
+        .async_of => .async_iterate,
+    };
+    const lhs_kind: ForInOfLhsKind = switch (node.initializer) {
+        .expression => .assignment,
+        .for_binding => .var_binding,
+        .for_declaration => .lexical_binding,
+    };
+    const break_jump = try forInOfHeadEvaluation(
+        executable,
+        ctx,
+        node.expression,
+        iteration_kind,
+    );
+    try forInOfBodyEvaluation(
+        executable,
+        ctx,
+        node.initializer,
+        node.consequent_statement.*,
+        break_jump,
+        iteration_kind,
+        lhs_kind,
+        null,
+    );
+}
+
+/// 14.7.5.6 ForIn/OfHeadEvaluation ( uninitializedBoundNames, expr, iterationKind )
+/// https://tc39.es/ecma262/#sec-runtime-semantics-forinofheadevaluation
+fn forInOfHeadEvaluation(
+    executable: *Executable,
+    ctx: *Context,
+    expression: ast.Expression,
+    iteration_kind: ForInOfIterationKind,
+) Executable.Error!?Executable.JumpIndex {
+    // TODO: 1-2.
+
+    // 3. Let exprRef be Completion(Evaluation of expr).
+    try codegenExpression(expression, executable, ctx);
+
+    // TODO: 4. Set the running execution context's LexicalEnvironment to oldEnv.
+
+    // 5. Let exprValue be ? GetValue(? exprRef).
+    if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+    // 6. If iterationKind is enumerate, then
+    if (iteration_kind == .enumerate) {
+        try executable.addInstruction(.load); // Store RHS object for the iterator
+
+        // a. If exprValue is either undefined or null, then
+        //     i. Return Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: empty }.
+        try executable.addInstruction(.load);
+        try executable.addInstructionWithConstant(.load_constant, .undefined);
+        try executable.addInstruction(.is_loosely_equal);
+        try executable.addInstruction(.jump_conditional);
+        const consequent_jump = try executable.addJumpIndex();
+        const alternate_jump = try executable.addJumpIndex();
+        try alternate_jump.setTargetHere();
+
+        // b. Let obj be ! ToObject(exprValue).
+        // c. Let iterator be EnumerateObjectProperties(obj).
+        // d. Let nextMethod be ! GetV(iterator, "next").
+        // e. Return the Iterator Record { [[Iterator]]: iterator, [[NextMethod]]: nextMethod, [[Done]]: false }.
+        try executable.addInstruction(.store);
+        try executable.addInstruction(.create_object_property_iterator);
+
+        return consequent_jump;
+    }
+    // 7. Else,
+    else {
+        // a. Assert: iterationKind is either iterate or async-iterate.
+        std.debug.assert(iteration_kind == .iterate or iteration_kind == .async_iterate);
+
+        // b. If iterationKind is async-iterate, let iteratorKind be async.
+        // c. Else, let iteratorKind be sync.
+        const iterator_kind: IteratorKind = if (iteration_kind == .async_iterate)
+            .@"async"
+        else
+            .sync;
+
+        // d. Return ? GetIterator(exprValue, iteratorKind).
+        try executable.addInstruction(.get_iterator);
+        try executable.addIndex(@intFromEnum(iterator_kind));
+
+        return null;
+    }
+}
+
+/// 14.7.5.7 ForIn/OfBodyEvaluation ( lhs, stmt, iteratorRecord, iterationKind, lhsKind, labelSet [ , iteratorKind ] )
+/// https://tc39.es/ecma262/#sec-runtime-semantics-forin-div-ofbodyevaluation-lhs-stmt-iterator-lhskind-labelset
+fn forInOfBodyEvaluation(
+    executable: *Executable,
+    ctx: *Context,
+    lhs: ast.ForInOfStatement.Initializer,
+    statement: ast.Statement,
+    break_jump: ?Executable.JumpIndex,
+    iteration_kind: ForInOfIterationKind,
+    lhs_kind: ForInOfLhsKind,
+    // TODO: label_set
+    maybe_iterator_kind: ?IteratorKind,
+) Executable.Error!void {
+    _ = iteration_kind;
+    // NOTE: The iterator is created by forInOfHeadEvaluation() and needs to be pushed onto the
+    //       stack. If this isn't applicable a break completion jump to the end of this function
+    //       is emitted.
+    try executable.addInstruction(.push_iterator);
+
+    // 1. If iteratorKind is not present, set iteratorKind to sync.
+    const iterator_kind = maybe_iterator_kind orelse .sync;
+    _ = iterator_kind;
+
+    // TODO: 2. Let oldEnv be the running execution context's LexicalEnvironment.
+
+    // 3. Let V be undefined.
+    try executable.addInstructionWithConstant(.load_constant, .undefined);
+
+    // TODO: 4. Let destructuring be IsDestructuring of lhs.
+    const destructuring = false;
+
+    // 5. If destructuring is true and lhsKind is assignment, then
+    if (destructuring and lhs_kind == .assignment) {
+        // TODO: a-b.
+    }
+
+    // 6. Repeat,
+    const start_index = executable.instructions.items.len;
+
+    // a. Let nextResult be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
+    try executable.addInstruction(.load_iterator_next_args);
+    try executable.addInstruction(.evaluate_call);
+    try executable.addIndex(0); // No arguments
+    try executable.addIndex(0); // Strictness doesn't matter here
+
+    // TODO: b. If iteratorKind is async, set nextResult to ? Await(nextResult).
+    // TODO: c. If nextResult is not an Object, throw a TypeError exception.
+
+    // Store result object on the stack for later `.value` access
+    try executable.addInstruction(.load);
+
+    // d. Let done be ? IteratorComplete(nextResult).
+    try executable.addInstruction(.load);
+    try executable.addInstructionWithIdentifier(
+        .evaluate_property_access_with_identifier_key,
+        "done",
+    );
+    try executable.addIndex(0); // Strictness doesn't matter here
+    try executable.addInstruction(.get_value);
+
+    // e. If done is true, return V.
+    try executable.addInstruction(.jump_conditional);
+    const consequent_jump = try executable.addJumpIndex();
+    const alternate_jump = try executable.addJumpIndex();
+
+    try alternate_jump.setTargetHere();
+
+    // f. Let nextValue be ? IteratorValue(nextResult).
+    try executable.addInstructionWithIdentifier(
+        .evaluate_property_access_with_identifier_key,
+        "value",
+    );
+    try executable.addIndex(0); // Strictness doesn't matter here
+    try executable.addInstruction(.get_value);
+
+    // g. If lhsKind is either assignment or var-binding, then
+    if (lhs_kind == .assignment or lhs_kind == .var_binding) {
+        // i. If destructuring is true, then
+        if (destructuring) {
+            // 1. If lhsKind is assignment, then
+            if (lhs_kind == .assignment) {
+                // TODO: a. Let status be Completion(DestructuringAssignmentEvaluation of
+                //          assignmentPattern with argument nextValue).
+            }
+            // 2. Else,
+            else {
+                // a. Assert: lhsKind is var-binding.
+                std.debug.assert(lhs_kind == .var_binding);
+
+                // b. Assert: lhs is a ForBinding.
+                std.debug.assert(lhs == .for_binding);
+
+                // TODO: c. Let status be Completion(BindingInitialization of lhs with arguments
+                //          nextValue and undefined).
+            }
+        }
+        // ii. Else,
+        else {
+            // 1. Let lhsRef be Completion(Evaluation of lhs). (It may be evaluated repeatedly.)
+            switch (lhs) {
+                .expression => |expression| try codegenExpression(expression, executable, ctx),
+                .for_binding => |identifier| try codegenIdentifierReference(identifier, executable, ctx),
+                .for_declaration => unreachable,
+            }
+
+            // TODO: 2. If lhsRef is an abrupt completion, then
+            //     a. Let status be lhsRef.
+            // 3. Else,
+            //     a. Let status be Completion(PutValue(lhsRef.[[Value]], nextValue)).
+            try executable.addInstruction(.push_reference);
+            try executable.addInstruction(.put_value);
+            try executable.addInstruction(.pop_reference);
+        }
+    }
+    // h. Else,
+    else {
+        // i. Assert: lhsKind is lexical-binding.
+        std.debug.assert(lhs_kind == .lexical_binding);
+
+        // ii. Assert: lhs is a ForDeclaration.
+        std.debug.assert(lhs == .for_declaration);
+
+        // TODO: iii-v.
+
+        // vi. If destructuring is true, then
+        if (destructuring) {
+            // TODO: 1. Let status be Completion(ForDeclarationBindingInitialization of lhs with
+            //          arguments nextValue and iterationEnv).
+        }
+        // vii. Else,
+        else {
+            // 1. Assert: lhs binds a single name.
+            // 2. Let lhsName be the sole element of BoundNames of lhs.
+            const lhs_name = lhs.for_declaration.binding_list.items[0].binding_identifier;
+
+            // TODO: 3. Let lhsRef be ! ResolveBinding(lhsName).
+            // TODO: 4. Let status be Completion(InitializeReferencedBinding(lhsRef, nextValue)).
+            try codegenIdentifierReference(lhs_name, executable, ctx);
+            try executable.addInstruction(.push_reference);
+            try executable.addInstruction(.put_value);
+            try executable.addInstruction(.pop_reference);
+        }
+    }
+
+    // TODO: i. If status is an abrupt completion, then
+
+    // j. Let result be Completion(Evaluation of stmt).
+    try executable.addInstruction(.store);
+    try codegenStatement(statement, executable, ctx);
+    const continue_index = executable.instructions.items.len;
+    try executable.addInstruction(.load);
+
+    // TODO: k. Set the running execution context's LexicalEnvironment to oldEnv.
+    // TODO: l. If LoopContinues(result, labelSet) is false, then
+
+    // m. If result.[[Value]] is not empty, set V to result.[[Value]].
+    // NOTE: This is done by the store/load sequence around each consequent execution.
+
+    try executable.addInstruction(.jump);
+    try executable.addIndex(start_index);
+
+    try consequent_jump.setTargetHere();
+
+    try executable.addInstruction(.store); // Pop last iterator result object
+
+    try executable.addInstruction(.store);
+
+    while (ctx.continue_jumps.popOrNull()) |jump_index| {
+        try jump_index.setTarget(continue_index);
+    }
+    while (ctx.break_jumps.popOrNull()) |jump_index| {
+        try jump_index.setTargetHere();
+    }
+
+    // TODO: We should probably also clean this up if something throws beforehand...
+    try executable.addInstruction(.pop_iterator);
+
+    if (break_jump) |jump_index| {
+        try executable.addInstruction(.jump);
+        const skip_break_jump = try executable.addJumpIndex();
+
+        // If this is for a for-in loop and the RHS is nullish we jump here and clean up the result
+        // value that was created for the jump_conditional instruction.
+        try jump_index.setTargetHere();
+        try executable.addInstruction(.store); // Pop RHS object
+        try executable.addInstructionWithConstant(.store_constant, .undefined);
+
+        try skip_break_jump.setTargetHere();
     }
 }
 

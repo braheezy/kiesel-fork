@@ -650,9 +650,7 @@ pub const Statement = union(enum) {
             .variable_statement => |variable_statement| return variable_statement.variable_declaration_list.varScopedDeclarations(allocator),
             .if_statement => |if_statement| return if_statement.varScopedDeclarations(allocator),
             .breakable_statement => |breakable_statement| switch (breakable_statement.iteration_statement) {
-                .do_while_statement => |do_while_statement| return do_while_statement.varScopedDeclarations(allocator),
-                .while_statement => |while_statement| return while_statement.varScopedDeclarations(allocator),
-                .for_statement => |for_statement| return for_statement.varScopedDeclarations(allocator),
+                inline else => |node| return node.varScopedDeclarations(allocator),
             },
             .try_statement => |try_statement| return try_statement.varScopedDeclarations(allocator),
         }
@@ -932,6 +930,7 @@ pub const IterationStatement = union(enum) {
     do_while_statement: DoWhileStatement,
     while_statement: WhileStatement,
     for_statement: ForStatement,
+    for_in_of_statement: ForInOfStatement,
 };
 
 /// https://tc39.es/ecma262/#prod-DoWhileStatement
@@ -1009,6 +1008,60 @@ pub const ForStatement = struct {
         // ForStatement : for ( LexicalDeclaration Expression[opt] ; Expression[opt] ) Statement
         // 1. Return the VarScopedDeclarations of Statement.
         return self.consequent_statement.varScopedDeclarations(allocator);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ForInOfStatement
+pub const ForInOfStatement = struct {
+    const Self = @This();
+
+    pub const Type = enum {
+        in,
+        of,
+        async_of,
+    };
+
+    pub const Initializer = union(enum) {
+        expression: Expression,
+        for_binding: Identifier,
+        for_declaration: LexicalDeclaration,
+    };
+
+    type: Type,
+    initializer: Initializer,
+    expression: Expression,
+    consequent_statement: *Statement,
+
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VariableDeclaration {
+        // ForInOfStatement :
+        //     for ( LeftHandSideExpression in Expression ) Statement
+        //     for ( ForDeclaration in Expression ) Statement
+        //     for ( LeftHandSideExpression of AssignmentExpression ) Statement
+        //     for ( ForDeclaration of AssignmentExpression ) Statement
+        //     for await ( LeftHandSideExpression of AssignmentExpression ) Statement
+        //     for await ( ForDeclaration of AssignmentExpression ) Statement
+        if (self.initializer != .for_binding) {
+            // 1. Return the VarDeclaredNames of Statement.
+            return self.consequent_statement.varScopedDeclarations(allocator);
+        }
+        // ForInOfStatement :
+        //     for ( var ForBinding in Expression ) Statement
+        //     for ( var ForBinding of AssignmentExpression ) Statement
+        //     for await ( var ForBinding of AssignmentExpression ) Statement
+        else {
+            // 1. Let declarations1 be « ForBinding ».
+            // 2. Let declarations2 be VarScopedDeclarations of Statement.
+            // 3. Return the list-concatenation of declarations1 and declarations2.
+            var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
+            try variable_declarations.append(.{ .binding_identifier = self.initializer.for_binding, .initializer = null });
+            try variable_declarations.appendSlice(try self.consequent_statement.varScopedDeclarations(allocator));
+            return variable_declarations.toOwnedSlice();
+        }
     }
 };
 

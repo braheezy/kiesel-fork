@@ -444,6 +444,7 @@ pub fn printIterationStatement(node: ast.IterationStatement, writer: anytype, in
         .do_while_statement => |x| try printDoWhileStatement(x, writer, indentation),
         .while_statement => |x| try printWhileStatement(x, writer, indentation),
         .for_statement => |x| try printForStatement(x, writer, indentation),
+        .for_in_of_statement => |x| try printForInOfStatement(x, writer, indentation),
     }
 }
 
@@ -483,6 +484,21 @@ pub fn printForStatement(node: ast.ForStatement, writer: anytype, indentation: u
     }
     try print("consequent:", writer, indentation + 1);
     try printStatement(node.consequent_statement.*, writer, indentation + 2);
+}
+
+pub fn printForInOfStatement(node: ast.ForInOfStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("ForInOfStatement", writer, indentation);
+    switch (node.initializer) {
+        .expression => |expression| try printExpression(expression, writer, indentation + 1),
+        .for_binding => |identifier| {
+            try print("var", writer, indentation + 1);
+            try print(identifier, writer, indentation + 1);
+        },
+        .for_declaration => |lexical_declaration| try printLexicalDeclaration(lexical_declaration, writer, indentation + 1),
+    }
+    try print(@tagName(node.type), writer, indentation + 1);
+    try printExpression(node.expression, writer, indentation + 1);
+    try printStatement(node.consequent_statement.*, writer, indentation + 1);
 }
 
 pub fn printContinueStatement(node: ast.ContinueStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {

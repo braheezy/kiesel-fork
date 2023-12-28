@@ -25,6 +25,7 @@ const Executable = @import("Executable.zig");
 const ImportedModuleReferrer = language.ImportedModuleReferrer;
 const Instruction = instructions_.Instruction;
 const Iterator = types.Iterator;
+const IteratorKind = types.IteratorKind;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
@@ -33,6 +34,7 @@ const String = types.String;
 const Value = types.Value;
 const arrayCreate = builtins.arrayCreate;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const createForInIterator = builtins.createForInIterator;
 const defineMethodProperty = builtins.defineMethodProperty;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const getArrayLength = @import("../../builtins/array.zig").getArrayLength;
@@ -58,20 +60,24 @@ const Self = @This();
 agent: *Agent,
 ip: usize,
 stack: std.ArrayList(Value),
+iterator_stack: std.ArrayList(Iterator),
 reference_stack: std.ArrayList(?Reference),
 exception_jump_target_stack: std.ArrayList(usize),
 result: ?Value = null,
 exception: ?Value = null,
+iterator: ?Iterator = null,
 reference: ?Reference = null,
 
 pub fn init(agent: *Agent) Allocator.Error!Self {
     const stack = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 32);
+    const iterator_stack = std.ArrayList(Iterator).init(agent.gc_allocator);
     const reference_stack = std.ArrayList(?Reference).init(agent.gc_allocator);
     const exception_jump_target_stack = std.ArrayList(usize).init(agent.gc_allocator);
     return .{
         .agent = agent,
         .ip = 0,
         .stack = stack,
+        .iterator_stack = iterator_stack,
         .reference_stack = reference_stack,
         .exception_jump_target_stack = exception_jump_target_stack,
     };
@@ -79,6 +85,7 @@ pub fn init(agent: *Agent) Allocator.Error!Self {
 
 pub fn deinit(self: Self) void {
     self.stack.deinit();
+    self.iterator_stack.deinit();
     self.reference_stack.deinit();
     self.exception_jump_target_stack.deinit();
 }
@@ -1995,6 +2002,21 @@ pub fn executeInstruction(
                 ) catch unreachable;
             }
         },
+        .create_object_property_iterator => {
+            const value = self.result.?;
+
+            // b. Let obj be ! ToObject(exprValue).
+            const object = value.toObject(self.agent) catch |err| try noexcept(err);
+
+            // c. Let iterator be EnumerateObjectProperties(obj).
+            const iterator = try createForInIterator(self.agent, object);
+
+            // d. Let nextMethod be ! GetV(iterator, "next").
+            const next_method = iterator.get(PropertyKey.from("next")) catch |err| try noexcept(err);
+
+            // e. Return the Iterator Record { [[Iterator]]: iterator, [[NextMethod]]: nextMethod, [[Done]]: false }.
+            self.iterator = .{ .iterator = iterator, .next_method = next_method, .done = false };
+        },
         .decrement => {
             const value = self.result.?;
             self.result = switch (value) {
@@ -2063,7 +2085,7 @@ pub fn executeInstruction(
             }
         },
         .evaluate_call => {
-            const maybe_reference = self.reference_stack.getLast();
+            const maybe_reference = self.reference_stack.getLastOrNull() orelse null;
             const argument_count = self.fetchIndex(executable);
             const strict = self.fetchIndex(executable) == 1;
             var arguments = try std.ArrayList(Value).initCapacity(
@@ -2262,6 +2284,10 @@ pub fn executeInstruction(
 
             // 12. Return result.
             self.result = Value.from(result);
+        },
+        .get_iterator => {
+            const iterator_kind: IteratorKind = @enumFromInt((self.fetchIndex(executable)));
+            self.iterator = try getIterator(self.agent, self.result.?, iterator_kind);
         },
         .get_new_target => {
             self.result = if (self.agent.getNewTarget()) |new_target|
@@ -2472,6 +2498,11 @@ pub fn executeInstruction(
             const value = self.fetchConstant(executable);
             try self.stack.append(value);
         },
+        .load_iterator_next_args => {
+            const iterator = self.iterator_stack.getLast();
+            try self.stack.append(iterator.next_method);
+            try self.stack.append(Value.from(iterator.iterator));
+        },
         .load_this_value_for_evaluate_call => {
             const maybe_reference = self.reference_stack.getLast();
             const this_value = evaluateCallGetThisValue(maybe_reference);
@@ -2571,11 +2602,13 @@ pub fn executeInstruction(
             self.result = Value.from(object);
         },
         .pop_exception_jump_target => _ = self.exception_jump_target_stack.pop(),
+        .pop_iterator => _ = self.iterator_stack.pop(),
         .pop_reference => _ = self.reference_stack.pop(),
         .push_exception_jump_target => {
             const jump_target = self.fetchIndex(executable);
             try self.exception_jump_target_stack.append(jump_target);
         },
+        .push_iterator => try self.iterator_stack.append(self.iterator.?),
         .push_reference => try self.reference_stack.append(self.reference),
         .put_value => {
             const lref = self.reference_stack.getLast().?;

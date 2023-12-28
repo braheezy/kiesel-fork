@@ -1416,6 +1416,8 @@ pub fn acceptIterationStatement(self: *Self) AcceptError!ast.IterationStatement 
         return .{ .while_statement = while_statement }
     else |_| if (self.acceptForStatement()) |for_statement|
         return .{ .for_statement = for_statement }
+    else |_| if (self.acceptForInOfStatement()) |for_in_of_statement|
+        return .{ .for_in_of_statement = for_in_of_statement }
     else |_|
         return error.UnexpectedToken;
 }
@@ -1475,6 +1477,49 @@ pub fn acceptForStatement(self: *Self) AcceptError!ast.ForStatement {
         .initializer = initializer,
         .test_expression = test_expression,
         .increment_expression = increment_expression,
+        .consequent_statement = consequent_statement,
+    };
+}
+
+pub fn acceptForInOfStatement(self: *Self) AcceptError!ast.ForInOfStatement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"for"));
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    const initializer_location = (try self.core.peek() orelse return error.UnexpectedToken).location;
+    const initializer: ast.ForInOfStatement.Initializer = if (self.core.accept(RuleSet.is(.@"var"))) |_|
+        .{ .for_binding = try self.acceptBindingIdentifier() }
+    else |_| if (self.acceptLexicalDeclaration(true)) |lexical_declaration|
+        .{ .for_declaration = lexical_declaration }
+    else |_| if (self.acceptExpression(.{ .forbidden = &.{.in} })) |expression|
+        .{ .expression = expression }
+    else |_|
+        return error.UnexpectedToken;
+
+    // It is a Syntax Error if AssignmentTargetType of LeftHandSideExpression is not simple.
+    if (initializer == .expression and initializer.expression.assignmentTargetType() != .simple) {
+        try self.emitErrorAt(
+            initializer_location,
+            "Invalid for in/of loop initializer expression",
+            .{},
+        );
+        return error.UnexpectedToken;
+    }
+
+    const @"type": ast.ForInOfStatement.Type = if (self.core.accept(RuleSet.is(.in))) |_|
+        .in
+    else |_| if (self.acceptKeyword("of")) |_|
+        .of
+    else |_|
+        return error.UnexpectedToken;
+    const expression = try self.acceptExpression(.{});
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    const consequent_statement = try self.acceptStatement();
+    return .{
+        .type = @"type",
+        .initializer = initializer,
+        .expression = expression,
         .consequent_statement = consequent_statement,
     };
 }

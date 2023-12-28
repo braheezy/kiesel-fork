@@ -24,6 +24,8 @@ pub const Instruction = enum(u8) {
     class_definition_evaluation,
     /// Create a catch binding for the given name and populate it with the stored exception.
     create_catch_binding,
+    /// Create an object property iterator for for-in loops.
+    create_object_property_iterator,
     /// Decrement the numeric result value by one.
     decrement,
     /// Apply the delete operation to the evaluated expression and set it as the result value.
@@ -46,6 +48,8 @@ pub const Instruction = enum(u8) {
     evaluate_property_access_with_identifier_key,
     // Store evaluation of a super() call as the result value.
     evaluate_super_call,
+    /// Store GetIterator() as the result value.
+    get_iterator,
     /// Store GetNewTarget() as the result value.
     get_new_target,
     /// Store the import.meta object as the result value.
@@ -91,6 +95,8 @@ pub const Instruction = enum(u8) {
     load,
     /// Load a constant and add it to the stack.
     load_constant,
+    /// Load the next method and iterator object from the top-most iterator record.
+    load_iterator_next_args,
     /// Determine the this value for an upcoming evaluate_call instruction and add it to the stack.
     load_this_value_for_evaluate_call,
     /// Determine the this value for an upcoming make_super_property_reference instruction and add it to the stack.
@@ -109,10 +115,14 @@ pub const Instruction = enum(u8) {
     object_spread_value,
     /// Pop a jump target for uncaught exceptions
     pop_exception_jump_target,
+    /// Pop the last stored iterator.
+    pop_iterator,
     /// Pop the last stored reference.
     pop_reference,
     /// Push a jump target for uncaught exceptions
     push_exception_jump_target,
+    /// Push the last evaluated iterator, if any.
+    push_iterator,
     /// Push the last evaluated reference, if any.
     push_reference,
     /// Call PutValue() with the last reference on the reference stack and the result value.
@@ -160,6 +170,7 @@ pub const Instruction = enum(u8) {
             .evaluate_new,
             .evaluate_property_access_with_expression_key,
             .evaluate_super_call,
+            .get_iterator,
             .instantiate_arrow_function_expression,
             .instantiate_async_arrow_function_expression,
             .instantiate_async_function_expression,

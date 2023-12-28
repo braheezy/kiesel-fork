@@ -8,6 +8,7 @@ const types = @import("../../types.zig");
 
 const Instruction = instructions_.Instruction;
 const InstructionIterator = instructions_.InstructionIterator;
+const IteratorKind = types.IteratorKind;
 const Value = types.Value;
 const sameValue = types.sameValue;
 
@@ -188,6 +189,11 @@ pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
                     "{s} [{}] (strict: {})",
                     .{ identifier, identifier_index, strict },
                 );
+            },
+            .get_iterator => {
+                const iterator_kind_raw = iterator.instruction_args[0].?;
+                const iterator_kind: IteratorKind = @enumFromInt(iterator_kind_raw);
+                try writer.print("(kind: {s})", .{@tagName(iterator_kind)});
             },
             .array_set_length,
             .binding_class_declaration_evaluation,
