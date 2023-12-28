@@ -18,7 +18,7 @@ pub fn printParenthesizedExpression(node: ast.ParenthesizedExpression, writer: a
 
 pub fn printIdentifierReference(node: ast.IdentifierReference, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("IdentifierReference", writer, indentation);
-    try print(node.identifier, writer, indentation + 1);
+    try print(node, writer, indentation + 1);
 }
 
 pub fn printPrimaryExpression(node: ast.PrimaryExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {

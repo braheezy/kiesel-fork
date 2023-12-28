@@ -39,7 +39,7 @@ pub fn codegenIdentifierReference(
     // IdentifierReference : yield
     // IdentifierReference : await
     // 1. Return ? ResolveBinding(StringValue of Identifier).
-    try executable.addInstructionWithIdentifier(.resolve_binding, node.identifier);
+    try executable.addInstructionWithIdentifier(.resolve_binding, node);
     const strict = ctx.contained_in_strict_mode_code;
     try executable.addIndex(@intFromBool(strict));
 }
@@ -531,8 +531,7 @@ pub fn codegenPropertyDefinition(
         // PropertyDefinition : IdentifierReference
         .identifier_reference => |identifier_reference| {
             // 1. Let propName be StringValue of IdentifierReference.
-            const prop_name = identifier_reference.identifier;
-            try executable.addInstructionWithConstant(.load_constant, Value.from(prop_name));
+            try executable.addInstructionWithConstant(.load_constant, Value.from(identifier_reference));
 
             // 2. Let exprValue be ? Evaluation of IdentifierReference.
             try codegenIdentifierReference(identifier_reference, executable, ctx);

@@ -356,7 +356,7 @@ pub fn acceptIdentifierReference(self: *Self) AcceptError!ast.IdentifierReferenc
             } else |_| {}
         }
     }
-    return .{ .identifier = try self.allocator.dupe(u8, token.text) };
+    return try self.allocator.dupe(u8, token.text);
 }
 
 pub fn acceptBindingIdentifier(self: *Self) AcceptError!ast.Identifier {
@@ -800,8 +800,7 @@ pub fn acceptPropertyDefinition(self: *Self) AcceptError!ast.PropertyDefinition 
                 },
             };
         } else |_| if (property_name == .literal_property_name and property_name.literal_property_name == .identifier) {
-            const identifier = property_name.literal_property_name.identifier;
-            return .{ .identifier_reference = .{ .identifier = identifier } };
+            return .{ .identifier_reference = property_name.literal_property_name.identifier };
         } else return error.UnexpectedToken;
     } else |_| return error.UnexpectedToken;
 }
@@ -810,11 +809,7 @@ pub fn acceptPropertyName(self: *Self) AcceptError!ast.PropertyName {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    if (self.acceptIdentifierReference()) |identifier_reference| {
-        // LiteralPropertyName : IdentifierName
-        const identifier = identifier_reference.identifier;
-        return .{ .literal_property_name = .{ .identifier = identifier } };
-    } else |_| if (self.acceptIdentifierName()) |identifier| {
+    if (self.acceptIdentifierName()) |identifier| {
         // LiteralPropertyName : IdentifierName
         return .{ .literal_property_name = .{ .identifier = identifier } };
     } else |_| if (self.acceptStringLiteral()) |string_literal| {

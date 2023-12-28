@@ -44,9 +44,7 @@ pub const ParenthesizedExpression = struct {
 };
 
 /// https://tc39.es/ecma262/#prod-IdentifierReference
-pub const IdentifierReference = struct {
-    identifier: Identifier,
-};
+pub const IdentifierReference = []const u8;
 
 /// https://tc39.es/ecma262/#prod-Identifier
 pub const Identifier = []const u8;
