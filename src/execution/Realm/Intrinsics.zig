@@ -59,6 +59,7 @@ lazy_intrinsics: struct {
     @"%Float32Array.prototype%": ?Object = null,
     @"%Float64Array%": ?Object = null,
     @"%Float64Array.prototype%": ?Object = null,
+    @"%ForInIteratorPrototype%": ?Object = null,
     @"%Function%": ?Object = null,
     @"%Function.prototype%": ?Object = null,
     @"%GeneratorFunction%": ?Object = null,
@@ -280,6 +281,9 @@ pub fn @"%Float64Array%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%Float64Array.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Float64Array.prototype%", builtins.Float64ArrayPrototype);
+}
+pub fn @"%ForInIteratorPrototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%ForInIteratorPrototype%", builtins.ForInIteratorPrototype);
 }
 pub fn @"%Function%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Function%", builtins.FunctionConstructor);
