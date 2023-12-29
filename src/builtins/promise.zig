@@ -1597,6 +1597,7 @@ pub const PromiseConstructor = struct {
         try defineBuiltinFunction(object, "race", race, 1, realm);
         try defineBuiltinFunction(object, "reject", reject, 1, realm);
         try defineBuiltinFunction(object, "resolve", resolve, 1, realm);
+        try defineBuiltinFunction(object, "withResolvers", withResolvers, 0, realm);
         try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
 
         // 27.2.4.4 Promise.prototype
@@ -1909,7 +1910,46 @@ pub const PromiseConstructor = struct {
         return Value.from(try promiseResolve(agent, constructor.object, resolution));
     }
 
-    /// 27.2.4.8 get Promise [ @@species ]
+    /// 27.2.4.8 Promise.withResolvers ( )
+    /// https://tc39.es/ecma262/#sec-promise.withResolvers
+    fn withResolvers(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        const realm = agent.currentRealm();
+
+        // 1. Let C be the this value.
+        const constructor = this_value;
+
+        // 2. Let promiseCapability be ? NewPromiseCapability(C).
+        const promise_capability = try newPromiseCapability(agent, constructor);
+
+        // 3. Let obj be OrdinaryObjectCreate(%Object.prototype%).
+        const object = try ordinaryObjectCreate(
+            agent,
+            try realm.intrinsics.@"%Object.prototype%"(),
+        );
+
+        // 4. Perform ! CreateDataPropertyOrThrow(obj, "promise", promiseCapability.[[Promise]]).
+        object.createDataPropertyOrThrow(
+            PropertyKey.from("promise"),
+            Value.from(promise_capability.promise),
+        ) catch |err| try noexcept(err);
+
+        // 5. Perform ! CreateDataPropertyOrThrow(obj, "resolve", promiseCapability.[[Resolve]]).
+        object.createDataPropertyOrThrow(
+            PropertyKey.from("resolve"),
+            Value.from(promise_capability.resolve),
+        ) catch |err| try noexcept(err);
+
+        // 6. Perform ! CreateDataPropertyOrThrow(obj, "reject", promiseCapability.[[Reject]]).
+        object.createDataPropertyOrThrow(
+            PropertyKey.from("reject"),
+            Value.from(promise_capability.reject),
+        ) catch |err| try noexcept(err);
+
+        // 7. Return obj.
+        return Value.from(object);
+    }
+
+    /// 27.2.4.9 get Promise [ @@species ]
     /// https://tc39.es/ecma262/#sec-get-promise-@@species
     fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Return the this value.
