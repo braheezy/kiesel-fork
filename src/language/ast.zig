@@ -1046,8 +1046,22 @@ pub const ForInOfStatement = struct {
         //     for await ( LeftHandSideExpression of AssignmentExpression ) Statement
         //     for await ( ForDeclaration of AssignmentExpression ) Statement
         if (self.initializer != .for_binding) {
+            var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
+            switch (self.initializer) {
+                // HACK: Emit lexical declarations too while they're codegen'd as var decls
+                .for_declaration => |lexical_declaration| {
+                    const lexical_binding = lexical_declaration.binding_list.items[0];
+                    try variable_declarations.append(.{
+                        .binding_identifier = lexical_binding.binding_identifier,
+                        .initializer = lexical_binding.initializer,
+                    });
+                },
+                else => {},
+            }
+
             // 1. Return the VarDeclaredNames of Statement.
-            return self.consequent_statement.varScopedDeclarations(allocator);
+            try variable_declarations.appendSlice(try self.consequent_statement.varScopedDeclarations(allocator));
+            return variable_declarations.toOwnedSlice();
         }
         // ForInOfStatement :
         //     for ( var ForBinding in Expression ) Statement
