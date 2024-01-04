@@ -161,27 +161,34 @@ pub fn subtract(x: Self, agent: *Agent, y: Self) Allocator.Error!Self {
 
 /// 6.1.6.2.9 BigInt::leftShift ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-leftShift
-pub fn leftShift(_: Self, agent: *Agent, _: Self) error{ExceptionThrown}!Self {
+pub fn leftShift(x: Self, agent: *Agent, y: Self) Agent.Error!Self {
     // 1. If y < 0ℤ, then
     //     a. Return ℤ(floor(ℝ(x) / 2**(-ℝ(y)))).
     // 2. Return x × 2ℤ^y.
-    // TODO: Figure out how to do this with built-in functionality, shiftLeft() only accepts an usize
-    return agent.throwException(.internal_error, "Left-shift for BigInts is not implemented", .{});
+    var result = try from(agent.gc_allocator, 0);
+    try result.value.shiftLeft(
+        &x.value,
+        y.value.to(usize) catch return agent.throwException(
+            .internal_error,
+            "Cannot left-shift BigInt by more than {} bits",
+            .{std.math.maxInt(usize)},
+        ),
+    );
+    return result;
 }
 
 /// 6.1.6.2.10 BigInt::signedRightShift ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-signedRightShift
 pub fn signedRightShift(x: Self, agent: *Agent, y: Self) Agent.Error!Self {
-    const error_message = std.fmt.comptimePrint(
-        "Cannot right-shift BigInt by more than {} bits",
-        .{std.math.maxInt(usize)},
-    );
-
     // 1. Return BigInt::leftShift(x, -y).
     var result = try from(agent.gc_allocator, 0);
     try result.value.shiftRight(
         &x.value,
-        y.value.to(usize) catch return agent.throwException(.internal_error, error_message, .{}),
+        y.value.to(usize) catch return agent.throwException(
+            .internal_error,
+            "Cannot right-shift BigInt by more than {} bits",
+            .{std.math.maxInt(usize)},
+        ),
     );
     return result;
 }
