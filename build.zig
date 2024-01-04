@@ -39,9 +39,9 @@ pub fn build(b: *std.Build) void {
     const zig_args = b.dependency("zig_args", .{});
     const zigline = b.dependency("zigline", .{});
 
-    var dependencies = std.ArrayList(std.Build.ModuleDependency).init(b.allocator);
-    defer dependencies.deinit();
-    dependencies.appendSlice(&.{
+    var imports = std.ArrayList(std.Build.Module.Import).init(b.allocator);
+    defer imports.deinit();
+    imports.appendSlice(&.{
         .{
             .module = options.createModule(),
             .name = "build-options",
@@ -64,16 +64,18 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
         });
-        dependencies.append(.{
+        imports.append(.{
             .module = icu4zig.module("icu4zig"),
             .name = "icu4zig",
         }) catch @panic("OOM");
     }
 
     const kiesel_module = b.addModule("kiesel", .{
-        .source_file = .{ .path = "src/main.zig" },
-        .dependencies = dependencies.items,
+        .root_source_file = .{ .path = "src/main.zig" },
+        .imports = imports.items,
     });
+    kiesel_module.linkLibrary(libgc.artifact("gc"));
+    kiesel_module.linkLibrary(libregexp.artifact("regexp"));
 
     const exe = b.addExecutable(.{
         .name = "kiesel",
@@ -94,12 +96,12 @@ pub fn build(b: *std.Build) void {
     }
     exe.linkLibrary(libgc.artifact("gc"));
     exe.linkLibrary(libregexp.artifact("regexp"));
-    exe.addModule("kiesel", kiesel_module);
-    exe.addModule("any-pointer", any_pointer.module("any-pointer"));
-    exe.addModule("args", zig_args.module("args"));
-    exe.addModule("gc", libgc.module("gc"));
-    exe.addModule("zigline", zigline.module("zigline"));
-    if (optimize != .Debug) exe.strip = true;
+    exe.root_module.addImport("kiesel", kiesel_module);
+    exe.root_module.addImport("any-pointer", any_pointer.module("any-pointer"));
+    exe.root_module.addImport("args", zig_args.module("args"));
+    exe.root_module.addImport("gc", libgc.module("gc"));
+    exe.root_module.addImport("zigline", zigline.module("zigline"));
+    if (optimize != .Debug) exe.root_module.strip = true;
 
     b.installArtifact(exe);
 
@@ -120,10 +122,10 @@ pub fn build(b: *std.Build) void {
     });
     unit_tests.linkLibrary(libgc.artifact("gc"));
     unit_tests.linkLibrary(libregexp.artifact("regexp"));
-    unit_tests.addModule("build-options", options.createModule());
-    unit_tests.addModule("any-pointer", any_pointer.module("any-pointer"));
-    unit_tests.addModule("gc", libgc.module("gc"));
-    unit_tests.addModule("ptk", parser_toolkit.module("parser-toolkit"));
+    unit_tests.root_module.addImport("build-options", options.createModule());
+    unit_tests.root_module.addImport("any-pointer", any_pointer.module("any-pointer"));
+    unit_tests.root_module.addImport("gc", libgc.module("gc"));
+    unit_tests.root_module.addImport("ptk", parser_toolkit.module("parser-toolkit"));
     if (enable_intl) {
         const icu4zig = b.dependency("icu4zig", .{
             .target = target,
@@ -134,7 +136,7 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         });
         build_icu4zig.link(unit_tests, icu4x);
-        unit_tests.addModule("icu4zig", icu4zig.module("icu4zig"));
+        unit_tests.root_module.addImport("icu4zig", icu4zig.module("icu4zig"));
     }
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
