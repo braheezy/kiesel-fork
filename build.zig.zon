@@ -3,8 +3,7 @@
     .version = "0.1.0",
     .dependencies = .{
         .any_pointer = .{
-            // FIXME: This points to https://github.com/MasterQ32/any-pointer/pull/7, update once merged
-            .url = "https://github.com/MasterQ32/any-pointer/archive/1e5162162bbffdf6b4caa0e6d681fcc77b3dba1e.tar.gz",
+            .url = "https://github.com/MasterQ32/any-pointer/archive/60b236deb8e5f4e53aeefbd31e5d9763bcaf8322.tar.gz",
             .hash = "1220ee116ee3e225e115f5d93167be6a06683bf1673d29674b64b9fe551548c6a69b",
         },
         .icu4zig = .{
@@ -20,19 +19,16 @@
             .hash = "1220322c0d6afcf63cd84f96d8b75d27d8d20d19d18ede6db086941ead4d1f55db61",
         },
         .parser_toolkit = .{
-            // FIXME: This points to https://github.com/MasterQ32/parser-toolkit/pull/11, update once merged
-            .url = "https://github.com/MasterQ32/parser-toolkit/archive/740994c2cc10e3f5e8496a152194815bdf2a11cc.tar.gz",
+            .url = "https://github.com/MasterQ32/parser-toolkit/archive/3e39228356c1b8cfb293b234439d2f4d9fbe9dd1.tar.gz",
             .hash = "1220b2ef6f360b60accfa89fa8c5016963c5dec1c20b8288302a8bc468392e9bc684",
         },
         .zig_args = .{
-            // FIXME: This points to https://github.com/MasterQ32/zig-args/pull/50, update once merged
-            .url = "https://github.com/MasterQ32/zig-args/archive/2f9d5bbb5df6b8a32f6475b72c564cadac015d76.tar.gz",
-            .hash = "1220150dc3eb55689ea1a32e8298828a311c11ed695a60ee94c9a4b65cd5db6f99c9",
+            .url = "https://github.com/MasterQ32/zig-args/archive/89f18a104d9c13763b90e97d6b4ce133da8a3e2b.tar.gz",
+            .hash = "12203ded54c85878eea7f12744066dcb4397177395ac49a7b2aa365bf6047b623829",
         },
         .zigline = .{
-            // FIXME: This points to https://github.com/alimpfard/zigline/pull/12, update once merged
-            .url = "https://github.com/alimpfard/zigline/archive/c128e62e80e78c44ad841917448fdb3bad66a527.tar.gz",
-            .hash = "1220845e35171b01d88d68781dbed6921effa2584ebbb6ec4e81ba37a3bcf4bddb79",
+            .url = "https://github.com/alimpfard/zigline/archive/cb14f38edbd229e4b3e4ba1619b2dcc9e7d42918.tar.gz",
+            .hash = "12209bf645f0dc3a683ea0d8704ddcf7151d7088d5e01c0bbd6993f6c1b2b577ad9c",
         },
     },
     .paths = .{
