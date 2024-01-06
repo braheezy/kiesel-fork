@@ -69,6 +69,10 @@ jobs:
         run: |
           ./build.sh x86_64-linux-musl kiesel-linux-x86_64
           ./upload.sh zig-out/bin/kiesel-linux-x86_64
+      - name: Build and upload kiesel-macos-aarch64
+        run: |
+          ./build.sh aarch64-macos-none kiesel-macos-aarch64
+          ./upload.sh zig-out/bin/kiesel-macos-aarch64
       - name: Build and upload kiesel-windows-aarch64.exe
         run: |
           ./build.sh aarch64-windows-gnu kiesel-windows-aarch64.exe
