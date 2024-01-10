@@ -15,6 +15,7 @@ const ArgumentsList = builtins.ArgumentsList;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
+const PropertyKeyHashMap = Object.PropertyStorage.PropertyKeyHashMap;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
@@ -160,7 +161,7 @@ const JSONSerialization = struct {
     replacer_function: ?Object,
 
     /// [[PropertyList]]
-    property_list: ?std.ArrayList(PropertyKey),
+    property_list: ?PropertyKeyHashMap(void),
 
     /// [[Gap]]
     gap: String,
@@ -368,26 +369,24 @@ fn serializeJSONObject(
     //     a. Let K be state.[[PropertyList]].
     // 6. Else,
     //     a. Let K be ? EnumerableOwnProperties(value, key).
-    const keys = state.property_list orelse blk: {
+    var keys = state.property_list orelse blk: {
         const keys = try value.enumerableOwnProperties(.key);
         defer keys.deinit();
-        var converted = try std.ArrayList(PropertyKey).initCapacity(
-            agent.gc_allocator,
-            keys.items.len,
-        );
+        var converted = PropertyKeyHashMap(void).init(agent.gc_allocator);
+        try converted.ensureUnusedCapacity(keys.items.len);
         for (keys.items) |key| {
-            converted.appendAssumeCapacity(key.toPropertyKey(agent) catch |err| try noexcept(err));
+            converted.putAssumeCapacityNoClobber(key.toPropertyKey(agent) catch |err| try noexcept(err), {});
         }
         break :blk converted;
     };
     defer if (state.property_list == null) keys.deinit();
 
     // 7. Let partial be a new empty List.
-    var partial = try std.ArrayList([]const u8).initCapacity(agent.gc_allocator, keys.items.len);
+    var partial = try std.ArrayList([]const u8).initCapacity(agent.gc_allocator, keys.count());
     defer partial.deinit();
 
     // 8. For each element P of K, do
-    for (keys.items) |property_key| {
+    for (keys.keys()) |property_key| {
         // a. Let strP be ? SerializeJSONProperty(state, P, value).
         const str_property = try serializeJSONProperty(
             agent,
@@ -698,8 +697,8 @@ pub const JSON = struct {
         const indent = String.from("");
 
         // 3. Let PropertyList be undefined.
-        var property_list: ?std.ArrayList(PropertyKey) = null;
-        defer if (property_list) |p| p.deinit();
+        var property_list: ?PropertyKeyHashMap(void) = null;
+        defer if (property_list) |*p| p.deinit();
 
         // 4. Let ReplacerFunction be undefined.
         var replacer_function: ?Object = null;
@@ -719,7 +718,7 @@ pub const JSON = struct {
                 // ii. If isArray is true, then
                 if (is_array) {
                     // 1. Set PropertyList to a new empty List.
-                    property_list = std.ArrayList(PropertyKey).init(agent.gc_allocator);
+                    property_list = PropertyKeyHashMap(void).init(agent.gc_allocator);
 
                     // 2. Let len be ? LengthOfArrayLike(replacer).
                     const len = try replacer.object.lengthOfArrayLike();
@@ -736,19 +735,21 @@ pub const JSON = struct {
                         const k_value = try replacer.object.get(property_key);
 
                         // c. Let item be undefined.
-                        var item: ?String = null;
+                        var item: ?PropertyKey = null;
 
                         switch (k_value) {
                             // d. If v is a String, then
                             .string => |string| {
                                 // i. Set item to v.
-                                item = string;
+                                item = PropertyKey.from(string);
                             },
 
                             // e. Else if v is a Number, then
                             .number => |number| {
                                 // i. Set item to ! ToString(v).
-                                item = try number.toString(agent.gc_allocator, 10);
+                                item = PropertyKey.from(
+                                    try number.toString(agent.gc_allocator, 10),
+                                );
                             },
 
                             // f. Else if v is an Object, then
@@ -756,7 +757,7 @@ pub const JSON = struct {
                                 // i. If v has a [[StringData]] or [[NumberData]] internal slot,
                                 //    set item to ? ToString(v).
                                 if (object.is(builtins.String) or object.is(builtins.Number)) {
-                                    item = try k_value.toString(agent);
+                                    item = PropertyKey.from(try k_value.toString(agent));
                                 }
                             },
 
@@ -764,9 +765,9 @@ pub const JSON = struct {
                         }
 
                         // g. If item is not undefined and PropertyList does not contain item, then
-                        if (item != null) {
+                        if (item != null and !property_list.?.contains(item.?)) {
                             // i. Append item to PropertyList.
-                            try property_list.?.append(PropertyKey.from(item.?));
+                            try property_list.?.putNoClobber(item.?, {});
                         }
 
                         // h. Set k to k + 1.
