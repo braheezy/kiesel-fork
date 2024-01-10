@@ -1032,7 +1032,7 @@ pub const Value = union(enum) {
             const bound_constructor = self.object.as(builtins.BoundFunction).fields.bound_target_function;
 
             // b. Return ? InstanceofOperator(O, BC).
-            return self.instanceofOperator(agent, Value.from(bound_constructor));
+            return object_value.instanceofOperator(agent, Value.from(bound_constructor));
         }
 
         // 3. If O is not an Object, return false.
