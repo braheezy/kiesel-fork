@@ -235,7 +235,8 @@ pub const Number = union(enum) {
             // a. If exponent > +0𝔽, then
             if (exponent.asFloat() > 0) {
                 // i. If exponent is an odd integral Number, return -∞𝔽. Otherwise, return +∞𝔽.
-                if (@trunc(exponent.asFloat()) == exponent.asFloat() and
+                if (std.math.isFinite(exponent.asFloat()) and
+                    @trunc(exponent.asFloat()) == exponent.asFloat() and
                     @mod(exponent.asFloat(), 2) != 0)
                     return .{ .f64 = -std.math.inf(f64) }
                 else
@@ -244,7 +245,8 @@ pub const Number = union(enum) {
             // b. Else,
             else {
                 // i. If exponent is an odd integral Number, return -0𝔽. Otherwise, return +0𝔽.
-                if (@trunc(exponent.asFloat()) == exponent.asFloat() and
+                if (std.math.isFinite(exponent.asFloat()) and
+                    @trunc(exponent.asFloat()) == exponent.asFloat() and
                     @mod(exponent.asFloat(), 2) != 0)
                     return .{ .f64 = -0.0 }
                 else
@@ -266,7 +268,8 @@ pub const Number = union(enum) {
             // a. If exponent > +0𝔽, then
             if (exponent.asFloat() > 0) {
                 // i. If exponent is an odd integral Number, return -0𝔽. Otherwise, return +0𝔽.
-                if (@trunc(exponent.asFloat()) == exponent.asFloat() and
+                if (std.math.isFinite(exponent.asFloat()) and
+                    @trunc(exponent.asFloat()) == exponent.asFloat() and
                     @mod(exponent.asFloat(), 2) != 0)
                     return .{ .f64 = -0.0 }
                 else
@@ -275,7 +278,8 @@ pub const Number = union(enum) {
             // b. Else,
             else {
                 // i. If exponent is an odd integral Number, return -∞𝔽. Otherwise, return +∞𝔽.
-                if (@trunc(exponent.asFloat()) == exponent.asFloat() and
+                if (std.math.isFinite(exponent.asFloat()) and
+                    @trunc(exponent.asFloat()) == exponent.asFloat() and
                     @mod(exponent.asFloat(), 2) != 0)
                     return .{ .f64 = -std.math.inf(f64) }
                 else
