@@ -28,7 +28,7 @@ pub const Reflect = struct {
         });
 
         try defineBuiltinFunction(object, "apply", apply, 3, realm);
-        try defineBuiltinFunction(object, "construct", construct, 3, realm);
+        try defineBuiltinFunction(object, "construct", construct, 2, realm);
         try defineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm);
         try defineBuiltinFunction(object, "deleteProperty", deleteProperty, 2, realm);
         try defineBuiltinFunction(object, "get", get, 1, realm);
