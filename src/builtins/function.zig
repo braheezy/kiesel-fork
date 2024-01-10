@@ -29,6 +29,7 @@ const boundFunctionCreate = builtins.boundFunctionCreate;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
+const defineBuiltinFunctionWithAttributes = utils.defineBuiltinFunctionWithAttributes;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const formatParseError = utils.formatParseError;
 const makeConstructor = builtins.makeConstructor;
@@ -472,6 +473,11 @@ pub const FunctionPrototype = struct {
         try defineBuiltinFunction(object, "bind", bind, 1, realm);
         try defineBuiltinFunction(object, "call", call, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
+        try defineBuiltinFunctionWithAttributes(object, "@@hasInstance", @"@@hasInstance", 1, realm, .{
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
     }
 
     fn behaviour(_: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
@@ -647,5 +653,17 @@ pub const FunctionPrototype = struct {
 
         // 5. Throw a TypeError exception.
         return agent.throwException(.type_error, "{} is not a function", .{func});
+    }
+
+    /// 20.2.3.6 Function.prototype [ @@hasInstance ] ( V )
+    /// https://tc39.es/ecma262/#sec-function.prototype-@@hasinstance
+    fn @"@@hasInstance"(_: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const value = arguments.get(0);
+
+        // 1. Let F be the this value.
+        const func = this_value;
+
+        // 2. Return ? OrdinaryHasInstance(F, V).
+        return Value.from(try func.ordinaryHasInstance(value));
     }
 };
