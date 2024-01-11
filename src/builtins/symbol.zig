@@ -19,6 +19,7 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinFunctionWithAttributes = utils.defineBuiltinFunctionWithAttributes;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
@@ -259,6 +260,7 @@ pub const SymbolPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinAccessor(object, "description", description, null, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
         try defineBuiltinFunctionWithAttributes(object, "@@toPrimitive", @"@@toPrimitive", 1, realm, .{
@@ -305,6 +307,17 @@ pub const SymbolPrototype = struct {
             "This value must be a symbol or Symbol object",
             .{},
         );
+    }
+
+    /// 20.4.3.2 get Symbol.prototype.description
+    /// https://tc39.es/ecma262/#sec-symbol.prototype.description
+    fn description(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let s be the this value.
+        // 2. Let sym be ? ThisSymbolValue(s).
+        const symbol = try thisSymbolValue(agent, this_value);
+
+        // 3. Return sym.[[Description]].
+        return Value.from(symbol.description orelse return .undefined);
     }
 
     /// 20.4.3.3 Symbol.prototype.toString ( )
