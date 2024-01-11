@@ -116,10 +116,10 @@ pub fn evaluate(self: *Self) Agent.Error!Value {
 
     const result_no_value: error{ExceptionThrown}!void = {};
 
-    // 13. If result.[[Type]] is normal, then
+    // 13. If result is a normal completion, then
     const result = if (result_no_value) |_| blk: {
         // a. Set result to Completion(Evaluation of script).
-        // b. If result.[[Type]] is normal and result.[[Value]] is empty, then
+        // b. If result is a normal completion and result.[[Value]] is empty, then
         if (generateAndRunBytecode(agent, script)) |completion|
             // i. Set result to NormalCompletion(undefined).
             break :blk completion.value orelse .undefined

@@ -2352,7 +2352,7 @@ pub fn codegenTryStatement(
         try executable.addInstruction(.jump);
         const end_jump = try executable.addJumpIndex();
 
-        // 2. If B.[[Type]] is throw, let C be Completion(CatchClauseEvaluation of Catch with
+        // 2. If B is a throw completion, let C be Completion(CatchClauseEvaluation of Catch with
         //    argument B.[[Value]]).
         // TODO: Create a new lexical environment
         try exception_jump_to_catch.setTargetHere();
@@ -2384,7 +2384,7 @@ pub fn codegenTryStatement(
         try codegenBlock(node.finally_block.?, executable, ctx);
         try executable.addInstruction(.rethrow_exception_if_any);
 
-        // 3. If F.[[Type]] is normal, set F to B.
+        // 3. If F is a normal completion, set F to B.
         // 4. Return ? UpdateEmpty(F, undefined).
     }
     // TryStatement : try Block Catch Finally
@@ -2398,7 +2398,7 @@ pub fn codegenTryStatement(
         try executable.addInstruction(.jump);
         const finally_jump = try executable.addJumpIndex();
 
-        // 2. If B.[[Type]] is throw, let C be Completion(CatchClauseEvaluation of Catch with argument B.[[Value]]).
+        // 2. If B is a throw completion, let C be Completion(CatchClauseEvaluation of Catch with argument B.[[Value]]).
         // 3. Else, let C be B.
         // TODO: Create a new lexical environment
         try exception_jump_to_catch.setTargetHere();
@@ -2420,7 +2420,7 @@ pub fn codegenTryStatement(
         try codegenBlock(node.finally_block.?, executable, ctx);
         try executable.addInstruction(.rethrow_exception_if_any);
 
-        // 5. If F.[[Type]] is normal, set F to C.
+        // 5. If F is a normal completion, set F to C.
         // 6. Return ? UpdateEmpty(F, undefined).
     }
 }

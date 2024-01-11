@@ -158,10 +158,10 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
         strict_eval,
     );
 
-    // 29. If result.[[Type]] is normal, then
+    // 29. If result is a normal completion, then
     const result = if (result_no_value) |_| blk: {
         // a. Set result to Completion(Evaluation of body).
-        // 30. If result.[[Type]] is normal and result.[[Value]] is empty, then
+        // 30. If result is a normal completion and result.[[Value]] is empty, then
         if (generateAndRunBytecode(agent, script)) |completion|
             // a. Set result to NormalCompletion(undefined).
             break :blk completion.value orelse .undefined

@@ -157,7 +157,7 @@ fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) Age
     // 7. Remove calleeContext from the execution context stack and restore callerContext as the running execution context.
     _ = agent.execution_context_stack.pop();
 
-    // 8. If result.[[Type]] is return, return result.[[Value]].
+    // 8. If result is a return completion, return result.[[Value]].
     if (result) |completion| {
         if (completion.type == .@"return")
             return completion.value.?;
@@ -489,7 +489,7 @@ pub fn construct(
     //    running execution context.
     _ = agent.execution_context_stack.pop();
 
-    // 10. If result.[[Type]] is return, then
+    // 10. If result is a return completion, then
     if (result) |completion| {
         if (completion.type == .@"return") {
             // a. If result.[[Value]] is an Object, return result.[[Value]].
