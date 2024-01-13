@@ -19,8 +19,7 @@
             .hash = "1220322c0d6afcf63cd84f96d8b75d27d8d20d19d18ede6db086941ead4d1f55db61",
         },
         .parser_toolkit = .{
-            // FIXME: This points to https://github.com/MasterQ32/parser-toolkit/pull/12, update once merged
-            .url = "https://github.com/MasterQ32/parser-toolkit/archive/5ab4b9599f83c1c7f403b417f7d1e39e5540abe1.tar.gz",
+            .url = "https://github.com/MasterQ32/parser-toolkit/archive/358a028beb32ebb193dadb6f7a954965745892a7.tar.gz",
             .hash = "122096e52791fd03257d5c6af9421dfa0c8ba763c01ef5a9d4c022903a741cbad13a",
         },
         .zig_args = .{
