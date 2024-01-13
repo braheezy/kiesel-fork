@@ -27,8 +27,8 @@
             .hash = "12203ded54c85878eea7f12744066dcb4397177395ac49a7b2aa365bf6047b623829",
         },
         .zigline = .{
-            .url = "https://github.com/alimpfard/zigline/archive/cb14f38edbd229e4b3e4ba1619b2dcc9e7d42918.tar.gz",
-            .hash = "12209bf645f0dc3a683ea0d8704ddcf7151d7088d5e01c0bbd6993f6c1b2b577ad9c",
+            .url = "https://github.com/alimpfard/zigline/archive/882d036c9951136a22c4e0e8a598967048dc4f44.tar.gz",
+            .hash = "122096b2bea9c2e4cf92f36d011aa951b156edb4fcc1f51b8ad46a3087e7ebea2ba3",
         },
     },
     .paths = .{
