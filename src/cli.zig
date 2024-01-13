@@ -54,6 +54,18 @@ const version = std.fmt.comptimePrint(
     .zig = builtin.zig_version_string,
 });
 
+// Python REPL my beloved 🐍
+const repl_preamble = std.fmt.comptimePrint(
+    \\Kiesel {[kiesel]s} [Zig {[zig]s}] on {[os]s}
+    \\Use {[eof]s} to exit.
+    \\
+, .{
+    .kiesel = kiesel.version_string,
+    .zig = builtin.zig_version_string,
+    .os = @tagName(builtin.os.tag),
+    .eof = if (builtin.os.tag == .windows) "Ctrl+Z followed by Enter" else "Ctrl+D",
+});
+
 const ScriptOrModuleHostDefined = struct {
     base_dir: std.fs.Dir,
 };
@@ -399,6 +411,8 @@ fn repl(allocator: Allocator, realm: *Realm, options: struct {
 }) ReplError!void {
     const stdout = std.io.getStdOut().writer();
 
+    try stdout.writeAll(repl_preamble);
+
     var editor = Editor.init(allocator, .{});
     defer editor.deinit();
 
@@ -513,6 +527,8 @@ fn replBasic(allocator: Allocator, realm: *Realm, options: struct {
 }) ReplError!void {
     const stdin = std.io.getStdIn().reader();
     const stdout = std.io.getStdOut().writer();
+
+    try stdout.writeAll(repl_preamble);
 
     while (true) {
         var array_list = std.ArrayList(u8).init(allocator);
