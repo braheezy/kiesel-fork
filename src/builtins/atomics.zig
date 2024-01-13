@@ -23,7 +23,6 @@ const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getModifySetValueInBuffer = builtins.getModifySetValueInBuffer;
 const getValueFromBuffer = builtins.getValueFromBuffer;
-const isBigIntElementType = builtins.isBigIntElementType;
 const isTypedArrayOutOfBounds = builtins.isTypedArrayOutOfBounds;
 const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferWitnessRecord;
 const setValueInBuffer = builtins.setValueInBuffer;
@@ -195,10 +194,10 @@ fn atomicReadModifyWrite(
 
     // 6. Let elementType be TypedArrayElementType(typedArray).
     inline for (builtins.typed_array_element_types) |entry| {
-        const name, const T = entry;
-        if (T == f32 or T == f64) continue;
+        const name, const @"type" = entry;
+        if (!@"type".isUnclampedIntegerElementType()) continue;
         // Bypass 'expected 32-bit integer type or smaller; found 64-bit integer type' for @atomicRmw()
-        if (comptime @bitSizeOf(T) > builtin.target.ptrBitWidth()) {
+        if (comptime @bitSizeOf(@"type".T) > builtin.target.ptrBitWidth()) {
             return agent.throwException(
                 .internal_error,
                 "Atomic operation on {s} not supported on this platform",
@@ -211,11 +210,11 @@ fn atomicReadModifyWrite(
                 agent,
                 buffer,
                 byte_index_in_buffer,
-                T,
+                @"type",
                 numeric_value,
                 op,
             );
-            return if (isBigIntElementType(T))
+            return if (@"type".isBigIntElementType())
                 Value.from(try BigInt.from(agent.gc_allocator, modified_value))
             else
                 Value.from(modified_value);
@@ -341,19 +340,20 @@ pub const Atomics = struct {
 
         // 4. Let elementType be TypedArrayElementType(typedArray).
         inline for (builtins.typed_array_element_types) |entry| {
-            const name, const T = entry;
+            const name, const @"type" = entry;
+            if (!@"type".isUnclampedIntegerElementType()) continue;
             if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
                 // 5. Return GetValueFromBuffer(buffer, byteIndexInBuffer, elementType, true, seq-cst).
                 const value = getValueFromBuffer(
                     agent,
                     buffer,
                     byte_index_in_buffer,
-                    T,
+                    @"type",
                     true,
                     .seq_cst,
                     null,
                 );
-                return if (isBigIntElementType(T))
+                return if (@"type".isBigIntElementType())
                     Value.from(try BigInt.from(agent.gc_allocator, value))
                 else
                     Value.from(value);
@@ -406,14 +406,15 @@ pub const Atomics = struct {
 
         // 6. Let elementType be TypedArrayElementType(typedArray).
         inline for (builtins.typed_array_element_types) |entry| {
-            const name, const T = entry;
+            const name, const @"type" = entry;
+            if (!@"type".isUnclampedIntegerElementType()) continue;
             if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
                 // 7. Perform SetValueInBuffer(buffer, byteIndexInBuffer, elementType, v, true, seq-cst).
                 try setValueInBuffer(
                     agent,
                     buffer,
                     byte_index_in_buffer,
-                    T,
+                    @"type",
                     numeric_value,
                     true,
                     .seq_cst,

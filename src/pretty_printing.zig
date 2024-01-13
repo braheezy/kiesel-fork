@@ -15,7 +15,6 @@ const PropertyKey = types.PropertyKey;
 const Value = types.Value;
 const getArrayLength = @import("builtins/array.zig").getArrayLength;
 const getFunctionName = @import("builtins/ecmascript_function.zig").getFunctionName;
-const isBigIntElementType = builtins.isBigIntElementType;
 const ordinaryOwnPropertyKeys = builtins.ordinaryOwnPropertyKeys;
 const typedArrayElementSize = builtins.typedArrayElementSize;
 
@@ -462,16 +461,16 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
             try tty_config.setColor(writer, .reset);
             try writer.writeAll(" ");
             inline for (builtins.typed_array_element_types) |entry| {
-                const name, const T = entry;
+                const name, const @"type" = entry;
                 if (std.mem.eql(u8, typed_array_name, name)) {
-                    const element_size = @sizeOf(T);
+                    const element_size = @"type".elementSize();
                     var i: u53 = 0;
                     while (i < byte_length) : (i += element_size) {
                         const bytes: *[element_size]u8 = @ptrCast(
                             data.items[@intCast(byte_offset + i)..@intCast(byte_offset + i + element_size)],
                         );
-                        const value = std.mem.bytesAsValue(T, bytes).*;
-                        const numeric = if (isBigIntElementType(T))
+                        const value = std.mem.bytesAsValue(@"type".T, bytes).*;
+                        const numeric = if (@"type".isBigIntElementType())
                             Value.from(BigInt.from(agent.gc_allocator, value) catch return)
                         else
                             Value.from(value);

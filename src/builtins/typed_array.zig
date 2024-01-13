@@ -33,7 +33,6 @@ const findViaPredicate = builtins.findViaPredicate;
 const getIteratorFromMethod = types.getIteratorFromMethod;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
 const getValueFromBuffer = builtins.getValueFromBuffer;
-const isBigIntElementType = builtins.isBigIntElementType;
 const isDetachedBuffer = builtins.isDetachedBuffer;
 const isFixedLengthArrayBuffer = builtins.isFixedLengthArrayBuffer;
 const isStrictlyEqual = types.isStrictlyEqual;
@@ -83,18 +82,65 @@ pub const Float32ArrayPrototype = MakeTypedArrayPrototype("Float32Array");
 pub const Float64ArrayConstructor = MakeTypedArrayConstructor("Float64Array");
 pub const Float64ArrayPrototype = MakeTypedArrayPrototype("Float64Array");
 
-pub const typed_array_element_types = .{
-    .{ "Int8Array", i8 },
-    .{ "Uint8Array", u8 },
-    .{ "Uint8ClampedArray", u8 },
-    .{ "Int16Array", i16 },
-    .{ "Uint16Array", u16 },
-    .{ "Int32Array", i32 },
-    .{ "Uint32Array", u32 },
-    .{ "BigInt64Array", i64 },
-    .{ "BigUint64Array", u64 },
-    .{ "Float32Array", f32 },
-    .{ "Float64Array", f64 },
+pub const TypedArrayElementType = struct {
+    const Self = @This();
+
+    pub const Clamping = enum {
+        clamped,
+        unclamped,
+    };
+
+    T: type,
+    clamping: Clamping = .unclamped,
+
+    pub fn elementSize(comptime self: Self) comptime_int {
+        return @sizeOf(self.T);
+    }
+
+    pub fn conversationOperation(comptime self: Self) fn (Value, *Agent) Agent.Error!self.T {
+        const field_name = switch (self.T) {
+            i8 => "toInt8",
+            u8 => if (self.clamping == .unclamped) "toUint8" else "toUint8Clamp",
+            i16 => "toInt16",
+            u16 => "toUint16",
+            i32 => "toInt32",
+            u32 => "toUint32",
+            i64 => "toBigInt64",
+            u64 => "toBigUint64",
+            else => unreachable,
+        };
+        return @field(Value, field_name);
+    }
+
+    /// 25.1.3.10 IsUnclampedIntegerElementType ( type )
+    /// https://tc39.es/ecma262/#sec-isunclampedintegerelementtype
+    pub inline fn isUnclampedIntegerElementType(comptime self: Self) bool {
+        // 1. If type is one of int8, uint8, int16, uint16, int32, or uint32, return true.
+        // 2. Return false.
+        return self.clamping != .clamped and self.T != f32 and self.T != f64;
+    }
+
+    /// 25.1.3.11 IsBigIntElementType ( type )
+    /// https://tc39.es/ecma262/#sec-isbigintelementtype
+    pub inline fn isBigIntElementType(comptime self: Self) bool {
+        // 1. If type is either biguint64 or bigint64, return true.
+        // 2. Return false.
+        return self.T == u64 or self.T == i64;
+    }
+};
+
+pub const typed_array_element_types = [_]struct { []const u8, TypedArrayElementType }{
+    .{ "Int8Array", .{ .T = i8 } },
+    .{ "Uint8Array", .{ .T = u8 } },
+    .{ "Uint8ClampedArray", .{ .T = u8, .clamping = .clamped } },
+    .{ "Int16Array", .{ .T = i16 } },
+    .{ "Uint16Array", .{ .T = u16 } },
+    .{ "Int32Array", .{ .T = i32 } },
+    .{ "Uint32Array", .{ .T = u32 } },
+    .{ "BigInt64Array", .{ .T = i64 } },
+    .{ "BigUint64Array", .{ .T = u64 } },
+    .{ "Float32Array", .{ .T = f32 } },
+    .{ "Float64Array", .{ .T = f64 } },
 };
 
 /// 10.4.5.1 [[GetOwnProperty]] ( P )
@@ -502,7 +548,7 @@ fn typedArrayGetElement(agent: *Agent, typed_array: *const TypedArray, index: u5
 
     // 5. Let elementType be TypedArrayElementType(O).
     inline for (typed_array_element_types) |entry| {
-        const name, const T = entry;
+        const name, const @"type" = entry;
         if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
             // 6. Return GetValueFromBuffer(O.[[ViewedArrayBuffer]], byteIndexInBuffer,
             //    elementType, true, unordered).
@@ -510,12 +556,12 @@ fn typedArrayGetElement(agent: *Agent, typed_array: *const TypedArray, index: u5
                 agent,
                 typed_array.fields.viewed_array_buffer,
                 byte_index_in_buffer,
-                T,
+                @"type",
                 true,
                 .unordered,
                 null,
             );
-            return if (isBigIntElementType(T))
+            return if (@"type".isBigIntElementType())
                 Value.from(try BigInt.from(agent.gc_allocator, value))
             else
                 Value.from(value);
@@ -546,7 +592,7 @@ fn typedArraySetElement(agent: *Agent, typed_array: *const TypedArray, index: f6
 
         // d. Let elementType be TypedArrayElementType(O).
         inline for (typed_array_element_types) |entry| {
-            const name, const T = entry;
+            const name, const @"type" = entry;
             if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
                 // e. Perform SetValueInBuffer(O.[[ViewedArrayBuffer]], byteIndexInBuffer,
                 //    elementType, numValue, true, unordered).
@@ -554,7 +600,7 @@ fn typedArraySetElement(agent: *Agent, typed_array: *const TypedArray, index: f6
                     agent,
                     typed_array.fields.viewed_array_buffer,
                     byte_index_in_buffer,
-                    T,
+                    @"type",
                     number_value,
                     true,
                     .unordered,
@@ -2513,19 +2559,19 @@ fn initializeTypedArrayFromTypedArray(
             //        either convert this into two comptime arguments passing the actual type or at
             //        least some kind of jump table.
             const value = blk_value: inline for (typed_array_element_types) |entry| {
-                const name, const T = entry;
+                const name, const @"type" = entry;
                 if (std.mem.eql(u8, src_type, name)) {
                     // i. Let value be GetValueFromBuffer(srcData, srcByteIndex, srcType, true, unordered).
                     const value = getValueFromBuffer(
                         agent,
                         src_data,
                         src_byte_index,
-                        T,
+                        @"type",
                         true,
                         .unordered,
                         null,
                     );
-                    break :blk_value if (isBigIntElementType(T))
+                    break :blk_value if (@"type".isBigIntElementType())
                         Value.from(try BigInt.from(agent.gc_allocator, value))
                     else
                         Value.from(value);
@@ -2533,14 +2579,14 @@ fn initializeTypedArrayFromTypedArray(
             } else unreachable;
 
             inline for (typed_array_element_types) |entry| {
-                const name, const T = entry;
+                const name, const @"type" = entry;
                 if (std.mem.eql(u8, element_type, name)) {
                     // ii. Perform SetValueInBuffer(data, targetByteIndex, elementType, value, true, unordered).
                     try setValueInBuffer(
                         agent,
                         data,
                         target_byte_index,
-                        T,
+                        @"type",
                         value,
                         true,
                         .unordered,
@@ -2834,8 +2880,8 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
             // https://tc39.es/ecma262/#sec-typedarray.bytes_per_element
             try defineBuiltinProperty(object, "BYTES_PER_ELEMENT", PropertyDescriptor{
                 .value = Value.from(comptime for (typed_array_element_types) |entry| {
-                    const name_, const T = entry;
-                    if (std.mem.eql(u8, name, name_)) break @sizeOf(T);
+                    const name_, const @"type" = entry;
+                    if (std.mem.eql(u8, name, name_)) break @"type".elementSize();
                 }),
                 .writable = false,
                 .enumerable = false,
@@ -3021,8 +3067,8 @@ fn MakeTypedArrayPrototype(comptime name: []const u8) type {
             // https://tc39.es/ecma262/#sec-typedarray.prototype.bytes_per_element
             try defineBuiltinProperty(object, "BYTES_PER_ELEMENT", PropertyDescriptor{
                 .value = Value.from(comptime for (typed_array_element_types) |entry| {
-                    const name_, const T = entry;
-                    if (std.mem.eql(u8, name, name_)) break @sizeOf(T);
+                    const name_, const @"type" = entry;
+                    if (std.mem.eql(u8, name, name_)) break @"type".elementSize();
                 }),
                 .writable = false,
                 .enumerable = false,

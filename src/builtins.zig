@@ -209,7 +209,6 @@ pub const getModifySetValueInBuffer = array_buffer.getModifySetValueInBuffer;
 pub const getPrototypeFromConstructor = ordinary.getPrototypeFromConstructor;
 pub const getValueFromBuffer = array_buffer.getValueFromBuffer;
 pub const globalObjectProperties = global.globalObjectProperties;
-pub const isBigIntElementType = array_buffer.isBigIntElementType;
 pub const isCompatiblePropertyDescriptor = ordinary.isCompatiblePropertyDescriptor;
 pub const isDetachedBuffer = array_buffer.isDetachedBuffer;
 pub const isFixedLengthArrayBuffer = array_buffer.isFixedLengthArrayBuffer;

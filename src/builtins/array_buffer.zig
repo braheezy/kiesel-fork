@@ -7,6 +7,7 @@ const Allocator = std.mem.Allocator;
 
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
+const typed_array = @import("../builtins/typed_array.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
@@ -17,6 +18,7 @@ const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
+const TypedArrayElementType = typed_array.TypedArrayElementType;
 const Value = types.Value;
 const copyDataBlockBytes = types.copyDataBlockBytes;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -196,19 +198,15 @@ pub fn isFixedLengthArrayBuffer(array_buffer: *const ArrayBuffer) bool {
     return array_buffer.fields.array_buffer_max_byte_length == null;
 }
 
-/// 25.1.3.11 IsBigIntElementType ( type )
-/// https://tc39.es/ecma262/#sec-isbigintelementtype
-pub inline fn isBigIntElementType(comptime T: type) bool {
-    // 1. If type is either biguint64 or bigint64, return true.
-    // 2. Return false.
-    return T == u64 or T == i64;
-}
-
 /// 25.1.3.13 RawBytesToNumeric ( type, rawBytes, isLittleEndian )
 /// https://tc39.es/ecma262/#sec-rawbytestonumeric
-pub fn rawBytesToNumeric(comptime T: type, raw_bytes: []const u8, is_little_endian: bool) T {
+pub fn rawBytesToNumeric(
+    comptime @"type": TypedArrayElementType,
+    raw_bytes: []const u8,
+    is_little_endian: bool,
+) @"type".T {
     // 1. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
-    const element_size = @sizeOf(T);
+    const element_size = @"type".elementSize();
 
     var bytes: [element_size]u8 = undefined;
     @memcpy(&bytes, raw_bytes);
@@ -217,7 +215,7 @@ pub fn rawBytesToNumeric(comptime T: type, raw_bytes: []const u8, is_little_endi
     if (!is_little_endian) std.mem.reverse(u8, &bytes);
 
     // 3-8.
-    return std.mem.bytesToValue(T, &bytes);
+    return std.mem.bytesToValue(@"type".T, &bytes);
 }
 
 /// 25.1.3.15 GetValueFromBuffer ( arrayBuffer, byteIndex, type, isTypedArray, order [ , isLittleEndian ] )
@@ -226,23 +224,23 @@ pub fn getValueFromBuffer(
     agent: *Agent,
     array_buffer: *const ArrayBuffer,
     byte_index: u53,
-    comptime T: type,
+    comptime @"type": TypedArrayElementType,
     is_typed_array: bool,
     order: Order,
     maybe_is_little_endian: ?bool,
-) T {
+) @"type".T {
     // 1. Assert: IsDetachedBuffer(arrayBuffer) is false.
     std.debug.assert(!isDetachedBuffer(array_buffer));
 
     // 2. Assert: There are sufficient bytes in arrayBuffer starting at byteIndex to represent a
     //    value of type.
-    std.debug.assert(array_buffer.fields.array_buffer_data.?.items.len >= byte_index + @sizeOf(T));
+    std.debug.assert(array_buffer.fields.array_buffer_data.?.items.len >= byte_index + @"type".elementSize());
 
     // 3. Let block be arrayBuffer.[[ArrayBufferData]].
     const block = array_buffer.fields.array_buffer_data.?;
 
     // 4. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
-    const element_size = @sizeOf(T);
+    const element_size = @"type".elementSize();
 
     // TODO: 5. If IsSharedArrayBuffer(arrayBuffer) is true, then
     const raw_value = if (false) {
@@ -265,19 +263,19 @@ pub fn getValueFromBuffer(
     const is_little_endian = maybe_is_little_endian orelse agent.little_endian;
 
     // 9. Return RawBytesToNumeric(type, rawValue, isLittleEndian).
-    return rawBytesToNumeric(T, raw_value, is_little_endian);
+    return rawBytesToNumeric(@"type", raw_value, is_little_endian);
 }
 
 /// 25.1.3.16 NumericToRawBytes ( type, value, isLittleEndian )
 /// https://tc39.es/ecma262/#sec-numerictorawbytes
 pub fn numericToRawBytes(
     agent: *Agent,
-    comptime T: type,
+    comptime @"type": TypedArrayElementType,
     value: Value,
     is_little_endian: bool,
-) Allocator.Error![@sizeOf(T)]u8 {
+) Allocator.Error![@sizeOf(@"type".T)]u8 {
     // 1. If type is float32, then
-    var raw_bytes = if (T == f32) blk: {
+    var raw_bytes = if (@"type".T == f32) blk: {
         // a. Let rawBytes be a List whose elements are the 4 bytes that are the result of
         //    converting value to IEEE 754-2019 binary32 format using roundTiesToEven mode. The
         //    bytes are arranged in little endian order. If value is NaN, rawBytes may be set to
@@ -292,7 +290,7 @@ pub fn numericToRawBytes(
         );
     }
     // 2. Else if type is float64, then
-    else if (T == f64) blk: {
+    else if (@"type".T == f64) blk: {
         // a. Let rawBytes be a List whose elements are the 8 bytes that are the IEEE 754-2019
         //    binary64 format encoding of value. The bytes are arranged in little endian order. If
         //    value is NaN, rawBytes may be set to any implementation chosen IEEE 754-2019 binary64
@@ -308,21 +306,13 @@ pub fn numericToRawBytes(
     // 3. Else,
     else blk: {
         // a. Let n be the Element Size value specified in Table 71 for Element Type type.
-        // b. Let convOp be the abstract operation named in the Conversion Operation column in Table 71 for Element Type type.
-        const conv_op = switch (T) {
-            i8 => "toInt8",
-            u8 => "toUint8",
-            i16 => "toInt16",
-            u16 => "toUint16",
-            i32 => "toInt32",
-            u32 => "toUint32",
-            i64 => "toBigInt64",
-            u64 => "toBigUint64",
-            else => unreachable,
-        };
+
+        // b. Let convOp be the abstract operation named in the Conversion Operation column in
+        //    Table 71 for Element Type type.
+        const convOp = @"type".conversationOperation();
 
         // c. Let intValue be ℝ(convOp(value)).
-        const int_value = @field(Value, conv_op)(value, agent) catch |err| try noexcept(err);
+        const int_value = convOp(value, agent) catch |err| try noexcept(err);
 
         // d. If intValue ≥ 0, then
         //     i. Let rawBytes be a List whose elements are the n-byte binary encoding of intValue.
@@ -346,7 +336,7 @@ pub fn setValueInBuffer(
     agent: *Agent,
     array_buffer: *const ArrayBuffer,
     byte_index: u53,
-    comptime T: type,
+    comptime @"type": TypedArrayElementType,
     value: Value,
     is_typed_array: bool,
     order: Order,
@@ -357,24 +347,24 @@ pub fn setValueInBuffer(
 
     // 2. Assert: There are sufficient bytes in arrayBuffer starting at byteIndex to represent a
     //    value of type.
-    std.debug.assert(array_buffer.fields.array_buffer_data.?.items.len >= byte_index + @sizeOf(T));
+    std.debug.assert(array_buffer.fields.array_buffer_data.?.items.len >= byte_index + @"type".elementSize());
 
     // 3. Assert: value is a BigInt if IsBigIntElementType(type) is true; otherwise, value is a
     //    Number.
-    std.debug.assert(value == if (isBigIntElementType(T)) .big_int else .number);
+    std.debug.assert(value == if (@"type".isBigIntElementType()) .big_int else .number);
 
     // 4. Let block be arrayBuffer.[[ArrayBufferData]].
     const block = array_buffer.fields.array_buffer_data.?;
 
     // 5. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
-    const element_size = @sizeOf(T);
+    const element_size = @"type".elementSize();
 
     // 6. If isLittleEndian is not present, set isLittleEndian to the value of the [[LittleEndian]]
     //    field of the surrounding agent's Agent Record.
     const is_little_endian = maybe_is_little_endian orelse agent.little_endian;
 
     // 7. Let rawBytes be NumericToRawBytes(type, value, isLittleEndian).
-    const raw_bytes = try numericToRawBytes(agent, T, value, is_little_endian);
+    const raw_bytes = try numericToRawBytes(agent, @"type", value, is_little_endian);
 
     // TODO: 8. If IsSharedArrayBuffer(arrayBuffer) is true, then
     if (false) {
@@ -397,35 +387,35 @@ pub fn getModifySetValueInBuffer(
     agent: *Agent,
     array_buffer: *const ArrayBuffer,
     byte_index: u53,
-    comptime T: type,
+    comptime @"type": TypedArrayElementType,
     value: Value,
     comptime op: std.builtin.AtomicRmwOp,
-) Allocator.Error!T {
+) Allocator.Error!@"type".T {
     // 1. Assert: IsDetachedBuffer(arrayBuffer) is false.
     std.debug.assert(!isDetachedBuffer(array_buffer));
 
     // 2. Assert: There are sufficient bytes in arrayBuffer starting at byteIndex to represent a
     //    value of type.
-    std.debug.assert(array_buffer.fields.array_buffer_data.?.items.len >= byte_index + @sizeOf(T));
+    std.debug.assert(array_buffer.fields.array_buffer_data.?.items.len >= byte_index + @"type".elementSize());
 
     // 3. Assert: value is a BigInt if IsBigIntElementType(type) is true; otherwise, value is a
     //    Number.
-    std.debug.assert(value == if (isBigIntElementType(T)) .big_int else .number);
+    std.debug.assert(value == if (@"type".isBigIntElementType()) .big_int else .number);
 
     // 4. Let block be arrayBuffer.[[ArrayBufferData]].
     const block = array_buffer.fields.array_buffer_data.?;
 
     // 5. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
-    const element_size = @sizeOf(T);
+    const element_size = @"type".elementSize();
 
     // 6. Let isLittleEndian be the value of the [[LittleEndian]] field of the surrounding agent's
     //    Agent Record.
     const is_little_endian = agent.little_endian;
 
     // 7. Let rawBytes be NumericToRawBytes(type, value, isLittleEndian).
-    const raw_bytes = try numericToRawBytes(agent, T, value, is_little_endian);
+    const raw_bytes = try numericToRawBytes(agent, @"type", value, is_little_endian);
 
-    var previous: T = undefined;
+    var previous: @"type".T = undefined;
 
     // TODO: 8. If IsSharedArrayBuffer(arrayBuffer) is true, then
     if (false) {
@@ -438,20 +428,20 @@ pub fn getModifySetValueInBuffer(
         // b. Let rawBytesModified be op(rawBytesRead, rawBytes).
         // c. Store the individual bytes of rawBytesModified into block, starting at block[byteIndex].
         const ptr = std.mem.bytesAsValue(
-            T,
+            @"type".T,
             block.items[@intCast(byte_index)..@intCast(byte_index + element_size)],
         );
         previous = @atomicRmw(
-            T,
-            @as(*T, @alignCast(ptr)),
+            @"type".T,
+            @as(*@"type".T, @alignCast(ptr)),
             op,
-            std.mem.bytesToValue(T, &raw_bytes),
+            std.mem.bytesToValue(@"type".T, &raw_bytes),
             .SeqCst,
         );
     }
 
     // 10. Return RawBytesToNumeric(type, rawBytesRead, isLittleEndian).
-    return rawBytesToNumeric(T, std.mem.asBytes(&previous), is_little_endian);
+    return rawBytesToNumeric(@"type", std.mem.asBytes(&previous), is_little_endian);
 }
 
 /// 25.1.5 Properties of the ArrayBuffer Constructor
