@@ -835,7 +835,7 @@ pub const DateConstructor = struct {
         const month = if (arguments.getOrNull(1)) |month| (try month.toNumber(agent)).asFloat() else 0;
 
         // 3. If date is present, let dt be ? ToNumber(date); else let dt be 1𝔽.
-        const date = if (arguments.getOrNull(2)) |date| (try date.toNumber(agent)).asFloat() else 0;
+        const date = if (arguments.getOrNull(2)) |date| (try date.toNumber(agent)).asFloat() else 1;
 
         // 4. If hours is present, let h be ? ToNumber(hours); else let h be +0𝔽.
         const hour = if (arguments.getOrNull(3)) |hours| (try hours.toNumber(agent)).asFloat() else 0;
