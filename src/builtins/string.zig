@@ -19,6 +19,8 @@ const Realm = execution.Realm;
 const StringIterator = builtins.StringIterator;
 const Value = types.Value;
 const PropertyKey = types.PropertyKey;
+const createArrayFromList = types.createArrayFromList;
+const createArrayFromListMapToValue = types.createArrayFromListMapToValue;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
@@ -391,6 +393,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "repeat", repeat, 1, realm);
         try defineBuiltinFunction(object, "search", search, 1, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
+        try defineBuiltinFunction(object, "split", split, 2, realm);
         try defineBuiltinFunction(object, "startsWith", startsWith, 1, realm);
         try defineBuiltinFunction(object, "substring", substring, 2, realm);
         try defineBuiltinFunction(object, "toLowerCase", toLowerCase, 0, realm);
@@ -993,6 +996,150 @@ pub const StringPrototype = struct {
                 std.math.lossyCast(usize, from),
                 std.math.lossyCast(usize, to),
             ),
+        );
+    }
+
+    /// 22.1.3.23 String.prototype.split ( separator, limit )
+    /// https://tc39.es/ecma262/#sec-string.prototype.split
+    fn split(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const separator_value = arguments.get(0);
+        const limit_value = arguments.get(1);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. If separator is neither undefined nor null, then
+        if (separator_value != .undefined and separator_value != .null) {
+            // a. Let splitter be ? GetMethod(separator, @@split).
+            const splitter = try separator_value.getMethod(
+                agent,
+                PropertyKey.from(agent.well_known_symbols.@"@@split"),
+            );
+
+            // b. If splitter is not undefined, then
+            if (splitter != null) {
+                // i. Return ? Call(splitter, separator, « O, limit »).
+                return Value.from(splitter.?).callAssumeCallable(
+                    separator_value,
+                    &.{ object, limit_value },
+                );
+            }
+        }
+
+        // 3. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 4. If limit is undefined, let lim be 2**32 - 1; else let lim be ℝ(? ToUint32(limit)).
+        const limit = if (limit_value == .undefined)
+            std.math.maxInt(u32)
+        else
+            try limit_value.toUint32(agent);
+
+        // 5. Let R be ? ToString(separator).
+        const separator = try separator_value.toString(agent);
+
+        // 6. If lim = 0, then
+        if (limit == 0) {
+            // a. Return CreateArrayFromList(« »).
+            return Value.from(try createArrayFromList(agent, &.{}));
+        }
+
+        // 7. If separator is undefined, then
+        if (separator_value == .undefined) {
+            // a. Return CreateArrayFromList(« S »).
+            return Value.from(try createArrayFromList(agent, &.{Value.from(string)}));
+        }
+
+        // 8. Let separatorLength be the length of R.
+        const separator_length = separator.utf16Length();
+
+        // 9. If separatorLength = 0, then
+        if (separator_length == 0) {
+            // FIXME: This is missing a bounds check. See: https://github.com/tc39/ecma262/issues/3261
+            // a. Let head be the substring of S from 0 to lim.
+            const head = try string.substring(
+                agent.gc_allocator,
+                0,
+                @min(limit, string.utf16Length()),
+            );
+
+            // b. Let codeUnits be a List consisting of the sequence of code units that are the elements of head.
+            const code_units = try head.utf16CodeUnits(agent.gc_allocator);
+
+            // c. Return CreateArrayFromList(codeUnits).
+            return Value.from(
+                try createArrayFromListMapToValue(agent, u16, code_units, struct {
+                    fn mapFn(agent_: *Agent, code_unit: u16) Allocator.Error!Value {
+                        return Value.from(std.unicode.utf16leToUtf8Alloc(
+                            agent_.gc_allocator,
+                            &.{code_unit},
+                        ) catch |err| switch (err) {
+                            error.OutOfMemory => return error.OutOfMemory,
+                            error.DanglingSurrogateHalf,
+                            error.ExpectedSecondSurrogateHalf,
+                            error.UnexpectedSecondSurrogateHalf,
+                            // TODO: Implement UTF-16 strings
+                            => return Value.from("\u{fffd}"),
+                        });
+                    }
+                }.mapFn),
+            );
+        }
+
+        // 10. If S is the empty String, return CreateArrayFromList(« S »).
+        if (separator.isEmpty()) {
+            return Value.from(try createArrayFromList(agent, &.{Value.from(string)}));
+        }
+
+        // 11. Let substrings be a new empty List.
+        var substrings = std.ArrayList(types.String).init(agent.gc_allocator);
+        defer substrings.deinit();
+
+        // 12. Let i be 0.
+        var i: usize = 0;
+
+        // 13. Let j be StringIndexOf(S, R, 0).
+        var j = string.indexOf(separator, 0);
+
+        // 14. Repeat, while j ≠ -1,
+        while (j != null) {
+            // a. Let T be the substring of S from i to j.
+            const tail = try string.substring(agent.gc_allocator, i, j.?);
+
+            // b. Append T to substrings.
+            try substrings.append(tail);
+
+            // c. If the number of elements in substrings is lim, return CreateArrayFromList(substrings).
+            if (substrings.items.len == limit) {
+                return Value.from(
+                    try createArrayFromListMapToValue(agent, types.String, substrings.items, struct {
+                        fn mapFn(_: *Agent, string_: types.String) Allocator.Error!Value {
+                            return Value.from(string_);
+                        }
+                    }.mapFn),
+                );
+            }
+
+            // d. Set i to j + separatorLength.
+            i = j.? + separator_length;
+
+            // e. Set j to StringIndexOf(S, R, i).
+            j = string.indexOf(separator, i);
+        }
+
+        // 15. Let T be the substring of S from i.
+        const tail = try string.substring(agent.gc_allocator, i, string.utf16Length());
+
+        // 16. Append T to substrings.
+        try substrings.append(tail);
+
+        // 17. Return CreateArrayFromList(substrings).
+        return Value.from(
+            try createArrayFromListMapToValue(agent, types.String, substrings.items, struct {
+                fn mapFn(_: *Agent, string_: types.String) Allocator.Error!Value {
+                    return Value.from(string_);
+                }
+            }.mapFn),
         );
     }
 
