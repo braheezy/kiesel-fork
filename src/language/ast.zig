@@ -860,7 +860,7 @@ pub const BindingElement = struct {
         // 1. Return true.
         // SingleNameBinding : BindingIdentifier Initializer
         // 1. Return false.
-        return self.initializer != null;
+        return self.initializer == null;
     }
 };
 
