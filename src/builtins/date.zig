@@ -540,7 +540,7 @@ pub fn parseDateTimeString(string: []const u8) f64 {
     }
     const time_value = makeDate(
         makeDay(
-            @floatFromInt(year),
+            @floatFromInt(if (sign == '-') -year else year),
             @floatFromInt(month - 1),
             @floatFromInt(date),
         ),
