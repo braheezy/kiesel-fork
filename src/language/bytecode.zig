@@ -21,7 +21,15 @@ test {
     _ = Vm;
 }
 
-pub fn generateBytecode(agent: *Agent, ast_node: anytype) Agent.Error!Executable {
+pub const Options = struct {
+    contained_in_strict_mode_code: bool = false,
+};
+
+pub fn generateBytecode(
+    agent: *Agent,
+    ast_node: anytype,
+    options: Options,
+) Agent.Error!Executable {
     var executable = Executable.init(agent.gc_allocator);
 
     var continue_jumps = std.ArrayList(Executable.JumpIndex).init(agent.gc_allocator);
@@ -31,7 +39,7 @@ pub fn generateBytecode(agent: *Agent, ast_node: anytype) Agent.Error!Executable
 
     var ctx = codegen.Context{
         .agent = agent,
-        .contained_in_strict_mode_code = false,
+        .contained_in_strict_mode_code = options.contained_in_strict_mode_code,
         .continue_jumps = continue_jumps,
         .break_jumps = break_jumps,
     };
@@ -70,8 +78,12 @@ pub fn generateBytecode(agent: *Agent, ast_node: anytype) Agent.Error!Executable
     return executable;
 }
 
-pub fn generateAndRunBytecode(agent: *Agent, ast_node: anytype) Agent.Error!Completion {
-    const executable = try generateBytecode(agent, ast_node);
+pub fn generateAndRunBytecode(
+    agent: *Agent,
+    ast_node: anytype,
+    options: Options,
+) Agent.Error!Completion {
+    const executable = try generateBytecode(agent, ast_node, options);
     defer executable.deinit();
 
     var vm = try Vm.init(agent);

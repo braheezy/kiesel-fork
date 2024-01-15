@@ -320,10 +320,7 @@ fn evaluateFunctionBody(
 
     // 2. Return ? Evaluation of FunctionStatementList.
     const executable = function.fields.cached_executable orelse blk: {
-        const executable = try generateBytecode(
-            agent,
-            function.fields.ecmascript_code,
-        );
+        const executable = try generateBytecode(agent, function.fields.ecmascript_code, .{});
         function.fields.cached_executable = executable;
         break :blk executable;
     };
@@ -1099,6 +1096,7 @@ fn functionDeclarationInstantiation(
                     value = (try generateAndRunBytecode(
                         agent,
                         ast.ExpressionStatement{ .expression = initializer.? },
+                        .{},
                     )).value.?;
                 }
                 if (environment == null)

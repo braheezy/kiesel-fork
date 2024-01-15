@@ -235,7 +235,7 @@ pub fn executeModule(self: *Self, capability: ?PromiseCapability) Agent.Error!vo
         try agent.execution_context_stack.append(module_context);
 
         // c. Let result be Completion(Evaluation of module.[[ECMAScriptCode]]).
-        const result = generateAndRunBytecode(agent, self.ecmascript_code);
+        const result = generateAndRunBytecode(agent, self.ecmascript_code, .{});
 
         // d. Suspend moduleContext and remove it from the execution context stack.
         _ = agent.execution_context_stack.pop();

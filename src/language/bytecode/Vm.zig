@@ -1119,6 +1119,7 @@ fn classFieldDefinitionEvaluation(
     const property_key = (try generateAndRunBytecode(
         agent,
         field_definition.property_name,
+        .{},
     )).value.?.toPropertyKey(agent) catch |err| try noexcept(err);
     const name = .{ .property_key = property_key };
 
@@ -1269,6 +1270,7 @@ fn classElementEvaluation(
             const property_name = (try generateAndRunBytecode(
                 agent,
                 method_definition.property_name,
+                .{},
             )).value.?;
             try methodDefinitionEvaluation(
                 agent,
@@ -1359,6 +1361,7 @@ fn classDefinitionEvaluation(
         const superclass_ref = generateAndRunBytecode(
             agent,
             ast.ExpressionStatement{ .expression = class_tail.class_heritage.?.* },
+            .{},
         );
 
         // d. Set the running execution context's LexicalEnvironment to env.

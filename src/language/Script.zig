@@ -120,7 +120,7 @@ pub fn evaluate(self: *Self) Agent.Error!Value {
     const result = if (result_no_value) |_| blk: {
         // a. Set result to Completion(Evaluation of script).
         // b. If result is a normal completion and result.[[Value]] is empty, then
-        if (generateAndRunBytecode(agent, script)) |completion|
+        if (generateAndRunBytecode(agent, script, .{})) |completion|
             // i. Set result to NormalCompletion(undefined).
             break :blk completion.value orelse .undefined
         else |err|
