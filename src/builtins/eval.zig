@@ -65,7 +65,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     if (script.statement_list.items.len == 0) return .undefined;
 
     // d. Let body be the ScriptBody of script.
-    // NOTE: No-op, we evaluate the script directly.
+    const body = script.statement_list;
 
     // TODO: e-h.
 
@@ -151,7 +151,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     // 28. Let result be Completion(EvalDeclarationInstantiation(body, varEnv, lexEnv, privateEnv, strictEval)).
     const result_no_value = evalDeclarationInstantiation(
         agent,
-        script,
+        body,
         variable_environment,
         lexical_environment,
         private_environment,
@@ -162,7 +162,9 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     const result = if (result_no_value) |_| blk: {
         // a. Set result to Completion(Evaluation of body).
         // 30. If result is a normal completion and result.[[Value]] is empty, then
-        if (generateAndRunBytecode(agent, script)) |completion|
+        if (generateAndRunBytecode(agent, body, .{
+            .contained_in_strict_mode_code = strict_eval,
+        })) |completion|
             // a. Set result to NormalCompletion(undefined).
             break :blk completion.value orelse .undefined
         else |err|
@@ -183,7 +185,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
 /// https://tc39.es/ecma262/#sec-evaldeclarationinstantiation
 fn evalDeclarationInstantiation(
     agent: *Agent,
-    body: ast.Script,
+    body: ast.StatementList,
     var_env: Environment,
     lex_env: Environment,
     private_env: ?*PrivateEnvironment,
@@ -195,7 +197,7 @@ fn evalDeclarationInstantiation(
     // TODO: 1. Let varNames be the VarDeclaredNames of body.
 
     // 2. Let varDeclarations be the VarScopedDeclarations of body.
-    const var_declarations = try body.statement_list.varScopedDeclarations(agent.gc_allocator);
+    const var_declarations = try body.varScopedDeclarations(agent.gc_allocator);
 
     // 3. If strict is false, then
     if (!strict) {
