@@ -298,7 +298,7 @@ pub const Math = struct {
         // 11. Assert: nx is finite and is neither +0𝔽 nor -0𝔽.
         // 12. Return an implementation-approximated Number value representing the result of the
         //     inverse tangent of the quotient ℝ(ny) / ℝ(nx).
-        return Value.from(std.math.atan2(f64, ny.asFloat(), nx.asFloat()));
+        return Value.from(std.math.atan2(ny.asFloat(), nx.asFloat()));
     }
 
     /// 21.3.2.9 Math.cbrt ( x )
