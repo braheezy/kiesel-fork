@@ -407,6 +407,8 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "@@iterator", @"@@iterator", 0, realm);
 
         if (build_options.enable_annex_b) {
+            try defineBuiltinFunction(object, "substr", substr, 2, realm);
+
             // B.2.2.15 String.prototype.trimLeft ( )
             // https://tc39.es/ecma262/#String.prototype.trimleft
             const @"%String.prototype.trimStart%" = object.propertyStorage().get(PropertyKey.from("trimStart")).?;
@@ -1395,6 +1397,59 @@ pub const StringPrototype = struct {
                 .state = .{ .it = it },
             },
         }));
+    }
+
+    /// B.2.2.1 String.prototype.substr ( start, length )
+    /// https://tc39.es/ecma262/#sec-string.prototype.substr
+    fn substr(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const start = arguments.get(0);
+        const length = arguments.get(1);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 3. Let size be the length of S.
+        const size: f64 = @floatFromInt(string.utf16Length());
+
+        // 4. Let intStart be ? ToIntegerOrInfinity(start).
+        var int_start = try start.toIntegerOrInfinity(agent);
+
+        // 5. If intStart = -∞, set intStart to 0.
+        if (std.math.isNegativeInf(int_start)) {
+            int_start = 0;
+        }
+        // 6. Else if intStart < 0, set intStart to max(size + intStart, 0).
+        else if (int_start < 0) {
+            int_start = @max(size + int_start, 0);
+        }
+        // 7. Else, set intStart to min(intStart, size).
+        else {
+            int_start = @min(int_start, size);
+        }
+
+        // 8. If length is undefined, let intLength be size; otherwise let intLength be ? ToIntegerOrInfinity(length).
+        var int_length = if (length == .undefined)
+            size
+        else
+            try length.toIntegerOrInfinity(agent);
+
+        // 9. Set intLength to the result of clamping intLength between 0 and size.
+        int_length = std.math.clamp(int_length, 0, size);
+
+        // 10. Let intEnd be min(intStart + intLength, size).
+        const int_end = @min(int_start + int_length, size);
+
+        // 11. Return the substring of S from intStart to intEnd.
+        return Value.from(
+            try string.substring(
+                agent.gc_allocator,
+                @intFromFloat(int_start),
+                @intFromFloat(int_end),
+            ),
+        );
     }
 };
 
