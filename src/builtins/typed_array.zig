@@ -718,6 +718,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinAccessor(object, "buffer", buffer, null, realm);
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinAccessor(object, "byteOffset", byteOffset, null, realm);
+        try defineBuiltinFunction(object, "copyWithin", copyWithin, 2, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
         try defineBuiltinFunction(object, "every", every, 1, realm);
         try defineBuiltinFunction(object, "fill", fill, 1, realm);
@@ -844,6 +845,186 @@ pub const TypedArrayPrototype = struct {
 
         // 7. Return 𝔽(offset).
         return Value.from(offset);
+    }
+
+    /// 23.2.3.6 %TypedArray%.prototype.copyWithin ( target, start [ , end ] )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.copywithin
+    fn copyWithin(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const target = arguments.get(0);
+        const start = arguments.get(1);
+        const end = arguments.get(2);
+
+        // 1. Let O be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
+        var ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const typed_array = ta.object;
+        const object = this_value.object;
+
+        // 3. Let len be TypedArrayLength(taRecord).
+        var len = typedArrayLength(ta);
+        const len_f64: f64 = @floatFromInt(len);
+
+        // 4. Let relativeTarget be ? ToIntegerOrInfinity(target).
+        const relative_target = try target.toIntegerOrInfinity(agent);
+
+        // 5. If relativeTarget = -∞, let targetIndex be 0.
+        const target_index_f64 = if (std.math.isNegativeInf(relative_target)) blk: {
+            break :blk 0;
+        }
+        // 6. Else if relativeTarget < 0, let targetIndex be max(len + relativeTarget, 0).
+        else if (relative_target < 0) blk: {
+            break :blk @max(len_f64 + relative_target, 0);
+        }
+        // 7. Else, let targetIndex be min(relativeTarget, len).
+        else blk: {
+            break :blk @min(relative_target, len_f64);
+        };
+        const target_index: u53 = @intFromFloat(target_index_f64);
+
+        // 8. Let relativeStart be ? ToIntegerOrInfinity(start).
+        const relative_start = try start.toIntegerOrInfinity(agent);
+
+        // 9. If relativeStart = -∞, let startIndex be 0.
+        const start_index_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
+            break :blk 0;
+        }
+        // 10. Else if relativeStart < 0, let startIndex be max(len + relativeStart, 0).
+        else if (relative_start < 0) blk: {
+            break :blk @max(len_f64 + relative_start, 0);
+        }
+        // 11. Else, let startIndex be min(relativeStart, len).
+        else blk: {
+            break :blk @min(relative_start, len_f64);
+        };
+        const start_index: u53 = @intFromFloat(start_index_f64);
+
+        // 12. If end is undefined, let relativeEnd be len; else let relativeEnd be
+        //     ? ToIntegerOrInfinity(end).
+        const relative_end = if (end == .undefined)
+            len_f64
+        else
+            try end.toIntegerOrInfinity(agent);
+
+        // 13. If relativeEnd = -∞, let endIndex be 0.
+        const end_index_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
+            break :blk 0;
+        }
+        // 14. Else if relativeEnd < 0, let endIndex be max(len + relativeEnd, 0).
+        else if (relative_end < 0) blk: {
+            break :blk @max(len_f64 + relative_end, 0);
+        }
+        // 15. Else, let endIndex be min(relativeEnd, len).
+        else blk: {
+            break :blk @min(relative_end, len_f64);
+        };
+
+        // 16. Let count be min(endIndex - startIndex, len - targetIndex).
+        const count_f64 = @min(end_index_f64 - start_index_f64, len_f64 - target_index_f64);
+
+        // 17. If count > 0, then
+        if (count_f64 > 0) {
+            const count: u53 = @intFromFloat(count_f64);
+
+            // a. NOTE: The copying must be performed in a manner that preserves the bit-level
+            //    encoding of the source data.
+
+            // b. Let buffer be O.[[ViewedArrayBuffer]].
+            const buffer_ = typed_array.fields.viewed_array_buffer;
+
+            // c. Set taRecord to MakeTypedArrayWithBufferWitnessRecord(O, seq-cst).
+            ta = makeTypedArrayWithBufferWitnessRecord(typed_array, .seq_cst);
+
+            // d. If IsTypedArrayOutOfBounds(taRecord) is true, throw a TypeError exception.
+            if (isTypedArrayOutOfBounds(ta)) {
+                return agent.throwException(.type_error, "Typed array is out of bounds", .{});
+            }
+
+            // e. Set len to TypedArrayLength(taRecord).
+            len = typedArrayLength(ta);
+
+            // f. Let elementSize be TypedArrayElementSize(O).
+            const element_size = typedArrayElementSize(typed_array);
+
+            // g. Let byteOffset be O.[[ByteOffset]].
+            const byte_offset = typed_array.fields.byte_offset;
+
+            // h. Let bufferByteLimit be (len × elementSize) + byteOffset.
+            const buffer_byte_limit = (len * element_size) + byte_offset;
+
+            // i. Let toByteIndex be (targetIndex × elementSize) + byteOffset.
+            var to_byte_index = (target_index * element_size) + byte_offset;
+
+            // j. Let fromByteIndex be (startIndex × elementSize) + byteOffset.
+            var from_byte_index = (start_index * element_size) + byte_offset;
+
+            // k. Let countBytes be count × elementSize.
+            var count_bytes = count * element_size;
+
+            // l. If fromByteIndex < toByteIndex and toByteIndex < fromByteIndex + countBytes, then
+            const direction: i2 = if (from_byte_index < to_byte_index and
+                to_byte_index < (from_byte_index + count_bytes))
+            blk: {
+                // ii. Set fromByteIndex to fromByteIndex + countBytes - 1.
+                from_byte_index += count_bytes - 1;
+
+                // iii. Set toByteIndex to toByteIndex + countBytes - 1.
+                to_byte_index += count_bytes - 1;
+
+                // i. Let direction be -1.
+                break :blk -1;
+            }
+            // m. Else,
+            else blk: {
+                // i. Let direction be 1.
+                break :blk 1;
+            };
+
+            // n. Repeat, while countBytes > 0,
+            while (count_bytes > 0) {
+                // i. If fromByteIndex < bufferByteLimit and toByteIndex < bufferByteLimit, then
+                if (from_byte_index < buffer_byte_limit and to_byte_index < buffer_byte_limit) {
+                    // 1. Let value be GetValueFromBuffer(buffer, fromByteIndex, uint8, true, unordered).
+                    const value = getValueFromBuffer(
+                        agent,
+                        buffer_,
+                        from_byte_index,
+                        .{ .T = u8 },
+                        true,
+                        .unordered,
+                        null,
+                    );
+
+                    // 2. Perform SetValueInBuffer(buffer, toByteIndex, uint8, value, true, unordered).
+                    try setValueInBuffer(
+                        agent,
+                        buffer_,
+                        to_byte_index,
+                        .{ .T = u8 },
+                        Value.from(value),
+                        true,
+                        .unordered,
+                        null,
+                    );
+
+                    // 3. Set fromByteIndex to fromByteIndex + direction.
+                    if (direction == 1) from_byte_index += 1 else from_byte_index -|= 1;
+
+                    // 4. Set toByteIndex to toByteIndex + direction.
+                    if (direction == 1) to_byte_index += 1 else to_byte_index -|= 1;
+
+                    // 5. Set countBytes to countBytes - 1.
+                    count_bytes -= 1;
+                }
+                // ii. Else,
+                else {
+                    // 1. Set countBytes to 0.
+                    count_bytes = 0;
+                }
+            }
+        }
+
+        // 18. Return O.
+        return Value.from(object);
     }
 
     /// 23.2.3.7 %TypedArray%.prototype.entries ( )
