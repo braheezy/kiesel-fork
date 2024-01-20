@@ -941,6 +941,8 @@ pub const DatePrototype = struct {
         });
 
         if (build_options.enable_annex_b) {
+            try defineBuiltinFunction(object, "getYear", getYear, 0, realm);
+
             // B.2.3.3 Date.prototype.toGMTString ( )
             // https://tc39.es/ecma262/#sec-date.prototype.togmtstring
             const @"%Date.prototype.toUTCString%" = object.propertyStorage().get(PropertyKey.from("toUTCString")).?;
@@ -2218,6 +2220,23 @@ pub const DatePrototype = struct {
 
         // 6. Return ? OrdinaryToPrimitive(O, tryFirst).
         return object.ordinaryToPrimitive(try_first);
+    }
+
+    /// B.2.3.1 Date.prototype.getYear ( )
+    /// https://tc39.es/ecma262/#sec-date.prototype.getyear
+    fn getYear(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        const date_object = try this_value.requireInternalSlot(agent, Date);
+
+        // 3. Let t be dateObject.[[DateValue]].
+        const time_value = date_object.fields.date_value;
+
+        // 4. If t is NaN, return NaN.
+        if (std.math.isNan(time_value)) return Value.nan();
+
+        // 5. Return YearFromTime(LocalTime(t)) - 1900𝔽.
+        return Value.from(yearFromTime(localTime(time_value)) - 1900);
     }
 };
 
