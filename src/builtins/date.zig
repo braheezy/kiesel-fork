@@ -942,6 +942,7 @@ pub const DatePrototype = struct {
 
         if (build_options.enable_annex_b) {
             try defineBuiltinFunction(object, "getYear", getYear, 0, realm);
+            try defineBuiltinFunction(object, "setYear", setYear, 1, realm);
 
             // B.2.3.3 Date.prototype.toGMTString ( )
             // https://tc39.es/ecma262/#sec-date.prototype.togmtstring
@@ -2237,6 +2238,47 @@ pub const DatePrototype = struct {
 
         // 5. Return YearFromTime(LocalTime(t)) - 1900𝔽.
         return Value.from(yearFromTime(localTime(time_value)) - 1900);
+    }
+
+    /// B.2.3.2 Date.prototype.setYear ( year )
+    /// https://tc39.es/ecma262/#sec-date.prototype.setyear
+    fn setYear(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const year_value = arguments.get(0);
+
+        // 1. Let dateObject be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        const date_object = try this_value.requireInternalSlot(agent, Date);
+
+        // 3. Let t be dateObject.[[DateValue]].
+        var time_value = date_object.fields.date_value;
+
+        // 4. Let y be ? ToNumber(year).
+        const year = try year_value.toNumber(agent);
+
+        // 5. If t is NaN, set t to +0𝔽; otherwise, set t to LocalTime(t).
+        time_value = if (std.math.isNan(time_value)) 0 else localTime(time_value);
+
+        // 6. Let yyyy be MakeFullYear(y).
+        const full_year = makeFullYear(year.asFloat());
+
+        // 7. Let d be MakeDay(yyyy, MonthFromTime(t), DateFromTime(t)).
+        const day_ = makeDay(
+            full_year,
+            @floatFromInt(monthFromTime(time_value)),
+            @floatFromInt(dateFromTime(time_value)),
+        );
+
+        // 8. Let date be MakeDate(d, TimeWithinDay(t)).
+        const date = makeDate(day_, timeWithinDay(time_value));
+
+        // 9. Let u be TimeClip(UTC(date)).
+        const date_value_utc = timeClip(utc(date));
+
+        // 10. Set dateObject.[[DateValue]] to u.
+        date_object.fields.date_value = date_value_utc;
+
+        // 11. Return u.
+        return Value.from(date_value_utc);
     }
 };
 
