@@ -5,6 +5,7 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -938,6 +939,13 @@ pub const DatePrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
+
+        if (build_options.enable_annex_b) {
+            // B.2.3.3 Date.prototype.toGMTString ( )
+            // https://tc39.es/ecma262/#sec-date.prototype.togmtstring
+            const @"%Date.prototype.toUTCString%" = object.propertyStorage().get(PropertyKey.from("toUTCString")).?;
+            try defineBuiltinProperty(object, "toGMTString", @"%Date.prototype.toUTCString%");
+        }
 
         return object;
     }
