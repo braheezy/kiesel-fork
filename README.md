@@ -47,7 +47,7 @@ Further reading:
 ## Build
 
 Dependencies managed through [`build.zig.zon`](./build.zig.zon) will be
-installed automatically when building for the first time
+installed automatically when building for the first time.
 
 To build and run the Kiesel CLI:
 
@@ -58,9 +58,14 @@ zig build run
 NOTE: Kiesel targets the master branch of Zig. This means that the build breaks
 semi-regularly, which I will usually fix as soon as I notice.
 
-By default code for the `Intl` will be built, which depends on `cargo` being
-available for the ICU4X library. If you don't have `cargo` installed or want to
-disable `Intl` functionality, build with `-Denable-int=false`.
+### Build Options
+
+These can be set by passing `-D<name>=<value>` to `zig build`.
+
+| Name             | Default | Description                                                                                                                             |
+| ---------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `enable-annex-b` | `true`  | Enables support for [ECMA-262 Annex B](https://tc39.es/ecma262/#sec-additional-ecmascript-features-for-web-browsers) language features. |
+| `enable-intl`    | `true`  | Enables support for [ECMA-402 (`Intl`)](https://tc39.es/ecma402/), which depends on `cargo` being available for the ICU4X library.      |
 
 ## Usage
 

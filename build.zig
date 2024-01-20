@@ -17,6 +17,11 @@ pub fn build(b: *std.Build) void {
         std.process.exit(1);
     }
 
+    const enable_annex_b = b.option(
+        bool,
+        "enable-annex-b",
+        "Enable Annex B features",
+    ) orelse true;
     const enable_intl = b.option(
         bool,
         "enable-intl",
@@ -24,6 +29,7 @@ pub fn build(b: *std.Build) void {
     ) orelse true;
 
     const options = b.addOptions();
+    options.addOption(bool, "enable_annex_b", enable_annex_b);
     options.addOption(bool, "enable_intl", enable_intl);
 
     const any_pointer = b.dependency("any_pointer", .{});
