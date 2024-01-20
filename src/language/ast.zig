@@ -996,12 +996,27 @@ pub const ForStatement = struct {
         // 1. Let declarations1 be VarScopedDeclarations of VariableDeclarationList.
         // 2. Let declarations2 be VarScopedDeclarations of Statement.
         // 3. Return the list-concatenation of declarations1 and declarations2.
-        if (self.initializer != null and self.initializer.? == .variable_statement) {
-            var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
-            try variable_declarations.appendSlice(try self.initializer.?.variable_statement.variable_declaration_list.varScopedDeclarations(allocator));
-            try variable_declarations.appendSlice(try self.consequent_statement.varScopedDeclarations(allocator));
-            return variable_declarations.toOwnedSlice();
-        }
+        if (self.initializer) |initializer| switch (initializer) {
+            .variable_statement => {
+                var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
+                try variable_declarations.appendSlice(try self.initializer.?.variable_statement.variable_declaration_list.varScopedDeclarations(allocator));
+                try variable_declarations.appendSlice(try self.consequent_statement.varScopedDeclarations(allocator));
+                return variable_declarations.toOwnedSlice();
+            },
+            // HACK: Emit lexical declarations too while they're codegen'd as var decls
+            .lexical_declaration => |lexical_declaration| {
+                var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
+                for (lexical_declaration.binding_list.items) |lexical_binding| {
+                    try variable_declarations.append(.{
+                        .binding_identifier = lexical_binding.binding_identifier,
+                        .initializer = lexical_binding.initializer,
+                    });
+                }
+                try variable_declarations.appendSlice(try self.consequent_statement.varScopedDeclarations(allocator));
+                return variable_declarations.toOwnedSlice();
+            },
+            else => {},
+        };
 
         // ForStatement : for ( Expression[opt] ; Expression[opt] ; Expression[opt] ) Statement
         // 1. Return the VarScopedDeclarations of Statement.
