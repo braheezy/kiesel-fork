@@ -12,6 +12,7 @@ const libregexp = @cImport({
     @cInclude("libregexp.h");
 });
 
+const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -793,6 +794,10 @@ pub const RegExpPrototype = struct {
         try defineBuiltinAccessor(object, "unicode", unicode, null, realm);
         try defineBuiltinAccessor(object, "unicodeSets", unicodeSets, null, realm);
 
+        if (build_options.enable_annex_b) {
+            try defineBuiltinFunction(object, "compile", compile, 2, realm);
+        }
+
         return object;
     }
 
@@ -1266,6 +1271,49 @@ pub const RegExpPrototype = struct {
         // 2. Let cu be the code unit 0x0076 (LATIN SMALL LETTER V).
         // 3. Return ? RegExpHasFlag(R, cu).
         return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_UNICODE_SETS);
+    }
+
+    /// B.2.4.1 RegExp.prototype.compile ( pattern, flags )
+    /// https://tc39.es/ecma262/#sec-regexp.prototype.compile
+    fn compile(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const pattern = arguments.get(0);
+        const flags_ = arguments.get(1);
+
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[RegExpMatcher]]).
+        const reg_exp = try this_value.requireInternalSlot(agent, RegExp);
+
+        var p: Value = undefined;
+        var f: Value = undefined;
+
+        // 3. If pattern is an Object and pattern has a [[RegExpMatcher]] internal slot, then
+        if (pattern == .object and pattern.object.is(RegExp)) {
+            // a. If flags is not undefined, throw a TypeError exception.
+            if (flags_ != .undefined) {
+                return agent.throwException(
+                    .type_error,
+                    "Flags must be undefined when pattern is a RegExp object, got {}",
+                    .{flags_},
+                );
+            }
+
+            // b. Let P be pattern.[[OriginalSource]].
+            p = Value.from(pattern.object.as(RegExp).fields.original_source);
+
+            // c. Let F be pattern.[[OriginalFlags]].
+            f = Value.from(pattern.object.as(RegExp).fields.original_flags);
+        }
+        // 4. Else,
+        else {
+            // a. Let P be pattern.
+            p = pattern;
+
+            // b. Let F be flags.
+            f = flags_;
+        }
+
+        // 5. Return ? RegExpInitialize(O, P, F).
+        return Value.from(try regExpInitialize(agent, reg_exp.object(), p, f));
     }
 };
 
