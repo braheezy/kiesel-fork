@@ -738,6 +738,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinFunction(object, "reduce", reduce, 1, realm);
         try defineBuiltinFunction(object, "reduceRight", reduceRight, 1, realm);
         try defineBuiltinFunction(object, "reverse", reverse, 0, realm);
+        try defineBuiltinFunction(object, "slice", slice, 2, realm);
         try defineBuiltinFunction(object, "some", some, 1, realm);
         try defineBuiltinFunction(object, "sort", sort, 1, realm);
         try defineBuiltinFunction(object, "subarray", subarray, 2, realm);
@@ -1882,6 +1883,190 @@ pub const TypedArrayPrototype = struct {
 
         // 7. Return O.
         return Value.from(object);
+    }
+
+    /// 23.2.3.27 %TypedArray%.prototype.slice ( start, end )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.slice
+    fn slice(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const start = arguments.get(0);
+        const end = arguments.get(1);
+
+        // 1. Let O be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
+        var ta = try validateTypedArray(agent, this_value, .seq_cst);
+        const typed_array = ta.object;
+        const object = this_value.object;
+
+        // 3. Let srcArrayLength be TypedArrayLength(taRecord).
+        const src_array_length: f64 = @floatFromInt(typedArrayLength(ta));
+
+        // 4. Let relativeStart be ? ToIntegerOrInfinity(start).
+        const relative_start = try start.toIntegerOrInfinity(agent);
+
+        // 5. If relativeStart = -∞, let startIndex be 0.
+        const start_index_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
+            break :blk 0;
+        }
+        // 6. Else if relativeStart < 0, let startIndex be max(srcArrayLength + relativeStart, 0).
+        else if (relative_start < 0) blk: {
+            break :blk @max(src_array_length + relative_start, 0);
+        }
+        // 7. Else, let startIndex be min(relativeStart, srcArrayLength).
+        else blk: {
+            break :blk @min(relative_start, src_array_length);
+        };
+        const start_index: u53 = @intFromFloat(start_index_f64);
+
+        // 8. If end is undefined, let relativeEnd be srcArrayLength; else let relativeEnd be
+        //    ? ToIntegerOrInfinity(end).
+        const relative_end = if (end == .undefined)
+            src_array_length
+        else
+            try end.toIntegerOrInfinity(agent);
+
+        // 9. If relativeEnd = -∞, let endIndex be 0.
+        var end_index_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
+            break :blk 0;
+        }
+        // 10. Else if relativeEnd < 0, let endIndex be max(srcArrayLength + relativeEnd, 0).
+        else if (relative_end < 0) blk: {
+            break :blk @max(src_array_length + relative_end, 0);
+        }
+        // 11. Else, let endIndex be min(relativeEnd, srcArrayLength).
+        else blk: {
+            break :blk @min(relative_end, src_array_length);
+        };
+        var end_index: u53 = @intFromFloat(end_index_f64);
+
+        // 12. Let countBytes be max(endIndex - startIndex, 0).
+        var count_bytes_f64 = @max(end_index_f64 - start_index_f64, 0);
+        var count_bytes: u53 = @intFromFloat(count_bytes_f64);
+
+        // 13. Let A be ? TypedArraySpeciesCreate(O, « 𝔽(countBytes) »).
+        const new_typed_array = try typedArraySpeciesCreate(
+            agent,
+            object.as(TypedArray),
+            &.{Value.from(count_bytes)},
+        );
+
+        // 14. If countBytes > 0, then
+        if (count_bytes > 0) {
+            // a. Set taRecord to MakeTypedArrayWithBufferWitnessRecord(O, seq-cst).
+            ta = makeTypedArrayWithBufferWitnessRecord(typed_array, .seq_cst);
+
+            // b. If IsTypedArrayOutOfBounds(taRecord) is true, throw a TypeError exception.
+            if (isTypedArrayOutOfBounds(ta)) {
+                return agent.throwException(.type_error, "Typed array is out of bounds", .{});
+            }
+
+            // c. Set endIndex to min(endIndex, TypedArrayLength(taRecord)).
+            end_index = @min(end_index, typedArrayLength(ta));
+            end_index_f64 = @floatFromInt(end_index);
+
+            // d. Set countBytes to max(endIndex - startIndex, 0).
+            count_bytes_f64 = @max(end_index_f64 - start_index_f64, 0);
+            count_bytes = @intFromFloat(count_bytes_f64);
+
+            // e. Let srcType be TypedArrayElementType(O).
+            const src_type = typed_array.fields.typed_array_name;
+
+            // f. Let targetType be TypedArrayElementType(A).
+            const target_type = new_typed_array.as(TypedArray).fields.typed_array_name;
+
+            // g. If srcType is targetType, then
+            if (std.mem.eql(u8, src_type, target_type)) {
+                // i. NOTE: The transfer must be performed in a manner that preserves the bit-level
+                //    encoding of the source data.
+
+                // ii. Let srcBuffer be O.[[ViewedArrayBuffer]].
+                const src_buffer = typed_array.fields.viewed_array_buffer;
+
+                // iii. Let targetBuffer be A.[[ViewedArrayBuffer]].
+                const target_buffer = new_typed_array.as(TypedArray).fields.viewed_array_buffer;
+
+                // iv. Let elementSize be TypedArrayElementSize(O).
+                const element_size = typedArrayElementSize(typed_array);
+
+                // v. Let srcByteOffset be O.[[ByteOffset]].
+                const src_byte_offset = typed_array.fields.byte_offset;
+
+                // vi. Let srcByteIndex be (startIndex × elementSize) + srcByteOffset.
+                var src_byte_index = (start_index * element_size) + src_byte_offset;
+
+                // vii. Let targetByteIndex be A.[[ByteOffset]].
+                var target_byte_index = new_typed_array.as(TypedArray).fields.byte_offset;
+
+                // viii. Let endByteIndex be targetByteIndex + (countBytes × elementSize).
+                const end_byte_index = target_byte_index + (count_bytes * element_size);
+
+                // ix. Repeat, while targetByteIndex < endByteIndex,
+                while (target_byte_index < end_byte_index) : ({
+                    src_byte_index += 1;
+                    target_byte_index += 1;
+                }) {
+                    // 1. Let value be GetValueFromBuffer(srcBuffer, srcByteIndex, uint8, true,
+                    //    unordered).
+                    const value = getValueFromBuffer(
+                        agent,
+                        src_buffer,
+                        src_byte_index,
+                        .{ .T = u8 },
+                        true,
+                        .unordered,
+                        null,
+                    );
+
+                    // 2. Perform SetValueInBuffer(targetBuffer, targetByteIndex, uint8, value,
+                    //    true, unordered).
+                    try setValueInBuffer(
+                        agent,
+                        target_buffer,
+                        target_byte_index,
+                        .{ .T = u8 },
+                        Value.from(value),
+                        true,
+                        .unordered,
+                        null,
+                    );
+
+                    // 3. Set srcByteIndex to srcByteIndex + 1.
+                    // 4. Set targetByteIndex to targetByteIndex + 1.
+                }
+            }
+            // h. Else,
+            else {
+                // i. Let n be 0.
+                var n: u53 = 0;
+
+                // ii. Let k be startIndex.
+                var k: u53 = start_index;
+
+                // iii. Repeat, while k < endIndex,
+                while (k < end_index) : ({
+                    k += 1;
+                    n += 1;
+                }) {
+                    // 1. Let Pk be ! ToString(𝔽(k)).
+                    const property_key = PropertyKey.from(k);
+
+                    // 2. Let kValue be ! Get(O, Pk).
+                    const k_value = object.get(property_key) catch |err| try noexcept(err);
+
+                    // 3. Perform ! Set(A, ! ToString(𝔽(n)), kValue, true).
+                    new_typed_array.set(
+                        PropertyKey.from(n),
+                        k_value,
+                        .throw,
+                    ) catch |err| try noexcept(err);
+
+                    // 4. Set k to k + 1.
+                    // 5. Set n to n + 1.
+                }
+            }
+        }
+
+        // 15. Return A.
+        return Value.from(new_typed_array);
     }
 
     /// 23.2.3.28 %TypedArray%.prototype.some ( callbackfn [ , thisArg ] )
