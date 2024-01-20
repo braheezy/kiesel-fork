@@ -5,6 +5,7 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -404,6 +405,13 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "trimStart", trimStart, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
         try defineBuiltinFunction(object, "@@iterator", @"@@iterator", 0, realm);
+
+        if (build_options.enable_annex_b) {
+            // B.2.2.15 String.prototype.trimLeft ( )
+            // https://tc39.es/ecma262/#String.prototype.trimleft
+            const @"%String.prototype.trimStart%" = object.propertyStorage().get(PropertyKey.from("trimStart")).?;
+            try defineBuiltinProperty(object, "trimLeft", @"%String.prototype.trimStart%");
+        }
 
         return object;
     }
