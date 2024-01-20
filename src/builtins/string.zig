@@ -411,6 +411,11 @@ pub const StringPrototype = struct {
             // https://tc39.es/ecma262/#String.prototype.trimleft
             const @"%String.prototype.trimStart%" = object.propertyStorage().get(PropertyKey.from("trimStart")).?;
             try defineBuiltinProperty(object, "trimLeft", @"%String.prototype.trimStart%");
+
+            // B.2.2.16 String.prototype.trimRight ( )
+            // https://tc39.es/ecma262/#String.prototype.trimright
+            const @"%String.prototype.trimEnd%" = object.propertyStorage().get(PropertyKey.from("trimEnd")).?;
+            try defineBuiltinProperty(object, "trimRight", @"%String.prototype.trimEnd%");
         }
 
         return object;
