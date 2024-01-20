@@ -117,6 +117,10 @@ pub fn parseNumericLiteral(
             .integer_digit, .fraction_digit, .fraction_period, .exponent_digit => {
                 if (state == .integer_digit and system == .decimal and production == .regular) {
                     state = .fraction_period;
+                } else if (state == .fraction_period and i == 1) {
+                    // Starting fraction period followed by another period, not actually a numeric
+                    // literal (happens in spead expressions)
+                    return error.InvalidNumericLiteral;
                 } else switch (consume) {
                     // Start of a member expression, terminate the literal
                     .partial => return .{
