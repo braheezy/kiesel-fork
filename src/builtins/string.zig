@@ -408,6 +408,19 @@ pub const StringPrototype = struct {
 
         if (build_options.enable_annex_b) {
             try defineBuiltinFunction(object, "substr", substr, 2, realm);
+            try defineBuiltinFunction(object, "anchor", anchor, 1, realm);
+            try defineBuiltinFunction(object, "big", big, 0, realm);
+            try defineBuiltinFunction(object, "blink", blink, 0, realm);
+            try defineBuiltinFunction(object, "bold", bold, 0, realm);
+            try defineBuiltinFunction(object, "fixed", fixed, 0, realm);
+            try defineBuiltinFunction(object, "fontcolor", fontcolor, 1, realm);
+            try defineBuiltinFunction(object, "fontsize", fontsize, 1, realm);
+            try defineBuiltinFunction(object, "italics", italics, 0, realm);
+            try defineBuiltinFunction(object, "link", link, 1, realm);
+            try defineBuiltinFunction(object, "small", small, 0, realm);
+            try defineBuiltinFunction(object, "strike", strike, 0, realm);
+            try defineBuiltinFunction(object, "sub", sub, 0, realm);
+            try defineBuiltinFunction(object, "sup", sup, 0, realm);
 
             // B.2.2.15 String.prototype.trimLeft ( )
             // https://tc39.es/ecma262/#String.prototype.trimleft
@@ -1450,6 +1463,193 @@ pub const StringPrototype = struct {
                 @intFromFloat(int_end),
             ),
         );
+    }
+
+    /// B.2.2.2.1 CreateHTML ( string, tag, attribute, value )
+    /// https://tc39.es/ecma262/#sec-createhtml
+    fn createHTML(
+        agent: *Agent,
+        string_value: Value,
+        tag: []const u8,
+        attribute: ?struct { name: []const u8, value: Value },
+    ) Agent.Error!types.String {
+        // 1. Let str be ? RequireObjectCoercible(string).
+        _ = try string_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(str).
+        const string = try string_value.toString(agent);
+
+        // 3. Let p1 be the string-concatenation of "<" and tag.
+        // 5. Let p2 be the string-concatenation of p1 and ">".
+        // 6. Let p3 be the string-concatenation of p2 and S.
+        // 7. Let p4 be the string-concatenation of p3, "</", tag, and ">".
+        // 8. Return p4.
+
+        // 4. If attribute is not the empty String, then
+        if (attribute) |attr| {
+            // a. Let V be ? ToString(value).
+            const value_string = try attr.value.toString(agent);
+
+            // b. Let escapedV be the String value that is the same as V except that each
+            //    occurrence of the code unit 0x0022 (QUOTATION MARK) in V has been replaced with
+            //    the six code unit sequence "&quot;".
+            const value_string_escaped = try std.mem.replaceOwned(
+                u8,
+                agent.gc_allocator,
+                value_string.utf8,
+                "\"",
+                "&quot;",
+            );
+
+            // c. Set p1 to the string-concatenation of:
+            // - p1
+            // - the code unit 0x0020 (SPACE)
+            // - attribute
+            // - the code unit 0x003D (EQUALS SIGN)
+            // - the code unit 0x0022 (QUOTATION MARK)
+            // - escapedV
+            // - the code unit 0x0022 (QUOTATION MARK)
+            return types.String.from(
+                try std.fmt.allocPrint(
+                    agent.gc_allocator,
+                    "<{[tag]s} {[attribute]s}=\"{[value]s}\">{[string]s}</{[tag]s}>",
+                    .{
+                        .string = string.utf8,
+                        .tag = tag,
+                        .attribute = attr.name,
+                        .value = value_string_escaped,
+                    },
+                ),
+            );
+        }
+
+        return types.String.from(
+            try std.fmt.allocPrint(
+                agent.gc_allocator,
+                "<{[tag]s}>{[string]s}</{[tag]s}>",
+                .{ .string = string.utf8, .tag = tag },
+            ),
+        );
+    }
+
+    /// B.2.2.2 String.prototype.anchor ( name )
+    /// https://tc39.es/ecma262/#sec-string.prototype.anchor
+    fn anchor(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const name = arguments.get(0);
+
+        // 1. Let S be the this value.
+        // 2. Return ? CreateHTML(S, "a", "name", name).
+        return Value.from(
+            try createHTML(agent, this_value, "a", .{ .name = "name", .value = name }),
+        );
+    }
+
+    /// B.2.2.3 String.prototype.big ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype.big
+    fn big(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let S be the this value.
+        // 2. Return ? CreateHTML(S, "big", "", "").
+        return Value.from(try createHTML(agent, this_value, "big", null));
+    }
+
+    /// B.2.2.4 String.prototype.blink ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype.blink
+    fn blink(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let S be the this value.
+        // 2. Return ? CreateHTML(S, "blink", "", "").
+        return Value.from(try createHTML(agent, this_value, "blink", null));
+    }
+
+    /// B.2.2.5 String.prototype.bold ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype.bold
+    fn bold(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let S be the this value.
+        // 2. Return ? CreateHTML(S, "b", "", "").
+        return Value.from(try createHTML(agent, this_value, "b", null));
+    }
+
+    /// B.2.2.6 String.prototype.fixed ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype.fixed
+    fn fixed(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let S be the this value.
+        // 2. Return ? CreateHTML(S, "tt", "", "").
+        return Value.from(try createHTML(agent, this_value, "tt", null));
+    }
+
+    /// B.2.2.7 String.prototype.fontcolor ( color )
+    /// https://tc39.es/ecma262/#sec-string.prototype.fontcolor
+    fn fontcolor(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const color = arguments.get(0);
+
+        // 1. Let S be the this value.
+        // 2. Return ? CreateHTML(S, "font", "color", color).
+        return Value.from(
+            try createHTML(agent, this_value, "font", .{ .name = "color", .value = color }),
+        );
+    }
+
+    /// B.2.2.8 String.prototype.fontsize ( size )
+    /// https://tc39.es/ecma262/#sec-string.prototype.fontsize
+    fn fontsize(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const size = arguments.get(0);
+
+        // 1. Let S be the this value.
+        // 2. Return ? CreateHTML(S, "font", "size", size).
+        return Value.from(
+            try createHTML(agent, this_value, "font", .{ .name = "size", .value = size }),
+        );
+    }
+
+    /// B.2.2.9 String.prototype.italics ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype.italics
+    fn italics(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let S be the this value.
+        // 2. Return ? CreateHTML(S, "i", "", "").
+        return Value.from(try createHTML(agent, this_value, "i", null));
+    }
+
+    /// B.2.2.10 String.prototype.link ( url )
+    /// https://tc39.es/ecma262/#sec-string.prototype.link
+    fn link(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const url = arguments.get(0);
+
+        // 1. Let S be the this value.
+        // 2. Return ? CreateHTML(S, "a", "href", url).
+        return Value.from(
+            try createHTML(agent, this_value, "a", .{ .name = "href", .value = url }),
+        );
+    }
+
+    /// B.2.2.11 String.prototype.small ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype.small
+    fn small(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let S be the this value.
+        // 2. Return ? CreateHTML(S, "small", "", "").
+        return Value.from(try createHTML(agent, this_value, "small", null));
+    }
+
+    /// B.2.2.12 String.prototype.strike ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype.strike
+    fn strike(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let S be the this value.
+        // 2. Return ? CreateHTML(S, "strike", "", "").
+        return Value.from(try createHTML(agent, this_value, "strike", null));
+    }
+
+    /// B.2.2.13 String.prototype.sub ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype.sub
+    fn sub(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let S be the this value.
+        // 2. Return ? CreateHTML(S, "sub", "", "").
+        return Value.from(try createHTML(agent, this_value, "sub", null));
+    }
+
+    /// B.2.2.14 String.prototype.sup ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype.sup
+    fn sup(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let S be the this value.
+        // 2. Return ? CreateHTML(S, "sup", "", "").
+        return Value.from(try createHTML(agent, this_value, "sup", null));
     }
 };
 
