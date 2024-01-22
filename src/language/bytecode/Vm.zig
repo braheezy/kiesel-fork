@@ -4,6 +4,7 @@ const Allocator = std.mem.Allocator;
 
 const SafePointer = @import("any-pointer").SafePointer;
 
+const build_options = @import("build-options");
 const ast = @import("../ast.zig");
 const builtins = @import("../../builtins.zig");
 const bytecode = @import("../bytecode.zig");
@@ -2703,7 +2704,14 @@ pub fn executeInstruction(
 
                 // 11. Assert: val is an Object.
                 .object => |object| blk: {
-                    // 12. NOTE: This step is replaced in section B.3.6.3.
+                    // B.3.6.3 Changes to the typeof Operator
+                    // https://tc39.es/ecma262/#sec-IsHTMLDDA-internal-slot-typeof
+                    if (build_options.enable_annex_b) {
+                        // 12. If val has an [[IsHTMLDDA]] internal slot, return "undefined".
+                        if (object.isHTMLDDA()) break :blk Value.from("undefined");
+                    } else {
+                        // 12. NOTE: This step is replaced in section B.3.6.3.
+                    }
 
                     // 13. If val has a [[Call]] internal slot, return "function".
                     if (object.internalMethods().call) |_| break :blk Value.from("function");

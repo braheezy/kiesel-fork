@@ -674,6 +674,17 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
         }
         if (object.internalMethods().call != null)
             return prettyPrintFunction(object, writer);
+        if (build_options.enable_annex_b and object.isHTMLDDA()) {
+            // Keep colors in sync with undefined and null below :^)
+            try tty_config.setColor(writer, .bright_black);
+            try writer.writeAll("[[");
+            try tty_config.setColor(writer, .yellow);
+            try writer.writeAll("IsHTMLDDA");
+            try tty_config.setColor(writer, .bright_black);
+            try writer.writeAll("]]");
+            try tty_config.setColor(writer, .reset);
+            return;
+        }
         return prettyPrintObject(object, writer);
     }
 

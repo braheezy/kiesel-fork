@@ -3,6 +3,7 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const build_options = @import("build-options");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const pretty_printing = @import("../../pretty_printing.zig");
@@ -341,7 +342,15 @@ pub const Value = union(enum) {
             else => {},
         }
 
-        // 3. NOTE: This step is replaced in section B.3.6.1.
+        // B.3.6.1 Changes to ToBoolean
+        // https://tc39.es/ecma262/#sec-IsHTMLDDA-internal-slot-to-boolean
+        if (build_options.enable_annex_b) {
+            // 3. If argument is an Object and argument has an [[IsHTMLDDA]] internal slot, return
+            //    false.
+            if (self == .object and self.object.isHTMLDDA()) return false;
+        } else {
+            // 3. NOTE: This step is replaced in section B.3.6.1.
+        }
 
         // 4. Return true.
         return true;
@@ -1505,7 +1514,20 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) Agent.Error!bool {
     // 3. If x is undefined and y is null, return true.
     if (x == .undefined and y == .null) return true;
 
-    // 4. NOTE: This step is replaced in section B.3.6.2.
+    // B.3.6.2 Changes to IsLooselyEqual
+    // https://tc39.es/ecma262/#sec-IsHTMLDDA-internal-slot-aec
+    if (build_options.enable_annex_b) {
+        // 4. Perform the following steps:
+        // a. If x is an Object, x has an [[IsHTMLDDA]] internal slot, and y is either undefined or
+        //    null, return true.
+        if (x == .object and x.object.isHTMLDDA() and (y == .undefined or y == .null)) return true;
+
+        // b. If x is either undefined or null, y is an Object, and y has an [[IsHTMLDDA]] internal
+        //    slot, return true.
+        if ((x == .undefined or x == .null) and y == .object and y.object.isHTMLDDA()) return true;
+    } else {
+        // 4. NOTE: This step is replaced in section B.3.6.2.
+    }
 
     // 5. If x is a Number and y is a String, return ! IsLooselyEqual(x, ! ToNumber(y)).
     if (x == .number and y == .string) {

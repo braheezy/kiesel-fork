@@ -5,6 +5,7 @@ const std = @import("std");
 
 const AnyPointer = @import("any-pointer").AnyPointer;
 
+const build_options = @import("build-options");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const spec = @import("../spec.zig");
@@ -114,6 +115,11 @@ pub inline fn prototype(self: Self) *?Self {
 
 pub inline fn extensible(self: Self) *bool {
     return &self.data.extensible;
+}
+
+pub inline fn isHTMLDDA(self: Self) bool {
+    comptime if (!build_options.enable_annex_b) @compileError("Annex B is not enabled");
+    return self.data.is_htmldda;
 }
 
 pub inline fn agent(self: Self) *Agent {

@@ -18,12 +18,24 @@ pub fn MakeObject(
     },
 ) type {
     const has_fields = options.Fields != void;
+    const has_is_htmldda = std.meta.fieldInfo(Data, .is_htmldda).type != void;
 
     // FIXME: Can we dedupe this?
-    const Args = if (has_fields) struct {
+    const Args = if (has_fields and has_is_htmldda) struct {
         fields: options.Fields,
         prototype: ?Object,
         extensible: bool = true,
+        is_htmldda: bool = false,
+        internal_methods: InternalMethods = .{},
+    } else if (has_fields) struct {
+        fields: options.Fields,
+        prototype: ?Object,
+        extensible: bool = true,
+        internal_methods: InternalMethods = .{},
+    } else if (has_is_htmldda) struct {
+        prototype: ?Object,
+        extensible: bool = true,
+        is_htmldda: bool = false,
         internal_methods: InternalMethods = .{},
     } else struct {
         prototype: ?Object,
@@ -50,6 +62,7 @@ pub fn MakeObject(
                     .extensible = args.extensible,
                     .internal_methods = args.internal_methods,
                     .property_storage = Object.PropertyStorage.init(agent.gc_allocator),
+                    .is_htmldda = if (has_is_htmldda) args.is_htmldda,
                 },
             };
             return self.object();
