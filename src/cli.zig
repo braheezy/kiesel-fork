@@ -75,6 +75,7 @@ pub const Kiesel = struct {
         const kiesel_object = try ordinaryObjectCreate(realm.agent, try realm.intrinsics.@"%Object.prototype%"());
         const gc_object = try ordinaryObjectCreate(realm.agent, try realm.intrinsics.@"%Object.prototype%"());
         try defineBuiltinFunction(gc_object, "collect", collect, 0, realm);
+        try defineBuiltinFunction(kiesel_object, "createIsHTMLDDA", createIsHTMLDDA, 0, realm);
         try defineBuiltinFunction(kiesel_object, "createRealm", createRealm, 0, realm);
         try defineBuiltinFunction(kiesel_object, "detachArrayBuffer", detachArrayBuffer, 1, realm);
         try defineBuiltinFunction(kiesel_object, "evalScript", evalScript, 1, realm);
@@ -91,6 +92,24 @@ pub const Kiesel = struct {
     fn collect(_: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
         gc.collect();
         return .undefined;
+    }
+
+    fn createIsHTMLDDA(agent: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
+        if (std.meta.fieldInfo(Object.Data, .is_htmldda).type == void) {
+            return agent.throwException(
+                .internal_error,
+                "[[IsHTMLDDA]] is not supported in this build",
+                .{},
+            );
+        } else {
+            const realm = agent.currentRealm();
+            return Value.from(
+                try kiesel.builtins.Object.create(agent, .{
+                    .prototype = try realm.intrinsics.@"%Object.prototype%"(),
+                    .is_htmldda = true,
+                }),
+            );
+        }
     }
 
     fn createRealm(agent: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
