@@ -264,8 +264,8 @@ fn validateAndApplyPropertyDescriptor(
             //    corresponding field in Desc if Desc has that field, or to the attribute's default
             //    value otherwise.
             try object.propertyStorage().set(property_key, PropertyDescriptor{
-                .get = descriptor.get,
-                .set = descriptor.set,
+                .get = descriptor.get orelse @as(?Object, null),
+                .set = descriptor.set orelse @as(?Object, null),
                 .enumerable = descriptor.enumerable orelse false,
                 .configurable = descriptor.configurable orelse false,
             });
@@ -315,14 +315,16 @@ fn validateAndApplyPropertyDescriptor(
             // i. If Desc has a [[Get]] field and SameValue(Desc.[[Get]], current.[[Get]]) is false,
             //    return false.
             if (descriptor.get != null and
-                current.get != null and
-                !descriptor.get.?.sameValue(current.get.?)) return false;
+                ((descriptor.get.? == null and current.get.? != null) or
+                (descriptor.get.? != null and current.get.? == null) or
+                !descriptor.get.?.?.sameValue(current.get.?.?))) return false;
 
             // ii. If Desc has a [[Set]] field and SameValue(Desc.[[Set]], current.[[Set]]) is
             //     false, return false.
             if (descriptor.set != null and
-                current.set != null and
-                !descriptor.set.?.sameValue(current.set.?)) return false;
+                ((descriptor.set.? == null and current.set.? != null) or
+                (descriptor.set.? != null and current.set.? == null) or
+                !descriptor.set.?.?.sameValue(current.set.?.?))) return false;
         }
         // e. Else if current.[[Writable]] is false, then
         else if (!current.writable.?) {
@@ -353,8 +355,8 @@ fn validateAndApplyPropertyDescriptor(
             //      the value of the corresponding field in Desc if Desc has that field, or to the
             //      attribute's default value otherwise.
             try object.propertyStorage().set(property_key, PropertyDescriptor{
-                .get = descriptor.get,
-                .set = descriptor.set,
+                .get = descriptor.get orelse @as(?Object, null),
+                .set = descriptor.set orelse @as(?Object, null),
                 .enumerable = enumerable,
                 .configurable = configurable,
             });
@@ -465,7 +467,7 @@ pub fn ordinaryGet(object: Object, property_key: PropertyKey, receiver: Value) A
 
     // 5. Let getter be desc.[[Get]].
     // 6. If getter is undefined, return undefined.
-    const getter = descriptor.get orelse return .undefined;
+    const getter = descriptor.get.? orelse return .undefined;
 
     // 7. Return ? Call(getter, Receiver).
     return Value.from(getter).callAssumeCallableNoArgs(receiver);
@@ -583,7 +585,7 @@ pub fn ordinarySetWithOwnDescriptor(
 
     // 4. Let setter be ownDesc.[[Set]].
     // 5. If setter is undefined, return false.
-    const setter = own_descriptor.set orelse return false;
+    const setter = own_descriptor.set.? orelse return false;
 
     // 6. Perform ? Call(setter, Receiver, « V »).
     _ = try Value.from(setter).callAssumeCallable(receiver_value, &.{value});

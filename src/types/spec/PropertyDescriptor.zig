@@ -26,10 +26,10 @@ value: ?Value = null,
 writable: ?bool = null,
 
 /// [[Get]]
-get: ?Object = null,
+get: ??Object = null,
 
 /// [[Set]]
-set: ?Object = null,
+set: ??Object = null,
 
 /// [[Enumerable]]
 enumerable: ?bool = null,
@@ -101,15 +101,7 @@ pub fn fromPropertyDescriptor(self: Self, agent: *Agent) Allocator.Error!Object 
         // a. Perform ! CreateDataPropertyOrThrow(obj, "get", Desc.[[Get]]).
         object.createDataPropertyOrThrow(
             PropertyKey.from("get"),
-            Value.from(get),
-        ) catch |err| try noexcept(err);
-    }
-    // NOTE: `get` being null can mean that it is either absent or undefined, if `set` is non-null
-    //       we can assume the latter.
-    else if (self.set) |_| {
-        object.createDataPropertyOrThrow(
-            PropertyKey.from("get"),
-            .undefined,
+            if (get) |o| Value.from(o) else .undefined,
         ) catch |err| try noexcept(err);
     }
 
@@ -118,15 +110,7 @@ pub fn fromPropertyDescriptor(self: Self, agent: *Agent) Allocator.Error!Object 
         // a. Perform ! CreateDataPropertyOrThrow(obj, "set", Desc.[[Set]]).
         object.createDataPropertyOrThrow(
             PropertyKey.from("set"),
-            Value.from(set),
-        ) catch |err| try noexcept(err);
-    }
-    // NOTE: `set` being null can mean that it is either absent or undefined, if `get` is non-null
-    //       we can assume the latter.
-    else if (self.get) |_| {
-        object.createDataPropertyOrThrow(
-            PropertyKey.from("set"),
-            .undefined,
+            if (set) |o| Value.from(o) else .undefined,
         ) catch |err| try noexcept(err);
     }
 

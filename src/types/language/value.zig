@@ -226,7 +226,7 @@ pub const Value = union(enum) {
             }
 
             // c. Set desc.[[Get]] to getter.
-            descriptor.get = if (getter != .undefined) getter.object else null;
+            descriptor.get = if (getter != .undefined) getter.object else @as(?Object, null);
         }
 
         // 13. Let hasSet be ? HasProperty(Obj, "set").
@@ -244,7 +244,7 @@ pub const Value = union(enum) {
             }
 
             // c. Set desc.[[Set]] to setter.
-            descriptor.set = if (setter != .undefined) setter.object else null;
+            descriptor.set = if (setter != .undefined) setter.object else @as(?Object, null);
         }
 
         // 15. If desc has a [[Get]] field or desc has a [[Set]] field, then
