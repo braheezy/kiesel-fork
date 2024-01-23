@@ -672,8 +672,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             const T, const prettyPrintFn = entry;
             if (object.is(T)) return prettyPrintFn(object.as(T), writer);
         }
-        if (object.internalMethods().call != null)
-            return prettyPrintFunction(object, writer);
+        // NOTE: This needs to go before pretty-printing functions as it has [[Call]] but no name.
         if (build_options.enable_annex_b and object.isHTMLDDA()) {
             // Keep colors in sync with undefined and null below :^)
             try tty_config.setColor(writer, .bright_black);
@@ -685,6 +684,8 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             try tty_config.setColor(writer, .reset);
             return;
         }
+        if (object.internalMethods().call != null)
+            return prettyPrintFunction(object, writer);
         return prettyPrintObject(object, writer);
     }
 

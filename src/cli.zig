@@ -103,12 +103,31 @@ pub const Kiesel = struct {
             );
         } else {
             const realm = agent.currentRealm();
-            return Value.from(
-                try kiesel.builtins.Object.create(agent, .{
-                    .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-                    .is_htmldda = true,
-                }),
-            );
+            const is_htmldda = try kiesel.builtins.Object.create(agent, .{
+                .prototype = try realm.intrinsics.@"%Object.prototype%"(),
+                .is_htmldda = true,
+                .internal_methods = .{
+                    .call = struct {
+                        /// This is required by [test262](https://github.com/tc39/test262/blob/main/INTERPRETING.md#host-defined-functions).
+                        ///
+                        /// What should happen when the function is being called with something
+                        /// other than no arguments or an empty string is unclear and different
+                        /// test262 runtimes disagree on this:
+                        ///
+                        /// - JSC: [Returns null unconditionally](https://github.com/WebKit/WebKit/blob/b571ec5131dcca906981b9a477d7b71e9605b6a6/Source/JavaScriptCore/jsc.cpp#L2818-L2827)
+                        /// - V8: [Returns null unconditionally](https://source.chromium.org/chromium/chromium/src/+/main:v8/src/runtime/runtime-test.cc;l=1038-1055;drc=ca3478a884cd4d1c5d7897ded9838773ca1c4fd3)
+                        /// - QuickJS: [Returns null unconditionally](https://github.com/quickjs-ng/quickjs/blob/6868fb9e2516fde4a7a3fcef113a6bb1e5ecc957/run-test262.c#L753-L757)
+                        /// - LibJS: [Returns undefined](https://github.com/SerenityOS/serenity/blob/9a207da36845e18dc4f747d8ecc98fbc0e11545c/Userland/Libraries/LibJS/Contrib/Test262/IsHTMLDDA.cpp#L20-L32)
+                        /// - SpiderMonkey: [Throws](https://searchfox.org/mozilla-central/rev/c130c69b7b863d5e28ab9524b65c27c7a9507c48/js/src/shell/js.cpp#7071-7085)
+                        ///
+                        /// We pick the most common one :^)
+                        fn call(_: Object, _: Value, _: ArgumentsList) Agent.Error!Value {
+                            return .null;
+                        }
+                    }.call,
+                },
+            });
+            return Value.from(is_htmldda);
         }
     }
 
