@@ -31,8 +31,8 @@ pub const Reflect = struct {
         try defineBuiltinFunction(object, "construct", construct, 2, realm);
         try defineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm);
         try defineBuiltinFunction(object, "deleteProperty", deleteProperty, 2, realm);
-        try defineBuiltinFunction(object, "get", get, 1, realm);
-        try defineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 3, realm);
+        try defineBuiltinFunction(object, "get", get, 2, realm);
+        try defineBuiltinFunction(object, "getOwnPropertyDescriptor", getOwnPropertyDescriptor, 2, realm);
         try defineBuiltinFunction(object, "getPrototypeOf", getPrototypeOf, 1, realm);
         try defineBuiltinFunction(object, "has", has, 2, realm);
         try defineBuiltinFunction(object, "isExtensible", isExtensible, 1, realm);
