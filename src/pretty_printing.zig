@@ -61,7 +61,13 @@ fn prettyPrintArray(
     for (0..length) |i| {
         const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i)));
         if (property_storage.get(property_key)) |property_descriptor| {
-            try writer.print("{pretty}", .{property_descriptor.value.?});
+            if (property_descriptor.value) |value| {
+                try writer.print("{pretty}", .{value});
+            } else {
+                try tty_config.setColor(writer, .dim);
+                try writer.writeAll("<accessor>");
+                try tty_config.setColor(writer, .reset);
+            }
         } else {
             try tty_config.setColor(writer, .dim);
             try writer.writeAll("<empty>");
