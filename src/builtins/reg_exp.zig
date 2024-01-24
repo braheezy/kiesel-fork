@@ -788,6 +788,7 @@ pub const RegExpPrototype = struct {
         try defineBuiltinAccessor(object, "multiline", multiline, null, realm);
         try defineBuiltinFunction(object, "@@search", @"@@search", 1, realm);
         try defineBuiltinAccessor(object, "source", source, null, realm);
+        try defineBuiltinFunction(object, "@@split", @"@@split", 2, realm);
         try defineBuiltinAccessor(object, "sticky", sticky, null, realm);
         try defineBuiltinFunction(object, "test", @"test", 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
@@ -1197,6 +1198,187 @@ pub const RegExpPrototype = struct {
         );
         _ = std.mem.replace(u8, pattern.utf8, "/", "\\/", output);
         return String.from(output);
+    }
+
+    /// 22.2.6.14 RegExp.prototype [ @@split ] ( string, limit )
+    /// https://tc39.es/ecma262/#sec-regexp.prototype-@@split
+    fn @"@@split"(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const realm = agent.currentRealm();
+        const string_value = arguments.get(0);
+        const limit_value = arguments.get(1);
+
+        // 1. Let rx be the this value.
+        // 2. If rx is not an Object, throw a TypeError exception.
+        if (this_value != .object) {
+            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+        }
+        const reg_exp = this_value.object;
+
+        // 3. Let S be ? ToString(string).
+        const string = try string_value.toString(agent);
+
+        // 4. Let C be ? SpeciesConstructor(rx, %RegExp%).
+        const constructor = try reg_exp.speciesConstructor(try realm.intrinsics.@"%RegExp%"());
+
+        // 5. Let flags be ? ToString(? Get(rx, "flags")).
+        const flags_ = try (try reg_exp.get(PropertyKey.from("flags"))).toString(agent);
+
+        // 6. If flags contains "u" or flags contains "v", let unicodeMatching be true.
+        // 7. Else, let unicodeMatching be false.
+        const unicode_matching = std.mem.indexOfScalar(u8, flags_.utf8, 'u') != null or
+            std.mem.indexOfScalar(u8, flags_.utf8, 'v') != null;
+
+        // 8. If flags contains "y", let newFlags be flags.
+        // 9. Else, let newFlags be the string-concatenation of flags and "y".
+        const new_flags = if (std.mem.indexOfScalar(u8, flags_.utf8, 'y') != null)
+            flags_
+        else
+            String.from(try std.fmt.allocPrint(agent.gc_allocator, "{s}y", .{flags_.utf8}));
+
+        // 10. Let splitter be ? Construct(C, « rx, newFlags »).
+        const splitter = try constructor.construct(
+            &.{ Value.from(reg_exp), Value.from(new_flags) },
+            null,
+        );
+
+        // 11. Let A be ! ArrayCreate(0).
+        const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
+
+        // 12. Let lengthA be 0.
+        var length_array: u32 = 0;
+
+        // 13. If limit is undefined, let lim be 2**32 - 1; else let lim be ℝ(? ToUint32(limit)).
+        const limit = if (limit_value == .undefined)
+            std.math.maxInt(u32)
+        else
+            try limit_value.toUint32(agent);
+
+        // 14. If lim = 0, return A.
+        if (limit == 0) return Value.from(array);
+
+        // 15. If S is the empty String, then
+        if (string.isEmpty()) {
+            // a. Let z be ? RegExpExec(splitter, S).
+            const z = try regExpExec(agent, splitter, string);
+
+            // b. If z is not null, return A.
+            if (z != null) return Value.from(array);
+
+            // c. Perform ! CreateDataPropertyOrThrow(A, "0", S).
+            array.createDataPropertyOrThrow(
+                PropertyKey.from(0),
+                Value.from(string),
+            ) catch |err| try noexcept(err);
+
+            // d. Return A.
+            return Value.from(array);
+        }
+
+        // 16. Let size be the length of S.
+        const size = string.utf16Length();
+
+        // 17. Let p be 0.
+        var p: u53 = 0;
+
+        // 18. Let q be p.
+        var q: u53 = p;
+
+        // 19. Repeat, while q < size,
+        while (q < size) {
+            // a. Perform ? Set(splitter, "lastIndex", 𝔽(q), true).
+            try splitter.set(PropertyKey.from("lastIndex"), Value.from(q), .throw);
+
+            // b. Let z be ? RegExpExec(splitter, S).
+            const z = try regExpExec(agent, splitter, string);
+
+            // c. If z is null, then
+            if (z == null) {
+                // i. Set q to AdvanceStringIndex(S, q, unicodeMatching).
+                q = advanceStringIndex(string, q, unicode_matching);
+            }
+            // d. Else,
+            else {
+                // i. Let e be ℝ(? ToLength(? Get(splitter, "lastIndex"))).
+                var e = try (try splitter.get(PropertyKey.from("lastIndex"))).toLength(agent);
+
+                // ii. Set e to min(e, size).
+                e = @min(e, size);
+
+                // iii. If e = p, then
+                if (e == p) {
+                    // 1. Set q to AdvanceStringIndex(S, q, unicodeMatching).
+                    q = advanceStringIndex(string, q, unicode_matching);
+                }
+                // iv. Else,
+                else {
+                    // 1. Let T be the substring of S from p to q.
+                    const tail = try string.substring(
+                        agent.gc_allocator,
+                        @intCast(p),
+                        @intCast(q),
+                    );
+
+                    // 2. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(lengthA)), T).
+                    array.createDataPropertyOrThrow(
+                        PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(length_array))),
+                        Value.from(tail),
+                    ) catch |err| try noexcept(err);
+
+                    // 3. Set lengthA to lengthA + 1.
+                    length_array += 1;
+
+                    // 4. If lengthA = lim, return A.
+                    if (length_array == limit) return Value.from(array);
+
+                    // 5. Set p to e.
+                    p = e;
+
+                    // 6. Let numberOfCaptures be ? LengthOfArrayLike(z).
+                    var number_of_captures = try z.?.lengthOfArrayLike();
+
+                    // 7. Set numberOfCaptures to max(numberOfCaptures - 1, 0).
+                    if (number_of_captures > 0) number_of_captures -= 1;
+
+                    // 8. Let i be 1.
+                    var i: u53 = 1;
+
+                    // 9. Repeat, while i ≤ numberOfCaptures,
+                    while (i <= number_of_captures) : (i += 1) {
+                        // a. Let nextCapture be ? Get(z, ! ToString(𝔽(i))).
+                        const next_capture = try z.?.get(PropertyKey.from(i));
+
+                        // b. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(lengthA)), nextCapture).
+                        array.createDataPropertyOrThrow(
+                            PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(length_array))),
+                            next_capture,
+                        ) catch |err| try noexcept(err);
+
+                        // c. Set i to i + 1.
+
+                        // d. Set lengthA to lengthA + 1.
+                        length_array += 1;
+
+                        // e. If lengthA = lim, return A.
+                        if (length_array == limit) return Value.from(array);
+                    }
+
+                    // 10. Set q to p.
+                    q = p;
+                }
+            }
+        }
+
+        // 20. Let T be the substring of S from p to size.
+        const tail = try string.substring(agent.gc_allocator, @intCast(p), size);
+
+        // 21. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(lengthA)), T).
+        array.createDataPropertyOrThrow(
+            PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(length_array))),
+            Value.from(tail),
+        ) catch |err| try noexcept(err);
+
+        // 22. Return A.
+        return Value.from(array);
     }
 
     /// 22.2.6.15 get RegExp.prototype.sticky
