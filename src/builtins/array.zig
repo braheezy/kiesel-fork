@@ -881,15 +881,15 @@ pub const ArrayPrototype = struct {
                     n += 1;
                     k += 1;
                 }) {
-                    // 1. Let P be ! ToString(𝔽(k)).
+                    // 1. Let Pk be ! ToString(𝔽(k)).
                     const property_key = PropertyKey.from(k);
 
-                    // 2. Let exists be ? HasProperty(E, P).
+                    // 2. Let exists be ? HasProperty(E, Pk).
                     const exists = try element.object.hasProperty(property_key);
 
                     // 3. If exists is true, then
                     if (exists) {
-                        // a. Let subElement be ? Get(E, P).
+                        // a. Let subElement be ? Get(E, Pk).
                         const sub_element = try element.object.get(property_key);
 
                         // b. Perform ? CreateDataPropertyOrThrow(A, ! ToString(𝔽(n)), subElement).
