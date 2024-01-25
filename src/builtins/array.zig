@@ -57,7 +57,6 @@ fn defineOwnProperty(
         // a. Return ? ArraySetLength(A, Desc).
         return arraySetLength(agent, array, property_descriptor);
     }
-
     // 2. Else if P is an array index, then
     else if (property_key.isArrayIndex()) {
         // a. Let lengthDesc be OrdinaryGetOwnProperty(A, "length").
@@ -2111,7 +2110,6 @@ pub const ArrayPrototype = struct {
     /// 23.1.3.26 Array.prototype.reverse ( )
     /// https://tc39.es/ecma262/#sec-array.prototype.reverse
     fn reverse(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
-
         // 1. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
 

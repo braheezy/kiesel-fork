@@ -395,7 +395,6 @@ pub fn makeTypedArrayWithBufferWitnessRecord(
 /// 10.4.5.11 TypedArrayByteLength ( taRecord )
 /// https://tc39.es/ecma262/#sec-typedarraybytelength
 pub fn typedArrayByteLength(ta: TypedArrayWithBufferWitness) u53 {
-
     // 1. If IsTypedArrayOutOfBounds(taRecord) is true, return 0.
     if (isTypedArrayOutOfBounds(ta)) return 0;
 
@@ -680,7 +679,6 @@ pub const TypedArrayConstructor = struct {
             // a. Let mapping be false.
             break :blk false;
         }
-
         // 4. Else,
         else blk: {
             // a. If IsCallable(mapfn) is false, throw a TypeError exception.

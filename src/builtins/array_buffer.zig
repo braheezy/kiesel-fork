@@ -595,7 +595,6 @@ pub const ArrayBufferPrototype = struct {
             // a. Let length be O.[[ArrayBufferByteLength]].
             break :blk object.fields.array_buffer_data.?.items.len;
         }
-
         // 6. Else,
         else blk: {
             // a. Let length be O.[[ArrayBufferMaxByteLength]].
