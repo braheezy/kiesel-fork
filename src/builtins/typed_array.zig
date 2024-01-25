@@ -625,6 +625,7 @@ pub const TypedArrayConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "from", from, 1, realm);
         try defineBuiltinFunction(object, "of", of, 0, realm);
         try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
 
@@ -657,6 +658,150 @@ pub const TypedArrayConstructor = struct {
             "TypedArray abstract superclass cannot be constructed",
             .{},
         );
+    }
+
+    /// 23.2.2.1 %TypedArray%.from ( source [ , mapfn [ , thisArg ] ] )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.from
+    fn from(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const source = arguments.get(0);
+        const map_fn = arguments.get(1);
+        const this_arg = arguments.get(2);
+
+        // 1. Let C be the this value.
+        const constructor = this_value;
+
+        // 2. If IsConstructor(C) is false, throw a TypeError exception.
+        if (!constructor.isConstructor()) {
+            return agent.throwException(.type_error, "{} is not a constructor", .{constructor});
+        }
+
+        // 3. If mapfn is undefined, then
+        const mapping = if (map_fn == .undefined) blk: {
+            // a. Let mapping be false.
+            break :blk false;
+        }
+
+        // 4. Else,
+        else blk: {
+            // a. If IsCallable(mapfn) is false, throw a TypeError exception.
+            if (!map_fn.isCallable()) {
+                return agent.throwException(.type_error, "{} is not callable", .{map_fn});
+            }
+
+            // b. Let mapping be true.
+            break :blk true;
+        };
+
+        // 5. Let usingIterator be ? GetMethod(source, @@iterator).
+        const using_iterator = try source.getMethod(
+            agent,
+            PropertyKey.from(agent.well_known_symbols.@"@@iterator"),
+        );
+
+        // 6. If usingIterator is not undefined, then
+        if (using_iterator != null) {
+            // a. Let values be ? IteratorToList(? GetIteratorFromMethod(source, usingIterator)).
+            const values = try (try getIteratorFromMethod(
+                agent,
+                source,
+                using_iterator.?,
+            )).toList();
+            defer agent.gc_allocator.free(values);
+
+            // b. Let len be the number of elements in values.
+            const len = values.len;
+
+            // c. Let targetObj be ? TypedArrayCreateFromConstructor(C, « 𝔽(len) »).
+            const target_object = try typedArrayCreateFromConstructor(
+                agent,
+                constructor.object,
+                &.{Value.from(@as(u53, @intCast(len)))},
+            );
+
+            // d. Let k be 0.
+            var k: u53 = 0;
+
+            // e. Repeat, while k < len,
+            while (k < len) : (k += 1) {
+                // i. Let Pk be ! ToString(𝔽(k)).
+                const property_key = PropertyKey.from(k);
+
+                // ii. Let kValue be the first element of values.
+                const k_value = values[@intCast(k)];
+
+                // iii. Remove the first element from values.
+                // NOTE: `values` is a slice, so we're not doing this.
+
+                // iv. If mapping is true, then
+                const mapped_value = if (mapping) blk: {
+                    // 1. Let mappedValue be ? Call(mapfn, thisArg, « kValue, 𝔽(k) »).
+                    break :blk try map_fn.callAssumeCallable(this_arg, &.{ k_value, Value.from(k) });
+                }
+                // v. Else,
+                else blk: {
+                    // 1. Let mappedValue be kValue.
+                    break :blk k_value;
+                };
+
+                // vi. Perform ? Set(targetObj, Pk, mappedValue, true).
+                try target_object.set(property_key, mapped_value, .throw);
+
+                // vii. Set k to k + 1.
+            }
+
+            // f. Assert: values is now an empty List.
+            // g. Return targetObj.
+            return Value.from(target_object);
+        }
+
+        // 7. NOTE: source is not an Iterable so assume it is already an array-like object.
+
+        // 8. Let arrayLike be ! ToObject(source).
+        const array_like = source.toObject(agent) catch |err| try noexcept(err);
+
+        // 9. Let len be ? LengthOfArrayLike(arrayLike).
+        const len = try array_like.lengthOfArrayLike();
+
+        // 10. Let targetObj be ? TypedArrayCreateFromConstructor(C, « 𝔽(len) »).
+        const target_object = try typedArrayCreateFromConstructor(
+            agent,
+            constructor.object,
+            &.{Value.from(len)},
+        );
+
+        // 11. Let k be 0.
+        var k: u53 = 0;
+
+        // 12. Repeat, while k < len,
+        while (k < len) : (k += 1) {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
+
+            // b. Let kValue be ? Get(arrayLike, Pk).
+            const k_value = try array_like.get(property_key);
+
+            // c. If mapping is true, then
+            const mapped_value = if (mapping) blk: {
+                // i. Let mappedValue be ? Call(mapfn, thisArg, « kValue, 𝔽(k) »).
+                break :blk try map_fn.callAssumeCallable(
+                    this_arg,
+                    &.{ k_value, Value.from(k) },
+                );
+            }
+            // d. Else,
+            else blk: {
+                // i. Let mappedValue be kValue.
+                break :blk k_value;
+            };
+
+            // e. Perform ? Set(targetObj, Pk, mappedValue, true).
+            try target_object.set(property_key, mapped_value, .throw);
+
+            // f. Set k to k + 1.
+        }
+
+        // 13. Return targetObj.
+        return Value.from(target_object);
     }
 
     /// 23.2.2.2 %TypedArray%.of ( ...items )
