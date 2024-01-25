@@ -199,11 +199,13 @@ pub const Kiesel = struct {
         const stdout = std.io.getStdOut().writer();
         const value = arguments.get(0);
         const options = try coerceOptionsToObject(agent, arguments.get(1));
+        const newline = try getOption(options, "newline", .boolean, null, true);
         const pretty = try getOption(options, "pretty", .boolean, null, false);
+        const end = if (newline) "\n" else "";
         if (pretty)
-            stdout.print("{pretty}\n", .{value}) catch {}
+            stdout.print("{pretty}{s}", .{ value, end }) catch {}
         else
-            stdout.print("{}\n", .{try value.toString(agent)}) catch {};
+            stdout.print("{}{s}", .{ try value.toString(agent), end }) catch {};
         return .undefined;
     }
 
