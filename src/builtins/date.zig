@@ -119,9 +119,10 @@ pub fn daysInYear(year: Year) DaysInYear {
 /// https://tc39.es/ecma262/#sec-dayfromyear
 pub fn dayFromYear(year: Year) f64 {
     // 1. Let ry be ℝ(y).
-    // 2. NOTE: In the following steps, each _numYearsN_ is the number of years divisible by N
-    //    that occur between the epoch and the start of year y. (The number is negative if y is
-    //    before the epoch.)
+    // 2. NOTE: In the following steps, numYears1, numYears4, numYears100, and numYears400
+    //    represent the number of years divisible by 1, 4, 100, and 400, respectively, that occur
+    //    between the epoch and the start of year y. The number is negative if y is before the
+    //    epoch.
 
     // 3. Let numYears1 be (ry - 1970).
     const num_years_1: f64 = @floatFromInt(year - 1970);
