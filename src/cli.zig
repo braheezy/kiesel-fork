@@ -135,6 +135,7 @@ pub const Kiesel = struct {
         const realm = try Realm.create(agent);
         try realm.setRealmGlobalObject(null, null);
         const global = try realm.setDefaultGlobalBindings();
+        try defineBuiltinProperty(global, "Kiesel", Value.from(try Kiesel.create(realm)));
         return Value.from(global);
     }
 
