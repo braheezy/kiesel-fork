@@ -393,6 +393,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "matchAll", matchAll, 1, realm);
         try defineBuiltinFunction(object, "repeat", repeat, 1, realm);
         try defineBuiltinFunction(object, "replace", replace, 2, realm);
+        try defineBuiltinFunction(object, "replaceAll", replaceAll, 2, realm);
         try defineBuiltinFunction(object, "search", search, 1, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
         try defineBuiltinFunction(object, "split", split, 2, realm);
@@ -1019,6 +1020,161 @@ pub const StringPrototype = struct {
                 &.{ preceding.utf8, replacement.utf8, following.utf8 },
             ),
         );
+    }
+
+    /// 22.1.3.20 String.prototype.replaceAll ( searchValue, replaceValue )
+    /// https://tc39.es/ecma262/#sec-string.prototype.replaceall
+    fn replaceAll(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const search_value = arguments.get(0);
+        var replace_value = arguments.get(1);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. If searchValue is neither undefined nor null, then
+        if (search_value != .undefined and search_value != .null) {
+            // a. Let isRegExp be ? IsRegExp(searchValue).
+            const is_reg_exp = try search_value.isRegExp();
+
+            // b. If isRegExp is true, then
+            if (is_reg_exp) {
+                // i. Let flags be ? Get(searchValue, "flags").
+                const flags = try search_value.get(agent, PropertyKey.from("flags"));
+
+                // ii. Perform ? RequireObjectCoercible(flags).
+                _ = try flags.requireObjectCoercible(agent);
+
+                // iii. If ? ToString(flags) does not contain "g", throw a TypeError exception.
+                if (std.mem.indexOfScalar(u8, (try flags.toString(agent)).utf8, 'g') == null) {
+                    return agent.throwException(
+                        .type_error,
+                        "RegExp object must have the 'g' flag set",
+                        .{},
+                    );
+                }
+            }
+
+            // c. Let replacer be ? GetMethod(searchValue, @@replace).
+            const replacer = try search_value.getMethod(
+                agent,
+                PropertyKey.from(agent.well_known_symbols.@"@@replace"),
+            );
+
+            // d. If replacer is not undefined, then
+            if (replacer != null) {
+                // i. Return ? Call(replacer, searchValue, « O, replaceValue »).
+                return Value.from(replacer.?).callAssumeCallable(
+                    search_value,
+                    &.{ object, replace_value },
+                );
+            }
+        }
+
+        // 3. Let string be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 4. Let searchString be ? ToString(searchValue).
+        const search_string = try search_value.toString(agent);
+
+        // 5. Let functionalReplace be IsCallable(replaceValue).
+        const functional_replace = replace_value.isCallable();
+
+        // 6. If functionalReplace is false, then
+        if (!functional_replace and replace_value != .string) {
+            // a. Set replaceValue to ? ToString(replaceValue).
+            replace_value = Value.from(try replace_value.toString(agent));
+        }
+
+        // 7. Let searchLength be the length of searchString.
+        const search_length = search_string.utf16Length();
+
+        // 8. Let advanceBy be max(1, searchLength).
+        const advance_by = @max(1, search_length);
+
+        // 9. Let matchPositions be a new empty List.
+        var match_positions = std.ArrayList(usize).init(agent.gc_allocator);
+        defer match_positions.deinit();
+
+        // 10. Let position be StringIndexOf(string, searchString, 0).
+        var maybe_position = string.indexOf(search_string, 0);
+
+        // 11. Repeat, while position ≠ -1,
+        while (maybe_position) |position| {
+            // a. Append position to matchPositions.
+            try match_positions.append(position);
+
+            // b. Set position to StringIndexOf(string, searchString, position + advanceBy).
+            maybe_position = string.indexOf(search_string, position + advance_by);
+        }
+
+        // 12. Let endOfLastMatch be 0.
+        var end_of_last_match: usize = 0;
+
+        // 13. Let result be the empty String.
+        var result = types.String.from("");
+
+        // 14. For each element p of matchPositions, do
+        for (match_positions.items) |position| {
+            // a. Let preserved be the substring of string from endOfLastMatch to p.
+            const preserved = try string.substring(agent.gc_allocator, end_of_last_match, position);
+
+            // b. If functionalReplace is true, then
+            const replacement = if (functional_replace) blk: {
+                // i. Let replacement be ? ToString(? Call(replaceValue, undefined, « searchString,
+                //    𝔽(p), string »)).
+                break :blk try (try replace_value.callAssumeCallable(
+                    .undefined,
+                    &.{
+                        Value.from(search_string),
+                        Value.from(@as(f64, @floatFromInt(position))),
+                        Value.from(string),
+                    },
+                )).toString(agent);
+            }
+            // c. Else,
+            else blk: {
+                // i. Assert: replaceValue is a String.
+                std.debug.assert(replace_value == .string);
+
+                // TODO: ii. Let captures be a new empty List.
+                // TODO: iii. Let replacement be ! GetSubstitution(searchString, string, p, captures,
+                //            undefined, replaceValue).
+                break :blk replace_value.string;
+            };
+
+            // d. Set result to the string-concatenation of result, preserved, and replacement.
+            result = types.String.from(
+                try std.mem.concat(agent.gc_allocator, u8, &.{
+                    result.utf8, preserved.utf8, replacement.utf8,
+                }),
+            );
+
+            // e. Set endOfLastMatch to p + searchLength.
+            end_of_last_match = position + search_length;
+        }
+
+        // 15. If endOfLastMatch < the length of string, then
+        if (end_of_last_match < string.utf16Length()) {
+            // a. Set result to the string-concatenation of result and the substring of string from
+            //    endOfLastMatch.
+            result = types.String.from(
+                try std.mem.concat(
+                    agent.gc_allocator,
+                    u8,
+                    &.{
+                        result.utf8,
+                        (try string.substring(
+                            agent.gc_allocator,
+                            end_of_last_match,
+                            string.utf16Length(),
+                        )).utf8,
+                    },
+                ),
+            );
+        }
+
+        // 16. Return result.
+        return Value.from(result);
     }
 
     /// 22.1.3.21 String.prototype.search ( regexp )
