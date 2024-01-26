@@ -5,8 +5,6 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
-const SafePointer = @import("any-pointer").SafePointer;
-
 const ast = @import("../language/ast.zig");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
@@ -20,6 +18,7 @@ const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
+const SafePointer = types.SafePointer;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const noexcept = utils.noexcept;

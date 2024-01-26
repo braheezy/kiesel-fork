@@ -5,8 +5,6 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
-const SafePointer = @import("any-pointer").SafePointer;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -20,6 +18,7 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const PropertyKeyHashMapContext = Object.PropertyStorage.PropertyKeyHashMapContext;
 const Realm = execution.Realm;
+const SafePointer = types.SafePointer;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;

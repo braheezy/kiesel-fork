@@ -6,8 +6,6 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
-const SafePointer = @import("any-pointer").SafePointer;
-
 const builtins = @import("../builtins.zig");
 const default_host_hooks = @import("default_host_hooks.zig");
 const environments = @import("environments.zig");
@@ -26,6 +24,7 @@ const Object = types.Object;
 const PropertyKeyHashMap = Object.PropertyStorage.PropertyKeyHashMap;
 const Realm = @import("Realm.zig");
 const Reference = types.Reference;
+const SafePointer = types.SafePointer;
 const SourceTextModule = language.SourceTextModule;
 const String = types.String;
 const Symbol = types.Symbol;

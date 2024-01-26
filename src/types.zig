@@ -1,5 +1,5 @@
-pub const language = @import("types/language.zig");
-pub const spec = @import("types/spec.zig");
+const language = @import("types/language.zig");
+const spec = @import("types/spec.zig");
 
 pub const BigInt = language.BigInt;
 pub const ClassFieldDefinition = spec.ClassFieldDefinition;
@@ -33,6 +33,8 @@ pub const isLooselyEqual = language.isLooselyEqual;
 pub const isStrictlyEqual = language.isStrictlyEqual;
 pub const sameValue = language.sameValue;
 pub const sameValueZero = language.sameValueZero;
+
+pub const SafePointer = @import("any-pointer").SafePointer;
 
 test {
     _ = language;

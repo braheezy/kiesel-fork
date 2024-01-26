@@ -5,8 +5,6 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
-const SafePointer = @import("any-pointer").SafePointer;
-
 const ecmascript_function = @import("ecmascript_function.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -19,6 +17,7 @@ const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
+const SafePointer = types.SafePointer;
 const String = types.String;
 const Value = types.Value;
 const setFunctionLength = ecmascript_function.setFunctionLength;

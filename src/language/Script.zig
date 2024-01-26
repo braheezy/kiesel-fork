@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const SafePointer = @import("any-pointer").SafePointer;
-
 const ast = @import("ast.zig");
 const ast_printing = @import("ast_printing.zig");
 const bytecode = @import("bytecode.zig");
@@ -15,6 +13,7 @@ const Agent = execution.Agent;
 const ExecutionContext = execution.ExecutionContext;
 const Parser = @import("Parser.zig");
 const Realm = execution.Realm;
+const SafePointer = types.SafePointer;
 const Value = types.Value;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 

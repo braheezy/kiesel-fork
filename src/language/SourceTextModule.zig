@@ -5,8 +5,6 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
-const SafePointer = @import("any-pointer").SafePointer;
-
 const ast = @import("ast.zig");
 const ast_printing = @import("ast_printing.zig");
 const bytecode = @import("bytecode.zig");
@@ -21,6 +19,7 @@ const Object = types.Object;
 const Parser = @import("Parser.zig");
 const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
 const Realm = execution.Realm;
+const SafePointer = types.SafePointer;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const newModuleEnvironment = execution.newModuleEnvironment;
 const noexcept = utils.noexcept;

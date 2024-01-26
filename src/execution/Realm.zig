@@ -6,8 +6,6 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Xoroshiro128 = std.rand.Xoroshiro128;
 
-const SafePointer = @import("any-pointer").SafePointer;
-
 const builtins = @import("../builtins.zig");
 const environments = @import("environments.zig");
 const types = @import("../types.zig");
@@ -17,6 +15,7 @@ const ExecutionContext = @import("ExecutionContext.zig");
 const GlobalEnvironment = environments.GlobalEnvironment;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
+const SafePointer = types.SafePointer;
 const addRestrictedFunctionProperties = builtins.addRestrictedFunctionProperties;
 const globalObjectProperties = builtins.globalObjectProperties;
 const newGlobalEnvironment = environments.newGlobalEnvironment;

@@ -103,7 +103,6 @@ pub fn build(b: *std.Build) void {
     exe.linkLibrary(libgc.artifact("gc"));
     exe.linkLibrary(libregexp.artifact("regexp"));
     exe.root_module.addImport("kiesel", kiesel_module);
-    exe.root_module.addImport("any-pointer", any_pointer.module("any-pointer"));
     exe.root_module.addImport("args", zig_args.module("args"));
     exe.root_module.addImport("gc", libgc.module("gc"));
     exe.root_module.addImport("zigline", zigline.module("zigline"));

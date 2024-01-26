@@ -6,7 +6,6 @@ const gc = @import("gc");
 const kiesel = @import("kiesel");
 
 const Editor = @import("zigline").Editor;
-const SafePointer = @import("any-pointer").SafePointer;
 
 const Allocator = std.mem.Allocator;
 
@@ -18,6 +17,7 @@ const ImportedModuleReferrer = kiesel.language.ImportedModuleReferrer;
 const Module = kiesel.language.Module;
 const Object = kiesel.types.Object;
 const Realm = kiesel.execution.Realm;
+const SafePointer = kiesel.types.SafePointer;
 const Script = kiesel.language.Script;
 const ScriptOrModule = kiesel.execution.ScriptOrModule;
 const SourceTextModule = kiesel.language.SourceTextModule;

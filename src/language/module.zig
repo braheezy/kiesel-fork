@@ -2,8 +2,6 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
-const SafePointer = @import("any-pointer").SafePointer;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const language = @import("../language.zig");
@@ -15,6 +13,7 @@ const ArgumentsList = builtins.ArgumentsList;
 const Object = types.Object;
 const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
 const Realm = execution.Realm;
+const SafePointer = types.SafePointer;
 const Script = language.Script;
 const SourceTextModule = language.SourceTextModule;
 const String = types.String;
