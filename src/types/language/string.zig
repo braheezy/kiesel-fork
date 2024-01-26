@@ -7,7 +7,7 @@ const Allocator = std.mem.Allocator;
 
 const tokenizer = @import("../../language/tokenizer.zig");
 
-pub const String = union(enum) {
+pub const String = struct {
     const Self = @This();
 
     /// https://tc39.es/ecma262/#ASCII-word-characters
@@ -17,6 +17,7 @@ pub const String = union(enum) {
     pub const whitespace = tokenizer.whitespace ++ tokenizer.line_terminators;
 
     utf8: []const u8,
+    utf16_length: usize,
 
     pub fn format(
         self: Self,
@@ -26,13 +27,12 @@ pub const String = union(enum) {
     ) @TypeOf(writer).Error!void {
         _ = fmt;
         _ = options;
-        switch (self) {
-            .utf8 => |utf8| try writer.print("{s}", .{utf8}),
-        }
+        try writer.print("{s}", .{self.utf8});
     }
 
     pub inline fn from(utf8: []const u8) Self {
-        return .{ .utf8 = utf8 };
+        const utf16_length = std.unicode.calcUtf16LeLen(utf8) catch unreachable;
+        return .{ .utf8 = utf8, .utf16_length = utf16_length };
     }
 
     pub inline fn isEmpty(self: Self) bool {
@@ -40,7 +40,10 @@ pub const String = union(enum) {
     }
 
     pub inline fn utf16Length(self: Self) usize {
-        return std.unicode.calcUtf16LeLen(self.utf8) catch unreachable;
+        // NOTE: Ideally we'd calulate the UTF-16 length lazily but that requires a mutable self
+        //       pointer (const-casting didn't seem to work, performance-wise).
+        //       Instead, we just do it once upfront now.
+        return self.utf16_length;
     }
 
     pub inline fn utf16CodeUnits(self: Self, allocator: Allocator) Allocator.Error![]const u16 {
