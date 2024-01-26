@@ -47,7 +47,7 @@ import_meta: ?Object,
 // TODO: [[ImportEntries]], [[LocalExportEntries]], [[IndirectExportEntries]], [[StarExportEntries]]
 
 /// [[HostDefined]]
-host_defined: SafePointer = SafePointer.null_pointer,
+host_defined: SafePointer,
 
 // [[HasTLA]]
 has_tla: bool,
@@ -61,7 +61,7 @@ pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
 pub fn parse(
     source_text: []const u8,
     realm: *Realm,
-    host_defined: SafePointer,
+    host_defined: ?SafePointer,
     ctx: Parser.ParseContext,
 ) Parser.Error!*Self {
     const agent = realm.agent;
@@ -89,7 +89,7 @@ pub fn parse(
         .environment = null,
         .namespace = null,
         .has_tla = @"async",
-        .host_defined = host_defined,
+        .host_defined = host_defined orelse SafePointer.null_pointer,
         .ecmascript_code = body,
         .context = null,
         .import_meta = null,

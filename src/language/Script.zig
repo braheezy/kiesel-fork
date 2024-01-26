@@ -28,7 +28,7 @@ ecmascript_code: ast.Script,
 // TODO: [[LoadedModules]]
 
 /// [[HostDefined]]
-host_defined: SafePointer = SafePointer.null_pointer,
+host_defined: SafePointer,
 
 pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
     try ast_printing.printScript(self.ecmascript_code, writer, 0);
@@ -39,7 +39,7 @@ pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
 pub fn parse(
     source_text: []const u8,
     realm: *Realm,
-    host_defined: SafePointer,
+    host_defined: ?SafePointer,
     ctx: Parser.ParseContext,
 ) Parser.Error!*Self {
     const agent = realm.agent;
@@ -55,7 +55,7 @@ pub fn parse(
     self.* = .{
         .realm = realm,
         .ecmascript_code = script,
-        .host_defined = host_defined,
+        .host_defined = host_defined orelse SafePointer.null_pointer,
     };
     return self;
 }
