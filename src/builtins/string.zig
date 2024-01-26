@@ -548,9 +548,7 @@ pub const StringPrototype = struct {
 
         // 6. Return the Number value for the numeric value of the code unit at index position
         //    within the String S.
-        const code_units = try string.utf16CodeUnits(agent.gc_allocator);
-        defer agent.gc_allocator.free(code_units);
-        return Value.from(code_units[position]);
+        return Value.from(string.utf16CodeUnitAt(position));
     }
 
     /// 22.1.3.4 String.prototype.codePointAt ( pos )

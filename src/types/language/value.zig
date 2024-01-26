@@ -1408,22 +1408,19 @@ pub fn isLessThan(
 
     // 3. If px is a String and py is a String, then
     if (px == .string and py == .string) {
-        const px_code_units = try px.string.utf16CodeUnits(agent.gc_allocator);
-        const py_code_units = try py.string.utf16CodeUnits(agent.gc_allocator);
-
         // a. Let lx be the length of px.
-        const lx = px_code_units.len;
+        const lx = px.string.utf16Length();
 
         // b. Let ly be the length of py.
-        const ly = py_code_units.len;
+        const ly = py.string.utf16Length();
 
         // c. For each integer i such that 0 ≤ i < min(lx, ly), in ascending order, do
         for (0..@min(lx, ly)) |i| {
             // i. Let cx be the numeric value of the code unit at index i within px.
-            const cx = px_code_units[i];
+            const cx = px.string.utf16CodeUnitAt(i);
 
             // ii. Let cy be the numeric value of the code unit at index i within py.
-            const cy = py_code_units[i];
+            const cy = py.string.utf16CodeUnitAt(i);
 
             // iii. If cx < cy, return true.
             if (cx < cy) return true;

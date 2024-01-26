@@ -1,6 +1,7 @@
 //! 6.1.4 The String Type
 //! https://tc39.es/ecma262/#sec-ecmascript-language-types-string-type
 
+const builtin = @import("builtin");
 const std = @import("std");
 
 const Allocator = std.mem.Allocator;
@@ -110,6 +111,48 @@ pub const String = struct {
         var i: usize = 0;
         while (it.nextCodepoint()) |code_point| : (i += 1) {
             if (i == index) return code_point;
+        }
+        unreachable;
+    }
+
+    pub fn utf16CodeUnitAt(self: Self, index: usize) u16 {
+        // NOTE: This is based on `std.unicode.utf8ToUtf16LeWithNull()`, including the SIMD fast path.
+
+        var remaining = self.utf8;
+        var i: usize = 0;
+        // Need support for std.simd.interlace
+        if (builtin.zig_backend != .stage2_x86_64 and comptime !builtin.cpu.arch.isMIPS()) {
+            const chunk_len = std.simd.suggestVectorLength(u8) orelse 1;
+            const Chunk = @Vector(chunk_len, u8);
+
+            // Fast path. Check for and encode ASCII characters at the start of the input.
+            while (remaining.len >= chunk_len) : (i += chunk_len) {
+                const chunk: Chunk = remaining[0..chunk_len].*;
+                const mask: Chunk = @splat(0x80);
+                if (@reduce(.Or, chunk & mask == mask)) {
+                    // found a non ASCII code unit
+                    break;
+                }
+                const zeroes: Chunk = @splat(0);
+                const utf16_chunk: [chunk_len * 2]u8 align(@alignOf(u16)) = std.simd.interlace(.{ chunk, zeroes });
+                if (i + chunk_len > index) {
+                    return std.mem.bytesAsSlice(u16, &utf16_chunk)[@mod(index, chunk_len)];
+                }
+                remaining = remaining[chunk_len..];
+            }
+        }
+
+        var it = std.unicode.Utf8View.initUnchecked(remaining).iterator();
+        while (it.nextCodepoint()) |code_point| : (i += 1) {
+            if (code_point < 0x10000) {
+                if (i == index) return @intCast(code_point);
+            } else {
+                defer i += 1;
+                const high = @as(u16, @intCast((code_point - 0x10000) >> 10)) + 0xD800;
+                const low = @as(u16, @intCast(code_point & 0x3FF)) + 0xDC00;
+                if (i == index) return @intCast(high);
+                if (i + 1 == index) return @intCast(low);
+            }
         }
         unreachable;
     }
