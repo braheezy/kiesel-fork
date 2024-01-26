@@ -38,7 +38,7 @@ global_object: Object,
 global_env: *GlobalEnvironment,
 
 /// [[HostDefined]]
-host_defined: SafePointer = SafePointer.null_pointer,
+host_defined: SafePointer,
 
 // TODO: [[TemplateMap]], [[LoadedModules]]
 
@@ -64,6 +64,8 @@ pub fn create(agent: *Agent) Allocator.Error!*Self {
 
         // 4. Set realmRec.[[GlobalEnv]] to undefined.
         .global_env = undefined,
+
+        .host_defined = SafePointer.null_pointer,
 
         // TODO: 5. Set realmRec.[[TemplateMap]] to a new empty List.
     };

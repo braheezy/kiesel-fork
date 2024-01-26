@@ -24,5 +24,5 @@ pub const JobCallback = struct {
     callback: Object,
 
     /// [[HostDefined]]
-    host_defined: SafePointer = SafePointer.null_pointer,
+    host_defined: SafePointer,
 };
