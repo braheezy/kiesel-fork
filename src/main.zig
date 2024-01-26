@@ -4,6 +4,8 @@ pub const language = @import("language.zig");
 pub const types = @import("types.zig");
 pub const utils = @import("utils.zig");
 
+pub const gc = @import("gc");
+
 pub const version_string = "0.1.0";
 
 test {
