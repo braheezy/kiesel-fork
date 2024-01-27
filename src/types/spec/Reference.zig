@@ -9,6 +9,7 @@ const language = @import("../language.zig");
 const Agent = execution.Agent;
 const Environment = execution.Environment;
 const PropertyKey = language.Object.PropertyKey;
+const String = language.String;
 const Symbol = language.Symbol;
 const Value = language.Value;
 
@@ -70,6 +71,9 @@ pub fn isPrivateReference(self: Self) bool {
 /// 6.2.5.5 GetValue ( V )
 /// https://tc39.es/ecma262/#sec-getvalue
 pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
+    const realm = agent.currentRealm();
+    _ = realm;
+
     // 1. If V is not a Reference Record, return V.
     // NOTE: This is handled at the call site.
 
@@ -87,8 +91,25 @@ pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
 
     // 3. If IsPropertyReference(V) is true, then
     if (self.isPropertyReference()) {
+        const referenced_name = switch (self.referenced_name) {
+            .string => |string| PropertyKey.from(string),
+            .symbol => |symbol| PropertyKey.from(symbol),
+            .private_name => unreachable,
+        };
+
         // a. Let baseObj be ? ToObject(V.[[Base]]).
-        const base_object = try self.base.value.toObject(agent);
+        // NOTE: For property lookups on primitives we can directly go to the prototype instead
+        //       of creating a wrapper object, unless we're doing a numeric or 'length' property
+        //       lookup on a string.
+        const base_object = (if (self.base.value != .string or switch (referenced_name) {
+            // TODO: Avoid creating the object just for "string".length lookups
+            .string => |string| !string.eql(String.from("length")),
+            .integer_index => false,
+            .symbol => true,
+        })
+            try self.base.value.synthesizePrototype(agent)
+        else
+            null) orelse try self.base.value.toObject(agent);
 
         // b. If IsPrivateReference(V) is true, then
         if (self.isPrivateReference()) {
@@ -97,11 +118,6 @@ pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
         }
 
         // c. Return ? baseObj.[[Get]](V.[[ReferencedName]], GetThisValue(V)).
-        const referenced_name = switch (self.referenced_name) {
-            .string => |string| PropertyKey.from(string),
-            .symbol => |symbol| PropertyKey.from(symbol),
-            .private_name => unreachable,
-        };
         return base_object.internalMethods().get(
             base_object,
             referenced_name,

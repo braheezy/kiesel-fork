@@ -1275,6 +1275,21 @@ pub const Value = union(enum) {
         // 3. Return true.
         return true;
     }
+
+    /// Non-standard helper to get the right prototype for a primitive value, if applicable.
+    pub fn synthesizePrototype(self: Self, agent: *Agent) Allocator.Error!?Object {
+        const realm = agent.currentRealm();
+
+        return switch (self) {
+            .null, .undefined => null,
+            .boolean => try realm.intrinsics.@"%Boolean.prototype%"(),
+            .string => try realm.intrinsics.@"%String.prototype%"(),
+            .symbol => try realm.intrinsics.@"%Symbol.prototype%"(),
+            .number => try realm.intrinsics.@"%Number.prototype%"(),
+            .big_int => try realm.intrinsics.@"%BigInt.prototype%"(),
+            .object => null,
+        };
+    }
 };
 
 /// 7.1.4.1.1 StringToNumber ( str )
