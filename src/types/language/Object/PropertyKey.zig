@@ -62,9 +62,9 @@ pub const PropertyKey = union(enum) {
 
     fn eqlStringAndIntegerIndex(string: String, index: IntegerIndex) bool {
         const len = comptime std.fmt.count("{d}", .{std.math.maxInt(IntegerIndex)});
-        var index_string: [len]u8 = undefined;
-        _ = std.fmt.bufPrint(&index_string, "{d}", .{index}) catch unreachable;
-        return string.eql(String.from(&index_string));
+        var buf: [len]u8 = undefined;
+        const index_string = std.fmt.bufPrint(&buf, "{d}", .{index}) catch unreachable;
+        return string.eql(String.from(index_string));
     }
 
     /// Non-standard helper to check `PropertyKey` equality without going through `sameValue()`.
