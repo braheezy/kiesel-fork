@@ -43,6 +43,7 @@ Further reading:
 - [Kiesel Devlog #3: Accessors, Date/Map/Set, test262 history graph](https://linus.dev/posts/kiesel-devlog-3/)
 - [Kiesel Devlog #4: The biggest update yet!](https://linus.dev/posts/kiesel-devlog-4/)
 - [Kiesel Devlog #5: Progress powered by the Shadow web engine](https://linus.dev/posts/kiesel-devlog-5/)
+- [Kiesel Devlog #6: Catching Up :^)](https://linus.dev/posts/kiesel-devlog-6/)
 
 ## Build
 
