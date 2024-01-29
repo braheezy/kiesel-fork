@@ -1301,9 +1301,14 @@ pub fn stringToNumber(string: String) Number {
     // 3. If literal is a List of errors, return NaN.
     // 4. Return StringNumericValue of literal.
     // TODO: Implement the proper string parsing grammar!
-    const value = trim(string.utf8, &String.whitespace);
-    if (value.len == 0) return Number.from(0);
-    return Number.from(std.fmt.parseFloat(f64, value) catch std.math.nan(f64));
+    const trimmed_string = trim(string.utf8, &String.whitespace);
+    if (trimmed_string.len == 0) return Number.from(0);
+    if (std.mem.eql(u8, trimmed_string, "-Infinity")) return Number.from(-std.math.inf(f64));
+    if (std.mem.eql(u8, trimmed_string, "+Infinity")) return Number.from(std.math.inf(f64));
+    if (std.mem.eql(u8, trimmed_string, "Infinity")) return Number.from(std.math.inf(f64));
+    // Don't pass other strings starting with "inf" to `std.fmt.parseFloat()`
+    if (std.ascii.startsWithIgnoreCase(trimmed_string, "inf")) return Number.from(std.math.nan(f64));
+    return Number.from(std.fmt.parseFloat(f64, trimmed_string) catch std.math.nan(f64));
 }
 
 /// 7.1.14 StringToBigInt ( str )
