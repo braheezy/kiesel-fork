@@ -32,6 +32,71 @@ const ordinaryDefineOwnProperty = builtins.ordinaryDefineOwnProperty;
 const ordinaryGetOwnProperty = builtins.ordinaryGetOwnProperty;
 const regExpCreate = builtins.regExpCreate;
 
+pub const StringPadPlacement = enum { start, end };
+
+/// 22.1.3.17.2 StringPad ( S, maxLength, fillString, placement )
+/// https://tc39.es/ecma262/#sec-stringpad
+pub fn stringPad(
+    agent: *Agent,
+    string: types.String,
+    max_length: usize,
+    fill_string: types.String,
+    placement: StringPadPlacement,
+) Agent.Error!types.String {
+    // 1. Let stringLength be the length of S.
+    const string_length = string.utf16Length();
+
+    // 2. If maxLength ≤ stringLength, return S.
+    if (max_length <= string_length) return string;
+
+    // 3. If fillString is the empty String, return S.
+    if (fill_string.isEmpty()) return string;
+
+    // 4. Let fillLen be maxLength - stringLength.
+    const fill_len = max_length - string_length;
+
+    // 5. Let truncatedStringFiller be the String value consisting of repeated concatenations of
+    //    fillString truncated to length fillLen.
+    const truncated_string_filler_utf8 = blk: {
+        const fill_string_code_units = try fill_string.utf16CodeUnits(agent.gc_allocator);
+        defer agent.gc_allocator.free(fill_string_code_units);
+
+        const truncated_string_filler = try agent.gc_allocator.alloc(u16, fill_len);
+        defer agent.gc_allocator.free(truncated_string_filler);
+
+        var i: usize = 0;
+        while (i < fill_len) : (i += fill_string_code_units.len) {
+            const dest = truncated_string_filler[i..@min(i + fill_string_code_units.len, fill_len)];
+            @memcpy(dest, fill_string_code_units[0..dest.len]);
+        }
+
+        break :blk std.unicode.utf16leToUtf8Alloc(
+            agent.gc_allocator,
+            truncated_string_filler,
+        ) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.DanglingSurrogateHalf,
+            error.ExpectedSecondSurrogateHalf,
+            error.UnexpectedSecondSurrogateHalf,
+            => return agent.throwException(
+                .internal_error,
+                "UTF-16 strings are not implemented yet",
+                .{},
+            ),
+        };
+    };
+    defer agent.gc_allocator.free(truncated_string_filler_utf8);
+
+    // 6. If placement is start, return the string-concatenation of truncatedStringFiller and S.
+    // 7. Else, return the string-concatenation of S and truncatedStringFiller.
+    return types.String.from(
+        try std.mem.concat(agent.gc_allocator, u8, switch (placement) {
+            .start => &.{ truncated_string_filler_utf8, string.utf8 },
+            .end => &.{ string.utf8, truncated_string_filler_utf8 },
+        }),
+    );
+}
+
 /// 10.4.3.1 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-getownproperty-p
 fn getOwnProperty(object: Object, property_key: PropertyKey) Allocator.Error!?PropertyDescriptor {
@@ -391,6 +456,8 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "lastIndexOf", lastIndexOf, 1, realm);
         try defineBuiltinFunction(object, "match", match, 1, realm);
         try defineBuiltinFunction(object, "matchAll", matchAll, 1, realm);
+        try defineBuiltinFunction(object, "padEnd", padEnd, 1, realm);
+        try defineBuiltinFunction(object, "padStart", padStart, 1, realm);
         try defineBuiltinFunction(object, "repeat", repeat, 1, realm);
         try defineBuiltinFunction(object, "replace", replace, 2, realm);
         try defineBuiltinFunction(object, "replaceAll", replaceAll, 2, realm);
@@ -878,6 +945,75 @@ pub const StringPrototype = struct {
             agent,
             PropertyKey.from(agent.well_known_symbols.@"@@matchAll"),
             &.{Value.from(string)},
+        );
+    }
+
+    /// 22.1.3.16 String.prototype.padEnd ( maxLength [ , fillString ] )
+    /// https://tc39.es/ecma262/#sec-string.prototype.padend
+    fn padEnd(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const max_length = arguments.get(0);
+        const fill_string = arguments.get(1);
+
+        // 1. let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Return ? StringPaddingBuiltinsImpl(O, maxLength, fillString, end).
+        return Value.from(
+            try stringPaddingBuiltinsImpl(agent, object, max_length, fill_string, .end),
+        );
+    }
+
+    /// 22.1.3.17 String.prototype.padStart ( maxLength [ , fillString ] )
+    /// https://tc39.es/ecma262/#sec-string.prototype.padstart
+    fn padStart(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const max_length = arguments.get(0);
+        const fill_string = arguments.get(1);
+
+        // 1. let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Return ? StringPaddingBuiltinsImpl(O, maxLength, fillString, start).
+        return Value.from(
+            try stringPaddingBuiltinsImpl(agent, object, max_length, fill_string, .start),
+        );
+    }
+
+    /// 22.1.3.17.1 StringPaddingBuiltinsImpl ( O, maxLength, fillString, placement )
+    /// https://tc39.es/ecma262/#sec-stringpaddingbuiltinsimpl
+    fn stringPaddingBuiltinsImpl(
+        agent: *Agent,
+        object: Value,
+        max_length: Value,
+        fill_string_value: Value,
+        placement: StringPadPlacement,
+    ) Agent.Error!types.String {
+        // 1. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 2. Let intMaxLength be ℝ(? ToLength(maxLength)).
+        const int_max_length = try max_length.toLength(agent);
+
+        // 3. Let stringLength be the length of S.
+        const string_length = string.utf16Length();
+
+        // 4. If intMaxLength ≤ stringLength, return S.
+        if (int_max_length <= string_length) return string;
+
+        // 5. If fillString is undefined, set fillString to the String value consisting solely of
+        //    the code unit 0x0020 (SPACE).
+        // 6. Else, set fillString to ? ToString(fillString).
+        const fill_string = if (fill_string_value == .undefined)
+            types.String.from(" ")
+        else
+            try fill_string_value.toString(agent);
+
+        // 7. Return StringPad(S, intMaxLength, fillString, placement).
+        return stringPad(
+            agent,
+            string,
+            @intCast(int_max_length),
+            fill_string,
+            placement,
         );
     }
 
