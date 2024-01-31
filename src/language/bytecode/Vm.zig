@@ -2733,8 +2733,16 @@ pub fn executeInstruction(
 }
 
 pub fn run(self: *Self, executable: Executable) Agent.Error!Completion {
-    while (self.fetchInstruction(executable)) |instruction| {
-        self.executeInstruction(executable, instruction) catch |err| {
+    while (@call(
+        .always_inline,
+        Self.fetchInstruction,
+        .{ self, executable },
+    )) |instruction| {
+        @call(
+            .always_inline,
+            Self.executeInstruction,
+            .{ self, executable, instruction },
+        ) catch |err| {
             if (self.exception_jump_target_stack.items.len != 0) {
                 self.exception = self.agent.exception;
                 self.agent.exception = null;
