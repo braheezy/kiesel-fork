@@ -71,9 +71,6 @@ pub fn isPrivateReference(self: Self) bool {
 /// 6.2.5.5 GetValue ( V )
 /// https://tc39.es/ecma262/#sec-getvalue
 pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
-    const realm = agent.currentRealm();
-    _ = realm;
-
     // 1. If V is not a Reference Record, return V.
     // NOTE: This is handled at the call site.
 
@@ -99,11 +96,12 @@ pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
 
         // a. Let baseObj be ? ToObject(V.[[Base]]).
         // NOTE: For property lookups on primitives we can directly go to the prototype instead
-        //       of creating a wrapper object, unless we're doing a numeric or 'length' property
-        //       lookup on a string.
+        //       of creating a wrapper object, or return the value for `"string".length`.
         const base_object = (if (self.base.value != .string or switch (referenced_name) {
-            // TODO: Avoid creating the object just for "string".length lookups
-            .string => |string| !string.eql(String.from("length")),
+            .string => |string| if (string.eql(String.from("length")))
+                return Value.from(@as(u53, @intCast(self.base.value.string.utf16Length())))
+            else
+                true,
             .integer_index => false,
             .symbol => true,
         })
