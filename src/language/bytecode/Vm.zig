@@ -63,6 +63,7 @@ stack: std.ArrayList(Value),
 iterator_stack: std.ArrayList(Iterator),
 reference_stack: std.ArrayList(?Reference),
 exception_jump_target_stack: std.ArrayList(usize),
+function_arguments: std.ArrayList(Value),
 result: ?Value = null,
 exception: ?Value = null,
 iterator: ?Iterator = null,
@@ -73,6 +74,7 @@ pub fn init(agent: *Agent) Allocator.Error!Self {
     const iterator_stack = std.ArrayList(Iterator).init(agent.gc_allocator);
     const reference_stack = std.ArrayList(?Reference).init(agent.gc_allocator);
     const exception_jump_target_stack = std.ArrayList(usize).init(agent.gc_allocator);
+    const function_arguments = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 8);
     return .{
         .agent = agent,
         .ip = 0,
@@ -80,6 +82,7 @@ pub fn init(agent: *Agent) Allocator.Error!Self {
         .iterator_stack = iterator_stack,
         .reference_stack = reference_stack,
         .exception_jump_target_stack = exception_jump_target_stack,
+        .function_arguments = function_arguments,
     };
 }
 
@@ -88,6 +91,7 @@ pub fn deinit(self: Self) void {
     self.iterator_stack.deinit();
     self.reference_stack.deinit();
     self.exception_jump_target_stack.deinit();
+    self.function_arguments.deinit();
 }
 
 fn fetchInstruction(self: *Self, executable: Executable) ?Instruction {
@@ -2091,15 +2095,14 @@ pub fn executeInstruction(
             const maybe_reference = self.reference_stack.getLastOrNull() orelse null;
             const argument_count = self.fetchIndex(executable);
             const strict = self.fetchIndex(executable) == 1;
-            var arguments = try std.ArrayList(Value).initCapacity(
-                self.agent.gc_allocator,
-                argument_count,
-            );
+            self.function_arguments.clearRetainingCapacity();
+            try self.function_arguments.ensureTotalCapacity(argument_count);
             for (0..argument_count) |_| {
                 const argument = self.stack.pop();
-                try arguments.append(argument);
+                self.function_arguments.appendAssumeCapacity(argument);
             }
-            std.mem.reverse(Value, arguments.items);
+            std.mem.reverse(Value, self.function_arguments.items);
+            const arguments = self.function_arguments.items;
             const this_value = self.stack.pop();
             const function = self.stack.pop();
 
@@ -2116,7 +2119,7 @@ pub fn executeInstruction(
                     // a. If SameValue(func, %eval%) is true, then
                     function.object.sameValue(eval))
                 {
-                    self.result = try directEval(self.agent, arguments.items, strict);
+                    self.result = try directEval(self.agent, arguments, strict);
                     return;
                 }
             }
@@ -2125,7 +2128,7 @@ pub fn executeInstruction(
                 self.agent,
                 function,
                 this_value,
-                arguments.items,
+                arguments,
             );
         },
         .evaluate_import_call => {
@@ -2172,18 +2175,16 @@ pub fn executeInstruction(
         },
         .evaluate_new => {
             const argument_count = self.fetchIndex(executable);
-            var arguments = try std.ArrayList(Value).initCapacity(
-                self.agent.gc_allocator,
-                argument_count,
-            );
-            defer arguments.deinit();
+            self.function_arguments.clearRetainingCapacity();
+            try self.function_arguments.ensureTotalCapacity(argument_count);
             for (0..argument_count) |_| {
                 const argument = self.stack.pop();
-                try arguments.append(argument);
+                self.function_arguments.appendAssumeCapacity(argument);
             }
-            std.mem.reverse(Value, arguments.items);
+            std.mem.reverse(Value, self.function_arguments.items);
+            const arguments = self.function_arguments.items;
             const constructor = self.stack.pop();
-            self.result = try evaluateNew(self.agent, constructor, arguments.items);
+            self.result = try evaluateNew(self.agent, constructor, arguments);
         },
         // 13.3.3 EvaluatePropertyAccessWithExpressionKey ( baseValue, expression, strict )
         // https://tc39.es/ecma262/#sec-evaluate-property-access-with-expression-key
@@ -2249,16 +2250,14 @@ pub fn executeInstruction(
             const function = try getSuperConstructor(self.agent);
 
             // 4. Let argList be ? ArgumentListEvaluation of Arguments.
-            var arguments = try std.ArrayList(Value).initCapacity(
-                self.agent.gc_allocator,
-                argument_count,
-            );
-            defer arguments.deinit();
+            self.function_arguments.clearRetainingCapacity();
+            try self.function_arguments.ensureTotalCapacity(argument_count);
             for (0..argument_count) |_| {
                 const argument = self.stack.pop();
-                try arguments.append(argument);
+                self.function_arguments.appendAssumeCapacity(argument);
             }
-            std.mem.reverse(Value, arguments.items);
+            std.mem.reverse(Value, self.function_arguments.items);
+            const arguments = self.function_arguments.items;
 
             // 5. If IsConstructor(func) is false, throw a TypeError exception.
             if (!function.isConstructor()) {
@@ -2270,7 +2269,7 @@ pub fn executeInstruction(
             }
 
             // 6. Let result be ? Construct(func, argList, newTarget).
-            var result = try function.object.construct(arguments.items, new_target);
+            var result = try function.object.construct(arguments, new_target);
 
             // 7. Let thisER be GetThisEnvironment().
             const this_environment = self.agent.getThisEnvironment();
