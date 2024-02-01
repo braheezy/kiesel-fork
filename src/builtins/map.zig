@@ -430,7 +430,7 @@ pub const MapPrototype = struct {
     }
 };
 
-const MapData = ValueHashMap(Value);
+const MapData = ValueHashMap(Value, sameValueZero);
 const IterableKeys = std.ArrayList(?Value);
 
 /// 24.1.4 Properties of Map Instances

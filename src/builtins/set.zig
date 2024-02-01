@@ -27,6 +27,7 @@ const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const sameValueZero = types.sameValueZero;
 
 /// 24.2.2 Properties of the Set Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-set-constructor
@@ -328,7 +329,7 @@ pub const SetPrototype = struct {
     }
 };
 
-const SetData = ValueHashMap(void);
+const SetData = ValueHashMap(void, sameValueZero);
 const IterableValues = std.ArrayList(?Value);
 
 /// 24.2.4 Properties of Set Instances

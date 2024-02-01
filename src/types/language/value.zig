@@ -1102,7 +1102,7 @@ pub const Value = union(enum) {
     fn GroupByContainer(comptime key_coercion: KeyCoercion) type {
         return switch (key_coercion) {
             .property => PropertyKeyHashMap(std.ArrayList(Value)),
-            .zero => ValueHashMap(std.ArrayList(Value)),
+            .zero => ValueHashMap(std.ArrayList(Value), sameValue),
         };
     }
 
@@ -1805,7 +1805,7 @@ pub fn getOption(
     return coerced_value;
 }
 
-pub fn ValueHashMap(comptime V: type) type {
+pub fn ValueHashMap(comptime V: type, comptime eqlFn: fn (Value, Value) bool) type {
     return std.ArrayHashMap(Value, V, struct {
         const Self = @This();
 
@@ -1827,7 +1827,7 @@ pub fn ValueHashMap(comptime V: type) type {
         }
 
         pub fn eql(_: Self, a: Value, b: Value, _: usize) bool {
-            return sameValueZero(a, b);
+            return eqlFn(a, b);
         }
     }, false);
 }
