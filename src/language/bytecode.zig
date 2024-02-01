@@ -66,15 +66,6 @@ pub fn generateBytecode(
         stdout.writeAll("\n") catch {};
     }
 
-    try executable.optimize();
-    if (agent.options.debug.print_bytecode) {
-        const stdout = std.io.getStdOut().writer();
-        stdout.writeAll("Optimized Bytecode\n") catch {};
-        stdout.writeAll("------------------\n") catch {};
-        executable.print(stdout) catch {};
-        stdout.writeAll("\n") catch {};
-    }
-
     return executable;
 }
 
@@ -83,7 +74,7 @@ pub fn generateAndRunBytecode(
     ast_node: anytype,
     options: Options,
 ) Agent.Error!Completion {
-    const executable = try generateBytecode(agent, ast_node, options);
+    var executable = try generateBytecode(agent, ast_node, options);
     defer executable.deinit();
 
     var vm = try Vm.init(agent);

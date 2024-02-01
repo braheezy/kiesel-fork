@@ -102,21 +102,18 @@ fn fetchInstruction(self: *Self, executable: Executable) ?Instruction {
 }
 
 fn fetchConstant(self: *Self, executable: Executable) Value {
-    const constants = executable.constants.items;
     const index = self.fetchIndex(executable);
-    return constants[index];
+    return executable.constants.unmanaged.entries.get(index).key;
 }
 
 fn fetchIdentifier(self: *Self, executable: Executable) []const u8 {
-    const identifiers = executable.identifiers.items;
     const index = self.fetchIndex(executable);
-    return identifiers[index];
+    return executable.identifiers.unmanaged.entries.get(index).key;
 }
 
 fn fetchFunctionOrClass(self: *Self, executable: Executable) Executable.FunctionOrClass {
-    const functions_and_classes = executable.functions_and_classes.items;
     const index = self.fetchIndex(executable);
-    return functions_and_classes[index];
+    return executable.functions_and_classes.items[index];
 }
 
 fn fetchIndex(self: *Self, executable: Executable) Executable.IndexType {

@@ -10,14 +10,15 @@ const Instruction = instructions_.Instruction;
 const InstructionIterator = instructions_.InstructionIterator;
 const IteratorKind = types.IteratorKind;
 const Value = types.Value;
+const ValueArrayHashMap = types.ValueArrayHashMap;
 const sameValue = types.sameValue;
 
 const Self = @This();
 
 allocator: Allocator,
 instructions: std.ArrayList(Instruction),
-constants: std.ArrayList(Value),
-identifiers: std.ArrayList(ast.Identifier),
+constants: ValueArrayHashMap(void, sameValue),
+identifiers: std.StringArrayHashMap(void),
 functions_and_classes: std.ArrayList(FunctionOrClass),
 
 pub const FunctionOrClass = union(enum) {
@@ -39,13 +40,13 @@ pub fn init(allocator: Allocator) Self {
     return .{
         .allocator = allocator,
         .instructions = std.ArrayList(Instruction).init(allocator),
-        .constants = std.ArrayList(Value).init(allocator),
-        .identifiers = std.ArrayList(ast.Identifier).init(allocator),
+        .constants = ValueArrayHashMap(void, sameValue).init(allocator),
+        .identifiers = std.StringArrayHashMap(void).init(allocator),
         .functions_and_classes = std.ArrayList(FunctionOrClass).init(allocator),
     };
 }
 
-pub fn deinit(self: Self) void {
+pub fn deinit(self: *Self) void {
     self.instructions.deinit();
     self.constants.deinit();
     self.identifiers.deinit();
@@ -56,12 +57,14 @@ pub fn addInstruction(self: *Self, instruction: Instruction) Allocator.Error!voi
     try self.instructions.append(instruction);
 }
 
-pub fn addConstant(self: *Self, constant: Value) Allocator.Error!void {
-    try self.constants.append(constant);
+pub fn addConstant(self: *Self, constant: Value) Allocator.Error!usize {
+    const result = try self.constants.getOrPut(constant);
+    return result.index;
 }
 
-pub fn addIdentifier(self: *Self, identifier: ast.Identifier) Allocator.Error!void {
-    try self.identifiers.append(identifier);
+pub fn addIdentifier(self: *Self, identifier: ast.Identifier) Allocator.Error!usize {
+    const result = try self.identifiers.getOrPut(identifier);
+    return result.index;
 }
 
 pub fn addFunctionOrClass(self: *Self, function_or_class: FunctionOrClass) Allocator.Error!void {
@@ -75,8 +78,8 @@ pub fn addInstructionWithConstant(
 ) Error!void {
     std.debug.assert(instruction.hasConstantIndex());
     try self.addInstruction(instruction);
-    try self.addConstant(constant);
-    try self.addIndex(self.constants.items.len - 1);
+    const index = try self.addConstant(constant);
+    try self.addIndex(index);
 }
 
 pub fn addInstructionWithIdentifier(
@@ -86,8 +89,8 @@ pub fn addInstructionWithIdentifier(
 ) Error!void {
     std.debug.assert(instruction.hasIdentifierIndex());
     try self.addInstruction(instruction);
-    try self.addIdentifier(identifier);
-    try self.addIndex(self.identifiers.items.len - 1);
+    const index = try self.addIdentifier(identifier);
+    try self.addIndex(index);
 }
 
 pub fn addInstructionWithFunctionOrClass(
@@ -161,7 +164,7 @@ pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
             },
             .create_catch_binding => {
                 const identifier_index = iterator.instruction_args[0].?;
-                const identifier = self.identifiers.items[identifier_index];
+                const identifier = self.identifiers.unmanaged.entries.get(identifier_index).key;
                 try writer.print("{s} [{}]", .{ identifier, identifier_index });
             },
             .evaluate_call => {
@@ -184,7 +187,7 @@ pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
             .evaluate_property_access_with_identifier_key => {
                 const identifier_index = iterator.instruction_args[0].?;
                 const strict = iterator.instruction_args[1].? == 1;
-                const identifier = self.identifiers.items[identifier_index];
+                const identifier = self.identifiers.unmanaged.entries.get(identifier_index).key;
                 try writer.print(
                     "{s} [{}] (strict: {})",
                     .{ identifier, identifier_index, strict },
@@ -217,7 +220,7 @@ pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
             },
             .load_constant, .store_constant => {
                 const constant_index = iterator.instruction_args[0].?;
-                const constant = self.constants.items[constant_index];
+                const constant = self.constants.unmanaged.entries.get(constant_index).key;
                 try writer.print("{pretty} [{}]", .{ constant, constant_index });
             },
             .object_define_method => {
@@ -229,7 +232,7 @@ pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
             .resolve_binding => {
                 const identifier_index = iterator.instruction_args[0].?;
                 const strict = iterator.instruction_args[1].? == 1;
-                const identifier = self.identifiers.items[identifier_index];
+                const identifier = self.identifiers.unmanaged.entries.get(identifier_index).key;
                 try writer.print("{s} [{}] (strict: {})", .{ identifier, identifier_index, strict });
             },
             else => {},
@@ -237,63 +240,4 @@ pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
         try writer.writeAll("\n");
     }
     try writer.print("{}: <end>\n", .{self.instructions.items.len});
-}
-
-pub fn optimize(self: *Self) Allocator.Error!void {
-    try self.deduplicateConstants();
-    try self.deduplicateIdentifiers();
-}
-
-fn deduplicate(
-    self: *Self,
-    comptime T: type,
-    comptime has_index_getter: []const u8,
-    items: []const T,
-    eql: fn (T, T) bool,
-) Allocator.Error!std.ArrayList(T) {
-    var deduplicated_list = std.ArrayList(T).init(self.allocator);
-    var iterator = InstructionIterator{ .instructions = self.instructions.items };
-    while (iterator.next()) |instruction| if (@field(Instruction, has_index_getter)(instruction)) {
-        const item = items[iterator.instruction_args[0].?];
-        const index = for (deduplicated_list.items, 0..) |other_item, index| {
-            if (eql(item, other_item)) break index;
-        } else blk: {
-            try deduplicated_list.append(item);
-            break :blk deduplicated_list.items.len - 1;
-        };
-        const bytes = std.mem.toBytes(@as(IndexType, @intCast(index)));
-        self.instructions.items[iterator.instruction_index + 1] = @enumFromInt(bytes[0]);
-        self.instructions.items[iterator.instruction_index + 2] = @enumFromInt(bytes[1]);
-    };
-    return deduplicated_list;
-}
-
-fn deduplicateConstants(self: *Self) Allocator.Error!void {
-    const deduplicated_constants = try self.deduplicate(
-        Value,
-        "hasConstantIndex",
-        self.constants.items,
-        struct {
-            fn eql(a: Value, b: Value) bool {
-                return sameValue(a, b);
-            }
-        }.eql,
-    );
-    self.constants.deinit();
-    self.constants = deduplicated_constants;
-}
-
-fn deduplicateIdentifiers(self: *Self) Allocator.Error!void {
-    const deduplicated_identifiers = try self.deduplicate(
-        ast.Identifier,
-        "hasIdentifierIndex",
-        self.identifiers.items,
-        struct {
-            fn eql(a: ast.Identifier, b: ast.Identifier) bool {
-                return std.mem.eql(u8, a, b);
-            }
-        }.eql,
-    );
-    self.identifiers.deinit();
-    self.identifiers = deduplicated_identifiers;
 }
