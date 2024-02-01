@@ -19,7 +19,7 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
-const ValueHashMap = types.ValueHashMap;
+const ValueArrayHashMap = types.ValueArrayHashMap;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createMapIterator = builtins.createMapIterator;
@@ -430,7 +430,7 @@ pub const MapPrototype = struct {
     }
 };
 
-const MapData = ValueHashMap(Value, sameValueZero);
+const MapData = ValueArrayHashMap(Value, sameValueZero);
 const IterableKeys = std.ArrayList(?Value);
 
 /// 24.1.4 Properties of Map Instances

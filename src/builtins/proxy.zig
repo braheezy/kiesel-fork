@@ -16,7 +16,7 @@ const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
-const PropertyKeyHashMapContext = Object.PropertyStorage.PropertyKeyHashMapContext;
+const PropertyKeyArrayHashMapContext = Object.PropertyStorage.PropertyKeyArrayHashMapContext;
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
 const Value = types.Value;
@@ -773,7 +773,7 @@ fn ownPropertyKeys(object: Object) Agent.Error!std.ArrayList(PropertyKey) {
     const PropertyKeySet = std.HashMap(
         PropertyKey,
         void,
-        PropertyKeyHashMapContext,
+        PropertyKeyArrayHashMapContext,
         80,
     );
 

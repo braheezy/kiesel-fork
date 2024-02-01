@@ -15,7 +15,7 @@ const ArgumentsList = builtins.ArgumentsList;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
-const PropertyKeyHashMap = Object.PropertyStorage.PropertyKeyHashMap;
+const PropertyKeyArrayHashMap = Object.PropertyStorage.PropertyKeyArrayHashMap;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
@@ -161,7 +161,7 @@ const JSONSerialization = struct {
     replacer_function: ?Object,
 
     /// [[PropertyList]]
-    property_list: ?PropertyKeyHashMap(void),
+    property_list: ?PropertyKeyArrayHashMap(void),
 
     /// [[Gap]]
     gap: String,
@@ -372,7 +372,7 @@ fn serializeJSONObject(
     var keys = state.property_list orelse blk: {
         const keys = try value.enumerableOwnProperties(.key);
         defer keys.deinit();
-        var converted = PropertyKeyHashMap(void).init(agent.gc_allocator);
+        var converted = PropertyKeyArrayHashMap(void).init(agent.gc_allocator);
         try converted.ensureUnusedCapacity(keys.items.len);
         for (keys.items) |key| {
             converted.putAssumeCapacityNoClobber(key.toPropertyKey(agent) catch |err| try noexcept(err), {});
@@ -697,7 +697,7 @@ pub const JSON = struct {
         const indent = String.from("");
 
         // 3. Let PropertyList be undefined.
-        var property_list: ?PropertyKeyHashMap(void) = null;
+        var property_list: ?PropertyKeyArrayHashMap(void) = null;
         defer if (property_list) |*p| p.deinit();
 
         // 4. Let ReplacerFunction be undefined.
@@ -718,7 +718,7 @@ pub const JSON = struct {
                 // ii. If isArray is true, then
                 if (is_array) {
                     // 1. Set PropertyList to a new empty List.
-                    property_list = PropertyKeyHashMap(void).init(agent.gc_allocator);
+                    property_list = PropertyKeyArrayHashMap(void).init(agent.gc_allocator);
 
                     // 2. Let len be ? LengthOfArrayLike(replacer).
                     const len = try replacer.object.lengthOfArrayLike();

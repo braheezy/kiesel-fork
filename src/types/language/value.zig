@@ -18,7 +18,7 @@ const Number = @import("number.zig").Number;
 const Object = @import("Object.zig");
 const PropertyDescriptor = @import("../spec/PropertyDescriptor.zig");
 const PropertyKey = Object.PropertyKey;
-const PropertyKeyHashMap = Object.PropertyStorage.PropertyKeyHashMap;
+const PropertyKeyArrayHashMap = Object.PropertyStorage.PropertyKeyArrayHashMap;
 const String = @import("string.zig").String;
 const Symbol = @import("Symbol.zig");
 const arrayCreate = builtins.arrayCreate;
@@ -1101,8 +1101,8 @@ pub const Value = union(enum) {
 
     fn GroupByContainer(comptime key_coercion: KeyCoercion) type {
         return switch (key_coercion) {
-            .property => PropertyKeyHashMap(std.ArrayList(Value)),
-            .zero => ValueHashMap(std.ArrayList(Value), sameValue),
+            .property => PropertyKeyArrayHashMap(std.ArrayList(Value)),
+            .zero => ValueArrayHashMap(std.ArrayList(Value), sameValue),
         };
     }
 
@@ -1805,7 +1805,7 @@ pub fn getOption(
     return coerced_value;
 }
 
-pub fn ValueHashMap(comptime V: type, comptime eqlFn: fn (Value, Value) bool) type {
+pub fn ValueArrayHashMap(comptime V: type, comptime eqlFn: fn (Value, Value) bool) type {
     return std.ArrayHashMap(Value, V, struct {
         const Self = @This();
 

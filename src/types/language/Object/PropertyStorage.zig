@@ -12,11 +12,11 @@ const Symbol = @import("../Symbol.zig");
 const Self = @This();
 
 // TODO: Shapes, linear storage for arrays, etc. Gotta start somewhere :^)
-hash_map: PropertyKeyHashMap(PropertyDescriptor),
+hash_map: PropertyKeyArrayHashMap(PropertyDescriptor),
 
 pub fn init(allocator: Allocator) Self {
     return .{
-        .hash_map = PropertyKeyHashMap(PropertyDescriptor).init(allocator),
+        .hash_map = PropertyKeyArrayHashMap(PropertyDescriptor).init(allocator),
     };
 }
 
@@ -46,7 +46,7 @@ pub fn remove(self: *Self, property_key: PropertyKey) void {
     std.debug.assert(removed);
 }
 
-pub const PropertyKeyHashMapContext = struct {
+pub const PropertyKeyArrayHashMapContext = struct {
     const hashString = std.hash_map.hashString;
     const hashSymbol = std.hash_map.getAutoHashFn(Symbol.Id, void);
     const hashIntegerIndex = std.hash_map.getAutoHashFn(PropertyKey.IntegerIndex, void);
@@ -64,14 +64,14 @@ pub const PropertyKeyHashMapContext = struct {
     }
 };
 
-pub fn PropertyKeyHashMap(comptime V: type) type {
+pub fn PropertyKeyArrayHashMap(comptime V: type) type {
     return std.ArrayHashMap(PropertyKey, V, struct {
         pub fn hash(self: @This(), property_key: PropertyKey) u32 {
-            return @truncate(PropertyKeyHashMapContext.hash(self, property_key));
+            return @truncate(PropertyKeyArrayHashMapContext.hash(self, property_key));
         }
 
         pub fn eql(self: @This(), a: PropertyKey, b: PropertyKey, _: usize) bool {
-            return PropertyKeyHashMapContext.eql(self, a, b);
+            return PropertyKeyArrayHashMapContext.eql(self, a, b);
         }
     }, false);
 }

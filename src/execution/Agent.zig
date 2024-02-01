@@ -21,7 +21,7 @@ const ImportedModuleReferrer = language.ImportedModuleReferrer;
 const Job = @import("job.zig").Job;
 const JobCallback = @import("job.zig").JobCallback;
 const Object = types.Object;
-const PropertyKeyHashMap = Object.PropertyStorage.PropertyKeyHashMap;
+const PropertyKeyArrayHashMap = Object.PropertyStorage.PropertyKeyArrayHashMap;
 const Realm = @import("Realm.zig");
 const Reference = types.Reference;
 const SafePointer = types.SafePointer;
@@ -80,7 +80,7 @@ pub const WellKnownSymbols = struct {
 };
 
 pub const HostHooks = struct {
-    pub const ImportMetaProperties = PropertyKeyHashMap(Value);
+    pub const ImportMetaProperties = PropertyKeyArrayHashMap(Value);
 
     pub const ResizeArrayBufferHandled = enum {
         handled,

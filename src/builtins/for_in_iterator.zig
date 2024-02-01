@@ -15,7 +15,7 @@ const ArgumentsList = builtins.ArgumentsList;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
-const PropertyKeyHashMap = Object.PropertyStorage.PropertyKeyHashMap;
+const PropertyKeyArrayHashMap = Object.PropertyStorage.PropertyKeyArrayHashMap;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
@@ -41,7 +41,7 @@ pub fn createForInIterator(agent: *Agent, object: Object) Allocator.Error!Object
                 .object_was_visited = false,
 
                 // 4. Set iterator.[[VisitedKeys]] to a new empty List.
-                .visited_keys = PropertyKeyHashMap(void).init(agent.gc_allocator),
+                .visited_keys = PropertyKeyArrayHashMap(void).init(agent.gc_allocator),
 
                 // 5. Set iterator.[[RemainingKeys]] to a new empty List.
                 .remaining_keys = std.ArrayList(PropertyKey).init(agent.gc_allocator),
@@ -160,7 +160,7 @@ pub const ForInIterator = MakeObject(.{
             object_was_visited: bool,
 
             /// [[VisitedKeys]]
-            visited_keys: PropertyKeyHashMap(void),
+            visited_keys: PropertyKeyArrayHashMap(void),
 
             /// [[RemainingKeys]]
             remaining_keys: std.ArrayList(PropertyKey),
