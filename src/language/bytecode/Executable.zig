@@ -20,6 +20,7 @@ instructions: std.ArrayList(Instruction),
 constants: ValueArrayHashMap(void, sameValue),
 identifiers: std.StringArrayHashMap(void),
 functions_and_classes: std.ArrayList(FunctionOrClass),
+environment_lookup_cache_size: usize = 0,
 
 pub const FunctionOrClass = union(enum) {
     arrow_function: ast.ArrowFunction,
@@ -232,8 +233,12 @@ pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
             .resolve_binding => {
                 const identifier_index = iterator.instruction_args[0].?;
                 const strict = iterator.instruction_args[1].? == 1;
+                const environment_lookup_cache_index = iterator.instruction_args[2].?;
                 const identifier = self.identifiers.unmanaged.entries.get(identifier_index).key;
-                try writer.print("{s} [{}] (strict: {})", .{ identifier, identifier_index, strict });
+                try writer.print(
+                    "{s} [{}] (strict: {}, environment_lookup_cache_index: {})",
+                    .{ identifier, identifier_index, strict, environment_lookup_cache_index },
+                );
             },
             else => {},
         }

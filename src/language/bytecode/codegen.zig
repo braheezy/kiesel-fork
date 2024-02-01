@@ -17,6 +17,7 @@ const temporaryChange = utils.temporaryChange;
 pub const Context = struct {
     agent: *Agent,
     contained_in_strict_mode_code: bool = false,
+    environment_lookup_cache_index: Executable.IndexType = 0,
     continue_jumps: std.ArrayList(Executable.JumpIndex),
     break_jumps: std.ArrayList(Executable.JumpIndex),
 };
@@ -43,6 +44,8 @@ pub fn codegenIdentifierReference(
     try executable.addInstructionWithIdentifier(.resolve_binding, node);
     const strict = ctx.contained_in_strict_mode_code;
     try executable.addIndex(@intFromBool(strict));
+    try executable.addIndex(ctx.environment_lookup_cache_index);
+    ctx.environment_lookup_cache_index += 1;
 }
 
 pub fn codegenPrimaryExpression(
@@ -1628,6 +1631,8 @@ pub fn codegenVariableDeclaration(
         try executable.addInstructionWithIdentifier(.resolve_binding, node.binding_identifier);
         const strict = ctx.contained_in_strict_mode_code;
         try executable.addIndex(@intFromBool(strict));
+        try executable.addIndex(ctx.environment_lookup_cache_index);
+        ctx.environment_lookup_cache_index += 1;
         try executable.addInstruction(.push_reference);
 
         // TODO: 3. If IsAnonymousFunctionDefinition(Initializer) is true, then

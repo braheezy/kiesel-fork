@@ -35,6 +35,10 @@ pub const Environment = union(enum) {
     global_environment: *GlobalEnvironment,
     module_environment: *ModuleEnvironment,
 
+    pub const LookupCacheEntry = struct {
+        distance: usize,
+    };
+
     pub fn outerEnv(self: Self) ?Self {
         return switch (self) {
             inline .function_environment,
@@ -191,47 +195,66 @@ pub const Environment = union(enum) {
 /// 9.1.2.1 GetIdentifierReference ( env, name, strict )
 /// https://tc39.es/ecma262/#sec-getidentifierreference
 pub fn getIdentifierReference(
-    maybe_env: ?Environment,
+    start_env: Environment,
     name: []const u8,
     strict: bool,
+    maybe_lookup_cache_entry: ?*?Environment.LookupCacheEntry,
 ) Agent.Error!Reference {
-    // 1. If env is null, then
-    if (maybe_env == null) {
-        // a. Return the Reference Record {
-        //      [[Base]]: unresolvable, [[ReferencedName]]: name, [[Strict]]: strict, [[ThisValue]]: empty
-        //    }.
-        return .{
-            .base = .unresolvable,
-            .referenced_name = .{ .string = name },
-            .strict = strict,
-            .this_value = null,
-        };
+    var env: ?Environment = start_env;
+    if (maybe_lookup_cache_entry) |lookup_cache_entry| {
+        if (lookup_cache_entry.*) |cache| {
+            var i: usize = 0;
+            while (i < cache.distance) : (i += 1) env = env.?.outerEnv();
+            return .{
+                .base = .{ .environment = env.? },
+                .referenced_name = .{ .string = name },
+                .strict = strict,
+                .this_value = null,
+            };
+        }
+        lookup_cache_entry.* = .{ .distance = 0 };
     }
 
-    const env = maybe_env.?;
+    while (true) {
+        // 2. Let exists be ? env.HasBinding(name).
+        const exists = try env.?.hasBinding(name);
 
-    // 2. Let exists be ? env.HasBinding(name).
-    const exists = try env.hasBinding(name);
+        // 3. If exists is true, then
+        if (exists) {
+            // a. Return the Reference Record {
+            //      [[Base]]: env, [[ReferencedName]]: name, [[Strict]]: strict, [[ThisValue]]: empty
+            //    }.
+            return .{
+                .base = .{ .environment = env.? },
+                .referenced_name = .{ .string = name },
+                .strict = strict,
+                .this_value = null,
+            };
+        }
+        // 4. Else,
+        else {
+            if (maybe_lookup_cache_entry) |lookup_cache_entry| {
+                lookup_cache_entry.*.?.distance += 1;
+            }
 
-    // 3. If exists is true, then
-    if (exists) {
-        // a. Return the Reference Record {
-        //      [[Base]]: env, [[ReferencedName]]: name, [[Strict]]: strict, [[ThisValue]]: empty
-        //    }.
-        return .{
-            .base = .{ .environment = env },
-            .referenced_name = .{ .string = name },
-            .strict = strict,
-            .this_value = null,
-        };
-    }
-    // 4. Else,
-    else {
-        // a. Let outer be env.[[OuterEnv]].
-        const outer = env.outerEnv();
+            // a. Let outer be env.[[OuterEnv]].
+            env = env.?.outerEnv();
 
-        // b. Return ? GetIdentifierReference(outer, name, strict).
-        return getIdentifierReference(outer, name, strict);
+            // 1. If env is null, then
+            if (env == null) {
+                // a. Return the Reference Record {
+                //      [[Base]]: unresolvable, [[ReferencedName]]: name, [[Strict]]: strict, [[ThisValue]]: empty
+                //    }.
+                return .{
+                    .base = .unresolvable,
+                    .referenced_name = .{ .string = name },
+                    .strict = strict,
+                    .this_value = null,
+                };
+            }
+
+            // b. Return ? GetIdentifierReference(outer, name, strict).
+        }
     }
 }
 

@@ -1091,7 +1091,7 @@ fn functionDeclarationInstantiation(
                 const name = formal_parameter.binding_element.identifier;
                 const initializer = formal_parameter.binding_element.initializer;
                 var value = arguments_list.get(i);
-                const reference = try agent.resolveBinding(name, environment, strict);
+                const reference = try agent.resolveBinding(name, environment, strict, null);
                 if (initializer != null and value == .undefined) {
                     value = (try generateAndRunBytecode(
                         agent,
@@ -1106,7 +1106,7 @@ fn functionDeclarationInstantiation(
             },
             .function_rest_parameter => |function_rest_parameter| {
                 const name = function_rest_parameter.binding_rest_element.identifier;
-                const reference = try agent.resolveBinding(name, environment, strict);
+                const reference = try agent.resolveBinding(name, environment, strict, null);
                 const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
                 const rest = arguments_list.values[@min(i, arguments_list.values.len)..];
                 for (rest, 0..) |value, n| {

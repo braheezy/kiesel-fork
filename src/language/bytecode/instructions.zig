@@ -156,11 +156,11 @@ pub const Instruction = enum(u8) {
 
     pub fn argumentCount(self: Self) u2 {
         return switch (self) {
+            .resolve_binding => 3,
             .evaluate_call,
             .evaluate_property_access_with_identifier_key,
             .jump_conditional,
             .object_define_method,
-            .resolve_binding,
             => 2,
             .apply_string_or_numeric_binary_operator,
             .array_set_length,
@@ -227,14 +227,14 @@ pub const InstructionIterator = struct {
     instructions: []const Instruction,
     index: usize = 0,
     instruction_index: usize = 0,
-    instruction_args: [2]?IndexType = [_]?IndexType{ null, null },
+    instruction_args: [3]?IndexType = .{ null, null, null },
 
     pub fn next(self: *Self) ?Instruction {
         if (self.index >= self.instructions.len) return null;
         const instruction = self.instructions[self.index];
         self.instruction_index = self.index;
         self.index += 1;
-        self.instruction_args = [_]?IndexType{ null, null };
+        self.instruction_args = .{ null, null, null };
         for (0..instruction.argumentCount()) |i| {
             const b1 = @intFromEnum(self.instructions[self.index]);
             self.index += 1;

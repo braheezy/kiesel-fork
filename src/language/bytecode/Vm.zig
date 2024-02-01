@@ -64,6 +64,7 @@ iterator_stack: std.ArrayList(Iterator),
 reference_stack: std.ArrayList(?Reference),
 exception_jump_target_stack: std.ArrayList(usize),
 function_arguments: std.ArrayList(Value),
+environment_lookup_cache: std.ArrayList(?Environment.LookupCacheEntry),
 result: ?Value = null,
 exception: ?Value = null,
 iterator: ?Iterator = null,
@@ -75,6 +76,7 @@ pub fn init(agent: *Agent) Allocator.Error!Self {
     const reference_stack = std.ArrayList(?Reference).init(agent.gc_allocator);
     const exception_jump_target_stack = std.ArrayList(usize).init(agent.gc_allocator);
     const function_arguments = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 8);
+    const environment_lookup_cache = std.ArrayList(?Environment.LookupCacheEntry).init(agent.gc_allocator);
     return .{
         .agent = agent,
         .ip = 0,
@@ -83,6 +85,7 @@ pub fn init(agent: *Agent) Allocator.Error!Self {
         .reference_stack = reference_stack,
         .exception_jump_target_stack = exception_jump_target_stack,
         .function_arguments = function_arguments,
+        .environment_lookup_cache = environment_lookup_cache,
     };
 }
 
@@ -92,6 +95,7 @@ pub fn deinit(self: Self) void {
     self.reference_stack.deinit();
     self.exception_jump_target_stack.deinit();
     self.function_arguments.deinit();
+    self.environment_lookup_cache.deinit();
 }
 
 fn fetchInstruction(self: *Self, executable: Executable) ?Instruction {
@@ -145,7 +149,7 @@ fn initializeBoundName(
         // 2. Else,
         .strict => |strict| {
             // a. Let lhs be ? ResolveBinding(name).
-            const lhs = try agent.resolveBinding(name, null, strict);
+            const lhs = try agent.resolveBinding(name, null, strict, null);
 
             // b. Return ? PutValue(lhs, value).
             try lhs.putValue(agent, value);
@@ -2623,7 +2627,11 @@ pub fn executeInstruction(
         .resolve_binding => {
             const name = self.fetchIdentifier(executable);
             const strict = self.fetchIndex(executable) == 1;
-            self.reference = try self.agent.resolveBinding(name, null, strict);
+            const environment_lookup_cache_index = self.fetchIndex(executable);
+            const lookup_cache_entry = &self.environment_lookup_cache.items[
+                environment_lookup_cache_index
+            ];
+            self.reference = try self.agent.resolveBinding(name, null, strict, lookup_cache_entry);
         },
         .resolve_this_binding => self.result = try self.agent.resolveThisBinding(),
         .rethrow_exception_if_any => if (self.exception) |value| {
@@ -2729,6 +2737,8 @@ pub fn executeInstruction(
 }
 
 pub fn run(self: *Self, executable: Executable) Agent.Error!Completion {
+    try self.environment_lookup_cache.resize(executable.environment_lookup_cache_size);
+    @memset(self.environment_lookup_cache.items, null);
     while (@call(
         .always_inline,
         Self.fetchInstruction,
