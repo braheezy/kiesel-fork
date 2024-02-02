@@ -90,19 +90,15 @@ pub const SetConstructor = struct {
         }
 
         // 7. Let iteratorRecord be ? GetIterator(iterable, sync).
-        const iterator = try getIterator(agent, iterable, .sync);
+        var iterator = try getIterator(agent, iterable, .sync);
 
         // 8. Repeat,
-        while (try iterator.step()) |next| {
-            // a. Let next be ? IteratorStep(iteratorRecord).
-            // b. If next is false, return set.
-
-            // c. Let nextValue be ? IteratorValue(next).
-            const next_value = try Iterator.value(next);
-
-            // d. Let status be Completion(Call(adder, set, « nextValue »)).
-            _ = adder.callAssumeCallable(Value.from(set), &.{next_value}) catch |err| {
-                // e. IfAbruptCloseIterator(status, iteratorRecord).
+        //     a. Let next be ? IteratorStepValue(iteratorRecord).
+        //     b. If next is done, return set.
+        while (try iterator.stepValue()) |next| {
+            // c. Let status be Completion(Call(adder, set, « next »)).
+            _ = adder.callAssumeCallable(Value.from(set), &.{next}) catch |err| {
+                // d. IfAbruptCloseIterator(status, iteratorRecord).
                 return iterator.close(@as(Agent.Error!Value, err));
             };
         }

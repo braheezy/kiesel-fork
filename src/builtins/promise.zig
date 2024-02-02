@@ -712,24 +712,13 @@ fn performPromiseAll(
 
     // 4. Repeat,
     while (true) {
-        // a. Let next be Completion(IteratorStep(iteratorRecord)).
-        const next = iterator.step() catch |err| {
-            // b. If next is an abrupt completion, set iteratorRecord.[[Done]] to true.
-            iterator.done = true;
-
-            // c. ReturnIfAbrupt(next).
-            return err;
-        };
-
-        // d. If next is false, then
-        if (next == null) {
-            // i. Set iteratorRecord.[[Done]] to true.
-            iterator.done = true;
-
-            // ii. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
+        // a. Let next be ? IteratorStepValue(iteratorRecord).
+        // b. If next is done, then
+        const next = try iterator.stepValue() orelse {
+            // i. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
             remaining_elements_count.value -= 1;
 
-            // iii. If remainingElementsCount.[[Value]] = 0, then
+            // ii. If remainingElementsCount.[[Value]] = 0, then
             if (remaining_elements_count.value == 0) {
                 // 1. Let valuesArray be CreateArrayFromList(values).
                 const values_array = try createArrayFromList(agent, values.items);
@@ -741,26 +730,17 @@ fn performPromiseAll(
                 );
             }
 
-            // iv. Return resultCapability.[[Promise]].
+            // iii. Return resultCapability.[[Promise]].
             return Value.from(result_capability.promise);
-        }
-
-        // e. Let nextValue be Completion(IteratorValue(next)).
-        const next_value = Iterator.value(next.?) catch |err| {
-            // f. If nextValue is an abrupt completion, set iteratorRecord.[[Done]] to true.
-            iterator.done = true;
-
-            // g. ReturnIfAbrupt(nextValue).
-            return err;
         };
 
-        // h. Append undefined to values.
+        // c. Append undefined to values.
         try values.append(.undefined);
 
-        // i. Let nextPromise be ? Call(promiseResolve, constructor, « nextValue »).
+        // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
             Value.from(constructor),
-            &.{next_value},
+            &.{next},
         );
 
         const AdditionalFields = struct {
@@ -780,7 +760,7 @@ fn performPromiseAll(
             remaining_elements: *RemainingElements,
         };
 
-        // j. Let steps be the algorithm steps defined in Promise.all Resolve Element Functions.
+        // e. Let steps be the algorithm steps defined in Promise.all Resolve Element Functions.
         const steps = struct {
             /// 27.2.4.1.3 Promise.all Resolve Element Functions
             /// https://tc39.es/ecma262/#sec-promise.all-resolve-element-functions
@@ -833,11 +813,11 @@ fn performPromiseAll(
             }
         }.func;
 
-        // k. Let length be the number of non-optional parameters of the function definition in
+        // f. Let length be the number of non-optional parameters of the function definition in
         //    Promise.all Resolve Element Functions.
         const length = 1;
 
-        // l. Let onFulfilled be CreateBuiltinFunction(steps, length, "", « [[AlreadyCalled]],
+        // g. Let onFulfilled be CreateBuiltinFunction(steps, length, "", « [[AlreadyCalled]],
         //    [[Index]], [[Values]], [[Capability]], [[RemainingElements]] »).
         const additional_fields = try agent.gc_allocator.create(AdditionalFields);
         const on_fulfilled = try createBuiltinFunction(agent, .{ .regular = steps }, .{
@@ -847,33 +827,33 @@ fn performPromiseAll(
         });
 
         additional_fields.* = .{
-            // m. Set onFulfilled.[[AlreadyCalled]] to false.
+            // h. Set onFulfilled.[[AlreadyCalled]] to false.
             .already_called = false,
 
-            // n. Set onFulfilled.[[Index]] to index.
+            // i. Set onFulfilled.[[Index]] to index.
             .index = index,
 
-            // o. Set onFulfilled.[[Values]] to values.
+            // j. Set onFulfilled.[[Values]] to values.
             .values = values,
 
-            // p. Set onFulfilled.[[Capability]] to resultCapability.
+            // k. Set onFulfilled.[[Capability]] to resultCapability.
             .capability = result_capability,
 
-            // q. Set onFulfilled.[[RemainingElements]] to remainingElementsCount.
+            // l. Set onFulfilled.[[RemainingElements]] to remainingElementsCount.
             .remaining_elements = remaining_elements_count,
         };
 
-        // r. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] + 1.
+        // m. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] + 1.
         remaining_elements_count.value += 1;
 
-        // s. Perform ? Invoke(nextPromise, "then", « onFulfilled, resultCapability.[[Reject]] »).
+        // n. Perform ? Invoke(nextPromise, "then", « onFulfilled, resultCapability.[[Reject]] »).
         _ = try next_promise.invoke(
             agent,
             PropertyKey.from("then"),
             &.{ Value.from(on_fulfilled), Value.from(result_capability.reject) },
         );
 
-        // t. Set index to index + 1.
+        // o. Set index to index + 1.
         index += 1;
     }
 }
@@ -900,24 +880,13 @@ fn performPromiseAllSettled(
 
     // 4. Repeat,
     while (true) {
-        // a. Let next be Completion(IteratorStep(iteratorRecord)).
-        const next = iterator.step() catch |err| {
-            // b. If next is an abrupt completion, set iteratorRecord.[[Done]] to true.
-            iterator.done = true;
-
-            // c. ReturnIfAbrupt(next).
-            return err;
-        };
-
-        // d. If next is false, then
-        if (next == null) {
-            // i. Set iteratorRecord.[[Done]] to true.
-            iterator.done = true;
-
-            // ii. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
+        // a. Let next be ? IteratorStepValue(iteratorRecord).
+        // b. If next is done, then
+        const next = try iterator.stepValue() orelse {
+            // i. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
             remaining_elements_count.value -= 1;
 
-            // iii. If remainingElementsCount.[[Value]] = 0, then
+            // ii. If remainingElementsCount.[[Value]] = 0, then
             if (remaining_elements_count.value == 0) {
                 // 1. Let valuesArray be CreateArrayFromList(values).
                 const values_array = try createArrayFromList(agent, values.items);
@@ -929,26 +898,17 @@ fn performPromiseAllSettled(
                 );
             }
 
-            // iv. Return resultCapability.[[Promise]].
+            // iii. Return resultCapability.[[Promise]].
             return Value.from(result_capability.promise);
-        }
-
-        // e. Let nextValue be Completion(IteratorValue(next)).
-        const next_value = Iterator.value(next.?) catch |err| {
-            // f. If nextValue is an abrupt completion, set iteratorRecord.[[Done]] to true.
-            iterator.done = true;
-
-            // g. ReturnIfAbrupt(nextValue).
-            return err;
         };
 
-        // h. Append undefined to values.
+        // c. Append undefined to values.
         try values.append(.undefined);
 
-        // i. Let nextPromise be ? Call(promiseResolve, constructor, « nextValue »).
+        // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
             Value.from(constructor),
-            &.{next_value},
+            &.{next},
         );
 
         const AlreadyCalled = struct { value: bool };
@@ -969,7 +929,7 @@ fn performPromiseAllSettled(
             remaining_elements: *RemainingElements,
         };
 
-        // j. Let stepsFulfilled be the algorithm steps defined in Promise.allSettled Resolve
+        // e. Let stepsFulfilled be the algorithm steps defined in Promise.allSettled Resolve
         //    Element Functions.
         const steps_fulfilled = struct {
             /// 27.2.4.2.2 Promise.allSettled Resolve Element Functions
@@ -1045,11 +1005,11 @@ fn performPromiseAllSettled(
             }
         }.func;
 
-        // k. Let lengthFulfilled be the number of non-optional parameters of the function
+        // f. Let lengthFulfilled be the number of non-optional parameters of the function
         //    definition in Promise.allSettled Resolve Element Functions.
         const length_fulfilled = 1;
 
-        // l. Let onFulfilled be CreateBuiltinFunction(stepsFulfilled, lengthFulfilled, "",
+        // g. Let onFulfilled be CreateBuiltinFunction(stepsFulfilled, lengthFulfilled, "",
         //    « [[AlreadyCalled]], [[Index]], [[Values]], [[Capability]], [[RemainingElements]] »).
         const on_fulfilled_additional_fields = try agent.gc_allocator.create(AdditionalFields);
         const on_fulfilled = try createBuiltinFunction(agent, .{ .regular = steps_fulfilled }, .{
@@ -1058,28 +1018,28 @@ fn performPromiseAllSettled(
             .additional_fields = SafePointer.make(*AdditionalFields, on_fulfilled_additional_fields),
         });
 
-        // m. Let alreadyCalled be the Record { [[Value]]: false }.
+        // h. Let alreadyCalled be the Record { [[Value]]: false }.
         const already_called = try agent.gc_allocator.create(AlreadyCalled);
         already_called.* = .{ .value = false };
 
         on_fulfilled_additional_fields.* = .{
-            // n. Set onFulfilled.[[AlreadyCalled]] to alreadyCalled.
+            // i. Set onFulfilled.[[AlreadyCalled]] to alreadyCalled.
             .already_called = already_called,
 
-            // o. Set onFulfilled.[[Index]] to index.
+            // j. Set onFulfilled.[[Index]] to index.
             .index = index,
 
-            // p. Set onFulfilled.[[Values]] to values.
+            // k. Set onFulfilled.[[Values]] to values.
             .values = values,
 
-            // q. Set onFulfilled.[[Capability]] to resultCapability.
+            // l. Set onFulfilled.[[Capability]] to resultCapability.
             .capability = result_capability,
 
-            // r. Set onFulfilled.[[RemainingElements]] to remainingElementsCount.
+            // m. Set onFulfilled.[[RemainingElements]] to remainingElementsCount.
             .remaining_elements = remaining_elements_count,
         };
 
-        // s. Let stepsRejected be the algorithm steps defined in Promise.allSettled Reject Element
+        // n. Let stepsRejected be the algorithm steps defined in Promise.allSettled Reject Element
         //    Functions.
         const steps_rejected = struct {
             /// 27.2.4.2.3 Promise.allSettled Reject Element Functions
@@ -1155,11 +1115,11 @@ fn performPromiseAllSettled(
             }
         }.func;
 
-        // t. Let lengthRejected be the number of non-optional parameters of the function
+        // o. Let lengthRejected be the number of non-optional parameters of the function
         //    definition in Promise.allSettled Reject Element Functions.
         const length_rejected = 1;
 
-        // u. Let onRejected be CreateBuiltinFunction(stepsRejected, lengthRejected, "",
+        // p. Let onRejected be CreateBuiltinFunction(stepsRejected, lengthRejected, "",
         //    « [[AlreadyCalled]], [[Index]], [[Values]], [[Capability]], [[RemainingElements]] »).
         const on_rejected_additional_fields = try agent.gc_allocator.create(AdditionalFields);
         const on_rejected = try createBuiltinFunction(agent, .{ .regular = steps_rejected }, .{
@@ -1169,33 +1129,33 @@ fn performPromiseAllSettled(
         });
 
         on_rejected_additional_fields.* = .{
-            // v. Set onRejected.[[AlreadyCalled]] to alreadyCalled.
+            // q. Set onRejected.[[AlreadyCalled]] to alreadyCalled.
             .already_called = already_called,
 
-            // w. Set onRejected.[[Index]] to index.
+            // r. Set onRejected.[[Index]] to index.
             .index = index,
 
-            // x. Set onRejected.[[Values]] to values.
+            // s. Set onRejected.[[Values]] to values.
             .values = values,
 
-            // y. Set onRejected.[[Capability]] to resultCapability.
+            // t. Set onRejected.[[Capability]] to resultCapability.
             .capability = result_capability,
 
-            // z. Set onRejected.[[RemainingElements]] to remainingElementsCount.
+            // u. Set onRejected.[[RemainingElements]] to remainingElementsCount.
             .remaining_elements = remaining_elements_count,
         };
 
-        // aa. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] + 1.
+        // v. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] + 1.
         remaining_elements_count.value += 1;
 
-        // ab. Perform ? Invoke(nextPromise, "then", « onFulfilled, onRejected »).
+        // w. Perform ? Invoke(nextPromise, "then", « onFulfilled, onRejected »).
         _ = try next_promise.invoke(
             agent,
             PropertyKey.from("then"),
             &.{ Value.from(on_fulfilled), Value.from(on_rejected) },
         );
 
-        // ac. Set index to index + 1.
+        // x. Set index to index + 1.
         index += 1;
     }
 }
@@ -1222,24 +1182,13 @@ fn performPromiseAny(
 
     // 4. Repeat,
     while (true) {
-        // a. Let next be Completion(IteratorStep(iteratorRecord)).
-        const next = iterator.step() catch |err| {
-            // b. If next is an abrupt completion, set iteratorRecord.[[Done]] to true.
-            iterator.done = true;
-
-            // c. ReturnIfAbrupt(next).
-            return err;
-        };
-
-        // d. If next is false, then
-        if (next == null) {
-            // i. Set iteratorRecord.[[Done]] to true.
-            iterator.done = true;
-
-            // ii. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
+        // a. Let next be ? IteratorStepValue(iteratorRecord).
+        // b. If next is done, then
+        const next = try iterator.stepValue() orelse {
+            // i. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
             remaining_elements_count.value -= 1;
 
-            // iii. If remainingElementsCount.[[Value]] = 0, then
+            // ii. If remainingElementsCount.[[Value]] = 0, then
             if (remaining_elements_count.value == 0) {
                 // 1. Let error be a newly created AggregateError object.
                 agent.throwException(.aggregate_error, "All promises were rejected", .{}) catch {};
@@ -1260,26 +1209,17 @@ fn performPromiseAny(
                 return error.ExceptionThrown;
             }
 
-            // iv. Return resultCapability.[[Promise]].
+            // iii. Return resultCapability.[[Promise]].
             return Value.from(result_capability.promise);
-        }
-
-        // e. Let nextValue be Completion(IteratorValue(next)).
-        const next_value = Iterator.value(next.?) catch |err| {
-            // f. If nextValue is an abrupt completion, set iteratorRecord.[[Done]] to true.
-            iterator.done = true;
-
-            // g. ReturnIfAbrupt(nextValue).
-            return err;
         };
 
-        // h. Append undefined to errors.
+        // c. Append undefined to errors.
         try errors.append(.undefined);
 
-        // i. Let nextPromise be ? Call(promiseResolve, constructor, « nextValue »).
+        // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
             Value.from(constructor),
-            &.{next_value},
+            &.{next},
         );
 
         const AdditionalFields = struct {
@@ -1299,7 +1239,7 @@ fn performPromiseAny(
             remaining_elements: *RemainingElements,
         };
 
-        // j. Let stepsRejected be the algorithm steps defined in Promise.any Reject Element
+        // e. Let stepsRejected be the algorithm steps defined in Promise.any Reject Element
         //    Functions.
         const steps_rejected = struct {
             /// 27.2.4.3.2 Promise.any Reject Element Functions
@@ -1370,11 +1310,11 @@ fn performPromiseAny(
             }
         }.func;
 
-        // k. Let lengthRejected be the number of non-optional parameters of the function
+        // f. Let lengthRejected be the number of non-optional parameters of the function
         //    definition in Promise.any Reject Element Functions.
         const length_rejected = 1;
 
-        // l. Let onRejected be CreateBuiltinFunction(stepsRejected, lengthRejected, "",
+        // g. Let onRejected be CreateBuiltinFunction(stepsRejected, lengthRejected, "",
         //    « [[AlreadyCalled]], [[Index]], [[Errors]], [[Capability]], [[RemainingElements]] »).
         const additional_fields = try agent.gc_allocator.create(AdditionalFields);
         const on_rejected = try createBuiltinFunction(agent, .{ .regular = steps_rejected }, .{
@@ -1384,33 +1324,33 @@ fn performPromiseAny(
         });
 
         additional_fields.* = .{
-            // m. Set onRejected.[[AlreadyCalled]] to false.
+            // h. Set onRejected.[[AlreadyCalled]] to false.
             .already_called = false,
 
-            // n. Set onRejected.[[Index]] to index.
+            // i. Set onRejected.[[Index]] to index.
             .index = index,
 
-            // o. Set onRejected.[[Errors]] to errors.
+            // j. Set onRejected.[[Errors]] to errors.
             .errors = errors,
 
-            // p. Set onRejected.[[Capability]] to resultCapability.
+            // k. Set onRejected.[[Capability]] to resultCapability.
             .capability = result_capability,
 
-            // q. Set onRejected.[[RemainingElements]] to remainingElementsCount.
+            // l. Set onRejected.[[RemainingElements]] to remainingElementsCount.
             .remaining_elements = remaining_elements_count,
         };
 
-        // r. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] + 1.
+        // m. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] + 1.
         remaining_elements_count.value += 1;
 
-        // s. Perform ? Invoke(nextPromise, "then", « resultCapability.[[Resolve]], onRejected »).
+        // n. Perform ? Invoke(nextPromise, "then", « resultCapability.[[Resolve]], onRejected »).
         _ = try next_promise.invoke(
             agent,
             PropertyKey.from("then"),
             &.{ Value.from(result_capability.resolve), Value.from(on_rejected) },
         );
 
-        // t. Set index to index + 1.
+        // o. Set index to index + 1.
         index += 1;
     }
 }
@@ -1426,40 +1366,20 @@ fn performPromiseRace(
 ) Agent.Error!Value {
     // 1. Repeat,
     while (true) {
-        // a. Let next be Completion(IteratorStep(iteratorRecord)).
-        const next = iterator.step() catch |err| {
-            // b. If next is an abrupt completion, set iteratorRecord.[[Done]] to true.
-            iterator.done = true;
-
-            // c. ReturnIfAbrupt(next).
-            return err;
-        };
-
-        // d. If next is false, then
-        if (next == null) {
-            // i. Set iteratorRecord.[[Done]] to true.
-            iterator.done = true;
-
-            // ii. Return resultCapability.[[Promise]].
+        // a. Let next be ? IteratorStepValue(iteratorRecord).
+        // b. If next is done, then
+        const next = try iterator.stepValue() orelse {
+            // i. Return resultCapability.[[Promise]].
             return Value.from(result_capability.promise);
-        }
-
-        // e. Let nextValue be Completion(IteratorValue(next)).
-        const next_value = Iterator.value(next.?) catch |err| {
-            // f. If nextValue is an abrupt completion, set iteratorRecord.[[Done]] to true.
-            iterator.done = true;
-
-            // g. ReturnIfAbrupt(nextValue).
-            return err;
         };
 
-        // h. Let nextPromise be ? Call(promiseResolve, constructor, « nextValue »).
+        // c. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
             Value.from(constructor),
-            &.{next_value},
+            &.{next},
         );
 
-        // i. Perform ? Invoke(nextPromise, "then", « resultCapability.[[Resolve]],
+        // d. Perform ? Invoke(nextPromise, "then", « resultCapability.[[Resolve]],
         //    resultCapability.[[Reject]] »).
         _ = try next_promise.invoke(
             agent,

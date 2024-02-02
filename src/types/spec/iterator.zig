@@ -86,7 +86,54 @@ pub const Iterator = struct {
         return result;
     }
 
-    /// 7.4.8 IteratorClose ( iteratorRecord, completion )
+    /// 7.4.8 IteratorStepValue ( iteratorRecord )
+    /// https://tc39.es/ecma262/#sec-iteratorstepvalue
+    pub fn stepValue(self: *Self) Agent.Error!?Value {
+        // 1. Let result be Completion(IteratorNext(iteratorRecord)).
+        // 2. If result is a throw completion, then
+        // 3. Set result to ! result.
+        const result = self.next(null) catch |err| {
+            // a. Set iteratorRecord.[[Done]] to true.
+            self.done = true;
+
+            // b. Return ? result.
+            return err;
+        };
+
+        // 4. Let done be Completion(IteratorComplete(result)).
+        // 5. If done is a throw completion, then
+        // 6. Set done to ! done.
+        const done = Iterator.complete(result) catch |err| {
+            // a. Set iteratorRecord.[[Done]] to true.
+            self.done = true;
+
+            // b. Return ? done.
+            return err;
+        };
+
+        // 7. If done is true, then
+        if (done) {
+            // a. Set iteratorRecord.[[Done]] to true.
+            self.done = true;
+
+            // b. Return done.
+            return null;
+        }
+
+        // 8. Let value be Completion(Get(result, "value")).
+        // 9. If value is a throw completion, then
+        const value_ = result.get(PropertyKey.from("value")) catch |err| {
+            // a. Set iteratorRecord.[[Done]] to true.
+            self.done = true;
+
+            return err;
+        };
+
+        // 10. Return ? value.
+        return value_;
+    }
+
+    /// 7.4.9 IteratorClose ( iteratorRecord, completion )
     /// https://tc39.es/ecma262/#sec-iteratorclose
     pub fn close(self: Self, completion: anytype) @TypeOf(completion) {
         const agent = self.iterator.agent();
@@ -131,29 +178,24 @@ pub const Iterator = struct {
         return completion;
     }
 
-    /// 7.4.13 IteratorToList ( iteratorRecord )
+    /// 7.4.14 IteratorToList ( iteratorRecord )
     /// https://tc39.es/ecma262/#sec-iteratortolist
-    pub fn toList(self: Self) Agent.Error![]const Value {
+    pub fn toList(self: *Self) Agent.Error![]const Value {
         const agent = self.iterator.agent();
 
         // 1. Let values be a new empty List.
         var values = std.ArrayList(Value).init(agent.gc_allocator);
         errdefer values.deinit();
 
-        // 2. Let next be true.
-
-        // 3. Repeat, while next is not false,
-        //     a. Set next to ? IteratorStep(iteratorRecord).
-        //     b. If next is not false, then
-        while (try self.step()) |next_| {
-            // i. Let nextValue be ? IteratorValue(next).
-            const next_value = try value(next_);
-
-            // ii. Append nextValue to values.
-            try values.append(next_value);
+        // 2. Repeat,
+        //     a. Let next be ? IteratorStepValue(iteratorRecord).
+        //     b. If next is done, then
+        //         i. Return values.
+        while (try self.stepValue()) |next_| {
+            // c. Append next to values.
+            try values.append(next_);
         }
 
-        // 4. Return values.
         return values.toOwnedSlice();
     }
 };
@@ -247,7 +289,7 @@ pub fn getIterator(
     return getIteratorFromMethod(agent, object, method.?);
 }
 
-/// 7.4.11 CreateIterResultObject ( value, done )
+/// 7.4.12 CreateIterResultObject ( value, done )
 /// https://tc39.es/ecma262/#sec-createiterresultobject
 pub fn createIterResultObject(agent: *Agent, value: Value, done: bool) Allocator.Error!Object {
     const realm = agent.currentRealm();

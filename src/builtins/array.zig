@@ -526,7 +526,7 @@ pub const ArrayConstructor = struct {
             };
 
             // c. Let iteratorRecord be ? GetIteratorFromMethod(items, usingIterator).
-            const iterator = try getIteratorFromMethod(agent, items, using_iterator.?);
+            var iterator = try getIteratorFromMethod(agent, items, using_iterator.?);
 
             // d. Let k be 0.
             var k: u53 = 0;
@@ -549,45 +549,40 @@ pub const ArrayConstructor = struct {
                 // ii. Let Pk be ! ToString(𝔽(k)).
                 const property_key = PropertyKey.from(k);
 
-                // iii. Let next be ? IteratorStep(iteratorRecord).
-                const next = try iterator.step();
-
-                // iv. If next is false, then
-                if (next == null) {
+                // iii. Let next be ? IteratorStepValue(iteratorRecord).
+                // iv. If next is done, then
+                const next = try iterator.stepValue() orelse {
                     // 1. Perform ? Set(A, "length", 𝔽(k), true).
                     try array.set(PropertyKey.from("length"), Value.from(k), .throw);
 
                     // 2. Return A.
                     return Value.from(array);
-                }
+                };
 
-                // v. Let nextValue be ? IteratorValue(next).
-                const next_value = try Iterator.value(next.?);
-
-                // vi. If mapping is true, then
+                // v. If mapping is true, then
                 const mapped_value = if (mapping) blk: {
-                    // 1. Let mappedValue be Completion(Call(mapfn, thisArg, « nextValue, 𝔽(k) »)).
+                    // 1. Let mappedValue be Completion(Call(mapfn, thisArg, « next, 𝔽(k) »)).
                     break :blk map_fn.callAssumeCallable(
                         this_arg,
-                        &.{ next_value, Value.from(k) },
+                        &.{ next, Value.from(k) },
                     ) catch |err| {
                         // 2. IfAbruptCloseIterator(mappedValue, iteratorRecord).
                         return iterator.close(@as(Agent.Error!Value, err));
                     };
                 }
-                // vii. Else,
+                // vi. Else,
                 else blk: {
-                    // 1. Let mappedValue be nextValue.
-                    break :blk next_value;
+                    // 1. Let mappedValue be next.
+                    break :blk next;
                 };
 
-                // viii. Let defineStatus be Completion(CreateDataPropertyOrThrow(A, Pk, mappedValue)).
+                // vii. Let defineStatus be Completion(CreateDataPropertyOrThrow(A, Pk, mappedValue)).
                 _ = array.createDataPropertyOrThrow(property_key, mapped_value) catch |err| {
-                    // ix. IfAbruptCloseIterator(defineStatus, iteratorRecord).
+                    // viii. IfAbruptCloseIterator(defineStatus, iteratorRecord).
                     return iterator.close(@as(Agent.Error!Value, err));
                 };
 
-                // x. Set k to k + 1.
+                // ix. Set k to k + 1.
             }
         }
 

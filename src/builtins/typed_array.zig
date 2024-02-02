@@ -699,11 +699,8 @@ pub const TypedArrayConstructor = struct {
         // 6. If usingIterator is not undefined, then
         if (using_iterator != null) {
             // a. Let values be ? IteratorToList(? GetIteratorFromMethod(source, usingIterator)).
-            const values = try (try getIteratorFromMethod(
-                agent,
-                source,
-                using_iterator.?,
-            )).toList();
+            var iterator = try getIteratorFromMethod(agent, source, using_iterator.?);
+            const values = try iterator.toList();
             defer agent.gc_allocator.free(values);
 
             // b. Let len be the number of elements in values.
@@ -3518,11 +3515,12 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
                         if (using_iterator != null) {
                             // a. Let values be ? IteratorToList(? GetIteratorFromMethod(
                             //    firstArgument, usingIterator)).
-                            const values = try (try getIteratorFromMethod(
+                            var iterator = try getIteratorFromMethod(
                                 agent,
                                 first_argument,
                                 using_iterator.?,
-                            )).toList();
+                            );
+                            const values = try iterator.toList();
                             defer agent.gc_allocator.free(values);
 
                             // b. Perform ? InitializeTypedArrayFromList(O, values).

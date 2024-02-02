@@ -1126,7 +1126,7 @@ pub const Value = union(enum) {
         var groups = GroupByContainer(key_coercion).init(agent.gc_allocator);
 
         // 4. Let iteratorRecord be ? GetIterator(items, sync).
-        const iterator = try getIterator(agent, self, .sync);
+        var iterator = try getIterator(agent, self, .sync);
 
         // 5. Let k be 0.
         var k: u53 = 0;
@@ -1146,17 +1146,13 @@ pub const Value = union(enum) {
                 return iterator.close(@as(Agent.Error!GroupByContainer(key_coercion), @"error"));
             }
 
-            // b. Let next be ? IteratorStep(iteratorRecord).
-            const next = try iterator.step();
+            // b. Let next be ? IteratorStepValue(iteratorRecord).
+            const next = try iterator.stepValue();
 
-            // c. If next is false, then
-            if (next == null) {
-                // i. Return groups.
-                return groups;
-            }
-
-            // d. Let value be ? IteratorValue(next).
-            const value = try Iterator.value(next.?);
+            // c. If next is done, then
+            //     i. Return groups.
+            // d. Let value be next.
+            const value = next orelse return groups;
 
             // e. Let key be Completion(Call(callbackfn, undefined, « value, 𝔽(k) »)).
             const key = callback_fn.callAssumeCallable(

@@ -1910,22 +1910,19 @@ pub fn executeInstruction(
 
             // From ArrayAccumulation:
             // 3. Let iteratorRecord be ? GetIterator(spreadObj, sync).
-            const iterator = try getIterator(self.agent, spread_obj, .sync);
+            var iterator = try getIterator(self.agent, spread_obj, .sync);
 
             // 4. Repeat,
-            //     a. Let next be ? IteratorStep(iteratorRecord).
-            //     b. If next is false, return nextIndex.
-            while (try iterator.step()) |next| : (next_index += 1) {
-                // c. Let nextValue be ? IteratorValue(next).
-                const next_value = try Iterator.value(next);
-
-                // d. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), nextValue).
+            //     a. Let next be ? IteratorStepValue(iteratorRecord).
+            //     b. If next is done, return nextIndex.
+            while (try iterator.stepValue()) |next| : (next_index += 1) {
+                // c. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), next).
                 array.createDataPropertyOrThrow(
                     PropertyKey.from(next_index),
-                    next_value,
+                    next,
                 ) catch |err| try noexcept(err);
 
-                // e. Set nextIndex to nextIndex + 1.
+                // d. Set nextIndex to nextIndex + 1.
             }
             self.result = Value.from(array);
         },
