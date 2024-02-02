@@ -1580,6 +1580,7 @@ fn classDefinitionEvaluation(
         };
 
         // c. If element is an abrupt completion, then
+        // d. Set element to ! element.
         const element = element_or_error catch |err| {
             // i. Set the running execution context's LexicalEnvironment to env.
             agent.runningExecutionContext().ecmascript_code.?.lexical_environment = env;
@@ -1590,8 +1591,6 @@ fn classDefinitionEvaluation(
             // iii. Return ? element.
             return err;
         };
-
-        // d. Set element to element.[[Value]].
 
         if (element != null) switch (element.?) {
             // TODO: e. If element is a PrivateElement, then

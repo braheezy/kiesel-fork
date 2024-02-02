@@ -69,7 +69,7 @@ pub const PromiseCapability = struct {
         }
 
         // 3. Else,
-        //     a. Set value to value.[[Value]].
+        //     a. Set value to ! value.
         // NOTE: This has to be handled at the call site.
     }
 };
