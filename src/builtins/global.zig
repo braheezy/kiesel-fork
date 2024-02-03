@@ -30,7 +30,7 @@ const NameAndPropertyDescriptor = struct {
 };
 
 const num_properties = 52 +
-    if (build_options.enable_annex_b) 1 else 0 +
+    if (build_options.enable_annex_b) 2 else 0 +
     if (build_options.enable_intl) 1 else 0;
 
 pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]NameAndPropertyDescriptor {
@@ -245,6 +245,7 @@ pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]Nam
         .{ "Reflect", .{ .value = Value.from(try realm.intrinsics.@"%Reflect%"()), .writable = true, .enumerable = false, .configurable = true } },
     } ++ if (build_options.enable_annex_b) .{
         .{ "escape", .{ .value = Value.from(try realm.intrinsics.@"%escape%"()), .writable = true, .enumerable = false, .configurable = true } },
+        .{ "unescape", .{ .value = Value.from(try realm.intrinsics.@"%unescape%"()), .writable = true, .enumerable = false, .configurable = true } },
     } else .{} ++ if (build_options.enable_intl) .{
         .{ "Intl", .{ .value = Value.from(try realm.intrinsics.@"%Intl%"()), .writable = true, .enumerable = false, .configurable = true } },
     } else .{};
@@ -274,6 +275,10 @@ pub const global_functions = struct {
     pub const EncodeURIComponent = GlobalFunction(.{ .name = "encodeURIComponent", .length = 1 });
     pub const Escape = if (build_options.enable_annex_b)
         GlobalFunction(.{ .name = "escape", .length = 1 })
+    else
+        @compileError("Annex B is not enabled");
+    pub const Unescape = if (build_options.enable_annex_b)
+        GlobalFunction(.{ .name = "unescape", .length = 1 })
     else
         @compileError("Annex B is not enabled");
 };
@@ -691,4 +696,96 @@ fn escape(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
 
     // 7. Return R.
     return Value.from(try std.mem.concat(agent.gc_allocator, u8, result.items));
+}
+
+/// B.2.1.2 unescape ( string )
+/// https://tc39.es/ecma262/#sec-unescape-string
+fn unescape(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    const string_value = arguments.get(0);
+
+    // 1. Set string to ? ToString(string).
+    const string = try string_value.toString(agent);
+
+    // 2. Let len be the length of string.
+    const len = string.utf16Length();
+
+    // 3. Let R be the empty String.
+    var result = std.ArrayList(u16).init(agent.gc_allocator);
+    defer result.deinit();
+
+    const code_units = try string.utf16CodeUnits(agent.gc_allocator);
+    defer agent.gc_allocator.free(code_units);
+
+    // 4. Let k be 0.
+    var k: usize = 0;
+
+    // 5. Repeat, while k < len,
+    while (k < len) : (k += 1) {
+        // a. Let C be the code unit at index k within string.
+        var c = code_units[k];
+
+        // b. If C is the code unit 0x0025 (PERCENT SIGN), then
+        if (c == '%') {
+            // i. Let hexDigits be the empty String.
+            var hex_digits: []const u16 = &.{};
+
+            // ii. Let optionalAdvance be 0.
+            var optional_advance: usize = 0;
+
+            // iii. If k + 5 < len and the code unit at index k + 1 within string is the code unit
+            //      0x0075 (LATIN SMALL LETTER U), then
+            if (k + 5 < len and code_units[k + 1] == 'u') {
+                // 1. Set hexDigits to the substring of string from k + 2 to k + 6.
+                hex_digits = code_units[k + 2 .. k + 6];
+
+                // 2. Set optionalAdvance to 5.
+                optional_advance = 5;
+            }
+            // iv. Else if k + 3 ≤ len, then
+            else if (k + 3 <= len) {
+                // 1. Set hexDigits to the substring of string from k + 1 to k + 3.
+                hex_digits = code_units[k + 1 .. k + 3];
+
+                // 2. Set optionalAdvance to 2.
+                optional_advance = 2;
+            }
+
+            // NOTE: This will succeed if all code points are ASCII, which is required for the hex
+            //       parsing to work anyway.
+            var buf: [4]u8 = undefined;
+            if (std.unicode.utf16leToUtf8(&buf, hex_digits) catch null) |end| {
+                // v. Let parseResult be ParseText(StringToCodePoints(hexDigits), HexDigits[~Sep]).
+                // vi. If parseResult is a Parse Node, then
+                if (std.fmt.parseInt(u16, buf[0..end], 16)) |n| {
+                    // 1. Let n be the MV of parseResult.
+                    // 2. Set C to the code unit whose numeric value is n.
+                    c = n;
+
+                    // 3. Set k to k + optionalAdvance.
+                    k += optional_advance;
+                } else |_| {}
+            }
+        }
+
+        // c. Set R to the string-concatenation of R and C.
+        try result.append(c);
+
+        // d. Set k to k + 1.
+    }
+
+    // 6. Return R.
+    return Value.from(std.unicode.utf16leToUtf8Alloc(
+        agent.gc_allocator,
+        result.items,
+    ) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.DanglingSurrogateHalf,
+        error.ExpectedSecondSurrogateHalf,
+        error.UnexpectedSecondSurrogateHalf,
+        => return agent.throwException(
+            .internal_error,
+            "UTF-16 strings are not implemented yet",
+            .{},
+        ),
+    });
 }

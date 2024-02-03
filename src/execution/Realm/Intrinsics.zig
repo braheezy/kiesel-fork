@@ -124,6 +124,7 @@ lazy_intrinsics: struct {
     @"%Uint16Array.prototype%": ?Object = null,
     @"%Uint32Array%": ?Object = null,
     @"%Uint32Array.prototype%": ?Object = null,
+    @"%unescape%": ?Object = null,
     @"%URIError%": ?Object = null,
     @"%URIError.prototype%": ?Object = null,
 } = .{},
@@ -483,6 +484,9 @@ pub fn @"%Uint32Array%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%Uint32Array.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Uint32Array.prototype%", builtins.Uint32ArrayPrototype);
+}
+pub fn @"%unescape%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%unescape%", builtins.global_functions.Unescape);
 }
 pub fn @"%URIError%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%URIError%", builtins.URIErrorConstructor);
