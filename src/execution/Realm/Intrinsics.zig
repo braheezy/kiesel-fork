@@ -52,6 +52,7 @@ lazy_intrinsics: struct {
     @"%encodeURIComponent%": ?Object = null,
     @"%Error%": ?Object = null,
     @"%Error.prototype%": ?Object = null,
+    @"%escape%": ?Object = null,
     @"%eval%": ?Object = null,
     @"%EvalError%": ?Object = null,
     @"%EvalError.prototype%": ?Object = null,
@@ -260,6 +261,9 @@ pub fn @"%Error%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%Error.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Error.prototype%", builtins.ErrorPrototype);
+}
+pub fn @"%escape%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%escape%", builtins.global_functions.Escape);
 }
 pub fn @"%eval%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%eval%", builtins.global_functions.Eval);

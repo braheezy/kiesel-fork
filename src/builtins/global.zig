@@ -29,7 +29,9 @@ const NameAndPropertyDescriptor = struct {
     PropertyDescriptor,
 };
 
-const num_properties = 52 + if (build_options.enable_intl) 1 else 0;
+const num_properties = 52 +
+    if (build_options.enable_annex_b) 1 else 0 +
+    if (build_options.enable_intl) 1 else 0;
 
 pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
@@ -241,7 +243,9 @@ pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]Nam
         // 19.4.4 Reflect
         // https://tc39.es/ecma262/#sec-reflect
         .{ "Reflect", .{ .value = Value.from(try realm.intrinsics.@"%Reflect%"()), .writable = true, .enumerable = false, .configurable = true } },
-    } ++ if (build_options.enable_intl) .{
+    } ++ if (build_options.enable_annex_b) .{
+        .{ "escape", .{ .value = Value.from(try realm.intrinsics.@"%escape%"()), .writable = true, .enumerable = false, .configurable = true } },
+    } else .{} ++ if (build_options.enable_intl) .{
         .{ "Intl", .{ .value = Value.from(try realm.intrinsics.@"%Intl%"()), .writable = true, .enumerable = false, .configurable = true } },
     } else .{};
 }
@@ -268,6 +272,10 @@ pub const global_functions = struct {
     pub const DecodeURIComponent = GlobalFunction(.{ .name = "decodeURIComponent", .length = 1 });
     pub const EncodeURI = GlobalFunction(.{ .name = "encodeURI", .length = 1 });
     pub const EncodeURIComponent = GlobalFunction(.{ .name = "encodeURIComponent", .length = 1 });
+    pub const Escape = if (build_options.enable_annex_b)
+        GlobalFunction(.{ .name = "escape", .length = 1 })
+    else
+        @compileError("Annex B is not enabled");
 };
 
 /// 19.2.1 eval ( x )
@@ -530,11 +538,11 @@ fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u
             }
 
             // ii. Let escape be the substring of string from k to k + 3.
-            const escape = input[k .. k + 3];
+            const escape_ = input[k .. k + 3];
 
             // iii. Let B be ParseHexOctet(string, k + 1).
             // iv. If B is not an integer, throw a URIError exception.
-            const byte = std.fmt.parseInt(u8, escape[1..], 16) catch {
+            const byte = std.fmt.parseInt(u8, escape_[1..], 16) catch {
                 return agent.throwException(.uri_error, "Escape sequence must be hex digits", .{});
             };
 
@@ -550,7 +558,7 @@ fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u
                 // 2. If preserveEscapeSet contains asciiChar, set S to escape. Otherwise, set S to
                 //    asciiChar.
                 s = if (std.mem.indexOfScalar(u8, preserve_escape_set, byte) != null)
-                    escape
+                    escape_
                 else
                     &.{byte};
             }
@@ -616,4 +624,71 @@ fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u
 
     // 5. Return R.
     return result.toOwnedSlice();
+}
+
+/// B.2.1.1 escape ( string )
+/// https://tc39.es/ecma262/#sec-escape-string
+fn escape(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    const string_value = arguments.get(0);
+
+    // 1. Set string to ? ToString(string).
+    const string = try string_value.toString(agent);
+
+    // 3. Let R be the empty String.
+    var result = std.ArrayList([]const u8).init(agent.gc_allocator);
+    defer result.deinit();
+
+    // 4. Let unescapedSet be the string-concatenation of the ASCII word characters and "@*+-./".
+    const unescaped_set = String.ascii_word_characters ++ "@*+-./";
+
+    const code_units = try string.utf16CodeUnits(agent.gc_allocator);
+    defer agent.gc_allocator.free(code_units);
+
+    // 2. Let len be the length of string.
+    // 5. Let k be 0.
+    // 6. Repeat, while k < len,
+    //     a. Let C be the code unit at index k within string.
+    for (code_units) |c| {
+        // b. If unescapedSet contains C, then
+        const s = if (c < 256 and std.mem.indexOfScalar(u8, unescaped_set, @intCast(c)) != null) blk: {
+            // i. Let S be C.
+            break :blk try std.fmt.allocPrint(agent.gc_allocator, "{c}", .{@as(u8, @intCast(c))});
+        }
+        // c. Else,
+        else blk: {
+            // i. Let n be the numeric value of C.
+            // ii. If n < 256, then
+            if (c < 256) {
+                // 1. Let hex be the String representation of n, formatted as an uppercase
+                //    hexadecimal number.
+                // 2. Let S be the string-concatenation of "%" and StringPad(hex, 2, "0", start).
+                break :blk try std.fmt.allocPrint(
+                    agent.gc_allocator,
+                    "%{}",
+                    .{std.fmt.fmtSliceHexUpper(&.{@intCast(c)})},
+                );
+            }
+            // iii. Else,
+            else {
+                // 1. Let hex be the String representation of n, formatted as an uppercase
+                //    hexadecimal number.
+                // 2. Let S be the string-concatenation of "%u" and StringPad(hex, 4, "0", start).
+                var bytes = std.mem.toBytes(c);
+                std.mem.reverse(u8, &bytes);
+                break :blk try std.fmt.allocPrint(
+                    agent.gc_allocator,
+                    "%u{}",
+                    .{std.fmt.fmtSliceHexUpper(&bytes)},
+                );
+            }
+        };
+
+        // d. Set R to the string-concatenation of R and S.
+        try result.append(s);
+
+        // e. Set k to k + 1.
+    }
+
+    // 7. Return R.
+    return Value.from(try std.mem.concat(agent.gc_allocator, u8, result.items));
 }
