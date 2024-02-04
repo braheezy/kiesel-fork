@@ -14,6 +14,7 @@ const Agent = execution.Agent;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Value = types.Value;
+const createAsyncFromSyncIterator = builtins.createAsyncFromSyncIterator;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -262,11 +263,10 @@ pub fn getIterator(
             }
 
             // iii. Let syncIteratorRecord be ? GetIteratorFromMethod(obj, syncMethod).
-            const sync_iterator_record = try getIteratorFromMethod(agent, object, sync_method.?);
+            const sync_iterator = try getIteratorFromMethod(agent, object, sync_method.?);
 
-            // TODO: iv. Return CreateAsyncFromSyncIterator(syncIteratorRecord).
-            _ = sync_iterator_record;
-            @panic("Not implemented");
+            // iv. Return CreateAsyncFromSyncIterator(syncIteratorRecord).
+            return createAsyncFromSyncIterator(agent, sync_iterator);
         }
 
         break :blk method;

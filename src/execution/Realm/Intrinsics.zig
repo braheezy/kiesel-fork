@@ -27,6 +27,7 @@ lazy_intrinsics: struct {
     @"%ArrayBuffer%": ?Object = null,
     @"%ArrayBuffer.prototype%": ?Object = null,
     @"%ArrayIteratorPrototype%": ?Object = null,
+    @"%AsyncFromSyncIteratorPrototype%": ?Object = null,
     @"%AsyncFunction%": ?Object = null,
     @"%AsyncFunction.prototype%": ?Object = null,
     @"%AsyncGeneratorFunction%": ?Object = null,
@@ -187,6 +188,9 @@ pub fn @"%ArrayBuffer.prototype%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%ArrayIteratorPrototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%ArrayIteratorPrototype%", builtins.ArrayIteratorPrototype);
+}
+pub fn @"%AsyncFromSyncIteratorPrototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%AsyncFromSyncIteratorPrototype%", builtins.AsyncFromSyncIteratorPrototype);
 }
 pub fn @"%AsyncFunction%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%AsyncFunction%", builtins.AsyncFunctionConstructor);
