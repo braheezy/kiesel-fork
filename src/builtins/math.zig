@@ -296,8 +296,13 @@ pub const Math = struct {
         //     c. If nx is either +0𝔽 or -0𝔽, return an implementation-approximated Number value
         //        representing -π / 2.
         // 11. Assert: nx is finite and is neither +0𝔽 nor -0𝔽.
-        // 12. Return an implementation-approximated Number value representing the result of the
-        //     inverse tangent of the quotient ℝ(ny) / ℝ(nx).
+        // 12. Let r be the inverse tangent of abs(ℝ(ny) / ℝ(nx)).
+        // 13. If nx < -0𝔽, then
+        //     a. If ny > +0𝔽, set r to π - r.
+        //     b. Else, set r to -π + r.
+        // 14. Else,
+        //     a. If ny < -0𝔽, set r to -r.
+        // 15. Return an implementation-approximated Number value representing r.
         return Value.from(std.math.atan2(ny.asFloat(), nx.asFloat()));
     }
 
