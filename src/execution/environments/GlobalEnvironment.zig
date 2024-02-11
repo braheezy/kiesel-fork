@@ -14,6 +14,7 @@ const DeclarativeEnvironment = environments.DeclarativeEnvironment;
 const Environment = environments.Environment;
 const Object = types.Object;
 const ObjectEnvironment = environments.ObjectEnvironment;
+const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Value = types.Value;
 
@@ -260,4 +261,49 @@ pub fn createGlobalVarBinding(
     }
 
     // 7. Return unused.
+}
+
+/// 9.1.1.4.18 CreateGlobalFunctionBinding ( N, V, D )
+/// https://tc39.es/ecma262/#sec-createglobalfunctionbinding
+pub fn createGlobalFunctionBinding(
+    self: *Self,
+    name: []const u8,
+    value: Value,
+    deletable: bool,
+) Agent.Error!void {
+    const property_key = PropertyKey.from(name);
+
+    // 1. Let ObjRec be envRec.[[ObjectRecord]].
+    // 2. Let globalObject be ObjRec.[[BindingObject]].
+    const global_object = self.object_record.binding_object;
+
+    // 3. Let existingProp be ? globalObject.[[GetOwnProperty]](N).
+    const existing_prop = try global_object.internalMethods().getOwnProperty(global_object, property_key);
+
+    // 4. If existingProp is undefined or existingProp.[[Configurable]] is true, then
+    const property_descriptor = if (existing_prop == null or existing_prop.?.configurable == true) blk: {
+        // a. Let desc be the PropertyDescriptor {
+        //      [[Value]]: V, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: D
+        //    }.
+        break :blk PropertyDescriptor{ .value = value, .writable = true, .enumerable = true, .configurable = deletable };
+    }
+    // 5. Else,
+    else blk: {
+        // a. Let desc be the PropertyDescriptor { [[Value]]: V }.
+        break :blk PropertyDescriptor{ .value = value };
+    };
+
+    // 6. Perform ? DefinePropertyOrThrow(globalObject, N, desc).
+    try global_object.definePropertyOrThrow(property_key, property_descriptor);
+
+    // 7. Perform ? Set(globalObject, N, V, false).
+    try global_object.set(property_key, value, .ignore);
+
+    // 8. If envRec.[[VarNames]] does not contain N, then
+    if (!self.var_names.contains(name)) {
+        // a. Append N to envRec.[[VarNames]].
+        try self.var_names.put(name, {});
+    }
+
+    // 9. Return unused.
 }

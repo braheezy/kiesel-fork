@@ -205,7 +205,12 @@ fn evalDeclarationInstantiation(
         if (var_env == .global_environment) {
             // TODO: i. For each element name of varNames, do
             for (var_declarations) |var_declaration| {
-                const name = var_declaration.binding_identifier;
+                const name = switch (var_declaration) {
+                    .variable_declaration => |variable_declaration| variable_declaration.binding_identifier,
+                    .hoistable_declaration => |hoistable_declaration| switch (hoistable_declaration) {
+                        inline else => |function_declaration| function_declaration.identifier,
+                    },
+                }.?;
 
                 // 1. If varEnv.HasLexicalDeclaration(name) is true, throw a SyntaxError exception.
                 if (var_env.global_environment.hasLexicalDeclaration(name)) {
@@ -233,19 +238,21 @@ fn evalDeclarationInstantiation(
     // 12. For each element d of varDeclarations, do
     for (var_declarations) |var_declaration| {
         // a. If d is either a VariableDeclaration, a ForBinding, or a BindingIdentifier, then
-        //     i. For each String vn of the BoundNames of d, do
-        for ([_]ast.Identifier{var_declaration.binding_identifier}) |var_name| {
-            // TODO: 1. If declaredFunctionNames does not contain vn, then
-            // a. If varEnv is a Global Environment Record, then
-            if (var_env == .global_environment) {
-                // TODO: i. Let vnDefinable be ? varEnv.CanDeclareGlobalVar(vn).
-                // TODO: ii. If vnDefinable is false, throw a TypeError exception.
-            }
+        if (var_declaration == .variable_declaration) {
+            // i. For each String vn of the BoundNames of d, do
+            for ([_]ast.Identifier{var_declaration.variable_declaration.binding_identifier}) |var_name| {
+                // TODO: 1. If declaredFunctionNames does not contain vn, then
+                // a. If varEnv is a Global Environment Record, then
+                if (var_env == .global_environment) {
+                    // TODO: i. Let vnDefinable be ? varEnv.CanDeclareGlobalVar(vn).
+                    // TODO: ii. If vnDefinable is false, throw a TypeError exception.
+                }
 
-            // b. If declaredVarNames does not contain vn, then
-            if (!declared_var_names.contains(var_name)) {
-                // i. Append vn to declaredVarNames.
-                try declared_var_names.putNoClobber(var_name, {});
+                // b. If declaredVarNames does not contain vn, then
+                if (!declared_var_names.contains(var_name)) {
+                    // i. Append vn to declaredVarNames.
+                    try declared_var_names.putNoClobber(var_name, {});
+                }
             }
         }
     }

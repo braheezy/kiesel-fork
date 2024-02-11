@@ -166,8 +166,15 @@ pub fn initializeEnvironment(self: *Self) Allocator.Error!void {
 
     // 21. For each element d of varDeclarations, do
     for (var_declarations) |var_declaration| {
+        const bound_name = switch (var_declaration) {
+            .variable_declaration => |variable_declaration| variable_declaration.binding_identifier,
+            .hoistable_declaration => |hoistable_declaration| switch (hoistable_declaration) {
+                inline else => |function_declaration| function_declaration.identifier,
+            },
+        }.?;
+
         // TODO: a. For each element dn of the BoundNames of d, do
-        for ([_]ast.Identifier{var_declaration.binding_identifier}) |var_name| {
+        for ([_]ast.Identifier{bound_name}) |var_name| {
             // i. If declaredVarNames does not contain dn, then
             if (!declared_var_names.contains(var_name)) {
                 // 1. Perform ! env.CreateMutableBinding(dn, false).

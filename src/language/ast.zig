@@ -29,6 +29,11 @@ const AnalyzeQuery = enum {
     is_string_literal,
 };
 
+const VarScopedDeclaration = union(enum) {
+    variable_declaration: VariableDeclaration,
+    hoistable_declaration: HoistableDeclaration,
+};
+
 /// https://tc39.es/ecma262/#prod-ParenthesizedExpression
 pub const ParenthesizedExpression = struct {
     const Self = @This();
@@ -626,7 +631,7 @@ pub const Statement = union(enum) {
     pub fn varScopedDeclarations(
         self: Self,
         allocator: Allocator,
-    ) Allocator.Error![]const VariableDeclaration {
+    ) Allocator.Error![]const VarScopedDeclaration {
         switch (self) {
             // Statement :
             //     EmptyStatement
@@ -707,16 +712,68 @@ pub const StatementList = struct {
     pub fn varScopedDeclarations(
         self: Self,
         allocator: Allocator,
-    ) Allocator.Error![]const VariableDeclaration {
+    ) Allocator.Error![]const VarScopedDeclaration {
         // StatementList : StatementList StatementListItem
         // 1. Let declarations1 be VarScopedDeclarations of StatementList.
         // 2. Let declarations2 be VarScopedDeclarations of StatementListItem.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         // StatementListItem : Declaration
         // 1. Return a new empty List.
-        var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
+        var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
         for (self.items) |item| {
             try variable_declarations.appendSlice(try item.varScopedDeclarations(allocator));
+        }
+        return variable_declarations.toOwnedSlice();
+    }
+
+    /// 8.2.11 Static Semantics: TopLevelVarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-toplevelvarscopeddeclarations
+    pub fn topLevelVarScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VarScopedDeclaration {
+        // StatementList : StatementList StatementListItem
+        // 1. Let declarations1 be TopLevelVarScopedDeclarations of StatementList.
+        // 2. Let declarations2 be TopLevelVarScopedDeclarations of StatementListItem.
+        // 3. Return the list-concatenation of declarations1 and declarations2.
+        var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
+        for (self.items) |item| {
+            switch (item) {
+                // StatementListItem : Statement
+                .statement => |statement| {
+                    // TODO: 1. If Statement is Statement : LabelledStatement , return
+                    //          TopLevelVarScopedDeclarations of Statement.
+                    // 2. Return VarScopedDeclarations of Statement.
+                    try variable_declarations.appendSlice(try statement.varScopedDeclarations(allocator));
+                },
+                // StatementListItem : Declaration
+                .declaration => |declaration| {
+                    switch (declaration.*) {
+                        // 1. If Declaration is Declaration : HoistableDeclaration , then
+                        .hoistable_declaration => |hoistable_declaration| {
+                            // a. Let declaration be DeclarationPart of HoistableDeclaration.
+                            // b. Return « declaration ».
+                            try variable_declarations.append(.{ .hoistable_declaration = hoistable_declaration });
+                        },
+
+                        // HACK: Emit lexical declarations too while they're codegen'd as var decls
+                        .lexical_declaration => |lexical_declaration| {
+                            for (lexical_declaration.binding_list.items) |lexical_binding| {
+                                try variable_declarations.append(.{
+                                    .variable_declaration = .{
+                                        .binding_identifier = lexical_binding.binding_identifier,
+                                        .initializer = lexical_binding.initializer,
+                                    },
+                                });
+                            }
+                        },
+
+                        else => {},
+                    }
+
+                    // 2. Return a new empty List.
+                },
+            }
         }
         return variable_declarations.toOwnedSlice();
     }
@@ -746,18 +803,20 @@ pub const StatementListItem = union(enum) {
     pub fn varScopedDeclarations(
         self: Self,
         allocator: Allocator,
-    ) Allocator.Error![]const VariableDeclaration {
+    ) Allocator.Error![]const VarScopedDeclaration {
         switch (self) {
             .statement => |statement| return try statement.varScopedDeclarations(allocator),
             .declaration => |declaration| {
-                var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
+                var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
                 switch (declaration.*) {
                     // HACK: Emit lexical declarations too while they're codegen'd as var decls
                     .lexical_declaration => |lexical_declaration| {
                         for (lexical_declaration.binding_list.items) |lexical_binding| {
                             try variable_declarations.append(.{
-                                .binding_identifier = lexical_binding.binding_identifier,
-                                .initializer = lexical_binding.initializer,
+                                .variable_declaration = .{
+                                    .binding_identifier = lexical_binding.binding_identifier,
+                                    .initializer = lexical_binding.initializer,
+                                },
                             });
                         }
                     },
@@ -812,14 +871,21 @@ pub const VariableDeclarationList = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn varScopedDeclarations(
         self: Self,
-        _: Allocator,
-    ) Allocator.Error![]const VariableDeclaration {
+        allocator: Allocator,
+    ) Allocator.Error![]const VarScopedDeclaration {
         // VariableDeclarationList : VariableDeclaration
         // 1. Return « VariableDeclaration ».
         // VariableDeclarationList : VariableDeclarationList , VariableDeclaration
         // 1. Let declarations1 be VarScopedDeclarations of VariableDeclarationList.
         // 2. Return the list-concatenation of declarations1 and « VariableDeclaration ».
-        return self.items;
+        var variable_declarations = try std.ArrayList(VarScopedDeclaration).initCapacity(
+            allocator,
+            self.items.len,
+        );
+        for (self.items) |variable_declaration| {
+            variable_declarations.appendAssumeCapacity(.{ .variable_declaration = variable_declaration });
+        }
+        return variable_declarations.toOwnedSlice();
     }
 };
 
@@ -907,13 +973,13 @@ pub const IfStatement = struct {
     pub fn varScopedDeclarations(
         self: Self,
         allocator: Allocator,
-    ) Allocator.Error![]const VariableDeclaration {
+    ) Allocator.Error![]const VarScopedDeclaration {
         // IfStatement : if ( Expression ) Statement else Statement
         // 1. Let declarations1 be VarScopedDeclarations of the first Statement.
         // 2. Let declarations2 be VarScopedDeclarations of the second Statement.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         if (self.alternate_statement != null) {
-            var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
+            var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
             try variable_declarations.appendSlice(try self.consequent_statement.varScopedDeclarations(allocator));
             try variable_declarations.appendSlice(try self.alternate_statement.?.varScopedDeclarations(allocator));
             return variable_declarations.toOwnedSlice();
@@ -945,7 +1011,7 @@ pub const DoWhileStatement = struct {
     pub fn varScopedDeclarations(
         self: Self,
         allocator: Allocator,
-    ) Allocator.Error![]const VariableDeclaration {
+    ) Allocator.Error![]const VarScopedDeclaration {
         // DoWhileStatement : do Statement while ( Expression ) ;
         // 1. Return the VarScopedDeclarations of Statement.
         return self.consequent_statement.varScopedDeclarations(allocator);
@@ -964,7 +1030,7 @@ pub const WhileStatement = struct {
     pub fn varScopedDeclarations(
         self: Self,
         allocator: Allocator,
-    ) Allocator.Error![]const VariableDeclaration {
+    ) Allocator.Error![]const VarScopedDeclaration {
         // WhileStatement : while ( Expression ) Statement
         // 1. Return the VarScopedDeclarations of Statement.
         return self.consequent_statement.varScopedDeclarations(allocator);
@@ -991,25 +1057,27 @@ pub const ForStatement = struct {
     pub fn varScopedDeclarations(
         self: Self,
         allocator: Allocator,
-    ) Allocator.Error![]const VariableDeclaration {
+    ) Allocator.Error![]const VarScopedDeclaration {
         // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
         // 1. Let declarations1 be VarScopedDeclarations of VariableDeclarationList.
         // 2. Let declarations2 be VarScopedDeclarations of Statement.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         if (self.initializer) |initializer| switch (initializer) {
             .variable_statement => {
-                var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
+                var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
                 try variable_declarations.appendSlice(try self.initializer.?.variable_statement.variable_declaration_list.varScopedDeclarations(allocator));
                 try variable_declarations.appendSlice(try self.consequent_statement.varScopedDeclarations(allocator));
                 return variable_declarations.toOwnedSlice();
             },
             // HACK: Emit lexical declarations too while they're codegen'd as var decls
             .lexical_declaration => |lexical_declaration| {
-                var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
+                var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
                 for (lexical_declaration.binding_list.items) |lexical_binding| {
                     try variable_declarations.append(.{
-                        .binding_identifier = lexical_binding.binding_identifier,
-                        .initializer = lexical_binding.initializer,
+                        .variable_declaration = .{
+                            .binding_identifier = lexical_binding.binding_identifier,
+                            .initializer = lexical_binding.initializer,
+                        },
                     });
                 }
                 try variable_declarations.appendSlice(try self.consequent_statement.varScopedDeclarations(allocator));
@@ -1052,7 +1120,7 @@ pub const ForInOfStatement = struct {
     pub fn varScopedDeclarations(
         self: Self,
         allocator: Allocator,
-    ) Allocator.Error![]const VariableDeclaration {
+    ) Allocator.Error![]const VarScopedDeclaration {
         // ForInOfStatement :
         //     for ( LeftHandSideExpression in Expression ) Statement
         //     for ( ForDeclaration in Expression ) Statement
@@ -1061,14 +1129,16 @@ pub const ForInOfStatement = struct {
         //     for await ( LeftHandSideExpression of AssignmentExpression ) Statement
         //     for await ( ForDeclaration of AssignmentExpression ) Statement
         if (self.initializer != .for_binding) {
-            var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
+            var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
             switch (self.initializer) {
                 // HACK: Emit lexical declarations too while they're codegen'd as var decls
                 .for_declaration => |lexical_declaration| {
                     const lexical_binding = lexical_declaration.binding_list.items[0];
                     try variable_declarations.append(.{
-                        .binding_identifier = lexical_binding.binding_identifier,
-                        .initializer = lexical_binding.initializer,
+                        .variable_declaration = .{
+                            .binding_identifier = lexical_binding.binding_identifier,
+                            .initializer = lexical_binding.initializer,
+                        },
                     });
                 },
                 else => {},
@@ -1086,8 +1156,10 @@ pub const ForInOfStatement = struct {
             // 1. Let declarations1 be « ForBinding ».
             // 2. Let declarations2 be VarScopedDeclarations of Statement.
             // 3. Return the list-concatenation of declarations1 and declarations2.
-            var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
-            try variable_declarations.append(.{ .binding_identifier = self.initializer.for_binding, .initializer = null });
+            var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
+            try variable_declarations.append(.{
+                .variable_declaration = .{ .binding_identifier = self.initializer.for_binding, .initializer = null },
+            });
             try variable_declarations.appendSlice(try self.consequent_statement.varScopedDeclarations(allocator));
             return variable_declarations.toOwnedSlice();
         }
@@ -1128,7 +1200,7 @@ pub const TryStatement = struct {
     pub fn varScopedDeclarations(
         self: Self,
         allocator: Allocator,
-    ) Allocator.Error![]const VariableDeclaration {
+    ) Allocator.Error![]const VarScopedDeclaration {
         // TryStatement : try Block Catch
         // 1. Let declarations1 be VarScopedDeclarations of Block.
         // 2. Let declarations2 be VarScopedDeclarations of Catch.
@@ -1144,15 +1216,15 @@ pub const TryStatement = struct {
         // 4. Return the list-concatenation of declarations1, declarations2, and declarations3.
         // Catch : catch ( CatchParameter ) Block
         // 1. Return the VarScopedDeclarations of Block.
-        var var_declarations = std.ArrayList(VariableDeclaration).init(allocator);
-        try var_declarations.appendSlice(try self.try_block.statement_list.varScopedDeclarations(allocator));
+        var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
+        try variable_declarations.appendSlice(try self.try_block.statement_list.varScopedDeclarations(allocator));
         if (self.catch_block) |catch_block| {
-            try var_declarations.appendSlice(try catch_block.statement_list.varScopedDeclarations(allocator));
+            try variable_declarations.appendSlice(try catch_block.statement_list.varScopedDeclarations(allocator));
         }
         if (self.finally_block) |finally_block| {
-            try var_declarations.appendSlice(try finally_block.statement_list.varScopedDeclarations(allocator));
+            try variable_declarations.appendSlice(try finally_block.statement_list.varScopedDeclarations(allocator));
         }
-        return var_declarations.toOwnedSlice();
+        return variable_declarations.toOwnedSlice();
     }
 };
 
@@ -1330,13 +1402,12 @@ pub const FunctionBody = struct {
     pub fn varScopedDeclarations(
         self: Self,
         allocator: Allocator,
-    ) Allocator.Error![]const VariableDeclaration {
+    ) Allocator.Error![]const VarScopedDeclaration {
         // FunctionStatementList : [empty]
         // 1. Return a new empty List.
         // FunctionStatementList : StatementList
         // 1. Return the TopLevelVarScopedDeclarations of StatementList.
-        // TODO: This should use TopLevelVarScopedDeclarations
-        return self.statement_list.varScopedDeclarations(allocator);
+        return self.statement_list.topLevelVarScopedDeclarations(allocator);
     }
 
     /// 15.2.2 Static Semantics: FunctionBodyContainsUseStrict
@@ -1832,6 +1903,19 @@ pub const Script = struct {
 
     statement_list: StatementList,
 
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VarScopedDeclaration {
+        // Script : [empty]
+        // 1. Return a new empty List.
+        // ScriptBody : StatementList
+        // 1. Return TopLevelVarScopedDeclarations of StatementList.
+        return self.statement_list.topLevelVarScopedDeclarations(allocator);
+    }
+
     /// 16.1.2 Static Semantics: IsStrict
     /// https://tc39.es/ecma262/#sec-static-semantics-isstrict
     pub fn isStrict(self: Self) bool {
@@ -1857,7 +1941,7 @@ pub const ModuleItemList = struct {
     pub fn varScopedDeclarations(
         self: Self,
         allocator: Allocator,
-    ) Allocator.Error![]const VariableDeclaration {
+    ) Allocator.Error![]const VarScopedDeclaration {
         // ModuleItemList : ModuleItemList ModuleItem
         // 1. Let declarations1 be VarScopedDeclarations of ModuleItemList.
         // 2. Let declarations2 be VarScopedDeclarations of ModuleItem.
@@ -1867,7 +1951,7 @@ pub const ModuleItemList = struct {
         // ModuleItem : ExportDeclaration
         // 1. If ExportDeclaration is export VariableStatement, return VarScopedDeclarations of VariableStatement.
         // 2. Return a new empty List.
-        var variable_declarations = std.ArrayList(VariableDeclaration).init(allocator);
+        var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
         for (self.items) |item| switch (item) {
             .statement_list_item => |statement_list_item| {
                 try variable_declarations.appendSlice(try statement_list_item.varScopedDeclarations(allocator));

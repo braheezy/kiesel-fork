@@ -10,6 +10,7 @@ const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
+const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
 const Parser = @import("Parser.zig");
 const Realm = execution.Realm;
@@ -101,14 +102,43 @@ pub fn evaluate(self: *Self) Agent.Error!Value {
 
     // TODO: 12. Let result be Completion(GlobalDeclarationInstantiation(script, globalEnv)).
     // NOTE: This is totally ad-hoc for now.
-    const var_scoped_declarations = try script.statement_list.varScopedDeclarations(agent.gc_allocator);
+    const var_scoped_declarations = try script.varScopedDeclarations(agent.gc_allocator);
     defer agent.gc_allocator.free(var_scoped_declarations);
     var seen = std.StringHashMap(void).init(agent.gc_allocator);
     defer seen.deinit();
-    for (var_scoped_declarations) |variable_declaration| {
-        const var_name = variable_declaration.binding_identifier;
+    for (var_scoped_declarations) |var_declaration| {
+        const var_name = switch (var_declaration) {
+            .variable_declaration => |variable_declaration| variable_declaration.binding_identifier,
+            .hoistable_declaration => |hoistable_declaration| switch (hoistable_declaration) {
+                inline else => |function_declaration| function_declaration.identifier,
+            },
+        }.?;
         if (!seen.contains(var_name)) {
-            try global_env.createGlobalVarBinding(agent, var_name, false);
+            if (var_declaration == .hoistable_declaration) {
+                const env = Environment{ .global_environment = global_env };
+                const private_env = null;
+
+                var hoistable_declaration = var_declaration.hoistable_declaration;
+                switch (hoistable_declaration) {
+                    inline else => |*function_declaration| {
+                        // Assign the function body's strictness, which is needed for the deferred bytecode generation.
+                        // FIXME: This should ideally happen at parse time.
+                        function_declaration.function_body.strict = self.ecmascript_code.isStrict() or
+                            function_declaration.function_body.functionBodyContainsUseStrict();
+                    },
+                }
+
+                const function_object = try switch (hoistable_declaration) {
+                    .function_declaration => |function_declaration| function_declaration.instantiateOrdinaryFunctionObject(agent, env, private_env),
+                    .generator_declaration => |generator_declaration| generator_declaration.instantiateGeneratorFunctionObject(agent, env, private_env),
+                    .async_function_declaration => |async_function_declaration| async_function_declaration.instantiateAsyncFunctionObject(agent, env, private_env),
+                    .async_generator_declaration => |async_generator_declaration| async_generator_declaration.instantiateAsyncGeneratorFunctionObject(agent, env, private_env),
+                };
+
+                try global_env.createGlobalFunctionBinding(var_name, Value.from(function_object), false);
+            } else {
+                try global_env.createGlobalVarBinding(agent, var_name, false);
+            }
             try seen.putNoClobber(var_name, {});
         }
     }

@@ -917,9 +917,7 @@ fn functionDeclarationInstantiation(
     // TODO: 9. Let varNames be the VarDeclaredNames of code.
 
     // 10. Let varDeclarations be the VarScopedDeclarations of code.
-    const var_declarations = try code.varScopedDeclarations(
-        agent.gc_allocator,
-    );
+    const var_declarations = try code.varScopedDeclarations(agent.gc_allocator);
     defer agent.gc_allocator.free(var_declarations);
 
     // TODO: 11. Let lexicalNames be the LexicallyDeclaredNames of code.
@@ -929,12 +927,35 @@ fn functionDeclarationInstantiation(
     var function_names = std.StringHashMap(void).init(agent.gc_allocator);
     defer function_names.deinit();
 
-    // TODO: 13. Let functionsToInitialize be a new empty List.
+    // 13. Let functionsToInitialize be a new empty List.
+    var functions_to_initialize = std.ArrayList(ast.HoistableDeclaration).init(agent.gc_allocator);
+    defer functions_to_initialize.deinit();
 
     // 14. For each element d of varDeclarations, in reverse List order, do
     var it = std.mem.reverseIterator(var_declarations);
-    while (it.next()) |_| {
-        // TODO: a. If d is neither a VariableDeclaration nor a ForBinding nor a BindingIdentifier, then
+    while (it.next()) |var_declaration| {
+        // a. If d is neither a VariableDeclaration nor a ForBinding nor a BindingIdentifier, then
+        if (var_declaration == .hoistable_declaration) {
+            // i. Assert: d is either a FunctionDeclaration, a GeneratorDeclaration, an
+            //    AsyncFunctionDeclaration, or an AsyncGeneratorDeclaration.
+
+            // ii. Let fn be the sole element of the BoundNames of d.
+            const function_name = switch (var_declaration.hoistable_declaration) {
+                inline else => |function_declaration| function_declaration.identifier,
+            }.?;
+
+            // iii. If functionNames does not contain fn, then
+            if (!function_names.contains(function_name)) {
+                // 1. Insert fn as the first element of functionNames.
+                try function_names.put(function_name, {});
+
+                // 2. NOTE: If there are multiple function declarations for the same name, the last
+                //    declaration is used.
+                // 3. Insert d as the first element of functionsToInitialize.
+                // NOTE: AFAICT the order isn't observable, so we can append.
+                try functions_to_initialize.append(var_declaration.hoistable_declaration);
+            }
+        }
     }
 
     // 15. Let argumentsObjectNeeded be true.
@@ -1140,7 +1161,12 @@ fn functionDeclarationInstantiation(
         // c. For each element n of varNames, do
         // TODO: This should use VarDeclaredNames
         for (var_declarations) |var_declaration| {
-            const var_name = var_declaration.binding_identifier;
+            const var_name = switch (var_declaration) {
+                .variable_declaration => |variable_declaration| variable_declaration.binding_identifier,
+                .hoistable_declaration => |hoistable_declaration| switch (hoistable_declaration) {
+                    inline else => |function_declaration| function_declaration.identifier,
+                },
+            }.?;
 
             // i. If instantiatedVarNames does not contain n, then
             if (!instantiated_var_names.contains(var_name)) {
@@ -1179,7 +1205,12 @@ fn functionDeclarationInstantiation(
         // e. For each element n of varNames, do
         // TODO: This should use VarDeclaredNames
         for (var_declarations) |var_declaration| {
-            const var_name = var_declaration.binding_identifier;
+            const var_name = switch (var_declaration) {
+                .variable_declaration => |variable_declaration| variable_declaration.binding_identifier,
+                .hoistable_declaration => |hoistable_declaration| switch (hoistable_declaration) {
+                    inline else => |function_declaration| function_declaration.identifier,
+                },
+            }.?;
 
             // i. If instantiatedVarNames does not contain n, then
             if (!instantiated_var_names.contains(var_name)) {
@@ -1234,7 +1265,43 @@ fn functionDeclarationInstantiation(
     // 32. Set the LexicalEnvironment of calleeContext to lexEnv.
     callee_context.ecmascript_code.?.lexical_environment = lex_env;
 
-    // TODO: 33-36.
+    // TODO: 33-34.
+
+    // 35. Let privateEnv be the PrivateEnvironment of calleeContext.
+    const private_env = callee_context.ecmascript_code.?.private_environment;
+
+    // 36. For each Parse Node f of functionsToInitialize, do
+    for (functions_to_initialize.items) |*hoistable_declaration| {
+        // a. Let fn be the sole element of the BoundNames of f.
+        const function_name = switch (hoistable_declaration.*) {
+            inline else => |function_declaration| function_declaration.identifier,
+        }.?;
+
+        switch (hoistable_declaration.*) {
+            inline else => |*function_declaration| {
+                // Assign the function body's strictness, which is needed for the deferred bytecode generation.
+                // FIXME: This should ideally happen at parse time.
+                function_declaration.function_body.strict = strict or
+                    function_declaration.function_body.functionBodyContainsUseStrict();
+            },
+        }
+
+        // b. Let fo be InstantiateFunctionObject of f with arguments lexEnv and privateEnv.
+        const function_object = try switch (hoistable_declaration.*) {
+            .function_declaration => |function_declaration| function_declaration.instantiateOrdinaryFunctionObject(agent, lex_env, private_env),
+            .generator_declaration => |generator_declaration| generator_declaration.instantiateGeneratorFunctionObject(agent, lex_env, private_env),
+            .async_function_declaration => |async_function_declaration| async_function_declaration.instantiateAsyncFunctionObject(agent, lex_env, private_env),
+            .async_generator_declaration => |async_generator_declaration| async_generator_declaration.instantiateAsyncGeneratorFunctionObject(agent, lex_env, private_env),
+        };
+
+        // c. Perform ! varEnv.SetMutableBinding(fn, fo, false).
+        var_env.setMutableBinding(
+            agent,
+            function_name,
+            Value.from(function_object),
+            false,
+        ) catch |err| try noexcept(err);
+    }
 
     // 37. Return unused.
 }

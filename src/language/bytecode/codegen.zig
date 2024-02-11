@@ -1457,25 +1457,17 @@ pub fn codegenDeclaration(
 /// 14.1.1 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-statement-semantics-runtime-semantics-evaluation
 pub fn codegenHoistableDeclaration(
-    node: ast.HoistableDeclaration,
-    executable: *Executable,
-    ctx: *Context,
+    _: ast.HoistableDeclaration,
+    _: *Executable,
+    _: *Context,
 ) Executable.Error!void {
     // HoistableDeclaration :
     //     GeneratorDeclaration
     //     AsyncFunctionDeclaration
     //     AsyncGeneratorDeclaration
     // 1. Return empty.
-    // NOTE: Until the FooDeclarationInstantiation are fully implemented these also involve
-    //       bytecode generation.
     // HoistableDeclaration : FunctionDeclaration
     // 1. Return ? Evaluation of FunctionDeclaration.
-    switch (node) {
-        .function_declaration => |x| try codegenFunctionDeclaration(x, executable, ctx),
-        .generator_declaration => |x| try codegenGeneratorDeclaration(x, executable, ctx),
-        .async_function_declaration => |x| try codegenAsyncFunctionDeclaration(x, executable, ctx),
-        .async_generator_declaration => |x| try codegenAsyncGeneratorDeclaration(x, executable, ctx),
-    }
 }
 
 pub fn codegenBreakableStatement(
@@ -1537,6 +1529,18 @@ pub fn codegenStatementListItem(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
+    if (node == .declaration and node.declaration.* == .hoistable_declaration) {
+        switch (node.declaration.hoistable_declaration) {
+            inline else => |*function_declaration| {
+                // Assign the function body's strictness, which is needed for the deferred bytecode generation.
+                // FIXME: This should ideally happen at parse time.
+                const strict = ctx.contained_in_strict_mode_code or
+                    function_declaration.function_body.functionBodyContainsUseStrict();
+                function_declaration.function_body.strict = strict;
+            },
+        }
+    }
+
     switch (node) {
         .statement => |statement| try codegenStatement(statement.*, executable, ctx),
         .declaration => |declaration| try codegenDeclaration(declaration.*, executable, ctx),
@@ -2432,39 +2436,6 @@ pub fn codegenTryStatement(
 
 /// 15.2.6 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-evaluation
-pub fn codegenFunctionDeclaration(
-    node: ast.FunctionDeclaration,
-    _: *Executable,
-    ctx: *Context,
-) Executable.Error!void {
-    // FIXME: This should be called in the various FooDeclarationInstantiation AOs instead.
-    //        It's enough to get ECMAScript Functions Objects up and running however :^)
-    const realm = ctx.agent.currentRealm();
-    const env = Environment{ .global_environment = realm.global_env };
-    const strict = ctx.contained_in_strict_mode_code or node.function_body.functionBodyContainsUseStrict();
-
-    // Copy `node` so that we can assign the function body's strictness, which is needed for the
-    // deferred bytecode generation.
-    // FIXME: This should ideally happen at parse time.
-    var function_declaration = node;
-    function_declaration.function_body.strict = strict;
-
-    const function = try function_declaration.instantiateOrdinaryFunctionObject(
-        ctx.agent,
-        env,
-        null,
-    );
-    realm.global_env.object_record.binding_object.set(
-        PropertyKey.from(node.identifier),
-        Value.from(function),
-        .ignore,
-    ) catch |err| try noexcept(err);
-
-    // 1. Return empty.
-}
-
-/// 15.2.6 Runtime Semantics: Evaluation
-/// https://tc39.es/ecma262/#sec-function-definitions-runtime-semantics-evaluation
 pub fn codegenFunctionExpression(
     node: ast.FunctionExpression,
     executable: *Executable,
@@ -2551,34 +2522,6 @@ pub fn codegenMethodDefinition(
     try executable.addIndex(@intFromEnum(std.meta.activeTag(node.method)));
 }
 
-pub fn codegenGeneratorDeclaration(
-    node: ast.GeneratorDeclaration,
-    _: *Executable,
-    ctx: *Context,
-) Executable.Error!void {
-    // FIXME: This should be called in the various FooDeclarationInstantiation AOs instead.
-    const realm = ctx.agent.currentRealm();
-    const env = Environment{ .global_environment = realm.global_env };
-    const strict = ctx.contained_in_strict_mode_code or node.function_body.functionBodyContainsUseStrict();
-
-    // Copy `node` so that we can assign the function body's strictness, which is needed for the
-    // deferred bytecode generation.
-    // FIXME: This should ideally happen at parse time.
-    var generator_declaration = node;
-    generator_declaration.function_body.strict = strict;
-
-    const function = try generator_declaration.instantiateGeneratorFunctionObject(
-        ctx.agent,
-        env,
-        null,
-    );
-    realm.global_env.object_record.binding_object.set(
-        PropertyKey.from(node.identifier),
-        Value.from(function),
-        .ignore,
-    ) catch |err| try noexcept(err);
-}
-
 /// 15.5.5 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-generator-function-definitions-runtime-semantics-evaluation
 pub fn codegenGeneratorExpression(
@@ -2599,34 +2542,6 @@ pub fn codegenGeneratorExpression(
         .instantiate_generator_function_expression,
         .{ .generator_expression = generator_expression },
     );
-}
-
-pub fn codegenAsyncGeneratorDeclaration(
-    node: ast.AsyncGeneratorDeclaration,
-    _: *Executable,
-    ctx: *Context,
-) Executable.Error!void {
-    // FIXME: This should be called in the various FooDeclarationInstantiation AOs instead.
-    const realm = ctx.agent.currentRealm();
-    const env = Environment{ .global_environment = realm.global_env };
-    const strict = ctx.contained_in_strict_mode_code or node.function_body.functionBodyContainsUseStrict();
-
-    // Copy `node` so that we can assign the function body's strictness, which is needed for the
-    // deferred bytecode generation.
-    // FIXME: This should ideally happen at parse time.
-    var async_generator_declaration = node;
-    async_generator_declaration.function_body.strict = strict;
-
-    const function = try async_generator_declaration.instantiateAsyncGeneratorFunctionObject(
-        ctx.agent,
-        env,
-        null,
-    );
-    realm.global_env.object_record.binding_object.set(
-        PropertyKey.from(node.identifier.?),
-        Value.from(function),
-        .ignore,
-    ) catch |err| try noexcept(err);
 }
 
 /// 15.6.5 Runtime Semantics: Evaluation
@@ -2683,34 +2598,6 @@ pub fn codegenClassExpression(
         .class_definition_evaluation,
         .{ .class_expression = node },
     );
-}
-
-pub fn codegenAsyncFunctionDeclaration(
-    node: ast.AsyncFunctionDeclaration,
-    _: *Executable,
-    ctx: *Context,
-) Executable.Error!void {
-    // FIXME: This should be called in the various FooDeclarationInstantiation AOs instead.
-    const realm = ctx.agent.currentRealm();
-    const env = Environment{ .global_environment = realm.global_env };
-    const strict = ctx.contained_in_strict_mode_code or node.function_body.functionBodyContainsUseStrict();
-
-    // Copy `node` so that we can assign the function body's strictness, which is needed for the
-    // deferred bytecode generation.
-    // FIXME: This should ideally happen at parse time.
-    var async_function_declaration = node;
-    async_function_declaration.function_body.strict = strict;
-
-    const function = try async_function_declaration.instantiateAsyncFunctionObject(
-        ctx.agent,
-        env,
-        null,
-    );
-    realm.global_env.object_record.binding_object.set(
-        PropertyKey.from(node.identifier.?),
-        Value.from(function),
-        .ignore,
-    ) catch |err| try noexcept(err);
 }
 
 /// 15.8.5 Runtime Semantics: Evaluation
