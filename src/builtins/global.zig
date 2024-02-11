@@ -30,8 +30,8 @@ const NameAndPropertyDescriptor = struct {
 };
 
 const num_properties = 52 +
-    if (build_options.enable_annex_b) 2 else 0 +
-    if (build_options.enable_intl) 1 else 0;
+    (if (build_options.enable_annex_b) 2 else 0) +
+    (if (build_options.enable_intl) 1 else 0);
 
 pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]NameAndPropertyDescriptor {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
@@ -243,12 +243,12 @@ pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]Nam
         // 19.4.4 Reflect
         // https://tc39.es/ecma262/#sec-reflect
         .{ "Reflect", .{ .value = Value.from(try realm.intrinsics.@"%Reflect%"()), .writable = true, .enumerable = false, .configurable = true } },
-    } ++ if (build_options.enable_annex_b) .{
+    } ++ (if (build_options.enable_annex_b) .{
         .{ "escape", .{ .value = Value.from(try realm.intrinsics.@"%escape%"()), .writable = true, .enumerable = false, .configurable = true } },
         .{ "unescape", .{ .value = Value.from(try realm.intrinsics.@"%unescape%"()), .writable = true, .enumerable = false, .configurable = true } },
-    } else .{} ++ if (build_options.enable_intl) .{
+    } else .{}) ++ (if (build_options.enable_intl) .{
         .{ "Intl", .{ .value = Value.from(try realm.intrinsics.@"%Intl%"()), .writable = true, .enumerable = false, .configurable = true } },
-    } else .{};
+    } else .{});
 }
 
 fn GlobalFunction(comptime options: struct { name: []const u8, length: u32 }) type {
