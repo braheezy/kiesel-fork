@@ -27,8 +27,9 @@
             .hash = "12203ded54c85878eea7f12744066dcb4397177395ac49a7b2aa365bf6047b623829",
         },
         .zigline = .{
-            .url = "https://github.com/alimpfard/zigline/archive/882d036c9951136a22c4e0e8a598967048dc4f44.tar.gz",
-            .hash = "122096b2bea9c2e4cf92f36d011aa951b156edb4fcc1f51b8ad46a3087e7ebea2ba3",
+            // FIXME: This points to https://github.com/alimpfard/zigline/pull/14, update once merged
+            .url = "https://github.com/alimpfard/zigline/archive/690c51545f72c6606aa4a01181db88e65eaf4ee3.tar.gz",
+            .hash = "1220083b4fb7fc758fd15379d3a4f09260acb0bafb9fd46dbe2dfba564b5c3276c64",
         },
     },
     .paths = .{
