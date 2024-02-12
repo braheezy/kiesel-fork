@@ -4,7 +4,6 @@
 const std = @import("std");
 
 const Allocator = std.mem.Allocator;
-const Xoroshiro128 = std.Random.Xoroshiro128;
 
 const builtins = @import("../builtins.zig");
 const environments = @import("environments.zig");
@@ -27,7 +26,7 @@ pub const Intrinsics = @import("Realm/Intrinsics.zig");
 const Self = @This();
 
 agent: *Agent,
-rng: Xoroshiro128,
+rng: std.Random.DefaultPrng,
 
 /// [[Intrinsics]]
 intrinsics: Intrinsics,
@@ -58,7 +57,7 @@ pub fn create(agent: *Agent) Allocator.Error!*Self {
     realm.* = .{
         .agent = realm.agent,
         .intrinsics = realm.intrinsics,
-        .rng = Xoroshiro128.init(@intFromPtr(realm)),
+        .rng = std.Random.DefaultPrng.init(@intFromPtr(realm)),
 
         // 3. Set realmRec.[[GlobalObject]] to undefined.
         .global_object = undefined,
