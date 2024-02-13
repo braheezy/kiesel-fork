@@ -57,8 +57,7 @@ pub const PromiseCapability = struct {
 
             // 2. If value is an abrupt completion, then
             error.ExceptionThrown => {
-                const exception = agent.exception.?;
-                agent.exception = null;
+                const exception = agent.clearException();
 
                 // a. Perform ? Call(capability.[[Reject]], undefined, « value.[[Value]] »).
                 _ = try Value.from(self.reject).callAssumeCallable(.undefined, &.{exception});
@@ -166,9 +165,10 @@ pub fn createResolvingFunctions(
 
                 // 10. If then is an abrupt completion, then
                 error.ExceptionThrown => {
+                    const exception = agent_.clearException();
+
                     // a. Perform RejectPromise(promise, then.[[Value]]).
-                    try rejectPromise(agent_, promise_, agent_.exception.?);
-                    agent_.exception = null;
+                    try rejectPromise(agent_, promise_, exception);
 
                     // b. Return undefined.
                     return .undefined;
@@ -1594,8 +1594,7 @@ pub const PromiseConstructor = struct {
 
             // 10. If completion is an abrupt completion, then
             error.ExceptionThrown => {
-                const exception = agent.exception.?;
-                agent.exception = null;
+                const exception = agent.clearException();
 
                 // a. Perform ? Call(resolvingFunctions.[[Reject]], undefined, « completion.[[Value]] »).
                 _ = try Value.from(resolving_functions.reject).callAssumeCallable(

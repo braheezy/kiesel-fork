@@ -252,6 +252,11 @@ pub fn createException(
     return error_object;
 }
 
+pub fn clearException(self: *Self) Value {
+    defer self.exception = null;
+    return self.exception.?;
+}
+
 /// 5.2.3.2 Throw an Exception
 /// https://tc39.es/ecma262/#sec-throw-an-exception
 pub fn throwException(

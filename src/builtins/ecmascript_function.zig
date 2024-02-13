@@ -400,23 +400,23 @@ fn evaluateAsyncFunctionBody(
     ) catch |err| try noexcept(err);
 
     // 2. Let declResult be Completion(FunctionDeclarationInstantiation(functionObject, argumentsList)).
-    const decl_result = functionDeclarationInstantiation(agent, function, arguments_list);
+    functionDeclarationInstantiation(agent, function, arguments_list) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
 
-    // 3. If declResult is an abrupt completion, then
-    if (std.meta.isError(decl_result)) {
-        const exception = agent.exception.?;
-        agent.exception = null;
+        // 3. If declResult is an abrupt completion, then
+        error.ExceptionThrown => {
+            const exception = agent.clearException();
 
-        // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « declResult.[[Value]] »).
-        _ = Value.from(promise_capability.reject).callAssumeCallable(
-            .undefined,
-            &.{exception},
-        ) catch |err| try noexcept(err);
-    }
+            // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « declResult.[[Value]] »).
+            _ = Value.from(promise_capability.reject).callAssumeCallable(
+                .undefined,
+                &.{exception},
+            ) catch |err_| try noexcept(err_);
+        },
+    };
+
     // 4. Else,
-    else {
-        // TODO: a. Perform AsyncFunctionStart(promiseCapability, FunctionBody).
-    }
+    //     TODO: a. Perform AsyncFunctionStart(promiseCapability, FunctionBody).
 
     // 5. Return Completion Record { [[Type]]: return, [[Value]]: promiseCapability.[[Promise]], [[Target]]: empty }.
     return .{ .type = .@"return", .value = Value.from(promise_capability.promise), .target = null };

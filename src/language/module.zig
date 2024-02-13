@@ -52,9 +52,9 @@ fn continueDynamicImport(
     // 2. Let module be moduleCompletion.[[Value]].
     const module = module_completion catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
+
         error.ExceptionThrown => {
-            const exception = agent.exception.?;
-            agent.exception = null;
+            const exception = agent.clearException();
 
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « moduleCompletion.[[Value]] »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
@@ -150,8 +150,7 @@ fn continueDynamicImport(
             // TODO: a. Let link be Completion(module.Link()).
             // TODO: b. If link is an abrupt completion, then
             if (false) {
-                const value = agent_.exception.?;
-                agent_.exception = null;
+                const value = agent_.clearException();
 
                 // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « link.[[Value]] »).
                 _ = Value.from(promise_capability_.reject).callAssumeCallable(

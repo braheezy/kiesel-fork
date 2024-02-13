@@ -2746,8 +2746,7 @@ pub fn run(self: *Self, executable: Executable) Agent.Error!Completion {
             .{ self, executable, instruction },
         ) catch |err| {
             if (self.exception_jump_target_stack.items.len != 0) {
-                self.exception = self.agent.exception;
-                self.agent.exception = null;
+                self.exception = self.agent.clearException();
                 self.ip = self.exception_jump_target_stack.getLast();
             } else return err;
         };
