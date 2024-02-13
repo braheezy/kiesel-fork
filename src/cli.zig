@@ -342,12 +342,12 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
             const parse_error_hint = try formatParseErrorHint(allocator, parse_error, source_text);
             defer allocator.free(parse_error_hint);
             try stderr.print("{s}\n", .{parse_error_hint});
-            agent.throwException(
+            const syntax_error = try agent.createException(
                 .syntax_error,
                 "{s}",
                 .{try formatParseError(agent.gc_allocator, parse_error)},
-            ) catch {};
-            try stderr.print("Uncaught exception: {pretty}\n", .{agent.exception.?});
+            );
+            try stderr.print("Uncaught exception: {pretty}\n", .{Value.from(syntax_error)});
             return null;
         },
         error.OutOfMemory => return error.OutOfMemory,

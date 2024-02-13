@@ -137,13 +137,14 @@ pub fn createResolvingFunctions(
             // 7. If SameValue(resolution, promise) is true, then
             if (sameValue(resolution, Value.from(promise_.object()))) {
                 // a. Let selfResolutionError be a newly created TypeError object.
-                // FIXME: This is awkward :)
-                agent_.throwException(.type_error, "Cannot resolve promise with itself", .{}) catch {};
-                const self_resolution_error = agent_.exception.?;
-                agent_.exception = null;
+                const self_resolution_error = try agent_.createException(
+                    .type_error,
+                    "Cannot resolve promise with itself",
+                    .{},
+                );
 
                 // b. Perform RejectPromise(promise, selfResolutionError).
-                try rejectPromise(agent_, promise_, self_resolution_error);
+                try rejectPromise(agent_, promise_, Value.from(self_resolution_error));
 
                 // c. Return undefined.
                 return .undefined;
@@ -1191,8 +1192,11 @@ fn performPromiseAny(
             // ii. If remainingElementsCount.[[Value]] = 0, then
             if (remaining_elements_count.value == 0) {
                 // 1. Let error be a newly created AggregateError object.
-                agent.throwException(.aggregate_error, "All promises were rejected", .{}) catch {};
-                const error_ = agent.exception.?.object;
+                const error_ = try agent.createException(
+                    .aggregate_error,
+                    "All promises were rejected",
+                    .{},
+                );
 
                 // 2. Perform ! DefinePropertyOrThrow(error, "errors", PropertyDescriptor {
                 //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
@@ -1206,6 +1210,7 @@ fn performPromiseAny(
                 }) catch |err| try noexcept(err);
 
                 // 3. Return ThrowCompletion(error).
+                agent.exception = Value.from(error_);
                 return error.ExceptionThrown;
             }
 
@@ -1279,13 +1284,11 @@ fn performPromiseAny(
                 // 10. If remainingElementsCount.[[Value]] = 0, then
                 if (remaining_elements_count_.value == 0) {
                     // a. Let error be a newly created AggregateError object.
-                    agent_.throwException(
+                    const error_ = try agent_.createException(
                         .aggregate_error,
                         "All promises were rejected",
                         .{},
-                    ) catch {};
-                    const error_ = agent_.exception.?.object;
-                    agent_.exception = null;
+                    );
 
                     // b. Perform ! DefinePropertyOrThrow(error, "errors", PropertyDescriptor {
                     //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,

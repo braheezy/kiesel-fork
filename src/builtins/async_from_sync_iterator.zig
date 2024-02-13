@@ -179,20 +179,17 @@ pub const AsyncFromSyncIteratorPrototype = struct {
 
         // 11. If result is not an Object, then
         if (result != .object) {
-            // FIXME: This is awkward :)
-            agent.throwException(
+            const type_error = try agent.createException(
                 .type_error,
                 "Return value of iterator 'return' function must be object",
                 .{},
-            ) catch {};
-            const type_error = agent.exception.?;
-            agent.exception = null;
+            );
 
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
             //    TypeError object »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
                 .undefined,
-                &.{type_error},
+                &.{Value.from(type_error)},
             ) catch |err| try noexcept(err);
 
             // b. Return promiseCapability.[[Promise]].
@@ -261,20 +258,17 @@ pub const AsyncFromSyncIteratorPrototype = struct {
 
         // 11. If result is not an Object, then
         if (result != .object) {
-            // FIXME: This is awkward :)
-            agent.throwException(
+            const type_error = try agent.createException(
                 .type_error,
                 "Return value of iterator 'throw' function must be object",
                 .{},
-            ) catch {};
-            const type_error = agent.exception.?;
-            agent.exception = null;
+            );
 
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
             //    TypeError object »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
                 .undefined,
-                &.{type_error},
+                &.{Value.from(type_error)},
             ) catch |err| try noexcept(err);
 
             // b. Return promiseCapability.[[Promise]].

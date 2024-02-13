@@ -11,6 +11,7 @@ const default_host_hooks = @import("default_host_hooks.zig");
 const environments = @import("environments.zig");
 const language = @import("../language.zig");
 const types = @import("../types.zig");
+const utils = @import("../utils.zig");
 
 const ArgumentsList = builtins.ArgumentsList;
 const BigInt = types.BigInt;
@@ -30,6 +31,7 @@ const String = types.String;
 const Symbol = types.Symbol;
 const Value = types.Value;
 const getIdentifierReference = environments.getIdentifierReference;
+const noexcept = utils.noexcept;
 
 const Self = @This();
 
@@ -227,6 +229,29 @@ const ExceptionType = enum {
     }
 };
 
+pub fn createException(
+    self: Self,
+    comptime exception_type: ExceptionType,
+    comptime fmt: []const u8,
+    args: anytype,
+) Allocator.Error!Object {
+    const realm = self.currentRealm();
+    const constructor = try @field(
+        Realm.Intrinsics,
+        "%" ++ exception_type.typeName() ++ "%",
+    )(&realm.intrinsics);
+    const message = try std.fmt.allocPrint(self.gc_allocator, fmt, args);
+    const error_object = constructor.construct(
+        &.{Value.from(message)},
+        null,
+    ) catch |err| try noexcept(err);
+    if (exception_type == .internal_error) {
+        // We don't have a dedicated type for this, but let's at least adjust the name
+        error_object.as(builtins.Error).fields.error_data.name = String.from("InternalError");
+    }
+    return error_object;
+}
+
 /// 5.2.3.2 Throw an Exception
 /// https://tc39.es/ecma262/#sec-throw-an-exception
 pub fn throwException(
@@ -235,29 +260,14 @@ pub fn throwException(
     comptime fmt: []const u8,
     args: anytype,
 ) error{ExceptionThrown} {
-    const realm = self.currentRealm();
-    const constructor = @field(
-        Realm.Intrinsics,
-        "%" ++ exception_type.typeName() ++ "%",
-    )(&realm.intrinsics) catch unreachable; // Already allocated for the global object
-    self.exception = blk: {
-        const message = std.fmt.allocPrint(
-            self.gc_allocator,
-            fmt,
-            args,
-        ) catch |err| switch (err) {
-            error.OutOfMemory => break :blk Value.from("Out of memory"),
-        };
-        const error_object = constructor.construct(&.{Value.from(message)}, null) catch |err| switch (err) {
-            error.OutOfMemory => break :blk Value.from("Out of memory"),
-            error.ExceptionThrown => unreachable,
-        };
-        if (exception_type == .internal_error) {
-            // We don't have a dedicated type for this, but let's at least adjust the name
-            error_object.as(builtins.Error).fields.error_data.name = String.from("InternalError");
-        }
-        break :blk Value.from(error_object);
-    };
+    self.exception = if (self.createException(
+        exception_type,
+        fmt,
+        args,
+    )) |error_object|
+        Value.from(error_object)
+    else |_|
+        Value.from("Out of memory");
     return error.ExceptionThrown;
 }
 
