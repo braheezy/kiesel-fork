@@ -627,6 +627,7 @@ pub const ArrayBufferPrototype = struct {
         });
 
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
+        try defineBuiltinAccessor(object, "detached", detached, null, realm);
         try defineBuiltinAccessor(object, "maxByteLength", maxByteLength, null, realm);
         try defineBuiltinAccessor(object, "resizable", resizable, null, realm);
         try defineBuiltinFunction(object, "resize", resize, 1, realm);
@@ -665,7 +666,20 @@ pub const ArrayBufferPrototype = struct {
         return Value.from(@as(u53, @intCast(length)));
     }
 
-    /// 25.1.6.3 get ArrayBuffer.prototype.maxByteLength
+    /// 25.1.6.3 get ArrayBuffer.prototype.detached
+    /// https://tc39.es/ecma262/#sec-get-arraybuffer.prototype.detached
+    fn detached(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
+
+        // TODO: 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
+
+        // 4. Return IsDetachedBuffer(O).
+        return Value.from(isDetachedBuffer(object));
+    }
+
+    /// 25.1.6.4 get ArrayBuffer.prototype.maxByteLength
     /// https://tc39.es/ecma262/#sec-get-arraybuffer.prototype.maxbytelength
     fn maxByteLength(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Let O be the this value.
@@ -692,7 +706,7 @@ pub const ArrayBufferPrototype = struct {
         return Value.from(@as(u53, @intCast(length)));
     }
 
-    /// 25.1.6.4 get ArrayBuffer.prototype.resizable
+    /// 25.1.6.5 get ArrayBuffer.prototype.resizable
     /// https://tc39.es/ecma262/#sec-get-arraybuffer.prototype.resizable
     fn resizable(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Let O be the this value.
@@ -705,7 +719,7 @@ pub const ArrayBufferPrototype = struct {
         return Value.from(!isFixedLengthArrayBuffer(object));
     }
 
-    /// 25.1.6.5 ArrayBuffer.prototype.resize ( newLength )
+    /// 25.1.6.6 ArrayBuffer.prototype.resize ( newLength )
     /// https://tc39.es/ecma262/#sec-arraybuffer.prototype.resize
     fn resize(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
         const new_length = arguments.get(0);
@@ -766,7 +780,7 @@ pub const ArrayBufferPrototype = struct {
         return .undefined;
     }
 
-    /// 25.1.6.6 ArrayBuffer.prototype.slice ( start, end )
+    /// 25.1.6.7 ArrayBuffer.prototype.slice ( start, end )
     /// https://tc39.es/ecma262/#sec-arraybuffer.prototype.slice
     fn slice(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
         const realm = agent.currentRealm();
