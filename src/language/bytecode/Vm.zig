@@ -1128,7 +1128,7 @@ fn classFieldDefinitionEvaluation(
     )).value.?.toPropertyKey(agent) catch |err| try noexcept(err);
     const name = .{ .property_key = property_key };
 
-    // 2. If Initializer[opt] is present, then
+    // 2. If Initializer is present, then
     const initializer = if (field_definition.initializer) |initializer| blk: {
         // a. Let formalParameterList be an instance of the production FormalParameters : [empty] .
         const formal_parameter_list = ast.FormalParameters{ .items = &.{} };
@@ -1337,17 +1337,15 @@ fn classDefinitionEvaluation(
         outer_private_environment,
     );
 
-    const class_body_present = class_tail.class_body.class_element_list.items.len != 0;
-
-    // 6. If ClassBody[opt] is present, then
-    if (class_body_present) {
+    // 6. If ClassBody is present, then
+    if (class_tail.class_body.class_element_list.items.len != 0) {
         // TODO: Initialize private environment
     }
 
     var prototype_parent: ?Object = undefined;
     var constructor_parent: Object = undefined;
 
-    // 7. If ClassHeritage[opt] is not present, then
+    // 7. If ClassHeritage is not present, then
     if (class_tail.class_heritage == null) {
         // a. Let protoParent be %Object.prototype%.
         prototype_parent = try realm.intrinsics.@"%Object.prototype%"();
@@ -1418,7 +1416,7 @@ fn classDefinitionEvaluation(
     // 9. Let proto be OrdinaryObjectCreate(protoParent).
     const prototype = try ordinaryObjectCreate(agent, prototype_parent);
 
-    // 10. If ClassBody[opt] is not present, let constructor be empty.
+    // 10. If ClassBody is not present, let constructor be empty.
     // 11. Else, let constructor be ConstructorMethod of ClassBody.
     const constructor = class_tail.class_body.constructorMethod();
 
@@ -1536,7 +1534,7 @@ fn classDefinitionEvaluation(
     // 16. Perform MakeConstructor(F, false, proto).
     try makeConstructor(function, .{ .writable_prototype = false, .prototype = prototype });
 
-    // 17. If ClassHeritage[opt] is present, set F.[[ConstructorKind]] to derived.
+    // 17. If ClassHeritage is present, set F.[[ConstructorKind]] to derived.
     if (class_tail.class_heritage != null) {
         if (function.is(builtins.ECMAScriptFunction)) {
             function.as(builtins.ECMAScriptFunction).fields.constructor_kind = .derived;
