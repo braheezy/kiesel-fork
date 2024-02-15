@@ -745,8 +745,8 @@ pub fn defineMethodProperty(
     property_key: PropertyKey,
     closure: Object,
     enumerable: bool,
-) Allocator.Error!void {
-    // 1. Assert: homeObject is an ordinary, extensible object with no non-configurable properties.
+) Agent.Error!void {
+    // 1. Assert: homeObject is an ordinary, extensible object.
 
     // TODO: 2. If key is a Private Name, then
     if (false) {
@@ -764,13 +764,16 @@ pub fn defineMethodProperty(
             .configurable = true,
         };
 
-        // b. Perform ! DefinePropertyOrThrow(homeObject, key, desc).
-        home_object.definePropertyOrThrow(
+        // b. Perform ? DefinePropertyOrThrow(homeObject, key, desc).
+        try home_object.definePropertyOrThrow(
             property_key,
             property_descriptor,
-        ) catch |err| try noexcept(err);
+        );
 
-        // c. Return unused.
+        // c. NOTE: DefinePropertyOrThrow only returns an abrupt completion when attempting to
+        //    define a class static method whose key is "prototype".
+
+        // d. Return unused.
     }
 }
 

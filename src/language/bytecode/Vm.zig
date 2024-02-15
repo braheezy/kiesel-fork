@@ -607,7 +607,7 @@ fn methodDefinitionEvaluation(
             // 2. Perform SetFunctionName(methodDef.[[Closure]], methodDef.[[Key]]).
             try setFunctionName(method_def.closure, method_def.key, null);
 
-            // 3. Return DefineMethodProperty(object, methodDef.[[Key]], methodDef.[[Closure]], enumerable).
+            // 3. Return ? DefineMethodProperty(object, methodDef.[[Key]], methodDef.[[Closure]], enumerable).
             try defineMethodProperty(object, method_def.key, method_def.closure, enumerable);
         },
 
@@ -773,7 +773,7 @@ fn methodDefinitionEvaluation(
                 .configurable = false,
             }) catch |err| try noexcept(err);
 
-            // 10. Return DefineMethodProperty(object, propKey, closure, enumerable).
+            // 10. Return ? DefineMethodProperty(object, propKey, closure, enumerable).
             try defineMethodProperty(object, property_key, closure, enumerable);
         },
 
@@ -826,7 +826,7 @@ fn methodDefinitionEvaluation(
                 .configurable = false,
             }) catch |err| try noexcept(err);
 
-            // 10. Return DefineMethodProperty(object, propKey, closure, enumerable).
+            // 10. Return ? DefineMethodProperty(object, propKey, closure, enumerable).
             try defineMethodProperty(object, property_key, closure, enumerable);
         },
 
@@ -863,7 +863,7 @@ fn methodDefinitionEvaluation(
             // 7. Perform SetFunctionName(closure, propKey).
             try setFunctionName(closure, property_key, null);
 
-            // 8. Return DefineMethodProperty(object, propKey, closure, enumerable).
+            // 8. Return ? DefineMethodProperty(object, propKey, closure, enumerable).
             try defineMethodProperty(object, property_key, closure, enumerable);
         },
     }
