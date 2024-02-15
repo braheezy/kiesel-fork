@@ -76,9 +76,14 @@ pub fn hostLoadImportedModule(
     try finishLoadingImportedModule(agent, referrer, specifier, payload, result);
 }
 
-/// 19.2.1.2 HostEnsureCanCompileStrings ( calleeRealm )
+/// 19.2.1.2 HostEnsureCanCompileStrings ( calleeRealm, parameterStrings, bodyString, direct )
 /// https://tc39.es/ecma262/#sec-hostensurecancompilestrings
-pub fn hostEnsureCanCompileStrings(_: *Realm) error{}!void {
+pub fn hostEnsureCanCompileStrings(
+    _: *Realm,
+    _: []const String,
+    _: String,
+    _: bool,
+) error{}!void {
     // The default implementation of HostEnsureCanCompileStrings is to return NormalCompletion(unused).
 }
 

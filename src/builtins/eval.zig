@@ -33,8 +33,8 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     //          of the eval function itself.
     const eval_realm = agent.currentRealm();
 
-    // 5. Perform ? HostEnsureCanCompileStrings(evalRealm).
-    try agent.host_hooks.hostEnsureCanCompileStrings(eval_realm);
+    // 5. Perform ? HostEnsureCanCompileStrings(evalRealm, « », x, direct).
+    try agent.host_hooks.hostEnsureCanCompileStrings(eval_realm, &.{}, x.string, direct);
 
     // TODO: 6-10.
 

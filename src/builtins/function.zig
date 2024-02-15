@@ -120,13 +120,7 @@ pub fn createDynamicFunction(
 ) Agent.Error!Object {
     const realm = agent.currentRealm();
 
-    // 1. Let currentRealm be the current Realm Record.
-    const current_realm = realm;
-
-    // 2. Perform ? HostEnsureCanCompileStrings(currentRealm).
-    try agent.host_hooks.hostEnsureCanCompileStrings(current_realm);
-
-    // 3. If newTarget is undefined, set newTarget to constructor.
+    // 1. If newTarget is undefined, set newTarget to constructor.
     const new_target = maybe_new_target orelse constructor;
 
     comptime var prefix: []const u8 = undefined;
@@ -141,7 +135,7 @@ pub fn createDynamicFunction(
     comptime var parameter_sym: GrammarSymbol(ast.FormalParameters) = .{};
 
     switch (kind) {
-        // 4. If kind is normal, then
+        // 2. If kind is normal, then
         .normal => {
             // a. Let prefix be "function".
             prefix = "function";
@@ -171,7 +165,7 @@ pub fn createDynamicFunction(
             fallback_prototype = "%Function.prototype%";
         },
 
-        // 5. Else if kind is generator, then
+        // 3. Else if kind is generator, then
         .generator => {
             // a. Let prefix be "function*".
             prefix = "function*";
@@ -201,7 +195,7 @@ pub fn createDynamicFunction(
             fallback_prototype = "%GeneratorFunction.prototype%";
         },
 
-        // 6. Else if kind is async, then
+        // 4. Else if kind is async, then
         .@"async" => {
             // a. Let prefix be "async function".
             prefix = "async function";
@@ -231,7 +225,7 @@ pub fn createDynamicFunction(
             fallback_prototype = "%AsyncFunction.prototype%";
         },
 
-        // 7. Else,
+        // 5. Else,
         .async_generator => {
             // a. Assert: kind is async-generator.
 
@@ -264,63 +258,83 @@ pub fn createDynamicFunction(
         },
     }
 
-    // 8. Let argCount be the number of elements in parameterArgs.
+    // 6. Let argCount be the number of elements in parameterArgs.
     const arg_count = parameter_args.count();
 
-    // 9. Let P be the empty String.
+    // 7. Let bodyString be ? ToString(bodyArg).
+    const body_string = try body_arg.toString(agent);
+
+    // 8. Let parameterStrings be a new empty List.
+    var parameter_strings = try std.ArrayList(String).initCapacity(
+        agent.gc_allocator,
+        parameter_args.count(),
+    );
+    defer parameter_strings.deinit();
+
+    // 9. For each element arg of parameterArgs, do
+    for (parameter_args.values) |arg| {
+        // a. Append ? ToString(arg) to parameterStrings.
+        parameter_strings.appendAssumeCapacity(try arg.toString(agent));
+    }
+
+    // 10. Let currentRealm be the current Realm Record.
+    const current_realm = realm;
+
+    // 11. Perform ? HostEnsureCanCompileStrings(currentRealm, parameterStrings, bodyString, false).
+    try agent.host_hooks.hostEnsureCanCompileStrings(current_realm, parameter_strings.items, body_string, false);
+
+    // 12. Let P be the empty String.
     var parameters_string: []const u8 = "";
 
-    // 10. If argCount > 0, then
+    // 13. If argCount > 0, then
     if (arg_count > 0) {
-        // a. Let firstArg be parameterArgs[0].
-        // b. Set P to ? ToString(firstArg).
-        // c. Let k be 1.
-        // d. Repeat, while k < argCount,
-        //     i. Let nextArg be parameterArgs[k].
-        //     ii. Let nextArgString be ? ToString(nextArg).
-        //     iii. Set P to the string-concatenation of P, "," (a comma), and nextArgString.
-        //     iv. Set k to k + 1.
-        var argument_strings = try std.ArrayList([]const u8).initCapacity(
+        // a. Set P to parameterStrings[0].
+        // b. Let k be 1.
+        // c. Repeat, while k < argCount,
+        //     i. Let nextArgString be parameterStrings[k].
+        //     ii. Set P to the string-concatenation of P, "," (a comma), and nextArgString.
+        //     iii. Set k to k + 1.
+        var bytes = try std.ArrayList([]const u8).initCapacity(
             agent.gc_allocator,
             arg_count,
         );
-        defer argument_strings.deinit();
-        for (parameter_args.values) |arg| {
-            argument_strings.appendAssumeCapacity((try arg.toString(agent)).utf8);
+        defer bytes.deinit();
+        for (parameter_strings.items) |next_arg_string| {
+            bytes.appendAssumeCapacity(next_arg_string.utf8);
         }
-        parameters_string = try std.mem.join(agent.gc_allocator, ",", argument_strings.items);
+        parameters_string = try std.mem.join(agent.gc_allocator, ",", bytes.items);
     }
 
-    // 11. Let bodyString be the string-concatenation of 0x000A (LINE FEED), ? ToString(bodyArg),
-    //     and 0x000A (LINE FEED).
-    const body_string = try std.fmt.allocPrint(
+    // 14. Let bodyParseString be the string-concatenation of 0x000A (LINE FEED), bodyString, and
+    //     0x000A (LINE FEED).
+    const body_parse_string = try std.fmt.allocPrint(
         agent.gc_allocator,
         "\n{s}\n",
-        .{(try body_arg.toString(agent)).utf8},
+        .{body_string.utf8},
     );
 
-    // 12. Let sourceString be the string-concatenation of prefix, " anonymous(", P, 0x000A
-    //     (LINE FEED), ") {", bodyString, and "}".
+    // 15. Let sourceString be the string-concatenation of prefix, " anonymous(", P, 0x000A
+    //     (LINE FEED), ") {", bodyParseString, and "}".
     const source_string = try std.fmt.allocPrint(
         agent.gc_allocator,
-        "{[prefix]s} anonymous({[parameters_string]s}\n) {{{[body_string]s}}}",
-        .{ .prefix = prefix, .parameters_string = parameters_string, .body_string = body_string },
+        "{[prefix]s} anonymous({[parameters_string]s}\n) {{{[body_parse_string]s}}}",
+        .{ .prefix = prefix, .parameters_string = parameters_string, .body_parse_string = body_parse_string },
     );
 
-    // 13. Let sourceText be StringToCodePoints(sourceString).
+    // 16. Let sourceText be StringToCodePoints(sourceString).
     const source_text = source_string;
 
     var diagnostics = Diagnostics.init(agent.gc_allocator);
     defer diagnostics.deinit();
 
-    // 14. Let parameters be ParseText(StringToCodePoints(P), parameterSym).
+    // 17. Let parameters be ParseText(StringToCodePoints(P), parameterSym).
     const parameters = Parser.parseNode(parameter_sym.type, parameter_sym.acceptFn, agent.gc_allocator, parameters_string, .{
         .diagnostics = &diagnostics,
         .file_name = "Function",
     }) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.ParseError => {
-            // 15. If parameters is a List of errors, throw a SyntaxError exception.
+            // 18. If parameters is a List of errors, throw a SyntaxError exception.
             const parse_error = diagnostics.errors.items[0];
             return agent.throwException(
                 .syntax_error,
@@ -330,14 +344,14 @@ pub fn createDynamicFunction(
         },
     };
 
-    // 16. Let body be ParseText(StringToCodePoints(bodyString), bodySym).
-    var body = Parser.parseNode(body_sym.type, body_sym.acceptFn, agent.gc_allocator, body_string, .{
+    // 19. Let body be ParseText(StringToCodePoints(bodyParseString), bodySym).
+    var body = Parser.parseNode(body_sym.type, body_sym.acceptFn, agent.gc_allocator, body_parse_string, .{
         .diagnostics = &diagnostics,
         .file_name = "Function",
     }) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.ParseError => {
-            // 17. If body is a List of errors, throw a SyntaxError exception.
+            // 20. If body is a List of errors, throw a SyntaxError exception.
             const parse_error = diagnostics.errors.items[0];
             return agent.throwException(
                 .syntax_error,
@@ -348,21 +362,21 @@ pub fn createDynamicFunction(
     };
     body.strict = body.functionBodyContainsUseStrict();
 
-    // 18. NOTE: The parameters and body are parsed separately to ensure that each is valid alone.
+    // 21. NOTE: The parameters and body are parsed separately to ensure that each is valid alone.
     //           For example, new Function("/*", "*/ ) {") does not evaluate to a function.
 
-    // 19. NOTE: If this step is reached, sourceText must have the syntax of exprSym (although the
+    // 22. NOTE: If this step is reached, sourceText must have the syntax of exprSym (although the
     //           reverse implication does not hold). The purpose of the next two steps is to
     //           enforce any Early Error rules which apply to exprSym directly.
 
-    // 20. Let expr be ParseText(sourceText, exprSym).
+    // 23. Let expr be ParseText(sourceText, exprSym).
     _ = Parser.parseNode(expr_sym.type, expr_sym.acceptFn, agent.gc_allocator, source_text, .{
         .diagnostics = &diagnostics,
         .file_name = "Function",
     }) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.ParseError => {
-            // 21. If expr is a List of errors, throw a SyntaxError exception.
+            // 24. If expr is a List of errors, throw a SyntaxError exception.
             const parse_error = diagnostics.errors.items[0];
             return agent.throwException(
                 .syntax_error,
@@ -372,16 +386,16 @@ pub fn createDynamicFunction(
         },
     };
 
-    // 22. Let proto be ? GetPrototypeFromConstructor(newTarget, fallbackProto).
+    // 25. Let proto be ? GetPrototypeFromConstructor(newTarget, fallbackProto).
     const proto = try getPrototypeFromConstructor(new_target, fallback_prototype);
 
-    // 23. Let env be currentRealm.[[GlobalEnv]].
+    // 26. Let env be currentRealm.[[GlobalEnv]].
     const env = current_realm.global_env;
 
-    // 24. Let privateEnv be null.
+    // 27. Let privateEnv be null.
     const private_env = null;
 
-    // 25. Let F be OrdinaryFunctionCreate(proto, sourceText, parameters, body, non-lexical-this, env, privateEnv).
+    // 28. Let F be OrdinaryFunctionCreate(proto, sourceText, parameters, body, non-lexical-this, env, privateEnv).
     const function = try ordinaryFunctionCreate(
         agent,
         proto,
@@ -393,11 +407,11 @@ pub fn createDynamicFunction(
         private_env,
     );
 
-    // 26. Perform SetFunctionName(F, "anonymous").
+    // 29. Perform SetFunctionName(F, "anonymous").
     try setFunctionName(function, PropertyKey.from("anonymous"), null);
 
     switch (kind) {
-        // 27. If kind is generator, then
+        // 30. If kind is generator, then
         .generator => {
             // a. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
             const prototype = try ordinaryObjectCreate(
@@ -416,7 +430,7 @@ pub fn createDynamicFunction(
             }) catch |err| try noexcept(err);
         },
 
-        // 28. Else if kind is async-generator, then
+        // 31. Else if kind is async-generator, then
         .async_generator => {
             // a. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
             const prototype = try ordinaryObjectCreate(
@@ -435,18 +449,18 @@ pub fn createDynamicFunction(
             }) catch |err| try noexcept(err);
         },
 
-        // 29. Else if kind is normal, then
+        // 32. Else if kind is normal, then
         .normal => {
             // a. Perform MakeConstructor(F).
             try makeConstructor(function, .{});
         },
 
-        // 30. NOTE: Functions whose kind is async are not constructible and do not have a
+        // 33. NOTE: Functions whose kind is async are not constructible and do not have a
         //           [[Construct]] internal method or a "prototype" property.
         .@"async" => {},
     }
 
-    // 31. Return F.
+    // 34. Return F.
     return function;
 }
 

@@ -116,7 +116,12 @@ pub const HostHooks = struct {
         host_defined: SafePointer,
         payload: ImportedModulePayload,
     ) Allocator.Error!void,
-    hostEnsureCanCompileStrings: *const fn (callee_realm: *Realm) Error!void,
+    hostEnsureCanCompileStrings: *const fn (
+        callee_realm: *Realm,
+        parameter_strings: []const String,
+        body_string: String,
+        direct: bool,
+    ) Error!void,
     hostHasSourceTextAvailable: *const fn (func: Object) bool,
     hostResizeArrayBuffer: *const fn (
         buffer: *builtins.ArrayBuffer,
