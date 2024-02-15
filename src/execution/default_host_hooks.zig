@@ -94,7 +94,7 @@ pub fn hostHasSourceTextAvailable(_: Object) bool {
     return true;
 }
 
-/// 25.1.3.7 HostResizeArrayBuffer ( buffer, newByteLength )
+/// 25.1.3.8 HostResizeArrayBuffer ( buffer, newByteLength )
 /// https://tc39.es/ecma262/#sec-hostresizearraybuffer
 pub fn hostResizeArrayBuffer(
     _: *builtins.ArrayBuffer,

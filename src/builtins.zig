@@ -188,6 +188,7 @@ pub const addRestrictedFunctionProperties = ecmascript_function.addRestrictedFun
 pub const advanceStringIndex = reg_exp.advanceStringIndex;
 pub const allocateArrayBuffer = array_buffer.allocateArrayBuffer;
 pub const arrayBufferByteLength = array_buffer.arrayBufferByteLength;
+pub const arrayBufferCopyAndDetach = array_buffer.arrayBufferCopyAndDetach;
 pub const arrayCreate = array.arrayCreate;
 pub const arraySetLength = array.arraySetLength;
 pub const arraySpeciesCreate = array.arraySpeciesCreate;

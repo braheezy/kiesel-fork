@@ -105,7 +105,92 @@ pub fn arrayBufferByteLength(array_buffer: *const ArrayBuffer, _: Order) u53 {
     return @intCast(array_buffer.fields.array_buffer_data.?.items.len);
 }
 
-/// 25.1.3.3 IsDetachedBuffer ( arrayBuffer )
+/// 25.1.3.3 ArrayBufferCopyAndDetach ( arrayBuffer, newLength, preserveResizability )
+pub fn arrayBufferCopyAndDetach(
+    agent: *Agent,
+    array_buffer_value: Value,
+    new_length: Value,
+    preserve_resizability: enum { preserve_resizability, fixed_length },
+) Agent.Error!Object {
+    const realm = agent.currentRealm();
+
+    // 1. Perform ? RequireInternalSlot(arrayBuffer, [[ArrayBufferData]]).
+    const array_buffer = try array_buffer_value.requireInternalSlot(agent, ArrayBuffer);
+
+    // TODO: 2. If IsSharedArrayBuffer(arrayBuffer) is true, throw a TypeError exception.
+
+    const array_buffer_byte_length = if (array_buffer.fields.array_buffer_data) |array_buffer_data|
+        array_buffer_data.items.len
+    else
+        0;
+
+    // 3. If newLength is undefined, then
+    const new_byte_length = if (new_length == .undefined) blk: {
+        // a. Let newByteLength be arrayBuffer.[[ArrayBufferByteLength]].
+        break :blk array_buffer_byte_length;
+    }
+    // 4. Else,
+    else blk: {
+        // a. Let newByteLength be ? ToIndex(newLength).
+        break :blk try new_length.toIndex(agent);
+    };
+
+    // 5. If IsDetachedBuffer(arrayBuffer) is true, throw a TypeError exception.
+    if (isDetachedBuffer(array_buffer)) {
+        return agent.throwException(.type_error, "ArrayBuffer is detached", .{});
+    }
+
+    // 6. If preserveResizability is preserve-resizability and IsFixedLengthArrayBuffer(arrayBuffer)
+    //    is false, then
+    const new_max_byte_length = if (preserve_resizability == .preserve_resizability and
+        !isFixedLengthArrayBuffer(array_buffer))
+    blk: {
+        // a. Let newMaxByteLength be arrayBuffer.[[ArrayBufferMaxByteLength]].
+        break :blk array_buffer.fields.array_buffer_max_byte_length;
+    }
+    // 7. Else,
+    else blk: {
+        // a. Let newMaxByteLength be empty.
+        break :blk null;
+    };
+
+    // 8. If arrayBuffer.[[ArrayBufferDetachKey]] is not undefined, throw a TypeError exception.
+    if (array_buffer.fields.array_buffer_detach_key != .undefined) {
+        return agent.throwException(.type_error, "ArrayBuffer detach key does not match", .{});
+    }
+
+    // 9. Let newBuffer be ? AllocateArrayBuffer(%ArrayBuffer%, newByteLength, newMaxByteLength).
+    const new_buffer = try allocateArrayBuffer(
+        agent,
+        try realm.intrinsics.@"%ArrayBuffer%"(),
+        new_byte_length,
+        new_max_byte_length,
+    );
+
+    // 10. Let copyLength be min(newByteLength, arrayBuffer.[[ArrayBufferByteLength]]).
+    const copy_length: u53 = @intCast(@min(new_byte_length, array_buffer_byte_length));
+
+    // 11. Let fromBlock be arrayBuffer.[[ArrayBufferData]].
+    const from_block = &array_buffer.fields.array_buffer_data.?;
+
+    // 12. Let toBlock be newBuffer.[[ArrayBufferData]].
+    const to_block = &new_buffer.as(ArrayBuffer).fields.array_buffer_data.?;
+
+    // 13. Perform CopyDataBlockBytes(toBlock, 0, fromBlock, 0, copyLength).
+    copyDataBlockBytes(to_block, 0, from_block, 0, copy_length);
+
+    // 14. NOTE: Neither creation of the new Data Block nor copying from the old Data Block are
+    //     observable. Implementations may implement this method as a zero-copy move or a realloc.
+    // TODO: Implement this as mentioned :^)
+
+    // 15. Perform ! DetachArrayBuffer(arrayBuffer).
+    detachArrayBuffer(agent, array_buffer, null) catch unreachable;
+
+    // 16. Return newBuffer.
+    return new_buffer;
+}
+
+/// 25.1.3.4 IsDetachedBuffer ( arrayBuffer )
 /// https://tc39.es/ecma262/#sec-isdetachedbuffer
 pub fn isDetachedBuffer(array_buffer: *const ArrayBuffer) bool {
     // 1. If arrayBuffer.[[ArrayBufferData]] is null, return true.
@@ -113,7 +198,7 @@ pub fn isDetachedBuffer(array_buffer: *const ArrayBuffer) bool {
     return array_buffer.fields.array_buffer_data == null;
 }
 
-/// 25.1.3.4 DetachArrayBuffer ( arrayBuffer [ , key ] )
+/// 25.1.3.5 DetachArrayBuffer ( arrayBuffer [ , key ] )
 /// https://tc39.es/ecma262/#sec-detacharraybuffer
 pub fn detachArrayBuffer(
     agent: *Agent,
@@ -140,7 +225,7 @@ pub fn detachArrayBuffer(
     // 6. Return unused.
 }
 
-/// 25.1.3.5 CloneArrayBuffer ( srcBuffer, srcByteOffset, srcLength )
+/// 25.1.3.6 CloneArrayBuffer ( srcBuffer, srcByteOffset, srcLength )
 /// https://tc39.es/ecma262/#sec-clonearraybuffer
 pub fn cloneArrayBuffer(
     agent: *Agent,
@@ -174,7 +259,7 @@ pub fn cloneArrayBuffer(
     return target_buffer;
 }
 
-/// 25.1.3.6 GetArrayBufferMaxByteLengthOption ( options )
+/// 25.1.3.7 GetArrayBufferMaxByteLengthOption ( options )
 /// https://tc39.es/ecma262/#sec-getarraybuffermaxbytelengthoption
 pub fn getArrayBufferMaxByteLengthOption(agent: *Agent, options: Value) Agent.Error!?u53 {
     // 1. If options is not an Object, return empty.
@@ -190,7 +275,7 @@ pub fn getArrayBufferMaxByteLengthOption(agent: *Agent, options: Value) Agent.Er
     return try max_byte_length.toIndex(agent);
 }
 
-/// 25.1.3.8 IsFixedLengthArrayBuffer ( arrayBuffer )
+/// 25.1.3.9 IsFixedLengthArrayBuffer ( arrayBuffer )
 /// https://tc39.es/ecma262/#sec-isfixedlengtharraybuffer
 pub fn isFixedLengthArrayBuffer(array_buffer: *const ArrayBuffer) bool {
     // 1. If arrayBuffer has an [[ArrayBufferMaxByteLength]] internal slot, return false.
@@ -198,7 +283,7 @@ pub fn isFixedLengthArrayBuffer(array_buffer: *const ArrayBuffer) bool {
     return array_buffer.fields.array_buffer_max_byte_length == null;
 }
 
-/// 25.1.3.13 RawBytesToNumeric ( type, rawBytes, isLittleEndian )
+/// 25.1.3.14 RawBytesToNumeric ( type, rawBytes, isLittleEndian )
 /// https://tc39.es/ecma262/#sec-rawbytestonumeric
 pub fn rawBytesToNumeric(
     comptime @"type": TypedArrayElementType,
@@ -218,7 +303,7 @@ pub fn rawBytesToNumeric(
     return std.mem.bytesToValue(@"type".T, &bytes);
 }
 
-/// 25.1.3.15 GetValueFromBuffer ( arrayBuffer, byteIndex, type, isTypedArray, order [ , isLittleEndian ] )
+/// 25.1.3.16 GetValueFromBuffer ( arrayBuffer, byteIndex, type, isTypedArray, order [ , isLittleEndian ] )
 /// https://tc39.es/ecma262/#sec-getvaluefrombuffer
 pub fn getValueFromBuffer(
     agent: *Agent,
@@ -266,7 +351,7 @@ pub fn getValueFromBuffer(
     return rawBytesToNumeric(@"type", raw_value, is_little_endian);
 }
 
-/// 25.1.3.16 NumericToRawBytes ( type, value, isLittleEndian )
+/// 25.1.3.17 NumericToRawBytes ( type, value, isLittleEndian )
 /// https://tc39.es/ecma262/#sec-numerictorawbytes
 pub fn numericToRawBytes(
     agent: *Agent,
@@ -330,7 +415,7 @@ pub fn numericToRawBytes(
     return raw_bytes;
 }
 
-/// 25.1.3.17 SetValueInBuffer ( arrayBuffer, byteIndex, type, value, isTypedArray, order [ , isLittleEndian ] )
+/// 25.1.3.18 SetValueInBuffer ( arrayBuffer, byteIndex, type, value, isTypedArray, order [ , isLittleEndian ] )
 /// https://tc39.es/ecma262/#sec-setvalueinbuffer
 pub fn setValueInBuffer(
     agent: *Agent,
@@ -381,7 +466,7 @@ pub fn setValueInBuffer(
     // 10. Return unused.
 }
 
-/// 25.1.3.18 GetModifySetValueInBuffer ( arrayBuffer, byteIndex, type, value, op )
+/// 25.1.3.19 GetModifySetValueInBuffer ( arrayBuffer, byteIndex, type, value, op )
 /// https://tc39.es/ecma262/#sec-getmodifysetvalueinbuffer
 pub fn getModifySetValueInBuffer(
     agent: *Agent,
@@ -546,6 +631,7 @@ pub const ArrayBufferPrototype = struct {
         try defineBuiltinAccessor(object, "resizable", resizable, null, realm);
         try defineBuiltinFunction(object, "resize", resize, 1, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
+        try defineBuiltinFunction(object, "transfer", transfer, 0, realm);
 
         // 25.1.6.7 ArrayBuffer.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-arraybuffer.prototype-@@tostringtag
@@ -797,6 +883,18 @@ pub const ArrayBufferPrototype = struct {
 
         // 28. Return new.
         return Value.from(new.object());
+    }
+
+    /// 25.1.6.8 ArrayBuffer.prototype.transfer ( [ newLength ] )
+    /// https://tc39.es/ecma262/#sec-arraybuffer.prototype.transfer
+    fn transfer(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const new_length = arguments.get(0);
+
+        // 1. Let O be the this value.
+        // 2. Return ? ArrayBufferCopyAndDetach(O, newLength, preserve-resizability).
+        return Value.from(
+            try arrayBufferCopyAndDetach(agent, this_value, new_length, .preserve_resizability),
+        );
     }
 };
 
