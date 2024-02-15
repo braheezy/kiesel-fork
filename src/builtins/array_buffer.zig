@@ -632,6 +632,7 @@ pub const ArrayBufferPrototype = struct {
         try defineBuiltinFunction(object, "resize", resize, 1, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
         try defineBuiltinFunction(object, "transfer", transfer, 0, realm);
+        try defineBuiltinFunction(object, "transferToFixedLength", transferToFixedLength, 0, realm);
 
         // 25.1.6.7 ArrayBuffer.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-arraybuffer.prototype-@@tostringtag
@@ -894,6 +895,18 @@ pub const ArrayBufferPrototype = struct {
         // 2. Return ? ArrayBufferCopyAndDetach(O, newLength, preserve-resizability).
         return Value.from(
             try arrayBufferCopyAndDetach(agent, this_value, new_length, .preserve_resizability),
+        );
+    }
+
+    /// 25.1.6.9 ArrayBuffer.prototype.transferToFixedLength ( [ newLength ] )
+    /// https://tc39.es/ecma262/#sec-arraybuffer.prototype.transfertofixedlength
+    fn transferToFixedLength(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const new_length = arguments.get(0);
+
+        // 1. Let O be the this value.
+        // 2. Return ? ArrayBufferCopyAndDetach(O, newLength, fixed-length).
+        return Value.from(
+            try arrayBufferCopyAndDetach(agent, this_value, new_length, .fixed_length),
         );
     }
 };
