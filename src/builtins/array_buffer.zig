@@ -604,10 +604,8 @@ pub const ArrayBufferConstructor = struct {
         if (arg != .object) return Value.from(false);
 
         // 2. If arg has a [[ViewedArrayBuffer]] internal slot, return true.
-        if (arg.object.is(builtins.DataView)) return Value.from(true);
-
         // 3. Return false.
-        return Value.from(false);
+        return Value.from(arg.object.is(builtins.DataView) or arg.object.is(builtins.TypedArray));
     }
 
     /// 25.1.5.3 get ArrayBuffer [ @@species ]
