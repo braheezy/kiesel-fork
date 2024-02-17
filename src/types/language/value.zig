@@ -891,7 +891,7 @@ pub const Value = union(enum) {
         return object.internalMethods().get(object, property_key, self);
     }
 
-    /// 7.3.11 GetMethod ( V, P )
+    /// 7.3.10 GetMethod ( V, P )
     /// https://tc39.es/ecma262/#sec-getmethod
     pub fn getMethod(self: Self, agent: *Agent, property_key: PropertyKey) Agent.Error!?Object {
         // 1. Let func be ? GetV(V, P).
@@ -909,7 +909,7 @@ pub const Value = union(enum) {
         return function.object;
     }
 
-    /// 7.3.14 Call ( F, V [ , argumentsList ] )
+    /// 7.3.13 Call ( F, V [ , argumentsList ] )
     /// https://tc39.es/ecma262/#sec-call
     pub fn call(
         self: Self,
@@ -949,7 +949,7 @@ pub const Value = union(enum) {
         return self.callAssumeCallable(this_value, &.{});
     }
 
-    /// 7.3.20 CreateListFromArrayLike ( obj [ , elementTypes ] )
+    /// 7.3.19 CreateListFromArrayLike ( obj [ , elementTypes ] )
     /// https://tc39.es/ecma262/#sec-createlistfromarraylike
     pub fn createListFromArrayLike(self: Self, agent: *Agent, args: struct {
         element_types: ?[]const std.meta.Tag(Value) = null,
@@ -1001,7 +1001,7 @@ pub const Value = union(enum) {
         return list.toOwnedSlice();
     }
 
-    /// 7.3.21 Invoke ( V, P [ , argumentsList ] )
+    /// 7.3.20 Invoke ( V, P [ , argumentsList ] )
     /// https://tc39.es/ecma262/#sec-invoke
     pub fn invoke(
         self: Self,
@@ -1027,7 +1027,7 @@ pub const Value = union(enum) {
         return self.invoke(agent, property_key, &.{});
     }
 
-    /// 7.3.22 OrdinaryHasInstance ( C, O )
+    /// 7.3.21 OrdinaryHasInstance ( C, O )
     /// https://tc39.es/ecma262/#sec-ordinaryhasinstance
     pub fn ordinaryHasInstance(self: Self, object_value: Value) Agent.Error!bool {
         // 1. If IsCallable(C) is false, return false.
@@ -1638,7 +1638,7 @@ pub fn isStrictlyEqual(x: Value, y: Value) bool {
     return sameValueNonNumber(x, y);
 }
 
-/// 7.3.18 CreateArrayFromList ( elements )
+/// 7.3.17 CreateArrayFromList ( elements )
 /// https://tc39.es/ecma262/#sec-createarrayfromlist
 pub fn createArrayFromList(agent: *Agent, elements: []const Value) Allocator.Error!Object {
     // 1. Let array be ! ArrayCreate(0).

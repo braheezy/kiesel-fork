@@ -1544,8 +1544,13 @@ fn classDefinitionEvaluation(
         } else unreachable;
     }
 
-    // 18. Perform CreateMethodProperty(proto, "constructor", F).
-    try prototype.createMethodProperty(PropertyKey.from("constructor"), Value.from(function));
+    // 18. Perform ! DefineMethodProperty(proto, "constructor", F, false).
+    defineMethodProperty(
+        prototype,
+        PropertyKey.from("constructor"),
+        function,
+        false,
+    ) catch |err| try noexcept(err);
 
     // 19. If ClassBody[opt] is not present, let elements be a new empty List.
     // 20. Else, let elements be NonConstructorElements of ClassBody.
