@@ -1318,13 +1318,32 @@ pub fn stringToBigInt(allocator: Allocator, string: String) Allocator.Error!?Big
     // 5. Assert: mv is an integer.
     // 6. Return ℤ(mv).
     // TODO: Implement the proper string parsing grammar!
-    var value = try BigInt.Value.init(allocator);
-    value.setString(10, string.utf8) catch |err| return switch (err) {
-        error.OutOfMemory => error.OutOfMemory,
-        error.InvalidCharacter => null,
+    var big_int = try types.BigInt.from(allocator, 0);
+    var trimmed_string = trim(string.utf8, &String.whitespace);
+    if (trimmed_string.len == 0) return big_int;
+    // Unlike std.fmt.parseFloat(), std.math.big.int.Managed.setString() doesn't like the prefix
+    // so we have to cut it off manually.
+    const base: u8 = if (std.ascii.startsWithIgnoreCase(string.utf8, "0b")) blk: {
+        trimmed_string = trimmed_string[2..];
+        break :blk 2;
+    } else if (std.ascii.startsWithIgnoreCase(string.utf8, "0o")) blk: {
+        trimmed_string = trimmed_string[2..];
+        break :blk 8;
+    } else if (std.ascii.startsWithIgnoreCase(string.utf8, "0x")) blk: {
+        trimmed_string = trimmed_string[2..];
+        break :blk 16;
+    } else blk: {
+        break :blk 10;
+    };
+    big_int.value.setString(
+        base,
+        trimmed_string,
+    ) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.InvalidCharacter => return null,
         error.InvalidBase => unreachable,
     };
-    return BigInt{ .value = value };
+    return big_int;
 }
 
 /// 7.2.10 SameValue ( x, y )
