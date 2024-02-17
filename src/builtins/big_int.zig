@@ -33,6 +33,8 @@ pub const BigIntConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "asIntN", asIntN, 2, realm);
+
         // 21.2.2.3 BigInt.prototype
         // https://tc39.es/ecma262/#sec-bigint.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -71,6 +73,25 @@ pub const BigIntConstructor = struct {
 
         // 4. Otherwise, return ? ToBigInt(prim).
         return Value.from(try primitive.toBigInt(agent));
+    }
+
+    /// 21.2.2.1 BigInt.asIntN ( bits, bigint )
+    /// https://tc39.es/ecma262/#sec-bigint.asintn
+    fn asIntN(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const bits_value = arguments.get(0);
+        const big_int_value = arguments.get(1);
+
+        // 1. Set bits to ? ToIndex(bits).
+        const bits = try bits_value.toIndex(agent);
+
+        // 2. Set bigint to ? ToBigInt(bigint).
+        const big_int = try big_int_value.toBigInt(agent);
+
+        // 3. Let mod be ℝ(bigint) modulo 2**bits.
+        // 4. If mod ≥ 2**(bits - 1), return ℤ(mod - 2**bits); otherwise, return ℤ(mod).
+        var result = try types.BigInt.from(agent.gc_allocator, 0);
+        try result.value.truncate(&big_int.value, .signed, @intCast(bits));
+        return Value.from(result);
     }
 };
 
