@@ -236,6 +236,62 @@ pub const NumericLiteral = struct {
     }
 };
 
+fn stringValueImpl(allocator: Allocator, text: []const u8) Allocator.Error![]const u8 {
+    var str = try std.ArrayList(u8).initCapacity(allocator, text.len);
+    var i: usize = 0;
+    while (i < text.len) : (i += 1) {
+        const c = text[i];
+        if (c == '\\') {
+            for (line_terminators) |line_terminator| {
+                if (std.mem.startsWith(u8, text[i + 1 ..], line_terminator)) {
+                    i += line_terminator.len;
+                    break;
+                }
+            } else {
+                switch (text[i + 1]) {
+                    '0' => str.appendAssumeCapacity(0),
+                    'b' => str.appendAssumeCapacity(0x08),
+                    'f' => str.appendAssumeCapacity(0x0c),
+                    'n' => str.appendAssumeCapacity('\n'),
+                    'r' => str.appendAssumeCapacity('\r'),
+                    't' => str.appendAssumeCapacity('\t'),
+                    'v' => str.appendAssumeCapacity(0x0b),
+                    'x' => {
+                        const byte = std.fmt.parseInt(
+                            u8,
+                            text[i + 2 .. i + 4],
+                            16,
+                        ) catch unreachable;
+                        str.appendAssumeCapacity(byte);
+                        i += 2;
+                    },
+                    'u' => {
+                        const chars = switch (text[i + 2]) {
+                            '{' => text[i + 3 .. i + escapeSequenceMatcher(text[i..]).? - 1],
+                            else => text[i + 2 .. i + 6],
+                        };
+                        const code_point = std.fmt.parseInt(u21, chars, 16) catch unreachable;
+                        var out: [4]u8 = undefined;
+                        const len = std.unicode.utf8Encode(code_point, &out) catch |err| switch (err) {
+                            error.CodepointTooLarge => unreachable,
+                            // TODO: Handle surrogate halfs
+                            error.Utf8CannotEncodeSurrogateHalf => @as(u3, 0),
+                        };
+                        str.appendSliceAssumeCapacity(out[0..len]);
+                        i += switch (text[i + 2]) {
+                            '{' => chars.len + 2,
+                            else => 4,
+                        };
+                    },
+                    else => |next_c| str.appendAssumeCapacity(next_c),
+                }
+                i += 1;
+            }
+        } else str.appendAssumeCapacity(c);
+    }
+    return str.toOwnedSlice();
+}
+
 /// https://tc39.es/ecma262/#prod-StringLiteral
 pub const StringLiteral = struct {
     const Self = @This();
@@ -246,59 +302,7 @@ pub const StringLiteral = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-sv
     pub fn stringValue(self: Self, allocator: Allocator) Allocator.Error!Value {
         std.debug.assert(self.text.len >= 2);
-        var str = try std.ArrayList(u8).initCapacity(allocator, self.text.len - 2);
-        var i: usize = 1;
-        while (i <= self.text.len - 2) : (i += 1) {
-            const c = self.text[i];
-            if (c == '\\') {
-                for (line_terminators) |line_terminator| {
-                    if (std.mem.startsWith(u8, self.text[i + 1 ..], line_terminator)) {
-                        i += line_terminator.len;
-                        break;
-                    }
-                } else {
-                    switch (self.text[i + 1]) {
-                        '0' => str.appendAssumeCapacity(0),
-                        'b' => str.appendAssumeCapacity(0x08),
-                        'f' => str.appendAssumeCapacity(0x0c),
-                        'n' => str.appendAssumeCapacity('\n'),
-                        'r' => str.appendAssumeCapacity('\r'),
-                        't' => str.appendAssumeCapacity('\t'),
-                        'v' => str.appendAssumeCapacity(0x0b),
-                        'x' => {
-                            const byte = std.fmt.parseInt(
-                                u8,
-                                self.text[i + 2 .. i + 4],
-                                16,
-                            ) catch unreachable;
-                            str.appendAssumeCapacity(byte);
-                            i += 2;
-                        },
-                        'u' => {
-                            const chars = switch (self.text[i + 2]) {
-                                '{' => self.text[i + 3 .. i + escapeSequenceMatcher(self.text[i..]).? - 1],
-                                else => self.text[i + 2 .. i + 6],
-                            };
-                            const code_point = std.fmt.parseInt(u21, chars, 16) catch unreachable;
-                            var out: [4]u8 = undefined;
-                            const len = std.unicode.utf8Encode(code_point, &out) catch |err| switch (err) {
-                                error.CodepointTooLarge => unreachable,
-                                // TODO: Handle surrogate halfs
-                                error.Utf8CannotEncodeSurrogateHalf => @as(u3, 0),
-                            };
-                            str.appendSliceAssumeCapacity(out[0..len]);
-                            i += switch (self.text[i + 2]) {
-                                '{' => chars.len + 2,
-                                else => 4,
-                            };
-                        },
-                        else => |next_c| str.appendAssumeCapacity(next_c),
-                    }
-                    i += 1;
-                }
-            } else str.appendAssumeCapacity(c);
-        }
-        return Value.from(try str.toOwnedSlice());
+        return Value.from(try stringValueImpl(allocator, self.text[1 .. self.text.len - 1]));
     }
 };
 
@@ -374,7 +378,24 @@ pub const RegularExpressionLiteral = struct {
 
 /// https://tc39.es/ecma262/#prod-TemplateLiteral
 pub const TemplateLiteral = struct {
-    text: []const u8,
+    pub const Span = union(enum) {
+        const Self = @This();
+
+        text: []const u8,
+        expression: Expression,
+
+        /// https://tc39.es/ecma262/#sec-static-semantics-tv
+        /// 12.9.6.1 Static Semantics: TV
+        pub fn templateValue(self: Self, allocator: Allocator) Allocator.Error!Value {
+            std.debug.assert(self.text[0] == '`' or self.text[0] == '}');
+            return if (self.text[self.text.len - 1] == '`')
+                Value.from(try stringValueImpl(allocator, self.text[1 .. self.text.len - 1]))
+            else
+                Value.from(try stringValueImpl(allocator, self.text[1 .. self.text.len - 2]));
+        }
+    };
+
+    spans: []const Span,
 };
 
 /// https://tc39.es/ecma262/#prod-UpdateExpression

@@ -5,7 +5,7 @@ const literals = @import("literals.zig");
 const parseNumericLiteral = literals.parseNumericLiteral;
 const parseRegularExpressionLiteral = literals.parseRegularExpressionLiteral;
 const parseStringLiteral = literals.parseStringLiteral;
-const parseTemplateLiteral = literals.parseTemplateLiteral;
+const parseTemplateLiteralSpan = literals.parseTemplateLiteralSpan;
 
 const TokenType = enum {
     @"--",
@@ -100,6 +100,9 @@ const TokenType = enum {
     super,
     @"switch",
     template,
+    template_head,
+    template_middle,
+    template_tail,
     this,
     throw,
     true,
@@ -127,6 +130,9 @@ const patterns = .{
     Pattern.create(.regular_expression, regularExpressionMatcher),
     Pattern.create(.string, stringMatcher),
     Pattern.create(.template, templateMatcher),
+    Pattern.create(.template_head, templateHeadMatcher),
+    Pattern.create(.template_middle, templateMiddleMatcher),
+    Pattern.create(.template_tail, templateTailMatcher),
     Pattern.create(.whitespace, whitespaceMatcher),
     Pattern.create(.@"--", ptk.matchers.literal("--")),
     Pattern.create(.@"-=", ptk.matchers.literal("-=")),
@@ -231,6 +237,7 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &patterns);
 pub var state: struct {
     tokenizer: *Tokenizer = undefined,
     parsing_regular_expression: bool = false,
+    open_template_literals: usize = 0,
 } = .{};
 
 comptime {
@@ -403,10 +410,38 @@ fn regularExpressionMatcher(str: []const u8) ?usize {
 }
 
 fn templateMatcher(str: []const u8) ?usize {
-    if (parseTemplateLiteral(str, .partial)) |template_literal|
-        return template_literal.text.len
+    if (parseTemplateLiteralSpan(str, .no_substitution)) |span|
+        return span.text.len
     else |err| switch (err) {
-        error.InvalidTemplateLiteral => return null,
+        error.InvalidTemplateLiteralSpan => return null,
+    }
+}
+
+fn templateHeadMatcher(str: []const u8) ?usize {
+    if (parseTemplateLiteralSpan(str, .head)) |span| {
+        state.open_template_literals += 1;
+        return span.text.len;
+    } else |err| switch (err) {
+        error.InvalidTemplateLiteralSpan => return null,
+    }
+}
+
+fn templateMiddleMatcher(str: []const u8) ?usize {
+    if (state.open_template_literals == 0) return null;
+    if (parseTemplateLiteralSpan(str, .middle)) |span|
+        return span.text.len
+    else |err| switch (err) {
+        error.InvalidTemplateLiteralSpan => return null,
+    }
+}
+
+fn templateTailMatcher(str: []const u8) ?usize {
+    if (state.open_template_literals == 0) return null;
+    if (parseTemplateLiteralSpan(str, .tail)) |span| {
+        state.open_template_literals -= 1;
+        return span.text.len;
+    } else |err| switch (err) {
+        error.InvalidTemplateLiteralSpan => return null,
     }
 }
 

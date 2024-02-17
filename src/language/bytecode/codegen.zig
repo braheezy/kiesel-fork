@@ -659,17 +659,49 @@ pub fn codegenRegularExpressionLiteral(
 pub fn codegenTemplateLiteral(
     node: ast.TemplateLiteral,
     executable: *Executable,
-    _: *Context,
+    ctx: *Context,
 ) Executable.Error!void {
     // TemplateLiteral : NoSubstitutionTemplate
     // 1. Return the TV of NoSubstitutionTemplate as defined in 12.9.6.
-    // TODO: Handle escapes
-    try executable.addInstructionWithConstant(
-        .store_constant,
-        Value.from(node.text[1 .. node.text.len - 1]),
-    );
+    if (node.spans.len == 1) {
+        const span = node.spans[0];
+        std.debug.assert(span == .text);
+        try executable.addInstructionWithConstant(
+            .store_constant,
+            try span.templateValue(executable.allocator),
+        );
+        return;
+    }
 
-    // TODO: SubstitutionTemplate : TemplateHead Expression TemplateSpans
+    // SubstitutionTemplate : TemplateHead Expression TemplateSpans
+    // 1. Let head be the TV of TemplateHead as defined in 12.9.6.
+    // 2. Let subRef be ? Evaluation of Expression.
+    // 3. Let sub be ? GetValue(subRef).
+    // 4. Let middle be ? ToString(sub).
+    // 5. Let tail be ? Evaluation of TemplateSpans.
+    // 6. Return the string-concatenation of head, middle, and tail.
+    for (node.spans, 0..) |span, i| {
+        std.debug.assert(if (i % 2 == 0) span == .text else span == .expression);
+        switch (span) {
+            .expression => |expression| {
+                try codegenExpression(expression, executable, ctx);
+                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                try executable.addInstruction(.to_string);
+                try executable.addInstruction(.load);
+            },
+            .text => {
+                try executable.addInstructionWithConstant(
+                    .load_constant,
+                    try span.templateValue(executable.allocator),
+                );
+            },
+        }
+        if (i != 0) {
+            try executable.addInstruction(.apply_string_or_numeric_binary_operator);
+            try executable.addIndex(@intFromEnum(ast.BinaryExpression.Operator.@"+"));
+            if (i < node.spans.len - 1) try executable.addInstruction(.load);
+        }
+    }
 }
 
 /// 13.4.2.1 Runtime Semantics: Evaluation

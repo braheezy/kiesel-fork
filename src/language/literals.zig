@@ -339,11 +339,10 @@ pub fn parseRegularExpressionLiteral(
 
 /// 12.9.6 Template Literal Lexical Components
 /// https://tc39.es/ecma262/#sec-template-literal-lexical-components
-pub fn parseTemplateLiteral(
+pub fn parseTemplateLiteralSpan(
     str: []const u8,
-    consume: enum { partial, complete },
-) error{InvalidTemplateLiteral}!ast.TemplateLiteral {
-    // TODO: This needs more work to handle nested templates correctly, actually parse expressions, etc.
+    kind: enum { no_substitution, head, middle, tail },
+) error{InvalidTemplateLiteralSpan}!ast.TemplateLiteral.Span {
     var state: enum {
         start,
         opening_backtick,
@@ -352,59 +351,132 @@ pub fn parseTemplateLiteral(
         backslash,
         expression_start,
         expression_end,
-        expression_character,
     } = .start;
-    for (str, 0..) |c, i| switch (c) {
-        '`' => switch (state) {
-            .start => state = .opening_backtick,
-            .opening_backtick, .character, .expression_end => state = .closing_backtick,
-            .backslash => state = .character,
-            .expression_start, .expression_character => state = .expression_character,
-            else => return error.InvalidTemplateLiteral,
-        },
-        '\\' => switch (state) {
-            .opening_backtick, .character, .expression_end => state = .backslash,
-            .backslash => state = .character,
-            .expression_start, .expression_character => state = .expression_character,
-            else => return error.InvalidTemplateLiteral,
-        },
-        '{' => switch (state) {
-            .opening_backtick, .character, .backslash, .expression_end => state = .character,
-            .expression_start => {
-                state = if (i > 0 and str[i - 1] == '$')
-                    .expression_start
-                else
-                    .expression_character;
+    // This is a mess, sorry about that 😵‍💫
+    switch (kind) {
+        .no_substitution => for (str, 0..) |c, i| switch (c) {
+            '`' => switch (state) {
+                .start => state = .opening_backtick,
+                .opening_backtick, .character => return .{ .text = str[0 .. i + 1] },
+                .backslash => state = .character,
+                else => return error.InvalidTemplateLiteralSpan,
             },
-            .expression_character => state = .expression_character,
-            else => return error.InvalidTemplateLiteral,
-        },
-        '}' => switch (state) {
-            .opening_backtick, .character, .backslash, .expression_end => state = .character,
-            .expression_character => state = .expression_end,
-            else => return error.InvalidTemplateLiteral,
-        },
-        else => switch (state) {
-            .opening_backtick, .character => {
-                state = if (i < str.len - 1 and c == '$' and str[i + 1] == '{')
-                    .expression_start
-                else
-                    .character;
+            '\\' => switch (state) {
+                .opening_backtick, .character => state = .backslash,
+                .backslash => state = .character,
+                else => return error.InvalidTemplateLiteralSpan,
             },
-            .backslash, .expression_end => state = .character,
-            .expression_start, .expression_character => state = .expression_character,
-            .closing_backtick => switch (consume) {
-                .partial => return .{ .text = str[0..i] },
-                .complete => return error.InvalidTemplateLiteral,
+            '$' => switch (state) {
+                .opening_backtick, .character => {
+                    if (i < str.len - 1 and str[i + 1] == '{') return error.InvalidTemplateLiteralSpan;
+                    state = .character;
+                },
+                .backslash => state = .character,
+                else => return error.InvalidTemplateLiteralSpan,
             },
-            else => return error.InvalidTemplateLiteral,
+            else => switch (state) {
+                .opening_backtick, .character => state = .character,
+                .backslash => {
+                    if (escapeSequenceMatcher(str[i - 1 ..]) == null) return error.InvalidTemplateLiteralSpan;
+                    state = .character;
+                },
+                else => return error.InvalidTemplateLiteralSpan,
+            },
         },
-    };
+        .head => for (str, 0..) |c, i| switch (c) {
+            '`' => switch (state) {
+                .start => state = .opening_backtick,
+                .backslash => state = .character,
+                else => return error.InvalidTemplateLiteralSpan,
+            },
+            '\\' => switch (state) {
+                .opening_backtick, .character => state = .backslash,
+                .backslash => state = .character,
+                else => return error.InvalidTemplateLiteralSpan,
+            },
+            '$' => switch (state) {
+                .opening_backtick, .character => {
+                    if (i < str.len - 1 and str[i + 1] == '{') return .{ .text = str[0 .. i + 2] };
+                    state = .character;
+                },
+                .backslash => state = .character,
+                else => return error.InvalidTemplateLiteralSpan,
+            },
+            else => switch (state) {
+                .opening_backtick, .character => state = .character,
+                .backslash => {
+                    if (escapeSequenceMatcher(str[i - 1 ..]) == null) return error.InvalidTemplateLiteralSpan;
+                    state = .character;
+                },
+                else => return error.InvalidTemplateLiteralSpan,
+            },
+        },
+        .middle => for (str, 0..) |c, i| switch (c) {
+            '`' => return error.InvalidTemplateLiteralSpan,
+            '}' => switch (state) {
+                .start => state = .expression_end,
+                .expression_end, .character, .backslash => state = .character,
+                else => return error.InvalidTemplateLiteralSpan,
+            },
+            '\\' => switch (state) {
+                .expression_end, .character => state = .backslash,
+                .backslash => state = .character,
+                else => return error.InvalidTemplateLiteralSpan,
+            },
+            '$' => switch (state) {
+                .expression_end, .character => {
+                    if (i < str.len - 1 and str[i + 1] == '{') return .{ .text = str[0 .. i + 2] };
+                    state = .character;
+                },
+                .backslash => state = .character,
+                else => return error.InvalidTemplateLiteralSpan,
+            },
+            else => switch (state) {
+                .expression_end, .character => state = .character,
+                .backslash => {
+                    if (escapeSequenceMatcher(str[i - 1 ..]) == null) return error.InvalidTemplateLiteralSpan;
+                    state = .character;
+                },
+                else => return error.InvalidTemplateLiteralSpan,
+            },
+        },
+        .tail => for (str, 0..) |c, i| switch (c) {
+            '}' => switch (state) {
+                .start => state = .expression_end,
+                .expression_end, .character, .backslash => state = .character,
+                else => return error.InvalidTemplateLiteralSpan,
+            },
+            '\\' => switch (state) {
+                .expression_end, .character => state = .backslash,
+                .backslash => state = .character,
+                else => return error.InvalidTemplateLiteralSpan,
+            },
+            '`' => switch (state) {
+                .backslash => state = .character,
+                .expression_end, .character => return .{ .text = str[0 .. i + 1] },
+                else => return error.InvalidTemplateLiteralSpan,
+            },
+            else => switch (state) {
+                .expression_end, .character => state = .character,
+                .backslash => {
+                    if (escapeSequenceMatcher(str[i - 1 ..]) == null) return error.InvalidTemplateLiteralSpan;
+                    state = .character;
+                },
+                else => return error.InvalidTemplateLiteralSpan,
+            },
+        },
+    }
 
-    return switch (state) {
+    return switch (kind) {
         // Valid end states after exhausting the input string
-        .closing_backtick => .{ .text = str },
-        else => error.InvalidTemplateLiteral,
+        .no_substitution, .tail => switch (state) {
+            .closing_backtick => return .{ .text = str },
+            else => error.InvalidTemplateLiteralSpan,
+        },
+        .head, .middle => switch (state) {
+            .expression_start => return .{ .text = str },
+            else => error.InvalidTemplateLiteralSpan,
+        },
     };
 }
 

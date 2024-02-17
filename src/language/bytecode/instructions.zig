@@ -147,6 +147,8 @@ pub const Instruction = enum(u8) {
     to_number,
     /// Store ToNumeric() as the result value.
     to_numeric,
+    /// Store ToString() as the result value.
+    to_string,
     /// Apply the typeof operation to the evaluated expression and set it as the result value.
     typeof,
     /// Store Number::unaryMinus() / BigInt::unaryMinus() as the result value.

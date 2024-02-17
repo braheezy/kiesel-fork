@@ -196,7 +196,10 @@ pub fn printRegularExpressionLiteral(node: ast.RegularExpressionLiteral, writer:
 
 pub fn printTemplateLiteral(node: ast.TemplateLiteral, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("TemplateLiteral", writer, indentation);
-    try print(node.text, writer, indentation + 1);
+    for (node.spans) |span| switch (span) {
+        .expression => |expression| try printExpression(expression, writer, indentation + 1),
+        .text => |text| try print(text, writer, indentation + 1),
+    };
 }
 
 pub fn printUpdateExpression(node: ast.UpdateExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {

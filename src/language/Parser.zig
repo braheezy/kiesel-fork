@@ -14,7 +14,6 @@ const containsLineTerminator = tokenizer_.containsLineTerminator;
 const parseNumericLiteral = literals.parseNumericLiteral;
 const parseRegularExpressionLiteral = literals.parseRegularExpressionLiteral;
 const parseStringLiteral = literals.parseStringLiteral;
-const parseTemplateLiteral = literals.parseTemplateLiteral;
 const temporaryChange = utils.temporaryChange;
 const reserved_words = tokenizer_.reserved_words;
 
@@ -2169,10 +2168,22 @@ fn acceptTemplateLiteral(self: *Self) AcceptError!ast.TemplateLiteral {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const token = try self.core.accept(RuleSet.is(.template));
-    var template_literal = parseTemplateLiteral(token.text, .complete) catch unreachable;
-    template_literal.text = try self.allocator.dupe(u8, template_literal.text);
-    return template_literal;
+    var spans = std.ArrayList(ast.TemplateLiteral.Span).init(self.allocator);
+    if (self.core.accept(RuleSet.is(.template))) |template| {
+        try spans.append(.{ .text = try self.allocator.dupe(u8, template.text) });
+    } else |_| if (self.core.accept(RuleSet.is(.template_head))) |template_head| {
+        try spans.append(.{ .text = try self.allocator.dupe(u8, template_head.text) });
+        while (true) {
+            const expression = try self.acceptExpression(.{});
+            try spans.append(.{ .expression = expression });
+            if (self.core.accept(RuleSet.is(.template_middle))) |template_middle| {
+                try spans.append(.{ .text = try self.allocator.dupe(u8, template_middle.text) });
+            } else |_| break;
+        }
+        const template_tail = try self.core.accept(RuleSet.is(.template_tail));
+        try spans.append(.{ .text = try self.allocator.dupe(u8, template_tail.text) });
+    } else |_| return error.UnexpectedToken;
+    return .{ .spans = try spans.toOwnedSlice() };
 }
 
 fn acceptAsyncFunctionDeclaration(self: *Self) AcceptError!ast.AsyncFunctionDeclaration {
