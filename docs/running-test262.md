@@ -25,20 +25,12 @@ Optionally you can also use `CanadaHonk/esvu` to automatically install a recent
 build of Kiesel for your platform, but for the following we'll assume a local
 build is available.
 
-Additionally we need a transformer script to patch out a couple of unsupported
-features in the test harness. The canonical version of this is currently in
-CanadaHonk's `test262.fyi` repo:
-
-```console
-wget -O ~/.local/bin/kiesel-transformer.js https://raw.githubusercontent.com/CanadaHonk/test262.fyi/main/helpers/kiesel/transformer.js
-```
-
 ## Usage
 
 To run all tests (this takes a long time!):
 
 ```console
-test262-harness --host-type=kiesel --host-path=/path/to/zig-out/bin/kiesel --transformer="$HOME/.local/bin/kiesel-transformer.js" 'test/**/*.js'
+test262-harness --host-type=kiesel --host-path=/path/to/zig-out/bin/kiesel 'test/**/*.js'
 ```
 
 To only run tests for e.g. `Object.groupBy()` pass
