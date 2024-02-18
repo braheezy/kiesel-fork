@@ -161,11 +161,14 @@ pub fn parseNumericLiteral(
                 // This avoids '.' on its own being tokenized as .numeric
                 if (state == .fraction_period and i == 1) return error.InvalidNumericLiteral;
 
-                return .{
-                    .text = str[0..i],
-                    .system = system,
-                    .production = production,
-                    .type = @"type",
+                return switch (state) {
+                    .integer_digit, .fraction_period, .fraction_digit, .exponent_digit, .big_int_suffix => .{
+                        .text = str[0..i],
+                        .system = system,
+                        .production = production,
+                        .type = @"type",
+                    },
+                    else => error.InvalidNumericLiteral,
                 };
             },
             .complete => return error.InvalidNumericLiteral,
