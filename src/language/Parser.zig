@@ -620,7 +620,7 @@ pub fn acceptArguments(self: *Self) AcceptError!ast.Arguments {
     errdefer self.core.restoreState(state);
 
     var arguments = std.ArrayList(ast.Expression).init(self.allocator);
-    defer arguments.deinit();
+    errdefer arguments.deinit();
     _ = try self.core.accept(RuleSet.is(.@"("));
     const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
     while (self.acceptExpression(ctx)) |argument| {
@@ -747,7 +747,7 @@ pub fn acceptArrayLiteral(self: *Self) AcceptError!ast.ArrayLiteral {
 
     _ = try self.core.accept(RuleSet.is(.@"["));
     var elements = std.ArrayList(ast.ArrayLiteral.Element).init(self.allocator);
-    defer elements.deinit();
+    errdefer elements.deinit();
     const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
     while (true) {
         if (self.core.accept(RuleSet.is(.@"..."))) |_| {
@@ -780,7 +780,7 @@ pub fn acceptPropertyDefinitionList(self: *Self) AcceptError!ast.PropertyDefinit
     errdefer self.core.restoreState(state);
 
     var property_definitions = std.ArrayList(ast.PropertyDefinition).init(self.allocator);
-    defer property_definitions.deinit();
+    errdefer property_definitions.deinit();
     while (self.acceptPropertyDefinition()) |property_definition| {
         try property_definitions.append(property_definition);
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
@@ -1097,7 +1097,7 @@ pub fn acceptSequenceExpression(
     errdefer self.core.restoreState(state);
 
     var expressions = std.ArrayList(ast.Expression).init(self.allocator);
-    defer expressions.deinit();
+    errdefer expressions.deinit();
     while (self.core.accept(RuleSet.is(.@","))) |_| {
         const expression = try self.acceptExpression(.{});
         try expressions.append(expression);
@@ -1253,7 +1253,7 @@ pub fn acceptStatementList(self: *Self) AcceptError!ast.StatementList {
     errdefer self.core.restoreState(state);
 
     var statement_list_items = std.ArrayList(ast.StatementListItem).init(self.allocator);
-    defer statement_list_items.deinit();
+    errdefer statement_list_items.deinit();
     while (self.acceptStatementListItem()) |statement_list_item|
         try statement_list_items.append(statement_list_item)
     else |_| {}
@@ -1669,7 +1669,7 @@ pub fn acceptFormalParameters(self: *Self) AcceptError!ast.FormalParameters {
     errdefer self.core.restoreState(state);
 
     var formal_parameters_items = std.ArrayList(ast.FormalParameters.Item).init(self.allocator);
-    defer formal_parameters_items.deinit();
+    errdefer formal_parameters_items.deinit();
     while (true) {
         if (self.acceptBindingRestElement()) |binding_rest_element| {
             const function_rest_parameter = ast.FunctionRestParameter{
@@ -2088,6 +2088,7 @@ fn acceptClassElementList(self: *Self) AcceptError!ast.ClassElementList {
     errdefer self.core.restoreState(state);
 
     var class_elements = std.ArrayList(ast.ClassElement).init(self.allocator);
+    errdefer class_elements.deinit();
     while (self.acceptClassElement()) |class_element|
         try class_elements.append(class_element)
     else |_| {}
@@ -2169,6 +2170,7 @@ fn acceptTemplateLiteral(self: *Self) AcceptError!ast.TemplateLiteral {
     errdefer self.core.restoreState(state);
 
     var spans = std.ArrayList(ast.TemplateLiteral.Span).init(self.allocator);
+    errdefer spans.deinit();
     if (self.core.accept(RuleSet.is(.template))) |template| {
         try spans.append(.{ .text = try self.allocator.dupe(u8, template.text) });
     } else |_| if (self.core.accept(RuleSet.is(.template_head))) |template_head| {
@@ -2329,6 +2331,7 @@ pub fn acceptModuleItemList(self: *Self) AcceptError!ast.ModuleItemList {
     errdefer self.core.restoreState(state);
 
     var module_items = std.ArrayList(ast.ModuleItem).init(self.allocator);
+    errdefer module_items.deinit();
     while (self.acceptModuleItem()) |module_item|
         try module_items.append(module_item)
     else |_| {}
@@ -2451,6 +2454,7 @@ pub fn acceptExportsList(self: *Self) AcceptError!ast.ExportsList {
 
     _ = try self.core.accept(RuleSet.is(.@"{"));
     var export_specifiers = std.ArrayList(ast.ExportSpecifier).init(self.allocator);
+    errdefer export_specifiers.deinit();
     while (self.acceptExportSpecifier()) |export_specifier| {
         try export_specifiers.append(export_specifier);
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
