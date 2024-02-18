@@ -1494,6 +1494,7 @@ pub fn acceptForInOfStatement(self: *Self) AcceptError!ast.ForInOfStatement {
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.@"for"));
+    const maybe_await_token = self.core.accept(RuleSet.is(.@"await")) catch null;
     _ = try self.core.accept(RuleSet.is(.@"("));
     const initializer_location = (try self.core.peek() orelse return error.UnexpectedToken).location;
     const initializer: ast.ForInOfStatement.Initializer = if (self.core.accept(RuleSet.is(.@"var"))) |_|
@@ -1515,10 +1516,14 @@ pub fn acceptForInOfStatement(self: *Self) AcceptError!ast.ForInOfStatement {
         return error.UnexpectedToken;
     }
 
-    const @"type": ast.ForInOfStatement.Type = if (self.core.accept(RuleSet.is(.in))) |_|
-        .in
-    else |_| if (self.acceptKeyword("of")) |_|
-        .of
+    const @"type": ast.ForInOfStatement.Type = if (self.core.accept(RuleSet.is(.in))) |_| blk: {
+        if (maybe_await_token) |await_token| {
+            try self.emitErrorAt(await_token.location, "For in loop cannot be awaited", .{});
+            return error.UnexpectedToken;
+        }
+        break :blk .in;
+    } else |_| if (self.acceptKeyword("of")) |_|
+        if (maybe_await_token) |_| .async_of else .of
     else |_|
         return error.UnexpectedToken;
     const expression = try self.acceptExpression(.{});
