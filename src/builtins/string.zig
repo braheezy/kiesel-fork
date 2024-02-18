@@ -453,6 +453,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "endsWith", endsWith, 1, realm);
         try defineBuiltinFunction(object, "includes", includes, 1, realm);
         try defineBuiltinFunction(object, "indexOf", indexOf, 1, realm);
+        try defineBuiltinFunction(object, "isWellFormed", isWellFormed, 0, realm);
         try defineBuiltinFunction(object, "lastIndexOf", lastIndexOf, 1, realm);
         try defineBuiltinFunction(object, "match", match, 1, realm);
         try defineBuiltinFunction(object, "matchAll", matchAll, 1, realm);
@@ -804,6 +805,21 @@ pub const StringPrototype = struct {
         // 8. Return 𝔽(StringIndexOf(S, searchStr, start)).
         const index = string.indexOf(search_str, start) orelse return Value.from(-1);
         return Value.from(@as(u53, @intCast(index)));
+    }
+
+    /// 22.1.3.10 String.prototype.isWellFormed ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype.iswellformed
+    fn isWellFormed(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // TODO: 3. Return IsStringWellFormedUnicode(S).
+        // NOTE: We only store valid UTF-8 strings so this always returns true for now.
+        _ = string;
+        return Value.from(true);
     }
 
     /// 22.1.3.11 String.prototype.lastIndexOf ( searchString [ , position ] )
