@@ -466,6 +466,8 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "split", split, 2, realm);
         try defineBuiltinFunction(object, "startsWith", startsWith, 1, realm);
         try defineBuiltinFunction(object, "substring", substring, 2, realm);
+        try defineBuiltinFunction(object, "toLocaleLowerCase", toLocaleLowerCase, 0, realm);
+        try defineBuiltinFunction(object, "toLocaleUpperCase", toLocaleUpperCase, 0, realm);
         try defineBuiltinFunction(object, "toLowerCase", toLowerCase, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "toUpperCase", toUpperCase, 0, realm);
@@ -1654,6 +1656,24 @@ pub const StringPrototype = struct {
 
         // 10. Return the substring of S from from to to.
         return Value.from(try string.substring(agent.gc_allocator, from, to));
+    }
+
+    /// 22.1.3.26 String.prototype.toLocaleLowerCase ( [ reserved1 [ , reserved2 ] ] )
+    /// https://tc39.es/ecma262/#sec-string.prototype.tolocalelowercase
+    fn toLocaleLowerCase(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        const object = try this_value.requireObjectCoercible(agent);
+        const string = try object.toString(agent);
+        const lower = try std.ascii.allocLowerString(agent.gc_allocator, string.utf8);
+        return Value.from(lower);
+    }
+
+    /// 22.1.3.27 String.prototype.toLocaleUpperCase ( [ reserved1 [ , reserved2 ] ] )
+    /// https://tc39.es/ecma262/#sec-string.prototype.tolocaleuppercase
+    fn toLocaleUpperCase(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        const object = try this_value.requireObjectCoercible(agent);
+        const string = try object.toString(agent);
+        const lower = try std.ascii.allocUpperString(agent.gc_allocator, string.utf8);
+        return Value.from(lower);
     }
 
     /// 22.1.3.28 String.prototype.toLowerCase ( )
