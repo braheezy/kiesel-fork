@@ -472,6 +472,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "toLowerCase", toLowerCase, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "toUpperCase", toUpperCase, 0, realm);
+        try defineBuiltinFunction(object, "toWellFormed", toWellFormed, 0, realm);
         try defineBuiltinFunction(object, "trim", trim, 0, realm);
         try defineBuiltinFunction(object, "trimEnd", trimEnd, 0, realm);
         try defineBuiltinFunction(object, "trimStart", trimStart, 0, realm);
@@ -1737,6 +1738,20 @@ pub const StringPrototype = struct {
 
         // 6. Return U.
         return Value.from(upper);
+    }
+
+    /// 22.1.3.31 String.prototype.toWellFormed ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype.towellformed
+    fn toWellFormed(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // TODO: 3-7.
+        // NOTE: We only store valid UTF-8 strings so this always returns the original string for now.
+        return Value.from(string);
     }
 
     /// 22.1.3.32 String.prototype.trim ( )
