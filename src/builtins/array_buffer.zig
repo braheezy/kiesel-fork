@@ -47,10 +47,10 @@ pub fn allocateArrayBuffer(
 
     // 2. If maxByteLength is present and maxByteLength is not empty, let allocatingResizableBuffer
     //    be true; otherwise let allocatingResizableBuffer be false.
-    const allocating_resizable_bufffer = max_byte_length != null;
+    const allocating_resizable_buffer = max_byte_length != null;
 
     // 3. If allocatingResizableBuffer is true, then
-    if (allocating_resizable_bufffer) {
+    if (allocating_resizable_buffer) {
         // a. If byteLength > maxByteLength, throw a RangeError exception.
         if (byte_length > max_byte_length.?) {
             return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
@@ -77,7 +77,7 @@ pub fn allocateArrayBuffer(
     };
 
     // 8. If allocatingResizableBuffer is true, then
-    if (allocating_resizable_bufffer) {
+    if (allocating_resizable_buffer) {
         // a. If it is not possible to create a Data Block block consisting of maxByteLength bytes,
         //    throw a RangeError exception.
         // b. NOTE: Resizable ArrayBuffers are designed to be implementable with in-place growth.
