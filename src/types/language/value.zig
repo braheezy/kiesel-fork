@@ -1323,13 +1323,13 @@ pub fn stringToBigInt(allocator: Allocator, string: String) Allocator.Error!?Big
     if (trimmed_string.len == 0) return big_int;
     // Unlike std.fmt.parseFloat(), std.math.big.int.Managed.setString() doesn't like the prefix
     // so we have to cut it off manually.
-    const base: u8 = if (std.ascii.startsWithIgnoreCase(string.utf8, "0b")) blk: {
+    const base: u8 = if (std.ascii.startsWithIgnoreCase(trimmed_string, "0b")) blk: {
         trimmed_string = trimmed_string[2..];
         break :blk 2;
-    } else if (std.ascii.startsWithIgnoreCase(string.utf8, "0o")) blk: {
+    } else if (std.ascii.startsWithIgnoreCase(trimmed_string, "0o")) blk: {
         trimmed_string = trimmed_string[2..];
         break :blk 8;
-    } else if (std.ascii.startsWithIgnoreCase(string.utf8, "0x")) blk: {
+    } else if (std.ascii.startsWithIgnoreCase(trimmed_string, "0x")) blk: {
         trimmed_string = trimmed_string[2..];
         break :blk 16;
     } else blk: {
