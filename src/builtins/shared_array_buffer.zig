@@ -20,6 +20,7 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createSharedByteDataBlock = types.createSharedByteDataBlock;
+const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getArrayBufferMaxByteLengthOption = builtins.getArrayBufferMaxByteLengthOption;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -111,6 +112,8 @@ pub const SharedArrayBufferConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
+        try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
+
         // 25.2.4.1 SharedArrayBuffer.prototype
         // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -161,6 +164,13 @@ pub const SharedArrayBufferConstructor = struct {
                 requested_max_byte_length,
             ),
         );
+    }
+
+    /// 25.2.4.2 get SharedArrayBuffer [ @@species ]
+    /// https://tc39.es/ecma262/#sec-sharedarraybuffer-@@species
+    fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Return the this value.
+        return this_value;
     }
 };
 
