@@ -35,6 +35,34 @@ pub fn createByteDataBlock(agent: *Agent, size: u64) Agent.Error!DataBlock {
     return data_block;
 }
 
+/// 6.2.9.2 CreateSharedByteDataBlock ( size )
+/// https://tc39.es/ecma262/#sec-createsharedbytedatablock
+pub fn createSharedByteDataBlock(agent: *Agent, size: u64) Agent.Error!DataBlock {
+    const size_casted = std.math.cast(usize, size) orelse {
+        return agent.throwException(.range_error, "Cannot allocate buffer of size {}", .{size});
+    };
+
+    // 1. Let db be a new Shared Data Block value consisting of size bytes. If it is impossible to
+    //    create such a Shared Data Block, throw a RangeError exception.
+    var data_block = DataBlock.initCapacity(agent.gc_allocator, size_casted) catch {
+        return agent.throwException(.range_error, "Cannot allocate buffer of size {}", .{size});
+    };
+
+    // 2. Let execution be the [[CandidateExecution]] field of the surrounding agent's Agent Record.
+    // 3. Let eventsRecord be the Agent Events Record of execution.[[EventsRecords]] whose
+    //    [[AgentSignifier]] is AgentSignifier().
+    // 4. Let zero be « 0 ».
+    // 5. For each index i of db, do
+    //     a. Append WriteSharedMemory { [[Order]]: init, [[NoTear]]: true, [[Block]]: db,
+    //        [[ByteIndex]]: i, [[ElementSize]]: 1, [[Payload]]: zero } to
+    //        eventsRecord.[[EventList]].
+    const slice = data_block.addManyAsSliceAssumeCapacity(size_casted);
+    @memset(slice, 0);
+
+    // 6. Return db.
+    return data_block;
+}
+
 /// 6.2.9.3 CopyDataBlockBytes ( toBlock, toIndex, fromBlock, fromIndex, count )
 /// https://tc39.es/ecma262/#sec-copydatablockbytes
 pub fn copyDataBlockBytes(

@@ -12,6 +12,7 @@ pub const Reference = @import("spec/Reference.zig");
 pub const copyDataBlockBytes = data_block.copyDataBlockBytes;
 pub const createByteDataBlock = data_block.createByteDataBlock;
 pub const createIterResultObject = iterator.createIterResultObject;
+pub const createSharedByteDataBlock = data_block.createSharedByteDataBlock;
 pub const getIterator = iterator.getIterator;
 pub const getIteratorFromMethod = iterator.getIteratorFromMethod;
 

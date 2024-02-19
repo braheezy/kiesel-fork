@@ -13,6 +13,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const ArrayBufferLike = @import("array_buffer.zig").ArrayBufferLike;
 const BigInt = types.BigInt;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
@@ -3027,22 +3028,22 @@ fn initializeTypedArrayFromTypedArray(
     // 11. If elementType is srcType, then
     const data = if (std.mem.eql(u8, element_type, src_type)) blk: {
         // a. Let data be ? CloneArrayBuffer(srcData, srcByteOffset, byteLength).
-        break :blk (try cloneArrayBuffer(
+        break :blk try cloneArrayBuffer(
             agent,
             src_data,
             src_byte_offset,
             byte_length,
-        )).as(builtins.ArrayBuffer);
+        );
     }
     // 12. Else,
     else blk: {
         // a. Let data be ? AllocateArrayBuffer(%ArrayBuffer%, byteLength).
-        const data = (try allocateArrayBuffer(
+        const data = try allocateArrayBuffer(
             agent,
             try realm.intrinsics.@"%ArrayBuffer%"(),
             byte_length,
             null,
-        )).as(builtins.ArrayBuffer);
+        );
 
         // b. If srcArray.[[ContentType]] is not O.[[ContentType]], throw a TypeError exception.
         if (src_array.fields.content_type != typed_array.fields.content_type) {
@@ -3093,7 +3094,7 @@ fn initializeTypedArrayFromTypedArray(
                     // ii. Perform SetValueInBuffer(data, targetByteIndex, elementType, value, true, unordered).
                     try setValueInBuffer(
                         agent,
-                        data,
+                        .{ .array_buffer = data.as(builtins.ArrayBuffer) },
                         target_byte_index,
                         @"type",
                         value,
@@ -3118,7 +3119,7 @@ fn initializeTypedArrayFromTypedArray(
     };
 
     // 13. Set O.[[ViewedArrayBuffer]] to data.
-    typed_array.fields.viewed_array_buffer = data;
+    typed_array.fields.viewed_array_buffer = .{ .array_buffer = data.as(builtins.ArrayBuffer) };
 
     // 14. Set O.[[ByteLength]] to byteLength.
     typed_array.fields.byte_length = .{ .value = byte_length };
@@ -3137,7 +3138,7 @@ fn initializeTypedArrayFromTypedArray(
 fn initializeTypedArrayFromArrayBuffer(
     agent: *Agent,
     typed_array: *TypedArray,
-    buffer: *builtins.ArrayBuffer,
+    buffer: ArrayBufferLike,
     byte_offset: Value,
     length: Value,
 ) Agent.Error!void {
@@ -3357,7 +3358,7 @@ fn allocateTypedArrayBuffer(
     );
 
     // 5. Set O.[[ViewedArrayBuffer]] to data.
-    typed_array.fields.viewed_array_buffer = data.as(builtins.ArrayBuffer);
+    typed_array.fields.viewed_array_buffer = .{ .array_buffer = data.as(builtins.ArrayBuffer) };
 
     // 6. Set O.[[ByteLength]] to byteLength.
     typed_array.fields.byte_length = .{ .value = byte_length };
@@ -3476,7 +3477,9 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
                         );
                     }
                     // iii. Else if firstArgument has an [[ArrayBufferData]] internal slot, then
-                    else if (first_argument.object.is(builtins.ArrayBuffer)) {
+                    else if (first_argument.object.is(builtins.ArrayBuffer) or
+                        first_argument.object.is(builtins.SharedArrayBuffer))
+                    {
                         // 1. If numberOfArgs > 1, let byteOffset be args[1]; else let byteOffset
                         //    be undefined.
                         const byte_offset = arguments.get(1);
@@ -3490,7 +3493,10 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
                         try initializeTypedArrayFromArrayBuffer(
                             agent,
                             object.as(TypedArray),
-                            first_argument.object.as(builtins.ArrayBuffer),
+                            if (first_argument.object.is(builtins.ArrayBuffer))
+                                .{ .array_buffer = first_argument.object.as(builtins.ArrayBuffer) }
+                            else
+                                .{ .shared_array_buffer = first_argument.object.as(builtins.SharedArrayBuffer) },
                             byte_offset,
                             length,
                         );
@@ -3502,7 +3508,8 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
                         std.debug.assert(
                             first_argument == .object and
                                 !first_argument.object.is(TypedArray) and
-                                !first_argument.object.is(builtins.ArrayBuffer),
+                                !first_argument.object.is(builtins.ArrayBuffer) and
+                                !first_argument.object.is(builtins.SharedArrayBuffer),
                         );
 
                         // 2. Let usingIterator be ? GetMethod(firstArgument, @@iterator).
@@ -3606,7 +3613,7 @@ pub const TypedArray = MakeObject(.{
         content_type: enum { bigint, number },
 
         /// [[ViewedArrayBuffer]]
-        viewed_array_buffer: *builtins.ArrayBuffer,
+        viewed_array_buffer: ArrayBufferLike,
 
         /// [[ByteLength]]
         byte_length: ByteLength,

@@ -419,6 +419,39 @@ fn prettyPrintSetIterator(
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintSharedArrayBuffer(
+    shared_array_buffer: *const builtins.SharedArrayBuffer,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    const tty_config = getTtyConfigForWriter(writer);
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("SharedArrayBuffer(");
+    try tty_config.setColor(writer, .reset);
+    const data = shared_array_buffer.fields.array_buffer_data;
+    try writer.print("byteLength: {pretty}", .{Value.from(@as(u53, @intCast(data.items.len)))});
+    if (shared_array_buffer.fields.array_buffer_max_byte_length) |max_byte_length| {
+        try writer.print(", maxByteLength: {pretty}", .{Value.from(max_byte_length)});
+    }
+    if (data.items.len != 0) {
+        try writer.writeAll(", data: ");
+        try tty_config.setColor(writer, .dim);
+        // Like std.fmt.fmtSliceHexLower() but with a space between each bytes
+        const charset = "0123456789abcdef";
+        var buf: [2]u8 = undefined;
+        for (data.items, 0..) |c, i| {
+            if (i != 0) try writer.writeAll(" ");
+            buf[0] = charset[c >> 4];
+            buf[1] = charset[c & 15];
+            try writer.writeAll(&buf);
+        }
+        try tty_config.setColor(writer, .reset);
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintStringIterator(
     string_iterator: *const builtins.StringIterator,
     writer: anytype,
@@ -455,7 +488,7 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
     try tty_config.setColor(writer, .white);
     try writer.print("{s}(", .{typed_array_name});
     try tty_config.setColor(writer, .reset);
-    if (viewed_array_buffer.fields.array_buffer_data) |data| {
+    if (viewed_array_buffer.arrayBufferData()) |data| {
         if (array_length != .auto) {
             try writer.print("length: {pretty}", .{Value.from(array_length.value)});
         }
@@ -668,6 +701,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.RegExpStringIterator, prettyPrintRegExpStringIterator },
             .{ builtins.Set, prettyPrintSet },
             .{ builtins.SetIterator, prettyPrintSetIterator },
+            .{ builtins.SharedArrayBuffer, prettyPrintSharedArrayBuffer },
             .{ builtins.String, prettyPrintPrimitiveWrapper },
             .{ builtins.StringIterator, prettyPrintStringIterator },
             .{ builtins.Symbol, prettyPrintPrimitiveWrapper },

@@ -29,7 +29,7 @@ const NameAndPropertyDescriptor = struct {
     PropertyDescriptor,
 };
 
-const num_properties = 52 +
+const num_properties = 53 +
     (if (build_options.enable_annex_b) 2 else 0) +
     (if (build_options.enable_intl) 1 else 0);
 
@@ -191,6 +191,10 @@ pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]Nam
         // 19.3.27 Set ( . . . )
         // https://tc39.es/ecma262/#sec-set
         .{ "Set", .{ .value = Value.from(try realm.intrinsics.@"%Set%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 19.3.28 SharedArrayBuffer ( . . . )
+        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-sharedarraybuffer
+        .{ "SharedArrayBuffer", .{ .value = Value.from(try realm.intrinsics.@"%SharedArrayBuffer%"()), .writable = true, .enumerable = false, .configurable = true } },
 
         // 19.3.29 String ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-string

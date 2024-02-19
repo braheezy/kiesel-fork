@@ -105,6 +105,8 @@ lazy_intrinsics: struct {
     @"%Set%": ?Object = null,
     @"%Set.prototype%": ?Object = null,
     @"%SetIteratorPrototype%": ?Object = null,
+    @"%SharedArrayBuffer%": ?Object = null,
+    @"%SharedArrayBuffer.prototype%": ?Object = null,
     @"%String%": ?Object = null,
     @"%String.prototype%": ?Object = null,
     @"%StringIteratorPrototype%": ?Object = null,
@@ -428,6 +430,12 @@ pub fn @"%Set.prototype%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%SetIteratorPrototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%SetIteratorPrototype%", builtins.SetIteratorPrototype);
+}
+pub fn @"%SharedArrayBuffer%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%SharedArrayBuffer%", builtins.SharedArrayBufferConstructor);
+}
+pub fn @"%SharedArrayBuffer.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%SharedArrayBuffer.prototype%", builtins.SharedArrayBufferPrototype);
 }
 pub fn @"%String%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%String%", builtins.StringConstructor);

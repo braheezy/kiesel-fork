@@ -13,6 +13,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const ArrayBufferLike = @import("../builtins/array_buffer.zig").ArrayBufferLike;
 const BigInt = types.BigInt;
 const MakeObject = types.MakeObject;
 const Number = types.Number;
@@ -337,7 +338,16 @@ pub const DataViewConstructor = struct {
         }
 
         // 2. Perform ? RequireInternalSlot(buffer, [[ArrayBufferData]]).
-        const buffer = try buffer_value.requireInternalSlot(agent, builtins.ArrayBuffer);
+        if (buffer_value != .object) {
+            return agent.throwException(.type_error, "{} is not an Object", .{buffer_value});
+        }
+        if (!buffer_value.object.is(builtins.ArrayBuffer) and !buffer_value.object.is(builtins.SharedArrayBuffer)) {
+            return agent.throwException(.type_error, "{} is not an ArrayBuffer or SharedArrayBuffer object", .{buffer_value});
+        }
+        const buffer: ArrayBufferLike = if (buffer_value.object.is(builtins.ArrayBuffer))
+            .{ .array_buffer = buffer_value.object.as(builtins.ArrayBuffer) }
+        else
+            .{ .shared_array_buffer = buffer_value.object.as(builtins.SharedArrayBuffer) };
 
         // 3. Let offset be ? ToIndex(byteOffset).
         const offset = try byte_offset.toIndex(agent);
@@ -806,7 +816,7 @@ pub const DataView = MakeObject(.{
         };
 
         /// [[ViewedArrayBuffer]]
-        viewed_array_buffer: *builtins.ArrayBuffer,
+        viewed_array_buffer: ArrayBufferLike,
 
         /// [[ByteLength]]
         byte_length: ByteLength,

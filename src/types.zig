@@ -25,6 +25,7 @@ pub const createArrayFromList = language.createArrayFromList;
 pub const createArrayFromListMapToValue = language.createArrayFromListMapToValue;
 pub const createByteDataBlock = spec.createByteDataBlock;
 pub const createIterResultObject = spec.createIterResultObject;
+pub const createSharedByteDataBlock = spec.createSharedByteDataBlock;
 pub const getIterator = spec.getIterator;
 pub const getIteratorFromMethod = spec.getIteratorFromMethod;
 pub const getOption = language.getOption;

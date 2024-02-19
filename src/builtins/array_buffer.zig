@@ -13,6 +13,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const DataBlock = types.DataBlock;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -29,6 +30,30 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const sameValue = types.sameValue;
+
+pub const ArrayBufferLike = union(enum) {
+    const Self = @This();
+
+    array_buffer: *const ArrayBuffer,
+    shared_array_buffer: *const builtins.SharedArrayBuffer,
+
+    pub inline fn object(self: Self) Object {
+        return switch (self) {
+            .array_buffer => |array_buffer| @constCast(array_buffer).object(),
+            .shared_array_buffer => |shared_array_buffer| @constCast(shared_array_buffer).object(),
+        };
+    }
+
+    pub inline fn arrayBufferData(self: Self) ?*const DataBlock {
+        return switch (self) {
+            .array_buffer => |array_buffer| if (array_buffer.fields.array_buffer_data) |array_buffer_data|
+                &array_buffer_data
+            else
+                null,
+            .shared_array_buffer => |shared_array_buffer| &shared_array_buffer.fields.array_buffer_data,
+        };
+    }
+};
 
 pub const Order = enum {
     seq_cst,
@@ -91,7 +116,7 @@ pub fn allocateArrayBuffer(
         //    Implementations may throw if, for example, virtual memory cannot be reserved up front.
 
         // c. Set obj.[[ArrayBufferMaxByteLength]] to maxByteLength.
-        object.as(ArrayBuffer).fields.array_buffer_max_byte_length = @intCast(max_byte_length.?);
+        object.as(ArrayBuffer).fields.array_buffer_max_byte_length = max_byte_length.?;
     }
 
     // 5. Return obj.
@@ -100,7 +125,7 @@ pub fn allocateArrayBuffer(
 
 /// 25.1.3.2 ArrayBufferByteLength ( arrayBuffer, order )
 /// https://tc39.es/ecma262/#sec-arraybufferbytelength
-pub fn arrayBufferByteLength(array_buffer: *const ArrayBuffer, _: Order) u53 {
+pub fn arrayBufferByteLength(array_buffer: anytype, _: Order) u53 {
     // TODO: 1. If IsSharedArrayBuffer(arrayBuffer) is true and arrayBuffer has an
     //          [[ArrayBufferByteLengthData]] internal slot, then
     // [...]
@@ -109,7 +134,12 @@ pub fn arrayBufferByteLength(array_buffer: *const ArrayBuffer, _: Order) u53 {
     std.debug.assert(!isDetachedBuffer(array_buffer));
 
     // 3. Return arrayBuffer.[[ArrayBufferByteLength]].
-    return @intCast(array_buffer.fields.array_buffer_data.?.items.len);
+    if (@TypeOf(array_buffer) == ArrayBufferLike) {
+        return @intCast(array_buffer.arrayBufferData().?.items.len);
+    } else {
+        comptime std.debug.assert(@typeInfo(@TypeOf(array_buffer)).Pointer.child == ArrayBuffer);
+        return @intCast(array_buffer.fields.array_buffer_data.?.items.len);
+    }
 }
 
 /// 25.1.3.3 ArrayBufferCopyAndDetach ( arrayBuffer, newLength, preserveResizability )
@@ -122,9 +152,8 @@ pub fn arrayBufferCopyAndDetach(
     const realm = agent.currentRealm();
 
     // 1. Perform ? RequireInternalSlot(arrayBuffer, [[ArrayBufferData]]).
+    // 2. If IsSharedArrayBuffer(arrayBuffer) is true, throw a TypeError exception.
     const array_buffer = try array_buffer_value.requireInternalSlot(agent, ArrayBuffer);
-
-    // TODO: 2. If IsSharedArrayBuffer(arrayBuffer) is true, throw a TypeError exception.
 
     const array_buffer_byte_length = if (array_buffer.fields.array_buffer_data) |array_buffer_data|
         array_buffer_data.items.len
@@ -199,10 +228,18 @@ pub fn arrayBufferCopyAndDetach(
 
 /// 25.1.3.4 IsDetachedBuffer ( arrayBuffer )
 /// https://tc39.es/ecma262/#sec-isdetachedbuffer
-pub fn isDetachedBuffer(array_buffer: *const ArrayBuffer) bool {
+pub fn isDetachedBuffer(array_buffer: anytype) bool {
     // 1. If arrayBuffer.[[ArrayBufferData]] is null, return true.
     // 2. Return false.
-    return array_buffer.fields.array_buffer_data == null;
+    if (@TypeOf(array_buffer) == ArrayBufferLike) {
+        return switch (array_buffer) {
+            .array_buffer => |object| object.fields.array_buffer_data == null,
+            .shared_array_buffer => false,
+        };
+    } else {
+        comptime std.debug.assert(@typeInfo(@TypeOf(array_buffer)).Pointer.child == ArrayBuffer);
+        return array_buffer.fields.array_buffer_data == null;
+    }
 }
 
 /// 25.1.3.5 DetachArrayBuffer ( arrayBuffer [ , key ] )
@@ -212,7 +249,7 @@ pub fn detachArrayBuffer(
     array_buffer: *ArrayBuffer,
     maybe_key: ?Value,
 ) error{ExceptionThrown}!void {
-    // TODO: 1. Assert: IsSharedArrayBuffer(arrayBuffer) is false.
+    // 1. Assert: IsSharedArrayBuffer(arrayBuffer) is false.
 
     // 2. If key is not present, set key to undefined.
     const key = maybe_key orelse .undefined;
@@ -236,7 +273,7 @@ pub fn detachArrayBuffer(
 /// https://tc39.es/ecma262/#sec-clonearraybuffer
 pub fn cloneArrayBuffer(
     agent: *Agent,
-    src_buffer: *const ArrayBuffer,
+    src_buffer: ArrayBufferLike,
     src_byte_offset: u53,
     src_length: u53,
 ) Agent.Error!Object {
@@ -254,7 +291,7 @@ pub fn cloneArrayBuffer(
     );
 
     // 3. Let srcBlock be srcBuffer.[[ArrayBufferData]].
-    const src_block = &src_buffer.fields.array_buffer_data.?;
+    const src_block = src_buffer.arrayBufferData().?;
 
     // 4. Let targetBlock be targetBuffer.[[ArrayBufferData]].
     const target_block = &target_buffer.as(ArrayBuffer).fields.array_buffer_data.?;
@@ -284,10 +321,18 @@ pub fn getArrayBufferMaxByteLengthOption(agent: *Agent, options: Value) Agent.Er
 
 /// 25.1.3.9 IsFixedLengthArrayBuffer ( arrayBuffer )
 /// https://tc39.es/ecma262/#sec-isfixedlengtharraybuffer
-pub fn isFixedLengthArrayBuffer(array_buffer: *const ArrayBuffer) bool {
+pub fn isFixedLengthArrayBuffer(array_buffer: anytype) bool {
     // 1. If arrayBuffer has an [[ArrayBufferMaxByteLength]] internal slot, return false.
     // 2. Return true.
-    return array_buffer.fields.array_buffer_max_byte_length == null;
+    if (@TypeOf(array_buffer) == ArrayBufferLike) {
+        return switch (array_buffer) {
+            .array_buffer => |object| object.fields.array_buffer_max_byte_length == null,
+            .shared_array_buffer => |object| object.fields.array_buffer_max_byte_length == null,
+        };
+    } else {
+        comptime std.debug.assert(@typeInfo(@TypeOf(array_buffer)).Pointer.child == ArrayBuffer);
+        return array_buffer.fields.array_buffer_max_byte_length == null;
+    }
 }
 
 /// 25.1.3.14 RawBytesToNumeric ( type, rawBytes, isLittleEndian )
@@ -310,11 +355,29 @@ pub fn rawBytesToNumeric(
     return std.mem.bytesToValue(@"type".T, &bytes);
 }
 
+/// 25.1.3.15 GetRawBytesFromSharedBlock ( block, byteIndex, type, isTypedArray, order )
+/// https://tc39.es/ecma262/#sec-getrawbytesfromsharedblock
+pub fn getRawBytesFromSharedBlock(
+    block: *const DataBlock,
+    byte_index: u53,
+    comptime @"type": TypedArrayElementType,
+    is_typed_array: bool,
+    order: Order,
+) [@sizeOf(@"type".T)]u8 {
+    // 1. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
+    const element_size = @"type".elementSize();
+
+    // TODO: 2-10.
+    _ = is_typed_array;
+    _ = order;
+    return block.items[@intCast(byte_index)..][0..element_size].*;
+}
+
 /// 25.1.3.16 GetValueFromBuffer ( arrayBuffer, byteIndex, type, isTypedArray, order [ , isLittleEndian ] )
 /// https://tc39.es/ecma262/#sec-getvaluefrombuffer
 pub fn getValueFromBuffer(
     agent: *Agent,
-    array_buffer: *const ArrayBuffer,
+    array_buffer: ArrayBufferLike,
     byte_index: u53,
     comptime @"type": TypedArrayElementType,
     is_typed_array: bool,
@@ -326,19 +389,21 @@ pub fn getValueFromBuffer(
 
     // 2. Assert: There are sufficient bytes in arrayBuffer starting at byteIndex to represent a
     //    value of type.
-    std.debug.assert(array_buffer.fields.array_buffer_data.?.items.len >= byte_index + @"type".elementSize());
+    std.debug.assert(array_buffer.arrayBufferData().?.items.len >= byte_index + @"type".elementSize());
 
     // 3. Let block be arrayBuffer.[[ArrayBufferData]].
-    const block = array_buffer.fields.array_buffer_data.?;
+    const block = array_buffer.arrayBufferData().?;
 
     // 4. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
     const element_size = @"type".elementSize();
 
-    // TODO: 5. If IsSharedArrayBuffer(arrayBuffer) is true, then
-    const raw_value = if (false) {
-        // [...]
-        _ = order;
-        _ = is_typed_array;
+    // 5. If IsSharedArrayBuffer(arrayBuffer) is true, then
+    const raw_value = if (array_buffer == .shared_array_buffer) blk: {
+        // a. Assert: block is a Shared Data Block.
+
+        // b. Let rawValue be GetRawBytesFromSharedBlock(block, byteIndex, type, isTypedArray,
+        //    order).
+        break :blk &getRawBytesFromSharedBlock(block, byte_index, @"type", is_typed_array, order);
     }
     // 6. Else,
     else blk: {
@@ -426,7 +491,7 @@ pub fn numericToRawBytes(
 /// https://tc39.es/ecma262/#sec-setvalueinbuffer
 pub fn setValueInBuffer(
     agent: *Agent,
-    array_buffer: *const ArrayBuffer,
+    array_buffer: ArrayBufferLike,
     byte_index: u53,
     comptime @"type": TypedArrayElementType,
     value: Value,
@@ -439,14 +504,14 @@ pub fn setValueInBuffer(
 
     // 2. Assert: There are sufficient bytes in arrayBuffer starting at byteIndex to represent a
     //    value of type.
-    std.debug.assert(array_buffer.fields.array_buffer_data.?.items.len >= byte_index + @"type".elementSize());
+    std.debug.assert(array_buffer.arrayBufferData().?.items.len >= byte_index + @"type".elementSize());
 
     // 3. Assert: value is a BigInt if IsBigIntElementType(type) is true; otherwise, value is a
     //    Number.
     std.debug.assert(value == if (@"type".isBigIntElementType()) .big_int else .number);
 
     // 4. Let block be arrayBuffer.[[ArrayBufferData]].
-    const block = array_buffer.fields.array_buffer_data.?;
+    const block = array_buffer.arrayBufferData().?;
 
     // 5. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
     const element_size = @"type".elementSize();
@@ -477,7 +542,7 @@ pub fn setValueInBuffer(
 /// https://tc39.es/ecma262/#sec-getmodifysetvalueinbuffer
 pub fn getModifySetValueInBuffer(
     agent: *Agent,
-    array_buffer: *const ArrayBuffer,
+    array_buffer: ArrayBufferLike,
     byte_index: u53,
     comptime @"type": TypedArrayElementType,
     value: Value,
@@ -488,14 +553,14 @@ pub fn getModifySetValueInBuffer(
 
     // 2. Assert: There are sufficient bytes in arrayBuffer starting at byteIndex to represent a
     //    value of type.
-    std.debug.assert(array_buffer.fields.array_buffer_data.?.items.len >= byte_index + @"type".elementSize());
+    std.debug.assert(array_buffer.arrayBufferData().?.items.len >= byte_index + @"type".elementSize());
 
     // 3. Assert: value is a BigInt if IsBigIntElementType(type) is true; otherwise, value is a
     //    Number.
     std.debug.assert(value == if (@"type".isBigIntElementType()) .big_int else .number);
 
     // 4. Let block be arrayBuffer.[[ArrayBufferData]].
-    const block = array_buffer.fields.array_buffer_data.?;
+    const block = array_buffer.arrayBufferData().?;
 
     // 5. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
     const element_size = @"type".elementSize();
@@ -657,9 +722,8 @@ pub const ArrayBufferPrototype = struct {
     fn byteLength(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        // 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
         const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
-
-        // TODO: 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
 
         // 4. If IsDetachedBuffer(O) is true, return +0𝔽.
         if (isDetachedBuffer(object)) return Value.from(0);
@@ -676,9 +740,8 @@ pub const ArrayBufferPrototype = struct {
     fn detached(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        // 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
         const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
-
-        // TODO: 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
 
         // 4. Return IsDetachedBuffer(O).
         return Value.from(isDetachedBuffer(object));
@@ -689,9 +752,8 @@ pub const ArrayBufferPrototype = struct {
     fn maxByteLength(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        // 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
         const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
-
-        // TODO: 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
 
         // 4. If IsDetachedBuffer(O) is true, return +0𝔽.
         if (isDetachedBuffer(object)) return Value.from(0);
@@ -716,9 +778,8 @@ pub const ArrayBufferPrototype = struct {
     fn resizable(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        // 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
         const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
-
-        // TODO: 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
 
         // 4. If IsFixedLengthArrayBuffer(O) is false, return true; otherwise return false.
         return Value.from(!isFixedLengthArrayBuffer(object));
@@ -731,12 +792,11 @@ pub const ArrayBufferPrototype = struct {
 
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferMaxByteLength]]).
+        // 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
         const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
         if (object.fields.array_buffer_max_byte_length == null) {
             return agent.throwException(.type_error, "ArrayBuffer is not resizable", .{});
         }
-
-        // TODO: 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
 
         // 4. Let newByteLength be ? ToIndex(newLength).
         const new_byte_length = try new_length.toIndex(agent);
@@ -794,9 +854,8 @@ pub const ArrayBufferPrototype = struct {
 
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        // 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
         const object = try this_value.requireInternalSlot(agent, ArrayBuffer);
-
-        // TODO: 3. If IsSharedArrayBuffer(O) is true, throw a TypeError exception.
 
         // 4. If IsDetachedBuffer(O) is true, throw a TypeError exception.
         if (isDetachedBuffer(object)) {
@@ -854,9 +913,8 @@ pub const ArrayBufferPrototype = struct {
         const new_object = try constructor.construct(&.{Value.from(new_len)}, null);
 
         // 17. Perform ? RequireInternalSlot(new, [[ArrayBufferData]]).
+        // 18. If IsSharedArrayBuffer(new) is true, throw a TypeError exception.
         const new = try Value.from(new_object).requireInternalSlot(agent, ArrayBuffer);
-
-        // TODO: 18. If IsSharedArrayBuffer(new) is true, throw a TypeError exception.
 
         // 19. If IsDetachedBuffer(new) is true, throw a TypeError exception.
         if (isDetachedBuffer(new)) {
@@ -939,7 +997,7 @@ pub const ArrayBuffer = MakeObject(.{
 
         /// [[ArrayBufferData]]
         /// [[ArrayBufferByteLength]]
-        array_buffer_data: ?std.ArrayList(u8),
+        array_buffer_data: ?DataBlock,
 
         /// [[ArrayBufferDetachKey]]
         array_buffer_detach_key: Value = .undefined,
