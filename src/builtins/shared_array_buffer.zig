@@ -182,6 +182,15 @@ pub const SharedArrayBufferPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        // 25.2.5.7 SharedArrayBuffer.prototype [ @@toStringTag ]
+        // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype-@@tostringtag
+        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+            .value = Value.from("SharedArrayBuffer"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
         return object;
     }
 };
