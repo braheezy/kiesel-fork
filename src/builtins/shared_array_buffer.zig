@@ -187,6 +187,7 @@ pub const SharedArrayBufferPrototype = struct {
 
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinAccessor(object, "growable", growable, null, realm);
+        try defineBuiltinAccessor(object, "maxByteLength", maxByteLength, null, realm);
 
         // 25.2.5.7 SharedArrayBuffer.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype-@@tostringtag
@@ -228,6 +229,31 @@ pub const SharedArrayBufferPrototype = struct {
 
         // 4. If IsFixedLengthArrayBuffer(O) is false, return true; otherwise return false.
         return Value.from(!isFixedLengthArrayBuffer(ArrayBufferLike{ .shared_array_buffer = object }));
+    }
+
+    /// 25.2.5.5 get SharedArrayBuffer.prototype.maxByteLength
+    /// https://tc39.es/ecma262/#sec-get-sharedarraybuffer.prototype.maxbytelength
+    fn maxByteLength(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
+        const object = try this_value.requireInternalSlot(agent, SharedArrayBuffer);
+
+        // 4. If IsFixedLengthArrayBuffer(O) is true, then
+        const length =
+            if (isFixedLengthArrayBuffer(ArrayBufferLike{ .shared_array_buffer = object }))
+        blk: {
+            // a. Let length be O.[[ArrayBufferByteLength]].
+            break :blk object.fields.array_buffer_data.items.len;
+        }
+        // 5. Else,
+        else blk: {
+            // a. Let length be O.[[ArrayBufferMaxByteLength]].
+            break :blk object.fields.array_buffer_max_byte_length.?;
+        };
+
+        // 6. Return 𝔽(length).
+        return Value.from(@as(u53, @intCast(length)));
     }
 };
 
