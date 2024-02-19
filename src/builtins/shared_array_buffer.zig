@@ -25,6 +25,7 @@ const createSharedByteDataBlock = types.createSharedByteDataBlock;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getArrayBufferMaxByteLengthOption = builtins.getArrayBufferMaxByteLengthOption;
+const isFixedLengthArrayBuffer = builtins.isFixedLengthArrayBuffer;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 25.2.2.1 AllocateSharedArrayBuffer ( constructor, byteLength [ , maxByteLength ] )
@@ -185,6 +186,7 @@ pub const SharedArrayBufferPrototype = struct {
         });
 
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
+        try defineBuiltinAccessor(object, "growable", growable, null, realm);
 
         // 25.2.5.7 SharedArrayBuffer.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype-@@tostringtag
@@ -214,6 +216,18 @@ pub const SharedArrayBufferPrototype = struct {
 
         // 5. Return 𝔽(length).
         return Value.from(length);
+    }
+
+    /// 25.2.5.4 get SharedArrayBuffer.prototype.growable
+    /// https://tc39.es/ecma262/#sec-get-sharedarraybuffer.prototype.growable
+    fn growable(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
+        const object = try this_value.requireInternalSlot(agent, SharedArrayBuffer);
+
+        // 4. If IsFixedLengthArrayBuffer(O) is false, return true; otherwise return false.
+        return Value.from(!isFixedLengthArrayBuffer(ArrayBufferLike{ .shared_array_buffer = object }));
     }
 };
 
