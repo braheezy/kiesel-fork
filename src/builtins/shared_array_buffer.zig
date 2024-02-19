@@ -12,12 +12,14 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const ArrayBufferLike = @import("array_buffer.zig").ArrayBufferLike;
 const DataBlock = types.DataBlock;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
+const arrayBufferByteLength = builtins.arrayBufferByteLength;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createSharedByteDataBlock = types.createSharedByteDataBlock;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
@@ -182,6 +184,8 @@ pub const SharedArrayBufferPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
+
         // 25.2.5.7 SharedArrayBuffer.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype-@@tostringtag
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
@@ -192,6 +196,24 @@ pub const SharedArrayBufferPrototype = struct {
         });
 
         return object;
+    }
+
+    /// 25.2.5.1 get SharedArrayBuffer.prototype.byteLength
+    /// https://tc39.es/ecma262/#sec-get-sharedarraybuffer.prototype.bytelength
+    fn byteLength(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
+        const object = try this_value.requireInternalSlot(agent, SharedArrayBuffer);
+
+        // 4. Let length be ArrayBufferByteLength(O, seq-cst).
+        const length = arrayBufferByteLength(
+            ArrayBufferLike{ .shared_array_buffer = object },
+            .seq_cst,
+        );
+
+        // 5. Return 𝔽(length).
+        return Value.from(length);
     }
 };
 
