@@ -324,7 +324,7 @@ fn ownPropertyKeys(object: Object) Allocator.Error!std.ArrayList(PropertyKey) {
 
         // b. For each integer i such that 0 ≤ i < length, in ascending order, do
         var i: u53 = 0;
-        while (i < length) : (i += i) {
+        while (i < length) : (i += 1) {
             // i. Append ! ToString(𝔽(i)) to keys.
             keys.appendAssumeCapacity(PropertyKey.from(i));
         }
