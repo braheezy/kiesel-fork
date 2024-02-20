@@ -20,9 +20,11 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const arrayBufferByteLength = builtins.arrayBufferByteLength;
+const copyDataBlockBytes = types.copyDataBlockBytes;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createSharedByteDataBlock = types.createSharedByteDataBlock;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getArrayBufferMaxByteLengthOption = builtins.getArrayBufferMaxByteLengthOption;
 const isFixedLengthArrayBuffer = builtins.isFixedLengthArrayBuffer;
@@ -188,6 +190,7 @@ pub const SharedArrayBufferPrototype = struct {
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinAccessor(object, "growable", growable, null, realm);
         try defineBuiltinAccessor(object, "maxByteLength", maxByteLength, null, realm);
+        try defineBuiltinFunction(object, "slice", slice, 2, realm);
 
         // 25.2.5.7 SharedArrayBuffer.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype-@@tostringtag
@@ -254,6 +257,107 @@ pub const SharedArrayBufferPrototype = struct {
 
         // 6. Return 𝔽(length).
         return Value.from(@as(u53, @intCast(length)));
+    }
+
+    /// 25.2.5.6 SharedArrayBuffer.prototype.slice ( start, end )
+    /// https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype.slice
+    fn slice(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const realm = agent.currentRealm();
+        const start = arguments.get(0);
+        const end = arguments.get(1);
+
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
+        const object = try this_value.requireInternalSlot(agent, SharedArrayBuffer);
+
+        // 4. Let len be ArrayBufferByteLength(O, seq-cst).
+        const len = arrayBufferByteLength(
+            ArrayBufferLike{ .shared_array_buffer = object },
+            .seq_cst,
+        );
+        const len_f64: f64 = @floatFromInt(len);
+
+        // 5. Let relativeStart be ? ToIntegerOrInfinity(start).
+        const relative_start = try start.toIntegerOrInfinity(agent);
+
+        // 6. If relativeStart = -∞, let first be 0.
+        const first_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
+            break :blk 0;
+        }
+        // 7. Else if relativeStart < 0, let first be max(len + relativeStart, 0).
+        else if (relative_start < 0) blk: {
+            break :blk @max(len_f64 + relative_start, 0);
+        }
+        // 8. Else, let first be min(relativeStart, len).
+        else blk: {
+            break :blk @min(relative_start, len_f64);
+        };
+        const first: u53 = @intFromFloat(first_f64);
+
+        // 9. If end is undefined, let relativeEnd be len; else let relativeEnd be
+        //    ? ToIntegerOrInfinity(end).
+        const relative_end = if (end == .undefined)
+            len_f64
+        else
+            try end.toIntegerOrInfinity(agent);
+
+        // 10. If relativeEnd = -∞, let final be 0.
+        const final_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
+            break :blk 0;
+        }
+        // 11. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
+        else if (relative_end < 0) blk: {
+            break :blk @max(len_f64 + relative_end, 0);
+        }
+        // 12. Else, let final be min(relativeEnd, len).
+        else blk: {
+            break :blk @min(relative_end, len_f64);
+        };
+
+        // 13. Let newLen be max(final - first, 0).
+        const new_len: u53 = @intFromFloat(@max(final_f64 - first_f64, 0));
+
+        // 14. Let ctor be ? SpeciesConstructor(O, %SharedArrayBuffer%).
+        const constructor = try object.object().speciesConstructor(
+            try realm.intrinsics.@"%SharedArrayBuffer%"(),
+        );
+
+        // 15. Let new be ? Construct(ctor, « 𝔽(newLen) »).
+        const new_object = try constructor.construct(&.{Value.from(new_len)}, null);
+
+        // 16. Perform ? RequireInternalSlot(new, [[ArrayBufferData]]).
+        // 17. If IsSharedArrayBuffer(new) is false, throw a TypeError exception.
+        const new = try Value.from(new_object).requireInternalSlot(agent, SharedArrayBuffer);
+
+        // 18. If new.[[ArrayBufferData]] is O.[[ArrayBufferData]], throw a TypeError exception.
+        if (new.fields.array_buffer_data.items.ptr == object.fields.array_buffer_data.items.ptr) {
+            return agent.throwException(
+                .type_error,
+                "Species constructor must return a new buffer",
+                .{},
+            );
+        }
+
+        // 19. If ArrayBufferByteLength(new, seq-cst) < newLen, throw a TypeError exception.
+        if (arrayBufferByteLength(
+            ArrayBufferLike{ .shared_array_buffer = new },
+            .seq_cst,
+        ) < new_len) {
+            return agent.throwException(.type_error, "SharedArrayBuffer is too small", .{});
+        }
+
+        // 20. Let fromBuf be O.[[ArrayBufferData]].
+        const from_buf = &object.fields.array_buffer_data;
+
+        // 21. Let toBuf be new.[[ArrayBufferData]].
+        const to_buf = &new.fields.array_buffer_data;
+
+        // 22. Perform CopyDataBlockBytes(toBuf, 0, fromBuf, first, newLen).
+        copyDataBlockBytes(to_buf, 0, from_buf, first, new_len);
+
+        // 23. Return new.
+        return Value.from(new.object());
     }
 };
 
