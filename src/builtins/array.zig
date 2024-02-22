@@ -1647,19 +1647,22 @@ pub const ArrayPrototype = struct {
 
         // 10. Repeat, while k < len,
         while (k < len) : (k += 1) {
-            // a. Let kPresent be ? HasProperty(O, ! ToString(𝔽(k))).
-            const k_present = try object.hasProperty(PropertyKey.from(k));
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
 
-            // b. If kPresent is true, then
+            // b. Let kPresent be ? HasProperty(O, Pk).
+            const k_present = try object.hasProperty(property_key);
+
+            // c. If kPresent is true, then
             if (k_present) {
-                // i. Let elementK be ? Get(O, ! ToString(𝔽(k))).
-                const element_k = try object.get(PropertyKey.from(k));
+                // i. Let elementK be ? Get(O, Pk).
+                const element_k = try object.get(property_key);
 
                 // ii. If IsStrictlyEqual(searchElement, elementK) is true, return 𝔽(k).
                 if (isStrictlyEqual(search_element, element_k)) return Value.from(k);
             }
 
-            // c. Set k to k + 1.
+            // d. Set k to k + 1.
         }
 
         // 11. Return -1𝔽.
@@ -1762,19 +1765,22 @@ pub const ArrayPrototype = struct {
 
         // 8. Repeat, while k ≥ 0,
         while (k >= 0) : (k -|= 1) {
-            // a. Let kPresent be ? HasProperty(O, ! ToString(𝔽(k))).
-            const k_present = try object.hasProperty(PropertyKey.from(k));
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
 
-            // b. If kPresent is true, then
+            // b. Let kPresent be ? HasProperty(O, Pk).
+            const k_present = try object.hasProperty(property_key);
+
+            // c. If kPresent is true, then
             if (k_present) {
-                // i. Let elementK be ? Get(O, ! ToString(𝔽(k))).
-                const element_k = try object.get(PropertyKey.from(k));
+                // i. Let elementK be ? Get(O, Pk).
+                const element_k = try object.get(property_key);
 
                 // ii. If IsStrictlyEqual(searchElement, elementK) is true, return 𝔽(k).
                 if (isStrictlyEqual(search_element, element_k)) return Value.from(k);
             }
 
-            // c. Set k to k - 1.
+            // d. Set k to k - 1.
             if (k == 0) break;
         }
 
