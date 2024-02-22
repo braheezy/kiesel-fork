@@ -17,7 +17,7 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 
-/// 27.6.1 Properties of the AsyncGenerator Prototype Object
+/// 27.6.1 The %AsyncGeneratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgenerator-prototype
 pub const AsyncGeneratorPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
@@ -25,7 +25,7 @@ pub const AsyncGeneratorPrototype = struct {
             .prototype = try realm.intrinsics.@"%AsyncIteratorPrototype%"(),
         });
 
-        // 27.6.1.1 AsyncGenerator.prototype.constructor
+        // 27.6.1.1 %AsyncGeneratorPrototype%.constructor
         // https://tc39.es/ecma262/#sec-asyncgenerator-prototype-constructor
         try defineBuiltinProperty(object, "constructor", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"()),
@@ -34,7 +34,7 @@ pub const AsyncGeneratorPrototype = struct {
             .configurable = true,
         });
 
-        // 27.6.1.5 AsyncGenerator.prototype [ @@toStringTag ]
+        // 27.6.1.5 %AsyncGeneratorPrototype% [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-asyncgenerator-prototype-tostringtag
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
             .value = Value.from("AsyncGenerator"),

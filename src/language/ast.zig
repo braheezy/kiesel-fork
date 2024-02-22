@@ -1515,7 +1515,7 @@ pub const GeneratorDeclaration = struct {
         // 5. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
         const prototype = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%GeneratorFunction.prototype.prototype%"(),
+            try realm.intrinsics.@"%GeneratorPrototype%"(),
         );
 
         // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
@@ -1587,7 +1587,7 @@ pub const AsyncGeneratorDeclaration = struct {
             // 5. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
             const prototype = try ordinaryObjectCreate(
                 agent,
-                try realm.intrinsics.@"%AsyncGeneratorFunction.prototype.prototype%"(),
+                try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
             );
 
             // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
@@ -1628,7 +1628,7 @@ pub const AsyncGeneratorDeclaration = struct {
             // 4. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
             const prototype = try ordinaryObjectCreate(
                 agent,
-                try realm.intrinsics.@"%AsyncGeneratorFunction.prototype.prototype%"(),
+                try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
             );
 
             // 5. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {

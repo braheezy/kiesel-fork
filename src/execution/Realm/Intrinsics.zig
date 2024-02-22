@@ -32,7 +32,7 @@ lazy_intrinsics: struct {
     @"%AsyncFunction.prototype%": ?Object = null,
     @"%AsyncGeneratorFunction%": ?Object = null,
     @"%AsyncGeneratorFunction.prototype%": ?Object = null,
-    @"%AsyncGeneratorFunction.prototype.prototype%": ?Object = null,
+    @"%AsyncGeneratorPrototype%": ?Object = null,
     @"%AsyncIteratorPrototype%": ?Object = null,
     @"%Atomics%": ?Object = null,
     @"%BigInt%": ?Object = null,
@@ -66,7 +66,7 @@ lazy_intrinsics: struct {
     @"%Function.prototype%": ?Object = null,
     @"%GeneratorFunction%": ?Object = null,
     @"%GeneratorFunction.prototype%": ?Object = null,
-    @"%GeneratorFunction.prototype.prototype%": ?Object = null,
+    @"%GeneratorPrototype%": ?Object = null,
     @"%Int8Array%": ?Object = null,
     @"%Int8Array.prototype%": ?Object = null,
     @"%Int16Array%": ?Object = null,
@@ -206,8 +206,8 @@ pub fn @"%AsyncGeneratorFunction%"(self: *Self) Allocator.Error!Object {
 pub fn @"%AsyncGeneratorFunction.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%AsyncGeneratorFunction.prototype%", builtins.AsyncGeneratorFunctionPrototype);
 }
-pub fn @"%AsyncGeneratorFunction.prototype.prototype%"(self: *Self) Allocator.Error!Object {
-    return self.lazyIntrinsic("%AsyncGeneratorFunction.prototype.prototype%", builtins.AsyncGeneratorPrototype);
+pub fn @"%AsyncGeneratorPrototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%AsyncGeneratorPrototype%", builtins.AsyncGeneratorPrototype);
 }
 pub fn @"%AsyncIteratorPrototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%AsyncIteratorPrototype%", builtins.AsyncIteratorPrototype);
@@ -308,8 +308,8 @@ pub fn @"%GeneratorFunction%"(self: *Self) Allocator.Error!Object {
 pub fn @"%GeneratorFunction.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%GeneratorFunction.prototype%", builtins.GeneratorFunctionPrototype);
 }
-pub fn @"%GeneratorFunction.prototype.prototype%"(self: *Self) Allocator.Error!Object {
-    return self.lazyIntrinsic("%GeneratorFunction.prototype.prototype%", builtins.GeneratorPrototype);
+pub fn @"%GeneratorPrototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%GeneratorPrototype%", builtins.GeneratorPrototype);
 }
 pub fn @"%Int8Array%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Int8Array%", builtins.Int8ArrayConstructor);

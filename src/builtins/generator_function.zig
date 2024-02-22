@@ -95,7 +95,7 @@ pub const GeneratorFunctionPrototype = struct {
         // 27.3.3.2 GeneratorFunction.prototype.prototype
         // https://tc39.es/ecma262/#sec-generatorfunction.prototype.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%GeneratorFunction.prototype.prototype%"()),
+            .value = Value.from(try realm.intrinsics.@"%GeneratorPrototype%"()),
             .writable = false,
             .enumerable = false,
             .configurable = true,

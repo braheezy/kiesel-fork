@@ -760,7 +760,7 @@ fn methodDefinitionEvaluation(
             // 8. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
             const prototype = try ordinaryObjectCreate(
                 agent,
-                try realm.intrinsics.@"%GeneratorFunction.prototype.prototype%"(),
+                try realm.intrinsics.@"%GeneratorPrototype%"(),
             );
 
             // 9. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
@@ -813,7 +813,7 @@ fn methodDefinitionEvaluation(
             // 8. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
             const prototype = try ordinaryObjectCreate(
                 agent,
-                try realm.intrinsics.@"%AsyncGeneratorFunction.prototype.prototype%"(),
+                try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
             );
 
             // 9. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
@@ -920,7 +920,7 @@ fn instantiateGeneratorFunctionExpression(
         // 10. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
         const prototype = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%GeneratorFunction.prototype.prototype%"(),
+            try realm.intrinsics.@"%GeneratorPrototype%"(),
         );
 
         // 11. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
@@ -972,7 +972,7 @@ fn instantiateGeneratorFunctionExpression(
         // 7. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
         const prototype = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%GeneratorFunction.prototype.prototype%"(),
+            try realm.intrinsics.@"%GeneratorPrototype%"(),
         );
 
         // 8. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
@@ -1041,7 +1041,7 @@ fn instantiateAsyncGeneratorFunctionExpression(
         // 10. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
         const prototype = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%AsyncGeneratorFunction.prototype.prototype%"(),
+            try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
         );
 
         // 11. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
@@ -1093,7 +1093,7 @@ fn instantiateAsyncGeneratorFunctionExpression(
         // 7. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
         const prototype = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%AsyncGeneratorFunction.prototype.prototype%"(),
+            try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
         );
 
         // 8. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {

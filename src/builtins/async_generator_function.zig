@@ -95,7 +95,7 @@ pub const AsyncGeneratorFunctionPrototype = struct {
         // 27.4.3.2 AsyncGeneratorFunction.prototype.prototype
         // https://tc39.es/ecma262/#sec-asyncgeneratorfunction-prototype-prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%AsyncGeneratorFunction.prototype.prototype%"()),
+            .value = Value.from(try realm.intrinsics.@"%AsyncGeneratorPrototype%"()),
             .writable = false,
             .enumerable = false,
             .configurable = true,

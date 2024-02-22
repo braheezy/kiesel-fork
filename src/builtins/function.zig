@@ -416,7 +416,7 @@ pub fn createDynamicFunction(
             // a. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
             const prototype = try ordinaryObjectCreate(
                 agent,
-                try realm.intrinsics.@"%GeneratorFunction.prototype.prototype%"(),
+                try realm.intrinsics.@"%GeneratorPrototype%"(),
             );
 
             // b. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
@@ -435,7 +435,7 @@ pub fn createDynamicFunction(
             // a. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
             const prototype = try ordinaryObjectCreate(
                 agent,
-                try realm.intrinsics.@"%AsyncGeneratorFunction.prototype.prototype%"(),
+                try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
             );
 
             // b. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {

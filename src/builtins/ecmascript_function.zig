@@ -347,7 +347,7 @@ fn evaluateGeneratorBody(
         builtins.Generator,
         agent,
         function.object(),
-        "%GeneratorFunction.prototype.prototype%",
+        "%GeneratorPrototype%",
     );
 
     // TODO: 4. Perform GeneratorStart(G, FunctionBody).
@@ -374,7 +374,7 @@ fn evaluateAsyncGeneratorBody(
         builtins.AsyncGenerator,
         agent,
         function.object(),
-        "%AsyncGeneratorFunction.prototype.prototype%",
+        "%AsyncGeneratorPrototype%",
     );
 
     // TODO: 4. Perform AsyncGeneratorStart(generator, FunctionBody).
