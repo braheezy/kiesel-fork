@@ -1998,14 +1998,15 @@ pub const DatePrototype = struct {
         // 3. Let tv be dateObject.[[DateValue]].
         const time_value = date_object.fields.date_value;
 
-        // 4. If tv is not finite, throw a RangeError exception.
+        // 4. If tv is NaN, throw a RangeError exception.
         if (!std.math.isFinite(time_value)) {
             return agent.throwException(.range_error, "Invalid Date object", .{});
         }
 
-        // 5. If tv corresponds with a year that cannot be represented in the Date Time String
+        // 5. Assert: tv is an integral Number.
+        // 6. If tv corresponds with a year that cannot be represented in the Date Time String
         //    Format, throw a RangeError exception.
-        // 6. Return a String representation of tv in the Date Time String Format on the UTC time
+        // 7. Return a String representation of tv in the Date Time String Format on the UTC time
         //    scale, including all format elements and the UTC offset representation "Z".
         const year = yearFromTime(time_value);
         const year_sign = if (year >= 0 and year <= 9999) "" else if (year > 9999) "+" else "-";
