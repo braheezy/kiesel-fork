@@ -1071,7 +1071,8 @@ pub fn acceptAssignmentExpression(
         else => unreachable,
     };
 
-    // It is a Syntax Error if AssignmentTargetType of LeftHandSideExpression is not simple.
+    // If LeftHandSideExpression is neither an ObjectLiteral nor an ArrayLiteral, it is a Syntax
+    // Error if AssignmentTargetType of LeftHandSideExpression is not simple.
     if (primary_expression.assignmentTargetType() != .simple) {
         try self.emitErrorAt(state.location, "Invalid left-hand side in assignment expression", .{});
         return error.UnexpectedToken;
@@ -1506,7 +1507,8 @@ pub fn acceptForInOfStatement(self: *Self) AcceptError!ast.ForInOfStatement {
     else |_|
         return error.UnexpectedToken;
 
-    // It is a Syntax Error if AssignmentTargetType of LeftHandSideExpression is not simple.
+    // If LeftHandSideExpression is neither an ObjectLiteral nor an ArrayLiteral, it is a Syntax
+    // Error if AssignmentTargetType of LeftHandSideExpression is not simple.
     if (initializer == .expression and initializer.expression.assignmentTargetType() != .simple) {
         try self.emitErrorAt(
             initializer_location,
