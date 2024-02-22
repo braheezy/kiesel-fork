@@ -1043,10 +1043,10 @@ pub const ArrayPrototype = struct {
 
             // d. If fromPresent is true, then
             if (from_present) {
-                // i. Let fromVal be ? Get(O, fromKey).
+                // i. Let fromValue be ? Get(O, fromKey).
                 const from_value = try object.get(from_key);
 
-                // ii. Perform ? Set(O, toKey, fromVal, true).
+                // ii. Perform ? Set(O, toKey, fromValue, true).
                 try object.set(to_key, from_value, .throw);
             }
             // e. Else,
@@ -2222,10 +2222,10 @@ pub const ArrayPrototype = struct {
 
             // d. If fromPresent is true, then
             if (from_present) {
-                // i. Let fromVal be ? Get(O, from).
+                // i. Let fromValue be ? Get(O, from).
                 const from_value = try object.get(from);
 
-                // ii. Perform ? Set(O, to, fromVal, true).
+                // ii. Perform ? Set(O, to, fromValue, true).
                 try object.set(to, from_value, .throw);
             }
             // e. Else,
