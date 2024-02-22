@@ -1010,7 +1010,7 @@ fn functionDeclarationInstantiation(
             ),
         };
 
-        // d. Assert: The VariableEnvironment of calleeContext is calleeEnv.
+        // d. Assert: The VariableEnvironment of calleeContext and calleeEnv are the same Environment Record.
         std.debug.assert(
             std.meta.eql(callee_context.ecmascript_code.?.variable_environment, callee_env),
         );

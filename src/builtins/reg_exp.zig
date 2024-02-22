@@ -1115,7 +1115,7 @@ pub const RegExpPrototype = struct {
         // 4. Let previousLastIndex be ? Get(rx, "lastIndex").
         const previous_last_index = try reg_exp.get(PropertyKey.from("lastIndex"));
 
-        // 5. If SameValue(previousLastIndex, +0𝔽) is false, then
+        // 5. If previousLastIndex is not +0𝔽, then
         if (!sameValue(previous_last_index, Value.from(0))) {
             // a. Perform ? Set(rx, "lastIndex", +0𝔽, true).
             try reg_exp.set(PropertyKey.from("lastIndex"), Value.from(0), .throw);

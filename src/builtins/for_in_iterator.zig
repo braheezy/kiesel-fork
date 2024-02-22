@@ -107,8 +107,7 @@ pub const ForInIteratorPrototype = struct {
                 // ii. Remove the first element from O.[[RemainingKeys]].
                 const remaining_key = for_in_iterator.fields.state.remaining_keys.orderedRemove(0);
 
-                // iii. If there does not exist an element v of O.[[VisitedKeys]] such that
-                //      SameValue(r, v) is true, then
+                // iii. If O.[[VisitedKeys]] does not contain r, then
                 if (!for_in_iterator.fields.state.visited_keys.contains(remaining_key)) {
                     // 1. Let desc be ? object.[[GetOwnProperty]](r).
                     const descriptor = try object.internalMethods().getOwnProperty(object, remaining_key);

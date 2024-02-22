@@ -54,7 +54,7 @@ pub fn asFloat(self: Self, agent: *Agent) Allocator.Error!f64 {
 /// 6.1.6.2.1 BigInt::unaryMinus ( x )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-unaryMinus
 pub fn unaryMinus(self: Self) Allocator.Error!Self {
-    // 1.If x is 0ℤ, return 0ℤ.
+    // 1.If x = 0ℤ, return 0ℤ.
     if (self.value.eqlZero()) return self;
 
     // 2. Return -x.
@@ -85,7 +85,7 @@ pub fn exponentiate(base: Self, agent: *Agent, exponent: Self) Agent.Error!Self 
         return agent.throwException(.range_error, "Exponent must be positive", .{});
     }
 
-    // 2. If base is 0ℤ and exponent is 0ℤ, return 1ℤ.
+    // 2. If base = 0ℤ and exponent = 0ℤ, return 1ℤ.
     // NOTE: This also applies if the base is not zero.
     if (exponent.value.eqlZero()) return one;
 
@@ -112,7 +112,7 @@ pub fn multiply(x: Self, agent: *Agent, y: Self) Allocator.Error!Self {
 /// 6.1.6.2.5 BigInt::divide ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-divide
 pub fn divide(x: Self, agent: *Agent, y: Self) Agent.Error!Self {
-    // 1. If y is 0ℤ, throw a RangeError exception.
+    // 1. If y = 0ℤ, throw a RangeError exception.
     if (y.value.eqlZero()) return agent.throwException(.range_error, "Division by zero", .{});
 
     // 2. Let quotient be ℝ(x) / ℝ(y).
@@ -126,10 +126,10 @@ pub fn divide(x: Self, agent: *Agent, y: Self) Agent.Error!Self {
 /// 6.1.6.2.6 BigInt::remainder ( n, d )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-remainder
 pub fn remainder(n: Self, agent: *Agent, d: Self) Agent.Error!Self {
-    // 1. If d is 0ℤ, throw a RangeError exception.
+    // 1. If d = 0ℤ, throw a RangeError exception.
     if (d.value.eqlZero()) return agent.throwException(.range_error, "Division by zero", .{});
 
-    // 2. If n is 0ℤ, return 0ℤ.
+    // 2. If n = 0ℤ, return 0ℤ.
     if (n.value.eqlZero()) return n;
 
     // 3. Let quotient be ℝ(n) / ℝ(d).

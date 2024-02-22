@@ -215,7 +215,7 @@ pub const SymbolConstructor = struct {
         const string_key = try key.toString(agent);
 
         // 2. For each element e of the GlobalSymbolRegistry List, do
-        //     a. If SameValue(e.[[Key]], stringKey) is true, return e.[[Symbol]].
+        //     a. If e.[[Key]] is stringKey, return e.[[Symbol]].
         if (agent.global_symbol_registry.get(string_key.utf8)) |symbol| return Value.from(symbol);
 
         // 3. Assert: GlobalSymbolRegistry does not currently contain an entry for stringKey.

@@ -2646,7 +2646,7 @@ pub const TypedArrayPrototype = struct {
             // a. Let Pk be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
 
-            // b. If k is actualIndex, let fromValue be numericValue.
+            // b. If k = actualIndex, let fromValue be numericValue.
             // c. Else, let fromValue be ! Get(O, Pk).
             const from_value = if (k == actual_index)
                 numeric_value

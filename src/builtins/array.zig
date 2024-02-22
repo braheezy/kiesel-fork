@@ -2807,7 +2807,7 @@ pub const ArrayPrototype = struct {
         // 3. Let relativeStart be ? ToIntegerOrInfinity(start).
         const relative_start = if (start) |s| try s.toIntegerOrInfinity(agent) else 0;
 
-        // 4. If relativeStart is -∞, let actualStart be 0.
+        // 4. If relativeStart = -∞, let actualStart be 0.
         const actual_start_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
         }
@@ -3055,7 +3055,7 @@ pub const ArrayPrototype = struct {
             // a. Let Pk be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
 
-            // b. If k is actualIndex, let fromValue be value.
+            // b. If k = actualIndex, let fromValue be value.
             // c. Else, let fromValue be ? Get(O, Pk).
             const from_value = if (k == actual_index)
                 value
