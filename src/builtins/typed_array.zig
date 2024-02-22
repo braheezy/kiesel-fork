@@ -1672,14 +1672,18 @@ pub const TypedArrayPrototype = struct {
             // b. Let element be ! Get(O, ! ToString(𝔽(k))).
             const element = object.get(PropertyKey.from(k)) catch |err| try noexcept(err);
 
-            // c. If element is undefined, let next be the empty String; otherwise, let next be
-            //    ! ToString(element).
-            const next = if (element == .undefined) "" else (try element.toString(agent)).utf8;
+            // c. If element is not undefined, then
+            if (element == .undefined) {
+                // i. Let S be ! ToString(element).
+                const string = element.toString(agent) catch |err| try noexcept(err);
 
-            // d. Set R to the string-concatenation of R and next.
-            try elements.append(next);
+                // ii. Set R to the string-concatenation of R and S.
+                try elements.append(string.utf8);
+            } else {
+                try elements.append("");
+            }
 
-            // e. Set k to k + 1.
+            // d. Set k to k + 1.
         }
 
         // 9. Return R.

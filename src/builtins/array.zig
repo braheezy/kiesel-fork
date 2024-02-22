@@ -1699,17 +1699,18 @@ pub const ArrayPrototype = struct {
             // b. Let element be ? Get(O, ! ToString(𝔽(k))).
             const element = try object.get(PropertyKey.from(k));
 
-            // c. If element is either undefined or null, let next be the empty String; otherwise,
-            //    let next be ? ToString(element).
-            const next = if (element == .undefined or element == .null)
-                ""
-            else
-                (try element.toString(agent)).utf8;
+            // c. If element is neither undefined nor null, then
+            if (element != .undefined and element != .null) {
+                // i. Let S be ? ToString(element).
+                const string = try element.toString(agent);
 
-            // d. Set R to the string-concatenation of R and next.
-            try elements.append(next);
+                // ii. Set R to the string-concatenation of R and S.
+                try elements.append(string.utf8);
+            } else {
+                try elements.append("");
+            }
 
-            // e. Set k to k + 1.
+            // d. Set k to k + 1.
         }
 
         // 8. Return R.
@@ -2669,16 +2670,15 @@ pub const ArrayPrototype = struct {
 
         // 6. Repeat, while k < len,
         while (k < len) : (k += 1) {
-            // a. If k > 0, then
-            // i. Set R to the string-concatenation of R and separator.
+            // a. If k > 0, set R to the string-concatenation of R and separator.
 
-            // b. Let nextElement be ? Get(array, ! ToString(𝔽(k))).
-            const next_element = try array.get(PropertyKey.from(k));
+            // b. Let element be ? Get(array, ! ToString(𝔽(k))).
+            const element = try array.get(PropertyKey.from(k));
 
-            // c. If nextElement is neither undefined nor null, then
-            if (next_element != .undefined and next_element != .null) {
-                // i. Let S be ? ToString(? Invoke(nextElement, "toLocaleString")).
-                const string = try (try next_element.invokeNoArgs(
+            // c. If element is neither undefined nor null, then
+            if (element != .undefined and element != .null) {
+                // i. Let S be ? ToString(? Invoke(element, "toLocaleString")).
+                const string = try (try element.invokeNoArgs(
                     agent,
                     PropertyKey.from("toLocaleString"),
                 )).toString(agent);
