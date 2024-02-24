@@ -7,21 +7,27 @@ const Allocator = std.mem.Allocator;
 
 const ast = @import("ast.zig");
 const ast_printing = @import("ast_printing.zig");
+const builtins = @import("../builtins.zig");
 const bytecode = @import("bytecode.zig");
 const execution = @import("../execution.zig");
+const language = @import("../language.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
+const GraphLoadingState = language.GraphLoadingState;
 const Object = types.Object;
 const Parser = @import("Parser.zig");
 const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
+const String = types.String;
+const Value = types.Value;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const newModuleEnvironment = execution.newModuleEnvironment;
+const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
 
 const Self = @This();
@@ -49,11 +55,142 @@ import_meta: ?Object,
 /// [[HostDefined]]
 host_defined: SafePointer,
 
-// [[HasTLA]]
+/// [[Status]]
+status: Status,
+
+/// [[RequestedModules]]
+requested_modules: std.StringArrayHashMap(void),
+
+/// [[HasTLA]]
 has_tla: bool,
+
+const Status = enum {
+    new,
+    unlinked,
+    linking,
+    linked,
+    evaluating,
+    evaluating_async,
+    evaluated,
+};
 
 pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
     try ast_printing.printModule(self.ecmascript_code, writer, 0);
+}
+
+/// 16.2.1.5.1 LoadRequestedModules ( [ hostDefined ] )
+/// https://tc39.es/ecma262/#sec-LoadRequestedModules
+pub fn loadRequestedModules(
+    self: *Self,
+    agent: *Agent,
+    host_defined: ?SafePointer,
+) Allocator.Error!*builtins.Promise {
+    const realm = agent.currentRealm();
+
+    // 1. If hostDefined is not present, let hostDefined be empty.
+
+    // 2. Let pc be ! NewPromiseCapability(%Promise%).
+    const promise_capability = newPromiseCapability(
+        agent,
+        Value.from(try realm.intrinsics.@"%Promise%"()),
+    ) catch |err| try noexcept(err);
+
+    // 3. Let state be the GraphLoadingState Record {
+    //      [[IsLoading]]: true, [[PendingModulesCount]]: 1, [[Visited]]: « »,
+    //      [[PromiseCapability]]: pc, [[HostDefined]]: hostDefined
+    //    }.
+    const state = try agent.gc_allocator.create(GraphLoadingState);
+    state.* = .{
+        .is_loading = true,
+        .pending_modules_count = 1,
+        .visited = GraphLoadingState.Visited.init(agent.gc_allocator),
+        .promise_capability = promise_capability,
+        .host_defined = host_defined orelse SafePointer.null_pointer,
+    };
+
+    // 4. Perform InnerModuleLoading(state, module).
+    try innerModuleLoading(agent, state, self);
+
+    // 5. Return pc.[[Promise]].
+    return promise_capability.promise.as(builtins.Promise);
+}
+
+/// 16.2.1.5.1.1 InnerModuleLoading ( state, module )
+fn innerModuleLoading(
+    agent: *Agent,
+    state: *GraphLoadingState,
+    module: *Self,
+) Allocator.Error!void {
+    // 1. Assert: state.[[IsLoading]] is true.
+    std.debug.assert(state.is_loading);
+
+    // 2. If module is a Cyclic Module Record, module.[[Status]] is new, and state.[[Visited]] does
+    //    not contain module, then
+    if (module.status == .new and !state.visited.contains(module)) {
+        // a. Append module to state.[[Visited]].
+        try state.visited.putNoClobber(module, {});
+
+        // b. Let requestedModulesCount be the number of elements in module.[[RequestedModules]].
+        const requested_modules_count = module.requested_modules.count();
+
+        // c. Set state.[[PendingModulesCount]] to state.[[PendingModulesCount]] +
+        //    requestedModulesCount.
+        state.pending_modules_count += requested_modules_count;
+
+        // d. For each String required of module.[[RequestedModules]], do
+        for (module.requested_modules.keys()) |required| {
+            // TODO: i. If module.[[LoadedModules]] contains a Record whose [[Specifier]] is required, then
+            if (false) {
+                // TODO: 1. Let record be that Record.
+                // TODO: 2. Perform InnerModuleLoading(state, record.[[Module]]).
+            }
+            // ii. Else,
+            else {
+                // 1. Perform HostLoadImportedModule(module, required, state.[[HostDefined]], state).
+                // 2. NOTE: HostLoadImportedModule will call FinishLoadingImportedModule, which
+                //    re-enters the graph loading process through ContinueModuleLoading.
+                try agent.host_hooks.hostLoadImportedModule(
+                    agent,
+                    .{ .module = module },
+                    String.from(required),
+                    state.host_defined,
+                    .{ .graph_loading_state = state },
+                );
+            }
+
+            // iii. If state.[[IsLoading]] is false, return unused.
+            if (!state.is_loading) return;
+        }
+    }
+
+    // 3. Assert: state.[[PendingModulesCount]] ≥ 1.
+    std.debug.assert(state.pending_modules_count >= 1);
+
+    // 4. Set state.[[PendingModulesCount]] to state.[[PendingModulesCount]] - 1.
+    state.pending_modules_count -= 1;
+
+    // 5. If state.[[PendingModulesCount]] = 0, then
+    if (state.pending_modules_count == 0) {
+        // a. Set state.[[IsLoading]] to false.
+        state.is_loading = false;
+
+        // b. For each Cyclic Module Record loaded of state.[[Visited]], do
+        var it = state.visited.keyIterator();
+        while (it.next()) |ptr| {
+            const loaded = ptr.*;
+
+            // i. If loaded.[[Status]] is new, set loaded.[[Status]] to unlinked.
+            if (loaded.status == .new) loaded.status = .unlinked;
+        }
+
+        // c. Perform ! Call(state.[[PromiseCapability]].[[Resolve]], undefined, « undefined »).
+        _ = Value.from(state.promise_capability.resolve).callAssumeCallable(
+            .undefined,
+            &.{.undefined},
+        ) catch |err| try noexcept(err);
+    }
+
+    // 6. Return unused.
 }
 
 /// 16.2.1.6.1 ParseModule ( sourceText, realm, hostDefined )
@@ -71,6 +208,7 @@ pub fn parse(
     const body = try Parser.parse(ast.Module, agent.gc_allocator, source_text, ctx);
 
     // TODO: 3-11.
+    const requested_modules = std.StringArrayHashMap(void).init(agent.gc_allocator);
     const @"async" = false;
 
     // 12. Return Source Text Module Record {
@@ -89,10 +227,12 @@ pub fn parse(
         .environment = null,
         .namespace = null,
         .has_tla = @"async",
+        .status = .new,
         .host_defined = host_defined orelse SafePointer.null_pointer,
         .ecmascript_code = body,
         .context = null,
         .import_meta = null,
+        .requested_modules = requested_modules,
     };
     return self;
 }

@@ -24,11 +24,43 @@ const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
 const performPromiseThen = builtins.performPromiseThen;
 
+/// 16.2.1.4 Abstract Module Records
+/// https://tc39.es/ecma262/#sec-abstract-module-records
 pub const Module = union(enum) {
+    const Self = @This();
+
     source_text_module: *SourceTextModule,
+
+    pub fn loadRequestedModules(
+        self: Self,
+        agent: *Agent,
+        host_defined: ?SafePointer,
+    ) Allocator.Error!*builtins.Promise {
+        return switch (self) {
+            inline else => |module| module.loadRequestedModules(agent, host_defined),
+        };
+    }
 };
 
-pub const GraphLoadingState = struct {};
+/// https://tc39.es/ecma262/#graphloadingstate-record
+pub const GraphLoadingState = struct {
+    pub const Visited = std.AutoHashMap(*SourceTextModule, void);
+
+    /// [[PromiseCapability]]
+    promise_capability: PromiseCapability,
+
+    /// [[IsLoading]]
+    is_loading: bool,
+
+    /// [[PendingModulesCount]]
+    pending_modules_count: usize,
+
+    /// [[Visited]]
+    visited: Visited,
+
+    /// [[HostDefined]]
+    host_defined: SafePointer,
+};
 
 pub const ImportedModuleReferrer = union(enum) {
     script: *Script,
@@ -37,7 +69,7 @@ pub const ImportedModuleReferrer = union(enum) {
 };
 
 pub const ImportedModulePayload = union(enum) {
-    graph_loading_state: GraphLoadingState,
+    graph_loading_state: *GraphLoadingState,
     promise_capability: PromiseCapability,
 };
 
@@ -67,30 +99,8 @@ fn continueDynamicImport(
         },
     };
 
-    // TODO: 3. Let loadPromise be module.LoadRequestedModules().
-    const load_promise = blk: {
-        const realm = agent.currentRealm();
-
-        // From 16.2.1.5.1 LoadRequestedModules ( [ hostDefined ] )
-        // 2. Let pc be ! NewPromiseCapability(%Promise%).
-        const capability = newPromiseCapability(
-            agent,
-            Value.from(try realm.intrinsics.@"%Promise%"()),
-        ) catch |err| try noexcept(err);
-
-        // 4. Perform InnerModuleLoading(state, module).
-        {
-            // From 16.2.1.5.1.1 InnerModuleLoading ( state, module )
-            // c. Perform ! Call(state.[[PromiseCapability]].[[Resolve]], undefined, « undefined »).
-            _ = Value.from(capability.resolve).callAssumeCallable(
-                .undefined,
-                &.{.undefined},
-            ) catch |err| try noexcept(err);
-        }
-
-        // 5. Return pc.[[Promise]].
-        break :blk capability.promise.as(builtins.Promise);
-    };
+    // 3. Let loadPromise be module.LoadRequestedModules().
+    const load_promise = try module.loadRequestedModules(agent, null);
 
     const RejectedClosureCaptures = struct {
         promise_capability: PromiseCapability,
