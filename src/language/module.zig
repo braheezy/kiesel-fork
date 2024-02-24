@@ -47,6 +47,12 @@ pub const Module = union(enum) {
             inline else => |module| module.link(agent),
         };
     }
+
+    pub fn evaluate(self: Self, agent: *Agent) Allocator.Error!*builtins.Promise {
+        return switch (self) {
+            inline else => |module| module.evaluate(agent),
+        };
+    }
 };
 
 /// https://tc39.es/ecma262/#graphloadingstate-record
@@ -185,26 +191,8 @@ fn continueDynamicImport(
                 },
             };
 
-            // TODO: c. Let evaluatePromise be module.Evaluate().
-            const evaluate_promise = blk: {
-                const realm = agent_.currentRealm();
-
-                // From 16.2.1.5.3 Evaluate ( )
-                // 6. Let capability be ! NewPromiseCapability(%Promise%).
-                const capability = newPromiseCapability(
-                    agent_,
-                    Value.from(try realm.intrinsics.@"%Promise%"()),
-                ) catch |err| try noexcept(err);
-
-                // ii. Perform ! Call(capability.[[Resolve]], undefined, « undefined »).
-                _ = Value.from(capability.resolve).callAssumeCallable(
-                    .undefined,
-                    &.{.undefined},
-                ) catch |err| try noexcept(err);
-
-                // 11. Return capability.[[Promise]].
-                break :blk capability.promise.as(builtins.Promise);
-            };
+            // c. Let evaluatePromise be module.Evaluate().
+            const evaluate_promise = try module_.evaluate(agent_);
 
             const FulfilledClosureCaptures = struct {
                 module: Module,

@@ -60,6 +60,9 @@ host_defined: SafePointer,
 /// [[Status]]
 status: Status,
 
+/// [[EvaluationError]]
+evaluation_error: ?Value,
+
 /// [[DFSIndex]]
 dfs_index: ?usize,
 
@@ -72,8 +75,20 @@ requested_modules: std.StringArrayHashMap(void),
 /// [[LoadedModules]]
 loaded_modules: std.StringArrayHashMap(Module),
 
+/// [[CycleRoot]]
+cycle_root: ?*Self,
+
 /// [[HasTLA]]
 has_tla: bool,
+
+/// [[AsyncEvaluation]]
+async_evaluation: bool,
+
+/// [[TopLevelCapability]]
+top_level_capability: ?PromiseCapability,
+
+/// [[PendingAsyncDependencies]]
+pending_async_dependencies: ?usize,
 
 const Status = enum {
     new,
@@ -424,8 +439,13 @@ pub fn parse(
         .realm = realm,
         .environment = null,
         .namespace = null,
+        .cycle_root = null,
         .has_tla = @"async",
+        .async_evaluation = false,
+        .top_level_capability = null,
+        .pending_async_dependencies = null,
         .status = .new,
+        .evaluation_error = null,
         .host_defined = host_defined orelse SafePointer.null_pointer,
         .ecmascript_code = body,
         .context = null,
@@ -436,6 +456,283 @@ pub fn parse(
         .dfs_ancestor_index = null,
     };
     return self;
+}
+
+/// 16.2.1.5.3 Evaluate ( )
+/// https://tc39.es/ecma262/#sec-moduleevaluation
+pub fn evaluate(self: *Self, agent: *Agent) Allocator.Error!*builtins.Promise {
+    const realm = agent.currentRealm();
+    var module = self;
+
+    // TODO: 1. Assert: This call to Evaluate is not happening at the same time as another call to
+    //          Evaluate within the surrounding agent.
+
+    // 2. Assert: module.[[Status]] is one of linked, evaluating-async, or evaluated.
+    std.debug.assert(switch (self.status) {
+        .linked, .evaluating_async, .evaluated => true,
+        else => false,
+    });
+
+    // 3. If module.[[Status]] is either evaluating-async or evaluated, set module to
+    //    module.[[CycleRoot]].
+    if (switch (self.status) {
+        .evaluating_async, .evaluated => true,
+        else => false,
+    }) {
+        module = module.cycle_root.?;
+    }
+
+    // 4. If module.[[TopLevelCapability]] is not empty, then
+    if (module.top_level_capability) |top_level_capability| {
+        // a. Return module.[[TopLevelCapability]].[[Promise]].
+        return top_level_capability.promise.as(builtins.Promise);
+    }
+
+    // 5. Let stack be a new empty List.
+    var stack = std.ArrayList(*Self).init(agent.gc_allocator);
+    defer stack.deinit();
+
+    // 6. Let capability be ! NewPromiseCapability(%Promise%).
+    const capability = newPromiseCapability(
+        agent,
+        Value.from(try realm.intrinsics.@"%Promise%"()),
+    ) catch |err| try noexcept(err);
+
+    // 7. Set module.[[TopLevelCapability]] to capability.
+    module.top_level_capability = capability;
+
+    // 8. Let result be Completion(InnerModuleEvaluation(module, stack, 0)).
+    const result = innerModuleEvaluation(agent, .{ .source_text_module = module }, &stack, 0);
+
+    // 9. If result is an abrupt completion, then
+    if (std.meta.isError(result)) _ = result catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+
+        error.ExceptionThrown => {
+            const exception = agent.clearException();
+
+            // a. For each Cyclic Module Record m of stack, do
+            for (stack.items) |m| {
+                // i. Assert: m.[[Status]] is evaluating.
+                std.debug.assert(m.status == .evaluating);
+
+                // ii. Set m.[[Status]] to evaluated.
+                m.status = .evaluated;
+
+                // iii. Set m.[[EvaluationError]] to result.
+                m.evaluation_error = exception;
+            }
+
+            // b. Assert: module.[[Status]] is evaluated.
+            std.debug.assert(module.status == .evaluated);
+
+            // c. Assert: module.[[EvaluationError]] and result are the same Completion Record.
+
+            // d. Perform ! Call(capability.[[Reject]], undefined, « result.[[Value]] »).
+            _ = Value.from(capability.reject).callAssumeCallable(
+                .undefined,
+                &.{exception},
+            ) catch |err_| try noexcept(err_);
+        },
+    }
+    // 10. Else,
+    else {
+        // a. Assert: module.[[Status]] is either evaluating-async or evaluated.
+        std.debug.assert(switch (module.status) {
+            .evaluating_async, .evaluated => true,
+            else => false,
+        });
+
+        // b. Assert: module.[[EvaluationError]] is empty.
+        std.debug.assert(module.evaluation_error == null);
+
+        // c. If module.[[AsyncEvaluation]] is false, then
+        if (!module.async_evaluation) {
+            // i. Assert: module.[[Status]] is evaluated.
+            std.debug.assert(module.status == .evaluated);
+
+            // ii. Perform ! Call(capability.[[Resolve]], undefined, « undefined »).
+            _ = Value.from(capability.resolve).callAssumeCallable(
+                .undefined,
+                &.{.undefined},
+            ) catch |err| try noexcept(err);
+        }
+
+        // d. Assert: stack is empty.
+        std.debug.assert(stack.items.len == 0);
+    }
+
+    // 11. Return capability.[[Promise]].
+    return capability.promise.as(builtins.Promise);
+}
+
+/// 16.2.1.5.3.1 InnerModuleEvaluation ( module, stack, index )
+/// https://tc39.es/ecma262/#sec-innermoduleevaluation
+fn innerModuleEvaluation(
+    agent: *Agent,
+    module: Module,
+    stack: *std.ArrayList(*Self),
+    index: usize,
+) Agent.Error!usize {
+    // 1. If module is not a Cyclic Module Record, then
+    if (module != .source_text_module) {
+        // a. Let promise be ! module.Evaluate().
+        const promise = module.evaluate(agent) catch |err| try noexcept(err);
+
+        // b. Assert: promise.[[PromiseState]] is not pending.
+        std.debug.assert(promise.fields.promise_state != .pending);
+
+        // c. If promise.[[PromiseState]] is rejected, then
+        if (promise.fields.promise_state == .rejected) {
+            // i. Return ThrowCompletion(promise.[[PromiseResult]]).
+            agent.exception = promise.fields.promise_result;
+            return error.ExceptionThrown;
+        }
+
+        // d. Return index.
+        return index;
+    }
+
+    // 2. If module.[[Status]] is either evaluating-async or evaluated, then
+    if (switch (module.source_text_module.status) {
+        .evaluating_async, .evaluated => true,
+        else => false,
+    }) {
+        // a. If module.[[EvaluationError]] is empty, return index.
+        if (module.source_text_module.evaluation_error == null) return index;
+
+        // b. Otherwise, return ? module.[[EvaluationError]].
+        agent.exception = module.source_text_module.evaluation_error.?;
+        return error.ExceptionThrown;
+    }
+
+    // 3. If module.[[Status]] is evaluating, return index.
+    if (module.source_text_module.status == .evaluating) return index;
+
+    // 4. Assert: module.[[Status]] is linked.
+    std.debug.assert(module.source_text_module.status == .linked);
+
+    // 5. Set module.[[Status]] to evaluating.
+    module.source_text_module.status = .evaluating;
+
+    // 6. Set module.[[DFSIndex]] to index.
+    module.source_text_module.dfs_index = index;
+
+    // 7. Set module.[[DFSAncestorIndex]] to index.
+    module.source_text_module.dfs_ancestor_index = index;
+
+    // 8. Set module.[[PendingAsyncDependencies]] to 0.
+    module.source_text_module.pending_async_dependencies = 0;
+
+    // 9. Set index to index + 1.
+    var new_index = index + 1;
+
+    // 10. Append module to stack.
+    try stack.append(module.source_text_module);
+
+    // 11. For each String required of module.[[RequestedModules]], do
+    for (module.source_text_module.requested_modules.keys()) |required| {
+        // a. Let requiredModule be GetImportedModule(module, required).
+        var required_module = getImportedModule(module.source_text_module, String.from(required));
+
+        // b. Set index to ? InnerModuleEvaluation(requiredModule, stack, index).
+        new_index = try innerModuleEvaluation(agent, required_module, stack, new_index);
+
+        // c. If requiredModule is a Cyclic Module Record, then
+        if (required_module == .source_text_module) {
+            // i. Assert: requiredModule.[[Status]] is one of evaluating, evaluating-async, or
+            //    evaluated.
+
+            // ii. Assert: requiredModule.[[Status]] is evaluating if and only if stack contains
+            //     requiredModule.
+            std.debug.assert(if (std.mem.indexOfScalar(*Self, stack.items, required_module.source_text_module) != null)
+                required_module.source_text_module.status == .evaluating
+            else
+                required_module.source_text_module.status != .evaluating);
+
+            // iii. If requiredModule.[[Status]] is evaluating, then
+            if (required_module.source_text_module.status == .evaluating) {
+                // 1. Set module.[[DFSAncestorIndex]] to min(module.[[DFSAncestorIndex]],
+                //    requiredModule.[[DFSAncestorIndex]]).
+                module.source_text_module.dfs_ancestor_index = @min(
+                    module.source_text_module.dfs_ancestor_index.?,
+                    required_module.source_text_module.dfs_ancestor_index.?,
+                );
+            }
+            // iv. Else,
+            else {
+                // 1. Set requiredModule to requiredModule.[[CycleRoot]].
+                required_module = .{ .source_text_module = required_module.source_text_module.cycle_root.? };
+
+                // 2. Assert: requiredModule.[[Status]] is either evaluating-async or evaluated.
+                std.debug.assert(switch (required_module.source_text_module.status) {
+                    .evaluating_async, .evaluated => true,
+                    else => false,
+                });
+
+                // 3. If requiredModule.[[EvaluationError]] is not empty, return
+                //    ? requiredModule.[[EvaluationError]].
+                if (required_module.source_text_module.evaluation_error) |evaluation_error| {
+                    agent.exception = evaluation_error;
+                    return error.ExceptionThrown;
+                }
+            }
+
+            // v. If requiredModule.[[AsyncEvaluation]] is true, then
+            if (required_module.source_text_module.async_evaluation) {
+                // 1. Set module.[[PendingAsyncDependencies]] to module.[[PendingAsyncDependencies]] + 1.
+                module.source_text_module.pending_async_dependencies.? += 1;
+
+                // TODO: 2. Append module to requiredModule.[[AsyncParentModules]].
+            }
+        }
+    }
+
+    // 12. If module.[[PendingAsyncDependencies]] > 0 or module.[[HasTLA]] is true, then
+    if (module.source_text_module.pending_async_dependencies.? > 0 or module.source_text_module.has_tla) {
+        // a. Assert: module.[[AsyncEvaluation]] is false and was never previously set to true.
+        // b. Set module.[[AsyncEvaluation]] to true.
+        // c. NOTE: The order in which module records have their [[AsyncEvaluation]] fields
+        //    transition to true is significant. (See 16.2.1.5.3.4.)
+        module.source_text_module.async_evaluation = true;
+
+        // TODO: d. If module.[[PendingAsyncDependencies]] = 0, perform ExecuteAsyncModule(module).
+    }
+    // 13. Else,
+    else {
+        // a. Perform ? module.ExecuteModule().
+        try module.source_text_module.executeModule(null);
+    }
+
+    // 14. Assert: module occurs exactly once in stack.
+
+    // 15. Assert: module.[[DFSAncestorIndex]] ≤ module.[[DFSIndex]].
+    std.debug.assert(module.source_text_module.dfs_ancestor_index.? <= module.source_text_module.dfs_index.?);
+
+    // 16. If module.[[DFSAncestorIndex]] = module.[[DFSIndex]], then
+    if (module.source_text_module.dfs_ancestor_index == module.source_text_module.dfs_index) {
+        // a. Let done be false.
+        // b. Repeat, while done is false,
+        while (true) {
+            // i. Let requiredModule be the last element of stack.
+            // ii. Remove the last element of stack.
+            // iii. Assert: requiredModule is a Cyclic Module Record.
+            const required_module = stack.pop();
+
+            // iv. If requiredModule.[[AsyncEvaluation]] is false, set requiredModule.[[Status]] to evaluated.
+            // v. Otherwise, set requiredModule.[[Status]] to evaluating-async.
+            required_module.status = if (!required_module.async_evaluation) .evaluated else .evaluating_async;
+
+            // vi. If requiredModule and module are the same Module Record, set done to true.
+            if (required_module == module.source_text_module) break;
+
+            // vii. Set requiredModule.[[CycleRoot]] to module.
+            required_module.cycle_root = module.source_text_module;
+        }
+    }
+
+    // 17. Return index.
+    return new_index;
 }
 
 /// 16.2.1.6.4 InitializeEnvironment ( )
