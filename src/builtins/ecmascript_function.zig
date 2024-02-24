@@ -943,22 +943,23 @@ fn functionDeclarationInstantiation(
         if (var_declaration == .hoistable_declaration) {
             // i. Assert: d is either a FunctionDeclaration, a GeneratorDeclaration, an
             //    AsyncFunctionDeclaration, or an AsyncGeneratorDeclaration.
+            const hoistable_declaration = var_declaration.hoistable_declaration;
 
             // ii. Let fn be the sole element of the BoundNames of d.
-            const function_name = switch (var_declaration.hoistable_declaration) {
+            const function_name = switch (hoistable_declaration) {
                 inline else => |function_declaration| function_declaration.identifier,
             }.?;
 
             // iii. If functionNames does not contain fn, then
             if (!function_names.contains(function_name)) {
                 // 1. Insert fn as the first element of functionNames.
-                try function_names.put(function_name, {});
+                try function_names.putNoClobber(function_name, {});
 
                 // 2. NOTE: If there are multiple function declarations for the same name, the last
                 //    declaration is used.
                 // 3. Insert d as the first element of functionsToInitialize.
                 // NOTE: AFAICT the order isn't observable, so we can append.
-                try functions_to_initialize.append(var_declaration.hoistable_declaration);
+                try functions_to_initialize.append(hoistable_declaration);
             }
         }
     }

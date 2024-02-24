@@ -12,6 +12,7 @@ const types = @import("../types.zig");
 const Agent = execution.Agent;
 const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
+const GlobalEnvironment = execution.GlobalEnvironment;
 const Parser = @import("Parser.zig");
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
@@ -100,50 +101,8 @@ pub fn evaluate(self: *Self) Agent.Error!Value {
     // 11. Let script be scriptRecord.[[ECMAScriptCode]].
     const script = self.ecmascript_code;
 
-    // TODO: 12. Let result be Completion(GlobalDeclarationInstantiation(script, globalEnv)).
-    // NOTE: This is totally ad-hoc for now.
-    const var_scoped_declarations = try script.varScopedDeclarations(agent.gc_allocator);
-    defer agent.gc_allocator.free(var_scoped_declarations);
-    var seen = std.StringHashMap(void).init(agent.gc_allocator);
-    defer seen.deinit();
-    for (var_scoped_declarations) |var_declaration| {
-        const var_name = switch (var_declaration) {
-            .variable_declaration => |variable_declaration| variable_declaration.binding_identifier,
-            .hoistable_declaration => |hoistable_declaration| switch (hoistable_declaration) {
-                inline else => |function_declaration| function_declaration.identifier,
-            },
-        }.?;
-        if (!seen.contains(var_name)) {
-            if (var_declaration == .hoistable_declaration) {
-                const env = Environment{ .global_environment = global_env };
-                const private_env = null;
-
-                var hoistable_declaration = var_declaration.hoistable_declaration;
-                switch (hoistable_declaration) {
-                    inline else => |*function_declaration| {
-                        // Assign the function body's strictness, which is needed for the deferred bytecode generation.
-                        // FIXME: This should ideally happen at parse time.
-                        function_declaration.function_body.strict = self.ecmascript_code.isStrict() or
-                            function_declaration.function_body.functionBodyContainsUseStrict();
-                    },
-                }
-
-                const function_object = try switch (hoistable_declaration) {
-                    .function_declaration => |function_declaration| function_declaration.instantiateOrdinaryFunctionObject(agent, env, private_env),
-                    .generator_declaration => |generator_declaration| generator_declaration.instantiateGeneratorFunctionObject(agent, env, private_env),
-                    .async_function_declaration => |async_function_declaration| async_function_declaration.instantiateAsyncFunctionObject(agent, env, private_env),
-                    .async_generator_declaration => |async_generator_declaration| async_generator_declaration.instantiateAsyncGeneratorFunctionObject(agent, env, private_env),
-                };
-
-                try global_env.createGlobalFunctionBinding(var_name, Value.from(function_object), false);
-            } else {
-                try global_env.createGlobalVarBinding(agent, var_name, false);
-            }
-            try seen.putNoClobber(var_name, {});
-        }
-    }
-
-    const result_no_value: error{ExceptionThrown}!void = {};
+    // 12. Let result be Completion(GlobalDeclarationInstantiation(script, globalEnv)).
+    const result_no_value = globalDeclarationInstantiation(agent, script, global_env);
 
     // 13. If result is a normal completion, then
     const result = if (result_no_value) |_| blk: {
@@ -167,4 +126,156 @@ pub fn evaluate(self: *Self) Agent.Error!Value {
 
     // 17. Return ? result.
     return try result;
+}
+
+/// 16.1.7 GlobalDeclarationInstantiation ( script, env )
+/// https://tc39.es/ecma262/#sec-globaldeclarationinstantiation
+fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *GlobalEnvironment) Agent.Error!void {
+    // TODO: 1. Let lexNames be the LexicallyDeclaredNames of script.
+
+    // 2. Let varNames be the VarDeclaredNames of script.
+    const var_names = try script.varDeclaredNames(agent.gc_allocator);
+    defer agent.gc_allocator.free(var_names);
+
+    // TODO: 3. For each element name of lexNames, do
+
+    // 4. For each element name of varNames, do
+    for (var_names) |name| {
+        // a. If env.HasLexicalDeclaration(name) is true, throw a SyntaxError exception.
+        if (env.hasLexicalDeclaration(name)) {
+            return agent.throwException(
+                .syntax_error,
+                "Global environment already has a lexical declaration '{s}'",
+                .{name},
+            );
+        }
+    }
+
+    // 5. Let varDeclarations be the VarScopedDeclarations of script.
+    const var_declarations = try script.varScopedDeclarations(agent.gc_allocator);
+    defer agent.gc_allocator.free(var_declarations);
+
+    // 6. Let functionsToInitialize be a new empty List.
+    var functions_to_initialize = std.ArrayList(ast.HoistableDeclaration).init(agent.gc_allocator);
+    defer functions_to_initialize.deinit();
+
+    // 7. Let declaredFunctionNames be a new empty List.
+    var declared_function_names = std.StringHashMap(void).init(agent.gc_allocator);
+    defer declared_function_names.deinit();
+
+    // 8. For each element d of varDeclarations, in reverse List order, do
+    var it = std.mem.reverseIterator(var_declarations);
+    while (it.next()) |var_declaration| {
+        // a. If d is not either a VariableDeclaration, a ForBinding, or a BindingIdentifier, then
+        if (var_declaration == .hoistable_declaration) {
+            // i. Assert: d is either a FunctionDeclaration, a GeneratorDeclaration, an
+            //    AsyncFunctionDeclaration, or an AsyncGeneratorDeclaration.
+            const hoistable_declaration = var_declaration.hoistable_declaration;
+
+            // ii. NOTE: If there are multiple function declarations for the same name, the last
+            //     declaration is used.
+
+            // iii. Let fn be the sole element of the BoundNames of d.
+            const function_name = switch (hoistable_declaration) {
+                inline else => |function_declaration| function_declaration.identifier,
+            }.?;
+
+            // iv. If declaredFunctionNames does not contain fn, then
+            if (!declared_function_names.contains(function_name)) {
+                // TODO: 1. Let fnDefinable be ? env.CanDeclareGlobalFunction(fn).
+                // TODO: 2. If fnDefinable is false, throw a TypeError exception.
+
+                // 3. Append fn to declaredFunctionNames.
+                try declared_function_names.putNoClobber(function_name, {});
+
+                // 4. Insert d as the first element of functionsToInitialize.
+                // NOTE: AFAICT the order isn't observable, so we can append.
+                try functions_to_initialize.append(hoistable_declaration);
+            }
+        }
+    }
+
+    // 9. Let declaredVarNames be a new empty List.
+    var declared_var_names = std.StringHashMap(void).init(agent.gc_allocator);
+    defer declared_var_names.deinit();
+
+    // 10. For each element d of varDeclarations, do
+    for (var_declarations) |var_declaration| {
+        // a. If d is either a VariableDeclaration, a ForBinding, or a BindingIdentifier, then
+        if (var_declaration == .variable_declaration) {
+            // TODO: Update this when binding patterns are supported.
+            const bound_names: []const ast.Identifier = &.{
+                var_declaration.variable_declaration.binding_identifier,
+            };
+
+            // i. For each String vn of the BoundNames of d, do
+            for (bound_names) |var_name| {
+                // 1. If declaredFunctionNames does not contain vn, then
+                if (!declared_function_names.contains(var_name)) {
+                    // TODO: a. Let vnDefinable be ? env.CanDeclareGlobalVar(vn).
+                    // TODO: b. If vnDefinable is false, throw a TypeError exception.
+
+                    // c. If declaredVarNames does not contain vn, then
+                    if (!declared_var_names.contains(var_name)) {
+                        // i. Append vn to declaredVarNames.
+                        try declared_var_names.putNoClobber(var_name, {});
+                    }
+                }
+            }
+        }
+    }
+
+    // 11. NOTE: No abnormal terminations occur after this algorithm step if the global object is
+    //     an ordinary object. However, if the global object is a Proxy exotic object it may
+    //     exhibit behaviours that cause abnormal terminations in some of the following steps.
+
+    // 12. NOTE: Annex B.3.2.2 adds additional steps at this point.
+
+    // TODO: 13. Let lexDeclarations be the LexicallyScopedDeclarations of script.
+
+    // 14. Let privateEnv be null.
+    const private_env = null;
+
+    // TODO: 15. For each element d of lexDeclarations, do
+
+    // 16. For each Parse Node f of functionsToInitialize, do
+    for (functions_to_initialize.items) |*ptr| {
+        var hoistable_declaration = ptr.*;
+
+        switch (hoistable_declaration) {
+            inline else => |*function_declaration| {
+                // Assign the function body's strictness, which is needed for the deferred bytecode generation.
+                // FIXME: This should ideally happen at parse time.
+                function_declaration.function_body.strict = script.isStrict() or
+                    function_declaration.function_body.functionBodyContainsUseStrict();
+            },
+        }
+
+        // a. Let fn be the sole element of the BoundNames of f.
+        const function_name = switch (hoistable_declaration) {
+            inline else => |function_declaration| function_declaration.identifier,
+        }.?;
+
+        // b. Let fo be InstantiateFunctionObject of f with arguments env and privateEnv.
+        const function_object = try switch (hoistable_declaration) {
+            .function_declaration => |function_declaration| function_declaration.instantiateOrdinaryFunctionObject(agent, .{ .global_environment = env }, private_env),
+            .generator_declaration => |generator_declaration| generator_declaration.instantiateGeneratorFunctionObject(agent, .{ .global_environment = env }, private_env),
+            .async_function_declaration => |async_function_declaration| async_function_declaration.instantiateAsyncFunctionObject(agent, .{ .global_environment = env }, private_env),
+            .async_generator_declaration => |async_generator_declaration| async_generator_declaration.instantiateAsyncGeneratorFunctionObject(agent, .{ .global_environment = env }, private_env),
+        };
+
+        // c. Perform ? env.CreateGlobalFunctionBinding(fn, fo, false).
+        try env.createGlobalFunctionBinding(function_name, Value.from(function_object), false);
+    }
+
+    // 17. For each String vn of declaredVarNames, do
+    var it_ = declared_var_names.keyIterator();
+    while (it_.next()) |ptr| {
+        const var_name = ptr.*;
+
+        // a. Perform ? env.CreateGlobalVarBinding(vn, false).
+        try env.createGlobalVarBinding(agent, var_name, false);
+    }
+
+    // 18. Return unused.
 }
