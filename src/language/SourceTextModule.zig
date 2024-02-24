@@ -18,6 +18,7 @@ const Agent = execution.Agent;
 const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
 const GraphLoadingState = language.GraphLoadingState;
+const Module = language.Module;
 const Object = types.Object;
 const Parser = @import("Parser.zig");
 const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
@@ -191,6 +192,42 @@ fn innerModuleLoading(
     }
 
     // 6. Return unused.
+}
+
+/// 16.2.1.5.1.2 ContinueModuleLoading ( state, moduleCompletion )
+/// https://tc39.es/ecma262/#sec-ContinueModuleLoading
+pub fn continueModuleLoading(
+    agent: *Agent,
+    state: *GraphLoadingState,
+    module_completion: Agent.Error!Module,
+) Allocator.Error!void {
+    // 1. If state.[[IsLoading]] is false, return unused.
+    if (!state.is_loading) return;
+
+    // 2. If moduleCompletion is a normal completion, then
+    if (module_completion) |module| {
+        // a. Perform InnerModuleLoading(state, moduleCompletion.[[Value]]).
+        try innerModuleLoading(agent, state, module.source_text_module);
+    }
+    // 3. Else,
+    else |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+
+        error.ExceptionThrown => {
+            const exception = agent.clearException();
+
+            // a. Set state.[[IsLoading]] to false.
+            state.is_loading = false;
+
+            // b. Perform ! Call(state.[[PromiseCapability]].[[Reject]], undefined, « moduleCompletion.[[Value]] »).
+            _ = Value.from(state.promise_capability.reject).callAssumeCallable(
+                .undefined,
+                &.{exception},
+            ) catch |err_| try noexcept(err_);
+        },
+    }
+
+    // 4. Return unused.
 }
 
 /// 16.2.1.6.1 ParseModule ( sourceText, realm, hostDefined )

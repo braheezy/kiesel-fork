@@ -18,6 +18,7 @@ const Script = language.Script;
 const SourceTextModule = language.SourceTextModule;
 const String = types.String;
 const Value = types.Value;
+const continueModuleLoading = language.continueModuleLoading;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const moduleNamespaceCreate = builtins.moduleNamespaceCreate;
 const newPromiseCapability = builtins.newPromiseCapability;
@@ -289,8 +290,9 @@ pub fn finishLoadingImportedModule(
 
     switch (payload) {
         // 2. If payload is a GraphLoadingState Record, then
-        .graph_loading_state => {
-            // TODO: a. Perform ContinueModuleLoading(payload, result).
+        .graph_loading_state => |graph_loading_state| {
+            // a. Perform ContinueModuleLoading(payload, result).
+            try continueModuleLoading(agent, graph_loading_state, result);
         },
         // 3. Else,
         .promise_capability => |promise_capability| {
