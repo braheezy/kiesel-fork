@@ -73,7 +73,7 @@ dfs_ancestor_index: ?usize,
 requested_modules: std.StringArrayHashMap(void),
 
 /// [[LoadedModules]]
-loaded_modules: std.StringArrayHashMap(Module),
+loaded_modules: std.StringHashMap(Module),
 
 /// [[CycleRoot]]
 cycle_root: ?*Self,
@@ -135,7 +135,7 @@ pub fn loadRequestedModules(
     };
 
     // 4. Perform InnerModuleLoading(state, module).
-    try innerModuleLoading(agent, state, self);
+    try innerModuleLoading(agent, state, .{ .source_text_module = self });
 
     // 5. Return pc.[[Promise]].
     return promise_capability.promise.as(builtins.Promise);
@@ -145,30 +145,34 @@ pub fn loadRequestedModules(
 fn innerModuleLoading(
     agent: *Agent,
     state: *GraphLoadingState,
-    module: *Self,
+    module: Module,
 ) Allocator.Error!void {
     // 1. Assert: state.[[IsLoading]] is true.
     std.debug.assert(state.is_loading);
 
     // 2. If module is a Cyclic Module Record, module.[[Status]] is new, and state.[[Visited]] does
     //    not contain module, then
-    if (module.status == .new and !state.visited.contains(module)) {
+    if (module == .source_text_module and
+        module.source_text_module.status == .new and
+        !state.visited.contains(module.source_text_module))
+    {
         // a. Append module to state.[[Visited]].
-        try state.visited.putNoClobber(module, {});
+        try state.visited.putNoClobber(module.source_text_module, {});
 
         // b. Let requestedModulesCount be the number of elements in module.[[RequestedModules]].
-        const requested_modules_count = module.requested_modules.count();
+        const requested_modules_count = module.source_text_module.requested_modules.count();
 
         // c. Set state.[[PendingModulesCount]] to state.[[PendingModulesCount]] +
         //    requestedModulesCount.
         state.pending_modules_count += requested_modules_count;
 
         // d. For each String required of module.[[RequestedModules]], do
-        for (module.requested_modules.keys()) |required| {
-            // TODO: i. If module.[[LoadedModules]] contains a Record whose [[Specifier]] is required, then
-            if (false) {
-                // TODO: 1. Let record be that Record.
-                // TODO: 2. Perform InnerModuleLoading(state, record.[[Module]]).
+        for (module.source_text_module.requested_modules.keys()) |required| {
+            // i. If module.[[LoadedModules]] contains a Record whose [[Specifier]] is required, then
+            if (module.source_text_module.loaded_modules.get(required)) |loaded_module| {
+                // 1. Let record be that Record.
+                // 2. Perform InnerModuleLoading(state, record.[[Module]]).
+                try innerModuleLoading(agent, state, loaded_module);
             }
             // ii. Else,
             else {
@@ -177,7 +181,7 @@ fn innerModuleLoading(
                 //    re-enters the graph loading process through ContinueModuleLoading.
                 try agent.host_hooks.hostLoadImportedModule(
                     agent,
-                    .{ .module = module },
+                    .{ .module = module.source_text_module },
                     String.from(required),
                     state.host_defined,
                     .{ .graph_loading_state = state },
@@ -232,7 +236,7 @@ pub fn continueModuleLoading(
     // 2. If moduleCompletion is a normal completion, then
     if (module_completion) |module| {
         // a. Perform InnerModuleLoading(state, moduleCompletion.[[Value]]).
-        try innerModuleLoading(agent, state, module.source_text_module);
+        try innerModuleLoading(agent, state, module);
     }
     // 3. Else,
     else |err| switch (err) {
@@ -451,7 +455,7 @@ pub fn parse(
         .context = null,
         .import_meta = null,
         .requested_modules = requested_modules,
-        .loaded_modules = std.StringArrayHashMap(Module).init(agent.gc_allocator),
+        .loaded_modules = std.StringHashMap(Module).init(agent.gc_allocator),
         .dfs_index = null,
         .dfs_ancestor_index = null,
     };
@@ -479,7 +483,9 @@ pub fn evaluate(self: *Self, agent: *Agent) Allocator.Error!*builtins.Promise {
         .evaluating_async, .evaluated => true,
         else => false,
     }) {
-        module = module.cycle_root.?;
+        // FIXME: [[CycleRoot]] is still empty if the module evaluation previously threw.
+        // See: https://github.com/tc39/ecma262/issues/2823
+        if (module.cycle_root) |cycle_root| module = cycle_root;
     }
 
     // 4. If module.[[TopLevelCapability]] is not empty, then

@@ -687,15 +687,22 @@ pub fn main() !u8 {
             _: SafePointer,
             payload: ImportedModulePayload,
         ) Allocator.Error!void {
-            const result = if (parseSourceTextModule(agent_, referrer, specifier)) |source_text_module|
-                Module{ .source_text_module = source_text_module }
-            else |err| switch (err) {
-                error.OutOfMemory, error.ExceptionThrown => @as(Agent.Error, @errorCast(err)),
-                else => agent_.throwException(
-                    .internal_error,
-                    "Failed to import '{}': {s}",
-                    .{ specifier, @errorName(err) },
-                ),
+            const result = blk: {
+                switch (referrer) {
+                    inline else => |r| {
+                        if (r.loaded_modules.get(specifier.utf8)) |module| break :blk module;
+                    },
+                }
+                break :blk if (parseSourceTextModule(agent_, referrer, specifier)) |source_text_module|
+                    Module{ .source_text_module = source_text_module }
+                else |err| switch (err) {
+                    error.OutOfMemory, error.ExceptionThrown => @as(Agent.Error, @errorCast(err)),
+                    else => agent_.throwException(
+                        .internal_error,
+                        "Failed to import '{}': {s}",
+                        .{ specifier, @errorName(err) },
+                    ),
+                };
             };
             try finishLoadingImportedModule(agent_, referrer, specifier, payload, result);
         }

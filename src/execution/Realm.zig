@@ -7,11 +7,13 @@ const Allocator = std.mem.Allocator;
 
 const builtins = @import("../builtins.zig");
 const environments = @import("environments.zig");
+const language = @import("../language.zig");
 const types = @import("../types.zig");
 
 const Agent = @import("Agent.zig");
 const ExecutionContext = @import("ExecutionContext.zig");
 const GlobalEnvironment = environments.GlobalEnvironment;
+const Module = language.Module;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const SafePointer = types.SafePointer;
@@ -37,10 +39,13 @@ global_object: Object,
 /// [[GlobalEnv]]
 global_env: *GlobalEnvironment,
 
+// TODO: [[TemplateMap]]
+
+/// [[LoadedModules]]
+loaded_modules: std.StringHashMap(Module),
+
 /// [[HostDefined]]
 host_defined: SafePointer,
-
-// TODO: [[TemplateMap]], [[LoadedModules]]
 
 /// 9.3.1 CreateRealm ( )
 /// https://tc39.es/ecma262/#sec-createrealm
@@ -65,6 +70,7 @@ pub fn create(agent: *Agent) Allocator.Error!*Self {
         // 4. Set realmRec.[[GlobalEnv]] to undefined.
         .global_env = undefined,
 
+        .loaded_modules = std.StringHashMap(Module).init(agent.gc_allocator),
         .host_defined = SafePointer.null_pointer,
 
         // TODO: 5. Set realmRec.[[TemplateMap]] to a new empty List.

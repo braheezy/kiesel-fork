@@ -289,14 +289,28 @@ pub fn finishLoadingImportedModule(
     payload: ImportedModulePayload,
     result: Agent.Error!Module,
 ) Allocator.Error!void {
-    _ = specifier;
-    _ = referrer;
     // 1. If result is a normal completion, then
     if (!std.meta.isError(result)) {
-        // TODO: a. If referrer.[[LoadedModules]] contains a Record whose [[Specifier]] is specifier, then
-        //     i. Assert: That Record's [[Module]] is result.[[Value]].
-        // TODO: b. Else,
-        //     i. Append the Record { [[Specifier]]: specifier, [[Module]]: result.[[Value]] } to referrer.[[LoadedModules]].
+        switch (referrer) {
+            inline else => |r| {
+                const module = result catch unreachable;
+                const get_or_put_result = try r.loaded_modules.getOrPut(specifier.utf8);
+
+                // a. If referrer.[[LoadedModules]] contains a Record whose [[Specifier]] is
+                //    specifier, then
+                if (get_or_put_result.found_existing) {
+                    // i. Assert: That Record's [[Module]] is result.[[Value]].
+                    std.debug.assert(get_or_put_result.value_ptr.source_text_module == module.source_text_module);
+                }
+                // b. Else,
+                else {
+                    // i. Append the Record {
+                    //      [[Specifier]]: specifier, [[Module]]: result.[[Value]]
+                    //    } to referrer.[[LoadedModules]].
+                    get_or_put_result.value_ptr.* = module;
+                }
+            },
+        }
     }
 
     switch (payload) {

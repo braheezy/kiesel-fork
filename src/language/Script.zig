@@ -7,12 +7,14 @@ const ast = @import("ast.zig");
 const ast_printing = @import("ast_printing.zig");
 const bytecode = @import("bytecode.zig");
 const execution = @import("../execution.zig");
+const language = @import("../language.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
 const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
 const GlobalEnvironment = execution.GlobalEnvironment;
+const Module = language.Module;
 const Parser = @import("Parser.zig");
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
@@ -27,7 +29,8 @@ realm: *Realm,
 /// [[ECMAScriptCode]]
 ecmascript_code: ast.Script,
 
-// TODO: [[LoadedModules]]
+/// [[LoadedModules]]
+loaded_modules: std.StringHashMap(Module),
 
 /// [[HostDefined]]
 host_defined: SafePointer,
@@ -57,6 +60,7 @@ pub fn parse(
     self.* = .{
         .realm = realm,
         .ecmascript_code = script,
+        .loaded_modules = std.StringHashMap(Module).init(agent.gc_allocator),
         .host_defined = host_defined orelse SafePointer.null_pointer,
     };
     return self;
