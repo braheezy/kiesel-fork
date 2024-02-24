@@ -647,6 +647,41 @@ pub const Statement = union(enum) {
         };
     }
 
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        switch (self) {
+            // Statement :
+            //     EmptyStatement
+            //     ExpressionStatement
+            //     ContinueStatement
+            //     BreakStatement
+            //     ReturnStatement
+            //     ThrowStatement
+            //     DebuggerStatement
+            // 1. Return a new empty List.
+            .empty_statement,
+            .expression_statement,
+            .continue_statement,
+            .break_statement,
+            .return_statement,
+            .throw_statement,
+            .debugger_statement,
+            => return &.{},
+
+            .block_statement => |block_statement| return block_statement.block.statement_list.varDeclaredNames(allocator),
+            .variable_statement => |variable_statement| return variable_statement.variable_declaration_list.varDeclaredNames(allocator),
+            .if_statement => |if_statement| return if_statement.varDeclaredNames(allocator),
+            .breakable_statement => |breakable_statement| switch (breakable_statement.iteration_statement) {
+                inline else => |node| return node.varDeclaredNames(allocator),
+            },
+            .try_statement => |try_statement| return try_statement.varDeclaredNames(allocator),
+        }
+    }
+
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn varScopedDeclarations(
@@ -728,6 +763,25 @@ pub const StatementList = struct {
 
     items: []const StatementListItem,
 
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // StatementList : StatementList StatementListItem
+        // 1. Let names1 be VarDeclaredNames of StatementList.
+        // 2. Let names2 be VarDeclaredNames of StatementListItem.
+        // 3. Return the list-concatenation of names1 and names2.
+        // StatementListItem : Declaration
+        // 1. Return a new empty List.
+        var var_declared_names = std.ArrayList(Identifier).init(allocator);
+        for (self.items) |item| {
+            try var_declared_names.appendSlice(try item.varDeclaredNames(allocator));
+        }
+        return var_declared_names.toOwnedSlice();
+    }
+
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn varScopedDeclarations(
@@ -747,6 +801,51 @@ pub const StatementList = struct {
         return variable_declarations.toOwnedSlice();
     }
 
+    /// 8.2.10 Static Semantics: TopLevelVarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-toplevelvardeclarednames
+    pub fn topLevelVarDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // StatementList : StatementList StatementListItem
+        // 1. Let names1 be TopLevelVarDeclaredNames of StatementList.
+        // 2. Let names2 be TopLevelVarDeclaredNames of StatementListItem.
+        // 3. Return the list-concatenation of names1 and names2.
+        var var_declared_names = std.ArrayList(Identifier).init(allocator);
+        for (self.items) |item| switch (item) {
+            // StatementListItem : Statement
+            .statement => |statement| {
+                // TODO: 1. If Statement is Statement : LabelledStatement , return
+                //          TopLevelVarDeclaredNames of Statement.
+                // 2. Return VarDeclaredNames of Statement.
+                try var_declared_names.appendSlice(try statement.varDeclaredNames(allocator));
+            },
+            // StatementListItem : Declaration
+            .declaration => |declaration| {
+                switch (declaration.*) {
+                    // 1. If Declaration is Declaration : HoistableDeclaration , then
+                    .hoistable_declaration => |hoistable_declaration| switch (hoistable_declaration) {
+                        inline else => |node| {
+                            // a. Return the BoundNames of HoistableDeclaration.
+                            try var_declared_names.appendSlice(try node.boundNames(allocator));
+                        },
+                    },
+
+                    // HACK: Emit lexical declarations too while they're codegen'd as var decls
+                    .lexical_declaration => |lexical_declaration| {
+                        for (lexical_declaration.binding_list.items) |lexical_binding| {
+                            try var_declared_names.append(lexical_binding.binding_identifier);
+                        }
+                    },
+
+                    // 2. Return a new empty List.
+                    else => {},
+                }
+            },
+        };
+        return var_declared_names.toOwnedSlice();
+    }
+
     /// 8.2.11 Static Semantics: TopLevelVarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevelvarscopeddeclarations
     pub fn topLevelVarScopedDeclarations(
@@ -758,44 +857,41 @@ pub const StatementList = struct {
         // 2. Let declarations2 be TopLevelVarScopedDeclarations of StatementListItem.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
-        for (self.items) |item| {
-            switch (item) {
-                // StatementListItem : Statement
-                .statement => |statement| {
-                    // TODO: 1. If Statement is Statement : LabelledStatement , return
-                    //          TopLevelVarScopedDeclarations of Statement.
-                    // 2. Return VarScopedDeclarations of Statement.
-                    try variable_declarations.appendSlice(try statement.varScopedDeclarations(allocator));
-                },
-                // StatementListItem : Declaration
-                .declaration => |declaration| {
-                    switch (declaration.*) {
-                        // 1. If Declaration is Declaration : HoistableDeclaration , then
-                        .hoistable_declaration => |hoistable_declaration| {
-                            // a. Let declaration be DeclarationPart of HoistableDeclaration.
-                            // b. Return « declaration ».
-                            try variable_declarations.append(.{ .hoistable_declaration = hoistable_declaration });
-                        },
+        for (self.items) |item| switch (item) {
+            // StatementListItem : Statement
+            .statement => |statement| {
+                // TODO: 1. If Statement is Statement : LabelledStatement , return
+                //          TopLevelVarScopedDeclarations of Statement.
+                // 2. Return VarScopedDeclarations of Statement.
+                try variable_declarations.appendSlice(try statement.varScopedDeclarations(allocator));
+            },
+            // StatementListItem : Declaration
+            .declaration => |declaration| {
+                switch (declaration.*) {
+                    // 1. If Declaration is Declaration : HoistableDeclaration , then
+                    .hoistable_declaration => |hoistable_declaration| {
+                        // a. Let declaration be DeclarationPart of HoistableDeclaration.
+                        // b. Return « declaration ».
+                        try variable_declarations.append(.{ .hoistable_declaration = hoistable_declaration });
+                    },
 
-                        // HACK: Emit lexical declarations too while they're codegen'd as var decls
-                        .lexical_declaration => |lexical_declaration| {
-                            for (lexical_declaration.binding_list.items) |lexical_binding| {
-                                try variable_declarations.append(.{
-                                    .variable_declaration = .{
-                                        .binding_identifier = lexical_binding.binding_identifier,
-                                        .initializer = lexical_binding.initializer,
-                                    },
-                                });
-                            }
-                        },
-
-                        else => {},
-                    }
+                    // HACK: Emit lexical declarations too while they're codegen'd as var decls
+                    .lexical_declaration => |lexical_declaration| {
+                        for (lexical_declaration.binding_list.items) |lexical_binding| {
+                            try variable_declarations.append(.{
+                                .variable_declaration = .{
+                                    .binding_identifier = lexical_binding.binding_identifier,
+                                    .initializer = lexical_binding.initializer,
+                                },
+                            });
+                        }
+                    },
 
                     // 2. Return a new empty List.
-                },
-            }
-        }
+                    else => {},
+                }
+            },
+        };
         return variable_declarations.toOwnedSlice();
     }
 
@@ -818,6 +914,30 @@ pub const StatementListItem = union(enum) {
 
     statement: *Statement,
     declaration: *Declaration,
+
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        switch (self) {
+            .statement => |statement| return try statement.varDeclaredNames(allocator),
+            .declaration => |declaration| {
+                var var_declared_names = std.ArrayList(Identifier).init(allocator);
+                switch (declaration.*) {
+                    // HACK: Emit lexical declarations too while they're codegen'd as var decls
+                    .lexical_declaration => |lexical_declaration| {
+                        for (lexical_declaration.binding_list.items) |lexical_binding| {
+                            try var_declared_names.append(lexical_binding.binding_identifier);
+                        }
+                    },
+                    else => {},
+                }
+                return var_declared_names.toOwnedSlice();
+            },
+        }
+    }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
@@ -887,6 +1007,39 @@ pub const VariableDeclarationList = struct {
     const Self = @This();
 
     items: []const VariableDeclaration,
+
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // VariableStatement : var VariableDeclarationList ;
+        // 1. Return BoundNames of VariableDeclarationList.
+        return self.boundNames(allocator);
+    }
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn boundNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // VariableDeclarationList : VariableDeclarationList , VariableDeclaration
+        // 1. Let names1 be BoundNames of VariableDeclarationList.
+        // 2. Let names2 be BoundNames of VariableDeclaration.
+        // 3. Return the list-concatenation of names1 and names2.
+        // VariableDeclaration : BindingIdentifier Initializer[opt]
+        // 1. Return the BoundNames of BindingIdentifier.
+        var bound_names = try std.ArrayList(Identifier).initCapacity(
+            allocator,
+            self.items.len,
+        );
+        for (self.items) |variable_declaration| {
+            bound_names.appendAssumeCapacity(variable_declaration.binding_identifier);
+        }
+        return bound_names.toOwnedSlice();
+    }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
@@ -989,6 +1142,28 @@ pub const IfStatement = struct {
     consequent_statement: *Statement,
     alternate_statement: ?*Statement,
 
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // IfStatement : if ( Expression ) Statement else Statement
+        // 1. Let names1 be VarDeclaredNames of the first Statement.
+        // 2. Let names2 be VarDeclaredNames of the second Statement.
+        // 3. Return the list-concatenation of names1 and names2.
+        if (self.alternate_statement) |alternate_statement| {
+            var var_declared_names = std.ArrayList(Identifier).init(allocator);
+            try var_declared_names.appendSlice(try self.consequent_statement.varDeclaredNames(allocator));
+            try var_declared_names.appendSlice(try alternate_statement.varDeclaredNames(allocator));
+            return var_declared_names.toOwnedSlice();
+        }
+
+        // IfStatement : if ( Expression ) Statement
+        // 1. Return the VarDeclaredNames of Statement.
+        return self.consequent_statement.varDeclaredNames(allocator);
+    }
+
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn varScopedDeclarations(
@@ -999,10 +1174,10 @@ pub const IfStatement = struct {
         // 1. Let declarations1 be VarScopedDeclarations of the first Statement.
         // 2. Let declarations2 be VarScopedDeclarations of the second Statement.
         // 3. Return the list-concatenation of declarations1 and declarations2.
-        if (self.alternate_statement != null) {
+        if (self.alternate_statement) |alternate_statement| {
             var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
             try variable_declarations.appendSlice(try self.consequent_statement.varScopedDeclarations(allocator));
-            try variable_declarations.appendSlice(try self.alternate_statement.?.varScopedDeclarations(allocator));
+            try variable_declarations.appendSlice(try alternate_statement.varScopedDeclarations(allocator));
             return variable_declarations.toOwnedSlice();
         }
 
@@ -1027,6 +1202,17 @@ pub const DoWhileStatement = struct {
     test_expression: Expression,
     consequent_statement: *Statement,
 
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // DoWhileStatement : do Statement while ( Expression ) ;
+        // 1. Return the VarDeclaredNames of Statement.
+        return self.consequent_statement.varDeclaredNames(allocator);
+    }
+
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn varScopedDeclarations(
@@ -1045,6 +1231,17 @@ pub const WhileStatement = struct {
 
     test_expression: Expression,
     consequent_statement: *Statement,
+
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // WhileStatement : while ( Expression ) Statement
+        // 1. Return the VarDeclaredNames of Statement.
+        return self.consequent_statement.varDeclaredNames(allocator);
+    }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
@@ -1072,6 +1269,42 @@ pub const ForStatement = struct {
     test_expression: ?Expression,
     increment_expression: ?Expression,
     consequent_statement: *Statement,
+
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // ForStatement : for ( Expression[opt] ; Expression[opt] ; Expression[opt] ) Statement
+        // 1. Return the VarDeclaredNames of Statement.
+        // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
+        // 1. Let names1 be BoundNames of VariableDeclarationList.
+        // 2. Let names2 be VarDeclaredNames of Statement.
+        // 3. Return the list-concatenation of names1 and names2.
+        if (self.initializer) |initializer| switch (initializer) {
+            .variable_statement => {
+                var var_declared_names = std.ArrayList(Identifier).init(allocator);
+                try var_declared_names.appendSlice(try self.initializer.?.variable_statement.variable_declaration_list.boundNames(allocator));
+                try var_declared_names.appendSlice(try self.consequent_statement.varDeclaredNames(allocator));
+                return var_declared_names.toOwnedSlice();
+            },
+            // HACK: Emit lexical declarations too while they're codegen'd as var decls
+            .lexical_declaration => |lexical_declaration| {
+                var var_declared_names = std.ArrayList(Identifier).init(allocator);
+                for (lexical_declaration.binding_list.items) |lexical_binding| {
+                    try var_declared_names.append(lexical_binding.binding_identifier);
+                }
+                try var_declared_names.appendSlice(try self.consequent_statement.varDeclaredNames(allocator));
+                return var_declared_names.toOwnedSlice();
+            },
+            else => {},
+        };
+
+        // ForStatement : for ( LexicalDeclaration Expression[opt] ; Expression[opt] ) Statement
+        // 1. Return the VarDeclaredNames of Statement.
+        return self.consequent_statement.varDeclaredNames(allocator);
+    }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
@@ -1136,6 +1369,49 @@ pub const ForInOfStatement = struct {
     expression: Expression,
     consequent_statement: *Statement,
 
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // ForInOfStatement :
+        //     for ( LeftHandSideExpression in Expression ) Statement
+        //     for ( ForDeclaration in Expression ) Statement
+        //     for ( LeftHandSideExpression of AssignmentExpression ) Statement
+        //     for ( ForDeclaration of AssignmentExpression ) Statement
+        //     for await ( LeftHandSideExpression of AssignmentExpression ) Statement
+        //     for await ( ForDeclaration of AssignmentExpression ) Statement
+        if (self.initializer != .for_binding) {
+            var var_declared_names = std.ArrayList(Identifier).init(allocator);
+            switch (self.initializer) {
+                // HACK: Emit lexical declarations too while they're codegen'd as var decls
+                .for_declaration => |lexical_declaration| {
+                    const lexical_binding = lexical_declaration.binding_list.items[0];
+                    try var_declared_names.append(lexical_binding.binding_identifier);
+                },
+                else => {},
+            }
+
+            // 1. Return the VarDeclaredNames of Statement.
+            try var_declared_names.appendSlice(try self.consequent_statement.varDeclaredNames(allocator));
+            return var_declared_names.toOwnedSlice();
+        }
+        // ForInOfStatement :
+        //     for ( var ForBinding in Expression ) Statement
+        //     for ( var ForBinding of AssignmentExpression ) Statement
+        //     for await ( var ForBinding of AssignmentExpression ) Statement
+        else {
+            // 1. Let names1 be the BoundNames of ForBinding.
+            // 2. Let names2 be the VarDeclaredNames of Statement.
+            // 3. Return the list-concatenation of names1 and names2.
+            var var_declared_names = std.ArrayList(Identifier).init(allocator);
+            try var_declared_names.append(self.initializer.for_binding);
+            try var_declared_names.appendSlice(try self.consequent_statement.varDeclaredNames(allocator));
+            return var_declared_names.toOwnedSlice();
+        }
+    }
+
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn varScopedDeclarations(
@@ -1165,7 +1441,7 @@ pub const ForInOfStatement = struct {
                 else => {},
             }
 
-            // 1. Return the VarDeclaredNames of Statement.
+            // 1. Return the VarScopedDeclarations of Statement.
             try variable_declarations.appendSlice(try self.consequent_statement.varScopedDeclarations(allocator));
             return variable_declarations.toOwnedSlice();
         }
@@ -1215,6 +1491,38 @@ pub const TryStatement = struct {
     catch_parameter: ?Identifier, // TODO: Binding patterns
     catch_block: ?Block,
     finally_block: ?Block,
+
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // TryStatement : try Block Catch
+        // 1. Let names1 be VarDeclaredNames of Block.
+        // 2. Let names2 be VarDeclaredNames of Catch.
+        // 3. Return the list-concatenation of names1 and names2.
+        // TryStatement : try Block Finally
+        // 1. Let names1 be VarDeclaredNames of Block.
+        // 2. Let names2 be VarDeclaredNames of Finally.
+        // 3. Return the list-concatenation of names1 and names2.
+        // TryStatement : try Block Catch Finally
+        // 1. Let names1 be VarDeclaredNames of Block.
+        // 2. Let names2 be VarDeclaredNames of Catch.
+        // 3. Let names3 be VarDeclaredNames of Finally.
+        // 4. Return the list-concatenation of names1, names2, and names3.
+        // Catch : catch ( CatchParameter ) Block
+        // 1. Return the VarDeclaredNames of Block.
+        var var_declared_names = std.ArrayList(Identifier).init(allocator);
+        try var_declared_names.appendSlice(try self.try_block.statement_list.varDeclaredNames(allocator));
+        if (self.catch_block) |catch_block| {
+            try var_declared_names.appendSlice(try catch_block.statement_list.varDeclaredNames(allocator));
+        }
+        if (self.finally_block) |finally_block| {
+            try var_declared_names.appendSlice(try finally_block.statement_list.varDeclaredNames(allocator));
+        }
+        return var_declared_names.toOwnedSlice();
+    }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
@@ -1351,10 +1659,25 @@ pub const FormalParameter = struct {
 pub const FunctionDeclaration = struct {
     const Self = @This();
 
-    identifier: Identifier,
+    identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
     source_text: []const u8,
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn boundNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // FunctionDeclaration : function BindingIdentifier ( FormalParameters ) { FunctionBody }
+        // 1. Return the BoundNames of BindingIdentifier.
+        // FunctionDeclaration : function ( FormalParameters ) { FunctionBody }
+        // 1. Return « "*default*" ».
+        var bound_names = try std.ArrayList(Identifier).initCapacity(allocator, 1);
+        bound_names.appendAssumeCapacity(self.identifier orelse "*default*");
+        return bound_names.toOwnedSlice();
+    }
 
     /// 15.2.4 Runtime Semantics: InstantiateOrdinaryFunctionObject
     /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateordinaryfunctionobject
@@ -1366,32 +1689,65 @@ pub const FunctionDeclaration = struct {
     ) Allocator.Error!Object {
         const realm = agent.currentRealm();
 
-        // 1. Let name be StringValue of BindingIdentifier.
-        const name = self.identifier;
+        // FunctionDeclaration : function BindingIdentifier ( FormalParameters ) { FunctionBody }
+        if (self.identifier) |identifier| {
+            // 1. Let name be StringValue of BindingIdentifier.
+            const name = identifier;
 
-        // 2. Let sourceText be the source text matched by FunctionDeclaration.
-        const source_text = self.source_text;
+            // 2. Let sourceText be the source text matched by FunctionDeclaration.
+            const source_text = self.source_text;
 
-        // 3. Let F be OrdinaryFunctionCreate(%Function.prototype%, sourceText, FormalParameters, FunctionBody, non-lexical-this, env, privateEnv).
-        const function = try ordinaryFunctionCreate(
-            agent,
-            try realm.intrinsics.@"%Function.prototype%"(),
-            source_text,
-            self.formal_parameters,
-            self.function_body,
-            .non_lexical_this,
-            env,
-            private_env,
-        );
+            // 3. Let F be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
+            //    FormalParameters, FunctionBody, non-lexical-this, env, privateEnv).
+            const function = try ordinaryFunctionCreate(
+                agent,
+                try realm.intrinsics.@"%Function.prototype%"(),
+                source_text,
+                self.formal_parameters,
+                self.function_body,
+                .non_lexical_this,
+                env,
+                private_env,
+            );
 
-        // 4. Perform SetFunctionName(F, name).
-        try setFunctionName(function, PropertyKey.from(name), null);
+            // 4. Perform SetFunctionName(F, name).
+            try setFunctionName(function, PropertyKey.from(name), null);
 
-        // 5. Perform MakeConstructor(F).
-        try makeConstructor(function, .{});
+            // 5. Perform MakeConstructor(F).
+            try makeConstructor(function, .{});
 
-        // 6. Return F.
-        return function;
+            // 6. Return F.
+            return function;
+        }
+        // FunctionDeclaration : function ( FormalParameters ) { FunctionBody }
+        // NOTE: An anonymous FunctionDeclaration can only occur as part of an export default
+        // declaration, and its function code is therefore always strict mode code.
+        else {
+            // 1. Let sourceText be the source text matched by FunctionDeclaration.
+            const source_text = self.source_text;
+
+            // 2. Let F be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
+            //    FormalParameters, FunctionBody, non-lexical-this, env, privateEnv).
+            const function = try ordinaryFunctionCreate(
+                agent,
+                try realm.intrinsics.@"%Function.prototype%"(),
+                source_text,
+                self.formal_parameters,
+                self.function_body,
+                .non_lexical_this,
+                env,
+                private_env,
+            );
+
+            // 3. Perform SetFunctionName(F, "default").
+            try setFunctionName(function, PropertyKey.from("default"), null);
+
+            // 4. Perform MakeConstructor(F).
+            try makeConstructor(function, .{});
+
+            // 5. Return F.
+            return function;
+        }
     }
 };
 
@@ -1417,6 +1773,19 @@ pub const FunctionBody = struct {
     type: Type,
     statement_list: StatementList,
     strict: ?bool = null, // Unassigned until bytecode generation
+
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // FunctionStatementList : [empty]
+        // 1. Return a new empty List.
+        // FunctionStatementList : StatementList
+        // 1. Return TopLevelVarDeclaredNames of StatementList.
+        return self.statement_list.varDeclaredNames(allocator);
+    }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
@@ -1475,10 +1844,25 @@ pub const MethodDefinition = struct {
 pub const GeneratorDeclaration = struct {
     const Self = @This();
 
-    identifier: Identifier,
+    identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
     source_text: []const u8,
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn boundNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // GeneratorDeclaration : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
+        // 1. Return the BoundNames of BindingIdentifier.
+        // GeneratorDeclaration : function * ( FormalParameters ) { GeneratorBody }
+        // 1. Return « "*default*" ».
+        var bound_names = try std.ArrayList(Identifier).initCapacity(allocator, 1);
+        bound_names.appendAssumeCapacity(self.identifier orelse "*default*");
+        return bound_names.toOwnedSlice();
+    }
 
     /// 15.5.3 Runtime Semantics: InstantiateGeneratorFunctionObject
     /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiategeneratorfunctionobject
@@ -1490,46 +1874,91 @@ pub const GeneratorDeclaration = struct {
     ) Allocator.Error!Object {
         const realm = agent.currentRealm();
 
-        // 1. Let name be StringValue of BindingIdentifier.
-        const name = self.identifier;
+        // GeneratorDeclaration : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
+        if (self.identifier) |identifier| {
+            // 1. Let name be StringValue of BindingIdentifier.
+            const name = identifier;
 
-        // 2. Let sourceText be the source text matched by GeneratorDeclaration.
-        const source_text = self.source_text;
+            // 2. Let sourceText be the source text matched by GeneratorDeclaration.
+            const source_text = self.source_text;
 
-        // 3. Let F be OrdinaryFunctionCreate(%GeneratorFunction.prototype%, sourceText,
-        //    FormalParameters, GeneratorBody, non-lexical-this, env, privateEnv).
-        const function = try ordinaryFunctionCreate(
-            agent,
-            try realm.intrinsics.@"%GeneratorFunction.prototype%"(),
-            source_text,
-            self.formal_parameters,
-            self.function_body,
-            .non_lexical_this,
-            env,
-            private_env,
-        );
+            // 3. Let F be OrdinaryFunctionCreate(%GeneratorFunction.prototype%, sourceText,
+            //    FormalParameters, GeneratorBody, non-lexical-this, env, privateEnv).
+            const function = try ordinaryFunctionCreate(
+                agent,
+                try realm.intrinsics.@"%GeneratorFunction.prototype%"(),
+                source_text,
+                self.formal_parameters,
+                self.function_body,
+                .non_lexical_this,
+                env,
+                private_env,
+            );
 
-        // 4. Perform SetFunctionName(F, name).
-        try setFunctionName(function, PropertyKey.from(name), null);
+            // 4. Perform SetFunctionName(F, name).
+            try setFunctionName(function, PropertyKey.from(name), null);
 
-        // 5. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
-        const prototype = try ordinaryObjectCreate(
-            agent,
-            try realm.intrinsics.@"%GeneratorPrototype%"(),
-        );
+            // 5. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
+            const prototype = try ordinaryObjectCreate(
+                agent,
+                try realm.intrinsics.@"%GeneratorPrototype%"(),
+            );
 
-        // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
-        //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
-        //    }).
-        function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
-            .value = Value.from(prototype),
-            .writable = true,
-            .enumerable = false,
-            .configurable = false,
-        }) catch |err| try noexcept(err);
+            // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
+            //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
+            //    }).
+            function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+                .value = Value.from(prototype),
+                .writable = true,
+                .enumerable = false,
+                .configurable = false,
+            }) catch |err| try noexcept(err);
 
-        // 7. Return F.
-        return function;
+            // 7. Return F.
+            return function;
+        }
+        // GeneratorDeclaration : function * ( FormalParameters ) { GeneratorBody }
+        // NOTE: An anonymous GeneratorDeclaration can only occur as part of an export default
+        // declaration, and its function code is therefore always strict mode code.
+        else {
+            // 1. Let sourceText be the source text matched by GeneratorDeclaration.
+            const source_text = self.source_text;
+
+            // 2. Let F be OrdinaryFunctionCreate(%GeneratorFunction.prototype%, sourceText,
+            //    FormalParameters, GeneratorBody, non-lexical-this, env, privateEnv).
+            const function = try ordinaryFunctionCreate(
+                agent,
+                try realm.intrinsics.@"%GeneratorFunction.prototype%"(),
+                source_text,
+                self.formal_parameters,
+                self.function_body,
+                .non_lexical_this,
+                env,
+                private_env,
+            );
+
+            // 3. Perform SetFunctionName(F, "default").
+            try setFunctionName(function, PropertyKey.from("default"), null);
+
+            // 4. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
+            const prototype = try ordinaryObjectCreate(
+                agent,
+                try realm.intrinsics.@"%GeneratorPrototype%"(),
+            );
+
+            // 5. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
+            //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
+            //    }).
+            function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
+                .value = Value.from(prototype),
+                .writable = true,
+                .enumerable = false,
+                .configurable = false,
+            }) catch |err| try noexcept(err);
+
+            // 6. Return F.
+            return function;
+        }
     }
 };
 
@@ -1549,6 +1978,21 @@ pub const AsyncGeneratorDeclaration = struct {
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
     source_text: []const u8,
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn boundNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // AsyncGeneratorDeclaration : async function * BindingIdentifier ( FormalParameters ) { AsyncGeneratorBody }
+        // 1. Return the BoundNames of BindingIdentifier.
+        // AsyncGeneratorDeclaration : async function * ( FormalParameters ) { AsyncGeneratorBody }
+        // 1. Return « "*default*" ».
+        var bound_names = try std.ArrayList(Identifier).initCapacity(allocator, 1);
+        bound_names.appendAssumeCapacity(self.identifier orelse "*default*");
+        return bound_names.toOwnedSlice();
+    }
 
     /// 15.6.3 Runtime Semantics: InstantiateAsyncGeneratorFunctionObject
     /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncgeneratorfunctionobject
@@ -1657,9 +2101,26 @@ pub const AsyncGeneratorExpression = struct {
 
 /// https://tc39.es/ecma262/#prod-ClassDeclaration
 pub const ClassDeclaration = struct {
+    const Self = @This();
+
     identifier: ?Identifier,
     class_tail: ClassTail,
     source_text: []const u8,
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn boundNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // ClassDeclaration : class BindingIdentifier ClassTail
+        // 1. Return the BoundNames of BindingIdentifier.
+        // ClassDeclaration : class ClassTail
+        // 1. Return « "*default*" ».
+        var bound_names = try std.ArrayList(Identifier).initCapacity(allocator, 1);
+        bound_names.appendAssumeCapacity(self.identifier orelse "*default*");
+        return bound_names.toOwnedSlice();
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-ClassExpression
@@ -1839,6 +2300,21 @@ pub const AsyncFunctionDeclaration = struct {
     function_body: FunctionBody,
     source_text: []const u8,
 
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn boundNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // AsyncFunctionDeclaration : async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
+        // 1. Return the BoundNames of BindingIdentifier.
+        // AsyncFunctionDeclaration : async function ( FormalParameters ) { AsyncFunctionBody }
+        // 1. Return « "*default*" ».
+        var bound_names = try std.ArrayList(Identifier).initCapacity(allocator, 1);
+        bound_names.appendAssumeCapacity(self.identifier orelse "*default*");
+        return bound_names.toOwnedSlice();
+    }
+
     /// 15.8.2 Runtime Semantics: InstantiateAsyncFunctionObject
     /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncfunctionobject
     pub fn instantiateAsyncFunctionObject(
@@ -1923,6 +2399,19 @@ pub const Script = struct {
     const Self = @This();
 
     statement_list: StatementList,
+
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // Script : [empty]
+        // 1. Return a new empty List.
+        // ScriptBody : StatementList
+        // 1. Return TopLevelVarDeclaredNames of StatementList.
+        return self.statement_list.topLevelVarDeclaredNames(allocator);
+    }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations

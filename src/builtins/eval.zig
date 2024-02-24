@@ -194,24 +194,20 @@ fn evalDeclarationInstantiation(
     _ = lex_env;
     _ = private_env;
 
-    // TODO: 1. Let varNames be the VarDeclaredNames of body.
+    // 1. Let varNames be the VarDeclaredNames of body.
+    const var_names = try body.varDeclaredNames(agent.gc_allocator);
+    defer agent.gc_allocator.free(var_names);
 
     // 2. Let varDeclarations be the VarScopedDeclarations of body.
     const var_declarations = try body.varScopedDeclarations(agent.gc_allocator);
+    defer agent.gc_allocator.free(var_declarations);
 
     // 3. If strict is false, then
     if (!strict) {
         // a. If varEnv is a Global Environment Record, then
         if (var_env == .global_environment) {
-            // TODO: i. For each element name of varNames, do
-            for (var_declarations) |var_declaration| {
-                const name = switch (var_declaration) {
-                    .variable_declaration => |variable_declaration| variable_declaration.binding_identifier,
-                    .hoistable_declaration => |hoistable_declaration| switch (hoistable_declaration) {
-                        inline else => |function_declaration| function_declaration.identifier,
-                    },
-                }.?;
-
+            // i. For each element name of varNames, do
+            for (var_names) |name| {
                 // 1. If varEnv.HasLexicalDeclaration(name) is true, throw a SyntaxError exception.
                 if (var_env.global_environment.hasLexicalDeclaration(name)) {
                     return agent.throwException(

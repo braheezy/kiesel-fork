@@ -564,7 +564,7 @@ pub fn printFormalParameter(node: ast.FormalParameter, writer: anytype, indentat
 pub fn printFunctionDeclaration(node: ast.FunctionDeclaration, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("FunctionDeclaration", writer, indentation);
     try print("identifier:", writer, indentation + 1);
-    try print(node.identifier, writer, indentation + 2);
+    if (node.identifier) |identifier| try print(identifier, writer, indentation + 2);
     try print("formal_parameters:", writer, indentation + 1);
     try printFormalParameters(node.formal_parameters, writer, indentation + 2);
     try print("function_body:", writer, indentation + 1);
@@ -610,7 +610,7 @@ pub fn printMethodDefinition(node: ast.MethodDefinition, writer: anytype, indent
 pub fn printGeneratorDeclaration(node: ast.GeneratorDeclaration, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("GeneratorDeclaration", writer, indentation);
     try print("identifier:", writer, indentation + 1);
-    try print(node.identifier, writer, indentation + 2);
+    if (node.identifier) |identifier| try print(identifier, writer, indentation + 2);
     try print("formal_parameters:", writer, indentation + 1);
     try printFormalParameters(node.formal_parameters, writer, indentation + 2);
     try print("function_body:", writer, indentation + 1);

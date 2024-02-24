@@ -917,7 +917,9 @@ fn functionDeclarationInstantiation(
     // 8. Let hasParameterExpressions be ContainsExpression of formals.
     const has_parameter_expressions = formals.containsExpression();
 
-    // TODO: 9. Let varNames be the VarDeclaredNames of code.
+    // 9. Let varNames be the VarDeclaredNames of code.
+    const var_names = try code.varDeclaredNames(agent.gc_allocator);
+    defer agent.gc_allocator.free(var_names);
 
     // 10. Let varDeclarations be the VarScopedDeclarations of code.
     const var_declarations = try code.varScopedDeclarations(agent.gc_allocator);
@@ -1162,15 +1164,7 @@ fn functionDeclarationInstantiation(
         }
 
         // c. For each element n of varNames, do
-        // TODO: This should use VarDeclaredNames
-        for (var_declarations) |var_declaration| {
-            const var_name = switch (var_declaration) {
-                .variable_declaration => |variable_declaration| variable_declaration.binding_identifier,
-                .hoistable_declaration => |hoistable_declaration| switch (hoistable_declaration) {
-                    inline else => |function_declaration| function_declaration.identifier,
-                },
-            }.?;
-
+        for (var_names) |var_name| {
             // i. If instantiatedVarNames does not contain n, then
             if (!instantiated_var_names.contains(var_name)) {
                 // 1. Append n to instantiatedVarNames.
@@ -1206,15 +1200,7 @@ fn functionDeclarationInstantiation(
         defer instantiated_var_names.deinit();
 
         // e. For each element n of varNames, do
-        // TODO: This should use VarDeclaredNames
-        for (var_declarations) |var_declaration| {
-            const var_name = switch (var_declaration) {
-                .variable_declaration => |variable_declaration| variable_declaration.binding_identifier,
-                .hoistable_declaration => |hoistable_declaration| switch (hoistable_declaration) {
-                    inline else => |function_declaration| function_declaration.identifier,
-                },
-            }.?;
-
+        for (var_names) |var_name| {
             // i. If instantiatedVarNames does not contain n, then
             if (!instantiated_var_names.contains(var_name)) {
                 // 1. Append n to instantiatedVarNames.
