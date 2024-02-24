@@ -9,6 +9,7 @@ pub const Script = @import("language/Script.zig");
 pub const SourceTextModule = @import("language/SourceTextModule.zig");
 pub const continueModuleLoading = SourceTextModule.continueModuleLoading;
 pub const finishLoadingImportedModule = module.finishLoadingImportedModule;
+pub const getImportedModule = module.getImportedModule;
 pub const getModuleNamespace = module.getModuleNamespace;
 pub const tokenizer = @import("language/tokenizer.zig");
 

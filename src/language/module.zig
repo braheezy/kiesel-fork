@@ -41,6 +41,12 @@ pub const Module = union(enum) {
             inline else => |module| module.loadRequestedModules(agent, host_defined),
         };
     }
+
+    pub fn link(self: Self, agent: *Agent) Agent.Error!void {
+        return switch (self) {
+            inline else => |module| module.link(agent),
+        };
+    }
 };
 
 /// https://tc39.es/ecma262/#graphloadingstate-record
@@ -158,20 +164,26 @@ fn continueDynamicImport(
             const module_ = captures_.module;
             const on_rejected_ = captures_.on_rejected;
 
-            // TODO: a. Let link be Completion(module.Link()).
-            // TODO: b. If link is an abrupt completion, then
-            if (false) {
-                const value = agent_.clearException();
+            // a. Let link be Completion(module.Link()).
+            const link = module_.link(agent_);
 
-                // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « link.[[Value]] »).
-                _ = Value.from(promise_capability_.reject).callAssumeCallable(
-                    .undefined,
-                    &.{value},
-                ) catch |err| try noexcept(err);
+            // b. If link is an abrupt completion, then
+            link catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
 
-                // ii. Return unused.
-                return .undefined;
-            }
+                error.ExceptionThrown => {
+                    const exception = agent_.clearException();
+
+                    // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « link.[[Value]] »).
+                    _ = Value.from(promise_capability_.reject).callAssumeCallable(
+                        .undefined,
+                        &.{exception},
+                    ) catch |err_| try noexcept(err_);
+
+                    // ii. Return unused.
+                    return .undefined;
+                },
+            };
 
             // TODO: c. Let evaluatePromise be module.Evaluate().
             const evaluate_promise = blk: {
@@ -267,6 +279,17 @@ fn continueDynamicImport(
     );
 
     // 9. Return unused.
+}
+
+/// 16.2.1.7 GetImportedModule ( referrer, specifier )
+/// https://tc39.es/ecma262/#sec-GetImportedModule
+pub fn getImportedModule(referrer: *SourceTextModule, specifier: String) Module {
+    // 1. Assert: Exactly one element of referrer.[[LoadedModules]] is a Record whose [[Specifier]]
+    //    is specifier, since LoadRequestedModules has completed successfully on referrer prior to
+    //    invoking this abstract operation.
+    // 2. Let record be the Record in referrer.[[LoadedModules]] whose [[Specifier]] is specifier.
+    // 3. Return record.[[Module]].
+    return referrer.loaded_modules.get(specifier.utf8).?;
 }
 
 /// 16.2.1.9 FinishLoadingImportedModule ( referrer, specifier, payload, result )

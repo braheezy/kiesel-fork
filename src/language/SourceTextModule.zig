@@ -27,6 +27,7 @@ const SafePointer = types.SafePointer;
 const String = types.String;
 const Value = types.Value;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
+const getImportedModule = language.getImportedModule;
 const newModuleEnvironment = execution.newModuleEnvironment;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
@@ -59,8 +60,17 @@ host_defined: SafePointer,
 /// [[Status]]
 status: Status,
 
+/// [[DFSIndex]]
+dfs_index: ?usize,
+
+/// [[DFSAncestorIndex]]
+dfs_ancestor_index: ?usize,
+
 /// [[RequestedModules]]
 requested_modules: std.StringArrayHashMap(void),
+
+/// [[LoadedModules]]
+loaded_modules: std.StringArrayHashMap(Module),
 
 /// [[HasTLA]]
 has_tla: bool,
@@ -230,6 +240,157 @@ pub fn continueModuleLoading(
     // 4. Return unused.
 }
 
+/// 16.2.1.5.2 Link ( )
+/// https://tc39.es/ecma262/#sec-moduledeclarationlinking
+pub fn link(self: *Self, agent: *Agent) Agent.Error!void {
+    // 1. Assert: module.[[Status]] is one of unlinked, linked, evaluating-async, or evaluated.
+    std.debug.assert(switch (self.status) {
+        .unlinked, .linked, .evaluating_async, .evaluated => true,
+        else => false,
+    });
+
+    // 2. Let stack be a new empty List.
+    var stack = std.ArrayList(*Self).init(agent.gc_allocator);
+    defer stack.deinit();
+
+    // 3. Let result be Completion(InnerModuleLinking(module, stack, 0)).
+    const result = innerModuleLinking(agent, .{ .source_text_module = self }, &stack, 0);
+
+    // 4. If result is an abrupt completion, then
+    _ = result catch |err| {
+        // a. For each Cyclic Module Record m of stack, do
+        for (stack.items) |module| {
+            // i. Assert: m.[[Status]] is linking.
+            std.debug.assert(module.status == .linking);
+
+            // ii. Set m.[[Status]] to unlinked.
+            module.status = .unlinked;
+        }
+
+        // b. Assert: module.[[Status]] is unlinked.
+        std.debug.assert(self.status == .unlinked);
+
+        // c. Return ? result.
+        return err;
+    };
+
+    // 5. Assert: module.[[Status]] is one of linked, evaluating-async, or evaluated.
+    std.debug.assert(switch (self.status) {
+        .linked, .evaluating_async, .evaluated => true,
+        else => false,
+    });
+
+    // 6. Assert: stack is empty.
+    std.debug.assert(stack.items.len == 0);
+
+    // 7. Return unused.
+}
+
+/// 16.2.1.5.2.1 InnerModuleLinking ( module, stack, index )
+/// https://tc39.es/ecma262/#sec-InnerModuleLinking
+fn innerModuleLinking(agent: *Agent, module: Module, stack: *std.ArrayList(*Self), index: usize) Agent.Error!usize {
+    // 1. If module is not a Cyclic Module Record, then
+    if (module != .source_text_module) {
+        // a. Perform ? module.Link().
+        try module.link(agent);
+
+        // b. Return index.
+        return index;
+    }
+
+    // 2. If module.[[Status]] is one of linking, linked, evaluating-async, or evaluated, then
+    if (switch (module.source_text_module.status) {
+        .linking, .linked, .evaluating_async, .evaluated => true,
+        else => false,
+    }) {
+        // a. Return index.
+        return index;
+    }
+
+    // 3. Assert: module.[[Status]] is unlinked.
+    std.debug.assert(module.source_text_module.status == .unlinked);
+
+    // 4. Set module.[[Status]] to linking.
+    module.source_text_module.status = .linking;
+
+    // 5. Set module.[[DFSIndex]] to index.
+    module.source_text_module.dfs_index = index;
+
+    // 6. Set module.[[DFSAncestorIndex]] to index.
+    module.source_text_module.dfs_ancestor_index = index;
+
+    // 7. Set index to index + 1.
+    var new_index = index + 1;
+
+    // 8. Append module to stack.
+    try stack.append(module.source_text_module);
+
+    // 9. For each String required of module.[[RequestedModules]], do
+    for (module.source_text_module.requested_modules.keys()) |required| {
+        // a. Let requiredModule be GetImportedModule(module, required).
+        const required_module = getImportedModule(module.source_text_module, String.from(required));
+
+        // b. Set index to ? InnerModuleLinking(requiredModule, stack, index).
+        new_index = try innerModuleLinking(agent, required_module, stack, new_index);
+
+        // c. If requiredModule is a Cyclic Module Record, then
+        if (required_module == .source_text_module) {
+            // i. Assert: requiredModule.[[Status]] is one of linking, linked, evaluating-async, or
+            //    evaluated.
+            std.debug.assert(switch (required_module.source_text_module.status) {
+                .linking, .linked, .evaluating_async, .evaluated => true,
+                else => false,
+            });
+
+            // ii. Assert: requiredModule.[[Status]] is linking if and only if stack contains
+            //     requiredModule.
+            std.debug.assert(if (std.mem.indexOfScalar(*Self, stack.items, required_module.source_text_module) != null)
+                required_module.source_text_module.status == .linking
+            else
+                required_module.source_text_module.status != .linking);
+
+            // iii. If requiredModule.[[Status]] is linking, then
+            if (required_module.source_text_module.status == .linking) {
+                // 1. Set module.[[DFSAncestorIndex]] to min(module.[[DFSAncestorIndex]],
+                //    requiredModule.[[DFSAncestorIndex]]).
+                module.source_text_module.dfs_ancestor_index = @min(
+                    module.source_text_module.dfs_ancestor_index.?,
+                    required_module.source_text_module.dfs_ancestor_index.?,
+                );
+            }
+        }
+    }
+
+    // 10. Perform ? module.InitializeEnvironment().
+    try module.source_text_module.initializeEnvironment();
+
+    // 11. Assert: module occurs exactly once in stack.
+
+    // 12. Assert: module.[[DFSAncestorIndex]] ≤ module.[[DFSIndex]].
+    std.debug.assert(module.source_text_module.dfs_ancestor_index.? <= module.source_text_module.dfs_index.?);
+
+    // 13. If module.[[DFSAncestorIndex]] = module.[[DFSIndex]], then
+    if (module.source_text_module.dfs_ancestor_index.? == module.source_text_module.dfs_index.?) {
+        // a. Let done be false.
+        // b. Repeat, while done is false,
+        while (true) {
+            // i. Let requiredModule be the last element of stack.
+            // ii. Remove the last element of stack.
+            // iii. Assert: requiredModule is a Cyclic Module Record.
+            const required_module = stack.pop();
+
+            // iv. Set requiredModule.[[Status]] to linked.
+            required_module.status = .linked;
+
+            // v. If requiredModule and module are the same Module Record, set done to true.
+            if (required_module == module.source_text_module) break;
+        }
+    }
+
+    // 14. Return index.
+    return new_index;
+}
+
 /// 16.2.1.6.1 ParseModule ( sourceText, realm, hostDefined )
 /// https://tc39.es/ecma262/#sec-parsemodule
 pub fn parse(
@@ -270,11 +431,15 @@ pub fn parse(
         .context = null,
         .import_meta = null,
         .requested_modules = requested_modules,
+        .loaded_modules = std.StringArrayHashMap(Module).init(agent.gc_allocator),
+        .dfs_index = null,
+        .dfs_ancestor_index = null,
     };
     return self;
 }
 
 /// 16.2.1.6.4 InitializeEnvironment ( )
+/// https://tc39.es/ecma262/#sec-source-text-module-record-initialize-environment
 pub fn initializeEnvironment(self: *Self) Allocator.Error!void {
     const agent = self.realm.agent;
 
