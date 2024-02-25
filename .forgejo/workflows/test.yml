@@ -12,4 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: https://github.com/goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.12.0-dev.2834+30f15e3af
       - run: zig build -Denable-intl=false test
