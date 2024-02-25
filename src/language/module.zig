@@ -332,7 +332,13 @@ pub fn finishLoadingImportedModule(
 /// 16.2.1.10 GetModuleNamespace ( module )
 /// https://tc39.es/ecma262/#sec-getmodulenamespace
 pub fn getModuleNamespace(agent: *Agent, module: Module) Allocator.Error!Object {
-    // TODO: 1. Assert: If module is a Cyclic Module Record, then module.[[Status]] is not new or unlinked.
+    // 1. Assert: If module is a Cyclic Module Record, then module.[[Status]] is not new or unlinked.
+    if (module == .source_text_module) {
+        std.debug.assert(switch (module.source_text_module.status) {
+            .new, .unlinked => false,
+            else => true,
+        });
+    }
 
     // 2. Let namespace be module.[[Namespace]].
     var namespace = switch (module) {
