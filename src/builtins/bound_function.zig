@@ -105,7 +105,7 @@ pub fn boundFunctionCreate(
             .bound_this = bound_this,
 
             // 9. Set obj.[[BoundArguments]] to boundArgs.
-            .bound_arguments = bound_args,
+            .bound_arguments = try agent.gc_allocator.dupe(Value, bound_args),
         },
     });
 
