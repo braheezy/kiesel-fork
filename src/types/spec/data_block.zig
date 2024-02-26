@@ -9,12 +9,19 @@ const Agent = execution.Agent;
 
 pub const DataBlock = std.ArrayList(u8);
 
+/// Arbitrary size limit (32 GiB)
+pub const max_byte_length = 1024 * 1024 * 1024 * 32;
+
 /// 6.2.9.1 CreateByteDataBlock ( size )
 /// https://tc39.es/ecma262/#sec-createbytedatablock
 pub fn createByteDataBlock(agent: *Agent, size: u64) Agent.Error!DataBlock {
     // 1. If size > 2**53 - 1, throw a RangeError exception.
-    if (size > std.math.maxInt(u53)) {
-        return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
+    comptime std.debug.assert(max_byte_length <= std.math.maxInt(u53));
+
+    // NOTE: Checking for a reasonable size below the theoretical limit is non-standard but also
+    //       done in other engines (and tested by test262)
+    if (size > max_byte_length) {
+        return agent.throwException(.range_error, "Cannot allocate buffer of size {}", .{size});
     }
 
     const size_casted = std.math.cast(usize, size) orelse {
@@ -38,6 +45,12 @@ pub fn createByteDataBlock(agent: *Agent, size: u64) Agent.Error!DataBlock {
 /// 6.2.9.2 CreateSharedByteDataBlock ( size )
 /// https://tc39.es/ecma262/#sec-createsharedbytedatablock
 pub fn createSharedByteDataBlock(agent: *Agent, size: u64) Agent.Error!DataBlock {
+    // NOTE: Checking for a reasonable size below the theoretical limit is non-standard but also
+    //       done in other engines (and tested by test262)
+    if (size > max_byte_length) {
+        return agent.throwException(.range_error, "Cannot allocate buffer of size {}", .{size});
+    }
+
     const size_casted = std.math.cast(usize, size) orelse {
         return agent.throwException(.range_error, "Cannot allocate buffer of size {}", .{size});
     };

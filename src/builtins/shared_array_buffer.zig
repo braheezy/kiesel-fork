@@ -38,13 +38,6 @@ pub fn allocateSharedArrayBuffer(
     byte_length: u64,
     max_byte_length: ?u53,
 ) Agent.Error!Object {
-    // Non-standard but present in other engines (and tested by test262)
-    if (byte_length > SharedArrayBuffer.Fields.max_byte_length or
-        (max_byte_length orelse 0) > SharedArrayBuffer.Fields.max_byte_length)
-    {
-        return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
-    }
-
     // 1. Let slots be « [[ArrayBufferData]] ».
 
     // 2. If maxByteLength is present and maxByteLength is not empty, let allocatingGrowableBuffer
@@ -365,9 +358,6 @@ pub const SharedArrayBufferPrototype = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-sharedarraybuffer-instances
 pub const SharedArrayBuffer = MakeObject(.{
     .Fields = struct {
-        /// Arbitrary size limit (32 GiB)
-        const max_byte_length = 1024 * 1024 * 1024 * 32;
-
         /// [[ArrayBufferData]]
         /// [[ArrayBufferByteLength]]
         array_buffer_data: DataBlock,
