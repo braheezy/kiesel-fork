@@ -11,12 +11,12 @@
             .hash = "122038d3ca3346181b0bc153f057177dd5adc4fd601b1d40820c83ffb2c82bc04561",
         },
         .libgc = .{
-            .url = "https://github.com/linusg/zig-libgc/archive/85c7d3dac3fb5b5fe9fce49636cb61fa872c4ffc.tar.gz",
-            .hash = "12207f23d6f9d70cddb5d7f20dc470b5de33c73f2250a2c867c89c112f9257479f10",
+            .url = "https://github.com/linusg/zig-libgc/archive/8d488adfb067ce435056fcfdb84537049c8d152b.tar.gz",
+            .hash = "1220df7e3832cbd79557677ee95f5992a2d2e7e31444985f1ab5c8d86e82f8d9a337",
         },
         .libregexp = .{
-            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/30a1ce06aa993ba64e3c307a9146fa8a4992acc7.tar.gz",
-            .hash = "1220322c0d6afcf63cd84f96d8b75d27d8d20d19d18ede6db086941ead4d1f55db61",
+            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/2d06c7e1d841e3ead3221dcf1e6302e49af68bd2.tar.gz",
+            .hash = "1220de71587ffbe5a6834db0dd581183c0fcb73123d170e67c45a4efe32bbbbaf766",
         },
         .parser_toolkit = .{
             .url = "https://github.com/MasterQ32/parser-toolkit/archive/358a028beb32ebb193dadb6f7a954965745892a7.tar.gz",
@@ -27,8 +27,7 @@
             .hash = "12203ded54c85878eea7f12744066dcb4397177395ac49a7b2aa365bf6047b623829",
         },
         .zigline = .{
-            // FIXME: This points to https://github.com/alimpfard/zigline/pull/15, update once merged
-            .url = "https://github.com/alimpfard/zigline/archive/71f6c460c6dde9b917afcdb68a5b6f92b65a1fbf.tar.gz",
+            .url = "https://github.com/alimpfard/zigline/archive/e18781dbc559e9a7aa3d6fa327335815803306dc.tar.gz",
             .hash = "12208f21bd7d85021b7d8d191e8c0114871cde63cc7d1056a8b4d7805fe8fc1b85a2",
         },
     },
