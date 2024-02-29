@@ -126,6 +126,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "expm1", expm1, 1, realm);
         try defineBuiltinFunction(object, "floor", floor, 1, realm);
         try defineBuiltinFunction(object, "fround", fround, 1, realm);
+        try defineBuiltinFunction(object, "hypot", hypot, 2, realm);
         try defineBuiltinFunction(object, "imul", imul, 2, realm);
         try defineBuiltinFunction(object, "log", log, 1, realm);
         try defineBuiltinFunction(object, "log1p", log1p, 1, realm);
@@ -448,6 +449,52 @@ pub const Math = struct {
 
         // 6. Return the ECMAScript Number value corresponding to n64.
         return Value.from(n64);
+    }
+
+    /// 21.3.2.18 Math.hypot ( ...args )
+    /// https://tc39.es/ecma262/#sec-math.hypot
+    fn hypot(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+        // 1. Let coerced be a new empty List.
+        var coerced = try std.ArrayList(Number).initCapacity(agent.gc_allocator, arguments.count());
+        defer coerced.deinit();
+
+        // 2. For each element arg of args, do
+        for (arguments.values) |arg| {
+            // a. Let n be ? ToNumber(arg).
+            const n = try arg.toNumber(agent);
+
+            // b. Append n to coerced.
+            coerced.appendAssumeCapacity(n);
+        }
+
+        // 3. For each element number of coerced, do
+        for (coerced.items) |number| {
+            // a. If number is either +∞𝔽 or -∞𝔽, return +∞𝔽.
+            if (number.isPositiveInf() or number.isNegativeInf()) return Value.infinity();
+        }
+
+        // 4. Let onlyZero be true.
+        var only_zero = true;
+
+        // 5. For each element number of coerced, do
+        for (coerced.items) |number| {
+            // a. If number is NaN, return NaN.
+            if (number.isNan()) return Value.nan();
+
+            // b. If number is neither +0𝔽 nor -0𝔽, set onlyZero to false.
+            if (!number.isZero()) only_zero = false;
+        }
+
+        // 6. If onlyZero is true, return +0𝔽.
+        if (only_zero) return Value.from(0);
+
+        // 7. Return an implementation-approximated Number value representing the square root of
+        //    the sum of squares of the mathematical values of the elements of coerced.
+        var sum_of_squares: f64 = 0;
+        for (coerced.items) |number| {
+            sum_of_squares += number.asFloat() * number.asFloat();
+        }
+        return Value.from(@sqrt(sum_of_squares));
     }
 
     /// 21.3.2.19 Math.imul ( x, y )
