@@ -191,7 +191,6 @@ fn evalDeclarationInstantiation(
     private_env: ?*PrivateEnvironment,
     strict: bool,
 ) Agent.Error!void {
-    _ = lex_env;
     _ = private_env;
 
     // 1. Let varNames be the VarDeclaredNames of body.
@@ -222,10 +221,90 @@ fn evalDeclarationInstantiation(
             }
         }
 
-        // TODO: b-c.
+        // b. Let thisEnv be lexEnv.
+        var this_env = lex_env;
+
+        // c. Assert: The following loop will terminate.
+        // d. Repeat, while thisEnv and varEnv are not the same Environment Record,
+        while (!std.meta.eql(this_env, var_env)) {
+            // i. If thisEnv is not an Object Environment Record, then
+            if (this_env != .object_environment) {
+                // 1. NOTE: The environment of with statements cannot contain any lexical
+                //    declaration so it doesn't need to be checked for var/let hoisting conflicts.
+
+                // 2. For each element name of varNames, do
+                for (var_names) |name| {
+                    // a. If ! thisEnv.HasBinding(name) is true, then
+                    if (this_env.hasBinding(name) catch |err| try noexcept(err)) {
+                        // i. Throw a SyntaxError exception.
+                        return agent.throwException(.syntax_error, "idk", .{});
+
+                        // ii. NOTE: Annex B.3.4 defines alternate semantics for the above step.
+                    }
+
+                    // b. NOTE: A direct eval will not hoist var declaration over a like-named
+                    //    lexical declaration.
+                }
+            }
+
+            // ii. Set thisEnv to thisEnv.[[OuterEnv]].
+            this_env = this_env.outerEnv().?;
+        }
     }
 
-    // TODO: 4-10.
+    // TODO: 4-7.
+
+    // 8. Let functionsToInitialize be a new empty List.
+    var functions_to_initialize = std.ArrayList(ast.HoistableDeclaration).init(agent.gc_allocator);
+    defer functions_to_initialize.deinit();
+
+    // 9. Let declaredFunctionNames be a new empty List.
+    var declared_function_names = std.StringHashMap(void).init(agent.gc_allocator);
+    defer declared_function_names.deinit();
+
+    // 10. For each element d of varDeclarations, in reverse List order, do
+    var it = std.mem.reverseIterator(var_declarations);
+    while (it.next()) |var_declaration| {
+        // a. If d is not either a VariableDeclaration, a ForBinding, or a BindingIdentifier, then
+        if (var_declaration == .hoistable_declaration) {
+            // i. Assert: d is either a FunctionDeclaration, a GeneratorDeclaration, an
+            //    AsyncFunctionDeclaration, or an AsyncGeneratorDeclaration.
+            const hoistable_declaration = var_declaration.hoistable_declaration;
+
+            // ii. NOTE: If there are multiple function declarations for the same name, the last
+            //     declaration is used.
+
+            // iii. Let fn be the sole element of the BoundNames of d.
+            const function_name = switch (hoistable_declaration) {
+                inline else => |function_declaration| function_declaration.identifier,
+            }.?;
+
+            // iv. If declaredFunctionNames does not contain fn, then
+            if (!declared_function_names.contains(function_name)) {
+                // 1. If varEnv is a Global Environment Record, then
+                if (var_env == .global_environment) {
+                    // a. Let fnDefinable be ? varEnv.CanDeclareGlobalFunction(fn).
+                    const function_definable = try var_env.global_environment.canDeclareGlobalFunction(function_name);
+
+                    // b. If fnDefinable is false, throw a TypeError exception.
+                    if (!function_definable) {
+                        return agent.throwException(
+                            .type_error,
+                            "Cannot declare '{s}' in global environment",
+                            .{function_name},
+                        );
+                    }
+                }
+
+                // 2. Append fn to declaredFunctionNames.
+                try declared_function_names.putNoClobber(function_name, {});
+
+                // 3. Insert d as the first element of functionsToInitialize.
+                // NOTE: AFAICT the order isn't observable, so we can append.
+                try functions_to_initialize.append(hoistable_declaration);
+            }
+        }
+    }
 
     // 11. Let declaredVarNames be a new empty List.
     var declared_var_names = std.StringHashMap(void).init(agent.gc_allocator);
@@ -235,28 +314,35 @@ fn evalDeclarationInstantiation(
     for (var_declarations) |var_declaration| {
         // a. If d is either a VariableDeclaration, a ForBinding, or a BindingIdentifier, then
         if (var_declaration == .variable_declaration) {
+            // TODO: Update this when binding patterns are supported.
+            const bound_names: []const ast.Identifier = &.{
+                var_declaration.variable_declaration.binding_identifier,
+            };
+
             // i. For each String vn of the BoundNames of d, do
-            for ([_]ast.Identifier{var_declaration.variable_declaration.binding_identifier}) |var_name| {
-                // TODO: 1. If declaredFunctionNames does not contain vn, then
-                // a. If varEnv is a Global Environment Record, then
-                if (var_env == .global_environment) {
-                    // i. Let vnDefinable be ? varEnv.CanDeclareGlobalVar(vn).
-                    const var_name_definable = try var_env.global_environment.canDeclareGlobalVar(var_name);
+            for (bound_names) |var_name| {
+                // 1. If declaredFunctionNames does not contain vn, then
+                if (!declared_function_names.contains(var_name)) {
+                    // a. If varEnv is a Global Environment Record, then
+                    if (var_env == .global_environment) {
+                        // i. Let vnDefinable be ? varEnv.CanDeclareGlobalVar(vn).
+                        const var_name_definable = try var_env.global_environment.canDeclareGlobalVar(var_name);
 
-                    // ii. If vnDefinable is false, throw a TypeError exception.
-                    if (!var_name_definable) {
-                        return agent.throwException(
-                            .type_error,
-                            "Cannot declare '{s}' in global environment",
-                            .{var_name},
-                        );
+                        // ii. If vnDefinable is false, throw a TypeError exception.
+                        if (!var_name_definable) {
+                            return agent.throwException(
+                                .type_error,
+                                "Cannot declare '{s}' in global environment",
+                                .{var_name},
+                            );
+                        }
                     }
-                }
 
-                // b. If declaredVarNames does not contain vn, then
-                if (!declared_var_names.contains(var_name)) {
-                    // i. Append vn to declaredVarNames.
-                    try declared_var_names.putNoClobber(var_name, {});
+                    // b. If declaredVarNames does not contain vn, then
+                    if (!declared_var_names.contains(var_name)) {
+                        // i. Append vn to declaredVarNames.
+                        try declared_var_names.putNoClobber(var_name, {});
+                    }
                 }
             }
         }
@@ -269,8 +355,8 @@ fn evalDeclarationInstantiation(
     // TODO: 15-17.
 
     // 18. For each String vn of declaredVarNames, do
-    var it = declared_var_names.keyIterator();
-    while (it.next()) |ptr| {
+    var it_ = declared_var_names.keyIterator();
+    while (it_.next()) |ptr| {
         const var_name = ptr.*;
 
         // a. If varEnv is a Global Environment Record, then
