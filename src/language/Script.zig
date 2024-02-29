@@ -186,8 +186,17 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
 
             // iv. If declaredFunctionNames does not contain fn, then
             if (!declared_function_names.contains(function_name)) {
-                // TODO: 1. Let fnDefinable be ? env.CanDeclareGlobalFunction(fn).
-                // TODO: 2. If fnDefinable is false, throw a TypeError exception.
+                // 1. Let fnDefinable be ? env.CanDeclareGlobalFunction(fn).
+                const function_definable = try env.canDeclareGlobalFunction(function_name);
+
+                // 2. If fnDefinable is false, throw a TypeError exception.
+                if (!function_definable) {
+                    return agent.throwException(
+                        .type_error,
+                        "Cannot declare '{s}' in global environment",
+                        .{function_name},
+                    );
+                }
 
                 // 3. Append fn to declaredFunctionNames.
                 try declared_function_names.putNoClobber(function_name, {});

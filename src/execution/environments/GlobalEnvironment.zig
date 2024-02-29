@@ -243,6 +243,36 @@ pub fn canDeclareGlobalVar(self: *Self, name: []const u8) Agent.Error!bool {
     return global_object.isExtensible();
 }
 
+/// 9.1.1.4.16 CanDeclareGlobalFunction ( N )
+/// https://tc39.es/ecma262/#sec-candeclareglobalfunction
+pub fn canDeclareGlobalFunction(self: *Self, name: []const u8) Agent.Error!bool {
+    // 1. Let ObjRec be envRec.[[ObjectRecord]].
+    // 2. Let globalObject be ObjRec.[[BindingObject]].
+    const global_object = self.object_record.binding_object;
+
+    // 3. Let existingProp be ? globalObject.[[GetOwnProperty]](N).
+    const existing_prop = try global_object.internalMethods().getOwnProperty(
+        global_object,
+        PropertyKey.from(name),
+    ) orelse {
+
+        // 4. If existingProp is undefined, return ? IsExtensible(globalObject).
+        return global_object.isExtensible();
+    };
+
+    // 5. If existingProp.[[Configurable]] is true, return true.
+    if (existing_prop.configurable == true) return true;
+
+    // 6. If IsDataDescriptor(existingProp) is true and existingProp has attribute values
+    //    { [[Writable]]: true, [[Enumerable]]: true }, return true.
+    if (existing_prop.isDataDescriptor() and
+        existing_prop.writable == true and
+        existing_prop.enumerable == true) return true;
+
+    // 7. Return false.
+    return false;
+}
+
 /// 9.1.1.4.17 CreateGlobalVarBinding ( N, D )
 /// https://tc39.es/ecma262/#sec-createglobalvarbinding
 pub fn createGlobalVarBinding(
