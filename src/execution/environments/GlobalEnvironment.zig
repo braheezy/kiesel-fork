@@ -226,6 +226,22 @@ pub fn hasLexicalDeclaration(self: Self, name: []const u8) bool {
     // 2. Return ! DclRec.HasBinding(N).
     return self.declarative_record.hasBinding(name);
 }
+/// 9.1.1.4.15 CanDeclareGlobalVar ( N )
+/// https://tc39.es/ecma262/#sec-candeclareglobalvar
+pub fn canDeclareGlobalVar(self: *Self, name: []const u8) Agent.Error!bool {
+    // 1. Let ObjRec be envRec.[[ObjectRecord]].
+    // 2. Let globalObject be ObjRec.[[BindingObject]].
+    const global_object = self.object_record.binding_object;
+
+    // 3. Let hasProperty be ? HasOwnProperty(globalObject, N).
+    const has_property = try global_object.hasOwnProperty(PropertyKey.from(name));
+
+    // 4. If hasProperty is true, return true.
+    if (has_property) return true;
+
+    // 5. Return ? IsExtensible(globalObject).
+    return global_object.isExtensible();
+}
 
 /// 9.1.1.4.17 CreateGlobalVarBinding ( N, D )
 /// https://tc39.es/ecma262/#sec-createglobalvarbinding

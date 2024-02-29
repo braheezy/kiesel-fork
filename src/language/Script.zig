@@ -216,8 +216,17 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
             for (bound_names) |var_name| {
                 // 1. If declaredFunctionNames does not contain vn, then
                 if (!declared_function_names.contains(var_name)) {
-                    // TODO: a. Let vnDefinable be ? env.CanDeclareGlobalVar(vn).
-                    // TODO: b. If vnDefinable is false, throw a TypeError exception.
+                    // a. Let vnDefinable be ? env.CanDeclareGlobalVar(vn).
+                    const var_name_definable = try env.canDeclareGlobalVar(var_name);
+
+                    // b. If vnDefinable is false, throw a TypeError exception.
+                    if (!var_name_definable) {
+                        return agent.throwException(
+                            .type_error,
+                            "Cannot declare '{s}' in global environment",
+                            .{var_name},
+                        );
+                    }
 
                     // c. If declaredVarNames does not contain vn, then
                     if (!declared_var_names.contains(var_name)) {

@@ -240,8 +240,17 @@ fn evalDeclarationInstantiation(
                 // TODO: 1. If declaredFunctionNames does not contain vn, then
                 // a. If varEnv is a Global Environment Record, then
                 if (var_env == .global_environment) {
-                    // TODO: i. Let vnDefinable be ? varEnv.CanDeclareGlobalVar(vn).
-                    // TODO: ii. If vnDefinable is false, throw a TypeError exception.
+                    // i. Let vnDefinable be ? varEnv.CanDeclareGlobalVar(vn).
+                    const var_name_definable = try var_env.global_environment.canDeclareGlobalVar(var_name);
+
+                    // ii. If vnDefinable is false, throw a TypeError exception.
+                    if (!var_name_definable) {
+                        return agent.throwException(
+                            .type_error,
+                            "Cannot declare '{s}' in global environment",
+                            .{var_name},
+                        );
+                    }
                 }
 
                 // b. If declaredVarNames does not contain vn, then
