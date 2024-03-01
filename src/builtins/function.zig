@@ -261,21 +261,21 @@ pub fn createDynamicFunction(
     // 6. Let argCount be the number of elements in parameterArgs.
     const arg_count = parameter_args.count();
 
-    // 7. Let bodyString be ? ToString(bodyArg).
-    const body_string = try body_arg.toString(agent);
-
-    // 8. Let parameterStrings be a new empty List.
+    // 7. Let parameterStrings be a new empty List.
     var parameter_strings = try std.ArrayList(String).initCapacity(
         agent.gc_allocator,
         parameter_args.count(),
     );
     defer parameter_strings.deinit();
 
-    // 9. For each element arg of parameterArgs, do
+    // 8. For each element arg of parameterArgs, do
     for (parameter_args.values) |arg| {
         // a. Append ? ToString(arg) to parameterStrings.
         parameter_strings.appendAssumeCapacity(try arg.toString(agent));
     }
+
+    // 9. Let bodyString be ? ToString(bodyArg).
+    const body_string = try body_arg.toString(agent);
 
     // 10. Let currentRealm be the current Realm Record.
     const current_realm = realm;
