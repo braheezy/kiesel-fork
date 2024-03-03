@@ -16,6 +16,7 @@ const BigInt = @import("BigInt.zig");
 const Iterator = types.Iterator;
 const Number = @import("number.zig").Number;
 const Object = @import("Object.zig");
+const PrivateName = types.PrivateName;
 const PropertyDescriptor = @import("../spec/PropertyDescriptor.zig");
 const PropertyKey = Object.PropertyKey;
 const PropertyKeyArrayHashMap = Object.PropertyStorage.PropertyKeyArrayHashMap;
@@ -1286,6 +1287,12 @@ pub const Value = union(enum) {
             .object => null,
         };
     }
+
+    /// Non-standard helper to turn a symbol value into a private name.
+    pub fn toPrivateName(self: Self) ?PrivateName {
+        if (self != .symbol or !self.symbol.private) return null;
+        return .{ .symbol = self.symbol };
+    }
 };
 
 /// 7.1.4.1.1 StringToNumber ( str )
@@ -1403,7 +1410,7 @@ pub fn sameValueNonNumber(x: Value, y: Value) bool {
 
         // 6. NOTE: All other ECMAScript language values are compared by identity.
         // 7. If x is y, return true; otherwise, return false.
-        .symbol => x.symbol.id == y.symbol.id,
+        .symbol => x.symbol.sameValue(y.symbol),
         .object => x.object.sameValue(y.object),
 
         .number => unreachable,

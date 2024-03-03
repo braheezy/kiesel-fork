@@ -83,20 +83,20 @@ pub fn codegenMemberExpression(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    // 1. Let baseReference be ? Evaluation of MemberExpression.
-    try codegenExpression(node.expression.*, executable, ctx);
-
-    // 2. Let baseValue be ? GetValue(baseReference).
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
-
-    // 3. If the source text matched by this MemberExpression is strict mode code, let strict
-    //    be true; else let strict be false.
-    const strict = ctx.contained_in_strict_mode_code;
-
     switch (node.property) {
         // MemberExpression : MemberExpression [ Expression ]
         .expression => |expression| {
+            // 1. Let baseReference be ? Evaluation of MemberExpression.
+            try codegenExpression(node.expression.*, executable, ctx);
+
+            // 2. Let baseValue be ? GetValue(baseReference).
+            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
+
+            // 3. If the source text matched by this MemberExpression is strict mode code, let
+            //    strict be true; else let strict be false.
+            const strict = ctx.contained_in_strict_mode_code;
+
             // 4. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
             try codegenExpression(expression.*, executable, ctx);
             if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
@@ -107,12 +107,40 @@ pub fn codegenMemberExpression(
 
         // MemberExpression : MemberExpression . IdentifierName
         .identifier => |identifier| {
+            // 1. Let baseReference be ? Evaluation of MemberExpression.
+            try codegenExpression(node.expression.*, executable, ctx);
+
+            // 2. Let baseValue be ? GetValue(baseReference).
+            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
+
+            // 3. If the source text matched by this MemberExpression is strict mode code, let
+            //    strict be true; else let strict be false.
+            const strict = ctx.contained_in_strict_mode_code;
+
             // 4. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
             try executable.addInstructionWithIdentifier(
                 .evaluate_property_access_with_identifier_key,
                 identifier,
             );
             try executable.addIndex(@intFromBool(strict));
+        },
+
+        // MemberExpression : MemberExpression . PrivateIdentifier
+        .private_identifier => |private_identifier| {
+            // 1. Let baseReference be ? Evaluation of MemberExpression.
+            try codegenExpression(node.expression.*, executable, ctx);
+
+            // 2. Let baseValue be ? GetValue(baseReference).
+            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
+
+            // 3. Let fieldNameString be the StringValue of PrivateIdentifier.
+            // 4. Return MakePrivateReference(baseValue, fieldNameString).
+            try executable.addInstructionWithIdentifier(
+                .make_private_reference,
+                private_identifier,
+            );
         },
     }
 }
@@ -2539,7 +2567,7 @@ pub fn codegenMethodDefinition(
         inline else => |*expression| expression.function_body.strict = strict,
     }
 
-    try codegenPropertyName(node.property_name, executable, ctx);
+    try codegenClassElementName(node.class_element_name, executable, ctx);
     try executable.addInstruction(.load);
 
     try executable.addInstructionWithFunctionOrClass(
@@ -2630,6 +2658,31 @@ pub fn codegenClassExpression(
         .class_definition_evaluation,
         .{ .class_expression = node },
     );
+}
+
+/// 15.7.16 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-class-definitions-runtime-semantics-evaluation
+pub fn codegenClassElementName(
+    node: ast.ClassElementName,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    switch (node) {
+        .property_name => |property_name| {
+            try codegenPropertyName(property_name, executable, ctx);
+        },
+
+        // ClassElementName : PrivateIdentifier
+        .private_identifier => |private_identifier| {
+            // 1. Let privateIdentifier be StringValue of PrivateIdentifier.
+            // 2. Let privateEnvRec be the running execution context's PrivateEnvironment.
+            // 3. Let names be privateEnvRec.[[Names]].
+            // 4. Assert: Exactly one element of names is a Private Name whose [[Description]] is privateIdentifier.
+            // 5. Let privateName be the Private Name in names whose [[Description]] is privateIdentifier.
+            // 6. Return privateName.
+            try executable.addInstructionWithIdentifier(.resolve_private_identifier, private_identifier);
+        },
+    }
 }
 
 /// 15.8.5 Runtime Semantics: Evaluation

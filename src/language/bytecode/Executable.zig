@@ -240,6 +240,11 @@ pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
                     .{ identifier, identifier_index, strict, environment_lookup_cache_index },
                 );
             },
+            .make_private_reference, .resolve_private_identifier => {
+                const identifier_index = iterator.instruction_args[0].?;
+                const identifier = self.identifiers.unmanaged.entries.get(identifier_index).key;
+                try writer.print("{s} [{}]", .{ identifier, identifier_index });
+            },
             else => {},
         }
         try writer.writeAll("\n");

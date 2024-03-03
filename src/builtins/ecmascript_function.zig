@@ -24,9 +24,13 @@ const Executable = bytecode.Executable;
 const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
+const PrivateElement = types.PrivateElement;
 const PrivateEnvironment = execution.PrivateEnvironment;
+const PrivateMethodDefinition = types.PrivateMethodDefinition;
+const PrivateName = types.PrivateName;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
+const PropertyKeyOrPrivateName = types.PropertyKeyOrPrivateName;
 const Realm = execution.Realm;
 const ScriptOrModule = execution.ScriptOrModule;
 const String = types.String;
@@ -100,15 +104,13 @@ pub const ECMAScriptFunction = MakeObject(.{
         source_text: []const u8,
 
         /// [[ClassFieldInitializerName]]
-        class_field_initializer_name: ?union(enum) {
-            property_key: PropertyKey,
-            private_name: void, // TODO: Implement private names
-        },
+        class_field_initializer_name: ?PropertyKeyOrPrivateName,
 
         /// [[Fields]]
         fields: []const ClassFieldDefinition,
 
-        // TODO: [[PrivateMethods]]
+        /// [[PrivateMethods]]
+        private_methods: []const PrivateMethodDefinition,
 
         /// [[IsClassConstructor]]
         is_class_constructor: bool,
@@ -587,7 +589,8 @@ pub fn ordinaryFunctionCreate(
             // 18. Set F.[[Fields]] to a new empty List.
             .fields = &.{},
 
-            // TODO: 19. Set F.[[PrivateMethods]] to a new empty List.
+            // 19. Set F.[[PrivateMethods]] to a new empty List.
+            .private_methods = &.{},
 
             // 20. Set F.[[ClassFieldInitializerName]] to empty.
             .class_field_initializer_name = null,
@@ -742,38 +745,43 @@ pub fn makeMethod(
 /// https://tc39.es/ecma262/#sec-definemethodproperty
 pub fn defineMethodProperty(
     home_object: Object,
-    property_key: PropertyKey,
+    key: PropertyKeyOrPrivateName,
     closure: Object,
     enumerable: bool,
-) Agent.Error!void {
+) Agent.Error!?PrivateMethodDefinition {
     // 1. Assert: homeObject is an ordinary, extensible object.
 
-    // TODO: 2. If key is a Private Name, then
-    if (false) {
-        // a. Return PrivateElement { [[Key]]: key, [[Kind]]: method, [[Value]]: closure }.
-    }
-    // 3. Else,
-    else {
-        // a. Let desc be the PropertyDescriptor {
-        //      [[Value]]: closure, [[Writable]]: true, [[Enumerable]]: enumerable, [[Configurable]]: true
-        //    }.
-        const property_descriptor = PropertyDescriptor{
-            .value = Value.from(closure),
-            .writable = true,
-            .enumerable = enumerable,
-            .configurable = true,
-        };
+    switch (key) {
+        // 2. If key is a Private Name, then
+        .private_name => |private_name| {
+            // a. Return PrivateElement { [[Key]]: key, [[Kind]]: method, [[Value]]: closure }.
+            const private_element = PrivateElement{ .method = closure };
+            return .{ .private_name = private_name, .private_element = private_element };
+        },
+        // 3. Else,
+        .property_key => |property_key| {
+            // a. Let desc be the PropertyDescriptor {
+            //      [[Value]]: closure, [[Writable]]: true, [[Enumerable]]: enumerable, [[Configurable]]: true
+            //    }.
+            const property_descriptor = PropertyDescriptor{
+                .value = Value.from(closure),
+                .writable = true,
+                .enumerable = enumerable,
+                .configurable = true,
+            };
 
-        // b. Perform ? DefinePropertyOrThrow(homeObject, key, desc).
-        try home_object.definePropertyOrThrow(
-            property_key,
-            property_descriptor,
-        );
+            // b. Perform ? DefinePropertyOrThrow(homeObject, key, desc).
+            try home_object.definePropertyOrThrow(
+                property_key,
+                property_descriptor,
+            );
 
-        // c. NOTE: DefinePropertyOrThrow only returns an abrupt completion when attempting to
-        //    define a class static method whose key is "prototype".
+            // c. NOTE: DefinePropertyOrThrow only returns an abrupt completion when attempting to
+            //    define a class static method whose key is "prototype".
 
-        // d. Return unused.
+            // d. Return unused.
+            return null;
+        },
     }
 }
 
@@ -781,9 +789,10 @@ pub fn defineMethodProperty(
 /// https://tc39.es/ecma262/#sec-setfunctionname
 pub fn setFunctionName(
     function: Object,
-    name_property_key: PropertyKey,
+    key: anytype,
     prefix: ?[]const u8,
 ) Allocator.Error!void {
+    comptime std.debug.assert(@TypeOf(key) == PropertyKey or @TypeOf(key) == PropertyKeyOrPrivateName);
     const agent = function.agent();
 
     // 1. Assert: F is an extensible object that does not have a "name" own property.
@@ -791,27 +800,31 @@ pub fn setFunctionName(
         function.extensible().* and !function.propertyStorage().has(PropertyKey.from("name")),
     );
 
-    var name = switch (try name_property_key.toStringOrSymbol(agent)) {
-        .string => |string| String.from(string),
+    var name = switch (if (@TypeOf(key) == PropertyKey) PropertyKeyOrPrivateName{ .property_key = key } else key) {
+        .property_key => |property_key| switch (try property_key.toStringOrSymbol(agent)) {
+            .string => |string| String.from(string),
 
-        // 2. If name is a Symbol, then
-        .symbol => |symbol| blk: {
-            // a. Let description be name's [[Description]] value.
-            const description = symbol.description;
+            // 2. If name is a Symbol, then
+            .symbol => |symbol| blk: {
+                // a. Let description be name's [[Description]] value.
+                const description = symbol.description;
 
-            // b. If description is undefined, set name to the empty String.
-            if (description == null) break :blk String.from("");
+                // b. If description is undefined, set name to the empty String.
+                if (description == null) break :blk String.from("");
 
-            // c. Else, set name to the string-concatenation of "[", description, and "]".
-            break :blk String.from(try std.fmt.allocPrint(
-                agent.gc_allocator,
-                "[{s}]",
-                .{description.?.utf8},
-            ));
+                // c. Else, set name to the string-concatenation of "[", description, and "]".
+                break :blk String.from(try std.fmt.allocPrint(
+                    agent.gc_allocator,
+                    "[{s}]",
+                    .{description.?.utf8},
+                ));
+            },
         },
-
-        // TODO: 3. Else if name is a Private Name, then
-        //     a. Set name to name.[[Description]].
+        // 3. Else if name is a Private Name, then
+        .private_name => |private_name| blk: {
+            // a. Set name to name.[[Description]].
+            break :blk private_name.symbol.description.?;
+        },
     };
 
     // 4. If F has an [[InitialName]] internal slot, then

@@ -4,13 +4,10 @@
 const builtins = @import("../../builtins.zig");
 const types = @import("../../types.zig");
 
-const PropertyKey = types.PropertyKey;
+const PropertyKeyOrPrivateName = types.PropertyKeyOrPrivateName;
 
 /// [[Name]]
-name: union(enum) {
-    property_key: PropertyKey,
-    private_name: void, // TODO: Implement private names
-},
+name: PropertyKeyOrPrivateName,
 
 /// [[Initializer]]
 initializer: ?*builtins.ECMAScriptFunction,

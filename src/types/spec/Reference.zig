@@ -4,14 +4,15 @@
 const std = @import("std");
 
 const execution = @import("../../execution.zig");
-const language = @import("../language.zig");
+const types = @import("../../types.zig");
 
 const Agent = execution.Agent;
 const Environment = execution.Environment;
-const PropertyKey = language.Object.PropertyKey;
-const String = language.String;
-const Symbol = language.Symbol;
-const Value = language.Value;
+const PrivateName = types.PrivateName;
+const PropertyKey = types.PropertyKey;
+const String = types.String;
+const Symbol = types.Symbol;
+const Value = types.Value;
 
 const Self = @This();
 
@@ -26,7 +27,7 @@ base: union(enum) {
 referenced_name: union(enum) {
     string: []const u8,
     symbol: Symbol,
-    private_name: void, // TODO: Implement private names
+    private_name: PrivateName,
 },
 
 /// [[Strict]]
@@ -88,37 +89,39 @@ pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
 
     // 3. If IsPropertyReference(V) is true, then
     if (self.isPropertyReference()) {
-        const referenced_name = switch (self.referenced_name) {
+        const property_key = switch (self.referenced_name) {
             .string => |string| PropertyKey.from(string),
             .symbol => |symbol| PropertyKey.from(symbol),
-            .private_name => unreachable,
+            .private_name => null,
         };
 
         // a. Let baseObj be ? ToObject(V.[[Base]]).
         // NOTE: For property lookups on primitives we can directly go to the prototype instead
         //       of creating a wrapper object, or return the value for `"string".length`.
-        const base_object = (if (self.base.value != .string or switch (referenced_name) {
-            .string => |string| if (string.eql(String.from("length")))
-                return Value.from(@as(u53, @intCast(self.base.value.string.utf16Length())))
-            else
-                true,
-            .integer_index => false,
-            .symbol => true,
-        })
-            try self.base.value.synthesizePrototype(agent)
-        else
-            null) orelse try self.base.value.toObject(agent);
+        const base_object = blk: {
+            if (self.base.value != .string or property_key == null) {
+                break :blk try self.base.value.synthesizePrototype(agent);
+            }
+            switch (property_key.?) {
+                .string => |string| if (string.eql(String.from("length")))
+                    return Value.from(@as(u53, @intCast(self.base.value.string.utf16Length())))
+                else
+                    break :blk try self.base.value.synthesizePrototype(agent),
+                .integer_index => break :blk null,
+                .symbol => break :blk try self.base.value.synthesizePrototype(agent),
+            }
+        } orelse try self.base.value.toObject(agent);
 
         // b. If IsPrivateReference(V) is true, then
         if (self.isPrivateReference()) {
-            // TODO: i. Return ? PrivateGet(baseObj, V.[[ReferencedName]]).
-            @panic("Not implemented");
+            // i. Return ? PrivateGet(baseObj, V.[[ReferencedName]]).
+            return base_object.privateGet(self.referenced_name.private_name);
         }
 
         // c. Return ? baseObj.[[Get]](V.[[ReferencedName]], GetThisValue(V)).
         return base_object.internalMethods().get(
             base_object,
-            referenced_name,
+            property_key.?,
             self.getThisValue(),
         );
     }
@@ -163,12 +166,12 @@ pub fn putValue(self: Self, agent: *Agent, value: Value) Agent.Error!void {
     // 3. If IsPropertyReference(V) is true, then
     if (self.isPropertyReference()) {
         // a. Let baseObj be ? ToObject(V.[[Base]]).
-        const base_object = try self.base.value.toObject(agent);
+        var base_object = try self.base.value.toObject(agent);
 
         // b. If IsPrivateReference(V) is true, then
         if (self.isPrivateReference()) {
-            // TODO: i. Return ? PrivateSet(baseObj, V.[[ReferencedName]], W).
-            @panic("Not implemented");
+            // i. Return ? PrivateSet(baseObj, V.[[ReferencedName]], W).
+            return base_object.privateSet(self.referenced_name.private_name, value);
         }
 
         // c. Let succeeded be ? baseObj.[[Set]](V.[[ReferencedName]], W, GetThisValue(V)).

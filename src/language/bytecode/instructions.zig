@@ -103,6 +103,8 @@ pub const Instruction = enum(u8) {
     load_this_value_for_make_super_property_reference,
     /// Apply logical NOT to the last value on the stack and store it as the result value.
     logical_not,
+    /// Store MakePrivateReference() as the result value.
+    make_private_reference,
     /// Store MakeSuperPropertyReference() as the result value.
     make_super_property_reference,
     /// Store OrdinaryObjectCreate(%Object.prototype%) as the result value.
@@ -131,6 +133,9 @@ pub const Instruction = enum(u8) {
     reg_exp_create,
     /// Store ResolveBinding() as the result value.
     resolve_binding,
+    /// Resolve a private identifier (#foo) to a private name in the current private environment
+    /// and store the underlying symbol as the result value.
+    resolve_private_identifier,
     /// Store ResolveThisBinding() as the result value.
     resolve_this_binding,
     /// Rethrow the stored exception, if any.
@@ -181,8 +186,10 @@ pub const Instruction = enum(u8) {
             .instantiate_ordinary_function_expression,
             .jump,
             .load_constant,
+            .make_private_reference,
             .make_super_property_reference,
             .push_exception_jump_target,
+            .resolve_private_identifier,
             .store_constant,
             => 1,
             else => 0,
@@ -200,7 +207,9 @@ pub const Instruction = enum(u8) {
         return switch (self) {
             .create_catch_binding,
             .evaluate_property_access_with_identifier_key,
+            .make_private_reference,
             .resolve_binding,
+            .resolve_private_identifier,
             => true,
             else => false,
         };

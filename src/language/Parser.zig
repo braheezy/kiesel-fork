@@ -374,6 +374,25 @@ pub fn acceptLabelIdentifier(self: *Self) AcceptError!ast.Identifier {
     return self.allocator.dupe(u8, token.text);
 }
 
+pub fn acceptPrivateIdentifier(self: *Self) AcceptError!ast.PrivateIdentifier {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const hash_token = try self.core.accept(RuleSet.is(.@"#"));
+
+    if (!self.state.in_class_body) {
+        try self.emitErrorAt(
+            hash_token.location,
+            "Private identifier is only allowed in class body",
+            .{},
+        );
+        return error.UnexpectedToken;
+    }
+
+    const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .@"await" }));
+    return self.allocator.dupe(u8, token.text);
+}
+
 pub fn acceptPrimaryExpression(self: *Self) AcceptError!ast.PrimaryExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
@@ -458,7 +477,14 @@ pub fn acceptMemberExpression(
             _ = try self.core.accept(RuleSet.is(.@"]"));
             break :blk .{ .expression = property_expression };
         },
-        .@"." => .{ .identifier = try self.acceptIdentifierName() },
+        .@"." => blk: {
+            if (self.acceptIdentifierName()) |identifier|
+                break :blk .{ .identifier = identifier }
+            else |_| if (self.acceptPrivateIdentifier()) |private_identifier|
+                break :blk .{ .private_identifier = private_identifier }
+            else |_|
+                return error.UnexpectedToken;
+        },
         else => unreachable,
     };
     // Defer heap allocation of expression until we know this is a MemberExpression
@@ -1849,12 +1875,13 @@ pub fn acceptMethodDefinition(
         break :blk self.core.tokenizer.offset - next_token.text.len;
     };
 
-    const property_name = try self.acceptPropertyName();
+    const class_element_name = try self.acceptClassElementName();
     if (method_type == null and
-        property_name == .literal_property_name and
-        property_name.literal_property_name == .identifier)
+        class_element_name == .property_name and
+        class_element_name.property_name == .literal_property_name and
+        class_element_name.property_name.literal_property_name == .identifier)
     {
-        const identifier = property_name.literal_property_name.identifier;
+        const identifier = class_element_name.property_name.literal_property_name.identifier;
         if (self.core.peek() catch null) |next_token| if (next_token.type != .@"(") {
             if (std.mem.eql(u8, identifier, "get")) return acceptMethodDefinition(self, .get);
             if (std.mem.eql(u8, identifier, "set")) return acceptMethodDefinition(self, .set);
@@ -1894,7 +1921,7 @@ pub fn acceptMethodDefinition(
             .source_text = source_text,
         }),
     };
-    return .{ .property_name = property_name, .method = method };
+    return .{ .class_element_name = class_element_name, .method = method };
 }
 
 fn acceptGeneratorDeclaration(self: *Self) AcceptError!ast.GeneratorDeclaration {
@@ -2137,12 +2164,33 @@ fn acceptFieldDefinition(self: *Self) AcceptError!ast.FieldDefinition {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const property_name = try self.acceptPropertyName();
+    const class_element_name = try self.acceptClassElementName();
     const initializer = if (self.core.accept(RuleSet.is(.@"="))) |_|
         try self.acceptExpression(.{})
     else |_|
         null;
-    return .{ .property_name = property_name, .initializer = initializer };
+    return .{ .class_element_name = class_element_name, .initializer = initializer };
+}
+
+fn acceptClassElementName(self: *Self) AcceptError!ast.ClassElementName {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const location = (try self.core.peek() orelse return error.UnexpectedToken).location;
+    if (self.acceptPropertyName()) |property_name| {
+        return .{ .property_name = property_name };
+    } else |_| if (self.acceptPrivateIdentifier()) |private_identifier| {
+        // It is a Syntax Error if StringValue of PrivateIdentifier is "#constructor".
+        if (std.mem.eql(u8, private_identifier, "constructor")) {
+            try self.emitErrorAt(
+                location,
+                "Private class element must not be named '#constructor'",
+                .{},
+            );
+            return error.UnexpectedToken;
+        }
+        return .{ .private_identifier = private_identifier };
+    } else |_| return error.UnexpectedToken;
 }
 
 fn acceptRegularExpressionLiteral(self: *Self) AcceptError!ast.RegularExpressionLiteral {

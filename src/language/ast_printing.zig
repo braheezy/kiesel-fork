@@ -11,6 +11,11 @@ fn print(string: []const u8, writer: anytype, indentation: usize) @TypeOf(writer
     try writer.print("{s}\n", .{string});
 }
 
+pub fn printPrivateIdentifier(node: ast.PrivateIdentifier, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("PrivateIdentifier", writer, indentation);
+    try print(node, writer, indentation + 1);
+}
+
 pub fn printParenthesizedExpression(node: ast.ParenthesizedExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("ParenthesizedExpression", writer, indentation);
     try printExpression(node.expression.*, writer, indentation + 1);
@@ -50,6 +55,7 @@ pub fn printMemberExpression(node: ast.MemberExpression, writer: anytype, indent
     switch (node.property) {
         .expression => |expression| try printExpression(expression.*, writer, indentation + 2),
         .identifier => |identifier| try print(identifier, writer, indentation + 2),
+        .private_identifier => |private_identifier| try printPrivateIdentifier(private_identifier, writer, indentation + 2),
     }
 }
 
@@ -598,7 +604,7 @@ pub fn printMethodDefinition(node: ast.MethodDefinition, writer: anytype, indent
     try print("MethodDefinition", writer, indentation);
     try print("type:", writer, indentation + 1);
     try print(@tagName(std.meta.activeTag(node.method)), writer, indentation + 2);
-    try printPropertyName(node.property_name, writer, indentation + 1);
+    try printClassElementName(node.class_element_name, writer, indentation + 1);
     switch (node.method) {
         .method, .get, .set => |x| try printFunctionExpression(x, writer, indentation + 1),
         .generator => |x| try printGeneratorExpression(x, writer, indentation + 1),
@@ -696,8 +702,15 @@ pub fn printClassElement(node: ast.ClassElement, writer: anytype, indentation: u
 
 pub fn printFieldDefinition(node: ast.FieldDefinition, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("FieldDefinition", writer, indentation);
-    try printPropertyName(node.property_name, writer, indentation + 1);
+    try printClassElementName(node.class_element_name, writer, indentation + 1);
     if (node.initializer) |initializer| try printExpression(initializer, writer, indentation + 1);
+}
+
+pub fn printClassElementName(node: ast.ClassElementName, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    switch (node) {
+        .private_identifier => |private_identifier| try printPrivateIdentifier(private_identifier, writer, indentation + 1),
+        .property_name => |property_name| try printPropertyName(property_name, writer, indentation),
+    }
 }
 
 pub fn printClassStaticBlock(node: ast.ClassStaticBlock, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {

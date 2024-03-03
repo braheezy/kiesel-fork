@@ -13,6 +13,7 @@ const types = @import("../types.zig");
 const Agent = execution.Agent;
 const ECMAScriptFunction = builtins.ECMAScriptFunction;
 const Object = types.Object;
+const PrivateName = types.PrivateName;
 const Reference = types.Reference;
 const SourceTextModule = language.SourceTextModule;
 const Value = types.Value;
@@ -402,7 +403,7 @@ pub fn newPrivateEnvironment(
     outer_private_environment: ?*PrivateEnvironment,
 ) Allocator.Error!*PrivateEnvironment {
     // 1. Let names be a new empty List.
-    const names = std.ArrayList(void).init(allocator);
+    const names = std.StringHashMap(PrivateName).init(allocator);
 
     // 2. Return the PrivateEnvironment Record {
     //      [[OuterPrivateEnvironment]]: outerPrivEnv, [[Names]]: names

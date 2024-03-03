@@ -54,6 +54,9 @@ pub const IdentifierReference = []const u8;
 /// https://tc39.es/ecma262/#prod-Identifier
 pub const Identifier = []const u8;
 
+/// https://tc39.es/ecma262/#prod-PrivateIdentifier
+pub const PrivateIdentifier = []const u8;
+
 /// https://tc39.es/ecma262/#prod-PrimaryExpression
 pub const PrimaryExpression = union(enum) {
     const Self = @This();
@@ -94,6 +97,7 @@ pub const MemberExpression = struct {
     pub const Property = union(enum) {
         expression: *Expression,
         identifier: Identifier,
+        private_identifier: PrivateIdentifier,
     };
 
     expression: *Expression,
@@ -1836,7 +1840,7 @@ pub const MethodDefinition = struct {
         async_generator: AsyncGeneratorExpression,
     };
 
-    property_name: PropertyName,
+    class_element_name: ClassElementName,
     method: Method,
 };
 
@@ -2187,6 +2191,71 @@ pub const ClassBody = struct {
         }
         return class_elements.toOwnedSlice();
     }
+
+    /// 15.7.8 Static Semantics: PrivateBoundIdentifiers
+    /// https://tc39.es/ecma262/#sec-static-semantics-privateboundidentifiers
+    pub fn privateBoundIdentifiers(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const PrivateIdentifier {
+        // ClassElementList : ClassElementList ClassElement
+        // 1. Let names1 be PrivateBoundIdentifiers of ClassElementList.
+        // 2. Let names2 be PrivateBoundIdentifiers of ClassElement.
+        // 3. Return the list-concatenation of names1 and names2.
+        var private_bound_identifiers = std.ArrayList(PrivateIdentifier).init(allocator);
+        for (self.class_element_list.items) |class_element| {
+            switch (class_element) {
+                // ClassElement :
+                //     ClassStaticBlock
+                //     ;
+                .class_static_block, .empty_statement => {
+                    // 1. Return a new empty List.
+                },
+
+                // MethodDefinition :
+                //     ClassElementName ( UniqueFormalParameters ) { FunctionBody }
+                //     get ClassElementName ( ) { FunctionBody }
+                //     set ClassElementName ( PropertySetParameterList ) { FunctionBody }
+                // GeneratorMethod :
+                //     * ClassElementName ( UniqueFormalParameters ) { GeneratorBody }
+                // AsyncMethod :
+                //     async ClassElementName ( UniqueFormalParameters ) { AsyncFunctionBody }
+                // AsyncGeneratorMethod :
+                //     async * ClassElementName ( UniqueFormalParameters ) { AsyncGeneratorBody }
+                .method_definition, .static_method_definition => |method_definition| {
+                    // 1. Return PrivateBoundIdentifiers of ClassElementName.
+                    switch (method_definition.class_element_name) {
+                        // ClassElementName : PrivateIdentifier
+                        .private_identifier => |private_identifier| {
+                            // 1. Return a List whose sole element is the StringValue of PrivateIdentifier.
+                            try private_bound_identifiers.append(private_identifier);
+                        },
+                        // ClassElementName : PropertyName
+                        .property_name => {
+                            // 1. Return a new empty List.
+                        },
+                    }
+                },
+
+                // FieldDefinition : ClassElementName Initializer[opt]
+                .field_definition, .static_field_definition => |field_definition| {
+                    // 1. Return PrivateBoundIdentifiers of ClassElementName.
+                    switch (field_definition.class_element_name) {
+                        // ClassElementName : PrivateIdentifier
+                        .private_identifier => |private_identifier| {
+                            // 1. Return a List whose sole element is the StringValue of PrivateIdentifier.
+                            try private_bound_identifiers.append(private_identifier);
+                        },
+                        // ClassElementName : PropertyName
+                        .property_name => {
+                            // 1. Return a new empty List.
+                        },
+                    }
+                },
+            }
+        }
+        return private_bound_identifiers.toOwnedSlice();
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-ClassElementList
@@ -2218,9 +2287,10 @@ pub const ClassElement = union(enum) {
             // ClassElement : MethodDefinition
             .method_definition => |method_definition| {
                 // 1. If PropName of MethodDefinition is "constructor", return constructor-method.
-                if (method_definition.property_name == .literal_property_name and
-                    method_definition.property_name.literal_property_name == .identifier and
-                    std.mem.eql(u8, method_definition.property_name.literal_property_name.identifier, "constructor"))
+                if (method_definition.class_element_name == .property_name and
+                    method_definition.class_element_name.property_name == .literal_property_name and
+                    method_definition.class_element_name.property_name.literal_property_name == .identifier and
+                    std.mem.eql(u8, method_definition.class_element_name.property_name.literal_property_name.identifier, "constructor"))
                 {
                     return .constructor_method;
                 }
@@ -2282,8 +2352,14 @@ pub const ClassElement = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-FieldDefinition
 pub const FieldDefinition = struct {
-    property_name: PropertyName,
+    class_element_name: ClassElementName,
     initializer: ?Expression,
+};
+
+/// https://tc39.es/ecma262/#prod-ClassElementName
+pub const ClassElementName = union(enum) {
+    property_name: PropertyName,
+    private_identifier: PrivateIdentifier,
 };
 
 /// https://tc39.es/ecma262/#prod-ClassStaticBlock

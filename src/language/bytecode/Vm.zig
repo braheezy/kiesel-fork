@@ -26,8 +26,12 @@ const Instruction = instructions_.Instruction;
 const Iterator = types.Iterator;
 const IteratorKind = types.IteratorKind;
 const Object = types.Object;
+const PrivateElement = types.PrivateElement;
+const PrivateMethodDefinition = types.PrivateMethodDefinition;
+const PrivateName = types.PrivateName;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
+const PropertyKeyOrPrivateName = types.PropertyKeyOrPrivateName;
 const Reference = types.Reference;
 const SafePointer = types.SafePointer;
 const String = types.String;
@@ -538,11 +542,16 @@ fn defineMethod(
     property_name: Value,
     object: Object,
     function_prototype: ?Object,
-) Agent.Error!struct { key: PropertyKey, closure: Object } {
+) Agent.Error!struct { key: PropertyKeyOrPrivateName, closure: Object } {
     const realm = agent.currentRealm();
 
     // 1. Let propKey be ? Evaluation of ClassElementName.
-    const property_key = try property_name.toPropertyKey(agent);
+    const property_key: PropertyKeyOrPrivateName = if (property_name.toPrivateName()) |private_name|
+        .{ .private_name = private_name }
+    else if (property_name.toPropertyKey(agent)) |property_key|
+        .{ .property_key = property_key }
+    else |err|
+        return err;
 
     // 2. Let env be the running execution context's LexicalEnvironment.
     const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -590,7 +599,7 @@ fn methodDefinitionEvaluation(
     },
     object: Object,
     enumerable: bool,
-) Agent.Error!void {
+) Agent.Error!?PrivateMethodDefinition {
     const realm = agent.currentRealm();
     switch (method_definition.method) {
         // MethodDefinition : ClassElementName ( UniqueFormalParameters ) { FunctionBody }
@@ -608,13 +617,18 @@ fn methodDefinitionEvaluation(
             try setFunctionName(method_def.closure, method_def.key, null);
 
             // 3. Return ? DefineMethodProperty(object, methodDef.[[Key]], methodDef.[[Closure]], enumerable).
-            try defineMethodProperty(object, method_def.key, method_def.closure, enumerable);
+            return defineMethodProperty(object, method_def.key, method_def.closure, enumerable);
         },
 
         // MethodDefinition : get ClassElementName ( ) { FunctionBody }
         .get => |function_expression| {
             // 1. Let propKey be ? Evaluation of ClassElementName.
-            const property_key = try method_definition.property_name.toPropertyKey(agent);
+            const property_key_or_private_name: PropertyKeyOrPrivateName = if (method_definition.property_name.toPrivateName()) |private_name|
+                .{ .private_name = private_name }
+            else if (method_definition.property_name.toPropertyKey(agent)) |property_key|
+                .{ .property_key = property_key }
+            else |err|
+                return err;
 
             // 2. Let env be the running execution context's LexicalEnvironment.
             const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -645,34 +659,46 @@ fn methodDefinitionEvaluation(
             makeMethod(closure.as(builtins.ECMAScriptFunction), object);
 
             // 8. Perform SetFunctionName(closure, propKey, "get").
-            try setFunctionName(closure, property_key, "get");
+            try setFunctionName(closure, property_key_or_private_name, "get");
 
-            // TODO: 9. If propKey is a Private Name, then
-            if (false) {
-                // a. Return PrivateElement { [[Key]]: propKey, [[Kind]]: accessor, [[Get]]: closure, [[Set]]: undefined }.
-            }
-            // 10. Else,
-            else {
-                // a. Let desc be the PropertyDescriptor {
-                //      [[Get]]: closure, [[Enumerable]]: enumerable, [[Configurable]]: true
-                //    }.
-                const property_descriptor = PropertyDescriptor{
-                    .get = closure,
-                    .enumerable = enumerable,
-                    .configurable = true,
-                };
+            switch (property_key_or_private_name) {
+                // 9. If propKey is a Private Name, then
+                .private_name => |private_name| {
+                    // a. Return PrivateElement { [[Key]]: propKey, [[Kind]]: accessor, [[Get]]: closure, [[Set]]: undefined }.
+                    const private_element = PrivateElement{
+                        .accessor = .{ .get = closure, .set = null },
+                    };
+                    return .{ .private_name = private_name, .private_element = private_element };
+                },
+                // 10. Else,
+                .property_key => |property_key| {
+                    // a. Let desc be the PropertyDescriptor {
+                    //      [[Get]]: closure, [[Enumerable]]: enumerable, [[Configurable]]: true
+                    //    }.
+                    const property_descriptor = PropertyDescriptor{
+                        .get = closure,
+                        .enumerable = enumerable,
+                        .configurable = true,
+                    };
 
-                // b. Perform ? DefinePropertyOrThrow(object, propKey, desc).
-                try object.definePropertyOrThrow(property_key, property_descriptor);
+                    // b. Perform ? DefinePropertyOrThrow(object, propKey, desc).
+                    try object.definePropertyOrThrow(property_key, property_descriptor);
 
-                // c. Return unused.
+                    // c. Return unused.
+                    return null;
+                },
             }
         },
 
         // MethodDefinition : set ClassElementName ( PropertySetParameterList ) { FunctionBody }
         .set => |function_expression| {
             // 1. Let propKey be ? Evaluation of ClassElementName.
-            const property_key = try method_definition.property_name.toPropertyKey(agent);
+            const property_key_or_private_name: PropertyKeyOrPrivateName = if (method_definition.property_name.toPrivateName()) |private_name|
+                .{ .private_name = private_name }
+            else if (method_definition.property_name.toPropertyKey(agent)) |property_key|
+                .{ .property_key = property_key }
+            else |err|
+                return err;
 
             // 2. Let env be the running execution context's LexicalEnvironment.
             const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -700,34 +726,46 @@ fn methodDefinitionEvaluation(
             makeMethod(closure.as(builtins.ECMAScriptFunction), object);
 
             // 7. Perform SetFunctionName(closure, propKey, "set").
-            try setFunctionName(closure, property_key, "set");
+            try setFunctionName(closure, property_key_or_private_name, "set");
 
-            // TODO: 8. If propKey is a Private Name, then
-            if (false) {
-                // a. Return PrivateElement { [[Key]]: propKey, [[Kind]]: accessor, [[Get]]: undefined, [[Set]]: closure }.
-            }
-            // 9. Else,
-            else {
-                // a. Let desc be the PropertyDescriptor {
-                //      [[Set]]: closure, [[Enumerable]]: enumerable, [[Configurable]]: true
-                //    }.
-                const property_descriptor = PropertyDescriptor{
-                    .set = closure,
-                    .enumerable = enumerable,
-                    .configurable = true,
-                };
+            switch (property_key_or_private_name) {
+                // 8. If propKey is a Private Name, then
+                .private_name => |private_name| {
+                    // a. Return PrivateElement { [[Key]]: propKey, [[Kind]]: accessor, [[Get]]: undefined, [[Set]]: closure }.
+                    const private_element = PrivateElement{
+                        .accessor = .{ .get = null, .set = closure },
+                    };
+                    return .{ .private_name = private_name, .private_element = private_element };
+                },
+                // 9. Else,
+                .property_key => |property_key| {
+                    // a. Let desc be the PropertyDescriptor {
+                    //      [[Set]]: closure, [[Enumerable]]: enumerable, [[Configurable]]: true
+                    //    }.
+                    const property_descriptor = PropertyDescriptor{
+                        .set = closure,
+                        .enumerable = enumerable,
+                        .configurable = true,
+                    };
 
-                // b. Perform ? DefinePropertyOrThrow(object, propKey, desc).
-                try object.definePropertyOrThrow(property_key, property_descriptor);
+                    // b. Perform ? DefinePropertyOrThrow(object, propKey, desc).
+                    try object.definePropertyOrThrow(property_key, property_descriptor);
 
-                // c. Return unused.
+                    // c. Return unused.
+                    return null;
+                },
             }
         },
 
         // GeneratorMethod : * ClassElementName ( UniqueFormalParameters ) { GeneratorBody }
         .generator => |generator_expression| {
             // 1. Let propKey be ? Evaluation of ClassElementName.
-            const property_key = try method_definition.property_name.toPropertyKey(agent);
+            const property_key_or_private_name: PropertyKeyOrPrivateName = if (method_definition.property_name.toPrivateName()) |private_name|
+                .{ .private_name = private_name }
+            else if (method_definition.property_name.toPropertyKey(agent)) |property_key|
+                .{ .property_key = property_key }
+            else |err|
+                return err;
 
             // 2. Let env be the running execution context's LexicalEnvironment.
             const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -755,7 +793,7 @@ fn methodDefinitionEvaluation(
             makeMethod(closure.as(builtins.ECMAScriptFunction), object);
 
             // 7. Perform SetFunctionName(closure, propKey).
-            try setFunctionName(closure, property_key, null);
+            try setFunctionName(closure, property_key_or_private_name, null);
 
             // 8. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
             const prototype = try ordinaryObjectCreate(
@@ -774,13 +812,18 @@ fn methodDefinitionEvaluation(
             }) catch |err| try noexcept(err);
 
             // 10. Return ? DefineMethodProperty(object, propKey, closure, enumerable).
-            try defineMethodProperty(object, property_key, closure, enumerable);
+            return defineMethodProperty(object, property_key_or_private_name, closure, enumerable);
         },
 
         // AsyncGeneratorMethod : async * ClassElementName ( UniqueFormalParameters ) { AsyncGeneratorBody }
         .async_generator => |async_generator_expression| {
             // 1. Let propKey be ? Evaluation of ClassElementName.
-            const property_key = try method_definition.property_name.toPropertyKey(agent);
+            const property_key_or_private_name: PropertyKeyOrPrivateName = if (method_definition.property_name.toPrivateName()) |private_name|
+                .{ .private_name = private_name }
+            else if (method_definition.property_name.toPropertyKey(agent)) |property_key|
+                .{ .property_key = property_key }
+            else |err|
+                return err;
 
             // 2. Let env be the running execution context's LexicalEnvironment.
             const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -808,7 +851,7 @@ fn methodDefinitionEvaluation(
             makeMethod(closure.as(builtins.ECMAScriptFunction), object);
 
             // 7. Perform SetFunctionName(closure, propKey).
-            try setFunctionName(closure, property_key, null);
+            try setFunctionName(closure, property_key_or_private_name, null);
 
             // 8. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
             const prototype = try ordinaryObjectCreate(
@@ -827,13 +870,18 @@ fn methodDefinitionEvaluation(
             }) catch |err| try noexcept(err);
 
             // 10. Return ? DefineMethodProperty(object, propKey, closure, enumerable).
-            try defineMethodProperty(object, property_key, closure, enumerable);
+            return defineMethodProperty(object, property_key_or_private_name, closure, enumerable);
         },
 
         // AsyncMethod : async ClassElementName ( UniqueFormalParameters ) { AsyncFunctionBody }
         .@"async" => |async_function_expression| {
             // 1. Let propKey be ? Evaluation of ClassElementName.
-            const property_key = try method_definition.property_name.toPropertyKey(agent);
+            const property_key_or_private_name: PropertyKeyOrPrivateName = if (method_definition.property_name.toPrivateName()) |private_name|
+                .{ .private_name = private_name }
+            else if (method_definition.property_name.toPropertyKey(agent)) |property_key|
+                .{ .property_key = property_key }
+            else |err|
+                return err;
 
             // 2. Let env be the LexicalEnvironment of the running execution context.
             const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -861,10 +909,10 @@ fn methodDefinitionEvaluation(
             makeMethod(closure.as(builtins.ECMAScriptFunction), object);
 
             // 7. Perform SetFunctionName(closure, propKey).
-            try setFunctionName(closure, property_key, null);
+            try setFunctionName(closure, property_key_or_private_name, null);
 
             // 8. Return ? DefineMethodProperty(object, propKey, closure, enumerable).
-            try defineMethodProperty(object, property_key, closure, enumerable);
+            return defineMethodProperty(object, property_key_or_private_name, closure, enumerable);
         },
     }
 }
@@ -1121,12 +1169,18 @@ fn classFieldDefinitionEvaluation(
     const realm = agent.currentRealm();
 
     // 1. Let name be ? Evaluation of ClassElementName.
-    const property_key = (try generateAndRunBytecode(
-        agent,
-        field_definition.property_name,
-        .{},
-    )).value.?.toPropertyKey(agent) catch |err| try noexcept(err);
-    const name = .{ .property_key = property_key };
+    const name: PropertyKeyOrPrivateName = blk: {
+        const value = (try generateAndRunBytecode(
+            agent,
+            field_definition.class_element_name,
+            .{},
+        )).value.?;
+        if (value.toPrivateName()) |private_name| {
+            break :blk .{ .private_name = private_name };
+        } else if (value.toPropertyKey(agent)) |property_key| {
+            break :blk .{ .property_key = property_key };
+        } else |err| try noexcept(err);
+    };
 
     // 2. If Initializer is present, then
     const initializer = if (field_definition.initializer) |initializer| blk: {
@@ -1247,6 +1301,7 @@ fn classElementEvaluation(
 ) Agent.Error!?union(enum) {
     class_field_definition: ClassFieldDefinition,
     class_static_block_definition: ClassStaticBlockDefinition,
+    private_method_definition: PrivateMethodDefinition,
 } {
     switch (class_element) {
         // ClassElement :
@@ -1274,23 +1329,29 @@ fn classElementEvaluation(
             // 1. Return ? MethodDefinitionEvaluation of MethodDefinition with arguments object and false.
             const property_name = (try generateAndRunBytecode(
                 agent,
-                method_definition.property_name,
+                method_definition.class_element_name,
                 .{},
             )).value.?;
-            try methodDefinitionEvaluation(
+            if (try methodDefinitionEvaluation(
                 agent,
                 .{ .property_name = property_name, .method = method_definition.method },
                 object,
                 false,
-            );
-            return null;
+            )) |private_method_definition|
+                return .{ .private_method_definition = private_method_definition }
+            else
+                return null;
         },
 
         // ClassElement : ClassStaticBlock
         .class_static_block => |class_static_block| {
             // 1. Return ClassStaticBlockDefinitionEvaluation of ClassStaticBlock with argument object.
             return .{
-                .class_static_block_definition = try classStaticBlockDefinitionEvaluation(agent, class_static_block, object),
+                .class_static_block_definition = try classStaticBlockDefinitionEvaluation(
+                    agent,
+                    class_static_block,
+                    object,
+                ),
             };
         },
 
@@ -1339,7 +1400,33 @@ fn classDefinitionEvaluation(
 
     // 6. If ClassBody is present, then
     if (class_tail.class_body.class_element_list.items.len != 0) {
-        // TODO: Initialize private environment
+        const private_bound_identifiers = try class_tail.class_body.privateBoundIdentifiers(agent.gc_allocator);
+        defer agent.gc_allocator.free(private_bound_identifiers);
+
+        // a. For each String dn of the PrivateBoundIdentifiers of ClassBody, do
+        for (private_bound_identifiers) |declared_name| {
+            // i. If classPrivateEnvironment.[[Names]] contains a Private Name pn such that pn.[[Description]] is dn, then
+            if (class_private_environment.names.contains(declared_name)) {
+                // 1. Assert: This is only possible for getter/setter pairs.
+            }
+            // ii. Else,
+            else {
+                var symbol = agent.createSymbol(String.from(declared_name)) catch |err| switch (err) {
+                    error.Overflow => return agent.throwException(
+                        .internal_error,
+                        "Maximum number of symbols exceeded",
+                        .{},
+                    ),
+                };
+                symbol.private = true;
+
+                // 1. Let name be a new Private Name whose [[Description]] is dn.
+                const name = PrivateName{ .symbol = symbol };
+
+                // 2. Append name to classPrivateEnvironment.[[Names]].
+                try class_private_environment.names.putNoClobber(declared_name, name);
+            }
+        }
     }
 
     var prototype_parent: ?Object = undefined;
@@ -1545,9 +1632,9 @@ fn classDefinitionEvaluation(
     }
 
     // 18. Perform ! DefineMethodProperty(proto, "constructor", F, false).
-    defineMethodProperty(
+    _ = defineMethodProperty(
         prototype,
-        PropertyKey.from("constructor"),
+        .{ .property_key = PropertyKey.from("constructor") },
         function,
         false,
     ) catch |err| try noexcept(err);
@@ -1557,10 +1644,17 @@ fn classDefinitionEvaluation(
     const elements = try class_tail.class_body.nonConstructorElements(agent.gc_allocator);
     defer agent.gc_allocator.free(elements);
 
-    // TODO: 21-22.
+    // 21. Let instancePrivateMethods be a new empty List.
+    var instance_private_methods = std.ArrayList(PrivateMethodDefinition).init(agent.gc_allocator);
+    // Converted to owned slice, no `deinit()` needed
+
+    // 22. Let staticPrivateMethods be a new empty List.
+    var static_private_methods = std.ArrayList(PrivateMethodDefinition).init(agent.gc_allocator);
+    defer static_private_methods.deinit();
 
     // 23. Let instanceFields be a new empty List.
     var instance_fields = std.ArrayList(ClassFieldDefinition).init(agent.gc_allocator);
+    // Converted to owned slice, no `deinit()` needed
 
     // 24. Let staticElements be a new empty List.
     var static_elements = std.ArrayList(union(enum) {
@@ -1596,7 +1690,59 @@ fn classDefinitionEvaluation(
         };
 
         if (element != null) switch (element.?) {
-            // TODO: e. If element is a PrivateElement, then
+            // e. If element is a PrivateElement, then
+            .private_method_definition => |private_method_definition| {
+                // i. Assert: element.[[Kind]] is either method or accessor.
+                std.debug.assert(
+                    private_method_definition.private_element == .method or
+                        private_method_definition.private_element == .accessor,
+                );
+
+                // ii. If IsStatic of e is false, let container be instancePrivateMethods.
+                // iii. Else, let container be staticPrivateMethods.
+                const container = if (!class_element.isStatic())
+                    &instance_private_methods
+                else
+                    &static_private_methods;
+
+                // iv. If container contains a PrivateElement pe such that pe.[[Key]] is element.[[Key]], then
+                if (for (container.items, 0..) |p, index| {
+                    if (p.private_name.eql(private_method_definition.private_name)) {
+                        break .{ .private_element = p.private_element, .index = index };
+                    }
+                } else null) |found| {
+                    // 1. Assert: element.[[Kind]] and pe.[[Kind]] are both accessor.
+                    std.debug.assert(
+                        private_method_definition.private_element == .accessor and
+                            found.private_element == .accessor,
+                    );
+
+                    var combined = private_method_definition;
+
+                    // 2. If element.[[Get]] is undefined, then
+                    if (private_method_definition.private_element.accessor.get == null) {
+                        // a. Let combined be PrivateElement {
+                        //      [[Key]]: element.[[Key]], [[Kind]]: accessor, [[Get]]: pe.[[Get]], [[Set]]: element.[[Set]]
+                        //    }.
+                        combined.private_element.accessor.get = found.private_element.accessor.get;
+                    }
+                    // 3. Else,
+                    else {
+                        // a. Let combined be PrivateElement {
+                        //      [[Key]]: element.[[Key]], [[Kind]]: accessor, [[Get]]: element.[[Get]], [[Set]]: pe.[[Set]]
+                        //    }.
+                        combined.private_element.accessor.set = found.private_element.accessor.set;
+                    }
+
+                    // 4. Replace pe in container with combined.
+                    container.items[found.index] = combined;
+                }
+                // v. Else,
+                else {
+                    // 1. Append element to container.
+                    try container.append(private_method_definition);
+                }
+            },
 
             // f. Else if element is a ClassFieldDefinition Record, then
             .class_field_definition => |class_field_definition| {
@@ -1629,7 +1775,13 @@ fn classDefinitionEvaluation(
         class_env.initializeBinding(agent, class_binding.?, Value.from(function));
     }
 
-    // TODO: 28. Set F.[[PrivateMethods]] to instancePrivateMethods.
+    // 28. Set F.[[PrivateMethods]] to instancePrivateMethods.
+    if (function.is(builtins.ECMAScriptFunction)) {
+        function.as(builtins.ECMAScriptFunction).fields.private_methods = try instance_private_methods.toOwnedSlice();
+    } else if (function.is(builtins.BuiltinFunction)) {
+        const class_constructor_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+        class_constructor_fields.private_methods = try instance_private_methods.toOwnedSlice();
+    } else unreachable;
 
     // 29. Set F.[[Fields]] to instanceFields.
     if (function.is(builtins.ECMAScriptFunction)) {
@@ -1639,8 +1791,14 @@ fn classDefinitionEvaluation(
         class_constructor_fields.fields = try instance_fields.toOwnedSlice();
     } else unreachable;
 
-    // TODO: 30. For each PrivateElement method of staticPrivateMethods, do
-    //     a. Perform ! PrivateMethodOrAccessorAdd(F, method).
+    // 30. For each PrivateElement method of staticPrivateMethods, do
+    for (static_private_methods.items) |method| {
+        // a. Perform ! PrivateMethodOrAccessorAdd(F, method).
+        function.privateMethodOrAccessorAdd(
+            method.private_name,
+            method.private_element,
+        ) catch |err| try noexcept(err);
+    }
 
     // 31. For each element elementRecord of staticElements, do
     for (static_elements.items) |element| {
@@ -2523,6 +2681,29 @@ pub fn executeInstruction(
             const value = self.result.?;
             self.result = Value.from(!value.toBoolean());
         },
+        // 6.2.5.9 MakePrivateReference ( baseValue, privateIdentifier )
+        // https://tc39.es/ecma262/#sec-makeprivatereference
+        .make_private_reference => {
+            const private_identifier = self.fetchIdentifier(executable);
+            const base_value = self.stack.pop();
+
+            // 1. Let privEnv be the running execution context's PrivateEnvironment.
+            // 2. Assert: privEnv is not null.
+            const private_environment = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
+
+            // 3. Let privateName be ResolvePrivateIdentifier(privEnv, privateIdentifier).
+            const private_name = private_environment.resolvePrivateIdentifier(private_identifier);
+
+            // 4. Return the Reference Record {
+            //      [[Base]]: baseValue, [[ReferencedName]]: privateName, [[Strict]]: true, [[ThisValue]]: empty
+            //    }.
+            self.reference = Reference{
+                .base = .{ .value = base_value },
+                .referenced_name = .{ .private_name = private_name },
+                .strict = true,
+                .this_value = null,
+            };
+        },
         // 13.3.7.3 MakeSuperPropertyReference ( actualThis, propertyKey, strict )
         // https://tc39.es/ecma262/#sec-makesuperpropertyreference
         .make_super_property_reference => {
@@ -2577,7 +2758,7 @@ pub fn executeInstruction(
             };
             const property_name = self.stack.pop();
             const object = self.stack.pop().object;
-            try methodDefinitionEvaluation(
+            _ = try methodDefinitionEvaluation(
                 self.agent,
                 .{ .property_name = property_name, .method = method },
                 object,
@@ -2631,6 +2812,21 @@ pub fn executeInstruction(
                 environment_lookup_cache_index
             ];
             self.reference = try self.agent.resolveBinding(name, null, strict, lookup_cache_entry);
+        },
+        .resolve_private_identifier => {
+            // 1. Let privateIdentifier be StringValue of PrivateIdentifier.
+            const private_identifier = self.fetchIdentifier(executable);
+
+            // 2. Let privateEnvRec be the running execution context's PrivateEnvironment.
+            const private_environment = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
+
+            // 3. Let names be privateEnvRec.[[Names]].
+            // 4. Assert: Exactly one element of names is a Private Name whose [[Description]] is privateIdentifier.
+            // 5. Let privateName be the Private Name in names whose [[Description]] is privateIdentifier.
+            // 6. Return privateName.
+            const private_name = private_environment.names.get(private_identifier).?;
+            std.debug.assert(private_name.symbol.private);
+            self.result = Value.from(private_name.symbol);
         },
         .resolve_this_binding => self.result = try self.agent.resolveThisBinding(),
         .rethrow_exception_if_any => if (self.exception) |value| {

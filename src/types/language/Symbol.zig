@@ -21,6 +21,9 @@ id: Id,
 /// [[Description]]
 description: ?String,
 
+/// Flag to mark this symbol as a private name.
+private: bool = false,
+
 pub fn format(
     self: Self,
     comptime fmt: []const u8,
@@ -36,6 +39,11 @@ pub fn format(
         try writer.writeAll("\"");
     }
     try writer.writeAll(")");
+}
+
+/// Shortcut for the SameValue AO applied on two symbols (i.e. id equality)
+pub fn sameValue(self: Self, other: Self) bool {
+    return self.id == other.id;
 }
 
 /// 20.4.3.3.1 SymbolDescriptiveString ( sym )

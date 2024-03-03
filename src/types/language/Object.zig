@@ -17,6 +17,9 @@ const ArgumentsList = builtins.ArgumentsList;
 const ClassConstructorFields = builtins.ClassConstructorFields;
 const ClassFieldDefinition = types.ClassFieldDefinition;
 const PreferredType = Value.PreferredType;
+const PrivateElement = types.PrivateElement;
+const PrivateName = types.PrivateName;
+const PrivateNameArrayHashMap = types.PrivateNameArrayHashMap;
 const PropertyDescriptor = spec.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = @import("value.zig").Value;
@@ -116,6 +119,10 @@ pub inline fn prototype(self: Self) *?Self {
 
 pub inline fn extensible(self: Self) *bool {
     return &self.data.extensible;
+}
+
+pub inline fn privateElements(self: Self) *PrivateNameArrayHashMap(PrivateElement) {
+    return &self.data.private_elements;
 }
 
 pub inline fn isHTMLDDA(self: Self) bool {
@@ -644,7 +651,159 @@ pub fn copyDataProperties(
     // 5. Return unused.
 }
 
-/// 7.3.33 DefineField ( receiver, fieldRecord )
+/// 7.3.26 PrivateElementFind ( O, P )
+/// https://tc39.es/ecma262/#sec-privateelementfind
+pub fn privateElementFind(self: Self, private_name: PrivateName) ?*PrivateElement {
+    // 1. If O.[[PrivateElements]] contains a PrivateElement pe such that pe.[[Key]] is P, then
+    //     a. Return pe.
+    // 2. Return empty.
+    return self.privateElements().getPtr(private_name);
+}
+
+/// 7.3.27 PrivateFieldAdd ( O, P, value )
+/// https://tc39.es/ecma262/#sec-privatefieldadd
+pub fn privateFieldAdd(self: *Self, private_name: PrivateName, value: Value) Agent.Error!void {
+    // TODO: 1. If the host is a web browser, then
+    //     a. Perform ? HostEnsureCanAddPrivateElement(O).
+
+    // 2. Let entry be PrivateElementFind(O, P).
+    const entry = self.privateElementFind(private_name);
+
+    // 3. If entry is not empty, throw a TypeError exception.
+    if (entry != null) {
+        return self.agent().throwException(
+            .type_error,
+            "Private element '#{}' already exists",
+            .{private_name},
+        );
+    }
+
+    // 4. Append PrivateElement { [[Key]]: P, [[Kind]]: field, [[Value]]: value } to O.[[PrivateElements]].
+    try self.privateElements().putNoClobber(private_name, .{ .field = value });
+
+    // 5. Return unused.
+}
+
+/// 7.3.28 PrivateMethodOrAccessorAdd ( O, method )
+/// https://tc39.es/ecma262/#sec-privatemethodoraccessoradd
+pub fn privateMethodOrAccessorAdd(
+    self: *Self,
+    private_name: PrivateName,
+    method: PrivateElement,
+) Agent.Error!void {
+    // 1. Assert: method.[[Kind]] is either method or accessor.
+    std.debug.assert(method == .method or method == .accessor);
+
+    // TODO: 2. If the host is a web browser, then
+    //     a. Perform ? HostEnsureCanAddPrivateElement(O).
+
+    // 3. Let entry be PrivateElementFind(O, method.[[Key]]).
+    const entry = self.privateElementFind(private_name);
+
+    // 4. If entry is not empty, throw a TypeError exception.
+    if (entry != null) {
+        return self.agent().throwException(
+            .type_error,
+            "Private element '#{}' already exists",
+            .{private_name},
+        );
+    }
+
+    // 5. Append method to O.[[PrivateElements]].
+    try self.privateElements().putNoClobber(private_name, method);
+
+    // 6. Return unused.
+}
+
+/// 7.3.30 PrivateGet ( O, P )
+/// https://tc39.es/ecma262/#sec-privateget
+pub fn privateGet(self: Self, private_name: PrivateName) Agent.Error!Value {
+    // 1. Let entry be PrivateElementFind(O, P).
+    const entry = self.privateElementFind(private_name) orelse {
+        // 2. If entry is empty, throw a TypeError exception.
+        return self.agent().throwException(
+            .type_error,
+            "Private element '#{}' doesn't exist",
+            .{private_name},
+        );
+    };
+
+    switch (entry.*) {
+        // 3. If entry.[[Kind]] is either field or method, then
+        //     a. Return entry.[[Value]].
+        .field => |value| return value,
+        .method => |object| return Value.from(object),
+
+        // 4. Assert: entry.[[Kind]] is accessor.
+        .accessor => |get_and_set| {
+            // 5. If entry.[[Get]] is undefined, throw a TypeError exception.
+            // 6. Let getter be entry.[[Get]].
+            const getter = get_and_set.get orelse {
+                return self.agent().throwException(
+                    .type_error,
+                    "Private element '#{}' has not getter",
+                    .{private_name},
+                );
+            };
+
+            // 7. Return ? Call(getter, O).
+            return Value.from(getter).callAssumeCallableNoArgs(Value.from(self));
+        },
+    }
+}
+
+/// 7.3.31 PrivateSet ( O, P, value )
+/// https://tc39.es/ecma262/#sec-privateset
+pub fn privateSet(self: *Self, private_name: PrivateName, value: Value) Agent.Error!void {
+    // 1. Let entry be PrivateElementFind(O, P).
+    const entry = self.privateElementFind(private_name) orelse {
+        // 2. If entry is empty, throw a TypeError exception.
+        return self.agent().throwException(
+            .type_error,
+            "Private element '#{}' doesn't exist",
+            .{private_name},
+        );
+    };
+
+    switch (entry.*) {
+        // 3. If entry.[[Kind]] is field, then
+        .field => |*value_ptr| {
+            // a. Set entry.[[Value]] to value.
+            value_ptr.* = value;
+        },
+
+        // 4. Else if entry.[[Kind]] is method, then
+        .method => {
+            // a. Throw a TypeError exception.
+            return self.agent().throwException(
+                .type_error,
+                "Private element '#{}' is a method and cannot be set",
+                .{private_name},
+            );
+        },
+
+        // 5. Else,
+        //     a. Assert: entry.[[Kind]] is accessor.
+        .accessor => |get_and_set| {
+            // c. Let setter be entry.[[Set]].
+            // b. If entry.[[Set]] is undefined, throw a TypeError exception.
+            const setter = get_and_set.set orelse {
+                return self.agent().throwException(
+                    .type_error,
+                    "Private element '#{}' has not setter",
+                    .{private_name},
+                );
+            };
+
+            // d. Perform ? Call(setter, O, « value »).
+            _ = try Value.from(setter).callAssumeCallable(Value.from(self.*), &.{value});
+        },
+    }
+
+    // 6. Return unused.
+}
+
+/// 7.3.32 DefineField ( receiver, fieldRecord )
 /// https://tc39.es/ecma262/#sec-definefield
 pub fn defineField(self: *Self, field: ClassFieldDefinition) Agent.Error!void {
     // 1. Let fieldName be fieldRecord.[[Name]].
@@ -663,8 +822,9 @@ pub fn defineField(self: *Self, field: ClassFieldDefinition) Agent.Error!void {
 
     switch (field.name) {
         // 5. If fieldName is a Private Name, then
-        .private_name => {
-            // TODO: a. Perform ? PrivateFieldAdd(receiver, fieldName, initValue).
+        .private_name => |private_name| {
+            // a. Perform ? PrivateFieldAdd(receiver, fieldName, initValue).
+            try self.privateFieldAdd(private_name, init_value);
         },
         // 6. Else,
         .property_key => |property_key| {
@@ -677,12 +837,22 @@ pub fn defineField(self: *Self, field: ClassFieldDefinition) Agent.Error!void {
     // 7. Return unused.
 }
 
-/// 7.3.34 InitializeInstanceElements ( O, constructor )
+/// 7.3.33 InitializeInstanceElements ( O, constructor )
 /// https://tc39.es/ecma262/#sec-initializeinstanceelements
 pub fn initializeInstanceElements(self: *Self, constructor: Self) Agent.Error!void {
-    // TODO: 1. Let methods be the value of constructor.[[PrivateMethods]].
-    // TODO: 2. For each PrivateElement method of methods, do
-    //     a. Perform ? PrivateMethodOrAccessorAdd(O, method).
+    // 1. Let methods be the value of constructor.[[PrivateMethods]].
+    const methods = if (constructor.is(builtins.ECMAScriptFunction)) blk: {
+        break :blk constructor.as(builtins.ECMAScriptFunction).fields.private_methods;
+    } else if (constructor.is(builtins.BuiltinFunction)) blk: {
+        const class_constructor_fields = constructor.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+        break :blk class_constructor_fields.private_methods;
+    } else unreachable;
+
+    // 2. For each PrivateElement method of methods, do
+    for (methods) |method| {
+        // a. Perform ? PrivateMethodOrAccessorAdd(O, method).
+        try self.privateMethodOrAccessorAdd(method.private_name, method.private_element);
+    }
 
     // 3. Let fields be the value of constructor.[[Fields]].
     const fields = if (constructor.is(builtins.ECMAScriptFunction)) blk: {

@@ -15,6 +15,7 @@ const ConstructorKind = ecmascript_function.ConstructorKind;
 const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
+const PrivateMethodDefinition = types.PrivateMethodDefinition;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
@@ -61,7 +62,9 @@ pub const ClassConstructorFields = struct {
     source_text: []const u8,
 
     // TODO: These are not in the spec yet - https://github.com/tc39/ecma262/issues/3204
-    // TODO: [[PrivateMethods]]
+
+    /// [[PrivateMethods]]
+    private_methods: []const PrivateMethodDefinition,
 
     /// [[Fields]]
     fields: []const ClassFieldDefinition,
