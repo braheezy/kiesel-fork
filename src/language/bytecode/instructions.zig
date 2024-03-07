@@ -60,6 +60,8 @@ pub const Instruction = enum(u8) {
     greater_than,
     /// Compare the last two values on the stack using the '>=' operator rules.
     greater_than_equals,
+    /// Store '#property in object' as the result value
+    has_private_element,
     /// Store HasProperty() as the result value.
     has_property,
     /// Increment the numeric result value by one.
@@ -178,6 +180,7 @@ pub const Instruction = enum(u8) {
             .evaluate_property_access_with_expression_key,
             .evaluate_super_call,
             .get_iterator,
+            .has_private_element,
             .instantiate_arrow_function_expression,
             .instantiate_async_arrow_function_expression,
             .instantiate_async_function_expression,
@@ -207,6 +210,7 @@ pub const Instruction = enum(u8) {
         return switch (self) {
             .create_catch_binding,
             .evaluate_property_access_with_identifier_key,
+            .has_private_element,
             .make_private_reference,
             .resolve_binding,
             .resolve_private_identifier,

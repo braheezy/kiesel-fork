@@ -2520,6 +2520,29 @@ pub fn executeInstruction(
             // 6. If r is either true or undefined, return false. Otherwise, return true.
             self.result = Value.from(!(result orelse true));
         },
+        .has_private_element => {
+            const private_identifier = self.fetchIdentifier(executable);
+            const rval = self.stack.pop();
+
+            // 4. If rval is not an Object, throw a TypeError exception.
+            if (rval != .object) {
+                return self.agent.throwException(
+                    .type_error,
+                    "Right-hand side of 'in' operator must be an object",
+                    .{},
+                );
+            }
+
+            // 5. Let privateEnv be the running execution context's PrivateEnvironment.
+            const private_environment = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
+
+            // 6. Let privateName be ResolvePrivateIdentifier(privateEnv, privateIdentifier).
+            const private_name = private_environment.resolvePrivateIdentifier(private_identifier);
+
+            // 7. If PrivateElementFind(rval, privateName) is not empty, return true.
+            // 8. Return false.
+            self.result = Value.from(rval.object.privateElementFind(private_name) != null);
+        },
         .has_property => {
             const rval = self.stack.pop();
             const lval = self.stack.pop();

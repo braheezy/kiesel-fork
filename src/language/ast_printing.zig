@@ -236,7 +236,10 @@ pub fn printBinaryExpression(node: ast.BinaryExpression, writer: anytype, indent
 
 pub fn printRelationalExpression(node: ast.RelationalExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("RelationalExpression", writer, indentation);
-    try printExpression(node.lhs_expression.*, writer, indentation + 1);
+    switch (node.lhs) {
+        .expression => |lhs_expression| try printExpression(lhs_expression.*, writer, indentation + 1),
+        .private_identifier => |private_identifier| try printPrivateIdentifier(private_identifier, writer, indentation + 1),
+    }
     try print(@tagName(node.operator), writer, indentation + 1);
     try printExpression(node.rhs_expression.*, writer, indentation + 1);
 }

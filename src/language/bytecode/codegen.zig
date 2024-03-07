@@ -1004,33 +1004,58 @@ pub fn codegenRelationalExpression(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    // RelationalExpression : RelationalExpression < ShiftExpression
-    // RelationalExpression : RelationalExpression > ShiftExpression
-    // RelationalExpression : RelationalExpression <= ShiftExpression
-    // RelationalExpression : RelationalExpression >= ShiftExpression
-    // RelationalExpression : RelationalExpression instanceof ShiftExpression
-    // RelationalExpression : RelationalExpression in ShiftExpression
-    // 1. Let lref be ? Evaluation of RelationalExpression.
-    try codegenExpression(node.lhs_expression.*, executable, ctx);
+    switch (node.lhs) {
+        // RelationalExpression : RelationalExpression < ShiftExpression
+        // RelationalExpression : RelationalExpression > ShiftExpression
+        // RelationalExpression : RelationalExpression <= ShiftExpression
+        // RelationalExpression : RelationalExpression >= ShiftExpression
+        // RelationalExpression : RelationalExpression instanceof ShiftExpression
+        // RelationalExpression : RelationalExpression in ShiftExpression
+        .expression => |lhs_expression| {
+            // 1. Let lref be ? Evaluation of RelationalExpression.
+            try codegenExpression(lhs_expression.*, executable, ctx);
 
-    // 2. Let lval be ? GetValue(lref).
-    if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
+            // 2. Let lval be ? GetValue(lref).
+            if (lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
 
-    // 3. Let rref be ? Evaluation of ShiftExpression.
-    try codegenExpression(node.rhs_expression.*, executable, ctx);
+            // 3. Let rref be ? Evaluation of ShiftExpression.
+            try codegenExpression(node.rhs_expression.*, executable, ctx);
 
-    // 4. Let rval be ? GetValue(rref).
-    if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
+            // 4. Let rval be ? GetValue(rref).
+            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
 
-    switch (node.operator) {
-        .@"<" => try executable.addInstruction(.less_than),
-        .@">" => try executable.addInstruction(.greater_than),
-        .@"<=" => try executable.addInstruction(.less_than_equals),
-        .@">=" => try executable.addInstruction(.greater_than_equals),
-        .instanceof => try executable.addInstruction(.instanceof_operator),
-        .in => try executable.addInstruction(.has_property),
+            switch (node.operator) {
+                .@"<" => try executable.addInstruction(.less_than),
+                .@">" => try executable.addInstruction(.greater_than),
+                .@"<=" => try executable.addInstruction(.less_than_equals),
+                .@">=" => try executable.addInstruction(.greater_than_equals),
+                .instanceof => try executable.addInstruction(.instanceof_operator),
+                .in => try executable.addInstruction(.has_property),
+            }
+        },
+
+        // RelationalExpression : PrivateIdentifier in ShiftExpression
+        .private_identifier => |private_identifier| {
+            std.debug.assert(node.operator == .in);
+
+            // 1. Let privateIdentifier be the StringValue of PrivateIdentifier.
+
+            // 2. Let rref be ? Evaluation of ShiftExpression.
+            try codegenExpression(node.rhs_expression.*, executable, ctx);
+
+            // 3. Let rval be ? GetValue(rref).
+            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
+
+            // 4. If rval is not an Object, throw a TypeError exception.
+            // 5. Let privateEnv be the running execution context's PrivateEnvironment.
+            // 6. Let privateName be ResolvePrivateIdentifier(privateEnv, privateIdentifier).
+            // 7. If PrivateElementFind(rval, privateName) is not empty, return true.
+            // 8. Return false.
+            try executable.addInstructionWithIdentifier(.has_private_element, private_identifier);
+        },
     }
 }
 

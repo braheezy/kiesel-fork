@@ -446,7 +446,7 @@ pub fn acceptSecondaryExpression(
         return .{ .update_expression = update_expression }
     else |_| if (self.acceptBinaryExpression(primary_expression, ctx)) |binary_expression|
         return .{ .binary_expression = binary_expression }
-    else |_| if (self.acceptRelationalExpression(primary_expression, ctx)) |relational_expression|
+    else |_| if (self.acceptRelationalExpression(.{ .expression = primary_expression }, ctx)) |relational_expression|
         return .{ .relational_expression = relational_expression }
     else |_| if (self.acceptEqualityExpression(primary_expression, ctx)) |equality_expression|
         return .{ .equality_expression = equality_expression }
@@ -949,13 +949,19 @@ pub fn acceptBinaryExpression(
 
 pub fn acceptRelationalExpression(
     self: *Self,
-    primary_expression: ast.Expression,
+    primary_expression: union(enum) {
+        expression: ast.Expression,
+        private_identifier: ast.PrivateIdentifier,
+    },
     ctx: AcceptContext,
 ) AcceptError!ast.RelationalExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const token = try self.core.accept(RuleSet.oneOf(.{ .@">", .@"<", .@">=", .@"<=", .instanceof, .in }));
+    const token = switch (primary_expression) {
+        .expression => try self.core.accept(RuleSet.oneOf(.{ .@">", .@"<", .@">=", .@"<=", .instanceof, .in })),
+        .private_identifier => try self.core.accept(RuleSet.is(.in)),
+    };
     const operator: ast.RelationalExpression.Operator = switch (token.type) {
         .@">" => .@">",
         .@"<" => .@"<",
@@ -966,13 +972,21 @@ pub fn acceptRelationalExpression(
         else => unreachable,
     };
     // Defer heap allocation of expression until we know this is a RelationalExpression
-    const lhs_expression = try self.allocator.create(ast.Expression);
-    lhs_expression.* = primary_expression;
+    const lhs: ast.RelationalExpression.Lhs = switch (primary_expression) {
+        .expression => |expression| .{
+            .expression = blk: {
+                const lhs_expression = try self.allocator.create(ast.Expression);
+                lhs_expression.* = expression;
+                break :blk lhs_expression;
+            },
+        },
+        .private_identifier => |private_identifier| .{ .private_identifier = private_identifier },
+    };
     const rhs_expression = try self.allocator.create(ast.Expression);
     rhs_expression.* = try self.acceptExpression(ctx);
     return .{
         .operator = operator,
-        .lhs_expression = lhs_expression,
+        .lhs = lhs,
         .rhs_expression = rhs_expression,
     };
 }
@@ -1158,6 +1172,14 @@ pub fn acceptExpression(self: *Self, ctx: AcceptContext) AcceptError!ast.Express
         .{ .import_call = import_call }
     else |_| if (self.acceptPrimaryExpression()) |primary_expression|
         .{ .primary_expression = primary_expression }
+    else |_| if (self.acceptPrivateIdentifier()) |private_identifier|
+        .{
+            .relational_expression = try acceptRelationalExpression(
+                self,
+                .{ .private_identifier = private_identifier },
+                ctx,
+            ),
+        }
     else |_|
         return error.UnexpectedToken;
 

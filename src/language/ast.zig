@@ -475,8 +475,13 @@ pub const RelationalExpression = struct {
         in,
     };
 
+    pub const Lhs = union(enum) {
+        expression: *Expression,
+        private_identifier: PrivateIdentifier,
+    };
+
     operator: Operator,
-    lhs_expression: *Expression,
+    lhs: Lhs,
     rhs_expression: *Expression,
 };
 
