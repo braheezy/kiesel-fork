@@ -672,7 +672,12 @@ pub fn acceptOptionalExpression(
         property_expression.* = try self.acceptExpression(.{});
         _ = try self.core.accept(RuleSet.is(.@"]"));
         break :blk .{ .expression = property_expression };
-    } else |_| .{ .identifier = try self.acceptIdentifierName() };
+    } else |_| if (self.acceptIdentifierName()) |identifier|
+        .{ .identifier = identifier }
+    else |_| if (self.acceptPrivateIdentifier()) |private_identifier|
+        .{ .private_identifier = private_identifier }
+    else |_|
+        return error.UnexpectedToken;
     // Defer heap allocation of expression until we know this is an OptionalExpression
     const expression = try self.allocator.create(ast.Expression);
     expression.* = primary_expression;

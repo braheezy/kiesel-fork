@@ -147,6 +147,7 @@ pub const OptionalExpression = struct {
         arguments: Arguments,
         expression: *Expression,
         identifier: Identifier,
+        private_identifier: PrivateIdentifier,
     };
 
     expression: *Expression,

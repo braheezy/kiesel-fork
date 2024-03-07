@@ -115,6 +115,7 @@ pub fn printOptionalExpression(node: ast.OptionalExpression, writer: anytype, in
     switch (node.property) {
         .expression => |expression| try printExpression(expression.*, writer, indentation + 2),
         .identifier => |identifier| try print(identifier, writer, indentation + 2),
+        .private_identifier => |private_identifier| try printPrivateIdentifier(private_identifier, writer, indentation + 2),
         .arguments => |arguments| {
             try print("arguments:", writer, indentation + 2);
             for (arguments) |argument| {

@@ -347,10 +347,6 @@ pub fn codegenOptionalExpression(
     // 4. Return ? ChainEvaluation of OptionalChain with arguments baseValue and baseReference.
     try alternate_jump.setTargetHere();
 
-    // 1. If the source text matched by this OptionalChain is strict mode code, let strict be
-    //    true; else let strict be false.
-    const strict = ctx.contained_in_strict_mode_code;
-
     switch (node.property) {
         // OptionalChain : ?. Arguments
         .arguments => |arguments| {
@@ -368,6 +364,7 @@ pub fn codegenOptionalExpression(
             // 3. Return ? EvaluateCall(baseValue, baseReference, Arguments, tailCall).
             try executable.addInstruction(.evaluate_call);
             try executable.addIndex(arguments.len);
+            const strict = ctx.contained_in_strict_mode_code;
             try executable.addIndex(@intFromBool(strict));
 
             // TODO: We should probably also clean this up if something throws beforehand...
@@ -376,6 +373,10 @@ pub fn codegenOptionalExpression(
 
         // OptionalChain : ?. [ Expression ]
         .expression => |expression| {
+            // 1. If the source text matched by this OptionalChain is strict mode code, let strict
+            //    be true; else let strict be false.
+            const strict = ctx.contained_in_strict_mode_code;
+
             // 2. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
             try codegenExpression(expression.*, executable, ctx);
             if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
@@ -386,12 +387,26 @@ pub fn codegenOptionalExpression(
 
         // OptionalChain : ?. IdentifierName
         .identifier => |identifier| {
+            // 1. If the source text matched by this OptionalChain is strict mode code, let strict
+            //    be true; else let strict be false.
+            const strict = ctx.contained_in_strict_mode_code;
+
             // 2. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
             try executable.addInstructionWithIdentifier(
                 .evaluate_property_access_with_identifier_key,
                 identifier,
             );
             try executable.addIndex(@intFromBool(strict));
+        },
+
+        // OptionalChain : ?. PrivateIdentifier
+        .private_identifier => |private_identifier| {
+            // 1. Let fieldNameString be the StringValue of PrivateIdentifier.
+            // 2. Return MakePrivateReference(baseValue, fieldNameString).
+            try executable.addInstructionWithIdentifier(
+                .make_private_reference,
+                private_identifier,
+            );
         },
     }
 
