@@ -38,6 +38,7 @@ const Symbol = types.Symbol;
 const Value = types.Value;
 const Vm = bytecode.Vm;
 const arrayCreate = builtins.arrayCreate;
+const asyncFunctionStart = builtins.asyncFunctionStart;
 const containsSlice = utils.containsSlice;
 const createMappedArgumentsObject = builtins.createMappedArgumentsObject;
 const createUnmappedArgumentsObject = builtins.createUnmappedArgumentsObject;
@@ -116,6 +117,17 @@ pub const ECMAScriptFunction = MakeObject(.{
         is_class_constructor: bool,
 
         cached_executable: ?Executable = null,
+
+        pub fn generateAndRunBytecode(self: *@This(), agent: *Agent) Agent.Error!Completion {
+            const executable = self.cached_executable orelse blk: {
+                const executable = try generateBytecode(agent, self.ecmascript_code, .{});
+                self.cached_executable = executable;
+                break :blk executable;
+            };
+            var vm = try Vm.init(agent);
+            defer vm.deinit();
+            return vm.run(executable);
+        }
     },
     .tag = .ecmascript_function,
 });
@@ -321,14 +333,7 @@ fn evaluateFunctionBody(
     try functionDeclarationInstantiation(agent, function, arguments_list);
 
     // 2. Return ? Evaluation of FunctionStatementList.
-    const executable = function.fields.cached_executable orelse blk: {
-        const executable = try generateBytecode(agent, function.fields.ecmascript_code, .{});
-        function.fields.cached_executable = executable;
-        break :blk executable;
-    };
-    var vm = try Vm.init(agent);
-    defer vm.deinit();
-    return vm.run(executable);
+    return function.fields.generateAndRunBytecode(agent);
 }
 
 /// 15.5.2 Runtime Semantics: EvaluateGeneratorBody
@@ -418,7 +423,8 @@ fn evaluateAsyncFunctionBody(
     };
 
     // 4. Else,
-    //     TODO: a. Perform AsyncFunctionStart(promiseCapability, FunctionBody).
+    //     a. Perform AsyncFunctionStart(promiseCapability, FunctionBody).
+    try asyncFunctionStart(agent, promise_capability, function);
 
     // 5. Return Completion Record { [[Type]]: return, [[Value]]: promiseCapability.[[Promise]], [[Target]]: empty }.
     return .{ .type = .@"return", .value = Value.from(promise_capability.promise), .target = null };
