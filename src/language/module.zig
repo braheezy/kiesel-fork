@@ -42,6 +42,22 @@ pub const Module = union(enum) {
         };
     }
 
+    pub fn getExportedNames(self: Self, agent: *Agent) Allocator.Error![]const []const u8 {
+        return switch (self) {
+            inline else => |module| module.getExportedNames(agent),
+        };
+    }
+
+    pub fn resolveExport(
+        self: Self,
+        agent: *Agent,
+        export_name: []const u8,
+    ) Allocator.Error!?ResolvedBindingOrAmbiguous {
+        return switch (self) {
+            inline else => |module| module.resolveExport(agent, export_name),
+        };
+    }
+
     pub fn link(self: Self, agent: *Agent) Agent.Error!void {
         return switch (self) {
             inline else => |module| module.link(agent),
@@ -84,6 +100,23 @@ pub const ImportedModuleReferrer = union(enum) {
 pub const ImportedModulePayload = union(enum) {
     graph_loading_state: *GraphLoadingState,
     promise_capability: PromiseCapability,
+};
+
+/// https://tc39.es/ecma262/#resolvedbinding-record
+pub const ResolvedBinding = struct {
+    /// [[Module]]
+    module: Module,
+
+    /// [[BindingName]]
+    binding_name: union(enum) {
+        string: []const u8,
+        namespace,
+    },
+};
+
+pub const ResolvedBindingOrAmbiguous = union(enum) {
+    resolved_binding: ResolvedBinding,
+    ambiguous,
 };
 
 /// 13.3.10.1.1 ContinueDynamicImport ( promiseCapability, moduleCompletion )
@@ -347,8 +380,9 @@ pub fn getModuleNamespace(agent: *Agent, module: Module) Allocator.Error!Object 
 
     // 3. If namespace is empty, then
     if (namespace == null) {
-        // TODO: a. Let exportedNames be module.GetExportedNames().
-        const exported_names = &[_][]const u8{};
+        // a. Let exportedNames be module.GetExportedNames().
+        const exported_names = try module.getExportedNames(agent);
+        defer agent.gc_allocator.free(exported_names);
 
         // b. Let unambiguousNames be a new empty List.
         var unambiguous_names = std.ArrayList([]const u8).init(agent.gc_allocator);
@@ -356,9 +390,13 @@ pub fn getModuleNamespace(agent: *Agent, module: Module) Allocator.Error!Object 
 
         // c. For each element name of exportedNames, do
         for (exported_names) |name| {
-            // TODO: i. Let resolution be module.ResolveExport(name).
-            // TODO: ii. If resolution is a ResolvedBinding Record, append name to unambiguousNames.
-            _ = name;
+            // i. Let resolution be module.ResolveExport(name).
+            const resolution = try module.resolveExport(agent, name);
+
+            // ii. If resolution is a ResolvedBinding Record, append name to unambiguousNames.
+            if (resolution != null and resolution.? == .resolved_binding) {
+                try unambiguous_names.append(name);
+            }
         }
 
         // d. Set namespace to ModuleNamespaceCreate(module, unambiguousNames).

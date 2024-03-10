@@ -21,6 +21,7 @@ const PropertyKey = types.PropertyKey;
 const Value = types.Value;
 const containsSlice = utils.containsSlice;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
+const getModuleNamespace = language.getModuleNamespace;
 const noexcept = utils.noexcept;
 const ordinaryDefineOwnProperty = builtins.ordinaryDefineOwnProperty;
 const ordinaryDelete = builtins.ordinaryDelete;
@@ -145,7 +146,7 @@ fn hasProperty(object: Object, property_key: PropertyKey) Allocator.Error!bool {
 
 /// 10.4.6.8 [[Get]] ( P, Receiver )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-get-p-receiver
-fn get(object: Object, property_key: PropertyKey, receiver: Value) Allocator.Error!Value {
+fn get(object: Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value {
     const agent = object.agent();
 
     // 1. If P is a Symbol, then
@@ -157,17 +158,40 @@ fn get(object: Object, property_key: PropertyKey, receiver: Value) Allocator.Err
     // 2. Let exports be O.[[Exports]].
     const exports = object.as(ModuleNamespace).fields.exports;
 
+    const property_key_string = (try property_key.toStringOrSymbol(agent)).string;
+
     // 3. If exports does not contain P, return undefined.
-    if (!containsSlice(exports, (try property_key.toStringOrSymbol(agent)).string)) {
+    if (!containsSlice(exports, property_key_string)) {
         return .undefined;
     }
 
     // 4. Let m be O.[[Module]].
-    const module = object.as(ModuleNamespace).fields.module;
+    const module: Module = object.as(ModuleNamespace).fields.module;
 
-    // TODO: 5-12.
-    _ = module;
-    @panic("Not implemented");
+    // 5. Let binding be m.ResolveExport(P).
+    // 6. Assert: binding is a ResolvedBinding Record.
+    const binding = (try module.resolveExport(agent, property_key_string)).?.resolved_binding;
+
+    // 7. Let targetModule be binding.[[Module]].
+    // 8. Assert: targetModule is not undefined.
+    const target_module = binding.module;
+
+    // 9. If binding.[[BindingName]] is namespace, then
+    if (binding.binding_name == .namespace) {
+        // a. Return GetModuleNamespace(targetModule).
+        return Value.from(try getModuleNamespace(agent, target_module));
+    }
+
+    // 10. Let targetEnv be targetModule.[[Environment]].
+    const target_env = switch (target_module) {
+        .source_text_module => |source_text_module| source_text_module.environment,
+    } orelse {
+        // 11. If targetEnv is empty, throw a ReferenceError exception.
+        return agent.throwException(.reference_error, "Module is not linked", .{});
+    };
+
+    // 12. Return ? targetEnv.GetBindingValue(binding.[[BindingName]], true).
+    return target_env.getBindingValue(agent, binding.binding_name.string, true);
 }
 
 /// 10.4.6.9 [[Set]] ( P, V, Receiver )

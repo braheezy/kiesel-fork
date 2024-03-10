@@ -66,6 +66,8 @@ pub const Instruction = enum(u8) {
     has_property,
     /// Increment the numeric result value by one.
     increment,
+    /// Call InitializeBoundName() with "*default*" and the result value.
+    initialize_default_export,
     /// Store InstanceofOperator() as the result value.
     instanceof_operator,
     /// Store InstantiateArrowFunctionExpression() as the result value.

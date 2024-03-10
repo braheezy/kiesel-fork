@@ -23,6 +23,7 @@ const Object = types.Object;
 const Parser = @import("Parser.zig");
 const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
 const Realm = execution.Realm;
+const ResolvedBindingOrAmbiguous = language.ResolvedBindingOrAmbiguous;
 const SafePointer = types.SafePointer;
 const String = types.String;
 const Value = types.Value;
@@ -52,7 +53,15 @@ context: ?ExecutionContext,
 /// [[ImportMeta]]
 import_meta: ?Object,
 
-// TODO: [[ImportEntries]], [[LocalExportEntries]], [[IndirectExportEntries]], [[StarExportEntries]]
+// TODO: [[ImportEntries]]
+
+/// [[LocalExportEntries]]
+local_export_entries: std.ArrayList(ExportEntry),
+
+/// [[IndirectExportEntries]]
+indirect_export_entries: std.ArrayList(ExportEntry),
+
+// TODO: [[StarExportEntries]]
 
 /// [[HostDefined]]
 host_defined: SafePointer,
@@ -98,6 +107,25 @@ const Status = enum {
     evaluating,
     evaluating_async,
     evaluated,
+};
+
+/// https://tc39.es/ecma262/#exportentry-record
+pub const ExportEntry = struct {
+    /// [[ExportName]]
+    export_name: ?[]const u8,
+
+    /// [[ModuleRequest]]
+    module_request: ?[]const u8,
+
+    /// [[ImportName]]
+    import_name: ?union(enum) {
+        string: []const u8,
+        all,
+        all_but_default,
+    },
+
+    /// [[LocalName]]
+    local_name: ?[]const u8,
 };
 
 pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
@@ -424,8 +452,44 @@ pub fn parse(
     // 2. If body is a List of errors, return body.
     const body = try Parser.parse(ast.Module, agent.gc_allocator, source_text, ctx);
 
-    // TODO: 3-11.
+    // TODO: 3-5.
     const requested_modules = std.StringArrayHashMap(void).init(agent.gc_allocator);
+
+    // 6. Let indirectExportEntries be a new empty List.
+    var indirect_export_entries = std.ArrayList(ExportEntry).init(agent.gc_allocator);
+
+    // 7. Let localExportEntries be a new empty List.
+    var local_export_entries = std.ArrayList(ExportEntry).init(agent.gc_allocator);
+
+    // TODO: 8-9.
+
+    // 9. Let exportEntries be ExportEntries of body.
+    const export_entries = try body.exportEntries(agent.gc_allocator);
+    defer agent.gc_allocator.free(export_entries);
+
+    // 10. For each ExportEntry Record ee of exportEntries, do
+    for (export_entries) |export_entry| {
+        // a. If ee.[[ModuleRequest]] is null, then
+        if (export_entry.module_request == null) {
+            // i. If importedBoundNames does not contain ee.[[LocalName]], then
+            //     1. Append ee to localExportEntries.
+            // ii. Else,
+            //     TODO: 1-3.
+            try local_export_entries.append(export_entry);
+        }
+        // b. Else if ee.[[ImportName]] is all-but-default, then
+        else if (export_entry.import_name != null and export_entry.import_name.? == .all_but_default) {
+            // TODO: i. Assert: ee.[[ExportName]] is null.
+            // TODO: ii. Append ee to starExportEntries.
+        }
+        // c. Else,
+        else {
+            // i. Append ee to indirectExportEntries.
+            try indirect_export_entries.append(export_entry);
+        }
+    }
+
+    // TODO: 11. Let async be body Contains await.
     const @"async" = false;
 
     // 12. Return Source Text Module Record {
@@ -455,6 +519,8 @@ pub fn parse(
         .context = null,
         .import_meta = null,
         .requested_modules = requested_modules,
+        .local_export_entries = local_export_entries,
+        .indirect_export_entries = indirect_export_entries,
         .loaded_modules = std.StringHashMap(Module).init(agent.gc_allocator),
         .dfs_index = null,
         .dfs_ancestor_index = null,
@@ -740,6 +806,112 @@ fn innerModuleEvaluation(
     // 17. Return index.
     return new_index;
 }
+/// 16.2.1.6.2 GetExportedNames ( [ exportStarSet ] )
+/// https://tc39.es/ecma262/#sec-getexportednames
+pub fn getExportedNames(self: Self, agent: *Agent) Allocator.Error![]const []const u8 {
+    // 1. Assert: module.[[Status]] is not new.
+    std.debug.assert(self.status != .new);
+
+    // TODO: 2-4.
+
+    // 5. Let exportedNames be a new empty List.
+    var exported_names = std.ArrayList([]const u8).init(agent.gc_allocator);
+
+    // 6. For each ExportEntry Record e of module.[[LocalExportEntries]], do
+    for (self.local_export_entries.items) |export_entry| {
+        // a. Assert: module provides the direct binding for this export.
+        // b. Assert: e.[[ExportName]] is not null.
+        // c. Append e.[[ExportName]] to exportedNames.
+        try exported_names.append(export_entry.export_name.?);
+    }
+
+    // 7. For each ExportEntry Record e of module.[[IndirectExportEntries]], do
+    for (self.indirect_export_entries.items) |export_entry| {
+        // a. Assert: module imports a specific binding for this export.
+        // b. Assert: e.[[ExportName]] is not null.
+        // c. Append e.[[ExportName]] to exportedNames.
+        try exported_names.append(export_entry.export_name.?);
+    }
+
+    // TODO: 8. For each ExportEntry Record e of module.[[StarExportEntries]], do
+
+    // 9. Return exportedNames.
+    return exported_names.toOwnedSlice();
+}
+
+/// 16.2.1.6.3 ResolveExport ( exportName [ , resolveSet ] )
+/// https://tc39.es/ecma262/#sec-resolveexport
+pub fn resolveExport(
+    self: *Self,
+    agent: *Agent,
+    export_name: []const u8,
+) Allocator.Error!?ResolvedBindingOrAmbiguous {
+    // 1. Assert: module.[[Status]] is not new.
+    std.debug.assert(self.status != .new);
+
+    // TODO: 2-4.
+
+    // 5. For each ExportEntry Record e of module.[[LocalExportEntries]], do
+    for (self.local_export_entries.items) |export_entry| {
+        // a. If e.[[ExportName]] is exportName, then
+        if (std.mem.eql(u8, export_entry.export_name.?, export_name)) {
+            // i. Assert: module provides the direct binding for this export.
+            // ii. Return ResolvedBinding Record {
+            //       [[Module]]: module, [[BindingName]]: e.[[LocalName]]
+            //     }.
+            return .{
+                .resolved_binding = .{
+                    .module = .{ .source_text_module = self },
+                    .binding_name = .{ .string = export_entry.local_name.? },
+                },
+            };
+        }
+    }
+
+    // 6. For each ExportEntry Record e of module.[[IndirectExportEntries]], do
+    for (self.indirect_export_entries.items) |export_entry| {
+        // a. If e.[[ExportName]] is exportName, then
+        if (std.mem.eql(u8, export_entry.export_name.?, export_name)) {
+            // i. Assert: e.[[ModuleRequest]] is not null.
+            std.debug.assert(export_entry.module_request != null);
+
+            // ii. Let importedModule be GetImportedModule(module, e.[[ModuleRequest]]).
+            const imported_module = getImportedModule(
+                self,
+                String.from(export_entry.module_request.?),
+            );
+
+            // iii. If e.[[ImportName]] is all, then
+            if (export_entry.import_name != null and export_entry.import_name.? == .all) {
+                // 1. Assert: module does not provide the direct binding for this export.
+                // 2. Return ResolvedBinding Record { [[Module]]: importedModule, [[BindingName]]: namespace }.
+            }
+            // iv. Else,
+            else {
+                // 1. Assert: module imports a specific binding for this export.
+                // 2. Return importedModule.ResolveExport(e.[[ImportName]], resolveSet).
+                return imported_module.resolveExport(agent, export_entry.import_name.?.string);
+            }
+        }
+    }
+
+    // 7. If exportName is "default", then
+    if (std.mem.eql(u8, export_name, "default")) {
+        // a. Assert: A default export was not explicitly defined by this module.
+        // b. Return null.
+        return null;
+
+        // c. NOTE: A default export cannot be provided by an export * from "mod" declaration.
+    }
+
+    // 8. Let starResolution be null.
+    const star_resolution = null;
+
+    // TODO: 9. For each ExportEntry Record e of module.[[StarExportEntries]], do
+
+    // 10. Return starResolution.
+    return star_resolution;
+}
 
 /// 16.2.1.6.4 InitializeEnvironment ( )
 /// https://tc39.es/ecma262/#sec-source-text-module-record-initialize-environment
@@ -838,6 +1010,18 @@ pub fn initializeEnvironment(self: *Self) Allocator.Error!void {
     // TODO: 23. Let privateEnv be null.
     // TODO: 24. For each element d of lexDeclarations, do
     //     [...]
+    // Ad-hoc creation of the '*default*' binding
+    for (code.module_item_list.items) |module_item| switch (module_item) {
+        .export_declaration => |export_declaration| switch (export_declaration) {
+            .default_hoistable_declaration, .default_class_declaration, .default_expression => {
+                // 1. Perform ! env.CreateMutableBinding(dn, false).
+                env.createMutableBinding(agent, "*default*", false) catch |err| try noexcept(err);
+                break;
+            },
+            else => {},
+        },
+        else => {},
+    };
 
     // 25. Remove moduleContext from the execution context stack.
     _ = agent.execution_context_stack.pop();

@@ -2809,9 +2809,95 @@ pub fn codegenModuleItem(
     ctx: *Context,
 ) Executable.Error!void {
     switch (node) {
+        .export_declaration => |export_declaration| {
+            try codegenExportDeclaration(export_declaration, executable, ctx);
+        },
         .statement_list_item => |statement_list_item| {
             try codegenStatementListItem(statement_list_item, executable, ctx);
         },
         else => {},
+    }
+}
+
+/// 16.2.3.7 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-exports-runtime-semantics-evaluation
+pub fn codegenExportDeclaration(
+    node: ast.ExportDeclaration,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    switch (node) {
+        // ExportDeclaration :
+        //     export ExportFromClause FromClause ;
+        //     export NamedExports ;
+        .export_from, .named_exports => {
+            // 1. Return empty.
+        },
+
+        // ExportDeclaration : export VariableStatement
+        .variable_statement => |variable_statement| {
+            // 1. Return ? Evaluation of VariableStatement.
+            try codegenVariableStatement(variable_statement, executable, ctx);
+        },
+
+        // ExportDeclaration : export  Declaration
+        .declaration => |declaration| {
+            // 1. Return ? Evaluation of Declaration.
+            try codegenDeclaration(declaration.*, executable, ctx);
+        },
+
+        // ExportDeclaration : export default HoistableDeclaration
+        .default_hoistable_declaration => |hoistable_declaration| {
+            // 1. Return ? Evaluation of HoistableDeclaration.
+            try codegenHoistableDeclaration(hoistable_declaration, executable, ctx);
+        },
+
+        // ExportDeclaration : export default ClassDeclaration
+        .default_class_declaration => |class_declaration| {
+            // 1. Let value be ? BindingClassDeclarationEvaluation of ClassDeclaration.
+            try executable.addInstruction(.load);
+            try executable.addInstructionWithFunctionOrClass(
+                .binding_class_declaration_evaluation,
+                .{ .class_declaration = class_declaration },
+            );
+
+            // 2. Let className be the sole element of BoundNames of ClassDeclaration.
+            const class_name = class_declaration.identifier;
+
+            // 3. If className is "*default*", then
+            if (class_name == null) {
+                // a. Let env be the running execution context's LexicalEnvironment.
+                // b. Perform ? InitializeBoundName("*default*", value, env).
+                try executable.addInstruction(.initialize_default_export);
+            }
+
+            // 4. Return empty.
+            try executable.addInstruction(.store);
+        },
+
+        // ExportDeclaration : export default AssignmentExpression ;
+        .default_expression => |expression| {
+            try executable.addInstruction(.load);
+
+            // TODO 1. If IsAnonymousFunctionDefinition(AssignmentExpression) is true, then
+            if (false) {
+                // a. Let value be ? NamedEvaluation of AssignmentExpression with argument "default".
+            }
+            // 2. Else,
+            else {
+                // a. Let rhs be ? Evaluation of AssignmentExpression.
+                try codegenExpression(expression, executable, ctx);
+
+                // b. Let value be ? GetValue(rhs).
+                if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            }
+
+            // 3. Let env be the running execution context's LexicalEnvironment.
+            // 4. Perform ? InitializeBoundName("*default*", value, env).
+            try executable.addInstruction(.initialize_default_export);
+
+            // 5. Return empty.
+            try executable.addInstruction(.store);
+        },
     }
 }

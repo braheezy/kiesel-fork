@@ -2571,6 +2571,20 @@ pub fn executeInstruction(
                 else => @panic("increment instruction must only be used with numeric value"),
             };
         },
+        .initialize_default_export => {
+            const value = self.result.?;
+
+            // 3. Let env be the running execution context's LexicalEnvironment.
+            const environment = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+            // 4. Perform ? InitializeBoundName("*default*", value, env).
+            try initializeBoundName(
+                self.agent,
+                "*default*",
+                value,
+                .{ .environment = environment },
+            );
+        },
         .instanceof_operator => {
             const rval = self.stack.pop();
             const lval = self.stack.pop();

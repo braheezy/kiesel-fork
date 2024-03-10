@@ -4,6 +4,7 @@ const Allocator = std.mem.Allocator;
 
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
+const language = @import("../language.zig");
 const reg_exp = @import("../builtins/reg_exp.zig");
 const tokenizer = @import("tokenizer.zig");
 const types = @import("../types.zig");
@@ -13,6 +14,7 @@ const line_terminators = tokenizer.line_terminators;
 const Agent = execution.Agent;
 const BigInt = types.BigInt;
 const Environment = execution.Environment;
+const ExportEntry = language.ExportEntry;
 const Object = types.Object;
 const PrivateEnvironment = execution.PrivateEnvironment;
 const PropertyKey = types.PropertyKey;
@@ -742,14 +744,38 @@ pub const Declaration = union(enum) {
             .is_string_literal => false,
         };
     }
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn boundNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        switch (self) {
+            inline else => |node| return node.boundNames(allocator),
+        }
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-HoistableDeclaration
 pub const HoistableDeclaration = union(enum) {
+    const Self = @This();
+
     function_declaration: FunctionDeclaration,
     generator_declaration: GeneratorDeclaration,
     async_function_declaration: AsyncFunctionDeclaration,
     async_generator_declaration: AsyncGeneratorDeclaration,
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn boundNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        switch (self) {
+            inline else => |node| return node.boundNames(allocator),
+        }
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-BreakableStatement
@@ -834,11 +860,9 @@ pub const StatementList = struct {
             .declaration => |declaration| {
                 switch (declaration.*) {
                     // 1. If Declaration is Declaration : HoistableDeclaration , then
-                    .hoistable_declaration => |hoistable_declaration| switch (hoistable_declaration) {
-                        inline else => |node| {
-                            // a. Return the BoundNames of HoistableDeclaration.
-                            try var_declared_names.appendSlice(try node.boundNames(allocator));
-                        },
+                    .hoistable_declaration => |hoistable_declaration| {
+                        // a. Return the BoundNames of HoistableDeclaration.
+                        try var_declared_names.appendSlice(try hoistable_declaration.boundNames(allocator));
                     },
 
                     // HACK: Emit lexical declarations too while they're codegen'd as var decls
@@ -987,6 +1011,8 @@ pub const StatementListItem = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-LexicalDeclaration
 pub const LexicalDeclaration = struct {
+    const Self = @This();
+
     pub const Type = enum {
         let,
         @"const",
@@ -994,17 +1020,64 @@ pub const LexicalDeclaration = struct {
 
     type: Type,
     binding_list: BindingList,
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn boundNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // LexicalDeclaration : LetOrConst BindingList ;
+        // 1. Return the BoundNames of BindingList.
+        return self.binding_list.boundNames(allocator);
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-BindingList
 pub const BindingList = struct {
+    const Self = @This();
+
     items: []const LexicalBinding,
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn boundNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // BindingList : BindingList , LexicalBinding
+        // 1. Let names1 be the BoundNames of BindingList.
+        // 2. Let names2 be the BoundNames of LexicalBinding.
+        // 3. Return the list-concatenation of names1 and names2.
+        var bound_names = std.ArrayList(Identifier).init(allocator);
+        for (self.items) |lexical_binding| {
+            try bound_names.appendSlice(try lexical_binding.boundNames(allocator));
+        }
+        return bound_names.toOwnedSlice();
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-LexicalBinding
 pub const LexicalBinding = struct {
+    const Self = @This();
+
     binding_identifier: Identifier,
     initializer: ?Expression,
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn boundNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // LexicalBinding : BindingIdentifier Initializer[opt]
+        // 1. Return the BoundNames of BindingIdentifier.
+        // LexicalBinding : BindingPattern Initializer
+        // TODO: 1. Return the BoundNames of BindingPattern.
+        var bound_names = std.ArrayList(Identifier).init(allocator);
+        try bound_names.append(self.binding_identifier);
+        return bound_names.toOwnedSlice();
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-VariableStatement
@@ -2519,7 +2592,152 @@ pub const Script = struct {
 
 /// https://tc39.es/ecma262/#prod-Module
 pub const Module = struct {
+    const Self = @This();
+
     module_item_list: ModuleItemList,
+
+    /// 16.2.3.4 Static Semantics: ExportEntries
+    /// https://tc39.es/ecma262/#sec-static-semantics-exportentries
+    pub fn exportEntries(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const ExportEntry {
+        // Module : [empty]
+        // 1. Return a new empty List.
+        // ModuleItemList : ModuleItemList ModuleItem
+        // 1. Let entries1 be ExportEntries of ModuleItemList.
+        // 2. Let entries2 be ExportEntries of ModuleItem.
+        // 3. Return the list-concatenation of entries1 and entries2.
+        var export_entries = std.ArrayList(ExportEntry).init(allocator);
+        for (self.module_item_list.items) |module_item| switch (module_item) {
+            // ModuleItem :
+            //     ImportDeclaration
+            //     StatementListItem
+            .import_declaration, .statement_list_item => {
+                // 1. Return a new empty List.
+            },
+            .export_declaration => |export_declaration| switch (export_declaration) {
+                // ExportDeclaration : export ExportFromClause FromClause ;
+                .export_from => {
+                    // TODO: 1. Let module be the sole element of ModuleRequests of FromClause.
+                    // TODO: 2. Return ExportEntriesForModule of ExportFromClause with argument module.
+                },
+
+                // ExportDeclaration : export NamedExports ;
+                .named_exports => {
+                    // TODO: 1. Return ExportEntriesForModule of NamedExports with argument null.
+                },
+
+                // ExportDeclaration : export VariableStatement
+                .variable_statement => |variable_statement| {
+                    // 1. Let entries be a new empty List.
+
+                    // 2. Let names be the BoundNames of VariableStatement.
+                    const names = try variable_statement.variable_declaration_list.boundNames(allocator);
+                    defer allocator.free(names);
+
+                    // 3. For each element name of names, do
+                    for (names) |name| {
+                        // a. Append the ExportEntry Record {
+                        //      [[ModuleRequest]]: null, [[ImportName]]: null, [[LocalName]]: name,
+                        //      [[ExportName]]: name
+                        //    } to entries.
+                        try export_entries.append(.{
+                            .module_request = null,
+                            .import_name = null,
+                            .local_name = name,
+                            .export_name = name,
+                        });
+                    }
+
+                    // 4. Return entries.
+                },
+
+                // ExportDeclaration : export Declaration
+                .declaration => |declaration| {
+                    // 1. Let entries be a new empty List.
+
+                    // 2. Let names be the BoundNames of Declaration.
+                    const names = try declaration.boundNames(allocator);
+                    defer allocator.free(names);
+
+                    // 3. For each element name of names, do
+                    for (names) |name| {
+                        // a. Append the ExportEntry Record {
+                        //      [[ModuleRequest]]: null, [[ImportName]]: null,
+                        //      [[LocalName]]: name, [[ExportName]]: name
+                        //    } to entries.
+                        try export_entries.append(.{
+                            .module_request = null,
+                            .import_name = null,
+                            .local_name = name,
+                            .export_name = name,
+                        });
+                    }
+
+                    // 4. Return entries.
+                },
+
+                // ExportDeclaration : export default HoistableDeclaration
+                .default_hoistable_declaration => |hoistable_declaration| {
+                    // 1. Let names be BoundNames of HoistableDeclaration.
+                    const names = try hoistable_declaration.boundNames(allocator);
+                    defer allocator.free(names);
+
+                    // 2. Let localName be the sole element of names.
+                    const local_name = names[0];
+
+                    // 3. Return a List whose sole element is a new ExportEntry Record {
+                    //      [[ModuleRequest]]: null, [[ImportName]]: null,
+                    //      [[LocalName]]: localName, [[ExportName]]: "default"
+                    //    }.
+                    try export_entries.append(.{
+                        .module_request = null,
+                        .import_name = null,
+                        .local_name = local_name,
+                        .export_name = "default",
+                    });
+                },
+
+                // ExportDeclaration : export default ClassDeclaration
+                .default_class_declaration => |class_declaration| {
+                    // 1. Let names be BoundNames of ClassDeclaration.
+                    const names = try class_declaration.boundNames(allocator);
+                    defer allocator.free(names);
+
+                    // 2. Let localName be the sole element of names.
+                    const local_name = names[0];
+
+                    // 3. Return a List whose sole element is a new ExportEntry Record {
+                    //      [[ModuleRequest]]: null, [[ImportName]]: null,
+                    //      [[LocalName]]: localName, [[ExportName]]: "default"
+                    //    }.
+                    try export_entries.append(.{
+                        .module_request = null,
+                        .import_name = null,
+                        .local_name = local_name,
+                        .export_name = "default",
+                    });
+                },
+
+                // ExportDeclaration : export default AssignmentExpression ;
+                .default_expression => {
+                    // 1. Let entry be the ExportEntry Record {
+                    //      [[ModuleRequest]]: null, [[ImportName]]: null,
+                    //      [[LocalName]]: "*default*", [[ExportName]]: "default"
+                    //    }.
+                    // 2. Return « entry ».
+                    try export_entries.append(.{
+                        .module_request = null,
+                        .import_name = null,
+                        .local_name = "*default*",
+                        .export_name = "default",
+                    });
+                },
+            },
+        };
+        return export_entries.toOwnedSlice();
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-ModuleItemList
