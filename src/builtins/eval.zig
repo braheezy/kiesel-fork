@@ -352,7 +352,33 @@ fn evalDeclarationInstantiation(
     // 14. NOTE: No abnormal terminations occur after this algorithm step unless varEnv is a Global
     //     Environment Record and the global object is a Proxy exotic object.
 
-    // TODO: 15-17.
+    // 15. Let lexDeclarations be the LexicallyScopedDeclarations of body.
+    const lex_declarations = try body.lexicallyScopedDeclarations(agent.gc_allocator);
+    defer agent.gc_allocator.free(lex_declarations);
+
+    // 16. For each element d of lexDeclarations, do
+    for (lex_declarations) |declaration| {
+        // a. NOTE: Lexically declared names are only instantiated here but not initialized.
+
+        const bound_names = try declaration.boundNames(agent.gc_allocator);
+        defer agent.gc_allocator.free(bound_names);
+
+        // b. For each element dn of the BoundNames of d, do
+        for (bound_names) |name| {
+            // i. If IsConstantDeclaration of d is true, then
+            if (declaration.isConstantDeclaration()) {
+                // 1. Perform ? lexEnv.CreateImmutableBinding(dn, true).
+                try lex_env.createImmutableBinding(agent, name, true);
+            }
+            // ii. Else,
+            else {
+                // 1. Perform ? lexEnv.CreateMutableBinding(dn, false).
+                try lex_env.createMutableBinding(agent, name, false);
+            }
+        }
+    }
+
+    // TODO: 17. For each Parse Node f of functionsToInitialize, do
 
     // 18. For each String vn of declaredVarNames, do
     var it_ = declared_var_names.keyIterator();

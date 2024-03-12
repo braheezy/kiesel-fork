@@ -253,12 +253,34 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
 
     // 12. NOTE: Annex B.3.2.2 adds additional steps at this point.
 
-    // TODO: 13. Let lexDeclarations be the LexicallyScopedDeclarations of script.
+    // 13. Let lexDeclarations be the LexicallyScopedDeclarations of script.
+    const lex_declarations = try script.lexicallyScopedDeclarations(agent.gc_allocator);
+    defer agent.gc_allocator.free(lex_declarations);
 
     // 14. Let privateEnv be null.
     const private_env = null;
 
-    // TODO: 15. For each element d of lexDeclarations, do
+    // 15. For each element d of lexDeclarations, do
+    for (lex_declarations) |declaration| {
+        // a. NOTE: Lexically declared names are only instantiated here but not initialized.
+
+        const bound_names = try declaration.boundNames(agent.gc_allocator);
+        defer agent.gc_allocator.free(bound_names);
+
+        // b. For each element dn of the BoundNames of d, do
+        for (bound_names) |name| {
+            // i. If IsConstantDeclaration of d is true, then
+            if (declaration.isConstantDeclaration()) {
+                // 1. Perform ? env.CreateImmutableBinding(dn, true).
+                try env.createImmutableBinding(agent, name, true);
+            }
+            // ii. Else,
+            else {
+                // 1. Perform ? env.CreateMutableBinding(dn, false).
+                try env.createMutableBinding(agent, name, false);
+            }
+        }
+    }
 
     // 16. For each Parse Node f of functionsToInitialize, do
     for (functions_to_initialize.items) |*ptr| {

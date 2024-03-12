@@ -1274,7 +1274,33 @@ fn functionDeclarationInstantiation(
     // 32. Set the LexicalEnvironment of calleeContext to lexEnv.
     callee_context.ecmascript_code.?.lexical_environment = lex_env;
 
-    // TODO: 33-34.
+    // 33. Let lexDeclarations be the LexicallyScopedDeclarations of code.
+    const lex_declarations = try code.lexicallyScopedDeclarations(agent.gc_allocator);
+    defer agent.gc_allocator.free(lex_declarations);
+
+    // 34. For each element d of lexDeclarations, do
+    for (lex_declarations) |declaration| {
+        // a. NOTE: A lexically declared name cannot be the same as a function/generator
+        //    declaration, formal parameter, or a var name. Lexically declared names are only
+        //    instantiated here but not initialized.
+
+        const bound_names = try declaration.boundNames(agent.gc_allocator);
+        defer agent.gc_allocator.free(bound_names);
+
+        // b. For each element dn of the BoundNames of d, do
+        for (bound_names) |name| {
+            // i. If IsConstantDeclaration of d is true, then
+            if (declaration.isConstantDeclaration()) {
+                // 1. Perform ! lexEnv.CreateImmutableBinding(dn, true).
+                lex_env.createImmutableBinding(agent, name, true) catch |err| try noexcept(err);
+            }
+            // ii. Else,
+            else {
+                // 1. Perform ! lexEnv.CreateMutableBinding(dn, false).
+                lex_env.createMutableBinding(agent, name, false) catch |err| try noexcept(err);
+            }
+        }
+    }
 
     // 35. Let privateEnv be the PrivateEnvironment of calleeContext.
     const private_env = callee_context.ecmascript_code.?.private_environment;

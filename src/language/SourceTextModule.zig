@@ -974,7 +974,7 @@ pub fn initializeEnvironment(self: *Self) Allocator.Error!void {
     const code = self.ecmascript_code;
 
     // 19. Let varDeclarations be the VarScopedDeclarations of code.
-    const var_declarations = try code.module_item_list.varScopedDeclarations(agent.gc_allocator);
+    const var_declarations = try code.varScopedDeclarations(agent.gc_allocator);
     defer agent.gc_allocator.free(var_declarations);
 
     // 20. Let declaredVarNames be a new empty List.
@@ -1006,22 +1006,53 @@ pub fn initializeEnvironment(self: *Self) Allocator.Error!void {
         }
     }
 
-    // TODO: 22. Let lexDeclarations be the LexicallyScopedDeclarations of code.
-    // TODO: 23. Let privateEnv be null.
-    // TODO: 24. For each element d of lexDeclarations, do
-    //     [...]
-    // Ad-hoc creation of the '*default*' binding
-    for (code.module_item_list.items) |module_item| switch (module_item) {
-        .export_declaration => |export_declaration| switch (export_declaration) {
-            .default_hoistable_declaration, .default_class_declaration, .default_expression => {
+    // 22. Let lexDeclarations be the LexicallyScopedDeclarations of code.
+    const lex_declarations = try code.lexicallyScopedDeclarations(agent.gc_allocator);
+    defer agent.gc_allocator.free(lex_declarations);
+
+    // 23. Let privateEnv be null.
+    const private_env = null;
+
+    // 24. For each element d of lexDeclarations, do
+    for (lex_declarations) |declaration| {
+        const bound_names = try declaration.boundNames(agent.gc_allocator);
+        defer agent.gc_allocator.free(bound_names);
+
+        // a. For each element dn of the BoundNames of d, do
+        for (bound_names) |name| {
+            // i. If IsConstantDeclaration of d is true, then
+            if (declaration.isConstantDeclaration()) {
+                // 1. Perform ! env.CreateImmutableBinding(dn, true).
+                env.createImmutableBinding(agent, name, true) catch |err| try noexcept(err);
+            }
+            // ii. Else,
+            else {
                 // 1. Perform ! env.CreateMutableBinding(dn, false).
-                env.createMutableBinding(agent, "*default*", false) catch |err| try noexcept(err);
-                break;
-            },
-            else => {},
-        },
-        else => {},
-    };
+                env.createMutableBinding(agent, name, false) catch |err| try noexcept(err);
+            }
+
+            // iii. If d is either a FunctionDeclaration, a GeneratorDeclaration, an
+            //      AsyncFunctionDeclaration, or an AsyncGeneratorDeclaration, then
+            if (declaration == .hoistable_declaration) {
+                const hoistable_declaration = declaration.hoistable_declaration;
+
+                // 1. Let fo be InstantiateFunctionObject of d with arguments env and privateEnv.
+                const function_object = try switch (hoistable_declaration) {
+                    .function_declaration => |function_declaration| function_declaration.instantiateOrdinaryFunctionObject(agent, env, private_env),
+                    .generator_declaration => |generator_declaration| generator_declaration.instantiateGeneratorFunctionObject(agent, env, private_env),
+                    .async_function_declaration => |async_function_declaration| async_function_declaration.instantiateAsyncFunctionObject(agent, env, private_env),
+                    .async_generator_declaration => |async_generator_declaration| async_generator_declaration.instantiateAsyncGeneratorFunctionObject(agent, env, private_env),
+                };
+
+                // 2. Perform ! env.InitializeBinding(dn, fo).
+                env.initializeBinding(
+                    agent,
+                    name,
+                    Value.from(function_object),
+                ) catch |err| try noexcept(err);
+            }
+        }
+    }
 
     // 25. Remove moduleContext from the execution context stack.
     _ = agent.execution_context_stack.pop();
