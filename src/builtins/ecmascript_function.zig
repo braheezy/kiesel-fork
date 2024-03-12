@@ -432,7 +432,7 @@ fn evaluateAsyncFunctionBody(
 
 /// 10.2.2 [[Construct]] ( argumentsList, newTarget )
 /// https://tc39.es/ecma262/#sec-ecmascript-function-objects-construct-argumentslist-newtarget
-pub fn construct(
+fn construct(
     object: Object,
     arguments_list: ArgumentsList,
     new_target: Object,

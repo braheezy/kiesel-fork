@@ -97,7 +97,7 @@ fn getPrototypeOf(object: Object) Agent.Error!?Object {
 
 /// 10.5.2 [[SetPrototypeOf]] ( V )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-setprototypeof-v
-pub fn setPrototypeOf(object: Object, prototype: ?Object) Agent.Error!bool {
+fn setPrototypeOf(object: Object, prototype: ?Object) Agent.Error!bool {
     const agent = object.agent();
     const proxy = object.as(Proxy);
 
@@ -961,7 +961,7 @@ fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) Age
 
 /// 10.5.13 [[Construct]] ( argumentsList, newTarget )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-construct-argumentslist-newtarget
-pub fn construct(
+fn construct(
     object: Object,
     arguments_list: ArgumentsList,
     new_target: Object,

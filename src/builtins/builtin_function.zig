@@ -87,7 +87,7 @@ pub const BuiltinFunction = MakeObject(.{
 
 /// 10.3.1 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-built-in-function-objects-call-thisargument-argumentslist
-pub fn call(
+fn call(
     object: Object,
     this_argument: Value,
     arguments_list: ArgumentsList,
