@@ -586,7 +586,7 @@ pub fn getModifySetValueInBuffer(
             @as(*@"type".T, @alignCast(ptr)),
             op,
             std.mem.bytesToValue(@"type".T, &raw_bytes),
-            .SeqCst,
+            .seq_cst,
         );
     }
 
