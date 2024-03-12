@@ -77,7 +77,7 @@ pub fn build(b: *std.Build) void {
     }
 
     const kiesel_module = b.addModule("kiesel", .{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .path = "src/kiesel.zig" },
         .imports = imports.items,
     });
     kiesel_module.linkLibrary(libgc.artifact("gc"));
@@ -121,7 +121,7 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .path = "src/kiesel.zig" },
         .target = target,
         .optimize = optimize,
     });
