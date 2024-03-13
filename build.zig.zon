@@ -10,6 +10,13 @@
             .url = "https://codeberg.org/linusg/icu4zig/archive/71f4473f01f9e83750d21652cae157f7de3e0c5a.tar.gz",
             .hash = "122038d3ca3346181b0bc153f057177dd5adc4fd601b1d40820c83ffb2c82bc04561",
         },
+        .kiesel_runtime = .{
+            // Uncommend for local development:
+            // .path = "../runtime",
+            .url = "https://codeberg.org/kiesel-js/runtime/archive/a230686db6327197ec81b98c886b3d44756bb3f9.tar.gz",
+            .hash = "12204277b20a311cf2e684ce8d1c2d7470b99234176600f3f39079c3ece2aed000b7",
+            .lazy = true,
+        },
         .libgc = .{
             .url = "https://github.com/linusg/zig-libgc/archive/8d488adfb067ce435056fcfdb84537049c8d152b.tar.gz",
             .hash = "1220df7e3832cbd79557677ee95f5992a2d2e7e31444985f1ab5c8d86e82f8d9a337",

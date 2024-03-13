@@ -101,6 +101,11 @@ pub fn build(b: *std.Build) void {
         build_icu4zig.link(exe, icu4x);
     }
     exe.root_module.addImport("kiesel", kiesel);
+    if (b.lazyDependency("kiesel_runtime", .{})) |kiesel_runtime| {
+        // Ensure the runtime uses the kiesel module defined above.
+        kiesel_runtime.module("kiesel-runtime").addImport("kiesel", kiesel);
+        exe.root_module.addImport("kiesel-runtime", kiesel_runtime.module("kiesel-runtime"));
+    }
     exe.root_module.addImport("args", zig_args.module("args"));
     exe.root_module.addImport("gc", libgc.module("gc"));
     exe.root_module.addImport("zigline", zigline.module("zigline"));
