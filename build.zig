@@ -76,12 +76,12 @@ pub fn build(b: *std.Build) void {
         }) catch @panic("OOM");
     }
 
-    const kiesel_module = b.addModule("kiesel", .{
+    const kiesel = b.addModule("kiesel", .{
         .root_source_file = .{ .path = "src/kiesel.zig" },
         .imports = imports.items,
     });
-    kiesel_module.linkLibrary(libgc.artifact("gc"));
-    kiesel_module.linkLibrary(libregexp.artifact("regexp"));
+    kiesel.linkLibrary(libgc.artifact("gc"));
+    kiesel.linkLibrary(libregexp.artifact("regexp"));
 
     const exe = b.addExecutable(.{
         .name = "kiesel",
@@ -100,9 +100,7 @@ pub fn build(b: *std.Build) void {
         });
         build_icu4zig.link(exe, icu4x);
     }
-    exe.linkLibrary(libgc.artifact("gc"));
-    exe.linkLibrary(libregexp.artifact("regexp"));
-    exe.root_module.addImport("kiesel", kiesel_module);
+    exe.root_module.addImport("kiesel", kiesel);
     exe.root_module.addImport("args", zig_args.module("args"));
     exe.root_module.addImport("gc", libgc.module("gc"));
     exe.root_module.addImport("zigline", zigline.module("zigline"));
