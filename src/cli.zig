@@ -4,6 +4,7 @@ const std = @import("std");
 const args = @import("args");
 const gc = @import("gc");
 const kiesel = @import("kiesel");
+const kiesel_runtime = @import("kiesel-runtime");
 
 const Editor = @import("zigline").Editor;
 
@@ -70,7 +71,12 @@ const ScriptOrModuleHostDefined = struct {
     base_dir: std.fs.Dir,
 };
 
-pub const Kiesel = struct {
+fn initializeGlobalObject(realm: *Realm, global_object: Object) Agent.Error!void {
+    try defineBuiltinProperty(global_object, "Kiesel", Value.from(try Kiesel.create(realm)));
+    try kiesel_runtime.addBindings(realm, global_object);
+}
+
+const Kiesel = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
         const kiesel_object = try ordinaryObjectCreate(realm.agent, try realm.intrinsics.@"%Object.prototype%"());
         const gc_object = try ordinaryObjectCreate(realm.agent, try realm.intrinsics.@"%Object.prototype%"());
@@ -134,9 +140,9 @@ pub const Kiesel = struct {
     fn createRealm(agent: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
         const realm = try Realm.create(agent);
         try realm.setRealmGlobalObject(null, null);
-        const global = try realm.setDefaultGlobalBindings();
-        try defineBuiltinProperty(global, "Kiesel", Value.from(try Kiesel.create(realm)));
-        return Value.from(global);
+        const global_object = try realm.setDefaultGlobalBindings();
+        try initializeGlobalObject(realm, global_object);
+        return Value.from(global_object);
     }
 
     fn detachArrayBuffer(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
@@ -769,7 +775,8 @@ pub fn main() !u8 {
 
     try Realm.initializeHostDefinedRealm(&agent, .{});
     const realm = agent.currentRealm();
-    try defineBuiltinProperty(realm.global_object, "Kiesel", Value.from(try Kiesel.create(realm)));
+    const global_object = realm.global_object;
+    try initializeGlobalObject(realm, global_object);
 
     const path_arg = if (parsed_args.positionals.len > 0) parsed_args.positionals[0] else null;
     if (path_arg) |path| {
