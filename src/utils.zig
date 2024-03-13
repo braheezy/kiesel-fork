@@ -174,6 +174,27 @@ pub fn defineBuiltinAccessor(
     setter: ?*const Behaviour.RegularFn,
     realm: *Realm,
 ) Allocator.Error!void {
+    return defineBuiltinAccessorWithAttributes(
+        object,
+        name,
+        getter,
+        setter,
+        realm,
+        .{ .enumerable = false, .configurable = true },
+    );
+}
+
+pub fn defineBuiltinAccessorWithAttributes(
+    object: Object,
+    comptime name: []const u8,
+    getter: ?*const Behaviour.RegularFn,
+    setter: ?*const Behaviour.RegularFn,
+    realm: *Realm,
+    attributes: struct {
+        enumerable: bool,
+        configurable: bool,
+    },
+) Allocator.Error!void {
     std.debug.assert(getter != null or setter != null);
     const getter_function = if (getter) |behaviour| blk: {
         const function_name = std.fmt.comptimePrint("get {s}", .{comptime getFunctionName(name)});
@@ -195,8 +216,8 @@ pub fn defineBuiltinAccessor(
     const property_descriptor = PropertyDescriptor{
         .get = getter_function,
         .set = setter_function,
-        .enumerable = false,
-        .configurable = true,
+        .enumerable = attributes.enumerable,
+        .configurable = attributes.configurable,
     };
     try object.propertyStorage().set(property_key, property_descriptor);
 }
