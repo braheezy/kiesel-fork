@@ -20,6 +20,8 @@ pub const Instruction = enum(u8) {
     binding_class_declaration_evaluation,
     /// Apply bitwise NOT to the last value on the stack and store it as the result value.
     bitwise_not,
+    /// Perform BlockDeclarationInstantiation().
+    block_declaration_instantiation,
     /// Store ClassDefinitionEvaluation() as the result value.
     class_definition_evaluation,
     /// Create a catch binding for the given name and populate it with the stored exception.
@@ -35,7 +37,7 @@ pub const Instruction = enum(u8) {
     /// (last to first) as an argument, the values on the stack afterwards are the this value and
     /// lastly the function to call.
     evaluate_call,
-    // Store evaluation of a import() call as the result value.
+    /// Store evaluation of a import() call as the result value.
     evaluate_import_call,
     /// Store EvaluateNew() as the result value.
     /// This instruction has the number of argument values that need to be popped from the stack
@@ -48,6 +50,8 @@ pub const Instruction = enum(u8) {
     evaluate_property_access_with_identifier_key,
     // Store evaluation of a super() call as the result value.
     evaluate_super_call,
+    /// Perform ForDeclarationBindingInstantiation with the given identifier and constant-ness.
+    for_declaration_binding_instantiation,
     /// Store GetIterator() as the result value.
     get_iterator,
     /// Store GetNewTarget() as the result value.
@@ -68,6 +72,8 @@ pub const Instruction = enum(u8) {
     increment,
     /// Call InitializeBoundName() with "*default*" and the result value.
     initialize_default_export,
+    /// Call InitializeReferencedBinding() with the last reference on the reference stack and the result value.
+    initialize_referenced_binding,
     /// Store InstanceofOperator() as the result value.
     instanceof_operator,
     /// Store InstantiateArrowFunctionExpression() as the result value.
@@ -117,14 +123,18 @@ pub const Instruction = enum(u8) {
     object_define_method,
     /// Set an object's property to the key/value pair from the last two values on the stack.
     object_set_property,
-    // Spread value into an object.
+    /// Spread value into an object.
     object_spread_value,
     /// Pop a jump target for uncaught exceptions
     pop_exception_jump_target,
     /// Pop the last stored iterator.
     pop_iterator,
+    /// Pop the last stored lexical environment.
+    pop_lexical_environment,
     /// Pop the last stored reference.
     pop_reference,
+    /// Push the current lexical environment.
+    push_lexical_environment,
     /// Push a jump target for uncaught exceptions
     push_exception_jump_target,
     /// Push the last evaluated iterator, if any.
@@ -142,6 +152,8 @@ pub const Instruction = enum(u8) {
     resolve_private_identifier,
     /// Store ResolveThisBinding() as the result value.
     resolve_this_binding,
+    /// Restore the last stored lexical environment.
+    restore_lexical_environment,
     /// Rethrow the stored exception, if any.
     rethrow_exception_if_any,
     /// Stop bytecode execution, indicating a return from the current function.
@@ -170,6 +182,7 @@ pub const Instruction = enum(u8) {
             .resolve_binding => 3,
             .evaluate_call,
             .evaluate_property_access_with_identifier_key,
+            .for_declaration_binding_instantiation,
             .jump_conditional,
             .object_define_method,
             => 2,
@@ -212,6 +225,7 @@ pub const Instruction = enum(u8) {
         return switch (self) {
             .create_catch_binding,
             .evaluate_property_access_with_identifier_key,
+            .for_declaration_binding_instantiation,
             .has_private_element,
             .make_private_reference,
             .resolve_binding,
@@ -221,7 +235,7 @@ pub const Instruction = enum(u8) {
         };
     }
 
-    pub fn asFunctionOrClassIndex(self: Self) bool {
+    pub fn hasFunctionOrClassIndex(self: Self) bool {
         return switch (self) {
             .binding_class_declaration_evaluation,
             .class_definition_evaluation,
@@ -232,6 +246,14 @@ pub const Instruction = enum(u8) {
             .instantiate_generator_function_expression,
             .instantiate_ordinary_function_expression,
             .object_define_method,
+            => true,
+            else => false,
+        };
+    }
+
+    pub fn hasBlockIndex(self: Self) bool {
+        return switch (self) {
+            .block_declaration_instantiation,
             => true,
             else => false,
         };

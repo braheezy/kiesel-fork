@@ -20,6 +20,7 @@ instructions: std.ArrayList(Instruction),
 constants: ValueArrayHashMap(void, sameValue),
 identifiers: std.StringArrayHashMap(void),
 functions_and_classes: std.ArrayList(FunctionOrClass),
+blocks: std.ArrayList(ast.StatementList),
 environment_lookup_cache_size: usize = 0,
 
 pub const FunctionOrClass = union(enum) {
@@ -44,6 +45,7 @@ pub fn init(allocator: Allocator) Self {
         .constants = ValueArrayHashMap(void, sameValue).init(allocator),
         .identifiers = std.StringArrayHashMap(void).init(allocator),
         .functions_and_classes = std.ArrayList(FunctionOrClass).init(allocator),
+        .blocks = std.ArrayList(ast.StatementList).init(allocator),
     };
 }
 
@@ -52,6 +54,7 @@ pub fn deinit(self: *Self) void {
     self.constants.deinit();
     self.identifiers.deinit();
     self.functions_and_classes.deinit();
+    self.blocks.deinit();
 }
 
 pub fn addInstruction(self: *Self, instruction: Instruction) Allocator.Error!void {
@@ -70,6 +73,10 @@ pub fn addIdentifier(self: *Self, identifier: ast.Identifier) Allocator.Error!us
 
 pub fn addFunctionOrClass(self: *Self, function_or_class: FunctionOrClass) Allocator.Error!void {
     try self.functions_and_classes.append(function_or_class);
+}
+
+pub fn addBlock(self: *Self, block: ast.StatementList) Allocator.Error!void {
+    try self.blocks.append(block);
 }
 
 pub fn addInstructionWithConstant(
@@ -99,10 +106,21 @@ pub fn addInstructionWithFunctionOrClass(
     instruction: Instruction,
     function_or_class: FunctionOrClass,
 ) Error!void {
-    std.debug.assert(instruction.asFunctionOrClassIndex());
+    std.debug.assert(instruction.hasFunctionOrClassIndex());
     try self.addInstruction(instruction);
     try self.addFunctionOrClass(function_or_class);
     try self.addIndex(self.functions_and_classes.items.len - 1);
+}
+
+pub fn addInstructionWithBlock(
+    self: *Self,
+    instruction: Instruction,
+    block: ast.StatementList,
+) Error!void {
+    std.debug.assert(instruction.hasBlockIndex());
+    try self.addInstruction(instruction);
+    try self.addBlock(block);
+    try self.addIndex(self.blocks.items.len - 1);
 }
 
 pub const JumpIndex = struct {
@@ -238,6 +256,15 @@ pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
                 try writer.print(
                     "{s} [{}] (strict: {}, environment_lookup_cache_index: {})",
                     .{ identifier, identifier_index, strict, environment_lookup_cache_index },
+                );
+            },
+            .for_declaration_binding_instantiation => {
+                const identifier_index = iterator.instruction_args[0].?;
+                const is_constant_declaration = iterator.instruction_args[1].? == 1;
+                const identifier = self.identifiers.unmanaged.entries.get(identifier_index).key;
+                try writer.print(
+                    "{s} [{}] (is_constant_declaration: {})",
+                    .{ identifier, identifier_index, is_constant_declaration },
                 );
             },
             .has_private_element, .make_private_reference, .resolve_private_identifier => {

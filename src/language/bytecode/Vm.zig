@@ -65,6 +65,7 @@ agent: *Agent,
 ip: usize,
 stack: std.ArrayList(Value),
 iterator_stack: std.ArrayList(Iterator),
+lexical_environment_stack: std.ArrayList(Environment),
 reference_stack: std.ArrayList(?Reference),
 exception_jump_target_stack: std.ArrayList(usize),
 function_arguments: std.ArrayList(Value),
@@ -77,6 +78,7 @@ reference: ?Reference = null,
 pub fn init(agent: *Agent) Allocator.Error!Self {
     const stack = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 32);
     const iterator_stack = std.ArrayList(Iterator).init(agent.gc_allocator);
+    const lexical_environment_stack = std.ArrayList(Environment).init(agent.gc_allocator);
     const reference_stack = std.ArrayList(?Reference).init(agent.gc_allocator);
     const exception_jump_target_stack = std.ArrayList(usize).init(agent.gc_allocator);
     const function_arguments = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 8);
@@ -86,6 +88,7 @@ pub fn init(agent: *Agent) Allocator.Error!Self {
         .ip = 0,
         .stack = stack,
         .iterator_stack = iterator_stack,
+        .lexical_environment_stack = lexical_environment_stack,
         .reference_stack = reference_stack,
         .exception_jump_target_stack = exception_jump_target_stack,
         .function_arguments = function_arguments,
@@ -96,6 +99,7 @@ pub fn init(agent: *Agent) Allocator.Error!Self {
 pub fn deinit(self: Self) void {
     self.stack.deinit();
     self.iterator_stack.deinit();
+    self.lexical_environment_stack.deinit();
     self.reference_stack.deinit();
     self.exception_jump_target_stack.deinit();
     self.function_arguments.deinit();
@@ -122,6 +126,11 @@ fn fetchIdentifier(self: *Self, executable: Executable) []const u8 {
 fn fetchFunctionOrClass(self: *Self, executable: Executable) Executable.FunctionOrClass {
     const index = self.fetchIndex(executable);
     return executable.functions_and_classes.items[index];
+}
+
+fn fetchBlock(self: *Self, executable: Executable) ast.StatementList {
+    const index = self.fetchIndex(executable);
+    return executable.blocks.items[index];
 }
 
 fn fetchIndex(self: *Self, executable: Executable) Executable.IndexType {
@@ -396,6 +405,72 @@ fn applyStringOrNumericBinaryOperator(
             .big_int => return Value.from(try lnum.big_int.bitwiseOR(agent, rnum.big_int)),
         },
     }
+}
+
+/// 14.2.3 BlockDeclarationInstantiation ( code, env )
+/// https://tc39.es/ecma262/#sec-blockdeclarationinstantiation
+fn blockDeclarationInstantiation(
+    agent: *Agent,
+    code: ast.StatementList,
+    env: Environment,
+) Allocator.Error!void {
+    // NOTE: Keeping this wrapped in a generic `Environment` makes a bunch of stuff below easier.
+    std.debug.assert(env == .declarative_environment);
+
+    // 1. let declarations be the LexicallyScopedDeclarations of code.
+    const declarations = try code.lexicallyScopedDeclarations(agent.gc_allocator);
+    defer agent.gc_allocator.free(declarations);
+
+    // 2. Let privateEnv be the running execution context's PrivateEnvironment.
+    const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
+
+    // 3. For each element d of declarations, do
+    for (declarations) |declaration| {
+        const bound_names = try declaration.boundNames(agent.gc_allocator);
+        defer agent.gc_allocator.free(bound_names);
+
+        // a. For each element dn of the BoundNames of d, do
+        for (bound_names) |name| {
+            // i. If IsConstantDeclaration of d is true, then
+            if (declaration.isConstantDeclaration()) {
+                // 1. Perform ! env.CreateImmutableBinding(dn, true).
+                env.createImmutableBinding(agent, name, true) catch |err| try noexcept(err);
+            }
+            // ii. Else,
+            else {
+                // 1. Perform ! env.CreateMutableBinding(dn, false). NOTE: This step is replaced in section B.3.2.6.
+                env.createMutableBinding(agent, name, false) catch |err| try noexcept(err);
+            }
+        }
+
+        // b. If d is either a FunctionDeclaration, a GeneratorDeclaration, an
+        //    AsyncFunctionDeclaration, or an AsyncGeneratorDeclaration, then
+        if (declaration == .hoistable_declaration) {
+            const hoistable_declaration = declaration.hoistable_declaration;
+
+            // i. Let fn be the sole element of the BoundNames of d.
+            const function_name = switch (hoistable_declaration) {
+                inline else => |function_declaration| function_declaration.identifier,
+            }.?;
+
+            // ii. Let fo be InstantiateFunctionObject of d with arguments env and privateEnv.
+            const function_object = try switch (hoistable_declaration) {
+                .function_declaration => |function_declaration| function_declaration.instantiateOrdinaryFunctionObject(agent, env, private_env),
+                .generator_declaration => |generator_declaration| generator_declaration.instantiateGeneratorFunctionObject(agent, env, private_env),
+                .async_function_declaration => |async_function_declaration| async_function_declaration.instantiateAsyncFunctionObject(agent, env, private_env),
+                .async_generator_declaration => |async_generator_declaration| async_generator_declaration.instantiateAsyncGeneratorFunctionObject(agent, env, private_env),
+            };
+
+            // iii. Perform ! env.InitializeBinding(fn, fo). NOTE: This step is replaced in section B.3.2.6.
+            env.initializeBinding(
+                agent,
+                function_name,
+                Value.from(function_object),
+            ) catch |err| try noexcept(err);
+        }
+    }
+
+    // 4. Return unused.
 }
 
 /// 15.2.5 Runtime Semantics: InstantiateOrdinaryFunctionExpression
@@ -2098,6 +2173,15 @@ pub fn executeInstruction(
                 else => unreachable,
             };
         },
+        .block_declaration_instantiation => {
+            const block = self.fetchBlock(executable);
+            const old_env = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+            const block_env = try newDeclarativeEnvironment(self.agent.gc_allocator, old_env);
+            try blockDeclarationInstantiation(self.agent, block, .{ .declarative_environment = block_env });
+            self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{
+                .declarative_environment = block_env,
+            };
+        },
         .class_definition_evaluation => {
             const class_expression = self.fetchFunctionOrClass(executable).class_expression;
 
@@ -2445,6 +2529,47 @@ pub fn executeInstruction(
             // 12. Return result.
             self.result = Value.from(result);
         },
+        .for_declaration_binding_instantiation => {
+            const name = self.fetchIdentifier(executable);
+            const is_constant_declaration = self.fetchIndex(executable) == 1;
+
+            // iii. Let iterationEnv be NewDeclarativeEnvironment(oldEnv).
+            const old_env = self.lexical_environment_stack.getLast();
+            const environment = try newDeclarativeEnvironment(self.agent.gc_allocator, old_env);
+
+            // iv. Perform ForDeclarationBindingInstantiation of lhs with argument iterationEnv.
+
+            // 14.7.5.4 Runtime Semantics: ForDeclarationBindingInstantiation
+            // https://tc39.es/ecma262/#sec-runtime-semantics-fordeclarationbindinginstantiation
+            {
+                // 1. For each element name of the BoundNames of ForBinding, do
+                // a. If IsConstantDeclaration of LetOrConst is true, then
+                if (is_constant_declaration) {
+                    // i. Perform ! environment.CreateImmutableBinding(name, true).
+                    environment.createImmutableBinding(
+                        self.agent,
+                        name,
+                        true,
+                    ) catch |err| try noexcept(err);
+                }
+                // b. Else,
+                else {
+                    // i. Perform ! environment.CreateMutableBinding(name, false).
+                    environment.createMutableBinding(
+                        self.agent,
+                        name,
+                        false,
+                    ) catch |err| try noexcept(err);
+                }
+
+                // 2. Return unused.
+            }
+
+            // v. Set the running execution context's LexicalEnvironment to iterationEnv.
+            self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{
+                .declarative_environment = environment,
+            };
+        },
         .get_iterator => {
             const iterator_kind: IteratorKind = @enumFromInt((self.fetchIndex(executable)));
             self.iterator = try getIterator(self.agent, self.result.?, iterator_kind);
@@ -2584,6 +2709,12 @@ pub fn executeInstruction(
                 value,
                 .{ .environment = environment },
             );
+        },
+        .initialize_referenced_binding => {
+            const reference = self.reference_stack.getLast().?;
+            const value = self.result.?;
+            try reference.initializeReferencedBinding(self.agent, value);
+            self.reference = null;
         },
         .instanceof_operator => {
             const rval = self.stack.pop();
@@ -2823,7 +2954,12 @@ pub fn executeInstruction(
         },
         .pop_exception_jump_target => _ = self.exception_jump_target_stack.pop(),
         .pop_iterator => _ = self.iterator_stack.pop(),
+        .pop_lexical_environment => _ = self.lexical_environment_stack.pop(),
         .pop_reference => _ = self.reference_stack.pop(),
+        .push_lexical_environment => {
+            const lexical_environment = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+            try self.lexical_environment_stack.append(lexical_environment);
+        },
         .push_exception_jump_target => {
             const jump_target = self.fetchIndex(executable);
             try self.exception_jump_target_stack.append(jump_target);
@@ -2866,6 +3002,10 @@ pub fn executeInstruction(
             self.result = Value.from(private_name.symbol);
         },
         .resolve_this_binding => self.result = try self.agent.resolveThisBinding(),
+        .restore_lexical_environment => {
+            const lexical_environment = self.lexical_environment_stack.getLast();
+            self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = lexical_environment;
+        },
         .rethrow_exception_if_any => if (self.exception) |value| {
             self.agent.exception = value;
             return error.ExceptionThrown;

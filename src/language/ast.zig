@@ -950,13 +950,6 @@ pub const StatementList = struct {
                         try var_declared_names.appendSlice(try hoistable_declaration.boundNames(allocator));
                     },
 
-                    // HACK: Emit lexical declarations too while they're codegen'd as var decls
-                    .lexical_declaration => |lexical_declaration| {
-                        for (lexical_declaration.binding_list.items) |lexical_binding| {
-                            try var_declared_names.append(lexical_binding.binding_identifier);
-                        }
-                    },
-
                     // 2. Return a new empty List.
                     else => {},
                 }
@@ -992,18 +985,6 @@ pub const StatementList = struct {
                         // a. Let declaration be DeclarationPart of HoistableDeclaration.
                         // b. Return « declaration ».
                         try variable_declarations.append(.{ .hoistable_declaration = hoistable_declaration });
-                    },
-
-                    // HACK: Emit lexical declarations too while they're codegen'd as var decls
-                    .lexical_declaration => |lexical_declaration| {
-                        for (lexical_declaration.binding_list.items) |lexical_binding| {
-                            try variable_declarations.append(.{
-                                .variable_declaration = .{
-                                    .binding_identifier = lexical_binding.binding_identifier,
-                                    .initializer = lexical_binding.initializer,
-                                },
-                            });
-                        }
                     },
 
                     // 2. Return a new empty List.
@@ -1068,19 +1049,7 @@ pub const StatementListItem = union(enum) {
     ) Allocator.Error![]const Identifier {
         switch (self) {
             .statement => |statement| return try statement.varDeclaredNames(allocator),
-            .declaration => |declaration| {
-                var var_declared_names = std.ArrayList(Identifier).init(allocator);
-                switch (declaration.*) {
-                    // HACK: Emit lexical declarations too while they're codegen'd as var decls
-                    .lexical_declaration => |lexical_declaration| {
-                        for (lexical_declaration.binding_list.items) |lexical_binding| {
-                            try var_declared_names.append(lexical_binding.binding_identifier);
-                        }
-                    },
-                    else => {},
-                }
-                return var_declared_names.toOwnedSlice();
-            },
+            .declaration => return &.{},
         }
     }
 
@@ -1092,24 +1061,7 @@ pub const StatementListItem = union(enum) {
     ) Allocator.Error![]const VarScopedDeclaration {
         switch (self) {
             .statement => |statement| return try statement.varScopedDeclarations(allocator),
-            .declaration => |declaration| {
-                var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
-                switch (declaration.*) {
-                    // HACK: Emit lexical declarations too while they're codegen'd as var decls
-                    .lexical_declaration => |lexical_declaration| {
-                        for (lexical_declaration.binding_list.items) |lexical_binding| {
-                            try variable_declarations.append(.{
-                                .variable_declaration = .{
-                                    .binding_identifier = lexical_binding.binding_identifier,
-                                    .initializer = lexical_binding.initializer,
-                                },
-                            });
-                        }
-                    },
-                    else => {},
-                }
-                return variable_declarations.toOwnedSlice();
-            },
+            .declaration => return &.{},
         }
     }
 
@@ -1517,8 +1469,6 @@ pub const ForStatement = struct {
         self: Self,
         allocator: Allocator,
     ) Allocator.Error![]const Identifier {
-        // ForStatement : for ( Expression[opt] ; Expression[opt] ; Expression[opt] ) Statement
-        // 1. Return the VarDeclaredNames of Statement.
         // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
         // 1. Let names1 be BoundNames of VariableDeclarationList.
         // 2. Let names2 be VarDeclaredNames of Statement.
@@ -1530,18 +1480,11 @@ pub const ForStatement = struct {
                 try var_declared_names.appendSlice(try self.consequent_statement.varDeclaredNames(allocator));
                 return var_declared_names.toOwnedSlice();
             },
-            // HACK: Emit lexical declarations too while they're codegen'd as var decls
-            .lexical_declaration => |lexical_declaration| {
-                var var_declared_names = std.ArrayList(Identifier).init(allocator);
-                for (lexical_declaration.binding_list.items) |lexical_binding| {
-                    try var_declared_names.append(lexical_binding.binding_identifier);
-                }
-                try var_declared_names.appendSlice(try self.consequent_statement.varDeclaredNames(allocator));
-                return var_declared_names.toOwnedSlice();
-            },
             else => {},
         };
 
+        // ForStatement : for ( Expression[opt] ; Expression[opt] ; Expression[opt] ) Statement
+        // 1. Return the VarDeclaredNames of Statement.
         // ForStatement : for ( LexicalDeclaration Expression[opt] ; Expression[opt] ) Statement
         // 1. Return the VarDeclaredNames of Statement.
         return self.consequent_statement.varDeclaredNames(allocator);
@@ -1561,20 +1504,6 @@ pub const ForStatement = struct {
             .variable_statement => {
                 var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
                 try variable_declarations.appendSlice(try self.initializer.?.variable_statement.variable_declaration_list.varScopedDeclarations(allocator));
-                try variable_declarations.appendSlice(try self.consequent_statement.varScopedDeclarations(allocator));
-                return variable_declarations.toOwnedSlice();
-            },
-            // HACK: Emit lexical declarations too while they're codegen'd as var decls
-            .lexical_declaration => |lexical_declaration| {
-                var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
-                for (lexical_declaration.binding_list.items) |lexical_binding| {
-                    try variable_declarations.append(.{
-                        .variable_declaration = .{
-                            .binding_identifier = lexical_binding.binding_identifier,
-                            .initializer = lexical_binding.initializer,
-                        },
-                    });
-                }
                 try variable_declarations.appendSlice(try self.consequent_statement.varScopedDeclarations(allocator));
                 return variable_declarations.toOwnedSlice();
             },
@@ -1616,6 +1545,8 @@ pub const ForInOfStatement = struct {
         self: Self,
         allocator: Allocator,
     ) Allocator.Error![]const Identifier {
+        var var_declared_names = std.ArrayList(Identifier).init(allocator);
+
         // ForInOfStatement :
         //     for ( LeftHandSideExpression in Expression ) Statement
         //     for ( ForDeclaration in Expression ) Statement
@@ -1624,19 +1555,8 @@ pub const ForInOfStatement = struct {
         //     for await ( LeftHandSideExpression of AssignmentExpression ) Statement
         //     for await ( ForDeclaration of AssignmentExpression ) Statement
         if (self.initializer != .for_binding) {
-            var var_declared_names = std.ArrayList(Identifier).init(allocator);
-            switch (self.initializer) {
-                // HACK: Emit lexical declarations too while they're codegen'd as var decls
-                .for_declaration => |lexical_declaration| {
-                    const lexical_binding = lexical_declaration.binding_list.items[0];
-                    try var_declared_names.append(lexical_binding.binding_identifier);
-                },
-                else => {},
-            }
-
             // 1. Return the VarDeclaredNames of Statement.
             try var_declared_names.appendSlice(try self.consequent_statement.varDeclaredNames(allocator));
-            return var_declared_names.toOwnedSlice();
         }
         // ForInOfStatement :
         //     for ( var ForBinding in Expression ) Statement
@@ -1646,11 +1566,11 @@ pub const ForInOfStatement = struct {
             // 1. Let names1 be the BoundNames of ForBinding.
             // 2. Let names2 be the VarDeclaredNames of Statement.
             // 3. Return the list-concatenation of names1 and names2.
-            var var_declared_names = std.ArrayList(Identifier).init(allocator);
             try var_declared_names.append(self.initializer.for_binding);
             try var_declared_names.appendSlice(try self.consequent_statement.varDeclaredNames(allocator));
-            return var_declared_names.toOwnedSlice();
         }
+
+        return var_declared_names.toOwnedSlice();
     }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
@@ -1667,22 +1587,8 @@ pub const ForInOfStatement = struct {
         //     for await ( LeftHandSideExpression of AssignmentExpression ) Statement
         //     for await ( ForDeclaration of AssignmentExpression ) Statement
         if (self.initializer != .for_binding) {
-            var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
-            switch (self.initializer) {
-                // HACK: Emit lexical declarations too while they're codegen'd as var decls
-                .for_declaration => |lexical_declaration| {
-                    const lexical_binding = lexical_declaration.binding_list.items[0];
-                    try variable_declarations.append(.{
-                        .variable_declaration = .{
-                            .binding_identifier = lexical_binding.binding_identifier,
-                            .initializer = lexical_binding.initializer,
-                        },
-                    });
-                },
-                else => {},
-            }
-
             // 1. Return the VarScopedDeclarations of Statement.
+            var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
             try variable_declarations.appendSlice(try self.consequent_statement.varScopedDeclarations(allocator));
             return variable_declarations.toOwnedSlice();
         }

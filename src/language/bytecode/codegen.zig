@@ -1604,10 +1604,22 @@ pub fn codegenBlock(
     }
 
     // Block : { StatementList }
-    // TODO: 1-4, 6
+    // 1. Let oldEnv be the running execution context's LexicalEnvironment.
+    try executable.addInstruction(.push_lexical_environment);
+
+    // 2. Let blockEnv be NewDeclarativeEnvironment(oldEnv).
+    // 3. Perform BlockDeclarationInstantiation(StatementList, blockEnv).
+    // 4. Set the running execution context's LexicalEnvironment to blockEnv.
+    try executable.addInstructionWithBlock(.block_declaration_instantiation, node.statement_list);
+
     // 5. Let blockValue be Completion(Evaluation of StatementList).
-    // 7. Return ? blockValue.
     try codegenStatementList(node.statement_list, executable, ctx);
+
+    // 6. Set the running execution context's LexicalEnvironment to oldEnv.
+    try executable.addInstruction(.restore_lexical_environment);
+    try executable.addInstruction(.pop_lexical_environment);
+
+    // 7. Return ? blockValue.
 }
 
 pub fn codegenStatementList(
@@ -1683,12 +1695,59 @@ pub fn codegenLexicalBinding(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    // TODO: Implement this properly, we just codegen a VariableDeclaration for now
-    const variable_declaration = ast.VariableDeclaration{
-        .binding_identifier = node.binding_identifier,
-        .initializer = node.initializer,
-    };
-    try codegenVariableDeclaration(variable_declaration, executable, ctx);
+    // LexicalBinding : BindingIdentifier Initializer
+    if (node.initializer) |initializer| {
+        try executable.addInstruction(.load);
+
+        // 1. Let bindingId be StringValue of BindingIdentifier.
+        // 2. Let lhs be ! ResolveBinding(bindingId).
+        try executable.addInstructionWithIdentifier(.resolve_binding, node.binding_identifier);
+        const strict = ctx.contained_in_strict_mode_code;
+        try executable.addIndex(@intFromBool(strict));
+        try executable.addIndex(ctx.environment_lookup_cache_index);
+        ctx.environment_lookup_cache_index += 1;
+        try executable.addInstruction(.push_reference);
+
+        // TODO: 3. If IsAnonymousFunctionDefinition(Initializer) is true, then
+        if (false) {
+            // a. Let value be ? NamedEvaluation of Initializer with argument bindingId.
+        }
+        // 4. Else,
+        else {
+            // a. Let rhs be ? Evaluation of Initializer.
+            try codegenExpression(initializer, executable, ctx);
+
+            // b. Let value be ? GetValue(rhs).
+            if (initializer.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        }
+
+        // 5. Perform ! InitializeReferencedBinding(lhs, value).
+        try executable.addInstruction(.initialize_referenced_binding);
+        try executable.addInstruction(.pop_reference);
+
+        // 6. Return empty.
+        try executable.addInstruction(.store);
+    }
+    // LexicalBinding : BindingIdentifier
+    else {
+        try executable.addInstruction(.load);
+
+        // 1. Let lhs be ! ResolveBinding(StringValue of BindingIdentifier).
+        try executable.addInstructionWithIdentifier(.resolve_binding, node.binding_identifier);
+        const strict = ctx.contained_in_strict_mode_code;
+        try executable.addIndex(@intFromBool(strict));
+        try executable.addIndex(ctx.environment_lookup_cache_index);
+        ctx.environment_lookup_cache_index += 1;
+        try executable.addInstruction(.push_reference);
+
+        // 2. Perform ! InitializeReferencedBinding(lhs, undefined).
+        try executable.addInstructionWithConstant(.store_constant, .undefined);
+        try executable.addInstruction(.initialize_referenced_binding);
+        try executable.addInstruction(.pop_reference);
+
+        // 3. Return empty.
+        try executable.addInstruction(.store);
+    }
 }
 
 /// 14.3.2.1 Runtime Semantics: Evaluation
@@ -1748,7 +1807,7 @@ pub fn codegenVariableDeclaration(
         // b. Let value be ? GetValue(rhs).
         // FIXME: This clobbers the result value and we don't have a good way of restoring it.
         //        Should probably use the stack more and have explicit result store instructions.
-        if (node.initializer.?.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        if (initializer.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
         // 5. Perform ? PutValue(lhs, value).
         try executable.addInstruction(.put_value);
@@ -1990,8 +2049,42 @@ pub fn codegenForStatement(
 
         // ForStatement : for ( LexicalDeclaration Expression[opt] ; Expression[opt] ) Statement
         .lexical_declaration => |lexical_declaration| {
-            // TODO: Implement this fully once lexical declarations behave different than var decls
+            // 1. Let oldEnv be the running execution context's LexicalEnvironment.
+            try executable.addInstruction(.push_lexical_environment);
+
+            // 2. Let loopEnv be NewDeclarativeEnvironment(oldEnv).
+            // 3. Let isConst be IsConstantDeclaration of LexicalDeclaration.
+            // 4. Let boundNames be the BoundNames of LexicalDeclaration.
+            // 5. For each element dn of boundNames, do
+            //     a. If isConst is true, then
+            //         i. Perform ! loopEnv.CreateImmutableBinding(dn, true).
+            //     b. Else,
+            //         i. Perform ! loopEnv.CreateMutableBinding(dn, false).
+            // 6. Set the running execution context's LexicalEnvironment to loopEnv.
+            const bound_names = try lexical_declaration.boundNames(executable.allocator);
+            defer executable.allocator.free(bound_names);
+            try executable.addInstructionWithIdentifier(
+                .for_declaration_binding_instantiation,
+                bound_names[0],
+            );
+            const is_constant_declaration = lexical_declaration.isConstantDeclaration();
+            try executable.addIndex(@intFromBool(is_constant_declaration));
+
+            // 7. Let forDcl be Completion(Evaluation of LexicalDeclaration).
             try codegenLexicalDeclaration(lexical_declaration, executable, ctx);
+
+            // TODO: 8. If forDcl is an abrupt completion, then
+            //     a. Set the running execution context's LexicalEnvironment to oldEnv.
+            //     b. Return ? forDcl.
+
+            // TODO: 9. If isConst is false, let perIterationLets be boundNames; otherwise let perIterationLets be a new empty List.
+
+            // 10. If the first Expression is present, let test be the first Expression; otherwise, let test be empty.
+            // 11. If the second Expression is present, let increment be the second Expression; otherwise, let increment be empty.
+            // 12. Let bodyResult be Completion(ForBodyEvaluation(test, increment, Statement, perIterationLets, labelSet)).
+
+            // 13. Set the running execution context's LexicalEnvironment to oldEnv.
+            // 14. Return ? bodyResult.
         },
     };
 
@@ -2054,6 +2147,11 @@ pub fn codegenForStatement(
     while (ctx.break_jumps.popOrNull()) |jump_index| {
         try jump_index.setTargetHere();
     }
+
+    if (node.initializer) |initializer| if (initializer == .lexical_declaration) {
+        try executable.addInstruction(.restore_lexical_environment);
+        try executable.addInstruction(.pop_lexical_environment);
+    };
 }
 
 const ForInOfIterationKind = enum { enumerate, iterate, async_iterate };
@@ -2178,7 +2276,8 @@ fn forInOfBodyEvaluation(
     const iterator_kind = maybe_iterator_kind orelse .sync;
     _ = iterator_kind;
 
-    // TODO: 2. Let oldEnv be the running execution context's LexicalEnvironment.
+    // 2. Let oldEnv be the running execution context's LexicalEnvironment.
+    try executable.addInstruction(.push_lexical_environment);
 
     // 3. Let V be undefined.
     try executable.addInstructionWithConstant(.load_constant, .undefined);
@@ -2277,7 +2376,17 @@ fn forInOfBodyEvaluation(
         // ii. Assert: lhs is a ForDeclaration.
         std.debug.assert(lhs == .for_declaration);
 
-        // TODO: iii-v.
+        // iii. Let iterationEnv be NewDeclarativeEnvironment(oldEnv).
+        // iv. Perform ForDeclarationBindingInstantiation of lhs with argument iterationEnv.
+        // v. Set the running execution context's LexicalEnvironment to iterationEnv.
+        const bound_names = try lhs.for_declaration.boundNames(executable.allocator);
+        defer executable.allocator.free(bound_names);
+        try executable.addInstructionWithIdentifier(
+            .for_declaration_binding_instantiation,
+            bound_names[0],
+        );
+        const is_constant_declaration = lhs.for_declaration.isConstantDeclaration();
+        try executable.addIndex(@intFromBool(is_constant_declaration));
 
         // vi. If destructuring is true, then
         if (destructuring) {
@@ -2290,11 +2399,16 @@ fn forInOfBodyEvaluation(
             // 2. Let lhsName be the sole element of BoundNames of lhs.
             const lhs_name = lhs.for_declaration.binding_list.items[0].binding_identifier;
 
-            // TODO: 3. Let lhsRef be ! ResolveBinding(lhsName).
-            // TODO: 4. Let status be Completion(InitializeReferencedBinding(lhsRef, nextValue)).
-            try codegenIdentifierReference(lhs_name, executable, ctx);
+            // 3. Let lhsRef be ! ResolveBinding(lhsName).
+            try executable.addInstructionWithIdentifier(.resolve_binding, lhs_name);
+            const strict = ctx.contained_in_strict_mode_code;
+            try executable.addIndex(@intFromBool(strict));
+            try executable.addIndex(ctx.environment_lookup_cache_index);
+            ctx.environment_lookup_cache_index += 1;
             try executable.addInstruction(.push_reference);
-            try executable.addInstruction(.put_value);
+
+            // 4. Let status be Completion(InitializeReferencedBinding(lhsRef, nextValue)).
+            try executable.addInstruction(.initialize_referenced_binding);
             try executable.addInstruction(.pop_reference);
         }
     }
@@ -2331,6 +2445,7 @@ fn forInOfBodyEvaluation(
 
     // TODO: We should probably also clean this up if something throws beforehand...
     try executable.addInstruction(.pop_iterator);
+    try executable.addInstruction(.pop_lexical_environment);
 
     if (break_jump) |jump_index| {
         try executable.addInstruction(.jump);
