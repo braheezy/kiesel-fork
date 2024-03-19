@@ -818,20 +818,18 @@ pub const ArrayBufferPrototype = struct {
         //    observable. Implementations may implement this method as in-place growth or shrinkage.
         // 14. Set O.[[ArrayBufferData]] to newBlock.
         // 15. Set O.[[ArrayBufferByteLength]] to newByteLength.
-        const old_byte_length = object.fields.array_buffer_data.?.items.len;
+        const current_byte_length = object.fields.array_buffer_data.?.items.len;
         const result = if (std.math.cast(usize, new_byte_length)) |new_byte_length_casted|
             object.fields.array_buffer_data.?.resize(new_byte_length_casted)
         else
             error.Overflow;
-        result catch {
-            return agent.throwException(
-                .range_error,
-                "Cannot resize buffer to size {}",
-                .{new_byte_length},
-            );
-        };
-        if (new_byte_length > old_byte_length) {
-            @memset(object.fields.array_buffer_data.?.items[old_byte_length..], 0);
+        result catch return agent.throwException(
+            .range_error,
+            "Cannot resize buffer to size {}",
+            .{new_byte_length},
+        );
+        if (new_byte_length > current_byte_length) {
+            @memset(object.fields.array_buffer_data.?.items[current_byte_length..], 0);
         }
 
         // 16. Return undefined.

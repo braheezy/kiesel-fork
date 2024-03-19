@@ -89,6 +89,11 @@ pub const HostHooks = struct {
         unhandled,
     };
 
+    pub const GrowSharedArrayBufferHandled = enum {
+        handled,
+        unhandled,
+    };
+
     pub const PromiseRejectionTrackerOperation = enum {
         reject,
         handle,
@@ -108,6 +113,10 @@ pub const HostHooks = struct {
     hostGetImportMetaProperties: *const fn (
         module: *SourceTextModule,
     ) Allocator.Error!ImportMetaProperties,
+    hostGrowSharedArrayBuffer: *const fn (
+        buffer: *builtins.SharedArrayBuffer,
+        new_byte_length: u53,
+    ) Error!GrowSharedArrayBufferHandled,
     hostFinalizeImportMeta: *const fn (import_meta: Object, module: *SourceTextModule) void,
     hostLoadImportedModule: *const fn (
         agent: *Self,
@@ -176,6 +185,7 @@ pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
         .hostCallJobCallback = default_host_hooks.hostCallJobCallback,
         .hostEnqueuePromiseJob = default_host_hooks.hostEnqueuePromiseJob,
         .hostGetImportMetaProperties = default_host_hooks.hostGetImportMetaProperties,
+        .hostGrowSharedArrayBuffer = default_host_hooks.hostGrowSharedArrayBuffer,
         .hostFinalizeImportMeta = default_host_hooks.hostFinalizeImportMeta,
         .hostLoadImportedModule = default_host_hooks.hostLoadImportedModule,
         .hostEnsureCanCompileStrings = default_host_hooks.hostEnsureCanCompileStrings,

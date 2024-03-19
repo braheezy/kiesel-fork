@@ -181,6 +181,7 @@ pub const SharedArrayBufferPrototype = struct {
         });
 
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
+        try defineBuiltinFunction(object, "grow", grow, 1, realm);
         try defineBuiltinAccessor(object, "growable", growable, null, realm);
         try defineBuiltinAccessor(object, "maxByteLength", maxByteLength, null, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
@@ -213,6 +214,80 @@ pub const SharedArrayBufferPrototype = struct {
 
         // 5. Return 𝔽(length).
         return Value.from(length);
+    }
+
+    /// 25.2.5.3 SharedArrayBuffer.prototype.grow ( newLength )
+    /// https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype.grow
+    fn grow(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const new_length = arguments.get(0);
+
+        // 1. Let O be the this value.
+        // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferMaxByteLength]]).
+        // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
+        const object = try this_value.requireInternalSlot(agent, SharedArrayBuffer);
+        if (object.fields.array_buffer_max_byte_length == null) {
+            return agent.throwException(.type_error, "SharedArrayBuffer is not growable", .{});
+        }
+
+        // 4. Let newByteLength be ? ToIndex(newLength).
+        const new_byte_length = try new_length.toIndex(agent);
+
+        // 5. Let hostHandled be ? HostGrowSharedArrayBuffer(O, newByteLength).
+        const host_handled = try agent.host_hooks.hostGrowSharedArrayBuffer(object, new_byte_length);
+
+        // 6. If hostHandled is handled, return undefined.
+        if (host_handled == .handled) return .undefined;
+
+        // 7. Let isLittleEndian be the value of the [[LittleEndian]] field of the surrounding
+        //    agent's Agent Record.
+        // 8. Let byteLengthBlock be O.[[ArrayBufferByteLengthData]].
+        // 9. Let currentByteLengthRawBytes be GetRawBytesFromSharedBlock(byteLengthBlock, 0,
+        //    biguint64, true, seq-cst).
+        // 10. Let newByteLengthRawBytes be NumericToRawBytes(biguint64, ℤ(newByteLength),
+        //     isLittleEndian).
+        // 11. Repeat,
+        // a. NOTE: This is a compare-and-exchange loop to ensure that parallel, racing grows of
+        //    the same buffer are totally ordered, are not lost, and do not silently do nothing.
+        //    The loop exits if it was able to attempt to grow uncontended.
+        // b. Let currentByteLength be ℝ(RawBytesToNumeric(biguint64, currentByteLengthRawBytes,
+        //    isLittleEndian)).
+        const current_byte_length = object.fields.array_buffer_data.items.len;
+
+        // c. If newByteLength = currentByteLength, return undefined.
+        if (new_byte_length == current_byte_length) return .undefined;
+
+        // d. If newByteLength < currentByteLength or newByteLength > O.[[ArrayBufferMaxByteLength]],
+        //    throw a RangeError exception.
+        if (new_byte_length < current_byte_length) {
+            return agent.throwException(.range_error, "Cannot shrink buffer", .{});
+        }
+        if (new_byte_length > object.fields.array_buffer_max_byte_length.?) {
+            return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
+        }
+
+        // e. Let byteLengthDelta be newByteLength - currentByteLength.
+        // f. If it is impossible to create a new Shared Data Block value consisting of
+        //    byteLengthDelta bytes, throw a RangeError exception.
+        // g. NOTE: No new Shared Data Block is constructed and used here. The observable behaviour
+        //    of growable SharedArrayBuffers is specified by allocating a max-sized Shared Data
+        //    Block at construction time, and this step captures the requirement that
+        //    implementations that run out of memory must throw a RangeError.
+        // h. Let readByteLengthRawBytes be AtomicCompareExchangeInSharedBlock(byteLengthBlock, 0,
+        //    8, currentByteLengthRawBytes, newByteLengthRawBytes).
+        // i. If ByteListEqual(readByteLengthRawBytes, currentByteLengthRawBytes) is true, return
+        //    undefined.
+        // j. Set currentByteLengthRawBytes to readByteLengthRawBytes.
+        const result = if (std.math.cast(usize, new_byte_length)) |new_byte_length_casted|
+            object.fields.array_buffer_data.resize(new_byte_length_casted)
+        else
+            error.Overflow;
+        result catch return agent.throwException(
+            .range_error,
+            "Cannot resize buffer to size {}",
+            .{new_byte_length},
+        );
+        @memset(object.fields.array_buffer_data.items[current_byte_length..], 0);
+        return .undefined;
     }
 
     /// 25.2.5.4 get SharedArrayBuffer.prototype.growable

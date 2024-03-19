@@ -104,6 +104,17 @@ pub fn hostResizeArrayBuffer(
     return .unhandled;
 }
 
+/// 25.2.2.3 HostGrowSharedArrayBuffer ( buffer, newByteLength )
+/// https://tc39.es/ecma262/#sec-hostgrowsharedarraybuffer
+pub fn hostGrowSharedArrayBuffer(
+    _: *builtins.SharedArrayBuffer,
+    _: u53,
+) error{}!Agent.HostHooks.GrowSharedArrayBufferHandled {
+    // The default implementation of HostGrowSharedArrayBuffer is to return
+    // NormalCompletion(unhandled).
+    return .unhandled;
+}
+
 /// 27.2.1.9 HostPromiseRejectionTracker ( promise, operation )
 /// https://tc39.es/ecma262/#sec-host-promise-rejection-tracker
 pub fn hostPromiseRejectionTracker(
