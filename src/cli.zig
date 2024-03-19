@@ -368,16 +368,7 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
     }
 
     defer {
-        // Run queued promise jobs
-        while (agent.queued_promise_jobs.items.len != 0) {
-            const queued_promise_job = agent.queued_promise_jobs.orderedRemove(0);
-            const current_realm = agent.runningExecutionContext().realm;
-            if (queued_promise_job.realm) |new_realm| {
-                agent.runningExecutionContext().realm = new_realm;
-            }
-            _ = queued_promise_job.job.func(queued_promise_job.job.captures) catch {};
-            agent.runningExecutionContext().realm = current_realm;
-        }
+        agent.drainJobQueue();
 
         // Report tracked promise rejections
         if (options.print_promise_rejection_warnings) {

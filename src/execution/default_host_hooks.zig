@@ -42,10 +42,16 @@ pub fn hostCallJobCallback(
     return Value.from(job_callback.callback).callAssumeCallable(this_value, arguments_list);
 }
 
+/// 9.5.4 HostEnqueueGenericJob ( job, realm )
+/// https://tc39.es/ecma262/#sec-hostenqueuegenericjob
+pub fn hostEnqueueGenericJob(agent: *Agent, job: Job, realm: *Realm) Allocator.Error!void {
+    try agent.queued_jobs.append(.{ .job = job, .realm = realm });
+}
+
 /// 9.5.5 HostEnqueuePromiseJob ( job, realm )
 /// https://tc39.es/ecma262/#sec-hostenqueuepromisejob
 pub fn hostEnqueuePromiseJob(agent: *Agent, job: Job, realm: ?*Realm) Allocator.Error!void {
-    try agent.queued_promise_jobs.append(.{ .job = job, .realm = realm });
+    try agent.queued_jobs.append(.{ .job = job, .realm = realm });
 }
 
 /// 13.3.12.1.1 HostGetImportMetaProperties ( moduleRecord )

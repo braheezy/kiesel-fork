@@ -42,7 +42,7 @@ well_known_symbols: WellKnownSymbols,
 global_symbol_registry: std.StringArrayHashMap(Symbol),
 host_hooks: HostHooks,
 execution_context_stack: std.ArrayList(ExecutionContext),
-queued_promise_jobs: std.ArrayList(QueuedPromiseJob),
+queued_jobs: std.ArrayList(QueuedJob),
 
 /// [[LittleEndian]]
 little_endian: bool = builtin.cpu.arch.endian() == .little,
@@ -74,7 +74,7 @@ pub const WellKnownSymbols = struct {
     @"@@unscopables": Symbol,
 };
 
-pub const QueuedPromiseJob = struct {
+pub const QueuedJob = struct {
     job: Job,
     realm: ?*Realm,
 };
@@ -88,7 +88,7 @@ pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
         .global_symbol_registry = undefined,
         .host_hooks = .{},
         .execution_context_stack = undefined,
-        .queued_promise_jobs = undefined,
+        .queued_jobs = undefined,
     };
     self.pre_allocated = .{
         .zero = try BigInt.from(self.gc_allocator, 0),
@@ -113,7 +113,7 @@ pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
     };
     self.global_symbol_registry = std.StringArrayHashMap(Symbol).init(self.gc_allocator);
     self.execution_context_stack = std.ArrayList(ExecutionContext).init(self.gc_allocator);
-    self.queued_promise_jobs = std.ArrayList(QueuedPromiseJob).init(self.gc_allocator);
+    self.queued_jobs = std.ArrayList(QueuedJob).init(self.gc_allocator);
     return self;
 }
 
@@ -124,7 +124,19 @@ pub fn deinit(self: *Self) void {
     self.pre_allocated.pow_2_64.value.deinit();
     self.global_symbol_registry.deinit();
     self.execution_context_stack.deinit();
-    self.queued_promise_jobs.deinit();
+    self.queued_jobs.deinit();
+}
+
+pub fn drainJobQueue(self: *Self) void {
+    while (self.queued_jobs.items.len != 0) {
+        const queued_job = self.queued_jobs.orderedRemove(0);
+        const current_realm = self.runningExecutionContext().realm;
+        if (queued_job.realm) |new_realm| {
+            self.runningExecutionContext().realm = new_realm;
+        }
+        _ = queued_job.job.func(queued_job.job.captures) catch {};
+        self.runningExecutionContext().realm = current_realm;
+    }
 }
 
 pub fn createSymbol(self: *Self, description: ?String) error{Overflow}!Symbol {

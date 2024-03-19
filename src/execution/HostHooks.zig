@@ -46,6 +46,11 @@ hostCallJobCallback: *const fn (
     this_value: Value,
     arguments_list: []const Value,
 ) Agent.Error!Value = default_host_hooks.hostCallJobCallback,
+hostEnqueueGenericJob: *const fn (
+    agent: *Agent,
+    job: Job,
+    realm: *Realm,
+) Allocator.Error!void = default_host_hooks.hostEnqueueGenericJob,
 hostEnqueuePromiseJob: *const fn (
     agent: *Agent,
     job: Job,
