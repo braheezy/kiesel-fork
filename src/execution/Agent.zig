@@ -7,9 +7,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const builtins = @import("../builtins.zig");
-const default_host_hooks = @import("default_host_hooks.zig");
 const environments = @import("environments.zig");
-const language = @import("../language.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
@@ -17,16 +15,11 @@ const ArgumentsList = builtins.ArgumentsList;
 const BigInt = types.BigInt;
 const Environment = environments.Environment;
 const ExecutionContext = @import("ExecutionContext.zig");
-const ImportedModulePayload = language.ImportedModulePayload;
-const ImportedModuleReferrer = language.ImportedModuleReferrer;
+const HostHooks = @import("HostHooks.zig");
 const Job = @import("job.zig").Job;
-const JobCallback = @import("job.zig").JobCallback;
 const Object = types.Object;
-const PropertyKeyArrayHashMap = Object.PropertyStorage.PropertyKeyArrayHashMap;
 const Realm = @import("Realm.zig");
 const Reference = types.Reference;
-const SafePointer = types.SafePointer;
-const SourceTextModule = language.SourceTextModule;
 const String = types.String;
 const Symbol = types.Symbol;
 const Value = types.Value;
@@ -81,67 +74,6 @@ pub const WellKnownSymbols = struct {
     @"@@unscopables": Symbol,
 };
 
-pub const HostHooks = struct {
-    pub const ImportMetaProperties = PropertyKeyArrayHashMap(Value);
-
-    pub const ResizeArrayBufferHandled = enum {
-        handled,
-        unhandled,
-    };
-
-    pub const GrowSharedArrayBufferHandled = enum {
-        handled,
-        unhandled,
-    };
-
-    pub const PromiseRejectionTrackerOperation = enum {
-        reject,
-        handle,
-    };
-
-    hostMakeJobCallback: *const fn (callback: Object) JobCallback,
-    hostCallJobCallback: *const fn (
-        job_callback: JobCallback,
-        this_value: Value,
-        arguments_list: []const Value,
-    ) Error!Value,
-    hostEnqueuePromiseJob: *const fn (
-        agent: *Self,
-        job: Job,
-        realm: ?*Realm,
-    ) Allocator.Error!void,
-    hostGetImportMetaProperties: *const fn (
-        module: *SourceTextModule,
-    ) Allocator.Error!ImportMetaProperties,
-    hostGrowSharedArrayBuffer: *const fn (
-        buffer: *builtins.SharedArrayBuffer,
-        new_byte_length: u53,
-    ) Error!GrowSharedArrayBufferHandled,
-    hostFinalizeImportMeta: *const fn (import_meta: Object, module: *SourceTextModule) void,
-    hostLoadImportedModule: *const fn (
-        agent: *Self,
-        referrer: ImportedModuleReferrer,
-        specifier: String,
-        host_defined: SafePointer,
-        payload: ImportedModulePayload,
-    ) Allocator.Error!void,
-    hostEnsureCanCompileStrings: *const fn (
-        callee_realm: *Realm,
-        parameter_strings: []const String,
-        body_string: String,
-        direct: bool,
-    ) Error!void,
-    hostHasSourceTextAvailable: *const fn (func: Object) bool,
-    hostResizeArrayBuffer: *const fn (
-        buffer: *builtins.ArrayBuffer,
-        new_byte_length: u53,
-    ) Error!ResizeArrayBufferHandled,
-    hostPromiseRejectionTracker: *const fn (
-        promise: *builtins.Promise,
-        operation: PromiseRejectionTrackerOperation,
-    ) void,
-};
-
 pub const QueuedPromiseJob = struct {
     job: Job,
     realm: ?*Realm,
@@ -154,7 +86,7 @@ pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
         .pre_allocated = undefined,
         .well_known_symbols = undefined,
         .global_symbol_registry = undefined,
-        .host_hooks = undefined,
+        .host_hooks = .{},
         .execution_context_stack = undefined,
         .queued_promise_jobs = undefined,
     };
@@ -180,19 +112,6 @@ pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
         .@"@@unscopables" = self.createSymbol(String.from("Symbol.unscopables")) catch unreachable,
     };
     self.global_symbol_registry = std.StringArrayHashMap(Symbol).init(self.gc_allocator);
-    self.host_hooks = .{
-        .hostMakeJobCallback = default_host_hooks.hostMakeJobCallback,
-        .hostCallJobCallback = default_host_hooks.hostCallJobCallback,
-        .hostEnqueuePromiseJob = default_host_hooks.hostEnqueuePromiseJob,
-        .hostGetImportMetaProperties = default_host_hooks.hostGetImportMetaProperties,
-        .hostGrowSharedArrayBuffer = default_host_hooks.hostGrowSharedArrayBuffer,
-        .hostFinalizeImportMeta = default_host_hooks.hostFinalizeImportMeta,
-        .hostLoadImportedModule = default_host_hooks.hostLoadImportedModule,
-        .hostEnsureCanCompileStrings = default_host_hooks.hostEnsureCanCompileStrings,
-        .hostHasSourceTextAvailable = default_host_hooks.hostHasSourceTextAvailable,
-        .hostResizeArrayBuffer = default_host_hooks.hostResizeArrayBuffer,
-        .hostPromiseRejectionTracker = default_host_hooks.hostPromiseRejectionTracker,
-    };
     self.execution_context_stack = std.ArrayList(ExecutionContext).init(self.gc_allocator);
     self.queued_promise_jobs = std.ArrayList(QueuedPromiseJob).init(self.gc_allocator);
     return self;

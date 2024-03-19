@@ -8,6 +8,7 @@ const language = @import("../language.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
+const HostHooks = execution.HostHooks;
 const ImportedModulePayload = language.ImportedModulePayload;
 const ImportedModuleReferrer = language.ImportedModuleReferrer;
 const Job = execution.Job;
@@ -51,10 +52,10 @@ pub fn hostEnqueuePromiseJob(agent: *Agent, job: Job, realm: ?*Realm) Allocator.
 /// https://tc39.es/ecma262/#sec-hostgetimportmetaproperties
 pub fn hostGetImportMetaProperties(
     module: *SourceTextModule,
-) error{}!Agent.HostHooks.ImportMetaProperties {
+) error{}!HostHooks.ImportMetaProperties {
     // The default implementation of HostGetImportMetaProperties is to return a new empty List.
     const agent = module.realm.agent;
-    return Agent.HostHooks.ImportMetaProperties.init(agent.gc_allocator);
+    return HostHooks.ImportMetaProperties.init(agent.gc_allocator);
 }
 
 /// 13.3.12.1.2 HostFinalizeImportMeta ( importMeta, moduleRecord )
@@ -99,7 +100,7 @@ pub fn hostHasSourceTextAvailable(_: Object) bool {
 pub fn hostResizeArrayBuffer(
     _: *builtins.ArrayBuffer,
     _: u53,
-) error{}!Agent.HostHooks.ResizeArrayBufferHandled {
+) error{}!HostHooks.ResizeArrayBufferHandled {
     // The default implementation of HostResizeArrayBuffer is to return NormalCompletion(unhandled).
     return .unhandled;
 }
@@ -109,7 +110,7 @@ pub fn hostResizeArrayBuffer(
 pub fn hostGrowSharedArrayBuffer(
     _: *builtins.SharedArrayBuffer,
     _: u53,
-) error{}!Agent.HostHooks.GrowSharedArrayBufferHandled {
+) error{}!HostHooks.GrowSharedArrayBufferHandled {
     // The default implementation of HostGrowSharedArrayBuffer is to return
     // NormalCompletion(unhandled).
     return .unhandled;
@@ -119,7 +120,7 @@ pub fn hostGrowSharedArrayBuffer(
 /// https://tc39.es/ecma262/#sec-host-promise-rejection-tracker
 pub fn hostPromiseRejectionTracker(
     _: *builtins.Promise,
-    _: Agent.HostHooks.PromiseRejectionTrackerOperation,
+    _: HostHooks.PromiseRejectionTrackerOperation,
 ) void {
     // The default implementation of HostPromiseRejectionTracker is to return unused.
 }

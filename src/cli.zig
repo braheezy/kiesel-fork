@@ -13,6 +13,7 @@ const Allocator = std.mem.Allocator;
 const Agent = kiesel.execution.Agent;
 const ArgumentsList = kiesel.builtins.ArgumentsList;
 const Diagnostics = kiesel.language.Diagnostics;
+const HostHooks = kiesel.execution.HostHooks;
 const ImportedModulePayload = kiesel.language.ImportedModulePayload;
 const ImportedModuleReferrer = kiesel.language.ImportedModuleReferrer;
 const Module = kiesel.language.Module;
@@ -35,7 +36,7 @@ const ordinaryObjectCreate = kiesel.builtins.ordinaryObjectCreate;
 
 var tracked_promise_rejections: std.AutoArrayHashMap(
     *kiesel.builtins.Promise,
-    Agent.HostHooks.PromiseRejectionTrackerOperation,
+    HostHooks.PromiseRejectionTrackerOperation,
 ) = undefined;
 
 const bdwgc_version_string = std.fmt.comptimePrint("{}.{}.{}", .{
@@ -760,7 +761,7 @@ pub fn main() !u8 {
     agent.host_hooks.hostPromiseRejectionTracker = struct {
         fn func(
             promise: *kiesel.builtins.Promise,
-            operation: Agent.HostHooks.PromiseRejectionTrackerOperation,
+            operation: HostHooks.PromiseRejectionTrackerOperation,
         ) void {
             if (tracked_promise_rejections.get(promise)) |previous_operation| {
                 // Don't report `Promise.reject().catch(handler)` evaluated in a single script
