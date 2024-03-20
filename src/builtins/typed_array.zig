@@ -879,6 +879,7 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinFunction(object, "reduce", reduce, 1, realm);
         try defineBuiltinFunction(object, "reduceRight", reduceRight, 1, realm);
         try defineBuiltinFunction(object, "reverse", reverse, 0, realm);
+        try defineBuiltinFunction(object, "set", set_, 1, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
         try defineBuiltinFunction(object, "some", some, 1, realm);
         try defineBuiltinFunction(object, "sort", sort, 1, realm);
@@ -2030,6 +2031,319 @@ pub const TypedArrayPrototype = struct {
         return Value.from(object);
     }
 
+    /// 23.2.3.26 %TypedArray%.prototype.set ( source [ , offset ] )
+    /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.set
+    fn set_(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const source = arguments.get(0);
+        const offset = arguments.get(1);
+
+        // 1. Let target be the this value.
+        // 2. Perform ? RequireInternalSlot(target, [[TypedArrayName]]).
+        // 3. Assert: target has a [[ViewedArrayBuffer]] internal slot.
+        const target = try this_value.requireInternalSlot(agent, TypedArray);
+
+        // 4. Let targetOffset be ? ToIntegerOrInfinity(offset).
+        const target_offset = try offset.toIntegerOrInfinity(agent);
+
+        // 5. If targetOffset < 0, throw a RangeError exception.
+        if (target_offset < 0) {
+            return agent.throwException(.range_error, "Offset must not be negative", .{});
+        }
+
+        // 6. If source is an Object that has a [[TypedArrayName]] internal slot, then
+        if (source == .object and source.object.is(TypedArray)) {
+            // a. Perform ? SetTypedArrayFromTypedArray(target, targetOffset, source).
+            try setTypedArrayFromTypedArray(agent, target, target_offset, source.object.as(TypedArray));
+        }
+        // 7. Else,
+        else {
+            // a. Perform ? SetTypedArrayFromArrayLike(target, targetOffset, source).
+            try setTypedArrayFromArrayLike(agent, target, target_offset, source);
+        }
+
+        // 8. Return undefined.
+        return .undefined;
+    }
+
+    /// 23.2.3.26.1 SetTypedArrayFromTypedArray ( target, targetOffset, source )
+    /// https://tc39.es/ecma262/#sec-settypedarrayfromtypedarray
+    fn setTypedArrayFromTypedArray(
+        agent: *Agent,
+        target: *TypedArray,
+        target_offset: f64,
+        source: *TypedArray,
+    ) Agent.Error!void {
+        std.debug.assert(target_offset >= 0);
+
+        // 1. Let targetBuffer be target.[[ViewedArrayBuffer]].
+        const target_buffer = target.fields.viewed_array_buffer;
+
+        // 2. Let targetRecord be MakeTypedArrayWithBufferWitnessRecord(target, seq-cst).
+        const target_ta = makeTypedArrayWithBufferWitnessRecord(target, .seq_cst);
+
+        // 3. If IsTypedArrayOutOfBounds(targetRecord) is true, throw a TypeError exception.
+        if (isTypedArrayOutOfBounds(target_ta)) {
+            return agent.throwException(.type_error, "Typed array is out of bounds", .{});
+        }
+
+        // 4. Let targetLength be TypedArrayLength(targetRecord).
+        const target_length = typedArrayLength(target_ta);
+
+        // 5. Let srcBuffer be source.[[ViewedArrayBuffer]].
+        var src_buffer = source.fields.viewed_array_buffer;
+
+        // 6. Let srcRecord be MakeTypedArrayWithBufferWitnessRecord(source, seq-cst).
+        const src_ta = makeTypedArrayWithBufferWitnessRecord(source, .seq_cst);
+
+        // 7. If IsTypedArrayOutOfBounds(srcRecord) is true, throw a TypeError exception.
+        if (isTypedArrayOutOfBounds(src_ta)) {
+            return agent.throwException(.type_error, "Typed array is out of bounds", .{});
+        }
+
+        // 8. Let srcLength be TypedArrayLength(srcRecord).
+        const src_length = typedArrayLength(src_ta);
+
+        // 9. Let targetType be TypedArrayElementType(target).
+        const target_type = target.fields.typed_array_name;
+
+        // 10. Let targetElementSize be TypedArrayElementSize(target).
+        const target_element_size = typedArrayElementSize(target);
+
+        // 11. Let targetByteOffset be target.[[ByteOffset]].
+        const target_byte_offset = target.fields.byte_offset;
+
+        // 12. Let srcType be TypedArrayElementType(source).
+        const src_type = source.fields.typed_array_name;
+
+        // 13. Let srcElementSize be TypedArrayElementSize(source).
+        const src_element_size = typedArrayElementSize(source);
+
+        // 14. Let srcByteOffset be source.[[ByteOffset]].
+        const src_byte_offset = source.fields.byte_offset;
+
+        // 15. If targetOffset = +∞, throw a RangeError exception.
+        if (target_offset == std.math.inf(f64)) {
+            return agent.throwException(.range_error, "Offset must not be infinite", .{});
+        }
+
+        // 16. If srcLength + targetOffset > targetLength, throw a RangeError exception.
+        if (if (std.math.add(u53, src_length, std.math.lossyCast(u53, target_offset))) |x|
+            x > target_length
+        else |_|
+            true)
+        {
+            return agent.throwException(
+                .range_error,
+                "Offset {} and source length {} are out of range for target length {}",
+                .{ target_offset, src_length, target_length },
+            );
+        }
+
+        // 17. If target.[[ContentType]] is not source.[[ContentType]], throw a TypeError exception.
+        if (target.fields.content_type != source.fields.content_type) {
+            return agent.throwException(
+                .type_error,
+                "Cannot convert between BigInt and Number typed arrays",
+                .{},
+            );
+        }
+
+        // 18. If IsSharedArrayBuffer(srcBuffer) is true, IsSharedArrayBuffer(targetBuffer) is true,
+        //     and srcBuffer.[[ArrayBufferData]] is targetBuffer.[[ArrayBufferData]], let
+        //     sameSharedArrayBuffer be true; otherwise, let sameSharedArrayBuffer be false.
+        const same_shared_array_buffer = src_buffer == .shared_array_buffer and
+            target_buffer == .shared_array_buffer and
+            src_buffer.shared_array_buffer.fields.array_buffer_data.items.ptr ==
+            target_buffer.shared_array_buffer.fields.array_buffer_data.items.ptr;
+
+        // 19. If SameValue(srcBuffer, targetBuffer) is true or sameSharedArrayBuffer is true, then
+        var src_byte_index = if (src_buffer.object().sameValue(target_buffer.object()) or same_shared_array_buffer) blk: {
+            // a. Let srcByteLength be TypedArrayByteLength(srcRecord).
+            const src_byte_length = typedArrayByteLength(src_ta);
+
+            // b. Set srcBuffer to ? CloneArrayBuffer(srcBuffer, srcByteOffset, srcByteLength).
+            src_buffer = .{
+                .array_buffer = (try cloneArrayBuffer(
+                    agent,
+                    src_buffer,
+                    src_byte_offset,
+                    src_byte_length,
+                )).as(builtins.ArrayBuffer),
+            };
+
+            // c. Let srcByteIndex be 0.
+            break :blk 0;
+        }
+        // 20. Else,
+        else blk: {
+            // a. Let srcByteIndex be srcByteOffset.
+            break :blk src_byte_offset;
+        };
+
+        // 21. Let targetByteIndex be (targetOffset × targetElementSize) + targetByteOffset.
+        var target_byte_index = (@as(u53, @intFromFloat(target_offset)) * target_element_size) + target_byte_offset;
+
+        // 22. Let limit be targetByteIndex + (targetElementSize × srcLength).
+        const limit = target_byte_index + (target_element_size * src_length);
+
+        // 23. If srcType is targetType, then
+        if (std.mem.eql(u8, src_type, target_type)) {
+            // a. NOTE: The transfer must be performed in a manner that preserves the bit-level
+            //    encoding of the source data.
+            // b. Repeat, while targetByteIndex < limit,
+            while (target_byte_index < limit) : ({
+                src_byte_index += 1;
+                target_byte_index += 1;
+            }) {
+                // i. Let value be GetValueFromBuffer(srcBuffer, srcByteIndex, uint8, true, unordered).
+                const value = getValueFromBuffer(
+                    agent,
+                    src_buffer,
+                    src_byte_index,
+                    .{ .T = u8 },
+                    true,
+                    .unordered,
+                    null,
+                );
+
+                // ii. Perform SetValueInBuffer(targetBuffer, targetByteIndex, uint8, value, true, unordered).
+                try setValueInBuffer(
+                    agent,
+                    target_buffer,
+                    target_byte_index,
+                    .{ .T = u8 },
+                    Value.from(value),
+                    true,
+                    .unordered,
+                    null,
+                );
+
+                // iii. Set srcByteIndex to srcByteIndex + 1.
+                // iv. Set targetByteIndex to targetByteIndex + 1.
+            }
+        }
+        // 24. Else,
+        else {
+
+            // a. Repeat, while targetByteIndex < limit,
+            while (target_byte_index < limit) : ({
+                src_byte_index += src_element_size;
+                target_byte_index += target_element_size;
+            }) {
+                const value = inline for (typed_array_element_types) |entry| {
+                    const name, const @"type" = entry;
+                    if (std.mem.eql(u8, src_type, name)) {
+                        // i. Let value be GetValueFromBuffer(srcBuffer, srcByteIndex, srcType, true, unordered).
+                        const value = getValueFromBuffer(
+                            agent,
+                            src_buffer,
+                            src_byte_index,
+                            @"type",
+                            true,
+                            .unordered,
+                            null,
+                        );
+                        break if (@"type".isBigIntElementType())
+                            Value.from(try BigInt.from(agent.gc_allocator, value))
+                        else
+                            Value.from(value);
+                    }
+                } else unreachable;
+
+                inline for (typed_array_element_types) |entry| {
+                    const name, const @"type" = entry;
+                    if (std.mem.eql(u8, target_type, name)) {
+                        // ii. Perform SetValueInBuffer(targetBuffer, targetByteIndex, targetType, value, true, unordered).
+                        try setValueInBuffer(
+                            agent,
+                            target_buffer,
+                            target_byte_index,
+                            @"type",
+                            value,
+                            true,
+                            .unordered,
+                            null,
+                        );
+                        break;
+                    }
+                } else unreachable;
+
+                // iii. Set srcByteIndex to srcByteIndex + srcElementSize.
+                // iv. Set targetByteIndex to targetByteIndex + targetElementSize.
+            }
+        }
+
+        // 25. Return unused.
+    }
+
+    /// 23.2.3.26.2 SetTypedArrayFromArrayLike ( target, targetOffset, source )
+    /// https://tc39.es/ecma262/#sec-settypedarrayfromarraylike
+    fn setTypedArrayFromArrayLike(
+        agent: *Agent,
+        target: *const TypedArray,
+        target_offset: f64,
+        source: Value,
+    ) Agent.Error!void {
+        std.debug.assert(target_offset >= 0);
+
+        // 1. Let targetRecord be MakeTypedArrayWithBufferWitnessRecord(target, seq-cst).
+        const target_ta = makeTypedArrayWithBufferWitnessRecord(target, .seq_cst);
+
+        // 2. If IsTypedArrayOutOfBounds(targetRecord) is true, throw a TypeError exception.
+        if (isTypedArrayOutOfBounds(target_ta)) {
+            return agent.throwException(.type_error, "Typed array is out of bounds", .{});
+        }
+
+        // 3. Let targetLength be TypedArrayLength(targetRecord).
+        const target_length = typedArrayLength(target_ta);
+
+        // 4. Let src be ? ToObject(source).
+        const src = try source.toObject(agent);
+
+        // 5. Let srcLength be ? LengthOfArrayLike(src).
+        const src_length = try src.lengthOfArrayLike();
+
+        // 6. If targetOffset = +∞, throw a RangeError exception.
+        if (target_offset == std.math.inf(f64)) {
+            return agent.throwException(.range_error, "Offset must not be infinite", .{});
+        }
+
+        // 7. If srcLength + targetOffset > targetLength, throw a RangeError exception.
+        if (if (std.math.add(u53, src_length, std.math.lossyCast(u53, target_offset))) |x|
+            x > target_length
+        else |_|
+            true)
+        {
+            return agent.throwException(
+                .range_error,
+                "Offset {} and source length {} are out of range for target length {}",
+                .{ target_offset, src_length, target_length },
+            );
+        }
+
+        // 8. Let k be 0.
+        var k: u53 = 0;
+
+        // 9. Repeat, while k < srcLength,
+        while (k < src_length) : (k += 1) {
+            // a. Let Pk be ! ToString(𝔽(k)).
+            const property_key = PropertyKey.from(k);
+
+            // b. Let value be ? Get(src, Pk).
+            const value = try src.get(property_key);
+
+            // c. Let targetIndex be 𝔽(targetOffset + k).
+            const target_index = target_offset + @as(f64, @floatFromInt(k));
+
+            // d. Perform ? TypedArraySetElement(target, targetIndex, value).
+            try typedArraySetElement(agent, target, target_index, value);
+
+            // e. Set k to k + 1.
+        }
+
+        // 10. Return unused.
+    }
+
     /// 23.2.3.27 %TypedArray%.prototype.slice ( start, end )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.slice
     fn slice(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
@@ -3072,7 +3386,7 @@ fn initializeTypedArrayFromTypedArray(
             // FIXME: The repeated branching and string comparisons here are definitely not ideal,
             //        either convert this into two comptime arguments passing the actual type or at
             //        least some kind of jump table.
-            const value = blk_value: inline for (typed_array_element_types) |entry| {
+            const value = inline for (typed_array_element_types) |entry| {
                 const name, const @"type" = entry;
                 if (std.mem.eql(u8, src_type, name)) {
                     // i. Let value be GetValueFromBuffer(srcData, srcByteIndex, srcType, true, unordered).
@@ -3085,7 +3399,7 @@ fn initializeTypedArrayFromTypedArray(
                         .unordered,
                         null,
                     );
-                    break :blk_value if (@"type".isBigIntElementType())
+                    break if (@"type".isBigIntElementType())
                         Value.from(try BigInt.from(agent.gc_allocator, value))
                     else
                         Value.from(value);
