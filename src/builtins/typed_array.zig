@@ -1673,7 +1673,7 @@ pub const TypedArrayPrototype = struct {
             const element = object.get(PropertyKey.from(k)) catch |err| try noexcept(err);
 
             // c. If element is not undefined, then
-            if (element == .undefined) {
+            if (element != .undefined) {
                 // i. Let S be ! ToString(element).
                 const string = element.toString(agent) catch |err| try noexcept(err);
 
