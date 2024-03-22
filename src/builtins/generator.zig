@@ -33,6 +33,7 @@ pub const GeneratorPrototype = struct {
 
         try defineBuiltinFunction(object, "next", next, 1, realm);
         try defineBuiltinFunction(object, "return", @"return", 1, realm);
+        try defineBuiltinFunction(object, "throw", throw, 1, realm);
 
         // 27.5.1.1 %GeneratorPrototype%.constructor
         // https://tc39.es/ecma262/#sec-generator.prototype.constructor
@@ -74,6 +75,21 @@ pub const GeneratorPrototype = struct {
 
         // 2. Let C be Completion Record { [[Type]]: return, [[Value]]: value, [[Target]]: empty }.
         const completion = Completion{ .type = .@"return", .value = value, .target = null };
+
+        // 3. Return ? GeneratorResumeAbrupt(g, C, empty).
+        return Value.from(try generatorResumeAbrupt(agent, generator, completion));
+    }
+
+    /// 27.5.1.4 %GeneratorPrototype%.throw ( exception )
+    /// https://tc39.es/ecma262/#sec-generator.prototype.return
+    fn throw(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const exception = arguments.get(0);
+
+        // 1. Let g be the this value.
+        const generator = this_value;
+
+        // 2. Let C be ThrowCompletion(exception).
+        const completion = Completion.throw(exception);
 
         // 3. Return ? GeneratorResumeAbrupt(g, C, empty).
         return Value.from(try generatorResumeAbrupt(agent, generator, completion));
