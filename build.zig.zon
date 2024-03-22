@@ -13,8 +13,8 @@
         .kiesel_runtime = .{
             // Uncommend for local development:
             // .path = "../runtime",
-            .url = "https://codeberg.org/kiesel-js/runtime/archive/55cd19d3c75d954fa0d8727df917a6b8e3b92605.tar.gz",
-            .hash = "1220ee575e83007fded6f3da4afdb7652911faf3770a220e46b841144d472db46805",
+            .url = "https://codeberg.org/kiesel-js/runtime/archive/e9f81cd0a8c5157db835143d0d418dad164baf3c.tar.gz",
+            .hash = "1220f7b3f360691b412b25f8921844c405116f200d3ef4b5456b5f4a67eae1f630a3",
             .lazy = true,
         },
         .libgc = .{
@@ -34,8 +34,9 @@
             .hash = "12203ded54c85878eea7f12744066dcb4397177395ac49a7b2aa365bf6047b623829",
         },
         .zigline = .{
-            .url = "https://github.com/alimpfard/zigline/archive/e18781dbc559e9a7aa3d6fa327335815803306dc.tar.gz",
-            .hash = "12208f21bd7d85021b7d8d191e8c0114871cde63cc7d1056a8b4d7805fe8fc1b85a2",
+            // FIXME: This points to https://github.com/alimpfard/zigline/pull/16, update once merged
+            .url = "https://github.com/alimpfard/zigline/archive/833140af09546502b2b516d9a3eed91969549d2a.tar.gz",
+            .hash = "1220664821dfacbf338dab67e2923be5d4365eebf65b7c1ca8a94f68a3b874db7459",
         },
     },
     .paths = .{

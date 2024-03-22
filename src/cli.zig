@@ -310,7 +310,7 @@ const Kiesel = struct {
     }
 };
 
-const RunError = Allocator.Error || std.os.WriteError;
+const RunError = Allocator.Error || std.fs.File.WriteError;
 
 fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: struct {
     base_dir: std.fs.Dir,
@@ -410,7 +410,7 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
     };
 }
 
-const ReadFileError = Allocator.Error || std.fs.File.OpenError || std.os.ReadError;
+const ReadFileError = Allocator.Error || std.fs.File.OpenError || std.fs.File.ReadError;
 
 fn readFile(allocator: Allocator, base_dir: std.fs.Dir, sub_path: []const u8) ReadFileError![]const u8 {
     const file = try base_dir.openFile(sub_path, .{});
@@ -421,7 +421,7 @@ fn readFile(allocator: Allocator, base_dir: std.fs.Dir, sub_path: []const u8) Re
 const GetHistoryPathError =
     Allocator.Error ||
     std.fs.GetAppDataDirError ||
-    std.os.MakeDirError ||
+    std.posix.MakeDirError ||
     std.fs.File.OpenError;
 
 fn getHistoryPath(allocator: Allocator) GetHistoryPathError![]const u8 {
