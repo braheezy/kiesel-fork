@@ -217,6 +217,7 @@ pub const detachArrayBuffer = array_buffer.detachArrayBuffer;
 pub const findViaPredicate = array.findViaPredicate;
 pub const fulfillPromise = promise.fulfillPromise;
 pub const generatorResume = generator.generatorResume;
+pub const generatorResumeAbrupt = generator.generatorResumeAbrupt;
 pub const generatorStart = generator.generatorStart;
 pub const generatorValidate = generator.generatorValidate;
 pub const getArrayBufferMaxByteLengthOption = array_buffer.getArrayBufferMaxByteLengthOption;

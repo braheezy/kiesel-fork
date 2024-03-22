@@ -12,6 +12,7 @@ const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
+const Completion = types.Completion;
 const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
@@ -31,6 +32,7 @@ pub const GeneratorPrototype = struct {
         });
 
         try defineBuiltinFunction(object, "next", next, 1, realm);
+        try defineBuiltinFunction(object, "return", @"return", 1, realm);
 
         // 27.5.1.1 %GeneratorPrototype%.constructor
         // https://tc39.es/ecma262/#sec-generator.prototype.constructor
@@ -60,6 +62,21 @@ pub const GeneratorPrototype = struct {
 
         // 1. Return ? GeneratorResume(this value, value, empty).
         return Value.from(try generatorResume(agent, this_value, value));
+    }
+
+    /// 27.5.1.3 %GeneratorPrototype%.return ( value )
+    /// https://tc39.es/ecma262/#sec-generator.prototype.return
+    fn @"return"(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const value = arguments.get(0);
+
+        // 1. Let g be the this value.
+        const generator = this_value;
+
+        // 2. Let C be Completion Record { [[Type]]: return, [[Value]]: value, [[Target]]: empty }.
+        const completion = Completion{ .type = .@"return", .value = value, .target = null };
+
+        // 3. Return ? GeneratorResumeAbrupt(g, C, empty).
+        return Value.from(try generatorResumeAbrupt(agent, generator, completion));
     }
 };
 
@@ -243,5 +260,78 @@ pub fn generatorResume(agent: *Agent, generator_value: Value, value: Value) Agen
     std.debug.assert(method_context == agent.runningExecutionContext());
 
     // 11. Return ? result.
+    return result;
+}
+
+/// 27.5.3.4 GeneratorResumeAbrupt ( generator, abruptCompletion, generatorBrand )
+/// https://tc39.es/ecma262/#sec-generatorresumeabrupt
+pub fn generatorResumeAbrupt(
+    agent: *Agent,
+    generator_value: Value,
+    abrupt_completion: Completion,
+) Agent.Error!Object {
+    // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
+    var state = try generatorValidate(agent, generator_value);
+
+    const generator = generator_value.object.as(Generator);
+
+    // 2. If state is suspended-start, then
+    if (state == .suspended_start) {
+        // a. Set generator.[[GeneratorState]] to completed.
+        generator.fields.generator_state = .completed;
+
+        // b. NOTE: Once a generator enters the completed state it never leaves it and its associated
+        //    execution context is never resumed. Any execution state associated with generator can be
+        //    discarded at this point.
+
+        // c. Set state to completed.
+        state = .completed;
+    }
+
+    // 3. If state is completed, then
+    if (state == .completed) {
+        // a. If abruptCompletion is a return completion, then
+        if (abrupt_completion.type == .@"return") {
+            // i. Return CreateIterResultObject(abruptCompletion.[[Value]], true).
+            return createIterResultObject(agent, abrupt_completion.value.?, true);
+        }
+
+        // b. Return ? abruptCompletion.
+        std.debug.assert(abrupt_completion.type == .throw);
+        agent.exception = abrupt_completion.value.?;
+        return error.ExceptionThrown;
+    }
+
+    // 4. Assert: state is suspended-yield.
+    std.debug.assert(state == .suspended_yield);
+
+    // 5. Let genContext be generator.[[GeneratorContext]].
+    const generator_context = generator.fields.generator_context;
+
+    // 6. Let methodContext be the running execution context.
+    const method_context = agent.runningExecutionContext();
+
+    // TODO: 7. Suspend methodContext.
+
+    // 8. Set generator.[[GeneratorState]] to executing.
+    generator.fields.generator_state = .executing;
+
+    // 9. Push genContext onto the execution context stack; genContext is now the running execution
+    //    context.
+    try agent.execution_context_stack.append(generator_context);
+
+    // 10. Resume the suspended evaluation of genContext using abruptCompletion as the result of
+    //     the operation that suspended it. Let result be the Completion Record returned by the
+    //     resumed computation.
+    const result = try generator.fields.state.closure(
+        agent,
+        generator.fields.state.generator_function,
+    );
+
+    // 11. Assert: When we return here, genContext has already been removed from the execution
+    //     context stack and methodContext is the currently running execution context.
+    std.debug.assert(method_context == agent.runningExecutionContext());
+
+    // 12. Return ? result.
     return result;
 }
