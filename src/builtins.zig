@@ -216,6 +216,7 @@ pub const defineMethodProperty = ecmascript_function.defineMethodProperty;
 pub const detachArrayBuffer = array_buffer.detachArrayBuffer;
 pub const findViaPredicate = array.findViaPredicate;
 pub const fulfillPromise = promise.fulfillPromise;
+pub const generatorStart = generator.generatorStart;
 pub const getArrayBufferMaxByteLengthOption = array_buffer.getArrayBufferMaxByteLengthOption;
 pub const getModifySetValueInBuffer = array_buffer.getModifySetValueInBuffer;
 pub const getPrototypeFromConstructor = ordinary.getPrototypeFromConstructor;

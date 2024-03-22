@@ -44,6 +44,7 @@ const createMappedArgumentsObject = builtins.createMappedArgumentsObject;
 const createUnmappedArgumentsObject = builtins.createUnmappedArgumentsObject;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const generateBytecode = bytecode.generateBytecode;
+const generatorStart = builtins.generatorStart;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const newFunctionEnvironment = execution.newFunctionEnvironment;
 const newPromiseCapability = builtins.newPromiseCapability;
@@ -357,7 +358,8 @@ fn evaluateGeneratorBody(
         "%GeneratorPrototype%",
     );
 
-    // TODO: 4. Perform GeneratorStart(G, FunctionBody).
+    // 4. Perform GeneratorStart(G, FunctionBody).
+    try generatorStart(agent, generator.as(builtins.Generator), function);
 
     // 5. Return Completion Record { [[Type]]: return, [[Value]]: G, [[Target]]: empty }.
     return .{ .type = .@"return", .value = Value.from(generator), .target = null };
