@@ -11,6 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
+const ArgumentsList = builtins.ArgumentsList;
 const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
@@ -18,6 +19,7 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createIterResultObject = types.createIterResultObject;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 /// 27.5.1 The %GeneratorPrototype% Object
@@ -27,6 +29,8 @@ pub const GeneratorPrototype = struct {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),
         });
+
+        try defineBuiltinFunction(object, "next", next, 1, realm);
 
         // 27.5.1.1 %GeneratorPrototype%.constructor
         // https://tc39.es/ecma262/#sec-generator.prototype.constructor
@@ -47,6 +51,15 @@ pub const GeneratorPrototype = struct {
         });
 
         return object;
+    }
+
+    /// 27.5.1.2 %GeneratorPrototype%.next ( value )
+    /// https://tc39.es/ecma262/#sec-generator.prototype.next
+    fn next(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const value = arguments.get(0);
+
+        // 1. Return ? GeneratorResume(this value, value, empty).
+        return Value.from(try generatorResume(agent, this_value, value));
     }
 };
 
@@ -161,4 +174,74 @@ pub fn generatorStart(
     generator.fields.generator_state = .suspended_start;
 
     // 8. Return unused.
+}
+
+/// 27.5.3.2 GeneratorValidate ( generator, generatorBrand )
+/// https://tc39.es/ecma262/#sec-generatorvalidate
+pub fn generatorValidate(agent: *Agent, generator_value: Value) Agent.Error!Generator.Fields.State {
+    // 1. Perform ? RequireInternalSlot(generator, [[GeneratorState]]).
+    // 2. Perform ? RequireInternalSlot(generator, [[GeneratorBrand]]).
+    const generator = try generator_value.requireInternalSlot(agent, Generator);
+
+    // 3. If generator.[[GeneratorBrand]] is not generatorBrand, throw a TypeError exception.
+    // NOTE: All iterators using [[GeneratorBrand]] in the spec are implemented without generators
+    //       so this is currently not needed.
+
+    // 4. Assert: generator also has a [[GeneratorContext]] internal slot.
+    // 5. Let state be generator.[[GeneratorState]].
+    const state = generator.fields.generator_state.?;
+
+    // 6. If state is executing, throw a TypeError exception.
+    if (state == .executing) {
+        return agent.throwException(.type_error, "Generator is currently executing", .{});
+    }
+
+    // 7. Return state.
+    return state;
+}
+
+/// 27.5.3.3 GeneratorResume ( generator, value, generatorBrand )
+/// https://tc39.es/ecma262/#sec-generatorresume
+pub fn generatorResume(agent: *Agent, generator_value: Value, value: Value) Agent.Error!Object {
+    // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
+    const state = try generatorValidate(agent, generator_value);
+
+    // 2. If state is completed, return CreateIterResultObject(undefined, true).
+    if (state == .completed) return createIterResultObject(agent, .undefined, true);
+
+    // 3. Assert: state is either suspended-start or suspended-yield.
+    std.debug.assert(state == .suspended_start or state == .suspended_yield);
+
+    const generator = generator_value.object.as(Generator);
+
+    // 4. Let genContext be generator.[[GeneratorContext]].
+    const generator_context = generator.fields.generator_context;
+
+    // 5. Let methodContext be the running execution context.
+    const method_context = agent.runningExecutionContext();
+
+    // TODO: 6. Suspend methodContext.
+
+    // 7. Set generator.[[GeneratorState]] to executing.
+    generator.fields.generator_state = .executing;
+
+    // 8. Push genContext onto the execution context stack; genContext is now the running execution
+    //    context.
+    try agent.execution_context_stack.append(generator_context);
+
+    // 9. Resume the suspended evaluation of genContext using NormalCompletion(value) as the result
+    //    of the operation that suspended it. Let result be the value returned by the resumed
+    //    computation.
+    _ = value;
+    const result = try generator.fields.state.closure(
+        agent,
+        generator.fields.state.generator_function,
+    );
+
+    // 10. Assert: When we return here, genContext has already been removed from the execution
+    //     context stack and methodContext is the currently running execution context.
+    std.debug.assert(method_context == agent.runningExecutionContext());
+
+    // 11. Return ? result.
+    return result;
 }
