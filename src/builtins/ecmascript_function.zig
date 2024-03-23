@@ -356,6 +356,13 @@ fn evaluateGeneratorBody(
         agent,
         function.object(),
         "%GeneratorPrototype%",
+        .{
+            // NOTE: All of these are set in `generatorStart()`, but `generator_state` needs to be
+            //       initialized memory for the assert to work.
+            .generator_state = null,
+            .generator_context = undefined,
+            .state = undefined,
+        },
     );
 
     // 4. Perform GeneratorStart(G, FunctionBody).
@@ -384,6 +391,7 @@ fn evaluateAsyncGeneratorBody(
         agent,
         function.object(),
         "%AsyncGeneratorPrototype%",
+        {},
     );
 
     // TODO: 4. Perform AsyncGeneratorStart(generator, FunctionBody).
@@ -458,6 +466,7 @@ fn construct(
             agent,
             new_target,
             "%Object.prototype%",
+            {},
         );
     }
 

@@ -818,16 +818,16 @@ pub const DateConstructor = struct {
         };
 
         // 6. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%Date.prototype%", « [[DateValue]] »).
-        // 7. Set O.[[DateValue]] to dv.
         const object = try ordinaryCreateFromConstructor(
             Date,
             agent,
             new_target.?,
             "%Date.prototype%",
+            .{
+                // 7. Set O.[[DateValue]] to dv.
+                .date_value = date_value,
+            },
         );
-        object.as(Date).fields = .{
-            .date_value = date_value,
-        };
 
         // 8. Return O.
         return Value.from(object);

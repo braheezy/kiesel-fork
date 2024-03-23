@@ -62,6 +62,7 @@ pub fn allocateSharedArrayBuffer(
         agent,
         constructor,
         "%SharedArrayBuffer.prototype%",
+        .{ .array_buffer_data = undefined },
     );
 
     // 6. If allocatingGrowableBuffer is true, let allocLength be maxByteLength; otherwise let

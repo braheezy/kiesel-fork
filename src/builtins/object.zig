@@ -105,6 +105,7 @@ pub const ObjectConstructor = struct {
                 agent,
                 new_target.?,
                 "%Object.prototype%",
+                {},
             ));
         }
 

@@ -70,10 +70,11 @@ pub const BooleanConstructor = struct {
             agent,
             new_target.?,
             "%Boolean.prototype%",
+            .{
+                // 4. Set O.[[BooleanData]] to b.
+                .boolean_data = b,
+            },
         );
-
-        // 4. Set O.[[BooleanData]] to b.
-        object.as(Boolean).fields = .{ .boolean_data = b };
 
         // 5. Return O.
         return Value.from(object);

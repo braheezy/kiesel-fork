@@ -679,7 +679,7 @@ pub fn ordinaryOwnPropertyKeys(object: Object) Allocator.Error!std.ArrayList(Pro
 }
 
 pub fn ordinaryObjectCreate(agent: *Agent, prototype: ?Object) Allocator.Error!Object {
-    return ordinaryObjectCreateWithType(builtins.Object, agent, prototype);
+    return ordinaryObjectCreateWithType(builtins.Object, agent, prototype, {});
 }
 
 /// 10.1.12 OrdinaryObjectCreate ( proto [ , additionalInternalSlotsList ] )
@@ -688,6 +688,7 @@ pub fn ordinaryObjectCreateWithType(
     comptime T: type,
     agent: *Agent,
     prototype: ?Object,
+    fields: T.Fields,
 ) Allocator.Error!Object {
     // 1. Let internalSlotsList be « [[Prototype]], [[Extensible]] ».
     // 2. If additionalInternalSlotsList is present, set internalSlotsList to the list-concatenation
@@ -698,7 +699,7 @@ pub fn ordinaryObjectCreateWithType(
     // 5. Return O.
     return try T.create(agent, if (T.Fields != void) .{
         .prototype = prototype,
-        .fields = undefined,
+        .fields = fields,
     } else .{
         .prototype = prototype,
     });
@@ -711,6 +712,7 @@ pub fn ordinaryCreateFromConstructor(
     agent: *Agent,
     constructor: Object,
     comptime intrinsic_default_proto: []const u8,
+    fields: T.Fields,
 ) Agent.Error!Object {
     // 1. Assert: intrinsicDefaultProto is this specification's name of an intrinsic
     //    object. The corresponding object must be an intrinsic that is intended to be used
@@ -723,7 +725,7 @@ pub fn ordinaryCreateFromConstructor(
     // 3. If internalSlotsList is present, let slotsList be internalSlotsList.
     // 4. Else, let slotsList be a new empty List.
     // 5. Return OrdinaryObjectCreate(proto, slotsList).
-    return ordinaryObjectCreateWithType(T, agent, prototype);
+    return ordinaryObjectCreateWithType(T, agent, prototype, fields);
 }
 
 /// 10.1.14 GetPrototypeFromConstructor ( constructor, intrinsicDefaultProto )

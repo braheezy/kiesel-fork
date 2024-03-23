@@ -90,16 +90,15 @@ pub fn allocateArrayBuffer(
         agent,
         constructor,
         "%ArrayBuffer.prototype%",
+        .{ .array_buffer_data = undefined },
     );
 
     // 5. Let block be ? CreateByteDataBlock(byteLength).
     const block = try createByteDataBlock(agent, byte_length);
 
-    object.as(ArrayBuffer).fields = .{
-        // 6. Set obj.[[ArrayBufferData]] to block.
-        // 7. Set obj.[[ArrayBufferByteLength]] to byteLength.
-        .array_buffer_data = block,
-    };
+    // 6. Set obj.[[ArrayBufferData]] to block.
+    // 7. Set obj.[[ArrayBufferByteLength]] to byteLength.
+    object.as(ArrayBuffer).fields.array_buffer_data = block;
 
     // 8. If allocatingResizableBuffer is true, then
     if (allocating_resizable_buffer) {

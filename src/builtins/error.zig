@@ -76,12 +76,13 @@ pub const ErrorConstructor = struct {
             agent,
             new_target_,
             "%Error.prototype%",
+            .{
+                // Non-standard
+                .error_data = .{ .name = String.from("Error"), .message = String.from("") },
+            },
         );
 
         // Non-standard
-        object.as(Error).fields = .{
-            .error_data = .{ .name = String.from("Error"), .message = String.from("") },
-        };
         object.data.internal_methods.set = internalSet;
 
         // 3. If message is not undefined, then
@@ -299,14 +300,13 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
                 agent,
                 new_target_,
                 "%" ++ name ++ ".prototype%",
+                .{
+                    // Non-standard
+                    .error_data = .{ .name = String.from(name), .message = String.from("") },
+                },
             );
 
-            const native_error = object.ptr.cast(*T);
-
             // Non-standard
-            native_error.fields = .{
-                .error_data = .{ .name = String.from(name), .message = String.from("") },
-            };
             object.data.internal_methods.set = internalSet;
 
             // 3. If message is not undefined, then
@@ -320,7 +320,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
                     Value.from(msg),
                 ) catch |err| try noexcept(err);
 
-                native_error.fields.error_data.message = msg;
+                object.as(T).fields.error_data.message = msg;
             }
 
             // 4. Perform ? InstallErrorCause(O, options).
@@ -422,12 +422,13 @@ pub const AggregateErrorConstructor = struct {
             agent,
             new_target_,
             "%AggregateError.prototype%",
+            .{
+                // Non-standard
+                .error_data = .{ .name = String.from("AggregateError"), .message = String.from("") },
+            },
         );
 
         // Non-standard
-        object.as(Error).fields = .{
-            .error_data = .{ .name = String.from("AggregateError"), .message = String.from("") },
-        };
         object.data.internal_methods.set = internalSet;
 
         // 3. If message is not undefined, then

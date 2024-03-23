@@ -1647,6 +1647,7 @@ fn classDefinitionEvaluation(
                         agent_,
                         new_target.?,
                         "%Object.prototype%",
+                        {},
                     );
                 };
 

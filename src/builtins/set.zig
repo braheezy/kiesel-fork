@@ -73,10 +73,16 @@ pub const SetConstructor = struct {
         }
 
         // 2. Let set be ? OrdinaryCreateFromConstructor(NewTarget, "%Set.prototype%", « [[SetData]] »).
-        const set = try ordinaryCreateFromConstructor(Set, agent, new_target.?, "%Set.prototype%");
-
-        // 3. Set set.[[SetData]] to a new empty List.
-        set.as(Set).fields = .{ .set_data = SetData.init(agent.gc_allocator) };
+        const set = try ordinaryCreateFromConstructor(
+            Set,
+            agent,
+            new_target.?,
+            "%Set.prototype%",
+            .{
+                // 3. Set set.[[SetData]] to a new empty List.
+                .set_data = SetData.init(agent.gc_allocator),
+            },
+        );
 
         // 4. If iterable is either undefined or null, return set.
         if (iterable == .undefined or iterable == .null) return Value.from(set);

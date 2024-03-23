@@ -413,6 +413,11 @@ pub const DataViewConstructor = struct {
             agent,
             new_target.?,
             "%DataView.prototype%",
+            .{
+                .viewed_array_buffer = undefined,
+                .byte_length = undefined,
+                .byte_offset = undefined,
+            },
         );
 
         // 11. If IsDetachedBuffer(buffer) is true, throw a TypeError exception.

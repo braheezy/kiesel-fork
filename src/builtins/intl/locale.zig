@@ -232,6 +232,7 @@ pub const LocaleConstructor = struct {
             agent,
             new_target.?,
             "%Intl.Locale.prototype%",
+            .{ .locale = undefined },
         );
 
         // 7. If Type(tag) is not String or Object, throw a TypeError exception.
@@ -435,8 +436,8 @@ pub const LocalePrototype = struct {
             agent,
             try realm.intrinsics.@"%Intl.Locale%"(),
             "%Intl.Locale.prototype%",
+            .{ .locale = maximal },
         ) catch |err| try noexcept(err);
-        object.as(Locale).fields = .{ .locale = maximal };
         return Value.from(object);
     }
 
@@ -464,8 +465,8 @@ pub const LocalePrototype = struct {
             agent,
             try realm.intrinsics.@"%Intl.Locale%"(),
             "%Intl.Locale.prototype%",
+            .{ .locale = minimal },
         ) catch |err| try noexcept(err);
-        object.as(Locale).fields = .{ .locale = minimal };
         return Value.from(object);
     }
 

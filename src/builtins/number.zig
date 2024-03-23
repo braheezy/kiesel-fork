@@ -177,10 +177,11 @@ pub const NumberConstructor = struct {
             agent,
             new_target.?,
             "%Number.prototype%",
+            .{
+                // 5. Set O.[[NumberData]] to n.
+                .number_data = n,
+            },
         );
-
-        // 5. Set O.[[NumberData]] to n.
-        object.as(Number).fields = .{ .number_data = n };
 
         // 6. Return O.
         return Value.from(object);

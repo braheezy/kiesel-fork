@@ -126,10 +126,16 @@ pub const MapConstructor = struct {
         }
 
         // 2. Let map be ? OrdinaryCreateFromConstructor(NewTarget, "%Map.prototype%", « [[MapData]] »).
-        const map = try ordinaryCreateFromConstructor(Map, agent, new_target.?, "%Map.prototype%");
-
-        // 3. Set map.[[MapData]] to a new empty List.
-        map.as(Map).fields = .{ .map_data = MapData.init(agent.gc_allocator) };
+        const map = try ordinaryCreateFromConstructor(
+            Map,
+            agent,
+            new_target.?,
+            "%Map.prototype%",
+            .{
+                // 3. Set map.[[MapData]] to a new empty List.
+                .map_data = MapData.init(agent.gc_allocator),
+            },
+        );
 
         // 4. If iterable is either undefined or null, return map.
         if (iterable == .undefined or iterable == .null) return Value.from(map);

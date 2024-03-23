@@ -130,6 +130,11 @@ pub fn regExpAlloc(agent: *Agent, new_target: Object) Agent.Error!Object {
         agent,
         new_target,
         "%RegExp.prototype%",
+        .{
+            .original_source = undefined,
+            .original_flags = undefined,
+            .re_bytecode = undefined,
+        },
     );
 
     // 2. Perform ! DefinePropertyOrThrow(obj, "lastIndex", PropertyDescriptor {

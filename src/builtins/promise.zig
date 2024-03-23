@@ -1563,23 +1563,27 @@ pub const PromiseConstructor = struct {
         // 3. Let promise be ? OrdinaryCreateFromConstructor(NewTarget, "%Promise.prototype%",
         //    « [[PromiseState]], [[PromiseResult]], [[PromiseFulfillReactions]],
         //    [[PromiseRejectReactions]], [[PromiseIsHandled]] »).
-        const promise = try ordinaryCreateFromConstructor(Promise, agent, new_target.?, "%Promise.prototype%");
+        const promise = try ordinaryCreateFromConstructor(
+            Promise,
+            agent,
+            new_target.?,
+            "%Promise.prototype%",
+            .{
+                .promise_result = undefined,
 
-        promise.as(Promise).fields = .{
-            .promise_result = undefined,
+                // 4. Set promise.[[PromiseState]] to pending.
+                .promise_state = .pending,
 
-            // 4. Set promise.[[PromiseState]] to pending.
-            .promise_state = .pending,
+                // 5. Set promise.[[PromiseFulfillReactions]] to a new empty List.
+                .promise_fulfill_reactions = std.ArrayList(PromiseReaction).init(agent.gc_allocator),
 
-            // 5. Set promise.[[PromiseFulfillReactions]] to a new empty List.
-            .promise_fulfill_reactions = std.ArrayList(PromiseReaction).init(agent.gc_allocator),
+                // 6. Set promise.[[PromiseRejectReactions]] to a new empty List.
+                .promise_reject_reactions = std.ArrayList(PromiseReaction).init(agent.gc_allocator),
 
-            // 6. Set promise.[[PromiseRejectReactions]] to a new empty List.
-            .promise_reject_reactions = std.ArrayList(PromiseReaction).init(agent.gc_allocator),
-
-            // 7. Set promise.[[PromiseIsHandled]] to false.
-            .promise_is_handled = false,
-        };
+                // 7. Set promise.[[PromiseIsHandled]] to false.
+                .promise_is_handled = false,
+            },
+        );
 
         // 8. Let resolvingFunctions be CreateResolvingFunctions(promise).
         const resolving_functions = try createResolvingFunctions(agent, promise.as(Promise));
