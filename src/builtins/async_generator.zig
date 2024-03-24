@@ -19,6 +19,7 @@ const Object = types.Object;
 const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
+const SafePointer = types.SafePointer;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createIterResultObject = types.createIterResultObject;
@@ -38,6 +39,7 @@ pub const AsyncGeneratorPrototype = struct {
         });
 
         try defineBuiltinFunction(object, "next", next, 1, realm);
+        try defineBuiltinFunction(object, "return", @"return", 1, realm);
 
         // 27.6.1.1 %AsyncGeneratorPrototype%.constructor
         // https://tc39.es/ecma262/#sec-asyncgenerator-prototype-constructor
@@ -109,6 +111,63 @@ pub const AsyncGeneratorPrototype = struct {
 
         // 9. If state is either suspended-start or suspended-yield, then
         if (state == .suspended_start or state == .suspended_yield) {
+            // a. Perform AsyncGeneratorResume(generator, completion).
+            try asyncGeneratorResume(agent, generator, completion);
+        }
+        // 10. Else,
+        else {
+            // a. Assert: state is either executing or awaiting-return.
+            std.debug.assert(state == .executing or state == .awaiting_return);
+        }
+
+        // 11. Return promiseCapability.[[Promise]].
+        return Value.from(promise_capability.promise);
+    }
+
+    /// 27.6.1.3 %AsyncGeneratorPrototype%.return ( value )
+    /// https://tc39.es/ecma262/#sec-asyncgenerator-prototype-return
+    fn @"return"(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const realm = agent.currentRealm();
+        const value = arguments.get(0);
+
+        // 1. Let generator be the this value.
+        const generator_value = this_value;
+
+        // 2. Let promiseCapability be ! NewPromiseCapability(%Promise%).
+        const promise_capability = newPromiseCapability(
+            agent,
+            Value.from(try realm.intrinsics.@"%Promise%"()),
+        ) catch |err| try noexcept(err);
+
+        // 3. Let result be Completion(AsyncGeneratorValidate(generator, empty)).
+        asyncGeneratorValidate(agent, generator_value) catch |err| {
+            // 4. IfAbruptRejectPromise(result, promiseCapability).
+            return Value.from(try promise_capability.rejectPromise(agent, err));
+        };
+
+        const generator = generator_value.object.as(AsyncGenerator);
+
+        // 5. Let completion be Completion Record {
+        //      [[Type]]: return, [[Value]]: value, [[Target]]: empty
+        //    }.
+        const completion = Completion{ .type = .@"return", .value = value, .target = null };
+
+        // 6. Perform AsyncGeneratorEnqueue(generator, completion, promiseCapability).
+        try asyncGeneratorEnqueue(generator, completion, promise_capability);
+
+        // 7. Let state be generator.[[AsyncGeneratorState]].
+        const state = generator.fields.async_generator_state;
+
+        // 8. If state is either suspended-start or completed, then
+        if (state == .suspended_start or state == .completed) {
+            // a. Set generator.[[AsyncGeneratorState]] to awaiting-return.
+            generator.fields.async_generator_state = .awaiting_return;
+
+            // b. Perform AsyncGeneratorAwaitReturn(generator).
+            try asyncGeneratorAwaitReturn(agent, generator);
+        }
+        // 9. Else if state is suspended-yield, then
+        else if (state == .suspended_yield) {
             // a. Perform AsyncGeneratorResume(generator, completion).
             try asyncGeneratorResume(agent, generator, completion);
         }
@@ -502,8 +561,8 @@ pub fn asyncGeneratorAwaitReturn(agent: *Agent, generator: *AsyncGenerator) Allo
     const Captures = struct {
         generator: *AsyncGenerator,
     };
-    const fulfilled_closure_captures = try agent.gc_allocator.create(Captures);
-    fulfilled_closure_captures.* = .{
+    const captures = try agent.gc_allocator.create(Captures);
+    captures.* = .{
         .generator = generator,
     };
 
@@ -512,8 +571,8 @@ pub fn asyncGeneratorAwaitReturn(agent: *Agent, generator: *AsyncGenerator) Allo
     const fulfilled_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) Agent.Error!Value {
             const function_ = agent_.activeFunctionObject();
-            const captures = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
-            const generator_ = captures.generator;
+            const captures_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+            const generator_ = captures_.generator;
             const value = arguments_.get(0);
 
             // a. Set generator.[[AsyncGeneratorState]] to completed.
@@ -538,6 +597,7 @@ pub fn asyncGeneratorAwaitReturn(agent: *Agent, generator: *AsyncGenerator) Allo
         try createBuiltinFunction(agent, .{ .regular = fulfilled_closure }, .{
             .length = 1,
             .name = "",
+            .additional_fields = SafePointer.make(*Captures, captures),
         }),
     );
 
@@ -546,8 +606,8 @@ pub fn asyncGeneratorAwaitReturn(agent: *Agent, generator: *AsyncGenerator) Allo
     const rejected_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) Agent.Error!Value {
             const function_ = agent_.activeFunctionObject();
-            const captures = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
-            const generator_ = captures.generator;
+            const captures_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+            const generator_ = captures_.generator;
             const reason = arguments_.get(0);
 
             // a. Set generator.[[AsyncGeneratorState]] to completed.
@@ -572,6 +632,7 @@ pub fn asyncGeneratorAwaitReturn(agent: *Agent, generator: *AsyncGenerator) Allo
         try createBuiltinFunction(agent, .{ .regular = rejected_closure }, .{
             .length = 1,
             .name = "",
+            .additional_fields = SafePointer.make(*Captures, captures),
         }),
     );
 
