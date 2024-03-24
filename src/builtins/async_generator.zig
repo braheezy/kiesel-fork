@@ -40,6 +40,7 @@ pub const AsyncGeneratorPrototype = struct {
 
         try defineBuiltinFunction(object, "next", next, 1, realm);
         try defineBuiltinFunction(object, "return", @"return", 1, realm);
+        try defineBuiltinFunction(object, "throw", throw, 1, realm);
 
         // 27.6.1.1 %AsyncGeneratorPrototype%.constructor
         // https://tc39.es/ecma262/#sec-asyncgenerator-prototype-constructor
@@ -178,6 +179,74 @@ pub const AsyncGeneratorPrototype = struct {
         }
 
         // 11. Return promiseCapability.[[Promise]].
+        return Value.from(promise_capability.promise);
+    }
+
+    /// 27.6.1.4 %AsyncGeneratorPrototype%.throw ( exception )
+    /// https://tc39.es/ecma262/#sec-asyncgenerator-prototype-throw
+    fn throw(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const realm = agent.currentRealm();
+        const exception = arguments.get(0);
+
+        // 1. Let generator be the this value.
+        const generator_value = this_value;
+
+        // 2. Let promiseCapability be ! NewPromiseCapability(%Promise%).
+        const promise_capability = newPromiseCapability(
+            agent,
+            Value.from(try realm.intrinsics.@"%Promise%"()),
+        ) catch |err| try noexcept(err);
+
+        // 3. Let result be Completion(AsyncGeneratorValidate(generator, empty)).
+        asyncGeneratorValidate(agent, generator_value) catch |err| {
+            // 4. IfAbruptRejectPromise(result, promiseCapability).
+            return Value.from(try promise_capability.rejectPromise(agent, err));
+        };
+
+        const generator = generator_value.object.as(AsyncGenerator);
+
+        // 5. Let state be generator.[[AsyncGeneratorState]].
+        var state = generator.fields.async_generator_state;
+
+        // 6. If state is suspended-start, then
+        if (state == .suspended_start) {
+            // a. Set generator.[[AsyncGeneratorState]] to completed.
+            generator.fields.async_generator_state = .completed;
+
+            // b. Set state to completed.
+            state = .completed;
+        }
+
+        // 7. If state is completed, then
+        if (state == .completed) {
+            // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « exception »).
+            _ = Value.from(promise_capability.reject).callAssumeCallable(
+                .undefined,
+                &.{exception},
+            ) catch |err| try noexcept(err);
+
+            // b. Return promiseCapability.[[Promise]].
+            return Value.from(promise_capability.promise);
+        }
+
+        // 8. Let completion be ThrowCompletion(exception).
+        const completion = Completion.throw(exception);
+
+        // 9. Perform AsyncGeneratorEnqueue(generator, completion, promiseCapability).
+        try asyncGeneratorEnqueue(generator, completion, promise_capability);
+
+        // 10. If state is suspended-yield, then
+        if (state == .suspended_yield) {
+            // a. Perform AsyncGeneratorResume(generator, completion).
+            try asyncGeneratorResume(agent, generator, completion);
+        }
+        // 11. Else,
+        else {
+            // a. Assert: state is either executing or awaiting-return.
+            std.debug.assert(state == .executing or state == .awaiting_return);
+        }
+
+        // 12. Return promiseCapability.[[Promise]].
         return Value.from(promise_capability.promise);
     }
 };
