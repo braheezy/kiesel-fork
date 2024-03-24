@@ -42,4 +42,7 @@ ecmascript_code: ?struct {
 
 /// Table 27: Additional State Components for Generator Execution Contexts
 /// https://tc39.es/ecma262/#table-additional-state-components-for-generator-execution-contexts
-generator: ?*builtins.Generator = null,
+generator: ?union {
+    generator: *builtins.Generator,
+    async_generator: *builtins.AsyncGenerator,
+} = null,

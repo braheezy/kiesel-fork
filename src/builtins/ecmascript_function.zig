@@ -39,6 +39,7 @@ const Value = types.Value;
 const Vm = bytecode.Vm;
 const arrayCreate = builtins.arrayCreate;
 const asyncFunctionStart = builtins.asyncFunctionStart;
+const asyncGeneratorStart = builtins.asyncGeneratorStart;
 const containsSlice = utils.containsSlice;
 const createMappedArgumentsObject = builtins.createMappedArgumentsObject;
 const createUnmappedArgumentsObject = builtins.createUnmappedArgumentsObject;
@@ -361,12 +362,12 @@ fn evaluateGeneratorBody(
             //       initialized memory for the assert to work.
             .generator_state = null,
             .generator_context = undefined,
-            .state = undefined,
+            .evaluation_state = undefined,
         },
     );
 
     // 4. Perform GeneratorStart(G, FunctionBody).
-    try generatorStart(agent, generator.as(builtins.Generator), function);
+    generatorStart(agent, generator.as(builtins.Generator), function);
 
     // 5. Return Completion Record { [[Type]]: return, [[Value]]: G, [[Target]]: empty }.
     return .{ .type = .@"return", .value = Value.from(generator), .target = null };
@@ -391,10 +392,18 @@ fn evaluateAsyncGeneratorBody(
         agent,
         function.object(),
         "%AsyncGeneratorPrototype%",
-        {},
+        .{
+            // NOTE: All of these are set in `asyncGeneratorStart()`, but `async_generator_state`
+            //       needs to be initialized memory for the assert to work.
+            .async_generator_state = null,
+            .async_generator_context = undefined,
+            .async_generator_queue = undefined,
+            .evaluation_state = undefined,
+        },
     );
 
-    // TODO: 4. Perform AsyncGeneratorStart(generator, FunctionBody).
+    // 4. Perform AsyncGeneratorStart(generator, FunctionBody).
+    asyncGeneratorStart(agent, generator.as(builtins.AsyncGenerator), function);
 
     // 5. Return Completion Record { [[Type]]: return, [[Value]]: generator, [[Target]]: empty }.
     return .{ .type = .@"return", .value = Value.from(generator), .target = null };

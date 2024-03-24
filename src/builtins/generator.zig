@@ -114,7 +114,7 @@ pub const Generator = MakeObject(.{
         generator_context: ExecutionContext,
 
         // Non-standard
-        state: struct {
+        evaluation_state: struct {
             closure: *const fn (*Agent, *builtins.ECMAScriptFunction) Agent.Error!Object,
             generator_function: *builtins.ECMAScriptFunction,
         },
@@ -128,7 +128,7 @@ pub fn generatorStart(
     agent: *Agent,
     generator: *Generator,
     generator_function: *builtins.ECMAScriptFunction,
-) Allocator.Error!void {
+) void {
     // 1. Assert: The value of generator.[[GeneratorState]] is undefined.
     std.debug.assert(generator.fields.generator_state == null);
 
@@ -136,9 +136,10 @@ pub fn generatorStart(
     const generator_context = agent.runningExecutionContext();
 
     // 3. Set the Generator component of genContext to generator.
-    generator_context.generator = generator;
+    generator_context.generator = .{ .generator = generator };
 
-    // 4. Let closure be a new Abstract Closure with no parameters that captures generatorBody and performs the following steps when called:
+    // 4. Let closure be a new Abstract Closure with no parameters that captures generatorBody and
+    //    performs the following steps when called:
     const closure = struct {
         fn func(
             agent_: *Agent,
@@ -148,7 +149,7 @@ pub fn generatorStart(
             const closure_generator_context = agent_.runningExecutionContext();
 
             // b. Let acGenerator be the Generator component of acGenContext.
-            const closure_generator = closure_generator_context.generator.?;
+            const closure_generator = closure_generator_context.generator.?.generator;
 
             // c. If generatorBody is a Parse Node, then
             const result = if (true) blk: {
@@ -198,7 +199,7 @@ pub fn generatorStart(
 
     // 5. Set the code evaluation state of genContext such that when evaluation is resumed for that
     //    execution context, closure will be called with no arguments.
-    generator.fields.state = .{ .closure = closure, .generator_function = generator_function };
+    generator.fields.evaluation_state = .{ .closure = closure, .generator_function = generator_function };
 
     // 6. Set generator.[[GeneratorContext]] to genContext.
     generator.fields.generator_context = generator_context.*;
@@ -266,9 +267,9 @@ pub fn generatorResume(agent: *Agent, generator_value: Value, value: Value) Agen
     //    of the operation that suspended it. Let result be the value returned by the resumed
     //    computation.
     _ = value;
-    const result = try generator.fields.state.closure(
+    const result = try generator.fields.evaluation_state.closure(
         agent,
-        generator.fields.state.generator_function,
+        generator.fields.evaluation_state.generator_function,
     );
 
     // 10. Assert: When we return here, genContext has already been removed from the execution
@@ -339,9 +340,9 @@ pub fn generatorResumeAbrupt(
     // 10. Resume the suspended evaluation of genContext using abruptCompletion as the result of
     //     the operation that suspended it. Let result be the Completion Record returned by the
     //     resumed computation.
-    const result = try generator.fields.state.closure(
+    const result = try generator.fields.evaluation_state.closure(
         agent,
-        generator.fields.state.generator_function,
+        generator.fields.evaluation_state.generator_function,
     );
 
     // 11. Assert: When we return here, genContext has already been removed from the execution
