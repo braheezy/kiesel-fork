@@ -11,6 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
+const ArgumentsList = builtins.ArgumentsList;
 const Completion = types.Completion;
 const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
@@ -21,7 +22,9 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createIterResultObject = types.createIterResultObject;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
+const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
 const performPromiseThen = builtins.performPromiseThen;
 const promiseResolve = builtins.promiseResolve;
@@ -33,6 +36,8 @@ pub const AsyncGeneratorPrototype = struct {
         const object = try builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%AsyncIteratorPrototype%"(),
         });
+
+        try defineBuiltinFunction(object, "next", next, 1, realm);
 
         // 27.6.1.1 %AsyncGeneratorPrototype%.constructor
         // https://tc39.es/ecma262/#sec-asyncgenerator-prototype-constructor
@@ -53,6 +58,68 @@ pub const AsyncGeneratorPrototype = struct {
         });
 
         return object;
+    }
+
+    /// 27.6.1.2 %AsyncGeneratorPrototype%.next ( value )
+    /// https://tc39.es/ecma262/#sec-asyncgenerator-prototype-next
+    fn next(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const realm = agent.currentRealm();
+        const value = arguments.get(0);
+
+        // 1. Let generator be the this value.
+        const generator_value = this_value;
+
+        // 2. Let promiseCapability be ! NewPromiseCapability(%Promise%).
+        const promise_capability = newPromiseCapability(
+            agent,
+            Value.from(try realm.intrinsics.@"%Promise%"()),
+        ) catch |err| try noexcept(err);
+
+        // 3. Let result be Completion(AsyncGeneratorValidate(generator, empty)).
+        asyncGeneratorValidate(agent, generator_value) catch |err| {
+            // 4. IfAbruptRejectPromise(result, promiseCapability).
+            return Value.from(try promise_capability.rejectPromise(agent, err));
+        };
+
+        const generator = generator_value.object.as(AsyncGenerator);
+
+        // 5. Let state be generator.[[AsyncGeneratorState]].
+        const state = generator.fields.async_generator_state;
+
+        // 6. If state is completed, then
+        if (state == .completed) {
+            // a. Let iteratorResult be CreateIterResultObject(undefined, true).
+            const iterator_result = try createIterResultObject(agent, .undefined, true);
+
+            // b. Perform ! Call(promiseCapability.[[Resolve]], undefined, « iteratorResult »).
+            _ = Value.from(promise_capability.resolve).callAssumeCallable(
+                .undefined,
+                &.{Value.from(iterator_result)},
+            ) catch |err| try noexcept(err);
+
+            // c. Return promiseCapability.[[Promise]].
+            return Value.from(promise_capability.promise);
+        }
+
+        // 7. Let completion be NormalCompletion(value).
+        const completion = Completion.normal(value);
+
+        // 8. Perform AsyncGeneratorEnqueue(generator, completion, promiseCapability).
+        try asyncGeneratorEnqueue(generator, completion, promise_capability);
+
+        // 9. If state is either suspended-start or suspended-yield, then
+        if (state == .suspended_start or state == .suspended_yield) {
+            // a. Perform AsyncGeneratorResume(generator, completion).
+            try asyncGeneratorResume(agent, generator, completion);
+        }
+        // 10. Else,
+        else {
+            // a. Assert: state is either executing or awaiting-return.
+            std.debug.assert(state == .executing or state == .awaiting_return);
+        }
+
+        // 11. Return promiseCapability.[[Promise]].
+        return Value.from(promise_capability.promise);
     }
 };
 
@@ -186,6 +253,39 @@ pub fn asyncGeneratorStart(
     // 9. Return unused.
 }
 
+/// 27.6.3.3 AsyncGeneratorValidate ( generator, generatorBrand )
+/// https://tc39.es/ecma262/#sec-asyncgeneratorvalidate
+pub fn asyncGeneratorValidate(agent: *Agent, generator_value: Value) error{ExceptionThrown}!void {
+    // 1. Perform ? RequireInternalSlot(generator, [[AsyncGeneratorContext]]).
+    // 2. Perform ? RequireInternalSlot(generator, [[AsyncGeneratorState]]).
+    // 3. Perform ? RequireInternalSlot(generator, [[AsyncGeneratorQueue]]).
+    _ = try generator_value.requireInternalSlot(agent, AsyncGenerator);
+
+    // 4. If generator.[[GeneratorBrand]] is not generatorBrand, throw a TypeError exception.
+    // NOTE: All iterators using [[GeneratorBrand]] in the spec are implemented without generators
+    //       so this is currently not needed.
+
+    // 5. Return unused.
+}
+
+/// 27.6.3.4 AsyncGeneratorEnqueue ( generator, completion, promiseCapability )
+/// https://tc39.es/ecma262/#sec-asyncgeneratorenqueue
+pub fn asyncGeneratorEnqueue(
+    generator: *AsyncGenerator,
+    completion: Completion,
+    promise_capability: PromiseCapability,
+) Allocator.Error!void {
+    // 1. Let request be AsyncGeneratorRequest {
+    //      [[Completion]]: completion, [[Capability]]: promiseCapability
+    //    }.
+    const request = AsyncGeneratorRequest{ .completion = completion, .capability = promise_capability };
+
+    // 2. Append request to generator.[[AsyncGeneratorQueue]].
+    try generator.fields.async_generator_queue.append(request);
+
+    // 3. Return unused.
+}
+
 /// 27.6.3.5 AsyncGeneratorCompleteStep ( generator, completion, done [ , realm ] )
 /// https://tc39.es/ecma262/#sec-asyncgeneratorcompletestep
 pub fn asyncGeneratorCompleteStep(
@@ -249,6 +349,49 @@ pub fn asyncGeneratorCompleteStep(
     }
 
     // 8. Return unused.
+}
+
+/// 27.6.3.6 AsyncGeneratorResume ( generator, completion )
+/// https://tc39.es/ecma262/#sec-asyncgeneratorresume
+pub fn asyncGeneratorResume(
+    agent: *Agent,
+    generator: *AsyncGenerator,
+    completion: Completion,
+) Allocator.Error!void {
+    // 1. Assert: generator.[[AsyncGeneratorState]] is either suspended-start or suspended-yield.
+    std.debug.assert(generator.fields.async_generator_state == .suspended_start or
+        generator.fields.async_generator_state == .suspended_yield);
+
+    // 2. Let genContext be generator.[[AsyncGeneratorContext]].
+    const generator_context = generator.fields.async_generator_context;
+
+    // 3. Let callerContext be the running execution context.
+    const caller_context = agent.runningExecutionContext();
+
+    // TODO: 4. Suspend callerContext.
+
+    // 5. Set generator.[[AsyncGeneratorState]] to executing.
+    generator.fields.async_generator_state = .executing;
+
+    // 6. Push genContext onto the execution context stack; genContext is now the running execution
+    //    context.
+    try agent.execution_context_stack.append(generator_context);
+
+    // 7. Resume the suspended evaluation of genContext using completion as the result of the
+    //    operation that suspended it. Let result be the Completion Record returned by the resumed
+    //    computation.
+    // 8. Assert: result is never an abrupt completion.
+    _ = completion;
+    try generator.fields.evaluation_state.closure(
+        agent,
+        generator.fields.evaluation_state.generator_function,
+    );
+
+    // 9. Assert: When we return here, genContext has already been removed from the execution
+    //    context stack and callerContext is the currently running execution context.
+    std.debug.assert(caller_context == agent.runningExecutionContext());
+
+    // 10. Return unused.
 }
 
 /// 27.6.3.10 AsyncGeneratorDrainQueue ( generator )
