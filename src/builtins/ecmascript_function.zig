@@ -561,8 +561,7 @@ pub fn ordinaryFunctionCreate(
     env: Environment,
     private_env: ?*PrivateEnvironment,
 ) Allocator.Error!Object {
-    // 7. If the source text matched by Body is strict mode code, let Strict be true; else let
-    //    Strict be false.
+    // 7. Let Strict be IsStrict(Body).
     const strict = body.strict.?;
 
     // 1. Let internalSlotsList be the internal slots listed in Table 30.

@@ -753,7 +753,7 @@ pub fn printAsyncArrowFunction(node: ast.AsyncArrowFunction, writer: anytype, in
 pub fn printScript(node: ast.Script, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("Script", writer, indentation);
     try print("strict:", writer, indentation + 1);
-    try print(if (node.isStrict()) "true" else "false", writer, indentation + 2);
+    try print(if (node.scriptIsStrict()) "true" else "false", writer, indentation + 2);
     try printStatementList(node.statement_list, writer, indentation + 1);
 }
 

@@ -623,8 +623,8 @@ pub const Expression = union(enum) {
         switch (self) {
             .primary_expression => |primary_expression| switch (primary_expression) {
                 .identifier_reference => |identifier_reference| {
-                    // TODO: 1. If this IdentifierReference is contained in strict mode code and StringValue
-                    //    of Identifier is either "eval" or "arguments", return invalid.
+                    // TODO: 1. If IsStrict(this IdentifierReference) is true and StringValue of
+                    //          Identifier is either "eval" or "arguments", return invalid.
                     if (false and
                         (std.mem.eql(u8, identifier_reference.identifier, "eval") or
                         std.mem.eql(u8, identifier_reference.identifier, "arguments")))
@@ -2721,9 +2721,9 @@ pub const Script = struct {
         return self.statement_list.topLevelVarScopedDeclarations(allocator);
     }
 
-    /// 16.1.2 Static Semantics: IsStrict
-    /// https://tc39.es/ecma262/#sec-static-semantics-isstrict
-    pub fn isStrict(self: Self) bool {
+    /// 16.1.2 Static Semantics: ScriptIsStrict
+    /// https://tc39.es/ecma262/#sec-scriptisstrict
+    pub fn scriptIsStrict(self: Self) bool {
         // 1. If ScriptBody is present and the Directive Prologue of ScriptBody contains a Use
         //    Strict Directive, return true; otherwise, return false.
         return self.statement_list.containsDirective("use strict");

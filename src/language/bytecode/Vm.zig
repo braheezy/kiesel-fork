@@ -282,8 +282,8 @@ fn directEval(agent: *Agent, arguments: []const Value, strict: bool) Agent.Error
     // iii. Let evalArg be the first element of argList.
     const eval_arg = arguments[0];
 
-    // iv. If the source text matched by this CallExpression is strict mode code, let strictCaller
-    //     be true. Otherwise let strictCaller be false.
+    // iv. If IsStrict(this CallExpression) is true, let strictCaller be true. Otherwise let
+    //     strictCaller be false.
     const strict_caller = strict;
 
     // v. Return ? PerformEval(evalArg, strictCaller, true).

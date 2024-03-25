@@ -93,8 +93,7 @@ pub fn codegenMemberExpression(
             if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
             try executable.addInstruction(.load);
 
-            // 3. If the source text matched by this MemberExpression is strict mode code, let
-            //    strict be true; else let strict be false.
+            // 3. Let strict be IsStrict(this MemberExpression).
             const strict = ctx.contained_in_strict_mode_code;
 
             // 4. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
@@ -114,8 +113,7 @@ pub fn codegenMemberExpression(
             if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
             try executable.addInstruction(.load);
 
-            // 3. If the source text matched by this MemberExpression is strict mode code, let
-            //    strict be true; else let strict be false.
+            // 3. Let strict be IsStrict(this MemberExpression).
             const strict = ctx.contained_in_strict_mode_code;
 
             // 4. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
@@ -166,10 +164,10 @@ pub fn codegenSuperProperty(
             if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
             try executable.addInstruction(.load);
 
-            // 6. If the source text matched by this SuperProperty is strict mode code, let
-            //    strict be true; else let strict be false.
+            // 6. Let strict be IsStrict(this SuperProperty).
             const strict = ctx.contained_in_strict_mode_code;
 
+            // 5. Let propertyKey be ? ToPropertyKey(propertyNameValue).
             // 7. Return ? MakeSuperPropertyReference(actualThis, propertyKey, strict).
             try executable.addInstruction(.make_super_property_reference);
             try executable.addIndex(@intFromBool(strict));
@@ -184,8 +182,7 @@ pub fn codegenSuperProperty(
             // 3. Let propertyKey be StringValue of IdentifierName.
             try executable.addInstructionWithConstant(.load_constant, Value.from(identifier));
 
-            // 4. If the source text matched by this SuperProperty is strict mode code, let
-            //    strict be true; else let strict be false.
+            // 4. Let strict be IsStrict(this SuperProperty).
             const strict = ctx.contained_in_strict_mode_code;
 
             // 5. Return ? MakeSuperPropertyReference(actualThis, propertyKey, strict).
@@ -373,8 +370,7 @@ pub fn codegenOptionalExpression(
 
         // OptionalChain : ?. [ Expression ]
         .expression => |expression| {
-            // 1. If the source text matched by this OptionalChain is strict mode code, let strict
-            //    be true; else let strict be false.
+            // 1. Let strict be IsStrict(this OptionalChain).
             const strict = ctx.contained_in_strict_mode_code;
 
             // 2. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
@@ -387,8 +383,7 @@ pub fn codegenOptionalExpression(
 
         // OptionalChain : ?. IdentifierName
         .identifier => |identifier| {
-            // 1. If the source text matched by this OptionalChain is strict mode code, let strict
-            //    be true; else let strict be false.
+            // 1. Let strict be IsStrict(this OptionalChain).
             const strict = ctx.contained_in_strict_mode_code;
 
             // 2. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
@@ -2889,7 +2884,7 @@ pub fn codegenScript(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    ctx.contained_in_strict_mode_code = node.isStrict();
+    ctx.contained_in_strict_mode_code = node.scriptIsStrict();
     try codegenStatementList(node.statement_list, executable, ctx);
 }
 

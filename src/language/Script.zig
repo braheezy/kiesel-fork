@@ -290,7 +290,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
             inline else => |*function_declaration| {
                 // Assign the function body's strictness, which is needed for the deferred bytecode generation.
                 // FIXME: This should ideally happen at parse time.
-                function_declaration.function_body.strict = script.isStrict() or
+                function_declaration.function_body.strict = script.scriptIsStrict() or
                     function_declaration.function_body.functionBodyContainsUseStrict();
             },
         }
