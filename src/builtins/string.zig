@@ -861,13 +861,7 @@ pub const StringPrototype = struct {
             std.math.sub(usize, len, search_len) catch return Value.from(-1),
         );
 
-        // 10. If searchStr is the empty String, return 𝔽(start).
-        if (search_str.isEmpty()) return Value.from(@as(u53, @intCast(start)));
-
-        // 11. For each integer i such that 0 ≤ i ≤ start, in descending order, do
-        //     a. Let candidate be the substring of S from i to i + searchLen.
-        //     b. If candidate is searchStr, return 𝔽(i).
-        // 12. Return -1𝔽.
+        // 10. Return 𝔽(StringLastIndexOf(S, searchStr, start)).
         const index = string.lastIndexOf(search_str, start) orelse return Value.from(-1);
         return Value.from(@as(u53, @intCast(index)));
     }

@@ -96,8 +96,18 @@ pub const String = struct {
             null;
     }
 
+    /// 6.1.4.2 StringLastIndexOf ( string, searchValue, fromIndex )
+    /// https://tc39.es/ecma262/#sec-stringlastindexof
     pub fn lastIndexOf(self: Self, search_value: String, from_index: usize) ?usize {
+        // 1. Let len be the length of string.
         const len = self.utf16Length();
+
+        // 2. Let searchLen be the length of searchValue.
+        // 3. Assert: fromIndex + searchLen ≤ len.
+        // 1. For each integer i such that 0 ≤ i ≤ fromIndex, in descending order, do
+        //     a. Let candidate be the substring of string from i to i + searchLen.
+        //     b. If candidate is searchValue, return i.
+        // 5. Return -1.
         if (search_value.isEmpty() and from_index <= len) return from_index;
         if (from_index >= len) return null;
         return if (std.mem.lastIndexOf(u8, self.utf8[from_index..], search_value.utf8)) |index|
