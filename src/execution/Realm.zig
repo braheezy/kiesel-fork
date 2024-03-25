@@ -27,8 +27,8 @@ pub const Intrinsics = @import("Realm/Intrinsics.zig");
 
 const Self = @This();
 
+/// [[AgentSignifier]]
 agent: *Agent,
-rng: std.Random.DefaultPrng,
 
 /// [[Intrinsics]]
 intrinsics: Intrinsics,
@@ -47,6 +47,9 @@ loaded_modules: std.StringHashMap(Module),
 /// [[HostDefined]]
 host_defined: SafePointer,
 
+/// Non-standard, needed for `Math.random()`
+rng: std.Random.DefaultPrng,
+
 /// 9.3.1 CreateRealm ( )
 /// https://tc39.es/ecma262/#sec-createrealm
 pub fn create(agent: *Agent) Allocator.Error!*Self {
@@ -60,23 +63,25 @@ pub fn create(agent: *Agent) Allocator.Error!*Self {
     try realm.createIntrinsics();
 
     realm.* = .{
-        .agent = realm.agent,
         .intrinsics = realm.intrinsics,
         .rng = std.Random.DefaultPrng.init(@intFromPtr(realm)),
 
-        // 3. Set realmRec.[[GlobalObject]] to undefined.
+        // 3. Set realmRec.[[AgentSignifier]] to AgentSignifier().
+        .agent = realm.agent,
+
+        // 4. Set realmRec.[[GlobalObject]] to undefined.
         .global_object = undefined,
 
-        // 4. Set realmRec.[[GlobalEnv]] to undefined.
+        // 5. Set realmRec.[[GlobalEnv]] to undefined.
         .global_env = undefined,
 
         .loaded_modules = std.StringHashMap(Module).init(agent.gc_allocator),
         .host_defined = SafePointer.null_pointer,
 
-        // TODO: 5. Set realmRec.[[TemplateMap]] to a new empty List.
+        // TODO: 6. Set realmRec.[[TemplateMap]] to a new empty List.
     };
 
-    // 6. Return realmRec.
+    // 7. Return realmRec.
     return realm;
 }
 
