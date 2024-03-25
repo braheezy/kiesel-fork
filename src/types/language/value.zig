@@ -1283,11 +1283,9 @@ pub const Value = union(enum) {
 /// 7.1.4.1.1 StringToNumber ( str )
 /// https://tc39.es/ecma262/#sec-stringtonumber
 pub fn stringToNumber(string: String) Number {
-    // 1. Let text be StringToCodePoints(str).
-
-    // 2. Let literal be ParseText(text, StringNumericLiteral).
-    // 3. If literal is a List of errors, return NaN.
-    // 4. Return StringNumericValue of literal.
+    // 1. Let literal be ParseText(str, StringNumericLiteral).
+    // 2. If literal is a List of errors, return NaN.
+    // 3. Return StringNumericValue of literal.
     // TODO: Implement the proper string parsing grammar!
     const trimmed_string = trim(string.utf8, &String.whitespace);
     if (trimmed_string.len == 0) return Number.from(0);
@@ -1302,13 +1300,11 @@ pub fn stringToNumber(string: String) Number {
 /// 7.1.14 StringToBigInt ( str )
 /// https://tc39.es/ecma262/#sec-stringtobigint
 pub fn stringToBigInt(allocator: Allocator, string: String) Allocator.Error!?BigInt {
-    // 1. Let text be StringToCodePoints(str).
-
-    // 2. Let literal be ParseText(text, StringIntegerLiteral).
-    // 3. If literal is a List of errors, return undefined.
-    // 4. Let mv be the MV of literal.
-    // 5. Assert: mv is an integer.
-    // 6. Return ℤ(mv).
+    // 1. Let literal be ParseText(str, StringIntegerLiteral).
+    // 2. If literal is a List of errors, return undefined.
+    // 3. Let mv be the MV of literal.
+    // 4. Assert: mv is an integer.
+    // 5. Return ℤ(mv).
     // TODO: Implement the proper string parsing grammar!
     var big_int = try types.BigInt.from(allocator, 0);
     var trimmed_string = trim(string.utf8, &String.whitespace);

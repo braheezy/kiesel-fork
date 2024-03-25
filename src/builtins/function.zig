@@ -327,7 +327,7 @@ pub fn createDynamicFunction(
     var diagnostics = Diagnostics.init(agent.gc_allocator);
     defer diagnostics.deinit();
 
-    // 17. Let parameters be ParseText(StringToCodePoints(P), parameterSym).
+    // 17. Let parameters be ParseText(P, parameterSym).
     const parameters = Parser.parseNode(parameter_sym.type, parameter_sym.acceptFn, agent.gc_allocator, parameters_string, .{
         .diagnostics = &diagnostics,
         .file_name = "Function",
@@ -344,7 +344,7 @@ pub fn createDynamicFunction(
         },
     };
 
-    // 19. Let body be ParseText(StringToCodePoints(bodyParseString), bodySym).
+    // 19. Let body be ParseText(bodyParseString, bodySym).
     var body = Parser.parseNode(body_sym.type, body_sym.acceptFn, agent.gc_allocator, body_parse_string, .{
         .diagnostics = &diagnostics,
         .file_name = "Function",

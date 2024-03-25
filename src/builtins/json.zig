@@ -630,7 +630,7 @@ pub const JSON = struct {
         // 2. Parse StringToCodePoints(jsonString) as a JSON text as specified in ECMA-404. Throw
         //    a SyntaxError exception if it is not a valid JSON text as defined in that specification.
         // 3. Let scriptString be the string-concatenation of "(", jsonString, and ");".
-        // 4. Let script be ParseText(StringToCodePoints(scriptString), Script).
+        // 4. Let script be ParseText(scriptString, Script).
         // 5. NOTE: The early error rules defined in 13.2.5.1 have special handling for the above
         //    invocation of ParseText.
         // 6. Assert: script is a Parse Node.
