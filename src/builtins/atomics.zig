@@ -15,7 +15,9 @@ const Agent = execution.Agent;
 const ArgumentsList = builtins.ArgumentsList;
 const BigInt = types.BigInt;
 const Object = types.Object;
+const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
 const PropertyDescriptor = types.PropertyDescriptor;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const TypedArrayWithBufferWitness = builtins.TypedArrayWithBufferWitness;
 const Value = types.Value;
@@ -25,6 +27,10 @@ const getModifySetValueInBuffer = builtins.getModifySetValueInBuffer;
 const getValueFromBuffer = builtins.getValueFromBuffer;
 const isTypedArrayOutOfBounds = builtins.isTypedArrayOutOfBounds;
 const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferWitnessRecord;
+const newPromiseCapability = builtins.newPromiseCapability;
+const noexcept = utils.noexcept;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+const sameValue = types.sameValue;
 const setValueInBuffer = builtins.setValueInBuffer;
 const typedArrayElementSize = builtins.typedArrayElementSize;
 const typedArrayLength = builtins.typedArrayLength;
@@ -161,6 +167,189 @@ fn revalidateAtomicAccess(
     // 6. Return unused.
 }
 
+/// 25.4.3.14 DoWait ( mode, typedArray, index, value, timeout )
+/// https://tc39.es/ecma262/#sec-dowait
+fn doWait(
+    agent: *Agent,
+    mode: enum { sync, @"async" },
+    typed_array_value: Value,
+    index: Value,
+    value: Value,
+    timeout: Value,
+) Agent.Error!Value {
+    const realm = agent.currentRealm();
+
+    // 1. Let taRecord be ? ValidateIntegerTypedArray(typedArray, true).
+    const ta = try validateIntegerTypedArray(agent, typed_array_value, true);
+
+    // 2. Let buffer be taRecord.[[Object]].[[ViewedArrayBuffer]].
+    const buffer = ta.object.fields.viewed_array_buffer;
+
+    // 3. If IsSharedArrayBuffer(buffer) is false, throw a TypeError exception.
+    if (buffer != .shared_array_buffer) {
+        return agent.throwException(
+            .type_error,
+            "TypedArray must be backed by a SharedArrayBuffer",
+            .{},
+        );
+    }
+
+    // 4. Let i be ? ValidateAtomicAccess(taRecord, index).
+    const i = try validateAtomicAccess(agent, ta, index);
+
+    const typed_array = typed_array_value.object.as(builtins.TypedArray);
+
+    // 5. Let arrayTypeName be typedArray.[[TypedArrayName]].
+    const array_type_name = typed_array.fields.typed_array_name;
+
+    // 6. If arrayTypeName is "BigInt64Array", let v be ? ToBigInt64(value).
+    // 7. Else, let v be ? ToInt32(value).
+    const v = if (std.mem.eql(u8, array_type_name, "BigInt64Array"))
+        Value.from(try BigInt.from(agent.gc_allocator, try value.toBigInt64(agent)))
+    else
+        Value.from(try value.toInt32(agent));
+
+    // 8. Let q be ? ToNumber(timeout).
+    const q = try timeout.toNumber(agent);
+
+    // 9. If q is either NaN or +∞𝔽, let t be +∞; else if q is -∞𝔽, let t be 0; else let t be max(ℝ(q), 0).
+    const t = if (q.isNan() or q.isPositiveInf())
+        std.math.inf(f64)
+    else if (q.isNegativeInf())
+        0
+    else
+        @max(q.asFloat(), 0);
+
+    // 10. If mode is sync and AgentCanSuspend() is false, throw a TypeError exception.
+
+    // 11. Let block be buffer.[[ArrayBufferData]].
+    const block = &buffer.shared_array_buffer.fields.array_buffer_data;
+
+    // 12. Let offset be typedArray.[[ByteOffset]].
+    const offset = typed_array.fields.byte_offset;
+
+    // 13. Let byteIndexInBuffer be (i × 4) + offset.
+    const byte_index_in_buffer = (i * 4) + offset;
+
+    // TODO: 14. Let WL be GetWaiterList(block, byteIndexInBuffer).
+    _ = block;
+
+    var promise_capability: PromiseCapability = undefined;
+    var result_object: Object = undefined;
+
+    // 15. If mode is sync, then
+    if (mode == .sync) {
+        // a. Let promiseCapability be blocking.
+        // b. Let resultObject be undefined.
+    }
+    // 16. Else,
+    else {
+        // a. Let promiseCapability be ! NewPromiseCapability(%Promise%).
+        promise_capability = newPromiseCapability(
+            agent,
+            Value.from(try realm.intrinsics.@"%Promise%"()),
+        ) catch |err| try noexcept(err);
+
+        // b. Let resultObject be OrdinaryObjectCreate(%Object.prototype%).
+        result_object = try ordinaryObjectCreate(
+            agent,
+            try realm.intrinsics.@"%Object.prototype%"(),
+        );
+    }
+
+    // TODO: 17. Perform EnterCriticalSection(WL).
+
+    // 18. Let elementType be TypedArrayElementType(typedArray).
+    const w = inline for (builtins.typed_array_element_types) |entry| {
+        const name, const @"type" = entry;
+        if (!@"type".isUnclampedIntegerElementType()) continue;
+        if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
+            // 19. Let w be GetValueFromBuffer(buffer, byteIndexInBuffer, elementType, true, seq-cst).
+            const w = getValueFromBuffer(
+                agent,
+                buffer,
+                byte_index_in_buffer,
+                @"type",
+                true,
+                .seq_cst,
+                null,
+            );
+            break if (@"type".isBigIntElementType())
+                Value.from(try BigInt.from(agent.gc_allocator, w))
+            else
+                Value.from(w);
+        }
+    } else unreachable;
+
+    // 20. If v ≠ w, then
+    if (!sameValue(v, w)) {
+        // TODO: a. Perform LeaveCriticalSection(WL).
+
+        // b. If mode is sync, return "not-equal".
+        if (mode == .sync) return Value.from("not-equal");
+
+        // c. Perform ! CreateDataPropertyOrThrow(resultObject, "async", false).
+        result_object.createDataPropertyOrThrow(
+            PropertyKey.from("async"),
+            Value.from(false),
+        ) catch |err| try noexcept(err);
+
+        // d. Perform ! CreateDataPropertyOrThrow(resultObject, "value", "not-equal").
+        result_object.createDataPropertyOrThrow(
+            PropertyKey.from("value"),
+            Value.from("not-equal"),
+        ) catch |err| try noexcept(err);
+
+        // e. Return resultObject.
+        return Value.from(result_object);
+    }
+
+    // 21. If t = 0 and mode is async, then
+    if (t == 0 and mode == .@"async") {
+        // a. NOTE: There is no special handling of synchronous immediate timeouts. Asynchronous
+        //    immediate timeouts have special handling in order to fail fast and avoid unnecessary
+        //    Promise jobs.
+
+        // TODO: b. Perform LeaveCriticalSection(WL).
+
+        // c. Perform ! CreateDataPropertyOrThrow(resultObject, "async", false).
+        result_object.createDataPropertyOrThrow(
+            PropertyKey.from("async"),
+            Value.from(false),
+        ) catch |err| try noexcept(err);
+
+        // d. Perform ! CreateDataPropertyOrThrow(resultObject, "value", "timed-out").
+        result_object.createDataPropertyOrThrow(
+            PropertyKey.from("value"),
+            Value.from("timed-out"),
+        ) catch |err| try noexcept(err);
+
+        // e. Return resultObject.
+        return Value.from(result_object);
+    }
+
+    // TODO: 22-31.
+    const waiter = .{ .result = "timed-out" };
+
+    // 32. If mode is sync, return waiterRecord.[[Result]].
+    if (mode == .sync) return Value.from(waiter.result);
+
+    // 33. Perform ! CreateDataPropertyOrThrow(resultObject, "async", true).
+    result_object.createDataPropertyOrThrow(
+        PropertyKey.from("async"),
+        Value.from(true),
+    ) catch |err| try noexcept(err);
+
+    // 34. Perform ! CreateDataPropertyOrThrow(resultObject, "value", promiseCapability.[[Promise]]).
+    result_object.createDataPropertyOrThrow(
+        PropertyKey.from("value"),
+        Value.from(promise_capability.promise),
+    ) catch |err| try noexcept(err);
+
+    // 35. Return resultObject.
+    return Value.from(result_object);
+}
+
 /// 25.4.3.17 AtomicReadModifyWrite ( typedArray, index, value, op )
 /// https://tc39.es/ecma262/#sec-atomicreadmodifywrite
 fn atomicReadModifyWrite(
@@ -236,6 +425,8 @@ pub const Atomics = struct {
         try defineBuiltinFunction(object, "or", @"or", 3, realm);
         try defineBuiltinFunction(object, "store", store, 3, realm);
         try defineBuiltinFunction(object, "sub", sub, 3, realm);
+        try defineBuiltinFunction(object, "wait", wait, 4, realm);
+        try defineBuiltinFunction(object, "waitAsync", waitAsync, 4, realm);
         try defineBuiltinFunction(object, "xor", xor, 3, realm);
 
         // 25.4.17 Atomics [ @@toStringTag ]
@@ -444,6 +635,30 @@ pub const Atomics = struct {
         //     a-g.
         // 4. Return ? AtomicReadModifyWrite(typedArray, index, value, subtract).
         return atomicReadModifyWrite(agent, typed_array, index, value, .Sub);
+    }
+
+    /// 25.4.13 Atomics.wait ( typedArray, index, value, timeout )
+    /// https://tc39.es/ecma262/#sec-atomics.wait
+    fn wait(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const typed_array = arguments.get(0);
+        const index = arguments.get(1);
+        const value = arguments.get(2);
+        const timeout = arguments.get(3);
+
+        // 1. Return ? DoWait(sync, typedArray, index, value, timeout).
+        return doWait(agent, .sync, typed_array, index, value, timeout);
+    }
+
+    /// 25.4.14 Atomics.waitAsync ( typedArray, index, value, timeout )
+    /// https://tc39.es/ecma262/#sec-atomics.waitasync
+    fn waitAsync(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+        const typed_array = arguments.get(0);
+        const index = arguments.get(1);
+        const value = arguments.get(2);
+        const timeout = arguments.get(3);
+
+        // 1. Return ? DoWait(async, typedArray, index, value, timeout).
+        return doWait(agent, .@"async", typed_array, index, value, timeout);
     }
 
     /// 25.4.16 Atomics.xor ( typedArray, index, value )
