@@ -62,7 +62,7 @@ pub const AsyncFunctionConstructor = struct {
     /// 27.7.1.1 AsyncFunction ( ...parameterArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-async-function-constructor-arguments
     fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
-        const parameter_args = Arguments.from(arguments.values[0..arguments.count() -| 1]);
+        const parameter_args = arguments.values[0..arguments.count() -| 1];
         const maybe_body_arg = arguments.getOrNull(arguments.count() -| 1);
 
         // 1. Let C be the active function object.

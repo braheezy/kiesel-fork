@@ -82,7 +82,7 @@ pub const FunctionConstructor = struct {
     /// 20.2.1.1 Function ( ...parameterArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-function-p1-p2-pn-body
     fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
-        const parameter_args = Arguments.from(arguments.values[0..arguments.count() -| 1]);
+        const parameter_args = arguments.values[0..arguments.count() -| 1];
         const maybe_body_arg = arguments.getOrNull(arguments.count() -| 1);
 
         // 1. Let C be the active function object.
@@ -115,7 +115,7 @@ pub fn createDynamicFunction(
         @"async",
         async_generator,
     },
-    parameter_args: Arguments,
+    parameter_args: []const Value,
     body_arg: Value,
 ) Agent.Error!Object {
     const realm = agent.currentRealm();
@@ -259,17 +259,17 @@ pub fn createDynamicFunction(
     }
 
     // 6. Let argCount be the number of elements in parameterArgs.
-    const arg_count = parameter_args.count();
+    const arg_count = parameter_args.len;
 
     // 7. Let parameterStrings be a new empty List.
     var parameter_strings = try std.ArrayList(String).initCapacity(
         agent.gc_allocator,
-        parameter_args.count(),
+        parameter_args.len,
     );
     defer parameter_strings.deinit();
 
     // 8. For each element arg of parameterArgs, do
-    for (parameter_args.values) |arg| {
+    for (parameter_args) |arg| {
         // a. Append ? ToString(arg) to parameterStrings.
         parameter_strings.appendAssumeCapacity(try arg.toString(agent));
     }
