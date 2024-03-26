@@ -3,19 +3,18 @@
 
 const std = @import("std");
 
-const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const Value = types.Value;
 
 /// 10.4.1.1 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-bound-function-exotic-objects-call-thisargument-argumentslist
-fn call(object: Object, _: Value, arguments_list: ArgumentsList) Agent.Error!Value {
+fn call(object: Object, _: Value, arguments_list: Arguments) Agent.Error!Value {
     const agent = object.agent();
     const function = object.as(BoundFunction);
 
@@ -44,7 +43,7 @@ fn call(object: Object, _: Value, arguments_list: ArgumentsList) Agent.Error!Val
 /// https://tc39.es/ecma262/#sec-bound-function-exotic-objects-construct-argumentslist-newtarget
 fn construct(
     object: Object,
-    arguments_list: ArgumentsList,
+    arguments_list: Arguments,
     new_target: Object,
 ) Agent.Error!Object {
     const agent = object.agent();

@@ -11,7 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -926,7 +926,7 @@ fn ownPropertyKeys(object: Object) Agent.Error!std.ArrayList(PropertyKey) {
 
 /// 10.5.12 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-call-thisargument-argumentslist
-fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) Agent.Error!Value {
+fn call(object: Object, this_argument: Value, arguments_list: Arguments) Agent.Error!Value {
     const agent = object.agent();
     const proxy = object.as(Proxy);
 
@@ -961,11 +961,7 @@ fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) Age
 
 /// 10.5.13 [[Construct]] ( argumentsList, newTarget )
 /// https://tc39.es/ecma262/#sec-proxy-object-internal-methods-and-internal-slots-construct-argumentslist-newtarget
-fn construct(
-    object: Object,
-    arguments_list: ArgumentsList,
-    new_target: Object,
-) Agent.Error!Object {
+fn construct(object: Object, arguments_list: Arguments, new_target: Object) Agent.Error!Object {
     const agent = object.agent();
     const proxy = object.as(Proxy);
 
@@ -1104,7 +1100,7 @@ pub const ProxyConstructor = struct {
 
     /// 28.2.1.1 Proxy ( target, handler )
     /// https://tc39.es/ecma262/#sec-proxy-target-handler
-    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const target = arguments.get(0);
         const handler = arguments.get(1);
 
@@ -1119,7 +1115,7 @@ pub const ProxyConstructor = struct {
 
     /// 28.2.2.1 Proxy.revocable ( target, handler )
     /// https://tc39.es/ecma262/#sec-proxy.revocable
-    fn revocable(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn revocable(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const target = arguments.get(0);
         const handler = arguments.get(1);
@@ -1134,7 +1130,7 @@ pub const ProxyConstructor = struct {
         // 2. Let revokerClosure be a new Abstract Closure with no parameters that captures nothing
         //    and performs the following steps when called:
         const revoker_closure = struct {
-            fn func(agent_: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
+            fn func(agent_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
                 // a. Let F be the active function object.
                 const function = agent_.activeFunctionObject();
 

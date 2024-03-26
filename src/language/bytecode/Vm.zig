@@ -13,7 +13,7 @@ const types = @import("../../types.zig");
 const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const BigInt = types.BigInt;
 const ClassConstructorFields = builtins.ClassConstructorFields;
 const ClassFieldDefinition = types.ClassFieldDefinition;
@@ -1593,14 +1593,10 @@ fn classDefinitionEvaluation(
         // a. Let defaultConstructor be a new Abstract Closure with no parameters that captures
         //    nothing and performs the following steps when called:
         const default_constructor = struct {
-            fn func(
-                agent_: *Agent,
-                arguments_list: ArgumentsList,
-                new_target: ?Object,
-            ) Agent.Error!Value {
+            fn func(agent_: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
                 // i. Let args be the List of arguments that was passed to this function by [[Call]]
                 //    or [[Construct]].
-                const args = arguments_list.values;
+                const args = arguments.values;
 
                 // ii. If NewTarget is undefined, throw a TypeError exception.
                 if (new_target == null) {

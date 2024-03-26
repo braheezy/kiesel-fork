@@ -11,7 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const ArrayBufferLike = @import("array_buffer.zig").ArrayBufferLike;
 const DataBlock = types.DataBlock;
 const MakeObject = types.MakeObject;
@@ -135,7 +135,7 @@ pub const SharedArrayBufferConstructor = struct {
 
     /// 25.2.3.1 SharedArrayBuffer ( length [ , options ] )
     /// https://tc39.es/ecma262/#sec-sharedarraybuffer-length
-    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const length = arguments.get(0);
         const options = arguments.get(1);
 
@@ -167,7 +167,7 @@ pub const SharedArrayBufferConstructor = struct {
 
     /// 25.2.4.2 get SharedArrayBuffer [ @@species ]
     /// https://tc39.es/ecma262/#sec-sharedarraybuffer-@@species
-    fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn @"@@species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -201,7 +201,7 @@ pub const SharedArrayBufferPrototype = struct {
 
     /// 25.2.5.1 get SharedArrayBuffer.prototype.byteLength
     /// https://tc39.es/ecma262/#sec-get-sharedarraybuffer.prototype.bytelength
-    fn byteLength(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn byteLength(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
         // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
@@ -219,7 +219,7 @@ pub const SharedArrayBufferPrototype = struct {
 
     /// 25.2.5.3 SharedArrayBuffer.prototype.grow ( newLength )
     /// https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype.grow
-    fn grow(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn grow(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const new_length = arguments.get(0);
 
         // 1. Let O be the this value.
@@ -293,7 +293,7 @@ pub const SharedArrayBufferPrototype = struct {
 
     /// 25.2.5.4 get SharedArrayBuffer.prototype.growable
     /// https://tc39.es/ecma262/#sec-get-sharedarraybuffer.prototype.growable
-    fn growable(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn growable(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
         // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
@@ -305,7 +305,7 @@ pub const SharedArrayBufferPrototype = struct {
 
     /// 25.2.5.5 get SharedArrayBuffer.prototype.maxByteLength
     /// https://tc39.es/ecma262/#sec-get-sharedarraybuffer.prototype.maxbytelength
-    fn maxByteLength(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn maxByteLength(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
         // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
@@ -330,7 +330,7 @@ pub const SharedArrayBufferPrototype = struct {
 
     /// 25.2.5.6 SharedArrayBuffer.prototype.slice ( start, end )
     /// https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype.slice
-    fn slice(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn slice(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const start = arguments.get(0);
         const end = arguments.get(1);

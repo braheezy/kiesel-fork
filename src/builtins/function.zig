@@ -13,7 +13,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const BuiltinFunction = builtins.BuiltinFunction;
 const ClassConstructorFields = builtins.ClassConstructorFields;
 const Diagnostics = language.Diagnostics;
@@ -81,8 +81,8 @@ pub const FunctionConstructor = struct {
 
     /// 20.2.1.1 Function ( ...parameterArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-function-p1-p2-pn-body
-    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
-        const parameter_args = ArgumentsList.from(arguments.values[0..arguments.count() -| 1]);
+    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+        const parameter_args = Arguments.from(arguments.values[0..arguments.count() -| 1]);
         const maybe_body_arg = arguments.getOrNull(arguments.count() -| 1);
 
         // 1. Let C be the active function object.
@@ -115,7 +115,7 @@ pub fn createDynamicFunction(
         @"async",
         async_generator,
     },
-    parameter_args: ArgumentsList,
+    parameter_args: Arguments,
     body_arg: Value,
 ) Agent.Error!Object {
     const realm = agent.currentRealm();
@@ -494,13 +494,13 @@ pub const FunctionPrototype = struct {
         });
     }
 
-    fn behaviour(_: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
+    fn behaviour(_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         return .undefined;
     }
 
     /// 20.2.3.1 Function.prototype.apply ( thisArg, argArray )
     /// https://tc39.es/ecma262/#sec-function.prototype.apply
-    fn apply(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn apply(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const this_arg = arguments.get(0);
         const arg_array = arguments.get(1);
 
@@ -531,7 +531,7 @@ pub const FunctionPrototype = struct {
 
     /// 20.2.3.2 Function.prototype.bind ( thisArg, ...args )
     /// https://tc39.es/ecma262/#sec-function.prototype.bind
-    fn bind(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn bind(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const this_arg = arguments.get(0);
         const args = if (arguments.count() <= 1) &[_]Value{} else arguments.values[1..];
 
@@ -604,7 +604,7 @@ pub const FunctionPrototype = struct {
 
     /// 20.2.3.3 Function.prototype.call ( thisArg, ...args )
     /// https://tc39.es/ecma262/#sec-function.prototype.call
-    fn call(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn call(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const this_arg = arguments.get(0);
         const args = if (arguments.count() <= 1) &[_]Value{} else arguments.values[1..];
 
@@ -624,7 +624,7 @@ pub const FunctionPrototype = struct {
 
     /// 20.2.3.5 Function.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-function.prototype.tostring
-    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let func be the this value.
         const func = this_value;
 
@@ -671,7 +671,7 @@ pub const FunctionPrototype = struct {
 
     /// 20.2.3.6 Function.prototype [ @@hasInstance ] ( V )
     /// https://tc39.es/ecma262/#sec-function.prototype-@@hasinstance
-    fn @"@@hasInstance"(_: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn @"@@hasInstance"(_: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
 
         // 1. Let F be the this value.

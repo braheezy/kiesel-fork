@@ -11,7 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -144,7 +144,7 @@ pub const NumberConstructor = struct {
 
     /// 21.1.1.1 Number ( value )
     /// https://tc39.es/ecma262/#sec-number-constructor-number-value
-    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const value = arguments.get(0);
 
         const n = blk: {
@@ -189,7 +189,7 @@ pub const NumberConstructor = struct {
 
     /// 21.1.2.2 Number.isFinite ( number )
     /// https://tc39.es/ecma262/#sec-number.isfinite
-    fn isFinite(_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn isFinite(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const number = arguments.get(0);
 
         // 1. If number is not a Number, return false.
@@ -204,7 +204,7 @@ pub const NumberConstructor = struct {
 
     /// 21.1.2.3 Number.isInteger ( number )
     /// https://tc39.es/ecma262/#sec-number.isinteger
-    fn isInteger(_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn isInteger(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const number = arguments.get(0);
 
         // 1. Return IsIntegralNumber(number).
@@ -213,7 +213,7 @@ pub const NumberConstructor = struct {
 
     /// 21.1.2.4 Number.isNaN ( number )
     /// https://tc39.es/ecma262/#sec-number.isnan
-    fn isNaN(_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn isNaN(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const number = arguments.get(0);
 
         // 1. If number is not a Number, return false.
@@ -228,7 +228,7 @@ pub const NumberConstructor = struct {
 
     /// 21.1.2.5 Number.isSafeInteger ( number )
     /// https://tc39.es/ecma262/#sec-number.issafeinteger
-    fn isSafeInteger(_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn isSafeInteger(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const number = arguments.get(0);
 
         // 1. If IsIntegralNumber(number) is true, then
@@ -292,14 +292,14 @@ pub const NumberPrototype = struct {
 
     /// 21.1.3.4 Number.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
     /// https://tc39.es/ecma262/#sec-number.prototype.tolocalestring
-    fn toLocaleString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const x = try thisNumberValue(agent, this_value);
         return Value.from(try x.toString(agent.gc_allocator, 10));
     }
 
     /// 21.1.3.6 Number.prototype.toString ( [ radix ] )
     /// https://tc39.es/ecma262/#sec-number.prototype.tostring
-    fn toString(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn toString(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const radix = arguments.get(0);
 
         // 1. Let x be ? ThisNumberValue(this value).
@@ -320,7 +320,7 @@ pub const NumberPrototype = struct {
 
     /// 21.1.3.7 Number.prototype.valueOf ( )
     /// https://tc39.es/ecma262/#sec-number.prototype.valueof
-    fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn valueOf(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return ? ThisNumberValue(this value).
         return Value.from(try thisNumberValue(agent, this_value));
     }

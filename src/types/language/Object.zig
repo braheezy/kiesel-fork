@@ -13,7 +13,7 @@ const types = @import("../../types.zig");
 const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const ClassConstructorFields = builtins.ClassConstructorFields;
 const ClassFieldDefinition = types.ClassFieldDefinition;
 const PreferredType = Value.PreferredType;
@@ -345,7 +345,7 @@ pub fn construct(
     // NOTE: This is done via the NoArgs variant of the function.
 
     // 3. Return ? F.[[Construct]](argumentsList, newTarget).
-    return self.internalMethods().construct.?(self, ArgumentsList.from(arguments_list), new_target_);
+    return self.internalMethods().construct.?(self, Arguments.from(arguments_list), new_target_);
 }
 
 pub inline fn constructNoArgs(self: Self) Agent.Error!Self {

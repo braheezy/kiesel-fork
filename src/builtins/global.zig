@@ -12,7 +12,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
@@ -289,7 +289,7 @@ pub const global_functions = struct {
 
 /// 19.2.1 eval ( x )
 /// https://tc39.es/ecma262/#sec-eval-x
-fn eval(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+fn eval(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const x = arguments.get(0);
 
     // 1. Return ? PerformEval(x, false, false).
@@ -298,7 +298,7 @@ fn eval(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
 
 /// 19.2.2 isFinite ( number )
 /// https://tc39.es/ecma262/#sec-isfinite-number
-fn isFinite(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+fn isFinite(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const number = arguments.get(0);
 
     // 1. Let num be ? ToNumber(number).
@@ -311,7 +311,7 @@ fn isFinite(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value
 
 /// 19.2.3 isNaN ( number )
 /// https://tc39.es/ecma262/#sec-isnan-number
-fn isNaN(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+fn isNaN(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const number = arguments.get(0);
 
     // 1. Let num be ? ToNumber(number).
@@ -324,7 +324,7 @@ fn isNaN(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
 
 /// 19.2.4 parseFloat ( string )
 /// https://tc39.es/ecma262/#sec-parsefloat-string
-fn parseFloat(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+fn parseFloat(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const string_value = arguments.get(0);
 
     // 1. Let inputString be ? ToString(string).
@@ -352,7 +352,7 @@ fn parseFloat(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Val
 
 /// 19.2.5 parseInt ( string, radix )
 /// https://tc39.es/ecma262/#sec-parseint-string-radix
-fn parseInt(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+fn parseInt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const string_value = arguments.get(0);
     const radix_value = arguments.get(1);
 
@@ -437,7 +437,7 @@ fn parseInt(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value
 
 /// 19.2.6.1 decodeURI ( encodedURI )
 /// https://tc39.es/ecma262/#sec-decodeuri-encodeduri
-fn decodeURI(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+fn decodeURI(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const encoded_uri = arguments.get(0);
 
     // 1. Let uriString be ? ToString(encodedURI).
@@ -452,7 +452,7 @@ fn decodeURI(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Valu
 
 /// 19.2.6.2 decodeURIComponent ( encodedURIComponent )
 /// https://tc39.es/ecma262/#sec-decodeuricomponent-encodeduricomponent
-fn decodeURIComponent(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+fn decodeURIComponent(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const encoded_uri_component = arguments.get(0);
 
     // 1. Let componentString be ? ToString(encodedURIComponent).
@@ -467,7 +467,7 @@ fn decodeURIComponent(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.E
 
 /// 19.2.6.3 encodeURI ( uri )
 /// https://tc39.es/ecma262/#sec-encodeuri-uri
-fn encodeURI(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+fn encodeURI(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const uri = arguments.get(0);
 
     // 1. Let uriString be ? ToString(uri).
@@ -482,7 +482,7 @@ fn encodeURI(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Valu
 
 /// 19.2.6.4 encodeURIComponent ( uriComponent )
 /// https://tc39.es/ecma262/#sec-encodeuricomponent-uricomponent
-fn encodeURIComponent(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+fn encodeURIComponent(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const uri_component = arguments.get(0);
 
     // 1. Let componentString be ? ToString(uriComponent).
@@ -637,7 +637,7 @@ fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u
 
 /// B.2.1.1 escape ( string )
 /// https://tc39.es/ecma262/#sec-escape-string
-fn escape(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const string_value = arguments.get(0);
 
     // 1. Set string to ? ToString(string).
@@ -704,7 +704,7 @@ fn escape(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
 
 /// B.2.1.2 unescape ( string )
 /// https://tc39.es/ecma262/#sec-unescape-string
-fn unescape(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const string_value = arguments.get(0);
 
     // 1. Set string to ? ToString(string).

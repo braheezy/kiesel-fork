@@ -11,7 +11,7 @@ const types = @import("../../types.zig");
 const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const BigInt = @import("BigInt.zig");
 const Iterator = types.Iterator;
 const Number = @import("number.zig").Number;
@@ -915,7 +915,7 @@ pub const Value = union(enum) {
         return self.object.internalMethods().call.?(
             self.object,
             this_value,
-            ArgumentsList.from(arguments_list),
+            Arguments.from(arguments_list),
         );
     }
 
@@ -927,7 +927,7 @@ pub const Value = union(enum) {
         return self.object.internalMethods().call.?(
             self.object,
             this_value,
-            ArgumentsList.from(arguments_list),
+            Arguments.from(arguments_list),
         );
     }
 

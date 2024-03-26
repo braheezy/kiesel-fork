@@ -11,7 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -62,7 +62,7 @@ pub const ErrorConstructor = struct {
 
     /// 20.5.1.1 Error ( message [ , options ] )
     /// https://tc39.es/ecma262/#sec-error-message
-    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const message = arguments.get(0);
         const options = arguments.get(1);
 
@@ -158,7 +158,7 @@ pub const ErrorPrototype = struct {
 
     /// 20.5.3.4 Error.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-error.prototype.tostring
-    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
         if (this_value != .object) {
@@ -278,11 +278,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
 
         /// 20.5.6.1.1 NativeError ( message [ , options ] )
         /// https://tc39.es/ecma262/#sec-nativeerror
-        fn behaviour(
-            agent: *Agent,
-            arguments: ArgumentsList,
-            new_target: ?Object,
-        ) Agent.Error!Value {
+        fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
             const message = arguments.get(0);
             const options = arguments.get(1);
 
@@ -407,7 +403,7 @@ pub const AggregateErrorConstructor = struct {
 
     /// 20.5.7.1.1 AggregateError ( errors, message [ , options ] )
     /// https://tc39.es/ecma262/#sec-aggregate-error
-    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const errors = arguments.get(0);
         const message = arguments.get(1);
         const options = arguments.get(2);

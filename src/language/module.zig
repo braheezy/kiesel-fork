@@ -9,7 +9,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const Object = types.Object;
 const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
 const Realm = execution.Realm;
@@ -157,7 +157,7 @@ fn continueDynamicImport(
     // 3. Let rejectedClosure be a new Abstract Closure with parameters (reason) that captures
     //    promiseCapability and performs the following steps when called:
     const rejected_closure = struct {
-        fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) Agent.Error!Value {
+        fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
             const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*RejectedClosureCaptures);
             const promise_capability_ = captures_.promise_capability;
@@ -196,7 +196,7 @@ fn continueDynamicImport(
     // 6. Let linkAndEvaluateClosure be a new Abstract Closure with no parameters that captures
     //    module, promiseCapability, and onRejected and performs the following steps when called:
     const link_and_evaluate_closure = struct {
-        fn func(agent_: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
+        fn func(agent_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
             const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*LinkAndEvaluateClosureCaptures);
             const promise_capability_ = captures_.promise_capability;
@@ -239,7 +239,7 @@ fn continueDynamicImport(
 
             // d. Let fulfilledClosure be a new Abstract Closure with no parameters that captures module and promiseCapability and performs the following steps when called:
             const fulfilled_closure = struct {
-                fn func(agent__: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
+                fn func(agent__: *Agent, _: Value, _: Arguments) Agent.Error!Value {
                     const function_ = agent__.activeFunctionObject();
                     const captures__ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*FulfilledClosureCaptures);
                     const promise_capability__ = captures__.promise_capability;

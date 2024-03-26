@@ -11,7 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const Completion = types.Completion;
 const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
@@ -58,7 +58,7 @@ pub const GeneratorPrototype = struct {
 
     /// 27.5.1.2 %GeneratorPrototype%.next ( value )
     /// https://tc39.es/ecma262/#sec-generator.prototype.next
-    fn next(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn next(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
 
         // 1. Return ? GeneratorResume(this value, value, empty).
@@ -67,7 +67,7 @@ pub const GeneratorPrototype = struct {
 
     /// 27.5.1.3 %GeneratorPrototype%.return ( value )
     /// https://tc39.es/ecma262/#sec-generator.prototype.return
-    fn @"return"(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn @"return"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
 
         // 1. Let g be the this value.
@@ -82,7 +82,7 @@ pub const GeneratorPrototype = struct {
 
     /// 27.5.1.4 %GeneratorPrototype%.throw ( exception )
     /// https://tc39.es/ecma262/#sec-generator.prototype.return
-    fn throw(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn throw(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const exception = arguments.get(0);
 
         // 1. Let g be the this value.

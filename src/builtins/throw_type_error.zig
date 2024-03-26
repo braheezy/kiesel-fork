@@ -11,7 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
@@ -53,7 +53,7 @@ pub const ThrowTypeError = struct {
         return object;
     }
 
-    fn behaviour(agent: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
+    fn behaviour(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         // 1. Throw a TypeError exception.
         return agent.throwException(.type_error, "Forbidden property access", .{});
     }

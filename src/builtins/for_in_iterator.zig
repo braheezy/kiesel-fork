@@ -11,7 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
@@ -65,7 +65,7 @@ pub const ForInIteratorPrototype = struct {
 
     /// 14.7.5.10.2.1 %ForInIteratorPrototype%.next ( )
     /// https://tc39.es/ecma262/#sec-%foriniteratorprototype%.next
-    fn next(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Assert: O is an Object.
         // 3. Assert: O has all of the internal slots of a For-In Iterator Instance (14.7.5.10.3).

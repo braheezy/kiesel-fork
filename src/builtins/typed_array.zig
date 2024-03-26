@@ -12,7 +12,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const ArrayBufferLike = @import("array_buffer.zig").ArrayBufferLike;
 const BigInt = types.BigInt;
 const MakeObject = types.MakeObject;
@@ -651,7 +651,7 @@ pub const TypedArrayConstructor = struct {
 
     /// 23.2.1.1 %TypedArray% ( )
     /// https://tc39.es/ecma262/#sec-%typedarray%
-    fn behaviour(agent: *Agent, _: ArgumentsList, _: ?Object) Agent.Error!Value {
+    fn behaviour(agent: *Agent, _: Arguments, _: ?Object) Agent.Error!Value {
         // 1. Throw a TypeError exception.
         return agent.throwException(
             .type_error,
@@ -662,7 +662,7 @@ pub const TypedArrayConstructor = struct {
 
     /// 23.2.2.1 %TypedArray%.from ( source [ , mapfn [ , thisArg ] ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.from
-    fn from(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn from(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const source = arguments.get(0);
         const map_fn = arguments.get(1);
         const this_arg = arguments.get(2);
@@ -802,7 +802,7 @@ pub const TypedArrayConstructor = struct {
 
     /// 23.2.2.2 %TypedArray%.of ( ...items )
     /// https://tc39.es/ecma262/#sec-%typedarray%.of
-    fn of(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn of(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let len be the number of elements in items.
         const len = arguments.count();
 
@@ -841,7 +841,7 @@ pub const TypedArrayConstructor = struct {
 
     /// 23.2.2.4 get %TypedArray% [ @@species ]
     /// https://tc39.es/ecma262/#sec-get-%typedarray%-@@species
-    fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn @"@@species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -905,7 +905,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.1 %TypedArray%.prototype.at ( index )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.at
-    fn at(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn at(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const index = arguments.get(0);
 
         // 1. Let O be the this value.
@@ -938,7 +938,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.2 get %TypedArray%.prototype.buffer
     /// https://tc39.es/ecma262/#sec-get-%typedarray%.prototype.buffer
-    fn buffer(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn buffer(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[TypedArrayName]]).
         // 3. Assert: O has a [[ViewedArrayBuffer]] internal slot.
@@ -953,7 +953,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.3 get %TypedArray%.prototype.byteLength
     /// https://tc39.es/ecma262/#sec-get-%typedarray%.prototype.bytelength
-    fn byteLength(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn byteLength(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[TypedArrayName]]).
         // 3. Assert: O has a [[ViewedArrayBuffer]] internal slot.
@@ -971,7 +971,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.4 get %TypedArray%.prototype.byteOffset
     /// https://tc39.es/ecma262/#sec-get-%typedarray%.prototype.byteoffset
-    fn byteOffset(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn byteOffset(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[TypedArrayName]]).
         // 3. Assert: O has a [[ViewedArrayBuffer]] internal slot.
@@ -992,7 +992,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.6 %TypedArray%.prototype.copyWithin ( target, start [ , end ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.copywithin
-    fn copyWithin(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn copyWithin(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const target = arguments.get(0);
         const start = arguments.get(1);
         const end = arguments.get(2);
@@ -1172,7 +1172,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.7 %TypedArray%.prototype.entries ( )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.entries
-    fn entries(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn entries(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? ValidateTypedArray(O, seq-cst).
         const object = @constCast(
@@ -1185,7 +1185,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.8 %TypedArray%.prototype.every ( callbackfn [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.every
-    fn every(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn every(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback_fn = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -1231,7 +1231,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.9 %TypedArray%.prototype.fill ( value [ , start [ , end ] ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.fill
-    fn fill(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn fill(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         var value = arguments.get(0);
         const start = arguments.get(1);
         const end = arguments.get(2);
@@ -1325,7 +1325,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.10 %TypedArray%.prototype.filter ( callbackfn [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.filter
-    fn filter(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn filter(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback_fn = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -1404,7 +1404,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.11 %TypedArray%.prototype.find ( predicate [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.find
-    fn find(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn find(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const predicate = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -1425,7 +1425,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.12 %TypedArray%.prototype.findIndex ( predicate [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.findindex
-    fn findIndex(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn findIndex(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const predicate = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -1446,7 +1446,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.13 %TypedArray%.prototype.findLast ( predicate [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.findlast
-    fn findLast(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn findLast(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const predicate = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -1467,7 +1467,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.14 %TypedArray%.prototype.findLastIndex ( predicate [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.findlastindex
-    fn findLastIndex(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn findLastIndex(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const predicate = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -1488,7 +1488,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.15 %TypedArray%.prototype.forEach ( callbackfn [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.foreach
-    fn forEach(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn forEach(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback_fn = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -1531,7 +1531,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.16 %TypedArray%.prototype.includes ( searchElement [ , fromIndex ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.includes
-    fn includes(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn includes(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const search_element = arguments.get(0);
         const from_index = arguments.get(1);
 
@@ -1584,7 +1584,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.17 %TypedArray%.prototype.indexOf ( searchElement [ , fromIndex ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.indexof
-    fn indexOf(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn indexOf(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const search_element = arguments.get(0);
         const from_index = arguments.get(1);
 
@@ -1643,7 +1643,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.18 %TypedArray%.prototype.join ( separator )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.join
-    fn join(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn join(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const separator = arguments.get(0);
 
         // 1. Let O be the this value.
@@ -1695,7 +1695,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.19 %TypedArray%.prototype.keys ( )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.keys
-    fn keys(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn keys(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? ValidateTypedArray(O, seq-cst).
         const object = @constCast(
@@ -1708,7 +1708,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.20 %TypedArray%.prototype.lastIndexOf ( searchElement [ , fromIndex ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.lastindexof
-    fn lastIndexOf(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn lastIndexOf(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const search_element = arguments.get(0);
         const from_index = arguments.get(1);
 
@@ -1767,7 +1767,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.21 get %TypedArray%.prototype.length
     /// https://tc39.es/ecma262/#sec-get-%typedarray%.prototype.length
-    fn length(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn length(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? RequireInternalSlot(O, [[TypedArrayName]]).
         // 3. Assert: O has [[ViewedArrayBuffer]] and [[ArrayLength]] internal slots.
@@ -1788,7 +1788,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.22 %TypedArray%.prototype.map ( callbackfn [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.map
-    fn map(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn map(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback_fn = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -1841,7 +1841,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.23 %TypedArray%.prototype.reduce ( callbackfn [ , initialValue ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.reduce
-    fn reduce(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn reduce(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback_fn = arguments.get(0);
         const initial_value = arguments.getOrNull(1);
 
@@ -1913,7 +1913,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.24 %TypedArray%.prototype.reduceRight ( callbackfn [ , initialValue ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.reduceright
-    fn reduceRight(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn reduceRight(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback_fn = arguments.get(0);
         const initial_value = arguments.getOrNull(1);
 
@@ -1985,7 +1985,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.25 %TypedArray%.prototype.reverse ( )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.reverse
-    fn reverse(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn reverse(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
@@ -2033,7 +2033,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.26 %TypedArray%.prototype.set ( source [ , offset ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.set
-    fn set_(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn set_(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const source = arguments.get(0);
         const offset = arguments.get(1);
 
@@ -2346,7 +2346,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.27 %TypedArray%.prototype.slice ( start, end )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.slice
-    fn slice(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn slice(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const start = arguments.get(0);
         const end = arguments.get(1);
 
@@ -2530,7 +2530,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.28 %TypedArray%.prototype.some ( callbackfn [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.some
-    fn some(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn some(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback_fn = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -2576,7 +2576,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.29 %TypedArray%.prototype.sort ( comparefn )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.sort
-    fn sort(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn sort(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const compare_fn = arguments.get(0);
 
         // 1. If comparefn is not undefined and IsCallable(comparefn) is false, throw a TypeError
@@ -2637,7 +2637,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.30 %TypedArray%.prototype.subarray ( start, end )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.subarray
-    fn subarray(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn subarray(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const start = arguments.get(0);
         const end = arguments.get(1);
 
@@ -2733,7 +2733,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.31 %TypedArray%.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.tolocalestring
-    fn toLocaleString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let array be ? ToObject(this value).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
         const array = this_value.object;
@@ -2782,7 +2782,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.32 %TypedArray%.prototype.toReversed ( )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.toreversed
-    fn toReversed(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toReversed(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
@@ -2824,7 +2824,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.33 %TypedArray%.prototype.toSorted ( comparefn )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.tosorted
-    fn toSorted(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn toSorted(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const compare_fn = arguments.get(0);
 
         // 1. If comparefn is not undefined and IsCallable(comparefn) is false, throw a TypeError
@@ -2893,7 +2893,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.35 %TypedArray%.prototype.values ( )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.values
-    fn values(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn values(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? ValidateTypedArray(O, seq-cst).
         const object = @constCast(
@@ -2906,7 +2906,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.36 %TypedArray%.prototype.with ( index, value )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.with
-    fn with(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn with(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const index = arguments.get(0);
         const value = arguments.get(1);
 
@@ -2979,7 +2979,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.38 get %TypedArray%.prototype [ @@toStringTag ]
     /// https://tc39.es/ecma262/#sec-get-%typedarray%.prototype-@@tostringtag
-    fn @"@@toStringTag"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn @"@@toStringTag"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. If O is not an Object, return undefined.
         const object_ = switch (this_value) {
@@ -3738,7 +3738,7 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
 
         /// 23.2.5.1 TypedArray ( ...args )
         /// https://tc39.es/ecma262/#sec-typedarray
-        fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
+        fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
             // 1. If NewTarget is undefined, throw a TypeError exception.
             if (new_target == null) {
                 return agent.throwException(

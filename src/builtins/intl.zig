@@ -14,7 +14,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
@@ -62,7 +62,7 @@ pub const Intl = struct {
         return object;
     }
 
-    fn getCanonicalLocales(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn getCanonicalLocales(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const locales = arguments.get(0);
 
         // 1. Let ll be ? CanonicalizeLocaleList(locales).

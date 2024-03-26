@@ -11,7 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const Iterator = types.Iterator;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
@@ -117,7 +117,7 @@ pub const MapConstructor = struct {
 
     /// 24.1.1.1 Map ( [ iterable ] )
     /// https://tc39.es/ecma262/#sec-map-iterable
-    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const iterable = arguments.get(0);
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
@@ -154,7 +154,7 @@ pub const MapConstructor = struct {
 
     /// 24.1.2.1 Map.groupBy ( items, callbackfn )
     /// https://tc39.es/ecma262/#sec-map.groupby
-    fn groupBy(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn groupBy(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const items = arguments.get(0);
         const callback_fn = arguments.get(1);
@@ -182,7 +182,7 @@ pub const MapConstructor = struct {
 
     /// 24.1.2.3 get Map [ @@species ]
     /// https://tc39.es/ecma262/#sec-get-map-@@species
-    fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn @"@@species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -226,7 +226,7 @@ pub const MapPrototype = struct {
 
     /// 24.1.3.1 Map.prototype.clear ( )
     /// https://tc39.es/ecma262/#sec-map.prototype.clear
-    fn clear(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn clear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let M be the this value.
         // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
         const map = try this_value.requireInternalSlot(agent, Map);
@@ -245,7 +245,7 @@ pub const MapPrototype = struct {
 
     /// 24.1.3.3 Map.prototype.delete ( key )
     /// https://tc39.es/ecma262/#sec-map.prototype.delete
-    fn delete(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn delete(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const key = arguments.get(0);
 
         // 1. Let M be the this value.
@@ -271,7 +271,7 @@ pub const MapPrototype = struct {
 
     /// 24.1.3.4 Map.prototype.entries ( )
     /// https://tc39.es/ecma262/#sec-map.prototype.entries
-    fn entries(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn entries(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let M be the this value.
         const map = this_value;
 
@@ -281,7 +281,7 @@ pub const MapPrototype = struct {
 
     /// 24.1.3.5 Map.prototype.forEach ( callbackfn [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-map.prototype.foreach
-    fn forEach(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn forEach(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback_fn = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -333,7 +333,7 @@ pub const MapPrototype = struct {
 
     /// 24.1.3.6 Map.prototype.get ( key )
     /// https://tc39.es/ecma262/#sec-map.prototype.get
-    fn get(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn get(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const key = arguments.get(0);
 
         // 1. Let M be the this value.
@@ -350,7 +350,7 @@ pub const MapPrototype = struct {
 
     /// 24.1.3.7 Map.prototype.has ( key )
     /// https://tc39.es/ecma262/#sec-map.prototype.has
-    fn has(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn has(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const key = arguments.get(0);
 
         // 1. Let M be the this value.
@@ -365,7 +365,7 @@ pub const MapPrototype = struct {
 
     /// 24.1.3.8 Map.prototype.keys ( )
     /// https://tc39.es/ecma262/#sec-map.prototype.keys
-    fn keys(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn keys(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let M be the this value.
         const map = this_value;
 
@@ -375,7 +375,7 @@ pub const MapPrototype = struct {
 
     /// 24.1.3.9 Map.prototype.set ( key, value )
     /// https://tc39.es/ecma262/#sec-map.prototype.set
-    fn set(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn set(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         var key = arguments.get(0);
         const value = arguments.get(1);
 
@@ -407,7 +407,7 @@ pub const MapPrototype = struct {
 
     /// 24.1.3.10 get Map.prototype.size
     /// https://tc39.es/ecma262/#sec-get-map.prototype.size
-    fn size(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn size(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let M be the this value.
         // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
         const map = try this_value.requireInternalSlot(agent, Map);
@@ -423,7 +423,7 @@ pub const MapPrototype = struct {
 
     /// 24.1.3.11 Map.prototype.values ( )
     /// https://tc39.es/ecma262/#sec-map.prototype.values
-    fn values(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn values(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let M be the this value.
         const map = this_value;
 

@@ -11,7 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const Iterator = types.Iterator;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
@@ -64,7 +64,7 @@ pub const SetConstructor = struct {
 
     /// 24.2.1.1 Set ( [ iterable ] )
     /// https://tc39.es/ecma262/#sec-set-iterable
-    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const iterable = arguments.get(0);
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
@@ -114,7 +114,7 @@ pub const SetConstructor = struct {
 
     /// 24.2.2.2 get Set [ @@species ]
     /// https://tc39.es/ecma262/#sec-get-set-@@species
-    fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn @"@@species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -160,7 +160,7 @@ pub const SetPrototype = struct {
 
     /// 24.2.3.1 Set.prototype.add ( value )
     /// https://tc39.es/ecma262/#sec-set.prototype.add
-    fn add(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn add(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         var value = arguments.get(0);
 
         // 1. Let S be the this value.
@@ -189,7 +189,7 @@ pub const SetPrototype = struct {
 
     /// 24.2.3.2 Set.prototype.clear ( )
     /// https://tc39.es/ecma262/#sec-set.prototype.clear
-    fn clear(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn clear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let S be the this value.
         // 2. Perform ? RequireInternalSlot(S, [[SetData]]).
         const set = try this_value.requireInternalSlot(agent, Set);
@@ -208,7 +208,7 @@ pub const SetPrototype = struct {
 
     /// 24.2.3.4 Set.prototype.delete ( value )
     /// https://tc39.es/ecma262/#sec-set.prototype.delete
-    fn delete(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn delete(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
 
         // 1. Let S be the this value.
@@ -233,7 +233,7 @@ pub const SetPrototype = struct {
 
     /// 24.2.3.5 Set.prototype.entries ( )
     /// https://tc39.es/ecma262/#sec-set.prototype.entries
-    fn entries(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn entries(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let M be the this value.
         const map = this_value;
 
@@ -243,7 +243,7 @@ pub const SetPrototype = struct {
 
     /// 24.2.3.6 Set.prototype.forEach ( callbackfn [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-set.prototype.foreach
-    fn forEach(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn forEach(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback_fn = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -291,7 +291,7 @@ pub const SetPrototype = struct {
 
     /// 24.2.3.7 Set.prototype.has ( value )
     /// https://tc39.es/ecma262/#sec-set.prototype.has
-    fn has(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn has(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
 
         // 1. Let S be the this value.
@@ -306,7 +306,7 @@ pub const SetPrototype = struct {
 
     /// 24.2.3.9 get Set.prototype.size
     /// https://tc39.es/ecma262/#sec-get-set.prototype.size
-    fn size(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn size(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let S be the this value.
         // 2. Perform ? RequireInternalSlot(S, [[SetData]]).
         const set = try this_value.requireInternalSlot(agent, Set);
@@ -322,7 +322,7 @@ pub const SetPrototype = struct {
 
     /// 24.2.3.10 Set.prototype.values ( )
     /// https://tc39.es/ecma262/#sec-set.prototype.values
-    fn values(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn values(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let M be the this value.
         const map = this_value;
 

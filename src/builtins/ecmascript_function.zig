@@ -14,7 +14,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const BuiltinFunction = builtins.BuiltinFunction;
 const ClassConstructorFields = builtins.ClassConstructorFields;
 const ClassFieldDefinition = types.ClassFieldDefinition;
@@ -136,7 +136,7 @@ pub const ECMAScriptFunction = MakeObject(.{
 
 /// 10.2.1 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-ecmascript-function-objects-call-thisargument-argumentslist
-fn call(object: Object, this_argument: Value, arguments_list: ArgumentsList) Agent.Error!Value {
+fn call(object: Object, this_argument: Value, arguments_list: Arguments) Agent.Error!Value {
     const agent = object.agent();
 
     const function = object.as(ECMAScriptFunction);
@@ -293,7 +293,7 @@ pub fn ordinaryCallBindThis(
 pub fn ordinaryCallEvaluateBody(
     agent: *Agent,
     function: *ECMAScriptFunction,
-    arguments_list: ArgumentsList,
+    arguments_list: Arguments,
 ) Agent.Error!Completion {
     // 1. Return ? EvaluateBody of F.[[ECMAScriptCode]] with arguments F and argumentsList.
     const function_body = function.fields.ecmascript_code;
@@ -328,7 +328,7 @@ pub fn ordinaryCallEvaluateBody(
 fn evaluateFunctionBody(
     agent: *Agent,
     function: *ECMAScriptFunction,
-    arguments_list: ArgumentsList,
+    arguments_list: Arguments,
 ) Agent.Error!Completion {
     // FunctionBody : FunctionStatementList
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
@@ -343,7 +343,7 @@ fn evaluateFunctionBody(
 fn evaluateGeneratorBody(
     agent: *Agent,
     function: *ECMAScriptFunction,
-    arguments_list: ArgumentsList,
+    arguments_list: Arguments,
 ) Agent.Error!Completion {
     // GeneratorBody : FunctionBody
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
@@ -378,7 +378,7 @@ fn evaluateGeneratorBody(
 fn evaluateAsyncGeneratorBody(
     agent: *Agent,
     function: *ECMAScriptFunction,
-    arguments_list: ArgumentsList,
+    arguments_list: Arguments,
 ) Agent.Error!Completion {
     // AsyncGeneratorBody : FunctionBody
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
@@ -414,7 +414,7 @@ fn evaluateAsyncGeneratorBody(
 fn evaluateAsyncFunctionBody(
     agent: *Agent,
     function: *ECMAScriptFunction,
-    arguments_list: ArgumentsList,
+    arguments_list: Arguments,
 ) Allocator.Error!Completion {
     // AsyncFunctionBody : FunctionBody
     const realm = agent.currentRealm();
@@ -453,7 +453,7 @@ fn evaluateAsyncFunctionBody(
 /// https://tc39.es/ecma262/#sec-ecmascript-function-objects-construct-argumentslist-newtarget
 fn construct(
     object: Object,
-    arguments_list: ArgumentsList,
+    arguments_list: Arguments,
     new_target: Object,
 ) Agent.Error!Object {
     const agent = object.agent();
@@ -917,7 +917,7 @@ pub fn setFunctionLength(function: Object, length: f64) Allocator.Error!void {
 fn functionDeclarationInstantiation(
     agent: *Agent,
     function: *ECMAScriptFunction,
-    arguments_list: ArgumentsList,
+    arguments_list: Arguments,
 ) Agent.Error!void {
     // 1. Let calleeContext be the running execution context.
     var callee_context = agent.runningExecutionContext();

@@ -12,7 +12,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object_ = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -93,7 +93,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.1.1 Object ( [ value ] )
     /// https://tc39.es/ecma262/#sec-object-value
-    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object_) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object_) Agent.Error!Value {
         const realm = agent.currentRealm();
         const value = arguments.get(0);
 
@@ -123,7 +123,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.1 Object.assign ( target, ...sources )
     /// https://tc39.es/ecma262/#sec-object.assign
-    fn assign(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn assign(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const target = arguments.get(0);
         const sources = arguments.values[1..];
 
@@ -167,7 +167,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.2 Object.create ( O, Properties )
     /// https://tc39.es/ecma262/#sec-object.create
-    fn create_(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn create_(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
         const properties = arguments.get(1);
 
@@ -191,7 +191,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.3 Object.defineProperties ( O, Properties )
     /// https://tc39.es/ecma262/#sec-object.defineproperties
-    fn defineProperties(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn defineProperties(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
         const properties = arguments.get(1);
 
@@ -257,7 +257,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.4 Object.defineProperty ( O, P, Attributes )
     /// https://tc39.es/ecma262/#sec-object.defineproperty
-    fn defineProperty(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn defineProperty(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
         const property = arguments.get(1);
         const attributes = arguments.get(2);
@@ -282,7 +282,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.5 Object.entries ( O )
     /// https://tc39.es/ecma262/#sec-object.entries
-    fn entries(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn entries(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
 
         // 1. Let obj be ? ToObject(O).
@@ -298,7 +298,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.6 Object.freeze ( O )
     /// https://tc39.es/ecma262/#sec-object.freeze
-    fn freeze(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn freeze(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return O.
@@ -316,7 +316,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.7 Object.fromEntries ( iterable )
     /// https://tc39.es/ecma262/multipage/fundamental-objects.html#sec-object.fromentries
-    fn fromEntries(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn fromEntries(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const iterable = arguments.get(0);
 
@@ -339,7 +339,7 @@ pub const ObjectConstructor = struct {
         // 4. Let closure be a new Abstract Closure with parameters (key, value) that captures obj
         //    and performs the following steps when called:
         const closure = struct {
-            fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) Agent.Error!Value {
+            fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
                 const function = agent_.activeFunctionObject();
                 const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
                 const object_ = captures_.object;
@@ -370,11 +370,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.8 Object.getOwnPropertyDescriptor ( O, P )
     /// https://tc39.es/ecma262/#sec-object.getownpropertydescriptor
-    fn getOwnPropertyDescriptor(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-    ) Agent.Error!Value {
+    fn getOwnPropertyDescriptor(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
         const property = arguments.get(1);
 
@@ -396,11 +392,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.9 Object.getOwnPropertyDescriptors ( O )
     /// https://tc39.es/ecma262/#sec-object.getownpropertydescriptors
-    fn getOwnPropertyDescriptors(
-        agent: *Agent,
-        _: Value,
-        arguments: ArgumentsList,
-    ) Agent.Error!Value {
+    fn getOwnPropertyDescriptors(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const object = arguments.get(0);
 
@@ -438,7 +430,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.10 Object.getOwnPropertyNames ( O )
     /// https://tc39.es/ecma262/#sec-object.getownpropertynames
-    fn getOwnPropertyNames(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn getOwnPropertyNames(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
 
         // 1. Return CreateArrayFromList(? GetOwnPropertyKeys(O, string)).
@@ -455,7 +447,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.11 Object.getOwnPropertySymbols ( O )
     /// https://tc39.es/ecma262/#sec-object.getownpropertysymbols
-    fn getOwnPropertySymbols(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn getOwnPropertySymbols(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
 
         // 1. Return CreateArrayFromList(? GetOwnPropertyKeys(O, symbol)).
@@ -504,7 +496,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.12 Object.getPrototypeOf ( O )
     /// https://tc39.es/ecma262/#sec-object.getprototypeof
-    fn getPrototypeOf(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn getPrototypeOf(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
 
         // 1. Let obj be ? ToObject(O).
@@ -516,7 +508,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.13 Object.groupBy ( items, callbackfn )
     /// https://tc39.es/ecma262/#sec-object.groupby
-    fn groupBy(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn groupBy(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const items = arguments.get(0);
         const callback_fn = arguments.get(1);
 
@@ -545,7 +537,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.14 Object.hasOwn ( O, P )
     /// https://tc39.es/ecma262/#sec-object.hasown
-    fn hasOwn(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn hasOwn(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
         const property = arguments.get(1);
 
@@ -561,7 +553,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.15 Object.is ( value1, value2 )
     /// https://tc39.es/ecma262/#sec-object.is
-    fn is(_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn is(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const value1 = arguments.get(0);
         const value2 = arguments.get(1);
 
@@ -571,7 +563,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.16 Object.isExtensible ( O )
     /// https://tc39.es/ecma262/#sec-object.isextensible
-    fn isExtensible(_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn isExtensible(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return true.
@@ -583,7 +575,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.17 Object.isFrozen ( O )
     /// https://tc39.es/ecma262/#sec-object.isfrozen
-    fn isFrozen(_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn isFrozen(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return true.
@@ -595,7 +587,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.18 Object.isSealed ( O )
     /// https://tc39.es/ecma262/#sec-object.issealed
-    fn isSealed(_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn isSealed(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return true.
@@ -607,7 +599,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.19 Object.keys ( O )
     /// https://tc39.es/ecma262/#sec-object.keys
-    fn keys(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn keys(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
 
         // 1. Let obj be ? ToObject(O).
@@ -623,7 +615,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.20 Object.preventExtensions ( O )
     /// https://tc39.es/ecma262/#sec-object.preventextensions
-    fn preventExtensions(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn preventExtensions(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return O.
@@ -641,7 +633,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.22 Object.seal ( O )
     /// https://tc39.es/ecma262/#sec-object.seal
-    fn seal(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn seal(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return O.
@@ -659,7 +651,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.23 Object.setPrototypeOf ( O, proto )
     /// https://tc39.es/ecma262/#sec-object.seal
-    fn setPrototypeOf(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn setPrototypeOf(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
         const prototype = arguments.get(1);
 
@@ -689,7 +681,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.2.24 Object.values ( O )
     /// https://tc39.es/ecma262/#sec-object.values
-    fn values(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn values(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
 
         // 1. Let obj be ? ToObject(O).
@@ -733,11 +725,7 @@ pub const ObjectPrototype = struct {
 
     /// 20.1.3.2 Object.prototype.hasOwnProperty ( V )
     /// https://tc39.es/ecma262/#sec-object.prototype.hasownproperty
-    fn hasOwnProperty(
-        agent: *Agent,
-        this_value: Value,
-        arguments: ArgumentsList,
-    ) Agent.Error!Value {
+    fn hasOwnProperty(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
 
         // 1. Let P be ? ToPropertyKey(V).
@@ -752,11 +740,7 @@ pub const ObjectPrototype = struct {
 
     /// 20.1.3.3 Object.prototype.isPrototypeOf ( V )
     /// https://tc39.es/ecma262/#sec-object.prototype.isprototypeof
-    fn isPrototypeOf(
-        agent: *Agent,
-        this_value: Value,
-        arguments: ArgumentsList,
-    ) Agent.Error!Value {
+    fn isPrototypeOf(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
 
         // 1. If V is not an Object, return false.
@@ -785,7 +769,7 @@ pub const ObjectPrototype = struct {
     fn propertyIsEnumerable(
         agent: *Agent,
         this_value: Value,
-        arguments: ArgumentsList,
+        arguments: Arguments,
     ) Agent.Error!Value {
         const value = arguments.get(0);
 
@@ -807,7 +791,7 @@ pub const ObjectPrototype = struct {
 
     /// 20.1.3.5 Object.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
     /// https://tc39.es/ecma262/#sec-object.prototype.tolocalestring
-    fn toLocaleString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         const object = try this_value.toObject(agent);
 
@@ -817,7 +801,7 @@ pub const ObjectPrototype = struct {
 
     /// 20.1.3.6 Object.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-object.prototype.tostring
-    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. If the this value is undefined, return "[object Undefined]".
         if (this_value == .undefined) return Value.from("[object Undefined]");
 
@@ -878,7 +862,7 @@ pub const ObjectPrototype = struct {
 
     /// 20.1.3.7 Object.prototype.valueOf ( )
     /// https://tc39.es/ecma262/#sec-object.prototype.valueof
-    fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn valueOf(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return ? ToObject(this value).
         return Value.from(try this_value.toObject(agent));
     }

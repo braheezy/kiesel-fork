@@ -8,7 +8,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const Object = types.Object;
 const Realm = execution.Realm;
 const Value = types.Value;
@@ -29,7 +29,7 @@ pub const IteratorPrototype = struct {
 
     /// 27.1.2.1 %IteratorPrototype% [ @@iterator ] ( )
     /// https://tc39.es/ecma262/#sec-%iteratorprototype%-@@iterator
-    fn @"@@iterator"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn @"@@iterator"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }

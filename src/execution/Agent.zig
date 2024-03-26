@@ -11,7 +11,6 @@ const environments = @import("environments.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
-const ArgumentsList = builtins.ArgumentsList;
 const BigInt = types.BigInt;
 const Environment = environments.Environment;
 const ExecutionContext = @import("ExecutionContext.zig");

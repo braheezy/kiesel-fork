@@ -12,7 +12,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments_ = types.Arguments;
 const Environment = execution.Environment;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
@@ -424,7 +424,7 @@ fn makeArgGetter(agent: *Agent, name: []const u8, env: Environment) Allocator.Er
     // 1. Let getterClosure be a new Abstract Closure with no parameters that captures name and env
     //    and performs the following steps when called:
     const getter_closure = struct {
-        fn func(agent_: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
+        fn func(agent_: *Agent, _: Value, _: Arguments_) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
             const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
             const name_ = captures_.name;
@@ -460,7 +460,7 @@ fn makeArgSetter(agent: *Agent, name: []const u8, env: Environment) Allocator.Er
     // 1. Let setterClosure be a new Abstract Closure with parameters (value) that captures name
     //    and env and performs the following steps when called:
     const setter_closure = struct {
-        fn func(agent_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+        fn func(agent_: *Agent, _: Value, arguments: Arguments_) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
             const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
             const name_ = captures_.name;

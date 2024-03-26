@@ -19,7 +19,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -688,7 +688,7 @@ pub const RegExpConstructor = struct {
 
     /// 22.2.4.1 RegExp ( pattern, flags )
     /// https://tc39.es/ecma262/#sec-regexp-pattern-flags
-    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const pattern = arguments.get(0);
         const flags = arguments.get(1);
 
@@ -768,7 +768,7 @@ pub const RegExpConstructor = struct {
 
     /// 22.2.5.2 get RegExp [ @@species ]
     /// https://tc39.es/ecma262/#sec-get-regexp-@@species
-    fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn @"@@species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -809,7 +809,7 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.2 RegExp.prototype.exec ( string )
     /// https://tc39.es/ecma262/#sec-regexp.prototype.exec
-    fn exec(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn exec(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let R be the this value.
         // 2. Perform ? RequireInternalSlot(R, [[RegExpMatcher]]).
         const reg_exp = try this_value.requireInternalSlot(agent, RegExp);
@@ -826,7 +826,7 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.3 get RegExp.prototype.dotAll
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.dotAll
-    fn dotAll(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn dotAll(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0073 (LATIN SMALL LETTER S).
         // 3. Return ? RegExpHasFlag(R, cu).
@@ -835,7 +835,7 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.4 get RegExp.prototype.flags
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.flags
-    fn flags(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn flags(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let R be the this value.
         // 2. If R is not an Object, throw a TypeError exception.
         if (this_value != .object) {
@@ -932,7 +932,7 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.5 get RegExp.prototype.global
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.global
-    fn global(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn global(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0067 (LATIN SMALL LETTER G).
         // 3. Return ? RegExpHasFlag(R, cu).
@@ -941,7 +941,7 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.6 get RegExp.prototype.hasIndices
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.global
-    fn hasIndices(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn hasIndices(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0064 (LATIN SMALL LETTER D).
         // 3. Return ? RegExpHasFlag(R, cu).
@@ -950,7 +950,7 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.7 get RegExp.prototype.ignoreCase
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.ignorecase
-    fn ignoreCase(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn ignoreCase(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0069 (LATIN SMALL LETTER I).
         // 3. Return ? RegExpHasFlag(R, cu).
@@ -959,7 +959,7 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.8 RegExp.prototype [ @@match ] ( string )
     /// https://tc39.es/ecma262/#sec-regexp.prototype-@@match
-    fn @"@@match"(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn @"@@match"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const string_value = arguments.get(0);
 
         // 1. Let rx be the this value.
@@ -1045,11 +1045,7 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.9 RegExp.prototype [ @@matchAll ] ( string )
     /// https://tc39.es/ecma262/#sec-regexp-prototype-matchall
-    fn @"@@matchAll"(
-        agent: *Agent,
-        this_value: Value,
-        arguments: ArgumentsList,
-    ) Agent.Error!Value {
+    fn @"@@matchAll"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const string_value = arguments.get(0);
         const realm = agent.currentRealm();
 
@@ -1095,7 +1091,7 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.10 get RegExp.prototype.multiline
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.multiline
-    fn multiline(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn multiline(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x006D (LATIN SMALL LETTER M).
         // 3. Return ? RegExpHasFlag(R, cu).
@@ -1104,7 +1100,7 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.12 RegExp.prototype [ @@search ] ( string )
     /// https://tc39.es/ecma262/#sec-regexp.prototype-@@search
-    fn @"@@search"(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn @"@@search"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const string_value = arguments.get(0);
 
         // 1. Let rx be the this value.
@@ -1147,7 +1143,7 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.13 get RegExp.prototype.source
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.source
-    fn source(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn source(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // Let R be the this value.
         // 2. If R is not an Object, throw a TypeError exception.
         if (this_value != .object) {
@@ -1207,7 +1203,7 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.14 RegExp.prototype [ @@split ] ( string, limit )
     /// https://tc39.es/ecma262/#sec-regexp.prototype-@@split
-    fn @"@@split"(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn @"@@split"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const string_value = arguments.get(0);
         const limit_value = arguments.get(1);
@@ -1388,7 +1384,7 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.15 get RegExp.prototype.sticky
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.sticky
-    fn sticky(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn sticky(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0079 (LATIN SMALL LETTER Y).
         // 3. Return ? RegExpHasFlag(R, cu).
@@ -1397,7 +1393,7 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.16 RegExp.prototype.test ( S )
     /// https://tc39.es/ecma262/#sec-regexp.prototype.test
-    fn @"test"(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn @"test"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let R be the this value.
         // 2. If R is not an Object, throw a TypeError exception.
         if (this_value != .object) {
@@ -1417,7 +1413,7 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.17 RegExp.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-regexp.prototype.tostring
-    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let R be the this value.
         // 2. If R is not an Object, throw a TypeError exception.
         if (this_value != .object) {
@@ -1444,7 +1440,7 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.18 get RegExp.prototype.unicode
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.unicode
-    fn unicode(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn unicode(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0075 (LATIN SMALL LETTER U).
         // 3. Return ? RegExpHasFlag(R, cu).
@@ -1453,7 +1449,7 @@ pub const RegExpPrototype = struct {
 
     /// 22.2.6.19 get RegExp.prototype.unicodeSets
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.unicodesets
-    fn unicodeSets(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn unicodeSets(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0076 (LATIN SMALL LETTER V).
         // 3. Return ? RegExpHasFlag(R, cu).
@@ -1462,7 +1458,7 @@ pub const RegExpPrototype = struct {
 
     /// B.2.4.1 RegExp.prototype.compile ( pattern, flags )
     /// https://tc39.es/ecma262/#sec-regexp.prototype.compile
-    fn compile(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn compile(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const pattern = arguments.get(0);
         const flags_ = arguments.get(1);
 

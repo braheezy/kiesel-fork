@@ -11,7 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const Iterator = types.Iterator;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
@@ -79,7 +79,7 @@ pub const AsyncFromSyncIteratorPrototype = struct {
 
     /// 27.1.4.2.1 %AsyncFromSyncIteratorPrototype%.next ( [ value ] )
     /// https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%-object
-    fn next(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn next(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const maybe_value = arguments.getOrNull(0);
 
@@ -118,7 +118,7 @@ pub const AsyncFromSyncIteratorPrototype = struct {
 
     /// 27.1.4.2.2 %AsyncFromSyncIteratorPrototype%.return ( [ value ] )
     /// https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%.return
-    fn @"return"(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn @"return"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const maybe_value = arguments.getOrNull(0);
 
@@ -204,7 +204,7 @@ pub const AsyncFromSyncIteratorPrototype = struct {
 
     /// 27.1.4.2.3 %AsyncFromSyncIteratorPrototype%.throw ( [ value ] )
     /// https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%.throw
-    fn throw(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn throw(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const maybe_value = arguments.getOrNull(0);
 
@@ -327,7 +327,7 @@ fn asyncFromSyncIteratorContinuation(agent: *Agent, result: Object, promise_capa
     // 8. Let unwrap be a new Abstract Closure with parameters (v) that captures done and performs
     //    the following steps when called:
     const unwrap = struct {
-        fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) Agent.Error!Value {
+        fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
             const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
             const done_ = captures_.done;

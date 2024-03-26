@@ -1,6 +1,7 @@
 const language = @import("types/language.zig");
 const spec = @import("types/spec.zig");
 
+pub const Arguments = spec.Arguments;
 pub const BigInt = language.BigInt;
 pub const ClassFieldDefinition = spec.ClassFieldDefinition;
 pub const ClassStaticBlockDefinition = spec.ClassStaticBlockDefinition;

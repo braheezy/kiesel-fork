@@ -11,7 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const Number = types.Number;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -150,7 +150,7 @@ pub const Math = struct {
 
     /// 21.3.2.1 Math.abs ( x )
     /// https://tc39.es/ecma262/#sec-math.abs
-    fn abs(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn abs(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -166,7 +166,7 @@ pub const Math = struct {
 
     /// 21.3.2.2 Math.acos ( x )
     /// https://tc39.es/ecma262/#sec-math.acos
-    fn acos(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn acos(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -181,7 +181,7 @@ pub const Math = struct {
 
     /// 21.3.2.3 Math.acosh ( x )
     /// https://tc39.es/ecma262/#sec-math.acosh
-    fn acosh(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn acosh(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -197,7 +197,7 @@ pub const Math = struct {
 
     /// 21.3.2.4 Math.asin ( x )
     /// https://tc39.es/ecma262/#sec-math.asin
-    fn asin(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn asin(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -212,7 +212,7 @@ pub const Math = struct {
 
     /// 21.3.2.5 Math.asinh ( x )
     /// https://tc39.es/ecma262/#sec-math.asinh
-    fn asinh(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn asinh(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -227,7 +227,7 @@ pub const Math = struct {
 
     /// 21.3.2.6 Math.atan ( x )
     /// https://tc39.es/ecma262/#sec-math.atan
-    fn atan(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn atan(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -243,7 +243,7 @@ pub const Math = struct {
 
     /// 21.3.2.7 Math.atanh ( x )
     /// https://tc39.es/ecma262/#sec-math.atanh
-    fn atanh(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn atanh(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -260,7 +260,7 @@ pub const Math = struct {
 
     /// 21.3.2.8 Math.atan2 ( y, x )
     /// https://tc39.es/ecma262/#sec-math.atan2
-    fn atan2(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn atan2(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const y = arguments.get(0);
         const x = arguments.get(1);
 
@@ -309,7 +309,7 @@ pub const Math = struct {
 
     /// 21.3.2.9 Math.cbrt ( x )
     /// https://tc39.es/ecma262/#sec-math.cbrt
-    fn cbrt(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn cbrt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -323,7 +323,7 @@ pub const Math = struct {
 
     /// 21.3.2.10 Math.ceil ( x )
     /// https://tc39.es/ecma262/#sec-math.ceil
-    fn ceil(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn ceil(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -338,7 +338,7 @@ pub const Math = struct {
 
     /// 21.3.2.11 Math.clz32 ( x )
     /// https://tc39.es/ecma262/#sec-math.clz32
-    fn clz32(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn clz32(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToUint32(x).
@@ -353,7 +353,7 @@ pub const Math = struct {
 
     /// 21.3.2.12 Math.cos ( x )
     /// https://tc39.es/ecma262/#sec-math.cos
-    fn cos(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn cos(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -368,7 +368,7 @@ pub const Math = struct {
 
     /// 21.3.2.13 Math.cosh ( x )
     /// https://tc39.es/ecma262/#sec-math.cosh
-    fn cosh(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn cosh(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -384,7 +384,7 @@ pub const Math = struct {
 
     /// 21.3.2.14 Math.exp ( x )
     /// https://tc39.es/ecma262/#sec-math.exp
-    fn exp(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn exp(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -400,7 +400,7 @@ pub const Math = struct {
 
     /// 21.3.2.15 Math.expm1 ( x )
     /// https://tc39.es/ecma262/#sec-math.expm1
-    fn expm1(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn expm1(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -416,7 +416,7 @@ pub const Math = struct {
 
     /// 21.3.2.16 Math.floor ( x )
     /// https://tc39.es/ecma262/#sec-math.floor
-    fn floor(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn floor(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -431,7 +431,7 @@ pub const Math = struct {
 
     /// 21.3.2.17 Math.fround ( x )
     /// https://tc39.es/ecma262/#sec-math.fround
-    fn fround(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn fround(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -453,7 +453,7 @@ pub const Math = struct {
 
     /// 21.3.2.18 Math.hypot ( ...args )
     /// https://tc39.es/ecma262/#sec-math.hypot
-    fn hypot(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn hypot(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let coerced be a new empty List.
         var coerced = try std.ArrayList(Number).initCapacity(agent.gc_allocator, arguments.count());
         defer coerced.deinit();
@@ -499,7 +499,7 @@ pub const Math = struct {
 
     /// 21.3.2.19 Math.imul ( x, y )
     /// https://tc39.es/ecma262/#sec-math.imul
-    fn imul(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn imul(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
         const y = arguments.get(1);
 
@@ -518,7 +518,7 @@ pub const Math = struct {
 
     /// 21.3.2.20 Math.log ( x )
     /// https://tc39.es/ecma262/#sec-math.log
-    fn log(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn log(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -535,7 +535,7 @@ pub const Math = struct {
 
     /// 21.3.2.21 Math.log1p ( x )
     /// https://tc39.es/ecma262/#sec-math.log1p
-    fn log1p(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn log1p(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -552,7 +552,7 @@ pub const Math = struct {
 
     /// 21.3.2.22 Math.log10 ( x )
     /// https://tc39.es/ecma262/#sec-math.log10
-    fn log10(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn log10(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -569,7 +569,7 @@ pub const Math = struct {
 
     /// 21.3.2.23 Math.log2 ( x )
     /// https://tc39.es/ecma262/#sec-math.log2
-    fn log2(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn log2(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -586,7 +586,7 @@ pub const Math = struct {
 
     /// 21.3.2.24 Math.max ( ...args )
     /// https://tc39.es/ecma262/#sec-math.max
-    fn max(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn max(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let coerced be a new empty List.
         var coerced = try std.ArrayList(Number).initCapacity(agent.gc_allocator, arguments.count());
         defer coerced.deinit();
@@ -624,7 +624,7 @@ pub const Math = struct {
 
     /// 21.3.2.25 Math.min ( ...args )
     /// https://tc39.es/ecma262/#sec-math.min
-    fn min(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn min(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let coerced be a new empty List.
         var coerced = try std.ArrayList(Number).initCapacity(agent.gc_allocator, arguments.count());
         defer coerced.deinit();
@@ -662,7 +662,7 @@ pub const Math = struct {
 
     /// 21.3.2.26 Math.pow ( base, exponent )
     /// https://tc39.es/ecma262/#sec-math.pow
-    fn pow(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn pow(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const base_value = arguments.get(0);
         const exponent_value = arguments.get(1);
 
@@ -678,7 +678,7 @@ pub const Math = struct {
 
     /// 21.3.2.27 Math.random ( )
     /// https://tc39.es/ecma262/#sec-math.random
-    fn random(agent: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
+    fn random(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const value = @min(realm.rng.random().float(f64), 1 - std.math.floatEps(f64));
         return Value.from(value);
@@ -686,7 +686,7 @@ pub const Math = struct {
 
     /// 21.3.2.28 Math.round ( x )
     /// https://tc39.es/ecma262/#sec-math.round
-    fn round(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn round(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -705,7 +705,7 @@ pub const Math = struct {
 
     /// 21.3.2.29 Math.sign ( x )
     /// https://tc39.es/ecma262/#sec-math.sign
-    fn sign(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn sign(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -721,7 +721,7 @@ pub const Math = struct {
 
     /// 21.3.2.30 Math.sin ( x )
     /// https://tc39.es/ecma262/#sec-math.sin
-    fn sin(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn sin(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -736,7 +736,7 @@ pub const Math = struct {
 
     /// 21.3.2.31 Math.sinh ( x )
     /// https://tc39.es/ecma262/#sec-math.sinh
-    fn sinh(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn sinh(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -750,7 +750,7 @@ pub const Math = struct {
 
     /// 21.3.2.32 Math.sqrt ( x )
     /// https://tc39.es/ecma262/#sec-math.sqrt
-    fn sqrt(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn sqrt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -765,7 +765,7 @@ pub const Math = struct {
 
     /// 21.3.2.33 Math.tan ( x )
     /// https://tc39.es/ecma262/#sec-math.tan
-    fn tan(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn tan(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -780,7 +780,7 @@ pub const Math = struct {
 
     /// 21.3.2.34 Math.tanh ( x )
     /// https://tc39.es/ecma262/#sec-math.tanh
-    fn tanh(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn tanh(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).
@@ -796,7 +796,7 @@ pub const Math = struct {
 
     /// 21.3.2.35 Math.trunc ( x )
     /// https://tc39.es/ecma262/#sec-math.trunc
-    fn trunc(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn trunc(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const x = arguments.get(0);
 
         // 1. Let n be ? ToNumber(x).

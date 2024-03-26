@@ -12,7 +12,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -318,7 +318,7 @@ pub const StringConstructor = struct {
 
     /// 22.1.1.1 String ( value )
     /// https://tc39.es/ecma262/#sec-string-constructor-string-value
-    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const value = arguments.get(0);
 
         const s = blk: {
@@ -352,7 +352,7 @@ pub const StringConstructor = struct {
 
     /// 22.1.2.1 String.fromCharCode ( ...codeUnits )
     /// https://tc39.es/ecma262/#sec-string.fromcharcode
-    fn fromCharCode(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn fromCharCode(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let result be the empty String.
         var result = try std.ArrayList(u16).initCapacity(agent.gc_allocator, arguments.count());
         defer result.deinit();
@@ -385,7 +385,7 @@ pub const StringConstructor = struct {
 
     /// 22.1.2.2 String.fromCodePoint ( ...codePoints )
     /// https://tc39.es/ecma262/#sec-string.fromcharcode
-    fn fromCodePoint(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn fromCodePoint(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let result be the empty String.
         var result = std.ArrayList(u8).init(agent.gc_allocator);
 
@@ -539,7 +539,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.1 String.prototype.at ( index )
     /// https://tc39.es/ecma262/#sec-string.prototype.at
-    fn at(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn at(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const index = arguments.get(0);
 
         // 1. Let O be ? RequireObjectCoercible(this value).
@@ -573,7 +573,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.2 String.prototype.charAt ( pos )
     /// https://tc39.es/ecma262/#sec-string.prototype.charat
-    fn charAt(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn charAt(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const pos = arguments.get(0);
 
         // 1. Let O be ? RequireObjectCoercible(this value).
@@ -598,7 +598,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.3 String.prototype.charCodeAt ( pos )
     /// https://tc39.es/ecma262/#sec-string.prototype.charcodeat
-    fn charCodeAt(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn charCodeAt(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const pos = arguments.get(0);
 
         // 1. Let O be ? RequireObjectCoercible(this value).
@@ -624,7 +624,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.4 String.prototype.codePointAt ( pos )
     /// https://tc39.es/ecma262/#sec-string.prototype.codepointat
-    fn codePointAt(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn codePointAt(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const pos = arguments.get(0);
 
         // 1. Let O be ? RequireObjectCoercible(this value).
@@ -650,7 +650,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.5 String.prototype.concat ( ...args )
     /// https://tc39.es/ecma262/#sec-string.prototype.concat
-    fn concat(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn concat(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let O be ? RequireObjectCoercible(this value).
         const object = try this_value.requireObjectCoercible(agent);
 
@@ -676,7 +676,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.7 String.prototype.endsWith ( searchString [ , endPosition ] )
     /// https://tc39.es/ecma262/#sec-string.prototype.endswith
-    fn endsWith(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn endsWith(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const search_string = arguments.get(0);
         const end_position = arguments.get(1);
 
@@ -735,7 +735,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.8 String.prototype.includes ( searchString [ , position ] )
     /// https://tc39.es/ecma262/#sec-string.prototype.includes
-    fn includes(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn includes(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const search_string = arguments.get(0);
         const position = arguments.get(1);
 
@@ -780,7 +780,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.9 String.prototype.indexOf ( searchString [ , position ] )
     /// https://tc39.es/ecma262/#sec-string.prototype.indexof
-    fn indexOf(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn indexOf(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const search_string = arguments.get(0);
         const position = arguments.get(1);
 
@@ -810,7 +810,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.10 String.prototype.isWellFormed ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.iswellformed
-    fn isWellFormed(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn isWellFormed(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be ? RequireObjectCoercible(this value).
         const object = try this_value.requireObjectCoercible(agent);
 
@@ -825,7 +825,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.11 String.prototype.lastIndexOf ( searchString [ , position ] )
     /// https://tc39.es/ecma262/#sec-string.prototype.lastindexof
-    fn lastIndexOf(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn lastIndexOf(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const search_string = arguments.get(0);
         const position = arguments.get(1);
 
@@ -868,7 +868,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.13 String.prototype.match ( regexp )
     /// https://tc39.es/ecma262/#sec-string.prototype.match
-    fn match(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn match(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const regexp = arguments.get(0);
 
         // 1. Let O be ? RequireObjectCoercible(this value).
@@ -905,7 +905,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.14 String.prototype.matchAll ( regexp )
     /// https://tc39.es/ecma262/#sec-string.prototype.matchall
-    fn matchAll(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn matchAll(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const regexp = arguments.get(0);
 
         // 1. Let O be ? RequireObjectCoercible(this value).
@@ -963,7 +963,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.16 String.prototype.padEnd ( maxLength [ , fillString ] )
     /// https://tc39.es/ecma262/#sec-string.prototype.padend
-    fn padEnd(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn padEnd(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const max_length = arguments.get(0);
         const fill_string = arguments.get(1);
 
@@ -978,7 +978,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.17 String.prototype.padStart ( maxLength [ , fillString ] )
     /// https://tc39.es/ecma262/#sec-string.prototype.padstart
-    fn padStart(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn padStart(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const max_length = arguments.get(0);
         const fill_string = arguments.get(1);
 
@@ -1032,7 +1032,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.18 String.prototype.repeat ( count )
     /// https://tc39.es/ecma262/#sec-string.prototype.repeat
-    fn repeat(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn repeat(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const count = arguments.get(0);
 
         // 1. Let O be ? RequireObjectCoercible(this value).
@@ -1075,7 +1075,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.19 String.prototype.replace ( searchValue, replaceValue )
     /// https://tc39.es/ecma262/#sec-string.prototype.replace
-    fn replace(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn replace(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const search_value = arguments.get(0);
         var replace_value = arguments.get(1);
 
@@ -1171,7 +1171,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.20 String.prototype.replaceAll ( searchValue, replaceValue )
     /// https://tc39.es/ecma262/#sec-string.prototype.replaceall
-    fn replaceAll(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn replaceAll(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const search_value = arguments.get(0);
         var replace_value = arguments.get(1);
 
@@ -1326,7 +1326,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.21 String.prototype.search ( regexp )
     /// https://tc39.es/ecma262/#sec-string.prototype.search
-    fn search(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn search(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const regexp = arguments.get(0);
 
         // 1. Let O be ? RequireObjectCoercible(this value).
@@ -1363,7 +1363,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.22 String.prototype.slice ( start, end )
     /// https://tc39.es/ecma262/#sec-string.prototype.slice
-    fn slice(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn slice(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const start = arguments.get(0);
         const end = arguments.get(1);
 
@@ -1429,7 +1429,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.23 String.prototype.split ( separator, limit )
     /// https://tc39.es/ecma262/#sec-string.prototype.split
-    fn split(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn split(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const separator_value = arguments.get(0);
         const limit_value = arguments.get(1);
 
@@ -1573,7 +1573,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.24 String.prototype.startsWith ( searchString [ , position ] )
     /// https://tc39.es/ecma262/#sec-string.prototype.startswith
-    fn startsWith(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn startsWith(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const search_string = arguments.get(0);
         const position = arguments.get(1);
 
@@ -1631,7 +1631,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.25 String.prototype.substring ( start, end )
     /// https://tc39.es/ecma262/#sec-string.prototype.substring
-    fn substring(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn substring(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const start = arguments.get(0);
         const end = arguments.get(1);
 
@@ -1671,7 +1671,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.26 String.prototype.toLocaleLowerCase ( [ reserved1 [ , reserved2 ] ] )
     /// https://tc39.es/ecma262/#sec-string.prototype.tolocalelowercase
-    fn toLocaleLowerCase(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toLocaleLowerCase(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const object = try this_value.requireObjectCoercible(agent);
         const string = try object.toString(agent);
         const lower = try std.ascii.allocLowerString(agent.gc_allocator, string.utf8);
@@ -1680,7 +1680,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.27 String.prototype.toLocaleUpperCase ( [ reserved1 [ , reserved2 ] ] )
     /// https://tc39.es/ecma262/#sec-string.prototype.tolocaleuppercase
-    fn toLocaleUpperCase(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toLocaleUpperCase(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const object = try this_value.requireObjectCoercible(agent);
         const string = try object.toString(agent);
         const lower = try std.ascii.allocUpperString(agent.gc_allocator, string.utf8);
@@ -1689,7 +1689,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.28 String.prototype.toLowerCase ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.tolowercase
-    fn toLowerCase(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toLowerCase(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be ? RequireObjectCoercible(this value).
         const object = try this_value.requireObjectCoercible(agent);
 
@@ -1708,14 +1708,14 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.29 String.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.tostring
-    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return ? ThisStringValue(this value).
         return Value.from(try thisStringValue(agent, this_value));
     }
 
     /// 22.1.3.30 String.prototype.toUpperCase ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.touppercase
-    fn toUpperCase(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toUpperCase(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // NOTE: The spec simply references toLowerCase() for this, so the steps below are inferred.
 
         // 1. Let O be ? RequireObjectCoercible(this value).
@@ -1736,7 +1736,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.31 String.prototype.toWellFormed ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.towellformed
-    fn toWellFormed(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toWellFormed(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be ? RequireObjectCoercible(this value).
         const object = try this_value.requireObjectCoercible(agent);
 
@@ -1750,7 +1750,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.32 String.prototype.trim ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.trim
-    fn trim(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn trim(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let S be the this value.
         // 2. Return ? TrimString(S, start+end).
         return Value.from(try trimString(agent, this_value, .@"start+end"));
@@ -1799,7 +1799,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.33 String.prototype.trimEnd ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.trimend
-    fn trimEnd(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn trimEnd(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let S be the this value.
         // 2. Return ? TrimString(S, end).
         return Value.from(try trimString(agent, this_value, .end));
@@ -1807,7 +1807,7 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.34 String.prototype.trimStart ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.trimend
-    fn trimStart(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn trimStart(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let S be the this value.
         // 2. Return ? TrimString(S, start).
         return Value.from(try trimString(agent, this_value, .start));
@@ -1815,14 +1815,14 @@ pub const StringPrototype = struct {
 
     /// 22.1.3.35 String.prototype.valueOf ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.valueof
-    fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn valueOf(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return ? ThisStringValue(this value).
         return Value.from(try thisStringValue(agent, this_value));
     }
 
     /// 22.1.3.36 String.prototype [ @@iterator ] ( )
     /// https://tc39.es/ecma262/#sec-string.prototype-@@iterator
-    fn @"@@iterator"(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn @"@@iterator"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
 
         // 1. Let O be ? RequireObjectCoercible(this value).
@@ -1846,7 +1846,7 @@ pub const StringPrototype = struct {
 
     /// B.2.2.1 String.prototype.substr ( start, length )
     /// https://tc39.es/ecma262/#sec-string.prototype.substr
-    fn substr(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn substr(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const start = arguments.get(0);
         const length = arguments.get(1);
 
@@ -1966,7 +1966,7 @@ pub const StringPrototype = struct {
 
     /// B.2.2.2 String.prototype.anchor ( name )
     /// https://tc39.es/ecma262/#sec-string.prototype.anchor
-    fn anchor(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn anchor(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const name = arguments.get(0);
 
         // 1. Let S be the this value.
@@ -1978,7 +1978,7 @@ pub const StringPrototype = struct {
 
     /// B.2.2.3 String.prototype.big ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.big
-    fn big(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn big(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let S be the this value.
         // 2. Return ? CreateHTML(S, "big", "", "").
         return Value.from(try createHTML(agent, this_value, "big", null));
@@ -1986,7 +1986,7 @@ pub const StringPrototype = struct {
 
     /// B.2.2.4 String.prototype.blink ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.blink
-    fn blink(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn blink(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let S be the this value.
         // 2. Return ? CreateHTML(S, "blink", "", "").
         return Value.from(try createHTML(agent, this_value, "blink", null));
@@ -1994,7 +1994,7 @@ pub const StringPrototype = struct {
 
     /// B.2.2.5 String.prototype.bold ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.bold
-    fn bold(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn bold(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let S be the this value.
         // 2. Return ? CreateHTML(S, "b", "", "").
         return Value.from(try createHTML(agent, this_value, "b", null));
@@ -2002,7 +2002,7 @@ pub const StringPrototype = struct {
 
     /// B.2.2.6 String.prototype.fixed ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.fixed
-    fn fixed(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn fixed(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let S be the this value.
         // 2. Return ? CreateHTML(S, "tt", "", "").
         return Value.from(try createHTML(agent, this_value, "tt", null));
@@ -2010,7 +2010,7 @@ pub const StringPrototype = struct {
 
     /// B.2.2.7 String.prototype.fontcolor ( color )
     /// https://tc39.es/ecma262/#sec-string.prototype.fontcolor
-    fn fontcolor(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn fontcolor(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const color = arguments.get(0);
 
         // 1. Let S be the this value.
@@ -2022,7 +2022,7 @@ pub const StringPrototype = struct {
 
     /// B.2.2.8 String.prototype.fontsize ( size )
     /// https://tc39.es/ecma262/#sec-string.prototype.fontsize
-    fn fontsize(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn fontsize(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const size = arguments.get(0);
 
         // 1. Let S be the this value.
@@ -2034,7 +2034,7 @@ pub const StringPrototype = struct {
 
     /// B.2.2.9 String.prototype.italics ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.italics
-    fn italics(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn italics(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let S be the this value.
         // 2. Return ? CreateHTML(S, "i", "", "").
         return Value.from(try createHTML(agent, this_value, "i", null));
@@ -2042,7 +2042,7 @@ pub const StringPrototype = struct {
 
     /// B.2.2.10 String.prototype.link ( url )
     /// https://tc39.es/ecma262/#sec-string.prototype.link
-    fn link(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn link(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const url = arguments.get(0);
 
         // 1. Let S be the this value.
@@ -2054,7 +2054,7 @@ pub const StringPrototype = struct {
 
     /// B.2.2.11 String.prototype.small ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.small
-    fn small(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn small(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let S be the this value.
         // 2. Return ? CreateHTML(S, "small", "", "").
         return Value.from(try createHTML(agent, this_value, "small", null));
@@ -2062,7 +2062,7 @@ pub const StringPrototype = struct {
 
     /// B.2.2.12 String.prototype.strike ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.strike
-    fn strike(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn strike(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let S be the this value.
         // 2. Return ? CreateHTML(S, "strike", "", "").
         return Value.from(try createHTML(agent, this_value, "strike", null));
@@ -2070,7 +2070,7 @@ pub const StringPrototype = struct {
 
     /// B.2.2.13 String.prototype.sub ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.sub
-    fn sub(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn sub(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let S be the this value.
         // 2. Return ? CreateHTML(S, "sub", "", "").
         return Value.from(try createHTML(agent, this_value, "sub", null));
@@ -2078,7 +2078,7 @@ pub const StringPrototype = struct {
 
     /// B.2.2.14 String.prototype.sup ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.sup
-    fn sup(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn sup(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let S be the this value.
         // 2. Return ? CreateHTML(S, "sup", "", "").
         return Value.from(try createHTML(agent, this_value, "sup", null));

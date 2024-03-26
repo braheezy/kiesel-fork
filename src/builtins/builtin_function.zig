@@ -10,6 +10,7 @@ const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
+const Arguments = types.Arguments;
 const ClassFieldDefinition = types.ClassFieldDefinition;
 const ConstructorKind = ecmascript_function.ConstructorKind;
 const ExecutionContext = execution.ExecutionContext;
@@ -24,31 +25,9 @@ const Value = types.Value;
 const setFunctionLength = ecmascript_function.setFunctionLength;
 const setFunctionName = ecmascript_function.setFunctionName;
 
-pub const ArgumentsList = struct {
-    const Self = @This();
-
-    values: []const Value,
-
-    pub inline fn from(values: []const Value) Self {
-        return .{ .values = values };
-    }
-
-    pub inline fn count(self: Self) usize {
-        return self.values.len;
-    }
-
-    pub inline fn get(self: Self, index: usize) Value {
-        return self.getOrNull(index) orelse .undefined;
-    }
-
-    pub inline fn getOrNull(self: Self, index: usize) ?Value {
-        return if (self.count() > index) self.values[index] else null;
-    }
-};
-
 pub const Behaviour = union(enum) {
-    pub const RegularFn = fn (*Agent, Value, ArgumentsList) Agent.Error!Value;
-    pub const ConstructorFn = fn (*Agent, ArgumentsList, ?Object) Agent.Error!Value;
+    pub const RegularFn = fn (*Agent, Value, Arguments) Agent.Error!Value;
+    pub const ConstructorFn = fn (*Agent, Arguments, ?Object) Agent.Error!Value;
 
     regular: *const RegularFn,
     constructor: *const ConstructorFn,
@@ -90,7 +69,7 @@ pub const BuiltinFunction = MakeObject(.{
 fn call(
     object: Object,
     this_argument: Value,
-    arguments_list: ArgumentsList,
+    arguments_list: Arguments,
 ) Agent.Error!Value {
     const agent = object.agent();
     const function = object.as(BuiltinFunction);
@@ -103,7 +82,7 @@ fn call(
 /// https://tc39.es/ecma262/#sec-built-in-function-objects-construct-argumentslist-newtarget
 pub fn construct(
     object: Object,
-    arguments_list: ArgumentsList,
+    arguments_list: Arguments,
     new_target: Object,
 ) Agent.Error!Object {
     const agent = object.agent();
@@ -119,7 +98,7 @@ pub fn builtinCallOrConstruct(
     agent: *Agent,
     function: *BuiltinFunction,
     this_argument: ?Value,
-    arguments_list: ArgumentsList,
+    arguments_list: Arguments,
     new_target: ?Object,
 ) Agent.Error!Value {
     // 1. Let callerContext be the running execution context.

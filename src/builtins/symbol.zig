@@ -11,7 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -180,7 +180,7 @@ pub const SymbolConstructor = struct {
 
     /// 20.4.1.1 Symbol ( [ description ] )
     /// https://tc39.es/ecma262/#sec-symbol-description
-    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const description = arguments.get(0);
 
         // 1. If NewTarget is not undefined, throw a TypeError exception.
@@ -208,7 +208,7 @@ pub const SymbolConstructor = struct {
 
     /// 20.4.2.2 Symbol.for ( key )
     /// https://tc39.es/ecma262/#sec-symbol.for
-    fn @"for"(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn @"for"(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const key = arguments.get(0);
 
         // 1. Let stringKey be ? ToString(key).
@@ -239,7 +239,7 @@ pub const SymbolConstructor = struct {
 
     /// 20.4.2.6 Symbol.keyFor ( sym )
     /// https://tc39.es/ecma262/#sec-symbol.keyfor
-    fn keyFor(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn keyFor(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const symbol = arguments.get(0);
 
         // 1. If sym is not a Symbol, throw a TypeError exception.
@@ -311,7 +311,7 @@ pub const SymbolPrototype = struct {
 
     /// 20.4.3.2 get Symbol.prototype.description
     /// https://tc39.es/ecma262/#sec-symbol.prototype.description
-    fn description(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn description(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let s be the this value.
         // 2. Let sym be ? ThisSymbolValue(s).
         const symbol = try thisSymbolValue(agent, this_value);
@@ -322,7 +322,7 @@ pub const SymbolPrototype = struct {
 
     /// 20.4.3.3 Symbol.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-symbol.prototype.tostring
-    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let sym be ? ThisSymbolValue(this value).
         const symbol = try thisSymbolValue(agent, this_value);
 
@@ -332,14 +332,14 @@ pub const SymbolPrototype = struct {
 
     /// 20.4.3.4 Symbol.prototype.valueOf ( )
     /// https://tc39.es/ecma262/#sec-symbol.prototype.valueof
-    fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn valueOf(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return ? ThisSymbolValue(this value).
         return Value.from(try thisSymbolValue(agent, this_value));
     }
 
     /// 20.4.3.5 Symbol.prototype [ @@toPrimitive ] ( hint )
     /// https://tc39.es/ecma262/#sec-symbol.prototype-@@toprimitive
-    fn @"@@toPrimitive"(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn @"@@toPrimitive"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return ? ThisSymbolValue(this value).
         // NOTE: The argument is ignored.
         return Value.from(try thisSymbolValue(agent, this_value));

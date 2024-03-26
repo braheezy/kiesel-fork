@@ -12,7 +12,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const Iterator = types.Iterator;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
@@ -394,7 +394,7 @@ pub const ArrayConstructor = struct {
 
     /// 23.1.1.1 Array ( ...values )
     /// https://tc39.es/ecma262/#sec-array
-    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         // 1. If NewTarget is undefined, let newTarget be the active function object; else let newTarget be NewTarget.
         const new_target_ = new_target orelse agent.activeFunctionObject();
 
@@ -482,7 +482,7 @@ pub const ArrayConstructor = struct {
 
     /// 23.1.2.1 Array.from ( items [ , mapfn [ , thisArg ] ] )
     /// https://tc39.es/ecma262/#sec-array.from
-    fn from(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn from(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const items = arguments.get(0);
         const map_fn = arguments.get(1);
         const this_arg = arguments.get(2);
@@ -641,7 +641,7 @@ pub const ArrayConstructor = struct {
 
     /// 23.1.2.2 Array.isArray ( arg )
     /// https://tc39.es/ecma262/#sec-array.isarray
-    fn isArray(_: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn isArray(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const arg = arguments.get(0);
 
         // 1. Return ? IsArray(arg).
@@ -650,7 +650,7 @@ pub const ArrayConstructor = struct {
 
     /// 23.1.2.3 Array.of ( ...items )
     /// https://tc39.es/ecma262/#sec-array.of
-    fn of(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn of(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let len be the number of elements in items.
         const len = arguments.count();
 
@@ -696,7 +696,7 @@ pub const ArrayConstructor = struct {
 
     /// 23.1.2.5 get Array [ @@species ]
     /// https://tc39.es/ecma262/#sec-get-array-@@species
-    fn @"@@species"(_: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn @"@@species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -805,7 +805,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.1 Array.prototype.at ( index )
     /// https://tc39.es/ecma262/#sec-array.prototype.at
-    fn at(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn at(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const index = arguments.get(0);
         // 1. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
@@ -835,7 +835,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.2 Array.prototype.concat ( ...items )
     /// https://tc39.es/ecma262/#sec-array.prototype.concat
-    fn concat(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn concat(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
 
@@ -939,7 +939,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.4 Array.prototype.copyWithin ( target, start [ , end ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.copywithin
-    fn copyWithin(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn copyWithin(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const target = arguments.get(0);
         const start = arguments.get(1);
         const end = arguments.get(2);
@@ -1069,7 +1069,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.5 Array.prototype.entries ( )
     /// https://tc39.es/ecma262/#sec-array.prototype.entries
-    fn entries(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn entries(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
 
@@ -1079,7 +1079,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.6 Array.prototype.every ( callbackfn [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.every
-    fn every(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn every(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback_fn = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -1129,7 +1129,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.7 Array.prototype.fill ( value [ , start [ , end ] ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.fill
-    fn fill(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn fill(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
         const start = arguments.get(1);
         const end = arguments.get(2);
@@ -1196,7 +1196,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.8 Array.prototype.filter ( callbackfn [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.filter
-    fn filter(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn filter(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback_fn = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -1258,7 +1258,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.9 Array.prototype.find ( predicate [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.find
-    fn find(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn find(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const predicate = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -1277,7 +1277,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.10 Array.prototype.findIndex ( predicate [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.findindex
-    fn findIndex(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn findIndex(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const predicate = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -1296,7 +1296,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.11 Array.prototype.findLast ( predicate [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.findlast
-    fn findLast(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn findLast(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const predicate = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -1315,11 +1315,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.12 Array.prototype.findLastIndex ( predicate [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.findlastindex
-    fn findLastIndex(
-        agent: *Agent,
-        this_value: Value,
-        arguments: ArgumentsList,
-    ) Agent.Error!Value {
+    fn findLastIndex(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const predicate = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -1337,7 +1333,7 @@ pub const ArrayPrototype = struct {
     }
     /// 23.1.3.13 Array.prototype.flat ( [ depth ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.flat
-    fn flat(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn flat(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const depth = arguments.get(0);
 
         // 1. Let O be ? ToObject(this value).
@@ -1477,7 +1473,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.14 Array.prototype.flatMap ( mapperFunction [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.flatmap
-    fn flatMap(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn flatMap(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const mapper_function = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -1513,7 +1509,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.15 Array.prototype.forEach ( callbackfn [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.foreach
-    fn forEach(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn forEach(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback_fn = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -1560,7 +1556,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.16 Array.prototype.includes ( searchElement [ , fromIndex ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.includes
-    fn includes(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn includes(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const search_element = arguments.get(0);
         const from_index = arguments.get(1);
 
@@ -1611,7 +1607,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.17 Array.prototype.indexOf ( searchElement [ , fromIndex ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.indexof
-    fn indexOf(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn indexOf(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const search_element = arguments.get(0);
         const from_index = arguments.get(1);
 
@@ -1671,7 +1667,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.18 Array.prototype.join ( separator )
     /// https://tc39.es/ecma262/#sec-array.prototype.join
-    fn join(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn join(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const separator = arguments.get(0);
 
         // 1. Let O be ? ToObject(this value).
@@ -1721,7 +1717,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.19 Array.prototype.keys ( )
     /// https://tc39.es/ecma262/#sec-array.prototype.keys
-    fn keys(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn keys(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
 
@@ -1731,7 +1727,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.20 Array.prototype.lastIndexOf ( searchElement [ , fromIndex ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.lastindexof
-    fn lastIndexOf(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn lastIndexOf(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const search_element = arguments.get(0);
         const from_index = arguments.get(1);
 
@@ -1791,7 +1787,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.21 Array.prototype.map ( callbackfn [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.map
-    fn map(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn map(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback_fn = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -1844,7 +1840,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.22 Array.prototype.pop ( )
     /// https://tc39.es/ecma262/#sec-array.prototype.pop
-    fn pop(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn pop(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
 
@@ -1886,7 +1882,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.23 Array.prototype.push ( ...items )
     /// https://tc39.es/ecma262/#sec-array.prototype.push
-    fn push(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn push(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
 
@@ -1919,7 +1915,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.24 Array.prototype.reduce ( callbackfn [ , initialValue ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.reduce
-    fn reduce(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn reduce(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback_fn = arguments.get(0);
         const initial_value = arguments.getOrNull(1);
 
@@ -2015,7 +2011,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.25 Array.prototype.reduceRight ( callbackfn [ , initialValue ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.reduceright
-    fn reduceRight(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn reduceRight(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback_fn = arguments.get(0);
         const initial_value = arguments.getOrNull(1);
 
@@ -2111,7 +2107,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.26 Array.prototype.reverse ( )
     /// https://tc39.es/ecma262/#sec-array.prototype.reverse
-    fn reverse(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn reverse(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
 
@@ -2194,7 +2190,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.27 Array.prototype.shift ( )
     /// https://tc39.es/ecma262/#sec-array.prototype.shift
-    fn shift(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn shift(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
 
@@ -2259,7 +2255,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.28 Array.prototype.slice ( start, end )
     /// https://tc39.es/ecma262/#sec-array.prototype.slice
-    fn slice(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn slice(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const start = arguments.get(0);
         const end = arguments.get(1);
 
@@ -2350,7 +2346,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.29 Array.prototype.some ( callbackfn [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.some
-    fn some(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn some(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback_fn = arguments.get(0);
         const this_arg = arguments.get(1);
 
@@ -2400,7 +2396,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.30 Array.prototype.sort ( comparefn )
     /// https://tc39.es/ecma262/#sec-array.prototype.sort
-    fn sort(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn sort(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const compare_fn = arguments.get(0);
 
         // 1. If comparefn is not undefined and IsCallable(comparefn) is false, throw a TypeError
@@ -2468,7 +2464,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.31 Array.prototype.splice ( start, deleteCount, ...items )
     /// https://tc39.es/ecma262/#sec-array.prototype.splice
-    fn splice(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn splice(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const start = arguments.getOrNull(0);
         const delete_count = arguments.getOrNull(1);
         const items = if (arguments.count() <= 2) &[_]Value{} else arguments.values[2..];
@@ -2649,7 +2645,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.32 Array.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
     /// https://tc39.es/ecma262/#sec-array.prototype.tolocalestring
-    fn toLocaleString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let array be ? ToObject(this value).
         const array = try this_value.toObject(agent);
 
@@ -2700,7 +2696,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.33 Array.prototype.toReversed ( )
     /// https://tc39.es/ecma262/#sec-array.prototype.toreversed
-    fn toReversed(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toReversed(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
 
@@ -2736,7 +2732,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.34 Array.prototype.toSorted ( comparefn )
     /// https://tc39.es/ecma262/#sec-array.prototype.tosorted
-    fn toSorted(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn toSorted(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const compare_fn = arguments.get(0);
 
         // 1. If comparefn is not undefined and IsCallable(comparefn) is false, throw a TypeError
@@ -2792,7 +2788,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.35 Array.prototype.toSpliced ( start, skipCount, ...items )
     /// https://tc39.es/ecma262/#sec-array.prototype.tospliced
-    fn toSpliced(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn toSpliced(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const start = arguments.getOrNull(0);
         const skip_count = arguments.getOrNull(1);
         const items = if (arguments.count() <= 2) &[_]Value{} else arguments.values[2..];
@@ -2913,7 +2909,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.36 Array.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-array.prototype.tostring
-    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
 
         // 1. Let array be ? ToObject(this value).
@@ -2931,7 +2927,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.37 Array.prototype.unshift ( ...items )
     /// https://tc39.es/ecma262/#sec-array.prototype.unshift
-    fn unshift(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn unshift(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
 
@@ -3008,7 +3004,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.38 Array.prototype.values ( )
     /// https://tc39.es/ecma262/#sec-array.prototype.values
-    fn values(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn values(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
 
@@ -3018,7 +3014,7 @@ pub const ArrayPrototype = struct {
 
     /// 23.1.3.39 Array.prototype.with ( index, value )
     /// https://tc39.es/ecma262/#sec-array.prototype.with
-    fn with(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn with(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const index = arguments.get(0);
         const value = arguments.get(1);
 

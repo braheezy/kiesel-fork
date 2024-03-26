@@ -13,7 +13,7 @@ const types = @import("../../types.zig");
 const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -205,7 +205,7 @@ pub const LocaleConstructor = struct {
 
     /// 14.1.1 Intl.Locale ( tag [ , options ] )
     /// https://tc39.es/ecma402/#sec-Intl.Locale
-    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const tag_value = arguments.get(0);
         const options_value = arguments.get(1);
 
@@ -414,7 +414,7 @@ pub const LocalePrototype = struct {
 
     /// 14.3.3 Intl.Locale.prototype.maximize ( )
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.maximize
-    fn maximize(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn maximize(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
 
         // 1. Let loc be the this value.
@@ -443,7 +443,7 @@ pub const LocalePrototype = struct {
 
     /// 14.3.4 Intl.Locale.prototype.minimize ( )
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.minimize
-    fn minimize(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn minimize(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
 
         // 1. Let loc be the this value.
@@ -472,7 +472,7 @@ pub const LocalePrototype = struct {
 
     /// 14.3.5 Intl.Locale.prototype.toString ( )
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.toString
-    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
         // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
         const locale = try this_value.requireInternalSlot(agent, Locale);
@@ -483,7 +483,7 @@ pub const LocalePrototype = struct {
 
     /// 14.3.6 get Intl.Locale.prototype.baseName
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.baseName
-    fn baseName(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn baseName(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
         // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
         const locale = try this_value.requireInternalSlot(agent, Locale);
@@ -495,7 +495,7 @@ pub const LocalePrototype = struct {
 
     /// 14.3.7 get Intl.Locale.prototype.calendar
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.calendar
-    fn calendar(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn calendar(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
         // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
         const locale = try this_value.requireInternalSlot(agent, Locale);
@@ -514,7 +514,7 @@ pub const LocalePrototype = struct {
 
     /// 14.3.8 get Intl.Locale.prototype.caseFirst
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.caseFirst
-    fn caseFirst(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn caseFirst(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
         // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
         const locale = try this_value.requireInternalSlot(agent, Locale);
@@ -533,7 +533,7 @@ pub const LocalePrototype = struct {
 
     /// 14.3.9 get Intl.Locale.prototype.collation
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.collation
-    fn collation(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn collation(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
         // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
         const locale = try this_value.requireInternalSlot(agent, Locale);
@@ -552,7 +552,7 @@ pub const LocalePrototype = struct {
 
     /// 14.3.10 get Intl.Locale.prototype.hourCycle
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.hourCycle
-    fn hourCycle(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn hourCycle(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
         // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
         const locale = try this_value.requireInternalSlot(agent, Locale);
@@ -571,7 +571,7 @@ pub const LocalePrototype = struct {
 
     /// 14.3.11 get Intl.Locale.prototype.numeric
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.numeric
-    fn numeric(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn numeric(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
         // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
         const locale = try this_value.requireInternalSlot(agent, Locale);
@@ -589,7 +589,7 @@ pub const LocalePrototype = struct {
 
     /// 14.3.12 get Intl.Locale.prototype.numberingSystem
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.numberingSystem
-    fn numberingSystem(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn numberingSystem(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
         // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
         const locale = try this_value.requireInternalSlot(agent, Locale);
@@ -608,7 +608,7 @@ pub const LocalePrototype = struct {
 
     /// 14.3.13 get Intl.Locale.prototype.language
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.language
-    fn language(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn language(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
         // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
         const locale = try this_value.requireInternalSlot(agent, Locale);
@@ -619,7 +619,7 @@ pub const LocalePrototype = struct {
 
     /// 14.3.14 get Intl.Locale.prototype.script
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.script
-    fn script(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn script(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
         // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
         const locale = try this_value.requireInternalSlot(agent, Locale);
@@ -632,7 +632,7 @@ pub const LocalePrototype = struct {
 
     /// 14.3.15 get Intl.Locale.prototype.region
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.region
-    fn region(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn region(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let loc be the this value.
         // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
         const locale = try this_value.requireInternalSlot(agent, Locale);

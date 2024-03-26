@@ -12,7 +12,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PreferredType = Value.PreferredType;
@@ -727,7 +727,7 @@ pub const DateConstructor = struct {
 
     /// 21.4.2.1 Date ( ...values )
     /// https://tc39.es/ecma262/#sec-date
-    fn behaviour(agent: *Agent, arguments: ArgumentsList, new_target: ?Object) Agent.Error!Value {
+    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         // 1. If NewTarget is undefined, then
         if (new_target == null) {
             // a. Let now be the time value (UTC) identifying the current time.
@@ -835,7 +835,7 @@ pub const DateConstructor = struct {
 
     /// 21.4.3.1 Date.now ( )
     /// https://tc39.es/ecma262/#sec-date.now
-    fn now(_: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
+    fn now(_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         // This function returns the time value designating the UTC date and time of the occurrence
         // of the call to it.
         const timestamp = std.time.milliTimestamp();
@@ -844,14 +844,14 @@ pub const DateConstructor = struct {
 
     /// 21.4.3.2 Date.parse ( string )
     /// https://tc39.es/ecma262/#sec-date.now
-    fn parse(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn parse(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const string = try arguments.get(0).toString(agent);
         return Value.from(parseDateTimeString(string.utf8));
     }
 
     /// 21.4.3.4 Date.UTC ( year [ , month [ , date [ , hours [ , minutes [ , seconds [ , ms ] ] ] ] ] ] )
     /// https://tc39.es/ecma262/#sec-date.utc
-    fn UTC(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn UTC(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let y be ? ToNumber(year).
         var year = (try arguments.get(0).toNumber(agent)).asFloat();
 
@@ -956,7 +956,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.2 Date.prototype.getDate ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getdate
-    fn getDate(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getDate(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -973,7 +973,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.3 Date.prototype.getDay ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getday
-    fn getDay(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getDay(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -990,7 +990,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.4 Date.prototype.getFullYear ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getfullyear
-    fn getFullYear(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getFullYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -1007,7 +1007,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.5 Date.prototype.getHours ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.gethours
-    fn getHours(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getHours(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -1024,7 +1024,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.6 Date.prototype.getMilliseconds ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getmilliseconds
-    fn getMilliseconds(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getMilliseconds(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -1041,7 +1041,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.7 Date.prototype.getMinutes ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getminutes
-    fn getMinutes(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getMinutes(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -1058,7 +1058,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.8 Date.prototype.getMonth ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getmonth
-    fn getMonth(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getMonth(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -1075,7 +1075,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.9 Date.prototype.getSeconds ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getseconds
-    fn getSeconds(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getSeconds(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -1092,7 +1092,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.10 Date.prototype.getTime ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.gettime
-    fn getTime(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getTime(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -1103,7 +1103,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.11 Date.prototype.getTimezoneOffset ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.gettimezoneoffset
-    fn getTimezoneOffset(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getTimezoneOffset(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -1120,7 +1120,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.12 Date.prototype.getUTCDate ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getutcdate
-    fn getUTCDate(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getUTCDate(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -1137,7 +1137,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.13 Date.prototype.getUTCDay ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getutcday
-    fn getUTCDay(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getUTCDay(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -1154,7 +1154,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.14 Date.prototype.getUTCFullYear ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getutcfullyear
-    fn getUTCFullYear(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getUTCFullYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -1171,7 +1171,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.15 Date.prototype.getUTCHours ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getutchours
-    fn getUTCHours(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getUTCHours(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -1188,7 +1188,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.16 Date.prototype.getUTCMilliseconds ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getutcmilliseconds
-    fn getUTCMilliseconds(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getUTCMilliseconds(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -1205,7 +1205,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.17 Date.prototype.getUTCMinutes ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getutcminutes
-    fn getUTCMinutes(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getUTCMinutes(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -1222,7 +1222,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.18 Date.prototype.getUTCMonth ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getutcmonth
-    fn getUTCMonth(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getUTCMonth(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -1239,7 +1239,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.19 Date.prototype.getUTCSeconds ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getutcseconds
-    fn getUTCSeconds(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getUTCSeconds(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -1256,7 +1256,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.20 Date.prototype.setDate ( date )
     /// https://tc39.es/ecma262/#sec-date.prototype.setdate
-    fn setDate(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn setDate(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const date_value = arguments.get(0);
 
         // 1. Let dateObject be the this value.
@@ -1297,7 +1297,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.21 Date.prototype.setFullYear ( year [ , month [ , date ] ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.setfullyear
-    fn setFullYear(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn setFullYear(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const year_value = arguments.get(0);
         const month_value = arguments.getOrNull(1);
         const date_value = arguments.getOrNull(2);
@@ -1342,7 +1342,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.22 Date.prototype.setHours ( hour [ , min [ , sec [ , ms ] ] ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.sethours
-    fn setHours(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn setHours(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const hour_value = arguments.get(0);
         const minute_value = arguments.getOrNull(1);
         const second_value = arguments.getOrNull(2);
@@ -1406,11 +1406,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.23 Date.prototype.setMilliseconds ( ms )
     /// https://tc39.es/ecma262/#sec-date.prototype.setmilliseconds
-    fn setMilliseconds(
-        agent: *Agent,
-        this_value: Value,
-        arguments: ArgumentsList,
-    ) Agent.Error!Value {
+    fn setMilliseconds(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const millisecond_value = arguments.get(0);
 
         // 1. Let dateObject be the this value.
@@ -1449,7 +1445,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.24 Date.prototype.setMinutes ( min [ , sec [ , ms ] ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.setminutes
-    fn setMinutes(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn setMinutes(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const minute_value = arguments.get(0);
         const second_value = arguments.getOrNull(1);
         const millisecond_value = arguments.getOrNull(2);
@@ -1506,7 +1502,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.25 Date.prototype.setMonth ( month [ , date ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.setmonth
-    fn setMonth(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn setMonth(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const month_value = arguments.get(0);
         const date_value = arguments.getOrNull(1);
 
@@ -1553,7 +1549,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.26 Date.prototype.setSeconds ( sec [ , ms ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.setseconds
-    fn setSeconds(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn setSeconds(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const second_value = arguments.get(0);
         const millisecond_value = arguments.getOrNull(1);
 
@@ -1605,7 +1601,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.27 Date.prototype.setTime ( time )
     /// https://tc39.es/ecma262/#sec-date.prototype.settime
-    fn setTime(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn setTime(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const time = arguments.get(0);
 
         // 1. Let dateObject be the this value.
@@ -1627,7 +1623,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.28 Date.prototype.setUTCDate ( date )
     /// https://tc39.es/ecma262/#sec-date.prototype.setutcdate
-    fn setUTCDate(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn setUTCDate(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const date_value = arguments.get(0);
 
         // 1. Let dateObject be the this value.
@@ -1665,11 +1661,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.29 Date.prototype.setUTCFullYear ( year [ , month [ , date ] ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.setutcfullyear
-    fn setUTCFullYear(
-        agent: *Agent,
-        this_value: Value,
-        arguments: ArgumentsList,
-    ) Agent.Error!Value {
+    fn setUTCFullYear(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const year_value = arguments.get(0);
         const month_value = arguments.getOrNull(1);
         const date_value = arguments.getOrNull(2);
@@ -1714,7 +1706,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.30 Date.prototype.setUTCHours ( hour [ , min [ , sec [ , ms ] ] ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.sethours
-    fn setUTCHours(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn setUTCHours(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const hour_value = arguments.get(0);
         const minute_value = arguments.getOrNull(1);
         const second_value = arguments.getOrNull(2);
@@ -1778,7 +1770,7 @@ pub const DatePrototype = struct {
     fn setUTCMilliseconds(
         agent: *Agent,
         this_value: Value,
-        arguments: ArgumentsList,
+        arguments: Arguments,
     ) Agent.Error!Value {
         const millisecond_value = arguments.get(0);
 
@@ -1815,11 +1807,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.32 Date.prototype.setUTCMinutes ( min [ , sec [ , ms ] ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.setutcminutes
-    fn setUTCMinutes(
-        agent: *Agent,
-        this_value: Value,
-        arguments: ArgumentsList,
-    ) Agent.Error!Value {
+    fn setUTCMinutes(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const minute_value = arguments.get(0);
         const second_value = arguments.getOrNull(1);
         const millisecond_value = arguments.getOrNull(2);
@@ -1873,7 +1861,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.33 Date.prototype.setUTCMonth ( month [ , date ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.setutcmonth
-    fn setUTCMonth(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn setUTCMonth(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const month_value = arguments.get(0);
         const date_value = arguments.getOrNull(1);
 
@@ -1917,11 +1905,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.34 Date.prototype.setUTCSeconds ( sec [ , ms ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.setutcseconds
-    fn setUTCSeconds(
-        agent: *Agent,
-        this_value: Value,
-        arguments: ArgumentsList,
-    ) Agent.Error!Value {
+    fn setUTCSeconds(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const second_value = arguments.get(0);
         const millisecond_value = arguments.getOrNull(1);
 
@@ -1970,7 +1954,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.35 Date.prototype.toDateString ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.todatestring
-    fn toDateString_(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toDateString_(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -1990,7 +1974,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.36 Date.prototype.toISOString ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.toisostring
-    fn toISOString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toISOString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -2036,7 +2020,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.37 Date.prototype.toJSON ( key )
     /// https://tc39.es/ecma262/#sec-date.prototype.tojson
-    fn toJSON(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toJSON(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // NOTE: The argument is ignored.
 
         // 1. Let O be ? ToObject(this value).
@@ -2057,7 +2041,7 @@ pub const DatePrototype = struct {
     fn toLocaleDateString(
         agent: *Agent,
         this_value: Value,
-        arguments: ArgumentsList,
+        arguments: Arguments,
     ) Agent.Error!Value {
         return toDateString_(agent, this_value, arguments);
     }
@@ -2067,7 +2051,7 @@ pub const DatePrototype = struct {
     fn toLocaleString(
         agent: *Agent,
         this_value: Value,
-        arguments: ArgumentsList,
+        arguments: Arguments,
     ) Agent.Error!Value {
         return toString(agent, this_value, arguments);
     }
@@ -2077,14 +2061,14 @@ pub const DatePrototype = struct {
     fn toLocaleTimeString(
         agent: *Agent,
         this_value: Value,
-        arguments: ArgumentsList,
+        arguments: Arguments,
     ) Agent.Error!Value {
         return toTimeString(agent, this_value, arguments);
     }
 
     /// 21.4.4.41 Date.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.tostring
-    fn toString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -2098,7 +2082,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.42 Date.prototype.toTimeString ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.totimestring
-    fn toTimeString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toTimeString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -2121,7 +2105,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.43 Date.prototype.toUTCString ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.toutcstring
-    fn toUTCString(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn toUTCString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -2171,7 +2155,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.44 Date.prototype.valueOf ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.valueof
-    fn valueOf(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn valueOf(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -2182,11 +2166,7 @@ pub const DatePrototype = struct {
 
     /// 21.4.4.45 Date.prototype [ @@toPrimitive ] ( hint )
     /// https://tc39.es/ecma262/#sec-date.prototype-@@toprimitive
-    fn @"@@toPrimitive"(
-        agent: *Agent,
-        this_value: Value,
-        arguments: ArgumentsList,
-    ) Agent.Error!Value {
+    fn @"@@toPrimitive"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const hint_value = arguments.get(0);
 
         // 1. Let O be the this value.
@@ -2227,7 +2207,7 @@ pub const DatePrototype = struct {
 
     /// B.2.3.1 Date.prototype.getYear ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getyear
-    fn getYear(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn getYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let dateObject be the this value.
         // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
@@ -2244,7 +2224,7 @@ pub const DatePrototype = struct {
 
     /// B.2.3.2 Date.prototype.setYear ( year )
     /// https://tc39.es/ecma262/#sec-date.prototype.setyear
-    fn setYear(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn setYear(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const year_value = arguments.get(0);
 
         // 1. Let dateObject be the this value.

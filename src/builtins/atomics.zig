@@ -12,7 +12,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const BigInt = types.BigInt;
 const Object = types.Object;
 const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
@@ -443,7 +443,7 @@ pub const Atomics = struct {
 
     /// 25.4.4 Atomics.add ( typedArray, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.add
-    fn add(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn add(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
         const index = arguments.get(1);
         const value = arguments.get(2);
@@ -461,7 +461,7 @@ pub const Atomics = struct {
 
     /// 25.4.5 Atomics.and ( typedArray, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.and
-    fn @"and"(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn @"and"(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
         const index = arguments.get(1);
         const value = arguments.get(2);
@@ -475,7 +475,7 @@ pub const Atomics = struct {
 
     /// 25.4.7 Atomics.exchange ( typedArray, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.exchange
-    fn exchange(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn exchange(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
         const index = arguments.get(1);
         const value = arguments.get(2);
@@ -490,7 +490,7 @@ pub const Atomics = struct {
 
     /// 25.4.8 Atomics.isLockFree ( size )
     /// https://tc39.es/ecma262/#sec-atomics.islockfree
-    fn isLockFree(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn isLockFree(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const size = arguments.get(0);
 
         // 1. Let n be ? ToIntegerOrInfinity(size).
@@ -510,7 +510,7 @@ pub const Atomics = struct {
 
     /// 25.4.9 Atomics.load ( typedArray, index )
     /// https://tc39.es/ecma262/#sec-atomics.load
-    fn load(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn load(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array_value = arguments.get(0);
         const index = arguments.get(1);
 
@@ -554,7 +554,7 @@ pub const Atomics = struct {
 
     /// 25.4.10 Atomics.or ( typedArray, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.or
-    fn @"or"(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn @"or"(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
         const index = arguments.get(1);
         const value = arguments.get(2);
@@ -568,7 +568,7 @@ pub const Atomics = struct {
 
     /// 25.4.11 Atomics.store ( typedArray, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.store
-    fn store(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn store(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array_value = arguments.get(0);
         const index = arguments.get(1);
         const value = arguments.get(2);
@@ -621,7 +621,7 @@ pub const Atomics = struct {
 
     /// 25.4.12 Atomics.sub ( typedArray, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.sub
-    fn sub(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn sub(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
         const index = arguments.get(1);
         const value = arguments.get(2);
@@ -639,7 +639,7 @@ pub const Atomics = struct {
 
     /// 25.4.13 Atomics.wait ( typedArray, index, value, timeout )
     /// https://tc39.es/ecma262/#sec-atomics.wait
-    fn wait(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn wait(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
         const index = arguments.get(1);
         const value = arguments.get(2);
@@ -651,7 +651,7 @@ pub const Atomics = struct {
 
     /// 25.4.14 Atomics.waitAsync ( typedArray, index, value, timeout )
     /// https://tc39.es/ecma262/#sec-atomics.waitasync
-    fn waitAsync(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn waitAsync(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
         const index = arguments.get(1);
         const value = arguments.get(2);
@@ -663,7 +663,7 @@ pub const Atomics = struct {
 
     /// 25.4.16 Atomics.xor ( typedArray, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.xor
-    fn xor(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn xor(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
         const index = arguments.get(1);
         const value = arguments.get(2);

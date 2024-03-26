@@ -11,7 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
@@ -619,7 +619,7 @@ pub const JSON = struct {
 
     /// 25.5.1 JSON.parse ( text [ , reviver ] )
     /// https://tc39.es/ecma262/#sec-json.parse
-    fn parse(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn parse(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const text = arguments.get(0);
         const reviver = arguments.get(1);
@@ -683,7 +683,7 @@ pub const JSON = struct {
 
     /// 25.5.2 JSON.stringify ( value [ , replacer [ , space ] ] )
     /// https://tc39.es/ecma262/#sec-json.stringify
-    fn stringify(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn stringify(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const value = arguments.get(0);
         const replacer = arguments.get(1);

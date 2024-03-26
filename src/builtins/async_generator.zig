@@ -11,7 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const Completion = types.Completion;
 const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
@@ -65,7 +65,7 @@ pub const AsyncGeneratorPrototype = struct {
 
     /// 27.6.1.2 %AsyncGeneratorPrototype%.next ( value )
     /// https://tc39.es/ecma262/#sec-asyncgenerator-prototype-next
-    fn next(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn next(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const value = arguments.get(0);
 
@@ -127,7 +127,7 @@ pub const AsyncGeneratorPrototype = struct {
 
     /// 27.6.1.3 %AsyncGeneratorPrototype%.return ( value )
     /// https://tc39.es/ecma262/#sec-asyncgenerator-prototype-return
-    fn @"return"(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn @"return"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const value = arguments.get(0);
 
@@ -184,7 +184,7 @@ pub const AsyncGeneratorPrototype = struct {
 
     /// 27.6.1.4 %AsyncGeneratorPrototype%.throw ( exception )
     /// https://tc39.es/ecma262/#sec-asyncgenerator-prototype-throw
-    fn throw(agent: *Agent, this_value: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn throw(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const exception = arguments.get(0);
 
@@ -638,7 +638,7 @@ pub fn asyncGeneratorAwaitReturn(agent: *Agent, generator: *AsyncGenerator) Allo
     // 10. Let fulfilledClosure be a new Abstract Closure with parameters (value) that captures
     //    generator and performs the following steps when called:
     const fulfilled_closure = struct {
-        fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) Agent.Error!Value {
+        fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
             const function_ = agent_.activeFunctionObject();
             const captures_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
             const generator_ = captures_.generator;
@@ -673,7 +673,7 @@ pub fn asyncGeneratorAwaitReturn(agent: *Agent, generator: *AsyncGenerator) Allo
     // 12. Let rejectedClosure be a new Abstract Closure with parameters (reason) that captures
     //    generator and performs the following steps when called:
     const rejected_closure = struct {
-        fn func(agent_: *Agent, _: Value, arguments_: ArgumentsList) Agent.Error!Value {
+        fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
             const function_ = agent_.activeFunctionObject();
             const captures_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
             const generator_ = captures_.generator;

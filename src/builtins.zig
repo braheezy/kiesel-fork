@@ -54,7 +54,6 @@ pub const AggregateError = @"error".AggregateError;
 pub const AggregateErrorConstructor = @"error".AggregateErrorConstructor;
 pub const AggregateErrorPrototype = @"error".AggregateErrorPrototype;
 pub const Arguments = arguments.Arguments;
-pub const ArgumentsList = builtin_function.ArgumentsList;
 pub const Array = array.Array;
 pub const ArrayBuffer = array_buffer.ArrayBuffer;
 pub const ArrayBufferConstructor = array_buffer.ArrayBufferConstructor;

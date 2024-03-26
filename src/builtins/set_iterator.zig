@@ -11,7 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
@@ -69,7 +69,7 @@ pub const SetIteratorPrototype = struct {
 
     /// 24.2.5.2.1 %SetIteratorPrototype%.next ( )
     /// https://tc39.es/ecma262/#sec-%setiteratorprototype%.next
-    fn next(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return ? GeneratorResume(this value, empty, "%SetIteratorPrototype%").
         // NOTE: In the absence of generators this implements one loop iteration of the
         //       CreateSetIterator closure. State is kept track of through the SetIterator

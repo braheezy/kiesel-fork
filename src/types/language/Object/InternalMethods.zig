@@ -6,14 +6,14 @@ const std = @import("std");
 const builtins = @import("../../../builtins.zig");
 const execution = @import("../../../execution.zig");
 const ordinary_internal_methods = builtins.ordinary_internal_methods;
-const spec = @import("../../spec.zig");
+const types = @import("../../../types.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
-const Object = @import("../Object.zig");
-const PropertyDescriptor = spec.PropertyDescriptor;
+const Arguments = types.Arguments;
+const Object = types.Object;
+const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = Object.PropertyKey;
-const Value = @import("../value.zig").Value;
+const Value = types.Value;
 
 /// [[GetPrototypeOf]]
 getPrototypeOf: *const fn (
@@ -85,12 +85,12 @@ ownPropertyKeys: *const fn (
 call: ?*const fn (
     object: Object,
     this_value: Value,
-    arguments_list: ArgumentsList,
+    arguments: Arguments,
 ) Agent.Error!Value = null,
 
 // [[Construct]]
 construct: ?*const fn (
     object: Object,
-    arguments_list: ArgumentsList,
+    arguments: Arguments,
     new_target: Object,
 ) Agent.Error!Object = null,

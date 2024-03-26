@@ -11,7 +11,7 @@ const Editor = @import("zigline").Editor;
 const Allocator = std.mem.Allocator;
 
 const Agent = kiesel.execution.Agent;
-const ArgumentsList = kiesel.builtins.ArgumentsList;
+const Arguments = kiesel.types.Arguments;
 const Diagnostics = kiesel.language.Diagnostics;
 const HostHooks = kiesel.execution.HostHooks;
 const ImportedModulePayload = kiesel.language.ImportedModulePayload;
@@ -96,12 +96,12 @@ const Kiesel = struct {
         return kiesel_object;
     }
 
-    fn collect(_: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
+    fn collect(_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         gc.collect();
         return .undefined;
     }
 
-    fn createIsHTMLDDA(agent: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
+    fn createIsHTMLDDA(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         if (std.meta.fieldInfo(Object.Data, .is_htmldda).type == void) {
             return agent.throwException(
                 .internal_error,
@@ -128,7 +128,7 @@ const Kiesel = struct {
                         /// - SpiderMonkey: [Throws](https://searchfox.org/mozilla-central/rev/c130c69b7b863d5e28ab9524b65c27c7a9507c48/js/src/shell/js.cpp#7071-7085)
                         ///
                         /// We pick the most common one :^)
-                        fn call(_: Object, _: Value, _: ArgumentsList) Agent.Error!Value {
+                        fn call(_: Object, _: Value, _: Arguments) Agent.Error!Value {
                             return .null;
                         }
                     }.call,
@@ -138,7 +138,7 @@ const Kiesel = struct {
         }
     }
 
-    fn createRealm(agent: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
+    fn createRealm(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         const realm = try Realm.create(agent);
         try realm.setRealmGlobalObject(null, null);
         const global_object = try realm.setDefaultGlobalBindings();
@@ -146,7 +146,7 @@ const Kiesel = struct {
         return Value.from(global_object);
     }
 
-    fn detachArrayBuffer(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn detachArrayBuffer(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const array_buffer = arguments.get(0);
         if (array_buffer != .object or !array_buffer.object.is(kiesel.builtins.ArrayBuffer)) {
             return agent.throwException(.type_error, "Argument must be an ArrayBuffer", .{});
@@ -160,7 +160,7 @@ const Kiesel = struct {
     }
 
     /// Algorithm from https://github.com/tc39/test262/blob/main/INTERPRETING.md
-    fn evalScript(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn evalScript(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const source_text = try arguments.get(0).toString(agent);
 
         // 1. Let hostDefined be any host-defined values for the provided sourceText (obtained in
@@ -202,7 +202,7 @@ const Kiesel = struct {
         return status;
     }
 
-    fn print(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn print(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const stdout = std.io.getStdOut().writer();
         const value = arguments.get(0);
         const options = try coerceOptionsToObject(agent, arguments.get(1));
@@ -216,7 +216,7 @@ const Kiesel = struct {
         return .undefined;
     }
 
-    fn readFile_(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn readFile_(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const path = try arguments.get(0).toString(agent);
         const bytes = readFile(
             agent.gc_allocator,
@@ -236,7 +236,7 @@ const Kiesel = struct {
         return Value.from(bytes);
     }
 
-    fn readLine(agent: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
+    fn readLine(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         const stdin = std.io.getStdIn().reader();
         const bytes = stdin.readUntilDelimiterOrEofAlloc(
             agent.gc_allocator,
@@ -255,7 +255,7 @@ const Kiesel = struct {
         return Value.from(bytes);
     }
 
-    fn readStdin(agent: *Agent, _: Value, _: ArgumentsList) Agent.Error!Value {
+    fn readStdin(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         const stdin = std.io.getStdIn().reader();
         const bytes = stdin.readAllAlloc(
             agent.gc_allocator,
@@ -273,7 +273,7 @@ const Kiesel = struct {
         return Value.from(bytes);
     }
 
-    fn sleep(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn sleep(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const milliseconds = try arguments.get(0).toNumber(agent);
         if (milliseconds.asFloat() < 0 or !milliseconds.isFinite()) {
             return agent.throwException(
@@ -287,7 +287,7 @@ const Kiesel = struct {
         return .undefined;
     }
 
-    fn writeFile(agent: *Agent, _: Value, arguments: ArgumentsList) Agent.Error!Value {
+    fn writeFile(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const path = try arguments.get(0).toString(agent);
         const contents = try arguments.get(1).toString(agent);
 

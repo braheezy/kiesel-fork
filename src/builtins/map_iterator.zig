@@ -11,7 +11,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
-const ArgumentsList = builtins.ArgumentsList;
+const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Map = builtins.Map;
 const Object = types.Object;
@@ -69,7 +69,7 @@ pub const MapIteratorPrototype = struct {
 
     /// 24.1.5.2.1 %MapIteratorPrototype%.next ( )
     /// https://tc39.es/ecma262/#sec-%mapiteratorprototype%.next
-    fn next(agent: *Agent, this_value: Value, _: ArgumentsList) Agent.Error!Value {
+    fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return ? GeneratorResume(this value, empty, "%MapIteratorPrototype%").
         // NOTE: In the absence of generators this implements one loop iteration of the
         //       CreateMapIterator closure. State is kept track of through the MapIterator

@@ -1,6 +1,7 @@
 const data_block = @import("spec/data_block.zig");
 const iterator = @import("spec/iterator.zig");
 
+pub const Arguments = @import("spec/Arguments.zig");
 pub const ClassFieldDefinition = @import("spec/ClassFieldDefinition.zig");
 pub const ClassStaticBlockDefinition = @import("spec/ClassStaticBlockDefinition.zig");
 pub const Completion = @import("spec/Completion.zig");
