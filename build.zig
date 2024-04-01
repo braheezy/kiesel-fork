@@ -166,6 +166,29 @@ pub fn build(b: *std.Build) void {
         .install_subdir = "docs",
     });
 
+    // Something changed in autodoc (possibly https://github.com/ziglang/zig/pull/19458) and it
+    // started to call the root module "root", which:
+    // - Broke detecting `src/kiesel.zig` as the entrypoint (now called `root/kiesel.zig` instead
+    //   of `src/kiesel.zig` in `sources.tar`, names need to match) and defaulted to the first
+    //   file instead (`root/builtins.zig`)
+    // - Named the breadcrumb "root" instead of "kiesel" after renaming to `src/root.zig` to work
+    //   around the first issue
+    // This makes the generated docs an awful amount less useful so we're fixing it with an inlined
+    // Python script. Yes, you read that correctly.
+    // See also: https://github.com/ziglang/zig/issues/17334#issuecomment-2010992633
+    const fix_docs = b.addSystemCommand(&.{
+        "python3", "-c",
+        \\import tarfile
+        \\with open("zig-out/docs/sources.tar", mode="r+b") as f:
+        \\    with tarfile.open(mode="r", fileobj=f) as tar:
+        \\        members = tar.getmembers()
+        \\    for tar_info in members:
+        \\        tar_info.name = tar_info.name.replace("root/", "kiesel/")
+        \\        f.seek(tar_info.offset)
+        \\        f.write(tar_info.tobuf(tarfile.USTAR_FORMAT))
+    });
+    fix_docs.step.dependOn(&install_docs.step);
+
     const docs_step = b.step("docs", "Build and install documentation");
-    docs_step.dependOn(&install_docs.step);
+    docs_step.dependOn(&fix_docs.step);
 }
