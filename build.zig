@@ -2,6 +2,7 @@ const builtin = @import("builtin");
 const std = @import("std");
 
 const build_icu4zig = @import("icu4zig");
+const build_macos_sdk = @import("macos_sdk");
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
@@ -36,6 +37,7 @@ pub fn build(b: *std.Build) void {
     const libgc = b.dependency("libgc", .{
         .target = target,
         .optimize = optimize,
+        .BUILD_SHARED_LIBS = false,
     });
     const libregexp = b.dependency("libregexp", .{
         .target = target,
@@ -57,10 +59,6 @@ pub fn build(b: *std.Build) void {
             .name = "any-pointer",
         },
         .{
-            .module = libgc.module("gc"),
-            .name = "gc",
-        },
-        .{
             .module = parser_toolkit.module("parser-toolkit"),
             .name = "ptk",
         },
@@ -80,6 +78,12 @@ pub fn build(b: *std.Build) void {
         .root_source_file = .{ .path = "src/kiesel.zig" },
         .imports = imports.items,
     });
+    kiesel.addIncludePath(.{
+        .cwd_relative = libgc.builder.getInstallPath(.header, ""),
+    });
+    if (target.result.os.tag == .macos) {
+        build_macos_sdk.addPaths(libgc.artifact("gc"));
+    }
     kiesel.linkLibrary(libgc.artifact("gc"));
     kiesel.linkLibrary(libregexp.artifact("regexp"));
 
@@ -107,7 +111,6 @@ pub fn build(b: *std.Build) void {
         exe.root_module.addImport("kiesel-runtime", kiesel_runtime.module("kiesel-runtime"));
     }
     exe.root_module.addImport("args", zig_args.module("args"));
-    exe.root_module.addImport("gc", libgc.module("gc"));
     exe.root_module.addImport("zigline", zigline.module("zigline"));
     if (optimize != .Debug) exe.root_module.strip = true;
 
@@ -132,7 +135,6 @@ pub fn build(b: *std.Build) void {
     unit_tests.linkLibrary(libregexp.artifact("regexp"));
     unit_tests.root_module.addImport("build-options", options.createModule());
     unit_tests.root_module.addImport("any-pointer", any_pointer.module("any-pointer"));
-    unit_tests.root_module.addImport("gc", libgc.module("gc"));
     unit_tests.root_module.addImport("ptk", parser_toolkit.module("parser-toolkit"));
     if (enable_intl) {
         const icu4zig = b.dependency("icu4zig", .{

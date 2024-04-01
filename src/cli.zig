@@ -2,7 +2,6 @@ const builtin = @import("builtin");
 const std = @import("std");
 
 const args = @import("args");
-const gc = @import("gc");
 const kiesel = @import("kiesel");
 const kiesel_runtime = @import("kiesel-runtime");
 
@@ -39,20 +38,14 @@ var tracked_promise_rejections: std.AutoArrayHashMap(
     HostHooks.PromiseRejectionTrackerOperation,
 ) = undefined;
 
-const bdwgc_version_string = std.fmt.comptimePrint("{}.{}.{}", .{
-    gc.c.GC_VERSION_MAJOR,
-    gc.c.GC_VERSION_MINOR,
-    gc.c.GC_VERSION_MICRO,
-});
-
 const version = std.fmt.comptimePrint(
     \\kiesel {[kiesel]s}
-    \\bdwgc {[bdwgc]s}
+    \\libgc {[libgc]s}
     \\zig {[zig]s}
     \\
 , .{
     .kiesel = kiesel.version_string,
-    .bdwgc = bdwgc_version_string,
+    .libgc = kiesel.gc.libgc_version_string,
     .zig = builtin.zig_version_string,
 });
 
@@ -97,7 +90,7 @@ const Kiesel = struct {
     }
 
     fn collect(_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
-        gc.collect();
+        kiesel.gc.collect();
         return .undefined;
     }
 
@@ -660,13 +653,9 @@ pub fn main() !u8 {
         return 0;
     }
 
-    if (parsed_args.options.@"disable-gc") gc.disable();
-    if (!parsed_args.options.@"print-gc-warnings") {
-        gc.c.GC_set_warn_proc(struct {
-            fn func(_: [*c]u8, _: gc.c.GC_word) callconv(.C) void {}
-        }.func);
-    }
-    var agent = try Agent.init(gc.allocator(), .{
+    if (parsed_args.options.@"disable-gc") kiesel.gc.disable();
+    if (!parsed_args.options.@"print-gc-warnings") kiesel.gc.disableWarnings();
+    var agent = try Agent.init(kiesel.gc.allocator(), .{
         .debug = .{
             .print_ast = parsed_args.options.@"print-ast",
             .print_bytecode = parsed_args.options.@"print-bytecode",

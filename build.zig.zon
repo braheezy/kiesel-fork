@@ -18,12 +18,17 @@
             .lazy = true,
         },
         .libgc = .{
-            .url = "https://github.com/linusg/zig-libgc/archive/8d488adfb067ce435056fcfdb84537049c8d152b.tar.gz",
-            .hash = "1220df7e3832cbd79557677ee95f5992a2d2e7e31444985f1ab5c8d86e82f8d9a337",
+            .url = "https://github.com/ivmai/bdwgc/archive/4d6cdc072663c1a22379d84acdac8a273ace1bc9.tar.gz",
+            .hash = "1220f14a2b23ea1a9c5c44aee01667273b732778a83e5925a825ab6afffab2ba24ad",
         },
         .libregexp = .{
             .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/594283c5e1a9dbea1ae357e5681077f01a9607fb.tar.gz",
             .hash = "12201df058b457961514ced84daf38cd8739519a4ee621b4ee229ad8b53fc228fb97",
+        },
+        // Needed for mach-o/getsect.h when building libgc for macOS
+        .macos_sdk = .{
+            .url = "https://github.com/mitchellh/zig-build-macos-sdk/archive/ee70f27c08680307fa35ada92e6b2c36e0ff84c6.tar.gz",
+            .hash = "1220b415f529f1c04ed876c2b481e9f8119d353d4e3d4d7c8607ee302d2142e13eca",
         },
         .parser_toolkit = .{
             .url = "https://github.com/MasterQ32/parser-toolkit/archive/358a028beb32ebb193dadb6f7a954965745892a7.tar.gz",

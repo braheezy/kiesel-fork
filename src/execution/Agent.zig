@@ -339,7 +339,7 @@ pub fn getGlobalObject(self: Self) Object {
 }
 
 test "well_known_symbols" {
-    const gc = @import("gc");
+    const gc = @import("../gc.zig");
     var agent = try init(gc.allocator(), .{});
     defer agent.deinit();
     const unscopables = agent.well_known_symbols.@"@@unscopables";

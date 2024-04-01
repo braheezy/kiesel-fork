@@ -872,7 +872,7 @@ pub fn initializeInstanceElements(self: *Self, constructor: Self) Agent.Error!vo
 }
 
 test "format" {
-    const gc = @import("gc");
+    const gc = @import("../../gc.zig");
     var agent_ = try Agent.init(gc.allocator(), .{});
     defer agent_.deinit();
     const object = try builtins.Object.create(&agent_, .{

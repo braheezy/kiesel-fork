@@ -195,7 +195,7 @@ pub inline fn hasFields(self: Self) bool {
 }
 
 test "isAccessorDescriptor" {
-    const gc = @import("gc");
+    const gc = @import("../../gc.zig");
     var agent = try Agent.init(gc.allocator(), .{});
     defer agent.deinit();
     const getter = try builtins.Object.create(&agent, .{
@@ -219,7 +219,7 @@ test "isDataDescriptor" {
 }
 
 test "isGenericDescriptor" {
-    const gc = @import("gc");
+    const gc = @import("../../gc.zig");
     var agent = try Agent.init(gc.allocator(), .{});
     defer agent.deinit();
     const setter = try builtins.Object.create(&agent, .{

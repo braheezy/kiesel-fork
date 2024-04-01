@@ -1836,7 +1836,7 @@ pub fn ValueArrayHashMap(comptime V: type, comptime eqlFn: fn (Value, Value) boo
 }
 
 test "format" {
-    const gc = @import("gc");
+    const gc = @import("../../gc.zig");
     var agent = try Agent.init(gc.allocator(), .{});
     defer agent.deinit();
     const object = try builtins.Object.create(&agent, .{

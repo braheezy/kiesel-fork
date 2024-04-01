@@ -5,8 +5,6 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
-const gc = @import("gc");
-
 const libregexp = @cImport({
     @cInclude("cutils.h"); // For the BOOL typedef
     @cInclude("libregexp.h");
@@ -15,6 +13,7 @@ const libregexp = @cImport({
 const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
+const gc = @import("../gc.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
@@ -39,18 +38,6 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const sameValue = types.sameValue;
 
-/// Copied from zig-libgc, unfortunately not a public API
-fn getHeader(ptr: [*]u8) *[*]u8 {
-    return @as(*[*]u8, @ptrFromInt(@intFromPtr(ptr) - @sizeOf(usize)));
-}
-
-/// Copied from zig-libgc, unfortunately not a public API
-fn alignedAllocSize(ptr: [*]u8) usize {
-    const unaligned_ptr = getHeader(ptr).*;
-    const delta = @intFromPtr(ptr) - @intFromPtr(unaligned_ptr);
-    return gc.c.GC_size(unaligned_ptr) - delta;
-}
-
 export fn lre_check_stack_overflow(_: ?*anyopaque, _: usize) c_int {
     // TODO: Implement stack overflow check
     return 0;
@@ -60,7 +47,7 @@ export fn lre_realloc(@"opaque": ?*anyopaque, maybe_ptr: ?*anyopaque, size: usiz
     const agent = @as(*Agent, @alignCast(@ptrCast(@"opaque".?)));
     if (maybe_ptr) |ptr| {
         var old_mem: []u8 = @as(*[0]u8, @ptrCast(ptr));
-        old_mem.len = alignedAllocSize(old_mem.ptr);
+        old_mem.len = gc.GcAllocator.alignedAllocSize(old_mem.ptr);
         return if (agent.gc_allocator.realloc(old_mem, size)) |slice| slice.ptr else |_| null;
     } else {
         return if (agent.gc_allocator.alloc(u8, size)) |slice| slice.ptr else |_| null;
