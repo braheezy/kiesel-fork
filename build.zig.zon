@@ -13,8 +13,8 @@
         .kiesel_runtime = .{
             // Uncommend for local development:
             // .path = "../runtime",
-            .url = "https://codeberg.org/kiesel-js/runtime/archive/49ed472bc6ba4c4b899ba62a2c0d834fffb00c5f.tar.gz",
-            .hash = "1220e26f7538ce0013dab67b641c71aa481593e898daead67c41723bb32c313eef4a",
+            .url = "https://codeberg.org/kiesel-js/runtime/archive/eabd4772e8993a616fbe42bcc65155f6e3caa916.tar.gz",
+            .hash = "122087a5204dd4b1cb1786b86b708fff8fb166fbb7901d826cb985183bb7673b0fba",
             .lazy = true,
         },
         .libgc = .{
