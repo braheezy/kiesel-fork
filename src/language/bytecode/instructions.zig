@@ -189,6 +189,7 @@ pub const Instruction = enum(u8) {
             .apply_string_or_numeric_binary_operator,
             .array_set_length,
             .binding_class_declaration_evaluation,
+            .block_declaration_instantiation,
             .class_definition_evaluation,
             .create_catch_binding,
             .evaluate_new,
