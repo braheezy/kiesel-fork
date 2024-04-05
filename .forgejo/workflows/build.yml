@@ -2,7 +2,11 @@ name: Build
 
 on:
   push:
-    branches: [main]
+  pull_request:
+
+env:
+  # https://stackoverflow.com/a/71158878
+  BRANCH_NAME: ${{ github.head_ref || github.ref_name }} 
 
 jobs:
   build:
@@ -45,6 +49,9 @@ jobs:
         run: |
           cat > upload.sh << EOF
           #!/bin/bash
+          if [[ "\$BRANCH_NAME" != "main" ]]; then
+            exit 0
+          fi
           curl \
             -u "${{ secrets.ARTIFACT_UPLOAD_USER }}:${{ secrets.ARTIFACT_UPLOAD_PASSWORD }}" \
             -F "path=@\$1" \
@@ -89,5 +96,7 @@ jobs:
           ./upload.sh zig-out/bin/kiesel-windows-x86_64.exe
       - name: Update version.txt
         run: |
-          git rev-parse main > version.txt
-          ./upload.sh version.txt
+          if [[ "\$BRANCH_NAME" == "main" ]]; then
+            git rev-parse main > version.txt
+            ./upload.sh version.txt
+          fi
