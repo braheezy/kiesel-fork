@@ -415,16 +415,31 @@ pub fn getValueFromBuffer(
     return rawBytesToNumeric(@"type", raw_value, is_little_endian);
 }
 
-/// 25.1.3.17 NumericToRawBytes ( type, value, isLittleEndian )
-/// https://tc39.es/ecma262/#sec-numerictorawbytes
+/// 6 NumericToRawBytes ( type, value, isLittleEndian )
+/// https://tc39.es/proposal-float16array/#sec-numerictorawbytes
 pub fn numericToRawBytes(
     agent: *Agent,
     comptime @"type": TypedArrayElementType,
     value: Value,
     is_little_endian: bool,
 ) Allocator.Error![@sizeOf(@"type".T)]u8 {
-    // 1. If type is float32, then
-    var raw_bytes = if (@"type".T == f32) blk: {
+    // 1. If type is Float16, then
+    var raw_bytes = if (@"type".T == f16) blk: {
+        // a. Let rawBytes be a List whose elements are the 2 bytes that are the result of
+        //    converting value to IEEE 754-2019 binary16 format using roundTiesToEven mode. The
+        //    bytes are arranged in little endian order. If value is NaN, rawBytes may be set to any
+        //    implementation chosen IEEE 754-2019 binary16 format Not-a-Number encoding. An
+        //    implementation must always choose the same encoding for each implementation
+        //    distinguishable NaN value.
+        break :blk std.mem.toBytes(
+            if (value.number.isNan())
+                std.math.nan(f16)
+            else
+                value.number.toFloat16(),
+        );
+    }
+    // 2. If type is float32, then
+    else if (@"type".T == f32) blk: {
         // a. Let rawBytes be a List whose elements are the 4 bytes that are the result of
         //    converting value to IEEE 754-2019 binary32 format using roundTiesToEven mode. The
         //    bytes are arranged in little endian order. If value is NaN, rawBytes may be set to
@@ -438,7 +453,7 @@ pub fn numericToRawBytes(
                 @as(f32, @floatCast(value.number.asFloat())),
         );
     }
-    // 2. Else if type is float64, then
+    // 3. Else if type is float64, then
     else if (@"type".T == f64) blk: {
         // a. Let rawBytes be a List whose elements are the 8 bytes that are the IEEE 754-2019
         //    binary64 format encoding of value. The bytes are arranged in little endian order. If
@@ -452,7 +467,7 @@ pub fn numericToRawBytes(
                 value.number.asFloat(),
         );
     }
-    // 3. Else,
+    // 4. Else,
     else blk: {
         // a. Let n be the Element Size value specified in Table 71 for Element Type type.
 
@@ -472,10 +487,10 @@ pub fn numericToRawBytes(
         break :blk std.mem.toBytes(int_value);
     };
 
-    // 4. If isLittleEndian is false, reverse the order of the elements of rawBytes.
+    // 5. If isLittleEndian is false, reverse the order of the elements of rawBytes.
     if (!is_little_endian) std.mem.reverse(u8, &raw_bytes);
 
-    // 5. Return rawBytes.
+    // 6. Return rawBytes.
     return raw_bytes;
 }
 
