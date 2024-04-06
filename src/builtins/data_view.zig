@@ -480,6 +480,7 @@ pub const DataViewPrototype = struct {
         try defineBuiltinAccessor(object, "byteOffset", byteOffset, null, realm);
         try defineBuiltinFunction(object, "getBigInt64", getBigInt64, 1, realm);
         try defineBuiltinFunction(object, "getBigUint64", getBigUint64, 1, realm);
+        try defineBuiltinFunction(object, "getFloat16", getFloat16, 1, realm);
         try defineBuiltinFunction(object, "getFloat32", getFloat32, 1, realm);
         try defineBuiltinFunction(object, "getFloat64", getFloat64, 1, realm);
         try defineBuiltinFunction(object, "getInt8", getInt8, 1, realm);
@@ -490,6 +491,7 @@ pub const DataViewPrototype = struct {
         try defineBuiltinFunction(object, "getUint32", getUint32, 1, realm);
         try defineBuiltinFunction(object, "setBigInt64", setBigInt64, 2, realm);
         try defineBuiltinFunction(object, "setBigUint64", setBigUint64, 2, realm);
+        try defineBuiltinFunction(object, "setFloat16", setFloat16, 2, realm);
         try defineBuiltinFunction(object, "setFloat32", setFloat32, 2, realm);
         try defineBuiltinFunction(object, "setFloat64", setFloat64, 2, realm);
         try defineBuiltinFunction(object, "setInt8", setInt8, 2, realm);
@@ -592,6 +594,18 @@ pub const DataViewPrototype = struct {
         // 1. Let v be the this value.
         // 2. Return ? GetViewValue(v, byteOffset, littleEndian, biguint64).
         return getViewValue(agent, this_value, byte_offset, little_endian, .{ .T = u64 });
+    }
+
+    /// 7.1 DataView.prototype.getFloat16 ( byteOffset [ , littleEndian ] )
+    /// https://tc39.es/proposal-float16array/#sec-dataview.prototype.getfloat16
+    fn getFloat16(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const byte_offset = arguments.get(0);
+        const little_endian = arguments.get(1);
+
+        // 1. Let v be the this value.
+        // 2. If littleEndian is not present, set littleEndian to false.
+        // 3. Return ? GetViewValue(v, byteOffset, littleEndian, Float16).
+        return getViewValue(agent, this_value, byte_offset, little_endian, .{ .T = f16 });
     }
 
     /// 25.3.4.7 DataView.prototype.getFloat32 ( byteOffset [ , littleEndian ] )
@@ -708,6 +722,19 @@ pub const DataViewPrototype = struct {
         // 1. Let v be the this value.
         // 2. Return ? SetViewValue(v, byteOffset, littleEndian, biguint64, value).
         return setViewValue(agent, this_value, byte_offset, little_endian, .{ .T = u64 }, value);
+    }
+
+    /// 7.2 DataView.prototype.setFloat16 ( byteOffset, value [ , littleEndian ] )
+    /// https://tc39.es/proposal-float16array/#sec-dataview.prototype.setfloat16
+    fn setFloat16(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const byte_offset = arguments.get(0);
+        const value = arguments.get(1);
+        const little_endian = arguments.getOrNull(2) orelse Value.from(false);
+
+        // 1. Let v be the this value.
+        // 2. If littleEndian is not present, set littleEndian to false.
+        // 3. Return ? SetViewValue(v, byteOffset, littleEndian, Float16, value).
+        return setViewValue(agent, this_value, byte_offset, little_endian, .{ .T = f16 }, value);
     }
 
     /// 25.3.4.17 DataView.prototype.setFloat32 ( byteOffset, value [ , littleEndian ] )
