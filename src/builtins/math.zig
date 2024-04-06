@@ -124,6 +124,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "cosh", cosh, 1, realm);
         try defineBuiltinFunction(object, "exp", exp, 1, realm);
         try defineBuiltinFunction(object, "expm1", expm1, 1, realm);
+        try defineBuiltinFunction(object, "f16round", f16round, 1, realm);
         try defineBuiltinFunction(object, "floor", floor, 1, realm);
         try defineBuiltinFunction(object, "fround", fround, 1, realm);
         try defineBuiltinFunction(object, "hypot", hypot, 2, realm);
@@ -412,6 +413,26 @@ pub const Math = struct {
         //    subtracting 1 from the exponential function of ℝ(n).
         if (n.isNegativeZero()) return Value.from(n);
         return Value.from(@exp(n.asFloat()) - 1);
+    }
+
+    /// 3.1 Math.f16round ( x )
+    /// https://tc39.es/proposal-float16array/#sec-math.f16round
+    fn f16round(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const x = arguments.get(0);
+
+        // 1. Let n be ? ToNumber(x).
+        const n = try x.toNumber(agent);
+
+        // 2. If n is NaN, return NaN.
+        // 3. If n is one of +0𝔽, -0𝔽, +∞𝔽, or -∞𝔽, return n.
+        // 4. Let n16 be the result of converting n to IEEE 754-2019 binary16 format using roundTiesToEven mode.
+        const n_16 = n.toFloat16();
+
+        // 5. Let n64 be the result of converting n16 to IEEE 754-2019 binary64 format.
+        const n_64: f64 = @floatCast(n_16);
+
+        // 6. Return the ECMAScript Number value corresponding to n64.
+        return Value.from(n_64);
     }
 
     /// 21.3.2.16 Math.floor ( x )
