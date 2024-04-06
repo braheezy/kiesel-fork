@@ -29,7 +29,7 @@ const NameAndPropertyDescriptor = struct {
     PropertyDescriptor,
 };
 
-const num_properties = 53 +
+const num_properties = 54 +
     (if (build_options.enable_annex_b) 2 else 0) +
     (if (build_options.enable_intl) 1 else 0);
 
@@ -131,6 +131,10 @@ pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]Nam
         // 19.3.11 EvalError ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-evalerror
         .{ "EvalError", .{ .value = Value.from(try realm.intrinsics.@"%EvalError%"()), .writable = true, .enumerable = false, .configurable = true } },
+
+        // 2.1 Float16Array ( . . . )
+        // https://tc39.es/proposal-float16array/#sec-float16array
+        .{ "Float16Array", .{ .value = Value.from(try realm.intrinsics.@"%Float16Array%"()), .writable = true, .enumerable = false, .configurable = true } },
 
         // 19.3.13 Float32Array ( . . . )
         // https://tc39.es/ecma262/#sec-float32array

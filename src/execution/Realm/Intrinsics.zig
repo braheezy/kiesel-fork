@@ -57,6 +57,8 @@ lazy_intrinsics: struct {
     @"%eval%": ?Object = null,
     @"%EvalError%": ?Object = null,
     @"%EvalError.prototype%": ?Object = null,
+    @"%Float16Array%": ?Object = null,
+    @"%Float16Array.prototype%": ?Object = null,
     @"%Float32Array%": ?Object = null,
     @"%Float32Array.prototype%": ?Object = null,
     @"%Float64Array%": ?Object = null,
@@ -280,6 +282,12 @@ pub fn @"%EvalError%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%EvalError.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%EvalError.prototype%", builtins.EvalErrorPrototype);
+}
+pub fn @"%Float16Array%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Float16Array%", builtins.Float16ArrayConstructor);
+}
+pub fn @"%Float16Array.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Float16Array.prototype%", builtins.Float16ArrayPrototype);
 }
 pub fn @"%Float32Array%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Float32Array%", builtins.Float32ArrayConstructor);

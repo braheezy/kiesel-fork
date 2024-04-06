@@ -77,6 +77,9 @@ pub const BigInt64ArrayPrototype = MakeTypedArrayPrototype("BigInt64Array");
 pub const BigUint64ArrayConstructor = MakeTypedArrayConstructor("BigUint64Array");
 pub const BigUint64ArrayPrototype = MakeTypedArrayPrototype("BigUint64Array");
 
+pub const Float16ArrayConstructor = MakeTypedArrayConstructor("Float16Array");
+pub const Float16ArrayPrototype = MakeTypedArrayPrototype("Float32Array");
+
 pub const Float32ArrayConstructor = MakeTypedArrayConstructor("Float32Array");
 pub const Float32ArrayPrototype = MakeTypedArrayPrototype("Float32Array");
 
@@ -118,7 +121,7 @@ pub const TypedArrayElementType = struct {
     pub inline fn isUnclampedIntegerElementType(comptime self: Self) bool {
         // 1. If type is one of int8, uint8, int16, uint16, int32, or uint32, return true.
         // 2. Return false.
-        return self.clamping != .clamped and self.T != f32 and self.T != f64;
+        return self.clamping != .clamped and self.T != f16 and self.T != f32 and self.T != f64;
     }
 
     /// 25.1.3.11 IsBigIntElementType ( type )
@@ -140,6 +143,7 @@ pub const typed_array_element_types = [_]struct { []const u8, TypedArrayElementT
     .{ "Uint32Array", .{ .T = u32 } },
     .{ "BigInt64Array", .{ .T = i64 } },
     .{ "BigUint64Array", .{ .T = u64 } },
+    .{ "Float16Array", .{ .T = f16 } },
     .{ "Float32Array", .{ .T = f32 } },
     .{ "Float64Array", .{ .T = f64 } },
 };
@@ -3146,6 +3150,7 @@ pub fn typedArrayElementSize(typed_array: *const TypedArray) u53 {
         .{ "Uint32Array", 4 },
         .{ "BigInt64Array", 8 },
         .{ "BigUint64Array", 8 },
+        .{ "Float16Array", 2 },
         .{ "Float32Array", 4 },
         .{ "Float64Array", 8 },
     }).get(typed_array.fields.typed_array_name).?);
