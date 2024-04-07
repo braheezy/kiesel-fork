@@ -6,6 +6,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const types = @import("../../types.zig");
+const utils = @import("../../utils.zig");
 
 const String = types.String;
 
@@ -180,6 +181,10 @@ pub const Number = union(enum) {
                 break :blk @as(u32, @intCast(int32bit));
             },
         };
+    }
+
+    pub fn toFloat16(self: Self) f16 {
+        return utils.float16.__truncdfhf2(self.asFloat());
     }
 
     /// 6.1.6.1.1 Number::unaryMinus ( x )

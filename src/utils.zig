@@ -7,6 +7,7 @@ const Allocator = std.mem.Allocator;
 
 const builtins = @import("builtins.zig");
 const execution = @import("execution.zig");
+pub const float16 = @import("utils/float16.zig");
 const types = @import("types.zig");
 
 const Agent = execution.Agent;
