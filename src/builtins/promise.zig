@@ -1519,6 +1519,7 @@ pub const PromiseConstructor = struct {
         try defineBuiltinFunction(object, "race", race, 1, realm);
         try defineBuiltinFunction(object, "reject", reject, 1, realm);
         try defineBuiltinFunction(object, "resolve", resolve, 1, realm);
+        try defineBuiltinFunction(object, "try", @"try", 1, realm);
         try defineBuiltinFunction(object, "withResolvers", withResolvers, 0, realm);
         try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
 
@@ -1833,6 +1834,50 @@ pub const PromiseConstructor = struct {
 
         // 3. Return ? PromiseResolve(C, x).
         return Value.from(try promiseResolve(agent, constructor.object, resolution));
+    }
+
+    /// 1 Promise.try ( callbackfn, ...args )
+    /// https://tc39.es/proposal-promise-try/#sec-promise.try
+    fn @"try"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const callbackfn = arguments.get(0);
+        const args = arguments.values[1..];
+
+        // 1. Let C be the this value.
+        const constructor = this_value;
+
+        // 2. If C is not an Object, throw a TypeError exception.
+        if (constructor != .object) {
+            return agent.throwException(.type_error, "{} is not an Object", .{constructor});
+        }
+
+        // 3. Let promiseCapability be ? NewPromiseCapability(C).
+        const promise_capability = try newPromiseCapability(agent, constructor);
+
+        // 4. Let status be Completion(Call(callbackfn, undefined, args)).
+        const status = callbackfn.call(agent, .undefined, args);
+
+        // 5. If status is an abrupt completion, then
+        //     a. Perform ? Call(promiseCapability.[[Reject]], undefined, « status.[[Value]] »).
+        // 6. Else,
+        //     a. Perform ? Call(promiseCapability.[[Resolve]], undefined, « status.[[Value]] »).
+        if (status) |value| {
+            _ = try Value.from(promise_capability.resolve).callAssumeCallable(
+                .undefined,
+                &.{value},
+            );
+        } else |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.ExceptionThrown => {
+                const exception = agent.clearException();
+                _ = try Value.from(promise_capability.reject).callAssumeCallable(
+                    .undefined,
+                    &.{exception},
+                );
+            },
+        }
+
+        // 7. Return promiseCapability.[[Promise]].
+        return Value.from(promise_capability.promise);
     }
 
     /// 27.2.4.8 Promise.withResolvers ( )
