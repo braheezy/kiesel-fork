@@ -773,8 +773,8 @@ pub const StringPrototype = struct {
         // 10. Let index be StringIndexOf(S, searchStr, start).
         const index = string.indexOf(search_str, start);
 
-        // 11. If index ≠ -1, return true.
-        // 12. Return false.
+        // 11. If index is not-found, return false.
+        // 12. Return true.
         return Value.from(index != null);
     }
 
@@ -803,9 +803,13 @@ pub const StringPrototype = struct {
         // 7. Let start be the result of clamping pos between 0 and len.
         const start = std.math.clamp(std.math.lossyCast(usize, pos), 0, len);
 
-        // 8. Return 𝔽(StringIndexOf(S, searchStr, start)).
-        const index = string.indexOf(search_str, start) orelse return Value.from(-1);
-        return Value.from(@as(u53, @intCast(index)));
+        // 8. Let result be StringIndexOf(S, searchStr, start).
+        // 9. If result is not-found, return -1𝔽.
+        // 10. Return 𝔽(result).
+        return if (string.indexOf(search_str, start)) |result|
+            Value.from(@as(u53, @intCast(result)))
+        else
+            Value.from(-1);
     }
 
     /// 22.1.3.10 String.prototype.isWellFormed ( )
@@ -861,9 +865,13 @@ pub const StringPrototype = struct {
             std.math.sub(usize, len, search_len) catch return Value.from(-1),
         );
 
-        // 10. Return 𝔽(StringLastIndexOf(S, searchStr, start)).
-        const index = string.lastIndexOf(search_str, start) orelse return Value.from(-1);
-        return Value.from(@as(u53, @intCast(index)));
+        // 10. Let result be StringLastIndexOf(S, searchStr, start).
+        // 11. If result is not-found, return -1𝔽.
+        // 12. Return 𝔽(result).
+        return if (string.lastIndexOf(search_str, start)) |result|
+            Value.from(@as(u53, @intCast(result)))
+        else
+            Value.from(-1);
     }
 
     /// 22.1.3.13 String.prototype.match ( regexp )
@@ -1121,7 +1129,7 @@ pub const StringPrototype = struct {
         // 8. Let position be StringIndexOf(string, searchString, 0).
         const position = string.indexOf(search_string, 0);
 
-        // 9. If position = -1, return string.
+        // 9. If position is not-found, return string.
         if (position == null) return Value.from(string);
 
         // 10. Let preceding be the substring of string from 0 to position.
@@ -1245,7 +1253,7 @@ pub const StringPrototype = struct {
         // 10. Let position be StringIndexOf(string, searchString, 0).
         var maybe_position = string.indexOf(search_string, 0);
 
-        // 11. Repeat, while position ≠ -1,
+        // 11. Repeat, while position is not not-found,
         while (maybe_position) |position| {
             // a. Append position to matchPositions.
             try match_positions.append(position);
@@ -1529,7 +1537,7 @@ pub const StringPrototype = struct {
         // 13. Let j be StringIndexOf(S, R, 0).
         var j = string.indexOf(separator, 0);
 
-        // 14. Repeat, while j ≠ -1,
+        // 14. Repeat, while j is not not-found,
         while (j != null) {
             // a. Let T be the substring of S from i to j.
             const tail = try string.substring(agent.gc_allocator, i, j.?);

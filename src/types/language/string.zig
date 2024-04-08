@@ -88,7 +88,7 @@ pub const String = struct {
         // 4. For each integer i such that fromIndex ≤ i ≤ len - searchLen, in ascending order, do
         //     a. Let candidate be the substring of string from i to i + searchLen.
         //     b. If candidate is searchValue, return i.
-        // 5. Return -1.
+        // 5. Return not-found.
         if (from_index >= len) return null;
         return if (std.mem.indexOf(u8, self.utf8[from_index..], search_value.utf8)) |index|
             index + from_index
@@ -107,7 +107,7 @@ pub const String = struct {
         // 1. For each integer i such that 0 ≤ i ≤ fromIndex, in descending order, do
         //     a. Let candidate be the substring of string from i to i + searchLen.
         //     b. If candidate is searchValue, return i.
-        // 5. Return -1.
+        // 5. Return not-found.
         if (search_value.isEmpty() and from_index <= len) return from_index;
         if (from_index >= len) return null;
         return if (std.mem.lastIndexOf(u8, self.utf8[from_index..], search_value.utf8)) |index|
