@@ -2416,7 +2416,9 @@ fn forInOfBodyEvaluation(
     const continue_index = executable.instructions.items.len;
     try executable.addInstruction(.load);
 
-    // TODO: k. Set the running execution context's LexicalEnvironment to oldEnv.
+    // k. Set the running execution context's LexicalEnvironment to oldEnv.
+    try executable.addInstruction(.restore_lexical_environment);
+
     // TODO: l. If LoopContinues(result, labelSet) is false, then
 
     // m. If result.[[Value]] is not empty, set V to result.[[Value]].
