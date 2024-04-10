@@ -18,12 +18,13 @@
             .lazy = true,
         },
         .libgc = .{
-            .url = "https://github.com/ivmai/bdwgc/archive/4d6cdc072663c1a22379d84acdac8a273ace1bc9.tar.gz",
-            .hash = "1220f14a2b23ea1a9c5c44aee01667273b732778a83e5925a825ab6afffab2ba24ad",
+            // FIXME: This points to https://github.com/ivmai/bdwgc/pull/632, update once merged
+            .url = "https://github.com/ivmai/bdwgc/archive/b919ac700a8394a6d2c39fa03b939e80c25d2e0d.tar.gz",
+            .hash = "122044891d37bc29e7f9dee14f5aa9dea25fab8dfeabfc047784a4f1518113676e57",
         },
         .libregexp = .{
-            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/594283c5e1a9dbea1ae357e5681077f01a9607fb.tar.gz",
-            .hash = "12201df058b457961514ced84daf38cd8739519a4ee621b4ee229ad8b53fc228fb97",
+            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/78f7445d7ccb5c8378d7fb883d3347d02850b6e5.tar.gz",
+            .hash = "12209673e1d57efc2e7a128707af72f3c115146b703b3d717dc17448f68e74167eb2",
         },
         // Needed for mach-o/getsect.h when building libgc for macOS
         .macos_sdk = .{
