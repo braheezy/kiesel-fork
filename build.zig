@@ -1,9 +1,6 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-const build_icu4zig = @import("icu4zig");
-const build_macos_sdk = @import("macos_sdk");
-
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -64,14 +61,15 @@ pub fn build(b: *std.Build) void {
         },
     }) catch @panic("OOM");
     if (enable_intl) {
-        const icu4zig = b.dependency("icu4zig", .{
+        if (b.lazyDependency("icu4zig", .{
             .target = target,
             .optimize = optimize,
-        });
-        imports.append(.{
-            .module = icu4zig.module("icu4zig"),
-            .name = "icu4zig",
-        }) catch @panic("OOM");
+        })) |icu4zig| {
+            imports.append(.{
+                .module = icu4zig.module("icu4zig"),
+                .name = "icu4zig",
+            }) catch @panic("OOM");
+        }
     }
 
     const kiesel = b.addModule("kiesel", .{
@@ -82,7 +80,9 @@ pub fn build(b: *std.Build) void {
         .cwd_relative = libgc.builder.getInstallPath(.header, ""),
     });
     if (target.result.os.tag == .macos) {
-        build_macos_sdk.addPaths(libgc.artifact("gc"));
+        if (b.lazyImport(@This(), "macos_sdk")) |build_macos_sdk| {
+            build_macos_sdk.addPaths(libgc.artifact("gc"));
+        }
     }
     kiesel.linkLibrary(libgc.artifact("gc"));
     kiesel.linkLibrary(libregexp.artifact("regexp"));
@@ -94,15 +94,18 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     if (enable_intl) {
-        const icu4zig = b.dependency("icu4zig", .{
+        if (b.lazyDependency("icu4zig", .{
             .target = target,
             .optimize = optimize,
-        });
-        const icu4x = icu4zig.builder.dependency("icu4x", .{
-            .target = target,
-            .optimize = optimize,
-        });
-        build_icu4zig.link(exe, icu4x);
+        })) |icu4zig| {
+            const icu4x = icu4zig.builder.dependency("icu4x", .{
+                .target = target,
+                .optimize = optimize,
+            });
+            if (b.lazyImport(@This(), "icu4zig")) |build_icu4zig| {
+                build_icu4zig.link(exe, icu4x);
+            }
+        }
     }
     exe.root_module.addImport("kiesel", kiesel);
     if (b.lazyDependency("kiesel_runtime", .{})) |kiesel_runtime| {
@@ -137,16 +140,19 @@ pub fn build(b: *std.Build) void {
     unit_tests.root_module.addImport("any-pointer", any_pointer.module("any-pointer"));
     unit_tests.root_module.addImport("ptk", parser_toolkit.module("parser-toolkit"));
     if (enable_intl) {
-        const icu4zig = b.dependency("icu4zig", .{
+        if (b.lazyDependency("icu4zig", .{
             .target = target,
             .optimize = optimize,
-        });
-        const icu4x = icu4zig.builder.dependency("icu4x", .{
-            .target = target,
-            .optimize = optimize,
-        });
-        build_icu4zig.link(unit_tests, icu4x);
-        unit_tests.root_module.addImport("icu4zig", icu4zig.module("icu4zig"));
+        })) |icu4zig| {
+            const icu4x = icu4zig.builder.dependency("icu4x", .{
+                .target = target,
+                .optimize = optimize,
+            });
+            if (b.lazyImport(@This(), "icu4zig")) |build_icu4zig| {
+                build_icu4zig.link(unit_tests, icu4x);
+            }
+            unit_tests.root_module.addImport("icu4zig", icu4zig.module("icu4zig"));
+        }
     }
     const run_unit_tests = b.addRunArtifact(unit_tests);
 

@@ -9,6 +9,7 @@
         .icu4zig = .{
             .url = "https://codeberg.org/linusg/icu4zig/archive/71f4473f01f9e83750d21652cae157f7de3e0c5a.tar.gz",
             .hash = "122038d3ca3346181b0bc153f057177dd5adc4fd601b1d40820c83ffb2c82bc04561",
+            .lazy = true,
         },
         .kiesel_runtime = .{
             // Uncommend for local development:
@@ -30,6 +31,7 @@
         .macos_sdk = .{
             .url = "https://github.com/mitchellh/zig-build-macos-sdk/archive/ee70f27c08680307fa35ada92e6b2c36e0ff84c6.tar.gz",
             .hash = "1220b415f529f1c04ed876c2b481e9f8119d353d4e3d4d7c8607ee302d2142e13eca",
+            .lazy = true,
         },
         .parser_toolkit = .{
             .url = "https://github.com/MasterQ32/parser-toolkit/archive/358a028beb32ebb193dadb6f7a954965745892a7.tar.gz",
