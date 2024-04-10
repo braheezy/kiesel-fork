@@ -204,10 +204,14 @@ pub fn getIdentifierReference(
     var env: ?Environment = start_env;
     if (maybe_lookup_cache_entry) |lookup_cache_entry| {
         if (lookup_cache_entry.*) |cache| {
-            var i: usize = 0;
-            while (i < cache.distance) : (i += 1) env = env.?.outerEnv();
+            // In the case of an unresolvable reference we'll reach the last environment without an
+            // outer env.
+            for (0..cache.distance) |_| env = env.?.outerEnv();
             return .{
-                .base = .{ .environment = env.? },
+                .base = if (env) |environment|
+                    .{ .environment = environment }
+                else
+                    .unresolvable,
                 .referenced_name = .{ .string = name },
                 .strict = strict,
                 .this_value = null,
