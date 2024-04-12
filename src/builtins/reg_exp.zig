@@ -778,6 +778,7 @@ pub const RegExpPrototype = struct {
         try defineBuiltinFunction(object, "@@match", @"@@match", 1, realm);
         try defineBuiltinFunction(object, "@@matchAll", @"@@matchAll", 1, realm);
         try defineBuiltinAccessor(object, "multiline", multiline, null, realm);
+        try defineBuiltinFunction(object, "@@replace", @"@@replace", 2, realm);
         try defineBuiltinFunction(object, "@@search", @"@@search", 1, realm);
         try defineBuiltinAccessor(object, "source", source, null, realm);
         try defineBuiltinFunction(object, "@@split", @"@@split", 2, realm);
@@ -1083,6 +1084,240 @@ pub const RegExpPrototype = struct {
         // 2. Let cu be the code unit 0x006D (LATIN SMALL LETTER M).
         // 3. Return ? RegExpHasFlag(R, cu).
         return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_MULTILINE);
+    }
+
+    /// 22.2.6.11 RegExp.prototype [ @@replace ] ( string, replaceValue )
+    /// https://tc39.es/ecma262/#sec-regexp.prototype-@@replace
+    fn @"@@replace"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const string_value = arguments.get(0);
+        var replace_value = arguments.get(1);
+
+        // 1. Let rx be the this value.
+        // 2. If rx is not an Object, throw a TypeError exception.
+        if (this_value != .object) {
+            return agent.throwException(.type_error, "{} is not an Object", .{this_value});
+        }
+        const reg_exp = this_value.object;
+
+        // 3. Let S be ? ToString(string).
+        const string = try string_value.toString(agent);
+
+        // 4. Let lengthS be the length of S.
+        const string_length = string.utf16Length();
+
+        // 5. Let functionalReplace be IsCallable(replaceValue).
+        const functional_replace = replace_value.isCallable();
+
+        // 6. If functionalReplace is false, then
+        if (!functional_replace) {
+            // a. Set replaceValue to ? ToString(replaceValue).
+            replace_value = Value.from(try replace_value.toString(agent));
+        }
+
+        // 7. Let flags be ? ToString(? Get(rx, "flags")).
+        const flags_ = try (try reg_exp.get(PropertyKey.from("flags"))).toString(agent);
+
+        // 8. If flags contains "g", let global be true. Otherwise, let global be false.
+        const global_ = std.mem.indexOfScalar(u8, flags_.utf8, 'g') != null;
+
+        // 9. If global is true, then
+        if (global_) {
+            // a. Perform ? Set(rx, "lastIndex", +0𝔽, true).
+            try reg_exp.set(PropertyKey.from("lastIndex"), Value.from(0), .throw);
+        }
+
+        // 10. Let results be a new empty List.
+        var results = std.ArrayList(Object).init(agent.gc_allocator);
+        defer results.deinit();
+
+        // 11. Let done be false.
+        // 12. Repeat, while done is false,
+        while (true) {
+            // a. Let result be ? RegExpExec(rx, S).
+            const result = try regExpExec(agent, reg_exp, string);
+
+            // b. If result is null, then
+            if (result == null) {
+                // i. Set done to true.
+                break;
+            }
+
+            // c. Else,
+            // i. Append result to results.
+            try results.append(result.?);
+
+            // ii. If global is false, then
+            if (!global_) {
+                // 1. Set done to true.
+                break;
+            }
+
+            // iii. Else,
+            // 1. Let matchStr be ? ToString(? Get(result, "0")).
+            const match_str = try (try result.?.get(PropertyKey.from(0))).toString(agent);
+
+            // 2. If matchStr is the empty String, then
+            if (match_str.isEmpty()) {
+                // a. Let thisIndex be ℝ(? ToLength(? Get(rx, "lastIndex"))).
+                const this_index = try (try reg_exp.get(PropertyKey.from("lastIndex"))).toLength(agent);
+
+                // b. If flags contains "u" or flags contains "v", let fullUnicode be true.
+                //    Otherwise, let fullUnicode be false.
+                const full_unicode = std.mem.indexOfScalar(u8, flags_.utf8, 'u') != null or
+                    std.mem.indexOfScalar(u8, flags_.utf8, 'v') != null;
+
+                // c. Let nextIndex be AdvanceStringIndex(S, thisIndex, fullUnicode).
+                const next_index = advanceStringIndex(string, this_index, full_unicode);
+
+                // d. Perform ? Set(rx, "lastIndex", 𝔽(nextIndex), true).
+                try reg_exp.set(PropertyKey.from("lastIndex"), Value.from(next_index), .throw);
+            }
+        }
+
+        // 13. Let accumulatedResult be the empty String.
+        var accumulated_result = std.ArrayList(u8).init(agent.gc_allocator);
+        defer accumulated_result.deinit();
+
+        // 14. Let nextSourcePosition be 0.
+        var next_source_position: usize = 0;
+
+        // 15. For each element result of results, do
+        for (results.items) |result| {
+            // a. Let resultLength be ? LengthOfArrayLike(result).
+            const result_length = try result.lengthOfArrayLike();
+
+            // b. Let nCaptures be max(resultLength - 1, 0).
+            const n_captures = result_length -| 1;
+
+            // c. Let matched be ? ToString(? Get(result, "0")).
+            const matched = try (try result.get(PropertyKey.from(0))).toString(agent);
+
+            // d. Let matchLength be the length of matched.
+            const matched_length = matched.utf16Length();
+
+            // e. Let position be ? ToIntegerOrInfinity(? Get(result, "index")).
+            const position_f64 = try (try result.get(PropertyKey.from("index"))).toIntegerOrInfinity(agent);
+
+            // f. Set position to the result of clamping position between 0 and lengthS.
+            const position: usize = @intFromFloat(
+                std.math.clamp(
+                    position_f64,
+                    0,
+                    @as(f64, @floatFromInt(string_length)),
+                ),
+            );
+
+            // g. Let captures be a new empty List.
+            var captures = try std.ArrayList(Value).initCapacity(
+                agent.gc_allocator,
+                @intCast(n_captures),
+            );
+            defer captures.deinit();
+
+            // h. Let n be 1.
+            var n: u53 = 1;
+
+            // i. Repeat, while n ≤ nCaptures,
+            while (n <= n_captures) : (n += 1) {
+                // i. Let capN be ? Get(result, ! ToString(𝔽(n))).
+                var capture_n = try result.get(PropertyKey.from(n));
+
+                // ii. If capN is not undefined, then
+                if (capture_n != .undefined) {
+                    // 1. Set capN to ? ToString(capN).
+                    capture_n = Value.from(try capture_n.toString(agent));
+                }
+
+                // iii. Append capN to captures.
+                captures.appendAssumeCapacity(capture_n);
+
+                // iv. NOTE: When n = 1, the preceding step puts the first element into captures
+                //     (at index 0). More generally, the nth capture (the characters captured by
+                //     the nth set of capturing parentheses) is at captures[n - 1].
+
+                // v. Set n to n + 1.
+            }
+
+            // j. Let namedCaptures be ? Get(result, "groups").
+            var named_captures = try result.get(PropertyKey.from("groups"));
+
+            // k. If functionalReplace is true, then
+            const replacement = if (functional_replace) blk: {
+                // i. Let replacerArgs be the list-concatenation of « matched », captures, and
+                //    « 𝔽(position), S ».
+                var replacer_args = try std.ArrayList(Value).initCapacity(
+                    agent.gc_allocator,
+                    captures.items.len + 3 + @intFromBool(named_captures != .undefined),
+                );
+                replacer_args.appendAssumeCapacity(Value.from(matched));
+                replacer_args.appendSliceAssumeCapacity(captures.items);
+                replacer_args.appendAssumeCapacity(Value.from(@as(u53, @intCast(position))));
+                replacer_args.appendAssumeCapacity(Value.from(string));
+
+                // ii. If namedCaptures is not undefined, then
+                if (named_captures != .undefined) {
+                    // 1. Append namedCaptures to replacerArgs.
+                    replacer_args.appendAssumeCapacity(named_captures);
+                }
+
+                // iii. Let replValue be ? Call(replaceValue, undefined, replacerArgs).
+                const replacement_value = try replace_value.callAssumeCallable(
+                    .undefined,
+                    replacer_args.items,
+                );
+
+                // iv. Let replacement be ? ToString(replValue).
+                break :blk try replacement_value.toString(agent);
+            }
+            // l. Else,
+            else blk: {
+                // i. If namedCaptures is not undefined, then
+                if (named_captures != .undefined) {
+                    // 1. Set namedCaptures to ? ToObject(namedCaptures).
+                    named_captures = Value.from(try named_captures.toObject(agent));
+                }
+
+                // TODO: ii. Let replacement be ? GetSubstitution(matched, S, position, captures,
+                //           namedCaptures, replaceValue).
+                break :blk replace_value.string;
+            };
+
+            // m. If position ≥ nextSourcePosition, then
+            if (position >= next_source_position) {
+                // i. NOTE: position should not normally move backwards. If it does, it is an
+                //    indication of an ill-behaving RegExp subclass or use of an access triggered
+                //    side-effect to change the global flag or other characteristics of rx. In such
+                //    cases, the corresponding substitution is ignored.
+
+                // ii. Set accumulatedResult to the string-concatenation of accumulatedResult, the
+                //     substring of S from nextSourcePosition to position, and replacement.
+                try accumulated_result.appendSlice(
+                    (try string.substring(
+                        agent.gc_allocator,
+                        next_source_position,
+                        position,
+                    )).utf8,
+                );
+                try accumulated_result.appendSlice(replacement.utf8);
+
+                // iii. Set nextSourcePosition to position + matchLength.
+                next_source_position = position + matched_length;
+            }
+        }
+
+        // 16. If nextSourcePosition ≥ lengthS, return accumulatedResult.
+        // 17. Return the string-concatenation of accumulatedResult and the substring of S from
+        //     nextSourcePosition.
+        if (next_source_position < string_length) {
+            try accumulated_result.appendSlice(
+                (try string.substring(
+                    agent.gc_allocator,
+                    next_source_position,
+                    string_length,
+                )).utf8,
+            );
+        }
+        return Value.from(try accumulated_result.toOwnedSlice());
     }
 
     /// 22.2.6.12 RegExp.prototype [ @@search ] ( string )
