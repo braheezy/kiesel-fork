@@ -20,6 +20,7 @@ const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 21.1.2 Properties of the Number Constructor
@@ -256,6 +257,7 @@ pub const NumberPrototype = struct {
         });
 
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
+        try defineBuiltinFunction(object, "toPrecision", toPrecision, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
 
@@ -295,6 +297,170 @@ pub const NumberPrototype = struct {
     fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const x = try thisNumberValue(agent, this_value);
         return Value.from(try x.toString(agent.gc_allocator, 10));
+    }
+
+    /// 21.1.3.5 Number.prototype.toPrecision ( precision )
+    /// https://tc39.es/ecma262/#sec-number.prototype.toprecision
+    fn toPrecision(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const precision_value = arguments.get(0);
+
+        // 1. Let x be ? ThisNumberValue(this value).
+        const x_number = try thisNumberValue(agent, this_value);
+
+        // 2. If precision is undefined, return ! ToString(x).
+        if (precision_value == .undefined) {
+            return Value.from(Value.from(x_number).toString(agent) catch |err| try noexcept(err));
+        }
+
+        // 3. Let p be ? ToIntegerOrInfinity(precision).
+        const precision_f64 = try precision_value.toIntegerOrInfinity(agent);
+
+        // 4. If x is not finite, return Number::toString(x, 10).
+        if (!x_number.isFinite()) {
+            return Value.from(try x_number.toString(agent.gc_allocator, 10));
+        }
+
+        // 5. If p < 1 or p > 100, throw a RangeError exception.
+        if (precision_f64 < 1 or precision_f64 > 100) {
+            return agent.throwException(.range_error, "Precision must be in range 1-100", .{});
+        }
+        const precision: usize = @intFromFloat(precision_f64);
+
+        // 6. Set x to ℝ(x).
+        var x = x_number.asFloat();
+
+        // 7. Let s be the empty String.
+        var sign: []const u8 = "";
+
+        // 8. If x < 0, then
+        if (x < 0) {
+            // a. Set s to the code unit 0x002D (HYPHEN-MINUS).
+            sign = "-";
+
+            // b. Set x to -x.
+            x = -x;
+        }
+
+        var exponent: i64 = undefined;
+        var number_string: []const u8 = undefined;
+
+        // 9. If x = 0, then
+        if (x == 0) {
+            // a. Let m be the String value consisting of p occurrences of the code unit 0x0030 (DIGIT ZERO).
+            number_string = try std.fmt.allocPrint(
+                agent.gc_allocator,
+                "{s:0>[1]}",
+                .{ "", precision },
+            );
+
+            // b. Let e be 0.
+            exponent = 0;
+        }
+        // 10. Else,
+        else {
+            // a. Let e and n be integers such that 10**(p - 1) ≤ n < 10**p and for which
+            //    n × 10**(e - p + 1) - x is as close to zero as possible. If there are two such
+            //    sets of e and n, pick the e and n for which n × 10**(e - p + 1) is larger.
+            exponent = @intFromFloat(@floor(std.math.log10(x)));
+            const number = @round(
+                x / std.math.pow(
+                    f64,
+                    10,
+                    @floatFromInt(exponent - @as(i64, @intCast(precision)) + 1),
+                ),
+            );
+
+            // b. Let m be the String value consisting of the digits of the decimal representation
+            //    of n (in order, with no leading zeroes).
+            number_string = try std.fmt.allocPrint(agent.gc_allocator, "{d}", .{number});
+
+            // c. If e < -6 or e ≥ p, then
+            if (exponent < -6 or exponent >= precision) {
+                // i. Assert: e ≠ 0.
+                std.debug.assert(exponent != 0);
+
+                // ii. If p ≠ 1, then
+                if (precision != 1) {
+                    // 1. Let a be the first code unit of m.
+                    const a = number_string[0..1];
+
+                    // 2. Let b be the other p - 1 code units of m.
+                    const b = number_string[1..];
+
+                    // 3. Set m to the string-concatenation of a, ".", and b.
+                    number_string = try std.fmt.allocPrint(
+                        agent.gc_allocator,
+                        "{s}.{s}",
+                        .{ a, b },
+                    );
+                }
+
+                var exponent_sign: u8 = undefined;
+
+                // iii. If e > 0, then
+                if (exponent > 0) {
+                    // 1. Let c be the code unit 0x002B (PLUS SIGN).
+                    exponent_sign = '+';
+                }
+                // iv. Else,
+                else {
+                    // 1. Assert: e < 0.
+                    std.debug.assert(exponent < 0);
+
+                    // 2. Let c be the code unit 0x002D (HYPHEN-MINUS).
+                    exponent_sign = '-';
+
+                    // 3. Set e to -e.
+                    exponent = -exponent;
+                }
+
+                // v. Let d be the String value consisting of the digits of the decimal
+                //    representation of e (in order, with no leading zeroes).
+                // vi. Return the string-concatenation of s, m, the code unit 0x0065 (LATIN SMALL
+                //     LETTER E), c, and d.
+                return Value.from(
+                    try std.fmt.allocPrint(
+                        agent.gc_allocator,
+                        "{s}{s}e{c}{d}",
+                        .{ sign, number_string, exponent_sign, exponent },
+                    ),
+                );
+            }
+        }
+
+        // 11. If e = p - 1, return the string-concatenation of s and m.
+        if (exponent == precision - 1) {
+            return Value.from(
+                try std.fmt.allocPrint(agent.gc_allocator, "{s}{s}", .{ sign, number_string }),
+            );
+        }
+
+        // 12. If e ≥ 0, then
+        if (exponent >= 0) {
+            // a. Set m to the string-concatenation of the first e + 1 code units of m, the code
+            //    unit 0x002E (FULL STOP), and the remaining p - (e + 1) code units of m.
+            number_string = try std.fmt.allocPrint(
+                agent.gc_allocator,
+                "{s}.{s}",
+                .{ number_string[0..@intCast(exponent + 1)], number_string[@intCast(exponent + 1)..] },
+            );
+        }
+        // 13. Else,
+        else {
+            // a. Set m to the string-concatenation of the code unit 0x0030 (DIGIT ZERO), the code
+            //    unit 0x002E (FULL STOP), -(e + 1) occurrences of the code unit 0x0030 (DIGIT ZERO),
+            //    and the String m.
+            number_string = try std.fmt.allocPrint(
+                agent.gc_allocator,
+                "0.{s:0>[2]}{s}",
+                .{ "", number_string, @as(usize, @intCast(-(exponent + 1))) },
+            );
+        }
+
+        // 14. Return the string-concatenation of s and m.
+        return Value.from(
+            try std.fmt.allocPrint(agent.gc_allocator, "{s}{s}", .{ sign, number_string }),
+        );
     }
 
     /// 21.1.3.6 Number.prototype.toString ( [ radix ] )
