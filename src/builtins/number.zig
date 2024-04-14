@@ -256,6 +256,7 @@ pub const NumberPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "toFixed", toFixed, 1, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toPrecision", toPrecision, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
@@ -289,6 +290,80 @@ pub const NumberPrototype = struct {
             .type_error,
             "This value must be a number or Number object",
             .{},
+        );
+    }
+
+    /// 21.1.3.3 Number.prototype.toFixed ( fractionDigits )
+    /// https://tc39.es/ecma262/#sec-number.prototype.toprecision
+    fn toFixed(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const fraction_digits_value = arguments.get(0);
+
+        // 1. Let x be ? ThisNumberValue(this value).
+        const x_number = try thisNumberValue(agent, this_value);
+
+        // 2. Let f be ? ToIntegerOrInfinity(fractionDigits).
+        // 3. Assert: If fractionDigits is undefined, then f is 0.
+        const fraction_digits_f64 = try fraction_digits_value.toIntegerOrInfinity(agent);
+
+        // 4. If f is not finite, throw a RangeError exception.
+        if (!std.math.isFinite(fraction_digits_f64)) {
+            return agent.throwException(.range_error, "Fraction digits must be a finite number", .{});
+        }
+
+        // 5. If f < 0 or f > 100, throw a RangeError exception.
+        if (fraction_digits_f64 < 0 or fraction_digits_f64 > 100) {
+            return agent.throwException(.range_error, "Fraction digits must be in range 0-100", .{});
+        }
+        const fraction_digits: usize = @intFromFloat(fraction_digits_f64);
+
+        // 6. If x is not finite, return Number::toString(x, 10).
+        if (!x_number.isFinite()) {
+            return Value.from(try x_number.toString(agent.gc_allocator, 10));
+        }
+
+        // 7. Set x to ℝ(x).
+        var x = x_number.asFloat();
+
+        // 8. Let s be the empty String.
+        var sign: []const u8 = "";
+
+        // 9. If x < 0, then
+        if (x < 0) {
+            // a. Set s to "-".
+            sign = "-";
+
+            // b. Set x to -x.
+            x = -x;
+        }
+
+        // 10. If x ≥ 10**21, then
+        if (x >= 10e21) {
+            // a. Let m be ! ToString(𝔽(x)).
+            return Value.from(Value.from(x).toString(agent) catch |err| try noexcept(err));
+        }
+
+        // 11. Else,
+        //     a. Let n be an integer for which n / 10**f - x is as close to zero as possible. If
+        //        there are two such n, pick the larger n.
+        //     b. If n = 0, let m be "0". Otherwise, let m be the String value consisting of the
+        //        digits of the decimal representation of n (in order, with no leading zeroes).
+        //     c. If f ≠ 0, then
+        //         i. Let k be the length of m.
+        //         ii. If k ≤ f, then
+        //             1. Let z be the String value consisting of f + 1 - k occurrences of the code
+        //                unit 0x0030 (DIGIT ZERO).
+        //             2. Set m to the string-concatenation of z and m.
+        //             3. Set k to f + 1.
+        //         iii. Let a be the first k - f code units of m.
+        //         iv. Let b be the other f code units of m.
+        //         v. Set m to the string-concatenation of a, ".", and b.
+        // 12. Return the string-concatenation of s and m.
+        return Value.from(
+            try std.fmt.allocPrint(
+                agent.gc_allocator,
+                "{s}{d:.[2]}",
+                .{ sign, x, fraction_digits },
+            ),
         );
     }
 
