@@ -7,8 +7,8 @@
             .hash = "1220ee116ee3e225e115f5d93167be6a06683bf1673d29674b64b9fe551548c6a69b",
         },
         .icu4zig = .{
-            .url = "https://codeberg.org/linusg/icu4zig/archive/71f4473f01f9e83750d21652cae157f7de3e0c5a.tar.gz",
-            .hash = "122038d3ca3346181b0bc153f057177dd5adc4fd601b1d40820c83ffb2c82bc04561",
+            .url = "https://codeberg.org/linusg/icu4zig/archive/1105ac6ba48287a16bc63bc1a3b6739699a46dc8.tar.gz",
+            .hash = "1220c23bf96f7cf763aff32a6b696a9ed25bed2c3c668deac5de9a4a3499748879bc",
             .lazy = true,
         },
         .kiesel_runtime = .{
@@ -20,12 +20,12 @@
         },
         .libgc = .{
             // FIXME: This points to https://github.com/ivmai/bdwgc/pull/632, update once merged
-            .url = "https://github.com/ivmai/bdwgc/archive/b919ac700a8394a6d2c39fa03b939e80c25d2e0d.tar.gz",
-            .hash = "122044891d37bc29e7f9dee14f5aa9dea25fab8dfeabfc047784a4f1518113676e57",
+            .url = "https://github.com/ivmai/bdwgc/archive/6151f8530d7440fcc7360e9741bcd81ee9551ba1.tar.gz",
+            .hash = "1220ab6a76b36fa9d056dd99dcea0b4cbf86ef0a98e4e7c77041ae1daa244dfef1a1",
         },
         .libregexp = .{
-            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/78f7445d7ccb5c8378d7fb883d3347d02850b6e5.tar.gz",
-            .hash = "12209673e1d57efc2e7a128707af72f3c115146b703b3d717dc17448f68e74167eb2",
+            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/abf96db416bec9179fb0fe64a96d8f4c3240cc66.tar.gz",
+            .hash = "1220c042a6df886ad15a99fe0271dec738fb4f2a49fb1399c0181497b1eccb7da3b6",
         },
         // Needed for mach-o/getsect.h when building libgc for macOS
         .macos_sdk = .{
@@ -42,9 +42,8 @@
             .hash = "12203ded54c85878eea7f12744066dcb4397177395ac49a7b2aa365bf6047b623829",
         },
         .zigline = .{
-            // FIXME: This points to https://github.com/alimpfard/zigline/pull/16, update once merged
-            .url = "https://github.com/alimpfard/zigline/archive/833140af09546502b2b516d9a3eed91969549d2a.tar.gz",
-            .hash = "1220664821dfacbf338dab67e2923be5d4365eebf65b7c1ca8a94f68a3b874db7459",
+            .url = "https://github.com/alimpfard/zigline/archive/ad7122de0aa07350ad566948b9318725247dee6b.tar.gz",
+            .hash = "1220fb045a65429291344e584d6dc67e70280c5dea0df028687e833dcde7426fa2c2",
         },
     },
     .paths = .{
