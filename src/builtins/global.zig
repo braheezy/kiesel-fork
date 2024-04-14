@@ -514,11 +514,13 @@ fn encode(
     const unescaped_set = always_unescaped ++ extra_unescaped;
 
     // 1-2., 5-7.
-    return std.Uri.escapeStringWithFn(agent.gc_allocator, string.utf8, struct {
-        fn keepUnescaped(c: u8) bool {
+    var buffer = std.ArrayList(u8).init(agent.gc_allocator);
+    try std.Uri.Component.percentEncode(buffer.writer(), string.utf8, struct {
+        fn isValidChar(c: u8) bool {
             return std.mem.indexOfScalar(u8, unescaped_set, c) != null;
         }
-    }.keepUnescaped);
+    }.isValidChar);
+    return buffer.toOwnedSlice();
 }
 
 /// 19.2.6.6 Decode ( string, preserveEscapeSet )
