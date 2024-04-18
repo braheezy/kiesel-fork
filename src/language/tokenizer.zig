@@ -365,12 +365,18 @@ fn identifierMatcher(str: []const u8) ?usize {
 }
 
 fn identifierNameMatcher(str: []const u8) ?usize {
-    // TODO: Handle UnicodeIDStart, UnicodeIDContinue, UnicodeEscapeSequence
+    // TODO: Handle UnicodeIDStart and UnicodeIDContinue
     const start_chars = "$_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
     const part_chars = start_chars ++ "0123456789";
-    for (str, 0..) |c, i| {
-        if (std.mem.indexOfScalar(u8, if (i > 0) part_chars else start_chars, c) == null) {
+    var i: usize = 0;
+    while (i < str.len) {
+        if (escapeSequenceMatcher(str[i..])) |len| {
+            if (str[i + 1] != 'u') return i;
+            i += len;
+        } else if (std.mem.indexOfScalar(u8, if (i > 0) part_chars else start_chars, str[i]) == null) {
             return i;
+        } else {
+            i += 1;
         }
     }
     return str.len;

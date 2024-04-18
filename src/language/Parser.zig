@@ -253,6 +253,35 @@ fn emitErrorAt(
     try self.diagnostics.emit(location, .@"error", fmt, args);
 }
 
+fn unescapeIdentifier(self: *Self, token: Tokenizer.Token) AcceptError![]const u8 {
+    const identifier = try ast.stringValueImpl(self.allocator, token.text);
+    if (token.type == .identifier) {
+        // TODO: Handle UnicodeIDStart and UnicodeIDContinue
+        const start_chars = "$_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        const part_chars = start_chars ++ "0123456789";
+        for (identifier, 0..) |c, i| {
+            if (std.mem.indexOfScalar(u8, if (i > 0) part_chars else start_chars, c) == null) {
+                return error.UnexpectedToken;
+            }
+        }
+        for (reserved_words) |reserved_word| {
+            if (std.mem.eql(u8, identifier, reserved_word)) {
+                if (std.mem.eql(u8, identifier, "yield") or
+                    std.mem.eql(u8, identifier, "yield")) continue;
+                try self.emitErrorAt(
+                    token.location,
+                    "Keyword must not contain escaped characters",
+                    .{},
+                );
+                return error.UnexpectedToken;
+            }
+        }
+    } else {
+        std.debug.assert(token.type == .yield or token.type == .@"await");
+    }
+    return identifier;
+}
+
 /// 5.1.5.8 [no LineTerminator here]
 /// https://tc39.es/ecma262/#sec-no-lineterminator-here
 fn noLineTerminatorHere(self: *Self) AcceptError!void {
@@ -336,7 +365,7 @@ pub fn acceptIdentifierName(self: *Self) AcceptError!ast.Identifier {
         break :blk reserved_word_token_types;
     };
     const token = try self.core.accept(RuleSet.oneOf(.{.identifier} ++ reserved_word_token_types));
-    return self.allocator.dupe(u8, token.text);
+    return ast.stringValueImpl(self.allocator, token.text);
 }
 
 pub fn acceptIdentifierReference(self: *Self) AcceptError!ast.IdentifierReference {
@@ -355,7 +384,7 @@ pub fn acceptIdentifierReference(self: *Self) AcceptError!ast.IdentifierReferenc
             } else |_| {}
         }
     }
-    return try self.allocator.dupe(u8, token.text);
+    return self.unescapeIdentifier(token);
 }
 
 pub fn acceptBindingIdentifier(self: *Self) AcceptError!ast.Identifier {
@@ -363,7 +392,7 @@ pub fn acceptBindingIdentifier(self: *Self) AcceptError!ast.Identifier {
     errdefer self.core.restoreState(state);
 
     const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .@"await" }));
-    return self.allocator.dupe(u8, token.text);
+    return self.unescapeIdentifier(token);
 }
 
 pub fn acceptLabelIdentifier(self: *Self) AcceptError!ast.Identifier {
@@ -371,7 +400,7 @@ pub fn acceptLabelIdentifier(self: *Self) AcceptError!ast.Identifier {
     errdefer self.core.restoreState(state);
 
     const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .@"await" }));
-    return self.allocator.dupe(u8, token.text);
+    return self.unescapeIdentifier(token);
 }
 
 pub fn acceptPrivateIdentifier(self: *Self) AcceptError!ast.PrivateIdentifier {
@@ -390,7 +419,7 @@ pub fn acceptPrivateIdentifier(self: *Self) AcceptError!ast.PrivateIdentifier {
     }
 
     const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .@"await" }));
-    return self.allocator.dupe(u8, token.text);
+    return self.unescapeIdentifier(token);
 }
 
 pub fn acceptPrimaryExpression(self: *Self) AcceptError!ast.PrimaryExpression {

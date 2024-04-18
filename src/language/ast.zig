@@ -286,7 +286,7 @@ pub const NumericLiteral = struct {
     }
 };
 
-fn stringValueImpl(allocator: Allocator, text: []const u8) Allocator.Error![]const u8 {
+pub fn stringValueImpl(allocator: Allocator, text: []const u8) Allocator.Error![]const u8 {
     var str = try std.ArrayList(u8).initCapacity(allocator, text.len);
     var i: usize = 0;
     while (i < text.len) : (i += 1) {
