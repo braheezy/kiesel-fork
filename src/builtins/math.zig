@@ -19,6 +19,7 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
+const getIterator = types.getIterator;
 
 /// 21.3.1 Value Properties of the Math Object
 /// https://tc39.es/ecma262/#sec-value-properties-of-the-math-object
@@ -142,6 +143,7 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "sin", sin, 1, realm);
         try defineBuiltinFunction(object, "sinh", sinh, 1, realm);
         try defineBuiltinFunction(object, "sqrt", sqrt, 1, realm);
+        try defineBuiltinFunction(object, "sumPrecise", sumPrecise, 1, realm);
         try defineBuiltinFunction(object, "tan", tan, 1, realm);
         try defineBuiltinFunction(object, "tanh", tanh, 1, realm);
         try defineBuiltinFunction(object, "trunc", trunc, 1, realm);
@@ -782,6 +784,227 @@ pub const Math = struct {
         // 4. Return an implementation-approximated Number value representing the result of the
         //    square root of ℝ(n).
         return Value.from(@sqrt(n.asFloat()));
+    }
+
+    fn twoSum(x: f64, y: f64) struct { f64, f64 } {
+        const hi = x + y;
+        const lo = y - (hi - x);
+        return .{ hi, lo };
+    }
+
+    /// 2 Math.sumPrecise ( items )
+    /// https://tc39.es/proposal-math-sum/#sec-math.sumprecise
+    fn sumPrecise(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        // The implementation for higher precision summation in steps 4 and 7.b.vi.4.b are based on
+        // the JavaScript polyfill in the proposal's repository by Kevin Gibbons (bakkot on GitHub).
+        // See the polyfill directory in https://github.com/tc39/proposal-math-sum for the licenses.
+
+        const items_ = arguments.get(0);
+
+        // 1. Perform ? RequireObjectCoercible(items).
+        const items = try items_.requireObjectCoercible(agent);
+
+        // 2. Let iteratorRecord be ? GetIterator(items, SYNC).
+        var iterator = try getIterator(agent, items, .sync);
+
+        // 3. Let state be MINUS-ZERO.
+        var state: enum {
+            finite,
+            minus_infinity,
+            minus_zero,
+            not_a_number,
+            plus_infinity,
+        } = .minus_zero;
+
+        // 4. Let sum be 0.
+        const initial_partials_count = 32;
+
+        var stack_fallback = std.heap.stackFallback(@sizeOf(f64) * initial_partials_count, agent.gc_allocator);
+        const allocator = stack_fallback.get();
+
+        var partials = try std.ArrayList(f64).initCapacity(allocator, initial_partials_count);
+        defer partials.deinit();
+        var overflow: f64 = 0.0;
+
+        const max_f64 = std.math.floatMax(f64);
+        const penultimate_f64 = 1.79769313486231550856e+308;
+        const max_ulp = max_f64 - penultimate_f64;
+        const @"2^1023" = std.math.pow(f64, 2, 1023);
+
+        // 5. Let count be 0.
+        var count: u53 = 0;
+
+        // 6. Let next be NOT-STARTED.
+        // 7. Repeat, while next is not DONE,
+        //    a. Set next to ? IteratorStepValue(iteratorRecord).
+        //    b. If next is not DONE, then
+        while (try iterator.stepValue()) |next| {
+            // i. Set count to count + 1.
+            // ii. If count ≥ 2**53, then
+            count = std.math.add(u53, count, 1) catch {
+                // 1. Let error be ThrowCompletion(a newly created RangeError object).
+                const @"error" = agent.throwException(
+                    .range_error,
+                    "Maximum number of values exceeded",
+                    .{},
+                );
+
+                // 2. Return ? IteratorClose(iteratorRecord, error).
+                return iterator.close(@as(Agent.Error!Value, @"error"));
+            };
+
+            // iii. NOTE: The above case is not expected to be reached in practice and is included
+            //            only so that implementations may rely on inputs being "reasonably sized"
+            //            without violating this specification.
+
+            // iv. If next is not a Number, then
+            if (next != .number) {
+                // 1. Let error be ThrowCompletion(a newly created TypeError object).
+                const @"error" = agent.throwException(
+                    .type_error,
+                    "Value is not a number",
+                    .{},
+                );
+
+                // 2. Return ? IteratorClose(iteratorRecord, error).
+                return iterator.close(@as(Agent.Error!Value, @"error"));
+            }
+
+            // v. Let n be next.
+            const n = next.number;
+
+            // vi. If state is not NOT-A-NUMBER, then
+            if (state != .not_a_number) {
+                // 1. If n is NaN, then
+                if (n.isNan()) {
+                    // a. Set state to NOT-A-NUMBER.
+                    state = .not_a_number;
+                }
+                // 2. Else if n is +∞𝔽, then
+                else if (n.isPositiveInf()) {
+                    // a. If state is MINUS-INFINITY, set state to NOT-A-NUMBER.
+                    // b. Else, set state to PLUS-INFINITY.
+                    state = if (state == .minus_infinity) .not_a_number else .plus_infinity;
+                }
+                // 3. Else if n is -∞𝔽, then
+                else if (n.isNegativeInf()) {
+                    // a. If state is PLUS-INFINITY, set state to NOT-A-NUMBER.
+                    // b. Else, set state to MINUS-INFINITY.
+                    state = if (state == .plus_infinity) .not_a_number else .minus_infinity;
+                }
+                // 4. Else if n is not -0𝔽 and state is either MINUS-ZERO or FINITE, then
+                else if (!n.isNegativeZero() and (state == .minus_zero or state == .finite)) {
+                    // a. Set state to FINITE.
+                    state = .finite;
+
+                    // b. Set sum to sum + ℝ(n).
+                    var x = n.asFloat();
+                    var written_partials_len: usize = 0;
+                    for (partials.items) |*y| {
+                        if (@abs(x) < @abs(y.*)) std.mem.swap(f64, &x, y);
+
+                        const hi, const lo = twoSum(x, y.*);
+                        if (std.math.isInf(hi)) {
+                            const sign_ = std.math.sign(hi);
+                            overflow += sign_;
+                            std.debug.assert(@abs(overflow) < std.math.pow(f64, 2, 53));
+                            x = (x - sign_ * @"2^1023") - sign_ * @"2^1023";
+                            if (@abs(x) < @abs(y.*)) std.mem.swap(f64, &x, y);
+                            hi, lo = twoSum(x, y.*);
+                        }
+
+                        if (lo != 0.0) {
+                            partials.items[written_partials_len] = lo;
+                            written_partials_len += 1;
+                        }
+
+                        x = hi;
+                    }
+
+                    partials.shrinkRetainingCapacity(written_partials_len);
+
+                    if (x != 0.0) {
+                        try partials.append(x);
+                    }
+                }
+            }
+        }
+
+        switch (state) {
+            // 8. If state is NOT-A-NUMBER, return NaN.
+            .not_a_number => return Value.nan(),
+            // 9. If state is PLUS-INFINITY, return +∞𝔽.
+            .plus_infinity => return Value.infinity(),
+            // 10. If state is MINUS-INFINITY, return -∞𝔽.
+            .minus_infinity => return Value.negativeInfinity(),
+            // 11. If state is MINUS-ZERO, return -0𝔽.
+            .minus_zero => return Value.from(-0.0),
+            // 12. Return 𝔽(sum).
+            // 13. NOTE: The value of sum can be computed without arbitrary-precision arithmetic by
+            //           a variety of algorithms. One such is the "Grow-Expansion" algorithm given
+            //           in Adaptive Precision Floating-Point Arithmetic and Fast Robust Geometric
+            //           Predicates by Jonathan Richard Shewchuk. A more recent algorithm is given
+            //           in "Fast exact summation using small and large superaccumulators", code for
+            //           which is available at https://gitlab.com/radfordneal/xsum.
+            else => {
+                var n = partials.items.len;
+                var hi: f64, var lo: f64 = .{ 0.0, 0.0 };
+
+                if (overflow != 0.0) {
+                    const next = if (partials.items.len > 0) blk: {
+                        n -= 1;
+                        break :blk partials.items[n];
+                    } else 0.0;
+
+                    if (@abs(overflow) > 1.0 or std.math.sign(overflow) == std.math.sign(next)) {
+                        return if (overflow > 0.0) Value.infinity() else Value.negativeInfinity();
+                    }
+
+                    hi, lo = twoSum(overflow * @"2^1023", next / 2.0);
+                    lo *= 2.0;
+
+                    if (std.math.isInf(hi * 2.0)) {
+                        if (hi > 0.0) {
+                            if (hi == @"2^1023" and lo == -(max_ulp / 2) and n > 0 and partials.items[n - 1] < 0.0) {
+                                return Value.from(max_f64);
+                            }
+                            return Value.infinity();
+                        } else if (hi == -@"2^1023" and lo == max_ulp / 2 and n > 0 and partials.items[n - 1] > 0.0) {
+                            return Value.from(-max_f64);
+                        }
+                        return Value.negativeInfinity();
+                    }
+
+                    if (lo != 0.0) {
+                        partials.items[n] = lo;
+                        n += 1;
+                        lo = 0.0;
+                    }
+
+                    hi *= 2.0;
+                }
+
+                while (n > 0) {
+                    const x = hi;
+                    n -= 1;
+                    const y = partials.items[n];
+                    hi, lo = twoSum(x, y);
+                    if (lo != 0.0) {
+                        break;
+                    }
+                }
+
+                if (n > 0 and lo != 0.0 and std.math.sign(lo) == std.math.sign(partials.items[n - 1])) {
+                    const y = lo * 2.0;
+                    const x = hi + y;
+                    if (y == x - hi) {
+                        hi = x;
+                    }
+                }
+
+                return Value.from(hi);
+            },
+        }
     }
 
     /// 21.3.2.33 Math.tan ( x )
