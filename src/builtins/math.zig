@@ -903,7 +903,7 @@ pub const Math = struct {
                     for (partials.items) |*y| {
                         if (@abs(x) < @abs(y.*)) std.mem.swap(f64, &x, y);
 
-                        const hi, const lo = twoSum(x, y.*);
+                        var hi, var lo = twoSum(x, y.*);
                         if (std.math.isInf(hi)) {
                             const sign_ = std.math.sign(hi);
                             overflow += sign_;
