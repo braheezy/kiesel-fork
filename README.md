@@ -67,6 +67,7 @@ These can be set by passing `-D<name>=<value>` to `zig build`.
 | ---------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `enable-annex-b` | `true`  | Enables support for [ECMA-262 Annex B](https://tc39.es/ecma262/#sec-additional-ecmascript-features-for-web-browsers) language features. |
 | `enable-intl`    | `true`  | Enables support for [ECMA-402 (`Intl`)](https://tc39.es/ecma402/), which depends on `cargo` being available for the ICU4X library.      |
+| `enable-legacy`  | `true`  | Enables support for [legacy](https://tc39.es/ecma262/#sec-conformance) language features                                                |
 
 ## Usage
 

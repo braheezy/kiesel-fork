@@ -25,10 +25,16 @@ pub fn build(b: *std.Build) void {
         "enable-intl",
         "Enable the Intl built-in object (requires Rust-based icu4x build)",
     ) orelse true;
+    const enable_legacy = b.option(
+        bool,
+        "enable-legacy",
+        "Enable features marked as 'Legacy' in the spec",
+    ) orelse true;
 
     const options = b.addOptions();
     options.addOption(bool, "enable_annex_b", enable_annex_b);
     options.addOption(bool, "enable_intl", enable_intl);
+    options.addOption(bool, "enable_legacy", enable_legacy);
 
     const any_pointer = b.dependency("any_pointer", .{});
     const libgc = b.dependency("libgc", .{
