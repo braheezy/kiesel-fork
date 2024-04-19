@@ -723,6 +723,7 @@ pub const ObjectPrototype = struct {
             try defineBuiltinFunction(object, "__defineGetter__", __defineGetter__, 2, realm);
             try defineBuiltinFunction(object, "__defineSetter__", __defineSetter__, 2, realm);
             try defineBuiltinFunction(object, "__lookupGetter__", __lookupGetter__, 1, realm);
+            try defineBuiltinFunction(object, "__lookupSetter__", __lookupSetter__, 1, realm);
         }
     }
 
@@ -997,6 +998,42 @@ pub const ObjectPrototype = struct {
                 // i. If IsAccessorDescriptor(desc) is true, return desc.[[Get]].
                 if (property_descriptor.isAccessorDescriptor()) {
                     return Value.from(property_descriptor.get.? orelse return .undefined);
+                }
+
+                // ii. Return undefined.
+                return .undefined;
+            }
+
+            // c. Set O to ? O.[[GetPrototypeOf]]().
+            object = try object.internalMethods().getPrototypeOf(object) orelse {
+                // d. If O is null, return undefined.
+                return .undefined;
+            };
+        }
+    }
+
+    /// 20.1.3.9.4 Object.prototype.__lookupSetter__ ( P )
+    /// https://tc39.es/ecma262/#sec-object.prototype.__lookupSetter__
+    fn __lookupSetter__(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const property = arguments.get(0);
+
+        // 1. Let O be ? ToObject(this value).
+        var object = try this_value.toObject(agent);
+
+        // 2. Let key be ? ToPropertyKey(P).
+        const property_key = try property.toPropertyKey(agent);
+
+        // 3. Repeat,
+        while (true) {
+            // a. Let desc be ? O.[[GetOwnProperty]](key).
+            // b. If desc is not undefined, then
+            if (try object.internalMethods().getOwnProperty(
+                object,
+                property_key,
+            )) |property_descriptor| {
+                // i. If IsAccessorDescriptor(desc) is true, return desc.[[Set]].
+                if (property_descriptor.isAccessorDescriptor()) {
+                    return Value.from(property_descriptor.set.? orelse return .undefined);
                 }
 
                 // ii. Return undefined.
