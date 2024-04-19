@@ -51,16 +51,14 @@ fn GrammarSymbol(comptime T: type) type {
 pub const FunctionConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
-            // 20.2.2.1 Function.length
-            // https://tc39.es/ecma262/#sec-function.length
             .length = 1,
             .name = "Function",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
-        // 20.2.2.2 Function.prototype
-        // https://tc39.es/ecma262/#sec-boolean.prototype
+        // 20.2.2.1 Function.prototype
+        // https://tc39.es/ecma262/#sec-function.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
             .value = Value.from(realm.intrinsics.@"%Function.prototype%"() catch unreachable),
             .writable = false,
