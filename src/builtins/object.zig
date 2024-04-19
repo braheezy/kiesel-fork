@@ -721,6 +721,7 @@ pub const ObjectPrototype = struct {
         if (build_options.enable_legacy) {
             try defineBuiltinAccessor(object, "__proto__", @"get __proto__", @"set __proto__", realm);
             try defineBuiltinFunction(object, "__defineGetter__", __defineGetter__, 2, realm);
+            try defineBuiltinFunction(object, "__defineSetter__", __defineSetter__, 2, realm);
         }
     }
 
@@ -926,6 +927,39 @@ pub const ObjectPrototype = struct {
         //    }.
         const property_descriptor = PropertyDescriptor{
             .get = getter.object,
+            .enumerable = true,
+            .configurable = true,
+        };
+
+        // 4. Let key be ? ToPropertyKey(P).
+        const property_key = try property.toPropertyKey(agent);
+
+        // 5. Perform ? DefinePropertyOrThrow(O, key, desc).
+        try object.definePropertyOrThrow(property_key, property_descriptor);
+
+        // 6. Return undefined.
+        return .undefined;
+    }
+
+    /// 20.1.3.9.2 Object.prototype.__defineSetter__ ( P, setter )
+    /// https://tc39.es/ecma262/#sec-object.prototype.__defineSetter__
+    fn __defineSetter__(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const property = arguments.get(0);
+        const setter = arguments.get(1);
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. If IsCallable(setter) is false, throw a TypeError exception.
+        if (!setter.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{setter});
+        }
+
+        // 3. Let desc be PropertyDescriptor {
+        //      [[Set]]: setter, [[Enumerable]]: true, [[Configurable]]: true
+        //    }.
+        const property_descriptor = PropertyDescriptor{
+            .set = setter.object,
             .enumerable = true,
             .configurable = true,
         };
