@@ -720,6 +720,7 @@ pub const ObjectPrototype = struct {
 
         if (build_options.enable_legacy) {
             try defineBuiltinAccessor(object, "__proto__", @"get __proto__", @"set __proto__", realm);
+            try defineBuiltinFunction(object, "__defineGetter__", __defineGetter__, 2, realm);
         }
     }
 
@@ -901,6 +902,39 @@ pub const ObjectPrototype = struct {
         if (!status) {
             return agent.throwException(.type_error, "Could not set prototype", .{});
         }
+
+        // 6. Return undefined.
+        return .undefined;
+    }
+
+    /// 20.1.3.9.1 Object.prototype.__defineGetter__ ( P, getter )
+    /// https://tc39.es/ecma262/#sec-object.prototype.__defineGetter__
+    fn __defineGetter__(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const property = arguments.get(0);
+        const getter = arguments.get(1);
+
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. If IsCallable(getter) is false, throw a TypeError exception.
+        if (!getter.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{getter});
+        }
+
+        // 3. Let desc be PropertyDescriptor {
+        //      [[Get]]: getter, [[Enumerable]]: true, [[Configurable]]: true
+        //    }.
+        const property_descriptor = PropertyDescriptor{
+            .get = getter.object,
+            .enumerable = true,
+            .configurable = true,
+        };
+
+        // 4. Let key be ? ToPropertyKey(P).
+        const property_key = try property.toPropertyKey(agent);
+
+        // 5. Perform ? DefinePropertyOrThrow(O, key, desc).
+        try object.definePropertyOrThrow(property_key, property_descriptor);
 
         // 6. Return undefined.
         return .undefined;
