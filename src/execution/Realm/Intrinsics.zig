@@ -145,8 +145,13 @@ inline fn lazyIntrinsic(
         // when first created, otherwise create() goes into infinite recursion.
         // Once the intrinsic is no longer null, regular create() can be used.
         if (@hasDecl(T, "createNoinit")) {
-            intrinsic.* = try T.createNoinit(self.realm);
-            try T.init(self.realm, intrinsic.*.?);
+            const object = try T.createNoinit(self.realm);
+            // Sanity check to ensure there is no dependency loop - creating the object must not
+            // (indirectly) rely on itself. If something within `createNoInit()` assigned the
+            // intrinsic it has been created twice and overwriting it would be a mistake.
+            std.debug.assert(intrinsic.* == null);
+            intrinsic.* = object;
+            try T.init(self.realm, object);
         } else {
             intrinsic.* = try T.create(self.realm);
         }

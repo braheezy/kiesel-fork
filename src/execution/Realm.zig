@@ -91,6 +91,10 @@ fn createIntrinsics(self: *Self) Allocator.Error!void {
     // 1. Set realmRec.[[Intrinsics]] to a new Record.
     self.intrinsics = Intrinsics{ .realm = self };
 
+    // Ensure %Object.prototype% exists before %Function.prototype% is created, otherwise the
+    // latter will be created twice.
+    _ = try self.intrinsics.@"%Object.prototype%"();
+
     // 2. Set fields of realmRec.[[Intrinsics]] with the values listed in Table 6. The field
     //    names are the names listed in column one of the table. The value of each field is a new
     //    object value fully and recursively populated with property values as defined by the
