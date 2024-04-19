@@ -5,6 +5,7 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const immutable_prototype = @import("immutable_prototype.zig");
@@ -24,6 +25,7 @@ const addEntriesFromIterable = builtins.addEntriesFromIterable;
 const createArrayFromList = types.createArrayFromList;
 const createArrayFromListMapToValue = types.createArrayFromListMapToValue;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const noexcept = utils.noexcept;
@@ -715,6 +717,10 @@ pub const ObjectPrototype = struct {
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
+
+        if (build_options.enable_legacy) {
+            try defineBuiltinAccessor(object, "__proto__", @"get __proto__", @"set __proto__", realm);
+        }
     }
 
     /// 20.1.3.2 Object.prototype.hasOwnProperty ( V )
@@ -859,6 +865,45 @@ pub const ObjectPrototype = struct {
     fn valueOf(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return ? ToObject(this value).
         return Value.from(try this_value.toObject(agent));
+    }
+
+    /// 20.1.3.8.1 get Object.prototype.__proto__
+    /// https://tc39.es/ecma262/#sec-get-object.prototype.__proto__
+    fn @"get __proto__"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let O be ? ToObject(this value).
+        const object = try this_value.toObject(agent);
+
+        // 2. Return ? O.[[GetPrototypeOf]]().
+        return Value.from(try object.internalMethods().getPrototypeOf(object) orelse return .null);
+    }
+
+    /// 20.1.3.8.2 set Object.prototype.__proto__
+    /// https://tc39.es/ecma262/#sec-set-object.prototype.__proto__
+    fn @"set __proto__"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const prototype = arguments.get(0);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. If proto is not an Object and proto is not null, return undefined.
+        if (prototype != .object and prototype != .null) return .undefined;
+
+        // 3. If O is not an Object, return undefined.
+        if (object != .object) return .undefined;
+
+        // 4. Let status be ? O.[[SetPrototypeOf]](proto).
+        const status = try object.object.internalMethods().setPrototypeOf(
+            object.object,
+            if (prototype == .object) prototype.object else null,
+        );
+
+        // 5. If status is false, throw a TypeError exception.
+        if (!status) {
+            return agent.throwException(.type_error, "Could not set prototype", .{});
+        }
+
+        // 6. Return undefined.
+        return .undefined;
     }
 };
 
