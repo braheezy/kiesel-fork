@@ -465,12 +465,6 @@ pub fn createDynamicFunction(
 /// 20.2.3 Properties of the Function Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-prototype-object
 pub const FunctionPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createNoinit(realm);
-        init(realm, object);
-        return object;
-    }
-
     pub fn createNoinit(realm: *Realm) Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .regular = behaviour }, .{
             .length = 0,

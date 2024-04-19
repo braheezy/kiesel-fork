@@ -699,12 +699,6 @@ pub const ObjectConstructor = struct {
 /// 20.1.3 Properties of the Object Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-object-prototype-object
 pub const ObjectPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object_ {
-        const object = try createNoinit(realm);
-        init(realm, object);
-        return object;
-    }
-
     pub fn createNoinit(realm: *Realm) Allocator.Error!Object_ {
         return Object.create(realm.agent, .{
             .prototype = null,
