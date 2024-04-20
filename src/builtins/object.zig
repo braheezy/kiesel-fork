@@ -927,7 +927,7 @@ pub const ObjectPrototype = struct {
         // 3. Let desc be PropertyDescriptor {
         //      [[Get]]: getter, [[Enumerable]]: true, [[Configurable]]: true
         //    }.
-        const property_descriptor = PropertyDescriptor{
+        const property_descriptor: PropertyDescriptor = .{
             .get = getter.object,
             .enumerable = true,
             .configurable = true,
@@ -960,7 +960,7 @@ pub const ObjectPrototype = struct {
         // 3. Let desc be PropertyDescriptor {
         //      [[Set]]: setter, [[Enumerable]]: true, [[Configurable]]: true
         //    }.
-        const property_descriptor = PropertyDescriptor{
+        const property_descriptor: PropertyDescriptor = .{
             .set = setter.object,
             .enumerable = true,
             .configurable = true,

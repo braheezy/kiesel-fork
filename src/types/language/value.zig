@@ -162,7 +162,7 @@ pub const Value = union(enum) {
         }
 
         // 2. Let desc be a new Property Descriptor that initially has no fields.
-        var descriptor = PropertyDescriptor{};
+        var descriptor: PropertyDescriptor = .{};
 
         // 3. Let hasEnumerable be ? HasProperty(Obj, "enumerable").
         const has_enumerable = try self.object.hasProperty(PropertyKey.from("enumerable"));

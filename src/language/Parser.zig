@@ -208,7 +208,7 @@ pub fn parseNode(
 ) Error!T {
     var tokenizer = Tokenizer.init(source_text, ctx.file_name);
     const core = ParserCore.init(&tokenizer);
-    var parser = Self{
+    var parser: Self = .{
         .allocator = allocator,
         .core = core,
         .diagnostics = ctx.diagnostics,
@@ -606,7 +606,7 @@ pub fn acceptNewExpression(self: *Self) AcceptError!ast.NewExpression {
         );
         defer tmp.restore();
 
-        const ctx = AcceptContext{ .precedence = getPrecedence(.new) };
+        const ctx: AcceptContext = .{ .precedence = getPrecedence(.new) };
         const expression = try self.allocator.create(ast.Expression);
         expression.* = try self.acceptExpression(ctx);
         break :blk expression;
@@ -677,7 +677,7 @@ pub fn acceptArguments(self: *Self) AcceptError!ast.Arguments {
     var arguments = std.ArrayList(ast.Expression).init(self.allocator);
     errdefer arguments.deinit();
     _ = try self.core.accept(RuleSet.is(.@"("));
-    const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
+    const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
     while (self.acceptExpression(ctx)) |argument| {
         try arguments.append(argument);
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
@@ -808,7 +808,7 @@ pub fn acceptArrayLiteral(self: *Self) AcceptError!ast.ArrayLiteral {
     _ = try self.core.accept(RuleSet.is(.@"["));
     var elements = std.ArrayList(ast.ArrayLiteral.Element).init(self.allocator);
     errdefer elements.deinit();
-    const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
+    const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
     while (true) {
         if (self.core.accept(RuleSet.is(.@"..."))) |_| {
             const expression = try self.acceptExpression(ctx);
@@ -852,7 +852,7 @@ pub fn acceptPropertyDefinition(self: *Self) AcceptError!ast.PropertyDefinition 
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
+    const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
     if (self.core.accept(RuleSet.is(.@"..."))) |_| {
         const expression = try self.acceptExpression(ctx);
         return .{ .spread = expression };
@@ -1214,7 +1214,7 @@ pub fn acceptExpression(self: *Self, ctx: AcceptContext) AcceptError!ast.Express
 
     while (true) {
         const next_token = try self.core.peek() orelse break;
-        const new_ctx = AcceptContext{
+        const new_ctx: AcceptContext = .{
             .precedence = getPrecedence(next_token.type),
             .associativity = getAssociativity(next_token.type),
             .forbidden = ctx.forbidden,
@@ -1398,7 +1398,7 @@ pub fn acceptLexicalBinding(self: *Self) AcceptError!ast.LexicalBinding {
     const binding_identifier = try self.acceptBindingIdentifier();
     var initializer: ?ast.Expression = null;
     if (self.core.accept(RuleSet.is(.@"="))) |_| {
-        const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
+        const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
         initializer = try self.acceptExpression(ctx);
     } else |_| {}
     return .{ .binding_identifier = binding_identifier, .initializer = initializer };
@@ -1438,7 +1438,7 @@ pub fn acceptVariableDeclaration(self: *Self) AcceptError!ast.VariableDeclaratio
     const binding_identifier = try self.acceptBindingIdentifier();
     var initializer: ?ast.Expression = null;
     if (self.core.accept(RuleSet.is(.@"="))) |_| {
-        const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
+        const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
         initializer = try self.acceptExpression(ctx);
     } else |_| {}
     return .{ .binding_identifier = binding_identifier, .initializer = initializer };
@@ -1761,14 +1761,14 @@ pub fn acceptFormalParameters(self: *Self) AcceptError!ast.FormalParameters {
     errdefer formal_parameters_items.deinit();
     while (true) {
         if (self.acceptBindingRestElement()) |binding_rest_element| {
-            const function_rest_parameter = ast.FunctionRestParameter{
+            const function_rest_parameter: ast.FunctionRestParameter = .{
                 .binding_rest_element = binding_rest_element,
             };
             try formal_parameters_items.append(.{ .function_rest_parameter = function_rest_parameter });
             _ = self.core.accept(RuleSet.is(.@",")) catch {};
             break;
         } else |_| if (self.acceptBindingElement()) |binding_element| {
-            const formal_parameter = ast.FormalParameter{
+            const formal_parameter: ast.FormalParameter = .{
                 .binding_element = binding_element,
             };
             try formal_parameters_items.append(.{ .formal_parameter = formal_parameter });
@@ -1879,20 +1879,20 @@ pub fn acceptArrowFunction(self: *Self) AcceptError!ast.ArrowFunction {
     }
     _ = try self.core.accept(RuleSet.is(.@"=>"));
     try self.noLineTerminatorHere();
-    const function_body = if (self.core.accept(RuleSet.is(.@"{"))) |_| blk: {
+    const function_body: ast.FunctionBody = if (self.core.accept(RuleSet.is(.@"{"))) |_| blk: {
         const function_body = try self.acceptFunctionBody(.normal);
         _ = try self.core.accept(RuleSet.is(.@"}"));
         break :blk function_body;
     } else |_| blk: {
-        const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
+        const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
         const expression_body = try self.acceptExpression(ctx);
         // Synthesize a FunctionBody with return statement
         const statement = try self.allocator.create(ast.Statement);
-        statement.* = ast.Statement{ .return_statement = .{ .expression = expression_body } };
+        statement.* = .{ .return_statement = .{ .expression = expression_body } };
         const items = try self.allocator.alloc(ast.StatementListItem, 1);
         items[0] = .{ .statement = statement };
-        const statement_list = ast.StatementList{ .items = items };
-        break :blk ast.FunctionBody{ .type = .normal, .statement_list = statement_list };
+        const statement_list: ast.StatementList = .{ .items = items };
+        break :blk .{ .type = .normal, .statement_list = statement_list };
     };
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
@@ -2389,20 +2389,20 @@ pub fn acceptAsyncArrowFunction(self: *Self) AcceptError!ast.AsyncArrowFunction 
     }
     _ = try self.core.accept(RuleSet.is(.@"=>"));
     try self.noLineTerminatorHere();
-    const function_body = if (self.core.accept(RuleSet.is(.@"{"))) |_| blk: {
+    const function_body: ast.FunctionBody = if (self.core.accept(RuleSet.is(.@"{"))) |_| blk: {
         const function_body = try self.acceptFunctionBody(.@"async");
         _ = try self.core.accept(RuleSet.is(.@"}"));
         break :blk function_body;
     } else |_| blk: {
-        const ctx = AcceptContext{ .precedence = getPrecedence(.@",") + 1 };
+        const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
         const expression_body = try self.acceptExpression(ctx);
         // Synthesize a FunctionBody with return statement
         const statement = try self.allocator.create(ast.Statement);
-        statement.* = ast.Statement{ .return_statement = .{ .expression = expression_body } };
+        statement.* = .{ .return_statement = .{ .expression = expression_body } };
         const items = try self.allocator.alloc(ast.StatementListItem, 1);
         items[0] = .{ .statement = statement };
-        const statement_list = ast.StatementList{ .items = items };
-        break :blk ast.FunctionBody{ .type = .@"async", .statement_list = statement_list };
+        const statement_list: ast.StatementList = .{ .items = items };
+        break :blk .{ .type = .@"async", .statement_list = statement_list };
     };
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(

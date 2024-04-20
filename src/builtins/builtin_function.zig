@@ -109,7 +109,7 @@ pub fn builtinCallOrConstruct(
     _ = caller_context;
 
     // 3. Let calleeContext be a new execution context.
-    const callee_context = ExecutionContext{
+    const callee_context: ExecutionContext = .{
         // 4. Set the Function of calleeContext to F.
         .function = function.object(),
 

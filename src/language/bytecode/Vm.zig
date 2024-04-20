@@ -715,7 +715,7 @@ fn methodDefinitionEvaluation(
             const source_text = function_expression.source_text;
 
             // 5. Let formalParameterList be an instance of the production FormalParameters : [empty] .
-            const formal_parameter_list = ast.FormalParameters{ .items = &.{} };
+            const formal_parameter_list: ast.FormalParameters = .{ .items = &.{} };
 
             // 6. Let closure be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
             //    formalParameterList, FunctionBody, non-lexical-this, env, privateEnv).
@@ -740,7 +740,7 @@ fn methodDefinitionEvaluation(
                 // 9. If propKey is a Private Name, then
                 .private_name => |private_name| {
                     // a. Return PrivateElement { [[Key]]: propKey, [[Kind]]: accessor, [[Get]]: closure, [[Set]]: undefined }.
-                    const private_element = PrivateElement{
+                    const private_element: PrivateElement = .{
                         .accessor = .{ .get = closure, .set = null },
                     };
                     return .{ .private_name = private_name, .private_element = private_element };
@@ -750,7 +750,7 @@ fn methodDefinitionEvaluation(
                     // a. Let desc be the PropertyDescriptor {
                     //      [[Get]]: closure, [[Enumerable]]: enumerable, [[Configurable]]: true
                     //    }.
-                    const property_descriptor = PropertyDescriptor{
+                    const property_descriptor: PropertyDescriptor = .{
                         .get = closure,
                         .enumerable = enumerable,
                         .configurable = true,
@@ -807,7 +807,7 @@ fn methodDefinitionEvaluation(
                 // 8. If propKey is a Private Name, then
                 .private_name => |private_name| {
                     // a. Return PrivateElement { [[Key]]: propKey, [[Kind]]: accessor, [[Get]]: undefined, [[Set]]: closure }.
-                    const private_element = PrivateElement{
+                    const private_element: PrivateElement = .{
                         .accessor = .{ .get = null, .set = closure },
                     };
                     return .{ .private_name = private_name, .private_element = private_element };
@@ -817,7 +817,7 @@ fn methodDefinitionEvaluation(
                     // a. Let desc be the PropertyDescriptor {
                     //      [[Set]]: closure, [[Enumerable]]: enumerable, [[Configurable]]: true
                     //    }.
-                    const property_descriptor = PropertyDescriptor{
+                    const property_descriptor: PropertyDescriptor = .{
                         .set = closure,
                         .enumerable = enumerable,
                         .configurable = true,
@@ -1260,7 +1260,7 @@ fn classFieldDefinitionEvaluation(
     // 2. If Initializer is present, then
     const initializer = if (field_definition.initializer) |initializer| blk: {
         // a. Let formalParameterList be an instance of the production FormalParameters : [empty] .
-        const formal_parameter_list = ast.FormalParameters{ .items = &.{} };
+        const formal_parameter_list: ast.FormalParameters = .{ .items = &.{} };
 
         // b. Let env be the LexicalEnvironment of the running execution context.
         const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -1273,13 +1273,13 @@ fn classFieldDefinitionEvaluation(
 
         // e. Let initializer be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
         //    formalParameterList, Initializer, non-lexical-this, env, privateEnv).
-        const body = blk_body: {
+        const body: ast.FunctionBody = blk_body: {
             const statement = try agent.gc_allocator.create(ast.Statement);
-            statement.* = ast.Statement{ .return_statement = .{ .expression = initializer } };
+            statement.* = .{ .return_statement = .{ .expression = initializer } };
             const items = try agent.gc_allocator.alloc(ast.StatementListItem, 1);
             items[0] = .{ .statement = statement };
-            const statement_list = ast.StatementList{ .items = items };
-            break :blk_body ast.FunctionBody{
+            const statement_list: ast.StatementList = .{ .items = items };
+            break :blk_body .{
                 .type = .normal,
                 .statement_list = statement_list,
                 .strict = true,
@@ -1336,14 +1336,14 @@ fn classStaticBlockDefinitionEvaluation(
     const source_text = "";
 
     // 4. Let formalParameters be an instance of the production FormalParameters : [empty] .
-    const formal_parameter_list = ast.FormalParameters{ .items = &.{} };
+    const formal_parameter_list: ast.FormalParameters = .{ .items = &.{} };
 
     // 5. Let bodyFunction be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
     //    formalParameters, ClassStaticBlockBody, non-lexical-this, lex, privateEnv).
-    const body = blk_body: {
+    const body: ast.FunctionBody = blk_body: {
         // NOTE: This serves as a replacement for EvaluateClassStaticBlockBody, which invokes
         //       FunctionDeclarationInstantiation before evaluating the statement list.
-        break :blk_body ast.FunctionBody{
+        break :blk_body .{
             .type = .normal,
             .statement_list = class_static_block.statement_list,
             .strict = true,
@@ -1496,7 +1496,7 @@ fn classDefinitionEvaluation(
                 symbol.private = true;
 
                 // 1. Let name be a new Private Name whose [[Description]] is dn.
-                const name = PrivateName{ .symbol = symbol };
+                const name: PrivateName = .{ .symbol = symbol };
 
                 // 2. Append name to classPrivateEnvironment.[[Names]].
                 try class_private_environment.names.putNoClobber(declared_name, name);
@@ -2444,7 +2444,7 @@ pub fn executeInstruction(
             //      [[Strict]]: strict,
             //      [[ThisValue]]: empty
             //    }.
-            self.reference = Reference{
+            self.reference = .{
                 .base = .{ .value = base_value },
                 .referenced_name = switch (try property_key.toStringOrSymbol(self.agent)) {
                     .string => |string| .{ .string = string },
@@ -2469,7 +2469,7 @@ pub fn executeInstruction(
             //      [[Strict]]: strict,
             //      [[ThisValue]]: empty
             //    }.
-            self.reference = Reference{
+            self.reference = .{
                 .base = .{ .value = base_value },
                 .referenced_name = .{ .string = property_name_string },
                 .strict = strict,
@@ -2862,7 +2862,7 @@ pub fn executeInstruction(
             // 4. Return the Reference Record {
             //      [[Base]]: baseValue, [[ReferencedName]]: privateName, [[Strict]]: true, [[ThisValue]]: empty
             //    }.
-            self.reference = Reference{
+            self.reference = .{
                 .base = .{ .value = base_value },
                 .referenced_name = .{ .private_name = private_name },
                 .strict = true,
@@ -2889,7 +2889,7 @@ pub fn executeInstruction(
             // 4. Return the Reference Record {
             //      [[Base]]: baseValue, [[ReferencedName]]: propertyKey, [[Strict]]: strict, [[ThisValue]]: actualThis
             //    }.
-            self.reference = Reference{
+            self.reference = .{
                 .base = .{ .value = base_value },
                 .referenced_name = switch (try property_key.toStringOrSymbol(self.agent)) {
                     .string => |string| .{ .string = string },

@@ -106,7 +106,7 @@ pub fn createResolvingFunctions(
     const additional_fields = try agent.gc_allocator.create(AdditionalFields);
 
     // 1. Let alreadyResolved be the Record { [[Value]]: false }.
-    const already_resolved = AlreadyResolved{ .value = false };
+    const already_resolved: AlreadyResolved = .{ .value = false };
 
     // 2. Let stepsResolve be the algorithm steps defined in Promise Resolve Functions.
     const steps_resolve = struct {
@@ -562,7 +562,7 @@ pub fn newPromiseReactionJob(
             }
         }
     }.func;
-    const job = Job{ .func = func, .captures = SafePointer.make(*Captures, captures) };
+    const job: Job = .{ .func = func, .captures = SafePointer.make(*Captures, captures) };
 
     // 2. Let handlerRealm be null.
     var handler_realm: ?*Realm = null;
@@ -651,7 +651,7 @@ pub fn newPromiseResolveThenableJob(
             return then_call_result;
         }
     }.func;
-    const job = Job{ .func = func, .captures = SafePointer.make(*Captures, captures) };
+    const job: Job = .{ .func = func, .captures = SafePointer.make(*Captures, captures) };
 
     // 2. Let getThenRealmResult be Completion(GetFunctionRealm(then.[[Callback]])).
     const get_handler_realm_result = then.callback.getFunctionRealm();
@@ -1431,7 +1431,7 @@ pub fn performPromiseThen(
     // 7. Let fulfillReaction be the PromiseReaction Record {
     //      [[Capability]]: resultCapability, [[Type]]: fulfill, [[Handler]]: onFulfilledJobCallback
     //    }.
-    const fulfill_reaction = PromiseReaction{
+    const fulfill_reaction: PromiseReaction = .{
         .capability = result_capability,
         .type = .fulfill,
         .handler = on_fulfilled_job_callback,
@@ -1440,7 +1440,7 @@ pub fn performPromiseThen(
     // 8. Let rejectReaction be the PromiseReaction Record {
     //      [[Capability]]: resultCapability, [[Type]]: reject, [[Handler]]: onRejectedJobCallback
     //    }.
-    const reject_reaction = PromiseReaction{
+    const reject_reaction: PromiseReaction = .{
         .capability = result_capability,
         .type = .reject,
         .handler = on_rejected_job_callback,

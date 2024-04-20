@@ -940,7 +940,7 @@ pub fn initializeEnvironment(self: *Self) Allocator.Error!void {
     //     [...]
 
     // 8. Let moduleContext be a new ECMAScript code execution context.
-    const module_context = ExecutionContext{
+    const module_context: ExecutionContext = .{
         // 9. Set the Function of moduleContext to null.
         .function = null,
 
@@ -1066,7 +1066,7 @@ pub fn executeModule(self: *Self, capability: ?PromiseCapability) Agent.Error!vo
     const agent = self.realm.agent;
 
     // 1. Let moduleContext be a new ECMAScript code execution context.
-    const module_context = ExecutionContext{
+    const module_context: ExecutionContext = .{
         // 2. Set the Function of moduleContext to null.
         .function = null,
 

@@ -199,7 +199,7 @@ fn prepareForOrdinaryCall(
     const local_env = try newFunctionEnvironment(agent.gc_allocator, function, new_target);
 
     // 2. Let calleeContext be a new ECMAScript code execution context.
-    const callee_context = ExecutionContext{
+    const callee_context: ExecutionContext = .{
         // 3. Set the Function of calleeContext to F.
         .function = function.object(),
 
@@ -642,7 +642,7 @@ pub fn addRestrictedFunctionProperties(function: Object, realm: *Realm) Allocato
     // 2. Let thrower be realm.[[Intrinsics]].[[%ThrowTypeError%]].
     const thrower = try realm.intrinsics.@"%ThrowTypeError%"();
 
-    const property_descriptor = PropertyDescriptor{
+    const property_descriptor: PropertyDescriptor = .{
         .get = thrower,
         .set = thrower,
         .enumerable = false,
@@ -780,7 +780,7 @@ pub fn defineMethodProperty(
         // 2. If key is a Private Name, then
         .private_name => |private_name| {
             // a. Return PrivateElement { [[Key]]: key, [[Kind]]: method, [[Value]]: closure }.
-            const private_element = PrivateElement{ .method = closure };
+            const private_element: PrivateElement = .{ .method = closure };
             return .{ .private_name = private_name, .private_element = private_element };
         },
         // 3. Else,
@@ -788,7 +788,7 @@ pub fn defineMethodProperty(
             // a. Let desc be the PropertyDescriptor {
             //      [[Value]]: closure, [[Writable]]: true, [[Enumerable]]: enumerable, [[Configurable]]: true
             //    }.
-            const property_descriptor = PropertyDescriptor{
+            const property_descriptor: PropertyDescriptor = .{
                 .value = Value.from(closure),
                 .writable = true,
                 .enumerable = enumerable,
@@ -876,7 +876,7 @@ pub fn setFunctionName(
     // 6. Perform ! DefinePropertyOrThrow(F, "name", PropertyDescriptor {
     //      [[Value]]: name, [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    function.definePropertyOrThrow(PropertyKey.from("name"), PropertyDescriptor{
+    function.definePropertyOrThrow(PropertyKey.from("name"), .{
         .value = Value.from(name),
         .writable = false,
         .enumerable = false,
@@ -902,7 +902,7 @@ pub fn setFunctionLength(function: Object, length: f64) Allocator.Error!void {
     // 2. Perform ! DefinePropertyOrThrow(F, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    function.definePropertyOrThrow(PropertyKey.from("length"), PropertyDescriptor{
+    function.definePropertyOrThrow(PropertyKey.from("length"), .{
         .value = Value.from(length),
         .writable = false,
         .enumerable = false,
@@ -1044,7 +1044,7 @@ fn functionDeclarationInstantiation(
         const callee_env = callee_context.ecmascript_code.?.lexical_environment;
 
         // c. Let env be NewDeclarativeEnvironment(calleeEnv).
-        const env = Environment{
+        const env: Environment = .{
             .declarative_environment = try newDeclarativeEnvironment(
                 agent.gc_allocator,
                 callee_env,
@@ -1227,7 +1227,7 @@ fn functionDeclarationInstantiation(
         //    the function body.
 
         // b. Let varEnv be NewDeclarativeEnvironment(env).
-        const var_env = Environment{
+        const var_env: Environment = .{
             .declarative_environment = try newDeclarativeEnvironment(agent.gc_allocator, env),
         };
 
@@ -1274,7 +1274,7 @@ fn functionDeclarationInstantiation(
     // 30. If strict is false, then
     const lex_env = if (!strict) blk: {
         // a. Let lexEnv be NewDeclarativeEnvironment(varEnv).
-        break :blk Environment{
+        const lex_env: Environment = .{
             .declarative_environment = try newDeclarativeEnvironment(agent.gc_allocator, var_env),
         };
 
@@ -1283,6 +1283,8 @@ fn functionDeclarationInstantiation(
         //    introduced by the eval code conflict with pre-existing top-level lexically scoped
         //    declarations. This is not needed for strict functions because a strict direct eval
         //    always places all declarations into a new Environment Record.
+
+        break :blk lex_env;
     }
     // 31. Else,
     else blk: {

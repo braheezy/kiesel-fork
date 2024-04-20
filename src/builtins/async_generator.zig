@@ -151,7 +151,7 @@ pub const AsyncGeneratorPrototype = struct {
         // 5. Let completion be Completion Record {
         //      [[Type]]: return, [[Value]]: value, [[Target]]: empty
         //    }.
-        const completion = Completion{ .type = .@"return", .value = value, .target = null };
+        const completion: Completion = .{ .type = .@"return", .value = value, .target = null };
 
         // 6. Perform AsyncGeneratorEnqueue(generator, completion, promiseCapability).
         try asyncGeneratorEnqueue(generator, completion, promise_capability);
@@ -406,7 +406,7 @@ pub fn asyncGeneratorEnqueue(
     // 1. Let request be AsyncGeneratorRequest {
     //      [[Completion]]: completion, [[Capability]]: promiseCapability
     //    }.
-    const request = AsyncGeneratorRequest{ .completion = completion, .capability = promise_capability };
+    const request: AsyncGeneratorRequest = .{ .completion = completion, .capability = promise_capability };
 
     // 2. Append request to generator.[[AsyncGeneratorQueue]].
     try generator.fields.async_generator_queue.append(request);

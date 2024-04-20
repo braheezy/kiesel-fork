@@ -37,7 +37,7 @@ pub fn generateBytecode(
     var break_jumps = std.ArrayList(Executable.JumpIndex).init(agent.gc_allocator);
     defer break_jumps.deinit();
 
-    var ctx = codegen.Context{
+    var ctx: codegen.Context = .{
         .agent = agent,
         .contained_in_strict_mode_code = options.contained_in_strict_mode_code,
         .continue_jumps = continue_jumps,

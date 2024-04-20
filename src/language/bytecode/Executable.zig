@@ -165,7 +165,7 @@ pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
     else
         std.io.getStdOut();
     const tty_config = std.io.tty.detectConfig(file);
-    var iterator = InstructionIterator{ .instructions = self.instructions.items };
+    var iterator: InstructionIterator = .{ .instructions = self.instructions.items };
     while (iterator.next()) |instruction| {
         try writer.print("{:>[1]}: ", .{
             iterator.instruction_index,

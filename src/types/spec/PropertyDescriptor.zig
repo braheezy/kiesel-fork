@@ -147,7 +147,7 @@ pub fn completePropertyDescriptor(self: *Self) void {
     //      [[Enumerable]]: false,
     //      [[Configurable]]: false
     //    }.
-    const like = Self{
+    const like: Self = .{
         .value = .undefined,
         .writable = false,
         .enumerable = false,

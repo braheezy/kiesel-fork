@@ -77,7 +77,7 @@ pub const QueuedJob = struct {
 };
 
 pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
-    var self = Self{
+    var self: Self = .{
         .gc_allocator = gc_allocator,
         .options = options,
         .pre_allocated = undefined,

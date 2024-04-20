@@ -10,7 +10,7 @@ const libgc = @cImport({
     @cInclude("gc/gc.h");
 });
 
-pub const vtable = Allocator.VTable{
+pub const vtable: Allocator.VTable = .{
     .alloc = alloc,
     .resize = resize,
     .free = free,
@@ -88,7 +88,7 @@ fn free(
 }
 
 test {
-    const allocator = Allocator{
+    const allocator: Allocator = .{
         .ptr = undefined,
         .vtable = &vtable,
     };

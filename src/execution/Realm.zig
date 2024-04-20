@@ -89,7 +89,7 @@ pub fn create(agent: *Agent) Allocator.Error!*Self {
 /// https://tc39.es/ecma262/#sec-createintrinsics
 fn createIntrinsics(self: *Self) Allocator.Error!void {
     // 1. Set realmRec.[[Intrinsics]] to a new Record.
-    self.intrinsics = Intrinsics{ .realm = self };
+    self.intrinsics = .{ .realm = self };
 
     // Ensure %Object.prototype% exists before %Function.prototype% is created, otherwise the
     // latter will be created twice.
@@ -188,7 +188,7 @@ pub fn initializeHostDefinedRealm(
     const realm = try create(agent);
 
     // 2. Let newContext be a new execution context.
-    const new_context = ExecutionContext{
+    const new_context: ExecutionContext = .{
         // 3. Set the Function of newContext to null.
         .function = null,
 

@@ -75,7 +75,7 @@ pub fn evaluate(self: *Self) Agent.Error!Value {
     const global_env = self.realm.global_env;
 
     // 1. Let scriptContext be a new ECMAScript code execution context.
-    const script_context = ExecutionContext{
+    const script_context: ExecutionContext = .{
         // 3. Set the Function of scriptContext to null.
         .function = null,
 

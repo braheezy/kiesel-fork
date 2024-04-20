@@ -28,14 +28,14 @@ target: ?[]const u8 = null,
 /// https://tc39.es/ecma262/#sec-normalcompletion
 pub fn normal(value: ?Value) Completion {
     // 1. Return Completion Record { [[Type]]: normal, [[Value]]: value, [[Target]]: empty }.
-    return Completion{ .type = .normal, .value = value, .target = null };
+    return .{ .type = .normal, .value = value, .target = null };
 }
 
 /// 6.2.4.2 ThrowCompletion ( value )
 /// https://tc39.es/ecma262/#sec-throwcompletion
 pub fn throw(value: Value) Completion {
     // 1. Return Completion Record { [[Type]]: throw, [[Value]]: value, [[Target]]: empty }.
-    return Completion{ .type = .throw, .value = value, .target = null };
+    return .{ .type = .throw, .value = value, .target = null };
 }
 
 test "normal" {

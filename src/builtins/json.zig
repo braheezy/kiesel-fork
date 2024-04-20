@@ -841,7 +841,7 @@ pub const JSON = struct {
         //       [[ReplacerFunction]]: ReplacerFunction, [[Stack]]: stack, [[Indent]]: indent,
         //       [[Gap]]: gap, [[PropertyList]]: PropertyList
         //     }.
-        var state = JSONSerialization{
+        var state: JSONSerialization = .{
             .replacer_function = replacer_function,
             .stack = stack,
             .indent = indent,

@@ -52,7 +52,7 @@ pub fn createAsyncFromSyncIterator(
     // 4. Let iteratorRecord be the Iterator Record {
     //      [[Iterator]]: asyncIterator, [[NextMethod]]: nextMethod, [[Done]]: false
     //    }.
-    const iterator = Iterator{
+    const iterator: Iterator = .{
         .iterator = async_iterator,
         .next_method = next_method,
         .done = false,

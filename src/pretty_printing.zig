@@ -26,7 +26,7 @@ const State = struct {
 
 var fba_buf: [@sizeOf(*anyopaque) * 1024]u8 = undefined;
 var fba = std.heap.FixedBufferAllocator.init(&fba_buf);
-var state = State{
+var state: State = .{
     .seen_objects = SeenObjects.init(fba.allocator()),
     .print_in_progress = false,
 };

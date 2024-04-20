@@ -214,7 +214,7 @@ pub fn defineBuiltinAccessorWithAttributes(
         });
     } else null;
     const property_key = getPropertyKey(name, object.agent());
-    const property_descriptor = PropertyDescriptor{
+    const property_descriptor: PropertyDescriptor = .{
         .get = getter_function,
         .set = setter_function,
         .enumerable = attributes.enumerable,

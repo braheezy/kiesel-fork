@@ -74,7 +74,7 @@ pub const GeneratorPrototype = struct {
         const generator = this_value;
 
         // 2. Let C be Completion Record { [[Type]]: return, [[Value]]: value, [[Target]]: empty }.
-        const completion = Completion{ .type = .@"return", .value = value, .target = null };
+        const completion: Completion = .{ .type = .@"return", .value = value, .target = null };
 
         // 3. Return ? GeneratorResumeAbrupt(g, C, empty).
         return Value.from(try generatorResumeAbrupt(agent, generator, completion));

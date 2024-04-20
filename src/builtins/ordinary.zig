@@ -153,7 +153,7 @@ pub fn ordinaryGetOwnProperty(object: Object, property_key: PropertyKey) ?Proper
     const x = object.propertyStorage().get(property_key) orelse return null;
 
     // 2. Let D be a newly created Property Descriptor with no fields.
-    var descriptor = PropertyDescriptor{};
+    var descriptor: PropertyDescriptor = .{};
 
     // 4. If X is a data property, then
     if (x.isDataDescriptor()) {
@@ -263,7 +263,7 @@ fn validateAndApplyPropertyDescriptor(
             //    [[Enumerable]], and [[Configurable]] attributes are set to the value of the
             //    corresponding field in Desc if Desc has that field, or to the attribute's default
             //    value otherwise.
-            try object.propertyStorage().set(property_key, PropertyDescriptor{
+            try object.propertyStorage().set(property_key, .{
                 .get = descriptor.get orelse @as(?Object, null),
                 .set = descriptor.set orelse @as(?Object, null),
                 .enumerable = descriptor.enumerable orelse false,
@@ -276,7 +276,7 @@ fn validateAndApplyPropertyDescriptor(
             //    [[Enumerable]], and [[Configurable]] attributes are set to the value of the
             //    corresponding field in Desc if Desc has that field, or to the attribute's default
             //    value otherwise.
-            try object.propertyStorage().set(property_key, PropertyDescriptor{
+            try object.propertyStorage().set(property_key, .{
                 .value = descriptor.value orelse .undefined,
                 .writable = descriptor.writable orelse false,
                 .enumerable = descriptor.enumerable orelse false,
@@ -354,7 +354,7 @@ fn validateAndApplyPropertyDescriptor(
             //      enumerable, respectively, and whose [[Get]] and [[Set]] attributes are set to
             //      the value of the corresponding field in Desc if Desc has that field, or to the
             //      attribute's default value otherwise.
-            try object.propertyStorage().set(property_key, PropertyDescriptor{
+            try object.propertyStorage().set(property_key, .{
                 .get = descriptor.get orelse @as(?Object, null),
                 .set = descriptor.set orelse @as(?Object, null),
                 .enumerable = enumerable,
@@ -376,7 +376,7 @@ fn validateAndApplyPropertyDescriptor(
             //      enumerable, respectively, and whose [[Value]] and [[Writable]] attributes are
             //      set to the value of the corresponding field in Desc if Desc has that field, or
             //      to the attribute's default value otherwise.
-            try object.propertyStorage().set(property_key, PropertyDescriptor{
+            try object.propertyStorage().set(property_key, .{
                 .value = descriptor.value orelse .undefined,
                 .writable = descriptor.writable orelse false,
                 .enumerable = enumerable,
@@ -387,7 +387,7 @@ fn validateAndApplyPropertyDescriptor(
         else {
             // i. For each field of Desc, set the corresponding attribute of the property named P
             //    of object O to the value of the field.
-            try object.propertyStorage().set(property_key, PropertyDescriptor{
+            try object.propertyStorage().set(property_key, .{
                 .value = descriptor.value orelse current.value,
                 .writable = descriptor.writable orelse current.writable,
                 .get = descriptor.get orelse current.get,
@@ -504,10 +504,8 @@ pub fn ordinarySetWithOwnDescriptor(
     receiver_value: Value,
     maybe_own_descriptor: ?PropertyDescriptor,
 ) Agent.Error!bool {
-    var own_descriptor: PropertyDescriptor = undefined;
-
     // 1. If ownDesc is undefined, then
-    if (maybe_own_descriptor == null) {
+    const own_descriptor = maybe_own_descriptor orelse blk: {
         // a. Let parent be ? O.[[GetPrototypeOf]]().
         const parent = try object.internalMethods().getPrototypeOf(object);
 
@@ -526,16 +524,14 @@ pub fn ordinarySetWithOwnDescriptor(
             // i. Set ownDesc to the PropertyDescriptor {
             //      [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true
             //    }.
-            own_descriptor = PropertyDescriptor{
+            break :blk PropertyDescriptor{
                 .value = .undefined,
                 .writable = true,
                 .enumerable = true,
                 .configurable = true,
             };
         }
-    } else {
-        own_descriptor = maybe_own_descriptor.?;
-    }
+    };
 
     // 2. If IsDataDescriptor(ownDesc) is true, then
     if (own_descriptor.isDataDescriptor()) {
@@ -561,7 +557,7 @@ pub fn ordinarySetWithOwnDescriptor(
             if (existing_descriptor.writable == false) return false;
 
             // iii. Let valueDesc be the PropertyDescriptor { [[Value]]: V }.
-            const value_descriptor = PropertyDescriptor{ .value = value };
+            const value_descriptor: PropertyDescriptor = .{ .value = value };
 
             // iv. Return ? Receiver.[[DefineOwnProperty]](P, valueDesc).
             return receiver.internalMethods().defineOwnProperty(

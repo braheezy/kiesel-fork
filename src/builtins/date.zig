@@ -518,7 +518,7 @@ pub fn parseDateTimeString(string: []const u8) f64 {
             return if (parser.pos + n < parser.buf.len) parser.buf[parser.pos + n] else null;
         }
     };
-    var parser = std.fmt.Parser{ .buf = string };
+    var parser: std.fmt.Parser = .{ .buf = string };
     const sign: ?u8 = if (old_parser.maybe(&parser, '-')) '-' else if (old_parser.maybe(&parser, '+')) '+' else null;
     const year_string = old_parser.until(&parser, '-');
     if (!old_parser.maybe(&parser, '-')) return invalid;

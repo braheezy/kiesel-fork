@@ -327,16 +327,16 @@ pub fn createGlobalFunctionBinding(
     const existing_prop = try global_object.internalMethods().getOwnProperty(global_object, property_key);
 
     // 4. If existingProp is undefined or existingProp.[[Configurable]] is true, then
-    const property_descriptor = if (existing_prop == null or existing_prop.?.configurable == true) blk: {
+    const property_descriptor: PropertyDescriptor = if (existing_prop == null or existing_prop.?.configurable == true) blk: {
         // a. Let desc be the PropertyDescriptor {
         //      [[Value]]: V, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: D
         //    }.
-        break :blk PropertyDescriptor{ .value = value, .writable = true, .enumerable = true, .configurable = deletable };
+        break :blk .{ .value = value, .writable = true, .enumerable = true, .configurable = deletable };
     }
     // 5. Else,
     else blk: {
         // a. Let desc be the PropertyDescriptor { [[Value]]: V }.
-        break :blk PropertyDescriptor{ .value = value };
+        break :blk .{ .value = value };
     };
 
     // 6. Perform ? DefinePropertyOrThrow(globalObject, N, desc).

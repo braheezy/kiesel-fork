@@ -220,7 +220,7 @@ pub fn createDataProperty(self: Self, property_key: PropertyKey, value: Value) A
     // 1. Let newDesc be the PropertyDescriptor {
     //      [[Value]]: V, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true
     //    }.
-    const new_descriptor = PropertyDescriptor{
+    const new_descriptor: PropertyDescriptor = .{
         .value = value,
         .writable = true,
         .enumerable = true,
@@ -266,7 +266,7 @@ pub fn createNonEnumerableDataPropertyOrThrow(
     // 2. Let newDesc be the PropertyDescriptor {
     //      [[Value]]: V, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //    }.
-    const new_descriptor = PropertyDescriptor{
+    const new_descriptor: PropertyDescriptor = .{
         .value = value,
         .writable = true,
         .enumerable = false,
@@ -371,10 +371,7 @@ pub fn setIntegrityLevel(self: Self, level: IntegrityLevel) Agent.Error!bool {
             // a. For each element k of keys, do
             for (keys.items) |property_key| {
                 // i. Perform ? DefinePropertyOrThrow(O, k, PropertyDescriptor { [[Configurable]]: false }).
-                try self.definePropertyOrThrow(
-                    property_key,
-                    PropertyDescriptor{ .configurable = false },
-                );
+                try self.definePropertyOrThrow(property_key, .{ .configurable = false });
             }
         },
 
@@ -397,17 +394,14 @@ pub fn setIntegrityLevel(self: Self, level: IntegrityLevel) Agent.Error!bool {
                     // 1. If IsAccessorDescriptor(currentDesc) is true, then
                     if (current_descriptor.isAccessorDescriptor()) {
                         // a. Let desc be the PropertyDescriptor { [[Configurable]]: false }.
-                        descriptor = PropertyDescriptor{ .configurable = false };
+                        descriptor = .{ .configurable = false };
                     }
                     // 2. Else,
                     else {
                         // a. Let desc be the PropertyDescriptor {
                         //      [[Configurable]]: false, [[Writable]]: false
                         //    }.
-                        descriptor = PropertyDescriptor{
-                            .configurable = false,
-                            .writable = false,
-                        };
+                        descriptor = .{ .configurable = false, .writable = false };
                     }
 
                     // 3. Perform ? DefinePropertyOrThrow(O, k, desc).

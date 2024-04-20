@@ -79,7 +79,7 @@ pub const ParsedFlags = packed struct(u8) {
     y: bool = false,
 
     pub fn from(flags: []const u8) ?Self {
-        var parsed_flags = Self{};
+        var parsed_flags: Self = .{};
         for (flags) |flag| switch (flag) {
             inline 'd', 'g', 'i', 'm', 's', 'u', 'v', 'y' => |c| {
                 if (@field(parsed_flags, &.{c})) return null;
@@ -372,7 +372,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
     ) catch |err| try noexcept(err);
 
     // 24. Let match be the Match Record { [[StartIndex]]: lastIndex, [[EndIndex]]: e }.
-    match = Match{ .start_index = last_index, .end_index = end_index };
+    match = .{ .start_index = last_index, .end_index = end_index };
 
     // 25. Let indices be a new empty List.
     var indices = std.ArrayList(?Match).init(agent.gc_allocator);

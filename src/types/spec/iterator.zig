@@ -218,7 +218,7 @@ pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: Object) Agent
     // 4. Let iteratorRecord be the Iterator Record {
     //      [[Iterator]]: iterator, [[NextMethod]]: nextMethod, [[Done]]: false
     //    }.
-    const iterator_record = Iterator{
+    const iterator_record: Iterator = .{
         .iterator = iterator.object,
         .next_method = next_method,
         .done = false,
