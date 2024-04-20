@@ -10,7 +10,7 @@ env:
 
 jobs:
   build:
-    runs-on: docker
+    runs-on: meow
     container:
       image: ghcr.io/catthehacker/ubuntu:act-22.04
     steps:
