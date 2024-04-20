@@ -663,8 +663,9 @@ pub fn privateElementFind(self: Self, private_name: PrivateName) ?*PrivateElemen
 /// 7.3.27 PrivateFieldAdd ( O, P, value )
 /// https://tc39.es/ecma262/#sec-privatefieldadd
 pub fn privateFieldAdd(self: *Self, private_name: PrivateName, value: Value) Agent.Error!void {
-    // TODO: 1. If the host is a web browser, then
+    // 1. If the host is a web browser, then
     //     a. Perform ? HostEnsureCanAddPrivateElement(O).
+    try self.agent().host_hooks.hostEnsureCanAddPrivateElement(self.agent(), self.*);
 
     // 2. Let entry be PrivateElementFind(O, P).
     const entry = self.privateElementFind(private_name);
@@ -694,8 +695,9 @@ pub fn privateMethodOrAccessorAdd(
     // 1. Assert: method.[[Kind]] is either method or accessor.
     std.debug.assert(method == .method or method == .accessor);
 
-    // TODO: 2. If the host is a web browser, then
+    // 2. If the host is a web browser, then
     //     a. Perform ? HostEnsureCanAddPrivateElement(O).
+    try self.agent().host_hooks.hostEnsureCanAddPrivateElement(self.agent(), self.*);
 
     // 3. Let entry be PrivateElementFind(O, method.[[Key]]).
     const entry = self.privateElementFind(private_name);

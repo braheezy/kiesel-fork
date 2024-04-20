@@ -56,6 +56,10 @@ hostEnqueuePromiseJob: *const fn (
     job: Job,
     realm: ?*Realm,
 ) Allocator.Error!void = default_host_hooks.hostEnqueuePromiseJob,
+hostEnsureCanAddPrivateElement: *const fn (
+    agent: *Agent,
+    object: Object,
+) Agent.Error!void = default_host_hooks.hostEnsureCanAddPrivateElement,
 hostEnsureCanCompileStrings: *const fn (
     callee_realm: *Realm,
     parameter_strings: []const String,

@@ -21,6 +21,13 @@ const String = types.String;
 const Value = types.Value;
 const finishLoadingImportedModule = language.finishLoadingImportedModule;
 
+/// 7.3.29 HostEnsureCanAddPrivateElement ( O )
+/// https://tc39.es/ecma262/#sec-hostensurecanaddprivateelement
+pub fn hostEnsureCanAddPrivateElement(_: *Agent, _: Object) Agent.Error!void {
+    // The default implementation of HostEnsureCanAddPrivateElement is to return
+    // NormalCompletion(unused).
+}
+
 /// 9.5.2 HostMakeJobCallback ( callback )
 /// https://tc39.es/ecma262/#sec-hostmakejobcallback
 pub fn hostMakeJobCallback(callback: Object) JobCallback {
