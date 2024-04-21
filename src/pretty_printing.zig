@@ -15,8 +15,10 @@ const PropertyKey = types.PropertyKey;
 const Value = types.Value;
 const getArrayLength = @import("builtins/array.zig").getArrayLength;
 const getFunctionName = @import("builtins/ecmascript_function.zig").getFunctionName;
+const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferWitnessRecord;
 const ordinaryOwnPropertyKeys = builtins.ordinaryOwnPropertyKeys;
 const typedArrayElementSize = builtins.typedArrayElementSize;
+const typedArrayLength = builtins.typedArrayLength;
 
 const SeenObjects = std.AutoHashMap(AnyPointer, usize);
 const State = struct {
@@ -480,21 +482,18 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
     const agent = typed_array.data.agent;
     const typed_array_name = typed_array.fields.typed_array_name;
     const viewed_array_buffer = typed_array.fields.viewed_array_buffer;
-    const array_length = typed_array.fields.array_length;
-    const byte_length = typed_array.fields.byte_length.value; // TODO: Handle .auto
-    const byte_offset = typed_array.fields.byte_offset;
     const tty_config = getTtyConfigForWriter(writer);
 
     try tty_config.setColor(writer, .white);
     try writer.print("{s}(", .{typed_array_name});
     try tty_config.setColor(writer, .reset);
     if (viewed_array_buffer.arrayBufferData()) |data| {
-        if (array_length != .auto) {
-            try writer.print("length: {pretty}", .{Value.from(array_length.value)});
-        }
+        const ta = makeTypedArrayWithBufferWitnessRecord(typed_array, .seq_cst);
+        const array_length = typedArrayLength(ta);
+        const byte_offset = typed_array.fields.byte_offset;
+        try writer.print("length: {pretty}", .{Value.from(array_length)});
         if (data.items.len != 0) {
-            if (array_length != .auto) try writer.writeAll(", ");
-            try writer.writeAll("data: ");
+            try writer.writeAll(", data: ");
             try tty_config.setColor(writer, .white);
             try writer.writeAll("[");
             try tty_config.setColor(writer, .reset);
@@ -504,7 +503,7 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
                 if (std.mem.eql(u8, typed_array_name, name)) {
                     const element_size = @"type".elementSize();
                     var i: u53 = 0;
-                    while (i < byte_length) : (i += element_size) {
+                    while (i < data.items.len) : (i += element_size) {
                         const bytes: *[element_size]u8 = @ptrCast(
                             data.items[@intCast(byte_offset + i)..@intCast(byte_offset + i + element_size)],
                         );
