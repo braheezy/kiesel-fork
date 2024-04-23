@@ -3140,7 +3140,7 @@ pub fn typedArrayElementSize(typed_array: *const TypedArray) u53 {
     // 1. Return the Element Size value specified in Table 70 for O.[[TypedArrayName]].
     // FIXME: Would be nice to completely do this at comptime based on the struct type, but once
     //        they are unique (for type comparison) we cannot cast to the generic TypedArray anymore.
-    return @intCast(std.ComptimeStringMap(u4, .{
+    return @intCast(std.StaticStringMap(u4).initComptime(.{
         .{ "Int8Array", 1 },
         .{ "Uint8Array", 1 },
         .{ "Uint8ClampedArray", 1 },
