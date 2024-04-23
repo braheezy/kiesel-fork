@@ -94,7 +94,7 @@ jobs:
           ./upload.sh zig-out/bin/kiesel-windows-x86_64.exe
       - name: Update version.txt
         run: |
-          if [[ "\$BRANCH_NAME" == "main" ]]; then
+          if [[ "$BRANCH_NAME" == "main" ]]; then
             git rev-parse main > version.txt
             ./upload.sh version.txt
           fi
