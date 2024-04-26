@@ -318,6 +318,7 @@ pub fn printStatement(node: ast.Statement, writer: anytype, indentation: usize) 
         .continue_statement => |x| try printContinueStatement(x, writer, indentation + 1),
         .break_statement => |x| try printBreakStatement(x, writer, indentation + 1),
         .return_statement => |x| try printReturnStatement(x, writer, indentation + 1),
+        .with_statement => |x| try printWithStatement(x, writer, indentation + 1),
         .throw_statement => |x| try printThrowStatement(x, writer, indentation + 1),
         .try_statement => |x| try printTryStatement(x, writer, indentation + 1),
         .debugger_statement => try print("debugger", writer, indentation + 1),
@@ -527,6 +528,12 @@ pub fn printBreakStatement(node: ast.BreakStatement, writer: anytype, indentatio
 pub fn printReturnStatement(node: ast.ReturnStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("ReturnStatement", writer, indentation);
     if (node.expression) |expression| try printExpression(expression, writer, indentation + 1);
+}
+
+pub fn printWithStatement(node: ast.WithStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("WithStatement", writer, indentation);
+    try printExpression(node.expression, writer, indentation + 1);
+    try printStatement(node.statement.*, writer, indentation + 1);
 }
 
 pub fn printThrowStatement(node: ast.ThrowStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {

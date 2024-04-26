@@ -28,6 +28,8 @@ pub const Instruction = enum(u8) {
     create_catch_binding,
     /// Create an object property iterator for for-in loops.
     create_object_property_iterator,
+    /// Create a declarative environment for a with statement.
+    create_with_environment,
     /// Decrement the numeric result value by one.
     decrement,
     /// Apply the delete operation to the evaluated expression and set it as the result value.
@@ -168,6 +170,8 @@ pub const Instruction = enum(u8) {
     to_number,
     /// Store ToNumeric() as the result value.
     to_numeric,
+    /// Store ToObject() as the result value.
+    to_object,
     /// Store ToString() as the result value.
     to_string,
     /// Apply the typeof operation to the evaluated expression and set it as the result value.

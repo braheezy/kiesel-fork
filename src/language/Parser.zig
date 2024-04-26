@@ -3,6 +3,7 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const build_options = @import("build-options");
 const ast = @import("ast.zig");
 const literals = @import("literals.zig");
 const tokenizer_ = @import("tokenizer.zig");
@@ -1257,6 +1258,8 @@ pub fn acceptStatement(self: *Self) AcceptError!*ast.Statement {
         statement.* = .{ .break_statement = break_statement }
     else |_| if (self.acceptReturnStatement()) |return_statement|
         statement.* = .{ .return_statement = return_statement }
+    else |_| if (self.acceptWithStatement()) |with_statement|
+        statement.* = .{ .with_statement = with_statement }
     else |_| if (self.acceptThrowStatement()) |throw_statement|
         statement.* = .{ .throw_statement = throw_statement }
     else |_| if (self.acceptTryStatement()) |try_statement|
@@ -1702,6 +1705,21 @@ pub fn acceptReturnStatement(self: *Self) AcceptError!ast.ReturnStatement {
     }
     try self.acceptOrInsertSemicolon();
     return .{ .expression = null };
+}
+
+pub fn acceptWithStatement(self: *Self) AcceptError!ast.WithStatement {
+    if (!build_options.enable_legacy) return error.UnexpectedToken;
+
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    // FIXME: Emit SyntaxError in strict mode
+    _ = try self.core.accept(RuleSet.is(.with));
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    const expression = try self.acceptExpression(.{});
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    const statement = try self.acceptStatement();
+    return .{ .expression = expression, .statement = statement };
 }
 
 pub fn acceptThrowStatement(self: *Self) AcceptError!ast.ThrowStatement {

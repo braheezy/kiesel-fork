@@ -50,6 +50,7 @@ const makeClassConstructor = builtins.makeClassConstructor;
 const makeConstructor = builtins.makeConstructor;
 const makeMethod = builtins.makeMethod;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
+const newObjectEnvironment = execution.newObjectEnvironment;
 const newPrivateEnvironment = execution.newPrivateEnvironment;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
@@ -2263,6 +2264,19 @@ pub fn executeInstruction(
             // e. Return the Iterator Record { [[Iterator]]: iterator, [[NextMethod]]: nextMethod, [[Done]]: false }.
             self.iterator = .{ .iterator = iterator, .next_method = next_method, .done = false };
         },
+        .create_with_environment => {
+            const object = self.result.?.object;
+            const old_env = self.lexical_environment_stack.getLast();
+            const new_env: Environment = .{
+                .object_environment = try newObjectEnvironment(
+                    self.agent.gc_allocator,
+                    object,
+                    true,
+                    old_env,
+                ),
+            };
+            self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = new_env;
+        },
         .decrement => {
             const value = self.result.?;
             self.result = switch (value) {
@@ -3032,6 +3046,10 @@ pub fn executeInstruction(
                 .number => |number| Value.from(number),
                 .big_int => |big_int| Value.from(big_int),
             };
+        },
+        .to_object => {
+            const value = self.result.?;
+            self.result = Value.from(try value.toObject(self.agent));
         },
         .to_string => {
             const value = self.result.?;

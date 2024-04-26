@@ -685,6 +685,7 @@ pub const Statement = union(enum) {
     continue_statement: ContinueStatement,
     break_statement: BreakStatement,
     return_statement: ReturnStatement,
+    with_statement: WithStatement,
     throw_statement: ThrowStatement,
     try_statement: TryStatement,
     debugger_statement,
@@ -733,6 +734,7 @@ pub const Statement = union(enum) {
             .breakable_statement => |breakable_statement| switch (breakable_statement.iteration_statement) {
                 inline else => |node| return node.varDeclaredNames(allocator),
             },
+            .with_statement => |with_statement| return with_statement.varDeclaredNames(allocator),
             .try_statement => |try_statement| return try_statement.varDeclaredNames(allocator),
         }
     }
@@ -768,6 +770,7 @@ pub const Statement = union(enum) {
             .breakable_statement => |breakable_statement| switch (breakable_statement.iteration_statement) {
                 inline else => |node| return node.varScopedDeclarations(allocator),
             },
+            .with_statement => |with_statement| return with_statement.varScopedDeclarations(allocator),
             .try_statement => |try_statement| return try_statement.varScopedDeclarations(allocator),
         }
     }
@@ -1623,6 +1626,36 @@ pub const BreakStatement = struct {
 /// https://tc39.es/ecma262/#prod-ReturnStatement
 pub const ReturnStatement = struct {
     expression: ?Expression,
+};
+
+/// https://tc39.es/ecma262/#prod-WithStatement
+pub const WithStatement = struct {
+    const Self = @This();
+
+    expression: Expression,
+    statement: *Statement,
+
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // WithStatement : with ( Expression ) Statement
+        // 1. Return the VarDeclaredNames of Statement.
+        return self.statement.varDeclaredNames(allocator);
+    }
+
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VarScopedDeclaration {
+        // WithStatement : with ( Expression ) Statement
+        // 1. Return the VarScopedDeclarations of Statement.
+        return self.statement.varScopedDeclarations(allocator);
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-ThrowStatement

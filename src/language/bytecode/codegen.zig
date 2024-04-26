@@ -1532,6 +1532,7 @@ pub fn codegenStatement(
         .continue_statement => |x| try codegenContinueStatement(x, executable, ctx),
         .break_statement => |x| try codegenBreakStatement(x, executable, ctx),
         .return_statement => |x| try codegenReturnStatement(x, executable, ctx),
+        .with_statement => |x| try codegenWithStatement(x, executable, ctx),
         .throw_statement => |x| try codegenThrowStatement(x, executable, ctx),
         .try_statement => |x| try codegenTryStatement(x, executable, ctx),
     }
@@ -2534,6 +2535,37 @@ pub fn codegenReturnStatement(
         try executable.addInstructionWithConstant(.store_constant, .undefined);
         try executable.addInstruction(.@"return");
     }
+}
+
+/// 14.11.2 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-with-statement-runtime-semantics-evaluation
+pub fn codegenWithStatement(
+    node: ast.WithStatement,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    // 1. Let val be ? Evaluation of Expression.
+    try codegenExpression(node.expression, executable, ctx);
+
+    // 2. Let obj be ? ToObject(? GetValue(val)).
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    try executable.addInstruction(.to_object);
+
+    // 3. Let oldEnv be the running execution context's LexicalEnvironment.
+    try executable.addInstruction(.push_lexical_environment);
+
+    // 4. Let newEnv be NewObjectEnvironment(obj, true, oldEnv).
+    // 5. Set the running execution context's LexicalEnvironment to newEnv.
+    try executable.addInstruction(.create_with_environment);
+
+    // 6. Let C be Completion(Evaluation of Statement).
+    try codegenStatement(node.statement.*, executable, ctx);
+
+    // 7. Set the running execution context's LexicalEnvironment to oldEnv.
+    try executable.addInstruction(.restore_lexical_environment);
+    try executable.addInstruction(.pop_lexical_environment);
+
+    // 8. Return ? UpdateEmpty(C, undefined).
 }
 
 /// 14.14.1 Runtime Semantics: Evaluation
