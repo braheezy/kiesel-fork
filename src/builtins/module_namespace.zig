@@ -252,9 +252,8 @@ pub fn moduleNamespaceCreate(
         .source_text_module => |source_text_module| std.debug.assert(source_text_module.namespace == null),
     }
 
-    // 6. Let sortedExports be a List whose elements are the elements of exports ordered as if an
-    //    Array of the same values had been sorted using %Array.prototype.sort% using undefined as
-    //    comparefn.
+    // 6. Let sortedExports be a List whose elements are the elements of exports, sorted according
+    //    to lexicographic code unit order.
     var sorted_exports = try std.ArrayList([]const u8).initCapacity(
         agent.gc_allocator,
         exports.len,
