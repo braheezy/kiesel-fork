@@ -245,7 +245,7 @@ fn validateAndApplyPropertyDescriptor(
     descriptor: PropertyDescriptor,
     maybe_current: ?PropertyDescriptor,
 ) Allocator.Error!bool {
-    // 1. Assert: IsPropertyKey(P) is true.
+    // 1. Assert: P is a property key.
 
     // 2. If current is undefined, then
     if (maybe_current == null) {

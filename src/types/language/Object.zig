@@ -824,7 +824,7 @@ pub fn defineField(self: *Self, field: ClassFieldDefinition) Agent.Error!void {
         },
         // 6. Else,
         .property_key => |property_key| {
-            // a. Assert: IsPropertyKey(fieldName) is true.
+            // a. Assert: fieldName is a property key.
             // b. Perform ? CreateDataPropertyOrThrow(receiver, fieldName, initValue).
             try self.createDataPropertyOrThrow(property_key, init_value);
         },
