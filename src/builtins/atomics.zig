@@ -68,6 +68,7 @@ fn validateIntegerTypedArray(
         // b. If IsUnclampedIntegerElementType(type) is false and IsBigIntElementType(type) is
         //    false, throw a TypeError exception.
         if (std.mem.eql(u8, name, "Uint8ClampedArray") or
+            std.mem.eql(u8, name, "Float16Array") or
             std.mem.eql(u8, name, "Float32Array") or
             std.mem.eql(u8, name, "Float64Array"))
         {
