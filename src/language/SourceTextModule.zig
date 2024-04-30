@@ -867,11 +867,11 @@ fn innerModuleEvaluation(
             // v. Otherwise, set requiredModule.[[Status]] to evaluating-async.
             required_module.status = if (!required_module.async_evaluation) .evaluated else .evaluating_async;
 
-            // vi. If requiredModule and module are the same Module Record, set done to true.
-            if (required_module == module.source_text_module) break;
-
             // vii. Set requiredModule.[[CycleRoot]] to module.
             required_module.cycle_root = module.source_text_module;
+
+            // vi. If requiredModule and module are the same Module Record, set done to true.
+            if (required_module == module.source_text_module) break;
         }
     }
 
