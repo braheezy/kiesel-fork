@@ -3054,13 +3054,24 @@ pub const ImportDeclaration = struct {
 
 /// https://tc39.es/ecma262/#prod-ImportClause
 pub const ImportClause = union(enum) {
-    imported_default_binding: struct {
-        binding_identifier: Identifier,
-    },
-    // TODO: NameSpaceImport
-    // TODO: NamedImports
+    const Self = @This();
+
+    imported_default_binding: Identifier,
+    namespace_import: Identifier,
+    named_imports: ImportsList,
     // TODO: ImportedDefaultBinding , NameSpaceImport
     // TODO: ImportedDefaultBinding , NamedImports
+};
+
+/// https://tc39.es/ecma262/#prod-ImportsList
+pub const ImportsList = struct {
+    items: []const ImportSpecifier,
+};
+
+/// https://tc39.es/ecma262/#prod-ImportSpecifier
+pub const ImportSpecifier = struct {
+    module_export_name: ?ModuleExportName,
+    imported_binding: Identifier,
 };
 
 /// https://tc39.es/ecma262/#prod-ExportDeclaration

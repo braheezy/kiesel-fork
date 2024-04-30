@@ -802,9 +802,29 @@ pub fn printImportDeclaration(node: ast.ImportDeclaration, writer: anytype, inde
 pub fn printImportClause(node: ast.ImportClause, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("ImportClause", writer, indentation);
     switch (node) {
-        .imported_default_binding => |imported_default_binding| {
-            try print(imported_default_binding.binding_identifier, writer, indentation + 1);
+        .imported_default_binding => |imported_binding| {
+            try print(imported_binding, writer, indentation + 1);
         },
+        .namespace_import => |imported_binding| {
+            try printIndentation(writer, indentation + 1);
+            try writer.writeAll("* as ");
+            try print(imported_binding, writer, 0);
+        },
+        .named_imports => |imports_list| try printImportsList(imports_list, writer, indentation + 1),
+    }
+}
+
+pub fn printImportsList(node: ast.ImportsList, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("ImportsList", writer, indentation);
+    for (node.items) |import_specifier| {
+        if (import_specifier.module_export_name) |module_export_name| {
+            try printIndentation(writer, indentation + 1);
+            try printModuleExportName(module_export_name, writer);
+            try writer.writeAll(" as ");
+            try print(import_specifier.imported_binding, writer, 0);
+        } else {
+            try print(import_specifier.imported_binding, writer, indentation + 1);
+        }
     }
 }
 

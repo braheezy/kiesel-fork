@@ -2511,9 +2511,56 @@ pub fn acceptImportClause(self: *Self) AcceptError!ast.ImportClause {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    if (self.acceptBindingIdentifier()) |binding_identifier|
-        return .{ .imported_default_binding = .{ .binding_identifier = binding_identifier } }
+    if (self.acceptBindingIdentifier()) |imported_binding|
+        return .{ .imported_default_binding = imported_binding }
+    else |_| if (self.acceptNameSpaceImport()) |imported_binding|
+        return .{ .namespace_import = imported_binding }
+    else |_| if (self.acceptImportsList()) |imports_list|
+        return .{ .named_imports = imports_list }
     else |_|
+        return error.UnexpectedToken;
+}
+
+pub fn acceptNameSpaceImport(self: *Self) AcceptError!ast.Identifier {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"*"));
+    _ = try self.acceptKeyword("as");
+    return self.acceptBindingIdentifier();
+}
+
+pub fn acceptImportsList(self: *Self) AcceptError!ast.ImportsList {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    var import_specifiers = std.ArrayList(ast.ImportSpecifier).init(self.allocator);
+    errdefer import_specifiers.deinit();
+    _ = try self.core.accept(RuleSet.is(.@"{"));
+    while (self.acceptImportSpecifier()) |import_specifier| {
+        try import_specifiers.append(import_specifier);
+        _ = self.core.accept(RuleSet.is(.@",")) catch break;
+    } else |_| {}
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+    return .{ .items = try import_specifiers.toOwnedSlice() };
+}
+
+pub fn acceptImportSpecifier(self: *Self) AcceptError!ast.ImportSpecifier {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const module_export_name = try self.acceptModuleExportName();
+    if (self.acceptKeyword("as")) |_|
+        return .{
+            .module_export_name = module_export_name,
+            .imported_binding = try self.acceptBindingIdentifier(),
+        }
+    else |_| if (module_export_name == .identifier)
+        return .{
+            .module_export_name = null,
+            .imported_binding = module_export_name.identifier,
+        }
+    else
         return error.UnexpectedToken;
 }
 
