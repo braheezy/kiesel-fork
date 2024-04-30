@@ -387,9 +387,21 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
     return switch (script_or_module) {
         .script => |script| script.evaluate(),
         .module => |module| blk: {
-            module.initializeEnvironment() catch |err| break :blk err;
-            module.executeModule(null) catch |err| break :blk err;
-            return .undefined;
+            const promise = module.loadRequestedModules(agent, null) catch |err| break :blk err;
+            std.debug.assert(agent.queued_jobs.items.len == 0);
+            switch (promise.fields.promise_state) {
+                .pending => unreachable,
+                .rejected => {
+                    tracked_promise_rejections.clearAndFree();
+                    agent.exception = promise.fields.promise_result;
+                    break :blk error.ExceptionThrown;
+                },
+                .fulfilled => {
+                    module.link(agent) catch |err| break :blk err;
+                    _ = module.evaluate(agent) catch |err| break :blk err;
+                    break :blk @as(Value, .undefined);
+                },
+            }
         },
     } catch |err| switch (err) {
         error.OutOfMemory => {
