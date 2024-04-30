@@ -15,6 +15,7 @@ const Agent = execution.Agent;
 const BigInt = types.BigInt;
 const Environment = execution.Environment;
 const ExportEntry = language.ExportEntry;
+const ImportEntry = language.ImportEntry;
 const Object = types.Object;
 const PrivateEnvironment = execution.PrivateEnvironment;
 const PropertyKey = types.PropertyKey;
@@ -2793,6 +2794,110 @@ pub const Module = struct {
         return self.module_item_list.varScopedDeclarations(allocator);
     }
 
+    /// 16.2.1.3 Static Semantics: ModuleRequests
+    /// https://tc39.es/ecma262/#sec-static-semantics-modulerequests
+    pub fn moduleRequests(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const []const u8 {
+        // Module : [empty]
+        // 1. Return a new empty List.
+        // ModuleItemList : ModuleItem
+        // 1. Return ModuleRequests of ModuleItem.
+        // ModuleItemList : ModuleItemList ModuleItem
+        // 1. Let moduleNames be ModuleRequests of ModuleItemList.
+        // 2. Let additionalNames be ModuleRequests of ModuleItem.
+        // 3. For each String name of additionalNames, do
+        // a. If moduleNames does not contain name, then
+        // i. Append name to moduleNames.
+        // 4. Return moduleNames.
+        var module_requests = std.StringArrayHashMap(void).init(allocator);
+        defer module_requests.deinit();
+        for (self.module_item_list.items) |module_item| switch (module_item) {
+            // ModuleItem : StatementListItem
+            .statement_list_item => {
+                // 1. Return a new empty List.
+            },
+
+            // ImportDeclaration : import ImportClause FromClause ;
+            // 1. Return ModuleRequests of FromClause.
+            // ModuleSpecifier : StringLiteral
+            // 1. Return a List whose sole element is the SV of StringLiteral.
+            .import_declaration => |import_declaration| {
+                const sv = try import_declaration.module_specifier.stringValue(allocator);
+                try module_requests.put(sv.string.utf8, {});
+            },
+
+            .export_declaration => |export_declaration| switch (export_declaration) {
+                // ExportDeclaration : export ExportFromClause FromClause ;
+                .export_from => |export_from| {
+                    // 1. Return the ModuleRequests of FromClause.
+                    const sv = try export_from.module_specifier.stringValue(allocator);
+                    try module_requests.put(sv.string.utf8, {});
+                },
+
+                // ExportDeclaration :
+                // export NamedExports ;
+                // export VariableStatement
+                // export Declaration
+                // export default HoistableDeclaration
+                // export default ClassDeclaration
+                // export default AssignmentExpression ;
+                .named_exports,
+                .variable_statement,
+                .declaration,
+                .default_hoistable_declaration,
+                .default_class_declaration,
+                .default_expression,
+                => {
+                    // 1. Return a new empty List.
+                },
+            },
+        };
+        return allocator.dupe([]const u8, module_requests.keys());
+    }
+
+    /// 16.2.2.2 Static Semantics: ImportEntries
+    /// https://tc39.es/ecma262/#sec-static-semantics-importentries
+    pub fn importEntries(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const ImportEntry {
+        // Module : [empty]
+        // 1. Return a new empty List.
+        // ModuleItemList : ModuleItemList ModuleItem
+        // 1. Let entries1 be ImportEntries of ModuleItemList.
+        // 2. Let entries2 be ImportEntries of ModuleItem.
+        // 3. Return the list-concatenation of entries1 and entries2.
+        var import_entries = std.ArrayList(ImportEntry).init(allocator);
+        errdefer import_entries.deinit();
+        for (self.module_item_list.items) |module_item| switch (module_item) {
+            // ModuleItem :
+            //     ExportDeclaration
+            //     StatementListItem
+            .export_declaration, .statement_list_item => {
+                // 1. Return a new empty List.
+            },
+            .import_declaration => |import_declaration| {
+                // ImportDeclaration : import ImportClause FromClause ;
+                if (import_declaration.import_clause) |import_clause| {
+                    // 1. Let module be the sole element of ModuleRequests of FromClause.
+                    const module = (try import_declaration.module_specifier.stringValue(
+                        allocator,
+                    )).string.utf8;
+
+                    // 2. Return ImportEntriesForModule of ImportClause with argument module.
+                    try import_entries.appendSlice(
+                        try import_clause.importEntriesForModule(allocator, module),
+                    );
+                }
+                // ImportDeclaration : import ModuleSpecifier ;
+                // 1. Return a new empty List.
+            },
+        };
+        return import_entries.toOwnedSlice();
+    }
+
     /// 16.2.3.4 Static Semantics: ExportEntries
     /// https://tc39.es/ecma262/#sec-static-semantics-exportentries
     pub fn exportEntries(
@@ -3061,6 +3166,109 @@ pub const ImportClause = union(enum) {
     named_imports: ImportsList,
     // TODO: ImportedDefaultBinding , NameSpaceImport
     // TODO: ImportedDefaultBinding , NamedImports
+
+    /// 16.2.2.3 Static Semantics: ImportEntriesForModule
+    /// https://tc39.es/ecma262/#sec-static-semantics-importentriesformodule
+    pub fn importEntriesForModule(
+        self: Self,
+        allocator: Allocator,
+        module: []const u8,
+    ) Allocator.Error![]const ImportEntry {
+        var import_entries = std.ArrayList(ImportEntry).init(allocator);
+        errdefer import_entries.deinit();
+        switch (self) {
+            // TODO: ImportClause : ImportedDefaultBinding , NameSpaceImport
+            // TODO: ImportClause : ImportedDefaultBinding , NamedImports
+
+            // ImportedDefaultBinding : ImportedBinding
+            .imported_default_binding => |imported_binding| {
+                // 1. Let localName be the sole element of BoundNames of ImportedBinding.
+                const local_name = imported_binding;
+
+                // 2. Let defaultEntry be the ImportEntry Record {
+                //      [[ModuleRequest]]: module, [[ImportName]]: "default", [[LocalName]]: localName
+                //    }.
+                const default_entry: ImportEntry = .{
+                    .module_request = module,
+                    .import_name = .{ .string = "default" },
+                    .local_name = local_name,
+                };
+
+                // 3. Return « defaultEntry ».
+                try import_entries.append(default_entry);
+            },
+
+            // NameSpaceImport : * as ImportedBinding
+            .namespace_import => |imported_binding| {
+                // 1. Let localName be the StringValue of ImportedBinding.
+                const local_name = imported_binding;
+
+                // 2. Let entry be the ImportEntry Record {
+                //      [[ModuleRequest]]: module, [[ImportName]]: namespace-object, [[LocalName]]: localName
+                //    }.
+                const entry: ImportEntry = .{
+                    .module_request = module,
+                    .import_name = .namespace_object,
+                    .local_name = local_name,
+                };
+
+                // 3. Return « entry ».
+                try import_entries.append(entry);
+            },
+
+            // NamedImports : { }
+            // 1. Return a new empty List.
+            // ImportsList : ImportsList , ImportSpecifier
+            // 1. Let specs1 be the ImportEntriesForModule of ImportsList with argument module.
+            // 2. Let specs2 be the ImportEntriesForModule of ImportSpecifier with argument module.
+            // 3. Return the list-concatenation of specs1 and specs2.
+            .named_imports => |imports_list| for (imports_list.items) |import_specifier| {
+                // ImportSpecifier : ModuleExportName as ImportedBinding
+                if (import_specifier.module_export_name) |module_export_name| {
+                    // 1. Let importName be the StringValue of ModuleExportName.
+                    const import_name = switch (module_export_name) {
+                        .identifier => |identifier| identifier,
+                        .string_literal => |string_literal| (try string_literal.stringValue(
+                            allocator,
+                        )).string.utf8,
+                    };
+
+                    // 2. Let localName be the StringValue of ImportedBinding.
+                    const local_name = import_specifier.imported_binding;
+
+                    // 3. Let entry be the ImportEntry Record {
+                    //      [[ModuleRequest]]: module, [[ImportName]]: importName, [[LocalName]]: localName
+                    //    }.
+                    const entry: ImportEntry = .{
+                        .module_request = module,
+                        .import_name = .{ .string = import_name },
+                        .local_name = local_name,
+                    };
+
+                    // 4. Return « entry ».
+                    try import_entries.append(entry);
+                }
+                // ImportSpecifier : ImportedBinding
+                else {
+                    // 1. Let localName be the sole element of BoundNames of ImportedBinding.
+                    const local_name = import_specifier.imported_binding;
+
+                    // 2. Let entry be the ImportEntry Record {
+                    //      [[ModuleRequest]]: module, [[ImportName]]: localName, [[LocalName]]: localName
+                    //    }.
+                    const entry: ImportEntry = .{
+                        .module_request = module,
+                        .import_name = .{ .string = local_name },
+                        .local_name = local_name,
+                    };
+
+                    // 3. Return « entry ».
+                    try import_entries.append(entry);
+                }
+            },
+        }
+        return import_entries.toOwnedSlice();
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-ImportsList

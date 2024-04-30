@@ -185,7 +185,7 @@ pub const Environment = union(enum) {
         name: []const u8,
         module: *SourceTextModule,
         binding_name: []const u8,
-    ) error{}!Value {
+    ) Allocator.Error!void {
         return switch (self) {
             .module_environment => |env| env.createImportBinding(name, module, binding_name),
             else => unreachable,

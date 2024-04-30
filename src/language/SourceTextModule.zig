@@ -29,6 +29,7 @@ const String = types.String;
 const Value = types.Value;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const getImportedModule = language.getImportedModule;
+const getModuleNamespace = language.getModuleNamespace;
 const newModuleEnvironment = execution.newModuleEnvironment;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
@@ -53,7 +54,8 @@ context: ?ExecutionContext,
 /// [[ImportMeta]]
 import_meta: ?Object,
 
-// TODO: [[ImportEntries]]
+/// [[ImportEntries]]
+import_entries: std.ArrayList(ImportEntry),
 
 /// [[LocalExportEntries]]
 local_export_entries: std.ArrayList(ExportEntry),
@@ -79,7 +81,7 @@ dfs_index: ?usize,
 dfs_ancestor_index: ?usize,
 
 /// [[RequestedModules]]
-requested_modules: std.StringArrayHashMap(void),
+requested_modules: std.ArrayList([]const u8),
 
 /// [[LoadedModules]]
 loaded_modules: std.StringHashMap(Module),
@@ -107,6 +109,21 @@ const Status = enum {
     evaluating,
     evaluating_async,
     evaluated,
+};
+
+/// https://tc39.es/ecma262/#importentry-record
+pub const ImportEntry = struct {
+    /// [[ModuleRequest]]
+    module_request: []const u8,
+
+    /// [[ImportName]]
+    import_name: ?union(enum) {
+        string: []const u8,
+        namespace_object,
+    },
+
+    /// [[LocalName]]
+    local_name: []const u8,
 };
 
 /// https://tc39.es/ecma262/#exportentry-record
@@ -188,14 +205,14 @@ fn innerModuleLoading(
         try state.visited.putNoClobber(module.source_text_module, {});
 
         // b. Let requestedModulesCount be the number of elements in module.[[RequestedModules]].
-        const requested_modules_count = module.source_text_module.requested_modules.count();
+        const requested_modules_count = module.source_text_module.requested_modules.items.len;
 
         // c. Set state.[[PendingModulesCount]] to state.[[PendingModulesCount]] +
         //    requestedModulesCount.
         state.pending_modules_count += requested_modules_count;
 
         // d. For each String required of module.[[RequestedModules]], do
-        for (module.source_text_module.requested_modules.keys()) |required| {
+        for (module.source_text_module.requested_modules.items) |required| {
             // i. If module.[[LoadedModules]] contains a Record whose [[Specifier]] is required, then
             if (module.source_text_module.loaded_modules.get(required)) |loaded_module| {
                 // 1. Let record be that Record.
@@ -373,7 +390,7 @@ fn innerModuleLinking(agent: *Agent, module: Module, stack: *std.ArrayList(*Self
     try stack.append(module.source_text_module);
 
     // 9. For each String required of module.[[RequestedModules]], do
-    for (module.source_text_module.requested_modules.keys()) |required| {
+    for (module.source_text_module.requested_modules.items) |required| {
         // a. Let requiredModule be GetImportedModule(module, required).
         const required_module = getImportedModule(module.source_text_module, String.from(required));
 
@@ -452,8 +469,24 @@ pub fn parse(
     // 2. If body is a List of errors, return body.
     const body = try Parser.parse(ast.Module, agent.gc_allocator, source_text, ctx);
 
-    // TODO: 3-5.
-    const requested_modules = std.StringArrayHashMap(void).init(agent.gc_allocator);
+    // 3. Let requestedModules be the ModuleRequests of body.
+    var requested_modules = std.ArrayList([]const u8).init(agent.gc_allocator);
+    {
+        const tmp = try body.moduleRequests(agent.gc_allocator);
+        defer agent.gc_allocator.free(tmp);
+        try requested_modules.appendSlice(tmp);
+    }
+
+    // 4. Let importEntries be ImportEntries of body.
+    var import_entries = std.ArrayList(ImportEntry).init(agent.gc_allocator);
+    {
+        const tmp = try body.importEntries(agent.gc_allocator);
+        defer agent.gc_allocator.free(tmp);
+        try import_entries.appendSlice(tmp);
+    }
+
+    // 5. Let importedBoundNames be ImportedLocalNames(importEntries).
+    // NOTE: This is lazily done with a for loop below.
 
     // 6. Let indirectExportEntries be a new empty List.
     var indirect_export_entries = std.ArrayList(ExportEntry).init(agent.gc_allocator);
@@ -471,11 +504,49 @@ pub fn parse(
     for (export_entries) |export_entry| {
         // a. If ee.[[ModuleRequest]] is null, then
         if (export_entry.module_request == null) {
+            const import_entry_with_bound_name: ?ImportEntry = for (import_entries.items) |import_entry| {
+                if (export_entry.local_name != null and
+                    std.mem.eql(u8, import_entry.local_name, export_entry.local_name.?))
+                    break import_entry;
+            } else null;
+
             // i. If importedBoundNames does not contain ee.[[LocalName]], then
-            //     1. Append ee to localExportEntries.
+            if (import_entry_with_bound_name == null) {
+                // 1. Append ee to localExportEntries.
+                try local_export_entries.append(export_entry);
+            }
             // ii. Else,
-            //     TODO: 1-3.
-            try local_export_entries.append(export_entry);
+            else {
+                // 1. Let ie be the element of importEntries whose [[LocalName]] is ee.[[LocalName]].
+                const import_entry = import_entry_with_bound_name.?;
+
+                // 2. If ie.[[ImportName]] is namespace-object, then
+                if (import_entry.import_name != null and import_entry.import_name.? == .namespace_object) {
+                    // a. NOTE: This is a re-export of an imported module namespace object.
+                    // b. Append ee to localExportEntries.
+                    try local_export_entries.append(export_entry);
+                }
+                // 3. Else,
+                else {
+                    // a. NOTE: This is a re-export of a single name.
+                    // b. Append the ExportEntry Record {
+                    //      [[ModuleRequest]]: ie.[[ModuleRequest]], [[ImportName]]: ie.[[ImportName]],
+                    //      [[LocalName]]: null, [[ExportName]]: ee.[[ExportName]]
+                    //    } to indirectExportEntries.
+                    try indirect_export_entries.append(.{
+                        .module_request = import_entry.module_request,
+                        .import_name = if (import_entry.import_name) |import_name|
+                            switch (import_name) {
+                                .string => |string| .{ .string = string },
+                                .namespace_object => unreachable,
+                            }
+                        else
+                            null,
+                        .local_name = null,
+                        .export_name = export_entry.export_name,
+                    });
+                }
+            }
         }
         // b. Else if ee.[[ImportName]] is all-but-default, then
         else if (export_entry.import_name != null and export_entry.import_name.? == .all_but_default) {
@@ -519,6 +590,7 @@ pub fn parse(
         .context = null,
         .import_meta = null,
         .requested_modules = requested_modules,
+        .import_entries = import_entries,
         .local_export_entries = local_export_entries,
         .indirect_export_entries = indirect_export_entries,
         .loaded_modules = std.StringHashMap(Module).init(agent.gc_allocator),
@@ -703,7 +775,7 @@ fn innerModuleEvaluation(
     try stack.append(module.source_text_module);
 
     // 11. For each String required of module.[[RequestedModules]], do
-    for (module.source_text_module.requested_modules.keys()) |required| {
+    for (module.source_text_module.requested_modules.items) |required| {
         // a. Let requiredModule be GetImportedModule(module, required).
         var required_module = getImportedModule(module.source_text_module, String.from(required));
 
@@ -915,7 +987,7 @@ pub fn resolveExport(
 
 /// 16.2.1.6.4 InitializeEnvironment ( )
 /// https://tc39.es/ecma262/#sec-source-text-module-record-initialize-environment
-pub fn initializeEnvironment(self: *Self) Allocator.Error!void {
+pub fn initializeEnvironment(self: *Self) Agent.Error!void {
     const agent = self.realm.agent;
 
     // TODO: 1. For each ExportEntry Record e of module.[[IndirectExportEntries]], do
@@ -936,8 +1008,78 @@ pub fn initializeEnvironment(self: *Self) Allocator.Error!void {
     // 6. Set module.[[Environment]] to env.
     self.environment = env;
 
-    // TODO: 7. For each ImportEntry Record in of module.[[ImportEntries]], do
-    //     [...]
+    // 7. For each ImportEntry Record in of module.[[ImportEntries]], do
+    for (self.import_entries.items) |import_entry| {
+        // a. Let importedModule be GetImportedModule(module, in.[[ModuleRequest]]).
+        const imported_module = getImportedModule(self, String.from(import_entry.module_request));
+
+        const import_name = import_entry.import_name.?;
+
+        // b. If in.[[ImportName]] is namespace-object, then
+        if (import_name == .namespace_object) {
+            // i. Let namespace be GetModuleNamespace(importedModule).
+            const namespace = try getModuleNamespace(agent, imported_module);
+
+            // ii. Perform ! env.CreateImmutableBinding(in.[[LocalName]], true).
+            env.createImmutableBinding(
+                agent,
+                import_entry.local_name,
+                true,
+            ) catch |err| try noexcept(err);
+
+            // iii. Perform ! env.InitializeBinding(in.[[LocalName]], namespace).
+            env.initializeBinding(
+                agent,
+                import_entry.local_name,
+                Value.from(namespace),
+            ) catch |err| try noexcept(err);
+        }
+        // c. Else,
+        else {
+            // i. Let resolution be importedModule.ResolveExport(in.[[ImportName]]).
+            const maybe_resolution = try imported_module.resolveExport(agent, import_name.string);
+
+            // ii. If resolution is either null or ambiguous, throw a SyntaxError exception.
+            if (maybe_resolution == null or maybe_resolution.? == .ambiguous) {
+                return agent.throwException(
+                    .syntax_error,
+                    "Cannot resolve export '{s}'",
+                    .{import_name.string},
+                );
+            }
+            const resolution = maybe_resolution.?.resolved_binding;
+
+            // iii. If resolution.[[BindingName]] is namespace, then
+            if (resolution.binding_name == .namespace) {
+                // 1. Let namespace be GetModuleNamespace(resolution.[[Module]]).
+                const namespace = try getModuleNamespace(agent, resolution.module);
+
+                // 2. Perform ! env.CreateImmutableBinding(in.[[LocalName]], true).
+                env.createImmutableBinding(
+                    agent,
+                    import_entry.local_name,
+                    true,
+                ) catch |err| try noexcept(err);
+
+                // 3. Perform ! env.InitializeBinding(in.[[LocalName]], namespace).
+                env.initializeBinding(
+                    agent,
+                    import_entry.local_name,
+                    Value.from(namespace),
+                ) catch |err| try noexcept(err);
+            }
+            // iv. Else,
+            else {
+                // 1. Perform env.CreateImportBinding(in.[[LocalName]], resolution.[[Module]],
+                //    resolution.[[BindingName]]).
+                try env.createImportBinding(
+                    import_entry.local_name,
+                    resolution.module.source_text_module,
+                    resolution.binding_name.string,
+                );
+            }
+        }
+    }
 
     // 8. Let moduleContext be a new ECMAScript code execution context.
     const module_context: ExecutionContext = .{

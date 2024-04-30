@@ -3,6 +3,7 @@ const module = @import("language/module.zig");
 pub const Diagnostics = @import("ptk").Diagnostics;
 pub const ExportEntry = SourceTextModule.ExportEntry;
 pub const GraphLoadingState = module.GraphLoadingState;
+pub const ImportEntry = SourceTextModule.ImportEntry;
 pub const ImportedModulePayload = module.ImportedModulePayload;
 pub const ImportedModuleReferrer = module.ImportedModuleReferrer;
 pub const Module = module.Module;
