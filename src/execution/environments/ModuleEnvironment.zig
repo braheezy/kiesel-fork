@@ -28,6 +28,12 @@ pub const IndirectBinding = struct {
     binding_name: []const u8,
 };
 
+pub fn hasBinding(self: Self, name: []const u8) bool {
+    // Handled via DeclarativeEnvironment in the spec but with a vague "has a binding", so we need
+    // to override the implementation and check the indirect bindings as well.
+    return self.indirect_bindings.contains(name) or self.declarative_environment.bindings.contains(name);
+}
+
 /// 9.1.1.5.1 GetBindingValue ( N, S )
 /// https://tc39.es/ecma262/#sec-module-environment-records-getbindingvalue-n-s
 pub fn getBindingValue(
@@ -40,7 +46,7 @@ pub fn getBindingValue(
     std.debug.assert(strict);
 
     // 2. Assert: envRec has a binding for N.
-    std.debug.assert(self.declarative_environment.bindings.contains(name) or self.indirect_bindings.contains(name));
+    std.debug.assert(self.hasBinding(name));
 
     // 3. If the binding for N is an indirect binding, then
     if (self.indirect_bindings.get(name)) |indirect_binding| {

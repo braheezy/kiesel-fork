@@ -51,9 +51,7 @@ pub const Environment = union(enum) {
 
     pub fn hasBinding(self: Self, name: []const u8) Agent.Error!bool {
         return switch (self) {
-            inline .function_environment,
-            .module_environment,
-            => |env| env.declarative_environment.hasBinding(name),
+            .function_environment => |env| env.declarative_environment.hasBinding(name),
             inline else => |env| env.hasBinding(name),
         };
     }
