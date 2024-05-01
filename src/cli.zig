@@ -440,6 +440,19 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
     return switch (script_or_module) {
         .script => |script| script.evaluate(),
         .module => |module| blk: {
+            const module_path = switch (options.origin) {
+                .repl, .command => "",
+                .path => |path| resolveModulePath(
+                    agent,
+                    script_or_module,
+                    path,
+                ) catch |err| break :blk err,
+            };
+            const module_cache_key: ModuleCacheKey = .{
+                .normalized_specifier = module_path,
+                .referrer = .{ .module = module },
+            };
+            try module_cache.putNoClobber(module_cache_key, .{ .source_text_module = module });
             const promise = module.loadRequestedModules(agent, null) catch |err| break :blk err;
             std.debug.assert(agent.queued_jobs.items.len == 0);
             switch (promise.fields.promise_state) {
