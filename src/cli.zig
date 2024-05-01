@@ -307,7 +307,11 @@ const RunError = Allocator.Error || std.fs.File.WriteError;
 
 fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: struct {
     base_dir: std.fs.Dir,
-    file_name: ?[]const u8 = null,
+    origin: union(enum) {
+        repl,
+        command,
+        path: []const u8,
+    },
     module: bool = false,
     print_promise_rejection_warnings: bool = true,
 }) RunError!?Value {
@@ -324,15 +328,21 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
     var diagnostics = Diagnostics.init(allocator);
     defer diagnostics.deinit();
 
+    const file_name: []const u8 = switch (options.origin) {
+        .repl => "repl",
+        .command => "command",
+        .path => |path| path,
+    };
+
     const parse_result: error{ ParseError, OutOfMemory }!ScriptOrModule = if (options.module) blk: {
         break :blk if (SourceTextModule.parse(source_text, realm, host_defined, .{
             .diagnostics = &diagnostics,
-            .file_name = options.file_name,
+            .file_name = file_name,
         })) |module| .{ .module = module } else |err| err;
     } else blk: {
         break :blk if (Script.parse(source_text, realm, host_defined, .{
             .diagnostics = &diagnostics,
-            .file_name = options.file_name,
+            .file_name = file_name,
         })) |script| .{ .script = script } else |err| err;
     };
 
@@ -560,7 +570,7 @@ fn repl(allocator: Allocator, realm: *Realm, options: struct {
 
         if (try run(allocator, realm, source_text, .{
             .base_dir = std.fs.cwd(),
-            .file_name = "repl",
+            .origin = .repl,
             .module = options.module,
             .print_promise_rejection_warnings = options.print_promise_rejection_warnings,
         })) |result| {
@@ -600,7 +610,7 @@ fn replBasic(allocator: Allocator, realm: *Realm, options: struct {
 
         if (try run(allocator, realm, source_text, .{
             .base_dir = std.fs.cwd(),
-            .file_name = "repl",
+            .origin = .repl,
             .module = options.module,
             .print_promise_rejection_warnings = options.print_promise_rejection_warnings,
         })) |result| {
@@ -780,7 +790,7 @@ pub fn main() !u8 {
                 try std.fs.cwd().openDir(dirname, .{})
             else
                 std.fs.cwd(),
-            .file_name = std.fs.path.basename(path),
+            .origin = .{ .path = path },
             .module = parsed_args.options.module,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
         })) |result| {
@@ -790,7 +800,7 @@ pub fn main() !u8 {
     } else if (parsed_args.options.command) |source_text| {
         if (try run(allocator, realm, source_text, .{
             .base_dir = std.fs.cwd(),
-            .file_name = "command",
+            .origin = .command,
             .module = parsed_args.options.module,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
         })) |result| {
