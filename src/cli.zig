@@ -38,6 +38,32 @@ var tracked_promise_rejections: std.AutoArrayHashMap(
     HostHooks.PromiseRejectionTrackerOperation,
 ) = undefined;
 
+const ModuleCacheKey = struct {
+    normalized_specifier: []const u8,
+    referrer: ImportedModuleReferrer,
+};
+
+var module_cache: std.HashMap(
+    ModuleCacheKey,
+    Module,
+    struct {
+        pub fn hash(_: anytype, key: ModuleCacheKey) u64 {
+            var hasher = std.hash.Wyhash.init(0);
+            hasher.update(key.normalized_specifier);
+            switch (key.referrer) {
+                inline else => |ptr| hasher.update(std.mem.asBytes(&ptr)),
+            }
+            return hasher.final();
+        }
+
+        pub fn eql(_: anytype, a: ModuleCacheKey, b: ModuleCacheKey) bool {
+            return std.mem.eql(u8, a.normalized_specifier, b.normalized_specifier) and
+                std.meta.eql(a.referrer, b.referrer);
+        }
+    },
+    std.hash_map.default_max_load_percentage,
+) = undefined;
+
 const version = std.fmt.comptimePrint(
     \\kiesel {[kiesel]s}
     \\libgc {[libgc]s}
@@ -64,6 +90,23 @@ const repl_preamble = std.fmt.comptimePrint(
 const ScriptOrModuleHostDefined = struct {
     base_dir: std.fs.Dir,
 };
+
+fn resolveModulePath(agent: *Agent, script_or_module: ScriptOrModule, specifier: []const u8) Agent.Error![]const u8 {
+    const base_dir: std.fs.Dir = switch (script_or_module) {
+        inline else => |x| x.host_defined.cast(*ScriptOrModuleHostDefined).base_dir,
+    };
+    if (builtin.os.tag == .wasi) {
+        return std.fs.path.resolve(agent.gc_allocator, &.{specifier});
+    }
+    return base_dir.realpathAlloc(agent.gc_allocator, specifier) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        else => return agent.throwException(
+            .internal_error,
+            "Failed to import '{s}': {s}",
+            .{ specifier, @errorName(err) },
+        ),
+    };
+}
 
 fn initializeGlobalObject(realm: *Realm, global_object: Object) Agent.Error!void {
     try defineBuiltinProperty(global_object, "Kiesel", Value.from(try Kiesel.create(realm)));
@@ -688,6 +731,9 @@ pub fn main() !u8 {
     tracked_promise_rejections = @TypeOf(tracked_promise_rejections).init(agent.gc_allocator);
     defer tracked_promise_rejections.deinit();
 
+    module_cache = @TypeOf(module_cache).init(agent.gc_allocator);
+    defer module_cache.deinit();
+
     agent.host_hooks.hostLoadImportedModule = struct {
         fn func(
             agent_: *Agent,
@@ -697,14 +743,21 @@ pub fn main() !u8 {
             payload: ImportedModulePayload,
         ) Allocator.Error!void {
             const result = blk: {
-                switch (referrer) {
-                    inline else => |r| {
-                        if (r.loaded_modules.get(specifier.utf8)) |module| break :blk module;
-                    },
-                }
-                break :blk if (parseSourceTextModule(agent_, referrer, specifier)) |source_text_module|
-                    Module{ .source_text_module = source_text_module }
-                else |err| switch (err) {
+                const module_path = switch (referrer) {
+                    .script => |script| resolveModulePath(agent_, .{ .script = script }, specifier.utf8),
+                    .module => |module| resolveModulePath(agent_, .{ .module = module }, specifier.utf8),
+                    .realm => unreachable,
+                } catch |err| break :blk err;
+                const module_cache_key: ModuleCacheKey = .{
+                    .normalized_specifier = module_path,
+                    .referrer = referrer,
+                };
+                if (module_cache.get(module_cache_key)) |module| break :blk module;
+                break :blk if (parseSourceTextModule(agent_, module_path)) |source_text_module| {
+                    const module: Module = .{ .source_text_module = source_text_module };
+                    try module_cache.putNoClobber(module_cache_key, module);
+                    break :blk module;
+                } else |err| switch (err) {
                     error.OutOfMemory, error.ExceptionThrown => @as(Agent.Error, @errorCast(err)),
                     else => agent_.throwException(
                         .internal_error,
@@ -718,20 +771,14 @@ pub fn main() !u8 {
 
         fn parseSourceTextModule(
             agent_: *Agent,
-            referrer: ImportedModuleReferrer,
-            specifier: String,
+            module_path: []const u8,
         ) (ReadFileError || error{ExceptionThrown})!*SourceTextModule {
             const realm = agent_.currentRealm();
-            const base_dir = switch (referrer) {
-                inline .script, .module => |x| x.host_defined.cast(*ScriptOrModuleHostDefined).base_dir,
-                .realm => unreachable,
-            };
-            const module_dir = try base_dir.openDir(
-                std.fs.path.dirname(specifier.utf8) orelse ".",
+            const module_dir = try std.fs.cwd().openDir(
+                std.fs.path.dirname(module_path) orelse ".",
                 .{},
             );
-            const module_file_name = std.fs.path.basename(specifier.utf8);
-            const source_text = try readFile(agent_.gc_allocator, module_dir, module_file_name);
+            const source_text = try readFile(agent_.gc_allocator, std.fs.cwd(), module_path);
             defer agent_.gc_allocator.free(source_text);
 
             const host_defined = SafePointer.make(*ScriptOrModuleHostDefined, blk: {
@@ -745,7 +792,7 @@ pub fn main() !u8 {
 
             return SourceTextModule.parse(source_text, realm, host_defined, .{
                 .diagnostics = &diagnostics,
-                .file_name = module_file_name,
+                .file_name = std.fs.path.basename(module_path),
             }) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 error.ParseError => {
