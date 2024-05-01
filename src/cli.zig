@@ -441,7 +441,7 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
         .script => |script| script.evaluate(),
         .module => |module| blk: {
             const module_path = switch (options.origin) {
-                .repl, .command => "",
+                .repl, .command => unreachable,
                 .path => |path| resolveModulePath(
                     agent,
                     script_or_module,
@@ -683,6 +683,7 @@ pub fn main() !u8 {
     const allocator = gpa.allocator();
 
     const stdout = std.io.getStdOut().writer();
+    const stderr = std.io.getStdErr().writer();
 
     const Options = struct {
         command: ?[]const u8 = null,
@@ -723,12 +724,25 @@ pub fn main() !u8 {
     const parsed_args = args.parseForCurrentProcess(Options, allocator, .print) catch return 1;
     defer parsed_args.deinit();
 
+    const path_arg = if (parsed_args.positionals.len > 0) parsed_args.positionals[0] else null;
+
     if (parsed_args.options.version) {
         try stdout.writeAll(version);
         return 0;
-    } else if (parsed_args.options.help) {
+    }
+    if (parsed_args.options.help) {
         try args.printHelp(Options, "kiesel", stdout);
         return 0;
+    }
+    if (parsed_args.options.module) {
+        if (path_arg == null) {
+            try stderr.writeAll("-m/--module option must not be used in REPL mode\n");
+            return 1;
+        }
+        if (parsed_args.options.command != null) {
+            try stderr.writeAll("-m/--module option must not be used with -c/--command\n");
+            return 1;
+        }
     }
 
     if (parsed_args.options.@"disable-gc") kiesel.gc.disable();
@@ -841,7 +855,6 @@ pub fn main() !u8 {
     const global_object = realm.global_object;
     try initializeGlobalObject(realm, global_object);
 
-    const path_arg = if (parsed_args.positionals.len > 0) parsed_args.positionals[0] else null;
     if (path_arg) |path| {
         const source_text = try readFile(allocator, std.fs.cwd(), path);
         defer allocator.free(source_text);
