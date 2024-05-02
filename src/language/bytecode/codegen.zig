@@ -1607,6 +1607,8 @@ pub fn codegenBlock(
     // 3. Perform BlockDeclarationInstantiation(StatementList, blockEnv).
     // 4. Set the running execution context's LexicalEnvironment to blockEnv.
     try executable.addInstructionWithBlock(.block_declaration_instantiation, node.statement_list);
+    const strict = ctx.contained_in_strict_mode_code;
+    try executable.addIndex(@intFromBool(strict));
 
     // 5. Let blockValue be Completion(Evaluation of StatementList).
     try codegenStatementList(node.statement_list, executable, ctx);
