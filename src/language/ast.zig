@@ -1988,7 +1988,7 @@ pub const FunctionBody = struct {
         // 1. Return a new empty List.
         // FunctionStatementList : StatementList
         // 1. Return TopLevelVarDeclaredNames of StatementList.
-        return self.statement_list.varDeclaredNames(allocator);
+        return self.statement_list.topLevelVarDeclaredNames(allocator);
     }
 
     /// 8.2.7 Static Semantics: VarScopedDeclarations
