@@ -348,6 +348,7 @@ pub fn printBreakableStatement(node: ast.BreakableStatement, writer: anytype, in
     // Omit printing 'BreakableStatement' here, it's implied and only adds nesting.
     switch (node) {
         .iteration_statement => |x| try printIterationStatement(x, writer, indentation),
+        .switch_statement => |x| try printSwitchStatement(x, writer, indentation),
     }
 }
 
@@ -534,6 +535,31 @@ pub fn printWithStatement(node: ast.WithStatement, writer: anytype, indentation:
     try print("WithStatement", writer, indentation);
     try printExpression(node.expression, writer, indentation + 1);
     try printStatement(node.statement.*, writer, indentation + 1);
+}
+
+pub fn printSwitchStatement(node: ast.SwitchStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("SwitchStatement", writer, indentation);
+    try printExpression(node.expression, writer, indentation + 1);
+    try printCaseBlock(node.case_block, writer, indentation + 1);
+}
+
+pub fn printCaseBlock(node: ast.CaseBlock, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    // Omit printing 'CaseBlock' here, it's implied and only adds nesting.
+    for (node.items) |item| switch (item) {
+        .case_clause => |case_clause| try printCaseClause(case_clause, writer, indentation),
+        .default_clause => |default_clause| try printDefaultClause(default_clause, writer, indentation),
+    };
+}
+
+pub fn printCaseClause(node: ast.CaseClause, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("CaseClause", writer, indentation);
+    try printExpression(node.expression, writer, indentation + 1);
+    try printStatementList(node.statement_list, writer, indentation + 1);
+}
+
+pub fn printDefaultClause(node: ast.DefaultClause, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("DefaultClause", writer, indentation);
+    try printStatementList(node.statement_list, writer, indentation + 1);
 }
 
 pub fn printThrowStatement(node: ast.ThrowStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {

@@ -20,7 +20,7 @@ instructions: std.ArrayList(Instruction),
 constants: ValueArrayHashMap(void, sameValue),
 identifiers: std.StringArrayHashMap(void),
 functions_and_classes: std.ArrayList(FunctionOrClass),
-blocks: std.ArrayList(ast.StatementList),
+blocks: std.ArrayList(StatementListOrCaseBlock),
 environment_lookup_cache_size: usize = 0,
 
 pub const FunctionOrClass = union(enum) {
@@ -34,6 +34,11 @@ pub const FunctionOrClass = union(enum) {
     generator_expression: ast.GeneratorExpression,
 };
 
+pub const StatementListOrCaseBlock = union(enum) {
+    statement_list: ast.StatementList,
+    case_block: ast.CaseBlock,
+};
+
 pub const IndexType = u16;
 
 pub const Error = error{IndexOutOfRange} || Allocator.Error;
@@ -45,7 +50,7 @@ pub fn init(allocator: Allocator) Self {
         .constants = ValueArrayHashMap(void, sameValue).init(allocator),
         .identifiers = std.StringArrayHashMap(void).init(allocator),
         .functions_and_classes = std.ArrayList(FunctionOrClass).init(allocator),
-        .blocks = std.ArrayList(ast.StatementList).init(allocator),
+        .blocks = std.ArrayList(StatementListOrCaseBlock).init(allocator),
     };
 }
 
@@ -75,7 +80,7 @@ pub fn addFunctionOrClass(self: *Self, function_or_class: FunctionOrClass) Alloc
     try self.functions_and_classes.append(function_or_class);
 }
 
-pub fn addBlock(self: *Self, block: ast.StatementList) Allocator.Error!void {
+pub fn addBlock(self: *Self, block: StatementListOrCaseBlock) Allocator.Error!void {
     try self.blocks.append(block);
 }
 
@@ -115,7 +120,7 @@ pub fn addInstructionWithFunctionOrClass(
 pub fn addInstructionWithBlock(
     self: *Self,
     instruction: Instruction,
-    block: ast.StatementList,
+    block: StatementListOrCaseBlock,
 ) Error!void {
     std.debug.assert(instruction.hasBlockIndex());
     try self.addInstruction(instruction);

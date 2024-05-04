@@ -1572,9 +1572,8 @@ pub fn codegenBreakableStatement(
     ctx: *Context,
 ) Executable.Error!void {
     switch (node) {
-        .iteration_statement => |iteration_statement| {
-            try codegenIterationStatement(iteration_statement, executable, ctx);
-        },
+        .iteration_statement => |iteration_statement| try codegenIterationStatement(iteration_statement, executable, ctx),
+        .switch_statement => |switch_statement| try codegenSwitchStatement(switch_statement, executable, ctx),
     }
 }
 
@@ -1606,7 +1605,10 @@ pub fn codegenBlock(
     // 2. Let blockEnv be NewDeclarativeEnvironment(oldEnv).
     // 3. Perform BlockDeclarationInstantiation(StatementList, blockEnv).
     // 4. Set the running execution context's LexicalEnvironment to blockEnv.
-    try executable.addInstructionWithBlock(.block_declaration_instantiation, node.statement_list);
+    try executable.addInstructionWithBlock(
+        .block_declaration_instantiation,
+        .{ .statement_list = node.statement_list },
+    );
     const strict = ctx.contained_in_strict_mode_code;
     try executable.addIndex(@intFromBool(strict));
 
@@ -2568,6 +2570,182 @@ pub fn codegenWithStatement(
     try executable.addInstruction(.pop_lexical_environment);
 
     // 8. Return ? UpdateEmpty(C, undefined).
+}
+
+/// 14.12.2 Runtime Semantics: CaseBlockEvaluation
+/// https://tc39.es/ecma262/#sec-runtime-semantics-caseblockevaluation
+fn caseBlockEvaluation(executable: *Executable, ctx: *Context, case_block: ast.CaseBlock) Executable.Error!void {
+    // CaseBlock : { }
+    if (case_block.items.len == 0) {
+        // 1. Return undefined.
+        try executable.addInstructionWithConstant(.store_constant, .undefined);
+        return;
+    }
+
+    // CaseBlock : { CaseClauses }
+    // 1. Let V be undefined.
+    // 2. Let A be the List of CaseClause items in CaseClauses, in source text order.
+    // 3. Let found be false.
+    // 4. For each CaseClause C of A, do
+    //     a. If found is false, then
+    //         i. Set found to ? CaseClauseIsSelected(C, input).
+    //     b. If found is true, then
+    //         i. Let R be Completion(Evaluation of C).
+    //         ii. If R.[[Value]] is not empty, set V to R.[[Value]].
+    //         iii. If R is an abrupt completion, return ? UpdateEmpty(R, V).
+    // 5. Return V.
+    // CaseBlock : { CaseClauses[opt] DefaultClause CaseClauses[opt] }
+    // 1. Let V be undefined.
+    // 2. If the first CaseClauses is present, then
+    //     a. Let A be the List of CaseClause items in the first CaseClauses, in source text order.
+    // 3. Else,
+    //     a. Let A be a new empty List.
+    // 4. Let found be false.
+    // 5. For each CaseClause C of A, do
+    //     a. If found is false, then
+    //         i. Set found to ? CaseClauseIsSelected(C, input).
+    //     b. If found is true, then
+    //         i. Let R be Completion(Evaluation of C).
+    //         ii. If R.[[Value]] is not empty, set V to R.[[Value]].
+    //         iii. If R is an abrupt completion, return ? UpdateEmpty(R, V).
+    // 6. Let foundInB be false.
+    // 7. If the second CaseClauses is present, then
+    //     a. Let B be the List of CaseClause items in the second CaseClauses, in source text order.
+    // 8. Else,
+    //     a. Let B be a new empty List.
+    // 9. If found is false, then
+    //     a. For each CaseClause C of B, do
+    //         i. If foundInB is false, then
+    //             1. Set foundInB to ? CaseClauseIsSelected(C, input).
+    //         ii. If foundInB is true, then
+    //             1. Let R be Completion(Evaluation of CaseClause C).
+    //             2. If R.[[Value]] is not empty, set V to R.[[Value]].
+    //             3. If R is an abrupt completion, return ? UpdateEmpty(R, V).
+    // 10. If foundInB is true, return V.
+    // 11. Let defaultR be Completion(Evaluation of DefaultClause).
+    // 12. If defaultR.[[Value]] is not empty, set V to defaultR.[[Value]].
+    // 13. If defaultR is an abrupt completion, return ? UpdateEmpty(defaultR, V).
+    // 14. NOTE: The following is another complete iteration of the second CaseClauses.
+    // 15. For each CaseClause C of B, do
+    //     a. Let R be Completion(Evaluation of CaseClause C).
+    //     b. If R.[[Value]] is not empty, set V to R.[[Value]].
+    //     c. If R is an abrupt completion, return ? UpdateEmpty(R, V).
+    // 16. Return V.
+
+    try executable.addInstruction(.load); // Save input value
+
+    var consequent_jumps = std.ArrayList(Executable.JumpIndex).init(executable.allocator);
+    defer consequent_jumps.deinit();
+
+    var has_default_clause = false;
+    for (case_block.items) |item| switch (item) {
+        .case_clause => |case_clause| {
+            try executable.addInstruction(.store);
+            try executable.addInstruction(.load);
+            try caseClauseIsSelected(executable, ctx, case_clause);
+            try executable.addInstruction(.jump_conditional);
+            const consequent_jump = try executable.addJumpIndex();
+            const alternate_jump = try executable.addJumpIndex();
+            try alternate_jump.setTargetHere();
+            try consequent_jumps.append(consequent_jump);
+        },
+        .default_clause => {
+            std.debug.assert(!has_default_clause);
+            has_default_clause = true;
+        },
+    };
+    try executable.addInstruction(.jump);
+    const default_or_end_jump = try executable.addJumpIndex();
+    var i: usize = 0;
+    for (case_block.items) |item| {
+        switch (item) {
+            .case_clause => |case_clause| {
+                try executable.addInstruction(.jump);
+                const skip_jump = try executable.addJumpIndex();
+                try consequent_jumps.items[i].setTargetHere();
+                try executable.addInstruction(.store); // Pop input value
+                try executable.addInstructionWithConstant(.store_constant, .undefined);
+                try skip_jump.setTargetHere();
+                try codegenStatementList(case_clause.statement_list, executable, ctx);
+                i += 1;
+            },
+            .default_clause => |default_clause| {
+                try executable.addInstruction(.jump);
+                const skip_jump = try executable.addJumpIndex();
+                try default_or_end_jump.setTargetHere();
+                try executable.addInstruction(.store); // Pop input value
+                try executable.addInstructionWithConstant(.store_constant, .undefined);
+                try skip_jump.setTargetHere();
+                try codegenStatementList(default_clause.statement_list, executable, ctx);
+            },
+        }
+    }
+    if (!has_default_clause) {
+        try executable.addInstruction(.jump);
+        const skip_jump = try executable.addJumpIndex();
+        try default_or_end_jump.setTargetHere();
+        try executable.addInstruction(.store); // Pop input value
+        try executable.addInstructionWithConstant(.store_constant, .undefined);
+        try skip_jump.setTargetHere();
+    }
+}
+
+/// 14.12.3 CaseClauseIsSelected ( C, input )
+/// https://tc39.es/ecma262/#sec-runtime-semantics-caseclauseisselected
+fn caseClauseIsSelected(executable: *Executable, ctx: *Context, case_clause: ast.CaseClause) Executable.Error!void {
+    // 1. Assert: C is an instance of the production CaseClause : case Expression : StatementList[opt] .
+
+    try executable.addInstruction(.load);
+
+    // 2. Let exprRef be ? Evaluation of the Expression of C.
+    try codegenExpression(case_clause.expression, executable, ctx);
+
+    // 3. Let clauseSelector be ? GetValue(exprRef).
+    if (case_clause.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    try executable.addInstruction(.load);
+
+    // 4. Return IsStrictlyEqual(input, clauseSelector).
+    try executable.addInstruction(.is_strictly_equal);
+}
+
+/// 14.12.4 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-switch-statement-runtime-semantics-evaluation
+pub fn codegenSwitchStatement(
+    node: ast.SwitchStatement,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    // 1. Let exprRef be ? Evaluation of Expression.
+    try codegenExpression(node.expression, executable, ctx);
+
+    // 2. Let switchValue be ? GetValue(exprRef).
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+    // 3. Let oldEnv be the running execution context's LexicalEnvironment.
+    try executable.addInstruction(.push_lexical_environment);
+
+    // 4. Let blockEnv be NewDeclarativeEnvironment(oldEnv).
+    // 5. Perform BlockDeclarationInstantiation(CaseBlock, blockEnv).
+    // 6. Set the running execution context's LexicalEnvironment to blockEnv.
+    try executable.addInstructionWithBlock(
+        .block_declaration_instantiation,
+        .{ .case_block = node.case_block },
+    );
+    const strict = ctx.contained_in_strict_mode_code;
+    try executable.addIndex(@intFromBool(strict));
+
+    // 7. Let R be Completion(CaseBlockEvaluation of CaseBlock with argument switchValue).
+    try caseBlockEvaluation(executable, ctx, node.case_block);
+
+    while (ctx.break_jumps.popOrNull()) |jump_index| {
+        try jump_index.setTargetHere();
+    }
+
+    // 8. Set the running execution context's LexicalEnvironment to oldEnv.
+    try executable.addInstruction(.restore_lexical_environment);
+    try executable.addInstruction(.pop_lexical_environment);
+
+    // 9. Return R.
 }
 
 /// 14.14.1 Runtime Semantics: Evaluation

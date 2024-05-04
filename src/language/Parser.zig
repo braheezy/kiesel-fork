@@ -1313,6 +1313,8 @@ pub fn acceptBreakableStatement(self: *Self) AcceptError!ast.BreakableStatement 
 
     if (self.acceptIterationStatement()) |iteration_statement|
         return .{ .iteration_statement = iteration_statement }
+    else |_| if (self.acceptSwitchStatement()) |switch_statement|
+        return .{ .switch_statement = switch_statement }
     else |_|
         return error.UnexpectedToken;
 }
@@ -1720,6 +1722,75 @@ pub fn acceptWithStatement(self: *Self) AcceptError!ast.WithStatement {
     _ = try self.core.accept(RuleSet.is(.@")"));
     const statement = try self.acceptStatement();
     return .{ .expression = expression, .statement = statement };
+}
+
+pub fn acceptSwitchStatement(self: *Self) AcceptError!ast.SwitchStatement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"switch"));
+    _ = try self.core.accept(RuleSet.is(.@"("));
+    const expression = try self.acceptExpression(.{});
+    _ = try self.core.accept(RuleSet.is(.@")"));
+    const case_block = try self.acceptCaseBlock();
+    return .{ .expression = expression, .case_block = case_block };
+}
+
+pub fn acceptCaseBlock(self: *Self) AcceptError!ast.CaseBlock {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"{"));
+    var case_block_items = std.ArrayList(ast.CaseBlock.Item).init(self.allocator);
+    errdefer case_block_items.deinit();
+    var has_default_clause = false;
+    while (self.acceptCaseBlockItem(has_default_clause)) |case_block_item| {
+        if (case_block_item == .default_clause) has_default_clause = true;
+        try case_block_items.append(case_block_item);
+    } else |_| {}
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+    return .{ .items = try case_block_items.toOwnedSlice() };
+}
+
+pub fn acceptCaseBlockItem(self: *Self, has_default_clause: bool) AcceptError!ast.CaseBlock.Item {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    if (self.acceptCaseClause()) |case_clause|
+        return .{ .case_clause = case_clause }
+    else |_| if (self.acceptDefaultClause(has_default_clause)) |default_clause|
+        return .{ .default_clause = default_clause }
+    else |_|
+        return error.UnexpectedToken;
+}
+
+pub fn acceptCaseClause(self: *Self) AcceptError!ast.CaseClause {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.case));
+    const expression = try self.acceptExpression(.{});
+    _ = try self.core.accept(RuleSet.is(.@":"));
+    const statement_list = try self.acceptStatementList();
+    return .{ .expression = expression, .statement_list = statement_list };
+}
+
+pub fn acceptDefaultClause(self: *Self, has_default_clause: bool) AcceptError!ast.DefaultClause {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.is(.default));
+    if (has_default_clause) {
+        try self.emitErrorAt(
+            token.location,
+            "Switch statement can only have one default clause",
+            .{},
+        );
+        return error.UnexpectedToken;
+    }
+    _ = try self.core.accept(RuleSet.is(.@":"));
+    const statement_list = try self.acceptStatementList();
+    return .{ .statement_list = statement_list };
 }
 
 pub fn acceptThrowStatement(self: *Self) AcceptError!ast.ThrowStatement {

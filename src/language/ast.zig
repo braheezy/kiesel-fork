@@ -732,8 +732,11 @@ pub const Statement = union(enum) {
             .block_statement => |block_statement| return block_statement.block.statement_list.varDeclaredNames(allocator),
             .variable_statement => |variable_statement| return variable_statement.variable_declaration_list.varDeclaredNames(allocator),
             .if_statement => |if_statement| return if_statement.varDeclaredNames(allocator),
-            .breakable_statement => |breakable_statement| switch (breakable_statement.iteration_statement) {
-                inline else => |node| return node.varDeclaredNames(allocator),
+            .breakable_statement => |breakable_statement| switch (breakable_statement) {
+                .iteration_statement => |iteration_statement| switch (iteration_statement) {
+                    inline else => |node| return node.varDeclaredNames(allocator),
+                },
+                .switch_statement => |switch_statement| return switch_statement.varDeclaredNames(allocator),
             },
             .with_statement => |with_statement| return with_statement.varDeclaredNames(allocator),
             .try_statement => |try_statement| return try_statement.varDeclaredNames(allocator),
@@ -768,8 +771,11 @@ pub const Statement = union(enum) {
             .block_statement => |block_statement| return block_statement.block.statement_list.varScopedDeclarations(allocator),
             .variable_statement => |variable_statement| return variable_statement.variable_declaration_list.varScopedDeclarations(allocator),
             .if_statement => |if_statement| return if_statement.varScopedDeclarations(allocator),
-            .breakable_statement => |breakable_statement| switch (breakable_statement.iteration_statement) {
-                inline else => |node| return node.varScopedDeclarations(allocator),
+            .breakable_statement => |breakable_statement| switch (breakable_statement) {
+                .iteration_statement => |iteration_statement| switch (iteration_statement) {
+                    inline else => |node| return node.varScopedDeclarations(allocator),
+                },
+                .switch_statement => |switch_statement| return switch_statement.varScopedDeclarations(allocator),
             },
             .with_statement => |with_statement| return with_statement.varScopedDeclarations(allocator),
             .try_statement => |try_statement| return try_statement.varScopedDeclarations(allocator),
@@ -836,6 +842,7 @@ pub const HoistableDeclaration = union(enum) {
 /// https://tc39.es/ecma262/#prod-BreakableStatement
 pub const BreakableStatement = union(enum) {
     iteration_statement: IterationStatement,
+    switch_statement: SwitchStatement,
 };
 
 /// https://tc39.es/ecma262/#prod-BlockStatement
@@ -1656,6 +1663,213 @@ pub const WithStatement = struct {
         // WithStatement : with ( Expression ) Statement
         // 1. Return the VarScopedDeclarations of Statement.
         return self.statement.varScopedDeclarations(allocator);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-SwitchStatement
+pub const SwitchStatement = struct {
+    const Self = @This();
+
+    expression: Expression,
+    case_block: CaseBlock,
+
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // SwitchStatement : switch ( Expression ) CaseBlock
+        // 1. Return the VarDeclaredNames of CaseBlock.
+        return self.case_block.varDeclaredNames(allocator);
+    }
+
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VarScopedDeclaration {
+        // SwitchStatement : switch ( Expression ) CaseBlock
+        // 1. Return the VarScopedDeclarations of CaseBlock.
+        return self.case_block.varScopedDeclarations(allocator);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-CaseBlock
+pub const CaseBlock = struct {
+    const Self = @This();
+
+    pub const Item = union(enum) {
+        case_clause: CaseClause,
+        default_clause: DefaultClause,
+    };
+
+    items: []const Item,
+
+    /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
+    pub fn lexicallyScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const LexicallyScopedDeclaration {
+        // CaseBlock : { }
+        // 1. Return a new empty List.
+        // CaseBlock : { CaseClauses[opt] DefaultClause CaseClauses[opt] }
+        // 1. If the first CaseClauses is present, let declarations1 be the LexicallyScopedDeclarations of the first CaseClauses.
+        // 2. Else, let declarations1 be a new empty List.
+        // 3. Let declarations2 be LexicallyScopedDeclarations of DefaultClause.
+        // 4. If the second CaseClauses is present, let declarations3 be the LexicallyScopedDeclarations of the second CaseClauses.
+        // 5. Else, let declarations3 be a new empty List.
+        // 6. Return the list-concatenation of declarations1, declarations2, and declarations3.
+        // CaseClauses : CaseClauses CaseClause
+        // 1. Let declarations1 be LexicallyScopedDeclarations of CaseClauses.
+        // 2. Let declarations2 be LexicallyScopedDeclarations of CaseClause.
+        // 3. Return the list-concatenation of declarations1 and declarations2.
+        var declarations = std.ArrayList(LexicallyScopedDeclaration).init(allocator);
+        for (self.items) |item| switch (item) {
+            inline else => |node| try declarations.appendSlice(try node.lexicallyScopedDeclarations(allocator)),
+        };
+        return declarations.toOwnedSlice();
+    }
+
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // CaseBlock : { }
+        // 1. Return a new empty List.
+        // CaseBlock : { CaseClauses[opt] DefaultClause CaseClauses[opt] }
+        // 1. If the first CaseClauses is present, let names1 be the VarDeclaredNames of the first CaseClauses.
+        // 2. Else, let names1 be a new empty List.
+        // 3. Let names2 be VarDeclaredNames of DefaultClause.
+        // 4. If the second CaseClauses is present, let names3 be the VarDeclaredNames of the second CaseClauses.
+        // 5. Else, let names3 be a new empty List.
+        // 6. Return the list-concatenation of names1, names2, and names3.
+        // CaseClauses : CaseClauses CaseClause
+        // 1. Let names1 be VarDeclaredNames of CaseClauses.
+        // 2. Let names2 be VarDeclaredNames of CaseClause.
+        // 3. Return the list-concatenation of names1 and names2.
+        var var_declared_names = std.ArrayList(Identifier).init(allocator);
+        for (self.items) |item| switch (item) {
+            inline else => |node| try var_declared_names.appendSlice(try node.varDeclaredNames(allocator)),
+        };
+        return var_declared_names.toOwnedSlice();
+    }
+
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VarScopedDeclaration {
+        // CaseBlock : { }
+        // 1. Return a new empty List.
+        // CaseBlock : { CaseClauses[opt] DefaultClause CaseClauses[opt] }
+        // 1. If the first CaseClauses is present, let declarations1 be the VarScopedDeclarations of the first CaseClauses.
+        // 2. Else, let declarations1 be a new empty List.
+        // 3. Let declarations2 be VarScopedDeclarations of DefaultClause.
+        // 4. If the second CaseClauses is present, let declarations3 be the VarScopedDeclarations of the second CaseClauses.
+        // 5. Else, let declarations3 be a new empty List.
+        // 6. Return the list-concatenation of declarations1, declarations2, and declarations3.
+        // CaseClauses : CaseClauses CaseClause
+        // 1. Let declarations1 be VarScopedDeclarations of CaseClauses.
+        // 2. Let declarations2 be VarScopedDeclarations of CaseClause.
+        // 3. Return the list-concatenation of declarations1 and declarations2.
+        var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
+        for (self.items) |item| switch (item) {
+            inline else => |node| try variable_declarations.appendSlice(try node.varScopedDeclarations(allocator)),
+        };
+        return variable_declarations.toOwnedSlice();
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-CaseClause
+pub const CaseClause = struct {
+    const Self = @This();
+
+    expression: Expression,
+    statement_list: StatementList,
+
+    /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
+    pub fn lexicallyScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const LexicallyScopedDeclaration {
+        // CaseClause : case Expression : StatementList[opt]
+        // 1. If the StatementList is present, return the LexicallyScopedDeclarations of StatementList.
+        // 2. Return a new empty List.
+        return self.statement_list.lexicallyScopedDeclarations(allocator);
+    }
+
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // CaseClause : case Expression : StatementList[opt]
+        // 1. If the StatementList is present, return the VarDeclaredNames of StatementList.
+        // 2. Return a new empty List.
+        return self.statement_list.varDeclaredNames(allocator);
+    }
+
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VarScopedDeclaration {
+        // CaseClause : case Expression : StatementList[opt]
+        // 1. If the StatementList is present, return the VarScopedDeclarations of StatementList.
+        // 2. Return a new empty List.
+        return self.statement_list.varScopedDeclarations(allocator);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-DefaultClause
+pub const DefaultClause = struct {
+    const Self = @This();
+
+    statement_list: StatementList,
+
+    /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
+    pub fn lexicallyScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const LexicallyScopedDeclaration {
+        // DefaultClause : default : StatementList[opt]
+        // 1. If the StatementList is present, return the LexicallyScopedDeclarations of StatementList.
+        // 2. Return a new empty List.
+        return self.statement_list.lexicallyScopedDeclarations(allocator);
+    }
+
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // DefaultClause : default : StatementList[opt]
+        // 1. If the StatementList is present, return the VarDeclaredNames of StatementList.
+        // 2. Return a new empty List.
+        return self.statement_list.varDeclaredNames(allocator);
+    }
+
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VarScopedDeclaration {
+        // DefaultClause : default : StatementList[opt]
+        // 1. If the StatementList is present, return the VarScopedDeclarations of StatementList.
+        // 2. Return a new empty List.
+        return self.statement_list.varScopedDeclarations(allocator);
     }
 };
 

@@ -129,7 +129,7 @@ fn fetchFunctionOrClass(self: *Self, executable: Executable) Executable.Function
     return executable.functions_and_classes.items[index];
 }
 
-fn fetchBlock(self: *Self, executable: Executable) ast.StatementList {
+fn fetchBlock(self: *Self, executable: Executable) Executable.StatementListOrCaseBlock {
     const index = self.fetchIndex(executable);
     return executable.blocks.items[index];
 }
@@ -412,7 +412,7 @@ fn applyStringOrNumericBinaryOperator(
 /// https://tc39.es/ecma262/#sec-blockdeclarationinstantiation
 fn blockDeclarationInstantiation(
     agent: *Agent,
-    code: ast.StatementList,
+    code: Executable.StatementListOrCaseBlock,
     env: Environment,
     strict: bool,
 ) Allocator.Error!void {
@@ -420,7 +420,9 @@ fn blockDeclarationInstantiation(
     std.debug.assert(env == .declarative_environment);
 
     // 1. let declarations be the LexicallyScopedDeclarations of code.
-    const declarations = try code.lexicallyScopedDeclarations(agent.gc_allocator);
+    const declarations = switch (code) {
+        inline else => |node| try node.lexicallyScopedDeclarations(agent.gc_allocator),
+    };
     defer agent.gc_allocator.free(declarations);
 
     // 2. Let privateEnv be the running execution context's PrivateEnvironment.
