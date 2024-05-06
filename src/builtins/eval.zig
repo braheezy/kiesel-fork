@@ -191,8 +191,6 @@ fn evalDeclarationInstantiation(
     private_env: ?*PrivateEnvironment,
     strict: bool,
 ) Agent.Error!void {
-    _ = private_env;
-
     // 1. Let varNames be the VarDeclaredNames of body.
     const var_names = try body.varDeclaredNames(agent.gc_allocator);
     defer agent.gc_allocator.free(var_names);
@@ -378,7 +376,75 @@ fn evalDeclarationInstantiation(
         }
     }
 
-    // TODO: 17. For each Parse Node f of functionsToInitialize, do
+    // 17. For each Parse Node f of functionsToInitialize, do
+    for (functions_to_initialize.items) |*hoistable_declaration| {
+        // a. Let fn be the sole element of the BoundNames of f.
+        const function_name = switch (hoistable_declaration.*) {
+            inline else => |function_declaration| function_declaration.identifier,
+        }.?;
+
+        switch (hoistable_declaration.*) {
+            inline else => |*function_declaration| {
+                // Assign the function body's strictness, which is needed for the deferred bytecode generation.
+                // FIXME: This should ideally happen at parse time.
+                function_declaration.function_body.strict = strict or
+                    function_declaration.function_body.functionBodyContainsUseStrict();
+            },
+        }
+
+        // b. Let fo be InstantiateFunctionObject of f with arguments lexEnv and privateEnv.
+        const function_object = try switch (hoistable_declaration.*) {
+            .function_declaration => |function_declaration| function_declaration.instantiateOrdinaryFunctionObject(agent, lex_env, private_env),
+            .generator_declaration => |generator_declaration| generator_declaration.instantiateGeneratorFunctionObject(agent, lex_env, private_env),
+            .async_function_declaration => |async_function_declaration| async_function_declaration.instantiateAsyncFunctionObject(agent, lex_env, private_env),
+            .async_generator_declaration => |async_generator_declaration| async_generator_declaration.instantiateAsyncGeneratorFunctionObject(agent, lex_env, private_env),
+        };
+
+        // c. If varEnv is a Global Environment Record, then
+        if (var_env == .global_environment) {
+            // i. Perform ? varEnv.CreateGlobalFunctionBinding(fn, fo, true).
+            try var_env.global_environment.createGlobalFunctionBinding(
+                function_name,
+                Value.from(function_object),
+                true,
+            );
+        }
+        // d. Else,
+        else {
+            // i. Let bindingExists be ! varEnv.HasBinding(fn).
+            const binding_exists = var_env.hasBinding(function_name) catch |err| try noexcept(err);
+
+            // ii. If bindingExists is false, then
+            if (!binding_exists) {
+                // 1. NOTE: The following invocation cannot return an abrupt completion because of
+                //    the validation preceding step 14.
+
+                // 2. Perform ! varEnv.CreateMutableBinding(fn, true).
+                var_env.createMutableBinding(
+                    agent,
+                    function_name,
+                    true,
+                ) catch |err| try noexcept(err);
+
+                // 3. Perform ! varEnv.InitializeBinding(fn, fo).
+                var_env.initializeBinding(
+                    agent,
+                    function_name,
+                    Value.from(function_object),
+                ) catch |err| try noexcept(err);
+            }
+            // iii. Else,
+            else {
+                // 1. Perform ! varEnv.SetMutableBinding(fn, fo, false).
+                var_env.setMutableBinding(
+                    agent,
+                    function_name,
+                    Value.from(function_object),
+                    false,
+                ) catch |err| try noexcept(err);
+            }
+        }
+    }
 
     // 18. For each String vn of declaredVarNames, do
     var it_ = declared_var_names.keyIterator();
