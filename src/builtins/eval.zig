@@ -65,7 +65,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     if (script.statement_list.items.len == 0) return .undefined;
 
     // d. Let body be the ScriptBody of script.
-    const body = script.statement_list;
+    const body = script;
 
     // TODO: e-h.
 
@@ -185,7 +185,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
 /// https://tc39.es/ecma262/#sec-evaldeclarationinstantiation
 fn evalDeclarationInstantiation(
     agent: *Agent,
-    body: ast.StatementList,
+    body: ast.Script,
     var_env: Environment,
     lex_env: Environment,
     private_env: ?*PrivateEnvironment,
