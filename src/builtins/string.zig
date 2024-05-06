@@ -97,6 +97,226 @@ pub fn stringPad(
     );
 }
 
+/// 22.1.3.19.1 GetSubstitution ( matched, str, position, captures, namedCaptures, replacementTemplate )
+/// https://tc39.es/ecma262/#sec-getsubstitution
+pub fn getSubstitution(
+    agent: *Agent,
+    matched: types.String,
+    str: types.String,
+    position: usize,
+    captures: []const ?types.String,
+    named_captures: ?Object,
+    replacement_template: types.String,
+) Agent.Error!types.String {
+    // 1. Let stringLength be the length of str.
+    const string_length = str.utf16Length();
+
+    // 2. Assert: position ≤ stringLength.
+    std.debug.assert(position <= string_length);
+
+    // 3. Let result be the empty String.
+    var result = std.ArrayList(u8).init(agent.gc_allocator);
+
+    // 4. Let templateRemainder be replacementTemplate.
+    var template_reminder = replacement_template;
+
+    // 5. Repeat, while templateRemainder is not the empty String,
+    while (!template_reminder.isEmpty()) {
+        // a. NOTE: The following steps isolate ref (a prefix of templateRemainder), determine
+        //    refReplacement (its replacement), and then append that replacement to result.
+        // b. If templateRemainder starts with "$$", then
+        const ref, const ref_replacement = if (std.mem.startsWith(u8, template_reminder.utf8, "$$")) blk: {
+            // i. Let ref be "$$".
+            const ref = types.String.from("$$");
+
+            // ii. Let refReplacement be "$".
+            const ref_replacement = types.String.from("$");
+
+            break :blk .{ ref, ref_replacement };
+        }
+        // c. Else if templateRemainder starts with "$`", then
+        else if (std.mem.startsWith(u8, template_reminder.utf8, "$`")) blk: {
+            // i. Let ref be "$`".
+            const ref = types.String.from("$`");
+
+            // ii. Let refReplacement be the substring of str from 0 to position.
+            const ref_replacement = try str.substring(agent.gc_allocator, 0, position);
+
+            break :blk .{ ref, ref_replacement };
+        }
+        // d. Else if templateRemainder starts with "$&", then
+        else if (std.mem.startsWith(u8, template_reminder.utf8, "$&")) blk: {
+            // i. Let ref be "$&".
+            const ref = types.String.from("$&");
+
+            // ii. Let refReplacement be matched.
+            const ref_replacement = matched;
+
+            break :blk .{ ref, ref_replacement };
+        }
+        // e. Else if templateRemainder starts with "$'" (0x0024 (DOLLAR SIGN) followed by 0x0027 (APOSTROPHE)), then
+        else if (std.mem.startsWith(u8, template_reminder.utf8, "$'")) blk: {
+            // i. Let ref be "$'".
+            const ref = types.String.from("$'");
+
+            // ii. Let matchLength be the length of matched.
+            const match_length = matched.utf16Length();
+
+            // iii. Let tailPos be position + matchLength.
+            const tail_pos = position +| match_length;
+
+            // iv. Let refReplacement be the substring of str from min(tailPos, stringLength).
+            // v. NOTE: tailPos can exceed stringLength only if this abstract operation was invoked by
+            //    a call to the intrinsic @@replace method of %RegExp.prototype% on an object whose
+            //    "exec" property is not the intrinsic %RegExp.prototype.exec%.
+            const ref_replacement = try str.substring(
+                agent.gc_allocator,
+                @min(tail_pos, string_length),
+                string_length,
+            );
+
+            break :blk .{ ref, ref_replacement };
+        }
+        // f. Else if templateRemainder starts with "$" followed by 1 or more decimal digits, then
+        else if (template_reminder.utf8.len >= 2 and
+            template_reminder.utf8[0] == '$' and
+            std.ascii.isDigit(template_reminder.utf8[1]))
+        blk: {
+            // i. If templateRemainder starts with "$" followed by 2 or more decimal digits, let
+            //    digitCount be 2. Otherwise, let digitCount be 1.
+            var digit_count: usize = if (template_reminder.utf8.len >= 3 and
+                std.ascii.isDigit(template_reminder.utf8[1]) and
+                std.ascii.isDigit(template_reminder.utf8[2])) 2 else 1;
+
+            // ii. Let digits be the substring of templateRemainder from 1 to 1 + digitCount.
+            var digits = template_reminder.utf8[1 .. 1 + digit_count];
+
+            // iii. Let index be ℝ(StringToNumber(digits)).
+            var index = std.fmt.parseInt(usize, digits, 10) catch unreachable;
+
+            // iv. Assert: 0 ≤ index ≤ 99.
+            std.debug.assert(index <= 99);
+
+            // v. Let captureLen be the number of elements in captures.
+            const capture_len = captures.len;
+
+            // vi. If index > captureLen and digitCount = 2, then
+            if (index > capture_len and digit_count == 2) {
+                // 1. NOTE: When a two-digit replacement pattern specifies an index exceeding the count
+                //    of capturing groups, it is treated as a one-digit replacement pattern followed by
+                //    a literal digit.
+
+                // 2. Set digitCount to 1.
+                digit_count = 1;
+
+                // 3. Set digits to the substring of digits from 0 to 1.
+                digits = digits[0..1];
+
+                // 4. Set index to ℝ(StringToNumber(digits)).
+                index = std.fmt.parseInt(usize, digits, 10) catch unreachable;
+            }
+
+            // vii. Let ref be the substring of templateRemainder from 0 to 1 + digitCount.
+            const ref = try template_reminder.substring(agent.gc_allocator, 0, 1 + digit_count);
+
+            // viii. If 1 ≤ index ≤ captureLen, then
+            const ref_replacement = if (index >= 1 and index <= capture_len) blk_ref_replacement: {
+                // 1. Let capture be captures[index - 1].
+                const capture = captures[index - 1];
+
+                // 2. If capture is undefined, then
+                if (capture == null) {
+                    // a. Let refReplacement be the empty String.
+                    break :blk_ref_replacement types.String.from("");
+                }
+                // 3. Else,
+                else {
+                    // a. Let refReplacement be capture.
+                    break :blk_ref_replacement capture.?;
+                }
+            }
+            // ix. Else,
+            else blk_ref_replacement: {
+                // 1. Let refReplacement be ref.
+                break :blk_ref_replacement ref;
+            };
+
+            break :blk .{ ref, ref_replacement };
+        }
+        // g. Else if templateRemainder starts with "$<", then
+        else if (std.mem.startsWith(u8, template_reminder.utf8, "$<")) blk: {
+            // i. Let gtPos be StringIndexOf(templateRemainder, ">", 0).
+            const gt_pos = template_reminder.indexOf(types.String.from(">"), 0);
+
+            // ii. If gtPos is not-found or namedCaptures is undefined, then
+            if (gt_pos == null or named_captures == null) {
+                // 1. Let ref be "$<".
+                const ref = types.String.from("$<");
+
+                // 2. Let refReplacement be ref.
+                const ref_replacement = ref;
+
+                break :blk .{ ref, ref_replacement };
+            }
+            // iii. Else,
+            else {
+                // 1. Let ref be the substring of templateRemainder from 0 to gtPos + 1.
+                const ref = try template_reminder.substring(agent.gc_allocator, 0, gt_pos.? + 1);
+
+                // 2. Let groupName be the substring of templateRemainder from 2 to gtPos.
+                const group_name = try template_reminder.substring(
+                    agent.gc_allocator,
+                    2,
+                    gt_pos.?,
+                );
+
+                // 3. Assert: namedCaptures is an Object.
+                std.debug.assert(named_captures != null);
+
+                // 4. Let capture be ? Get(namedCaptures, groupName).
+                const capture = try named_captures.?.get(PropertyKey.from(group_name));
+
+                // 5. If capture is undefined, then
+                //     a. Let refReplacement be the empty String.
+                // 6. Else,
+                //     a. Let refReplacement be ? ToString(capture).
+                const ref_replacement = if (capture == .undefined)
+                    types.String.from("")
+                else
+                    try capture.toString(agent);
+
+                break :blk .{ ref, ref_replacement };
+            }
+        }
+        // h. Else,
+        else blk: {
+            // i. Let ref be the substring of templateRemainder from 0 to 1.
+            const ref = try template_reminder.substring(agent.gc_allocator, 0, 1);
+
+            // ii. Let refReplacement be ref.
+            const ref_replacement = ref;
+
+            break :blk .{ ref, ref_replacement };
+        };
+
+        // i. Let refLength be the length of ref.
+        const ref_length = ref.utf16Length();
+
+        // j. Set templateRemainder to the substring of templateRemainder from refLength.
+        template_reminder = try template_reminder.substring(
+            agent.gc_allocator,
+            ref_length,
+            template_reminder.utf16Length(),
+        );
+
+        // k. Set result to the string-concatenation of result and refReplacement.
+        try result.appendSlice(ref_replacement.utf8);
+    }
+
+    // 6. Return result.
+    return types.String.from(try result.toOwnedSlice());
+}
+
 /// 10.4.3.1 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-getownproperty-p
 fn getOwnProperty(object: Object, property_key: PropertyKey) Allocator.Error!?PropertyDescriptor {
@@ -1161,10 +1381,18 @@ pub const StringPrototype = struct {
             // a. Assert: replaceValue is a String.
             std.debug.assert(replace_value == .string);
 
-            // TODO: b. Let captures be a new empty List.
-            // TODO: c. Let replacement be ! GetSubstitution(searchString, string, position, captures,
-            //          undefined, replaceValue).
-            break :blk replace_value.string;
+            // b. Let captures be a new empty List.
+            // c. Let replacement be ! GetSubstitution(searchString, string, position, captures,
+            //    undefined, replaceValue).
+            break :blk getSubstitution(
+                agent,
+                search_string,
+                string,
+                position.?,
+                &.{},
+                null,
+                replace_value.string,
+            ) catch |err| try noexcept(err);
         };
 
         // 14. Return the string-concatenation of preceding, replacement, and following.
@@ -1291,10 +1519,18 @@ pub const StringPrototype = struct {
                 // i. Assert: replaceValue is a String.
                 std.debug.assert(replace_value == .string);
 
-                // TODO: ii. Let captures be a new empty List.
-                // TODO: iii. Let replacement be ! GetSubstitution(searchString, string, p, captures,
-                //            undefined, replaceValue).
-                break :blk replace_value.string;
+                // ii. Let captures be a new empty List.
+                // iii. Let replacement be ! GetSubstitution(searchString, string, p, captures,
+                //      undefined, replaceValue).
+                break :blk getSubstitution(
+                    agent,
+                    search_string,
+                    string,
+                    position,
+                    &.{},
+                    null,
+                    replace_value.string,
+                ) catch |err| try noexcept(err);
             };
 
             // d. Set result to the string-concatenation of result, preserved, and replacement.

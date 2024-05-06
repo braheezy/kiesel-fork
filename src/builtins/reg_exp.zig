@@ -33,6 +33,7 @@ const createRegExpStringIterator = builtins.createRegExpStringIterator;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
+const getSubstitution = builtins.getSubstitution;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
@@ -1208,7 +1209,7 @@ pub const RegExpPrototype = struct {
             );
 
             // g. Let captures be a new empty List.
-            var captures = try std.ArrayList(Value).initCapacity(
+            var captures = try std.ArrayList(?String).initCapacity(
                 agent.gc_allocator,
                 @intCast(n_captures),
             );
@@ -1219,17 +1220,19 @@ pub const RegExpPrototype = struct {
 
             // i. Repeat, while n ≤ nCaptures,
             while (n <= n_captures) : (n += 1) {
+                var capture_n_string: ?String = null;
+
                 // i. Let capN be ? Get(result, ! ToString(𝔽(n))).
                 var capture_n = try result.get(PropertyKey.from(n));
 
                 // ii. If capN is not undefined, then
                 if (capture_n != .undefined) {
                     // 1. Set capN to ? ToString(capN).
-                    capture_n = Value.from(try capture_n.toString(agent));
+                    capture_n_string = try capture_n.toString(agent);
                 }
 
                 // iii. Append capN to captures.
-                captures.appendAssumeCapacity(capture_n);
+                captures.appendAssumeCapacity(capture_n_string);
 
                 // iv. NOTE: When n = 1, the preceding step puts the first element into captures
                 //     (at index 0). More generally, the nth capture (the characters captured by
@@ -1250,7 +1253,9 @@ pub const RegExpPrototype = struct {
                     captures.items.len + 3 + @intFromBool(named_captures != .undefined),
                 );
                 replacer_args.appendAssumeCapacity(Value.from(matched));
-                replacer_args.appendSliceAssumeCapacity(captures.items);
+                for (captures.items) |capture| replacer_args.appendAssumeCapacity(
+                    if (capture) |s| Value.from(s) else .null,
+                );
                 replacer_args.appendAssumeCapacity(Value.from(@as(u53, @intCast(position))));
                 replacer_args.appendAssumeCapacity(Value.from(string));
 
@@ -1272,14 +1277,22 @@ pub const RegExpPrototype = struct {
             // l. Else,
             else blk: {
                 // i. If namedCaptures is not undefined, then
-                if (named_captures != .undefined) {
+                const named_captures_object: ?Object = if (named_captures != .undefined) blk_obj: {
                     // 1. Set namedCaptures to ? ToObject(namedCaptures).
-                    named_captures = Value.from(try named_captures.toObject(agent));
-                }
+                    break :blk_obj try named_captures.toObject(agent);
+                } else null;
 
-                // TODO: ii. Let replacement be ? GetSubstitution(matched, S, position, captures,
+                // ii. Let replacement be ? GetSubstitution(matched, S, position, captures,
                 //           namedCaptures, replaceValue).
-                break :blk replace_value.string;
+                break :blk try getSubstitution(
+                    agent,
+                    matched,
+                    string,
+                    position,
+                    captures.items,
+                    named_captures_object,
+                    replace_value.string,
+                );
             };
 
             // m. If position ≥ nextSourcePosition, then
