@@ -31,6 +31,7 @@ state: struct {
     in_iteration_statement: bool = false,
     in_method_definition: bool = false,
     in_module: bool = false,
+    in_strict_mode: bool = false,
     call_expression_forbidden: bool = false,
 } = .{},
 
@@ -53,6 +54,7 @@ const AcceptContext = struct {
     precedence: Precedence = 0,
     associativity: ?Associativity = null,
     forbidden: []const Tokenizer.TokenType = &.{},
+    update_strict_mode: bool = false,
 };
 
 const Precedence = u5;
@@ -1331,20 +1333,32 @@ pub fn acceptBlock(self: *Self) AcceptError!ast.Block {
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.@"{"));
-    const block = .{ .statement_list = try self.acceptStatementList() };
+    const block = .{ .statement_list = try self.acceptStatementList(.{}) };
     _ = try self.core.accept(RuleSet.is(.@"}"));
     return block;
 }
 
-pub fn acceptStatementList(self: *Self) AcceptError!ast.StatementList {
+pub fn acceptStatementList(self: *Self, ctx: AcceptContext) AcceptError!ast.StatementList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const tmp = temporaryChange(&self.state.in_strict_mode, self.state.in_strict_mode);
+    defer tmp.restore();
+    var look_for_use_strict = ctx.update_strict_mode and !self.state.in_strict_mode;
+
     var statement_list_items = std.ArrayList(ast.StatementListItem).init(self.allocator);
     errdefer statement_list_items.deinit();
-    while (self.acceptStatementListItem()) |statement_list_item|
-        try statement_list_items.append(statement_list_item)
-    else |_| {}
+    while (self.acceptStatementListItem()) |statement_list_item| {
+        try statement_list_items.append(statement_list_item);
+        if (look_for_use_strict) {
+            if (!statement_list_item.analyze(.is_string_literal)) {
+                look_for_use_strict = false;
+                continue;
+            }
+            const statement_list: ast.StatementList = .{ .items = statement_list_items.items };
+            self.state.in_strict_mode = statement_list.containsDirective("use strict");
+        }
+    } else |_| {}
     return .{ .items = try statement_list_items.toOwnedSlice() };
 }
 
@@ -1771,7 +1785,7 @@ pub fn acceptCaseClause(self: *Self) AcceptError!ast.CaseClause {
     _ = try self.core.accept(RuleSet.is(.case));
     const expression = try self.acceptExpression(.{});
     _ = try self.core.accept(RuleSet.is(.@":"));
-    const statement_list = try self.acceptStatementList();
+    const statement_list = try self.acceptStatementList(.{});
     return .{ .expression = expression, .statement_list = statement_list };
 }
 
@@ -1789,7 +1803,7 @@ pub fn acceptDefaultClause(self: *Self, has_default_clause: bool) AcceptError!as
         return error.UnexpectedToken;
     }
     _ = try self.core.accept(RuleSet.is(.@":"));
-    const statement_list = try self.acceptStatementList();
+    const statement_list = try self.acceptStatementList(.{});
     return .{ .statement_list = statement_list };
 }
 
@@ -1936,8 +1950,13 @@ pub fn acceptFunctionBody(
     const tmp = temporaryChange(&self.state.in_function_body, true);
     defer tmp.restore();
 
-    const statement_list = try self.acceptStatementList();
-    return .{ .type = @"type", .statement_list = statement_list };
+    const statement_list = try self.acceptStatementList(.{ .update_strict_mode = true });
+    const strict = self.state.in_strict_mode or statement_list.containsDirective("use strict");
+    return .{
+        .type = @"type",
+        .statement_list = statement_list,
+        .strict = strict,
+    };
 }
 
 pub fn acceptArrowFunction(self: *Self) AcceptError!ast.ArrowFunction {
@@ -1981,7 +2000,11 @@ pub fn acceptArrowFunction(self: *Self) AcceptError!ast.ArrowFunction {
         const items = try self.allocator.alloc(ast.StatementListItem, 1);
         items[0] = .{ .statement = statement };
         const statement_list: ast.StatementList = .{ .items = items };
-        break :blk .{ .type = .normal, .statement_list = statement_list };
+        break :blk .{
+            .type = .normal,
+            .statement_list = statement_list,
+            .strict = self.state.in_strict_mode,
+        };
     };
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
@@ -2195,6 +2218,10 @@ fn acceptClassDeclaration(self: *Self) AcceptError!ast.ClassDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    // "All parts of a ClassDeclaration or a ClassExpression are strict mode code."
+    const tmp2 = temporaryChange(&self.state.in_strict_mode, true);
+    defer tmp2.restore();
+
     _ = try self.core.accept(RuleSet.is(.class));
     // We need to do this after consuming the 'class' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "class".len);
@@ -2218,6 +2245,10 @@ fn acceptClassDeclaration(self: *Self) AcceptError!ast.ClassDeclaration {
 fn acceptClassExpression(self: *Self) AcceptError!ast.ClassExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
+
+    // "All parts of a ClassDeclaration or a ClassExpression are strict mode code."
+    const tmp2 = temporaryChange(&self.state.in_strict_mode, true);
+    defer tmp2.restore();
 
     _ = try self.core.accept(RuleSet.is(.class));
     // We need to do this after consuming the 'class' token to skip preceeding whitespace.
@@ -2280,22 +2311,16 @@ fn acceptClassElement(self: *Self) AcceptError!ast.ClassElement {
 
     if (self.acceptKeyword("static")) |_| {
         if (self.acceptMethodDefinition(null)) |*method_definition| {
-            switch (method_definition.method) {
-                inline else => |*expression| @constCast(expression).function_body.strict = true,
-            }
             return .{ .static_method_definition = method_definition.* };
         } else |_| if (self.acceptFieldDefinition()) |field_definition| {
             _ = try self.acceptOrInsertSemicolon();
             return .{ .static_field_definition = field_definition };
         } else |_| if (self.core.accept(RuleSet.is(.@"{"))) |_| {
-            const class_static_block = .{ .statement_list = try self.acceptStatementList() };
+            const class_static_block = .{ .statement_list = try self.acceptStatementList(.{}) };
             _ = try self.core.accept(RuleSet.is(.@"}"));
             return .{ .class_static_block = class_static_block };
         } else |_| return error.UnexpectedToken;
     } else |_| if (self.acceptMethodDefinition(null)) |*method_definition| {
-        switch (method_definition.method) {
-            inline else => |*expression| @constCast(expression).function_body.strict = true,
-        }
         return .{ .method_definition = method_definition.* };
     } else |_| if (self.acceptFieldDefinition()) |field_definition| {
         _ = try self.acceptOrInsertSemicolon();
@@ -2491,7 +2516,11 @@ pub fn acceptAsyncArrowFunction(self: *Self) AcceptError!ast.AsyncArrowFunction 
         const items = try self.allocator.alloc(ast.StatementListItem, 1);
         items[0] = .{ .statement = statement };
         const statement_list: ast.StatementList = .{ .items = items };
-        break :blk .{ .type = .@"async", .statement_list = statement_list };
+        break :blk .{
+            .type = .@"async",
+            .statement_list = statement_list,
+            .strict = self.state.in_strict_mode,
+        };
     };
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
@@ -2510,7 +2539,7 @@ pub fn acceptScript(self: *Self) AcceptError!ast.Script {
     errdefer self.core.restoreState(state);
 
     _ = self.core.accept(RuleSet.is(.hashbang_comment)) catch {};
-    const statement_list = try self.acceptStatementList();
+    const statement_list = try self.acceptStatementList(.{ .update_strict_mode = true });
     return .{ .statement_list = statement_list };
 }
 
@@ -2518,8 +2547,12 @@ pub fn acceptModule(self: *Self) AcceptError!ast.Module {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const tmp = temporaryChange(&self.state.in_module, true);
-    defer tmp.restore();
+    const tmp1 = temporaryChange(&self.state.in_module, true);
+    defer tmp1.restore();
+
+    // "Module code is always strict mode code."
+    const tmp2 = temporaryChange(&self.state.in_strict_mode, true);
+    defer tmp2.restore();
 
     _ = self.core.accept(RuleSet.is(.hashbang_comment)) catch {};
     const module_item_list = try self.acceptModuleItemList();

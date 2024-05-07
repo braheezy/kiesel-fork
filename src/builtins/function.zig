@@ -343,7 +343,7 @@ pub fn createDynamicFunction(
     };
 
     // 19. Let body be ParseText(bodyParseString, bodySym).
-    var body = Parser.parseNode(body_sym.type, body_sym.acceptFn, agent.gc_allocator, body_parse_string, .{
+    const body = Parser.parseNode(body_sym.type, body_sym.acceptFn, agent.gc_allocator, body_parse_string, .{
         .diagnostics = &diagnostics,
         .file_name = "Function",
     }) catch |err| switch (err) {
@@ -358,7 +358,6 @@ pub fn createDynamicFunction(
             );
         },
     };
-    body.strict = body.functionBodyContainsUseStrict();
 
     // 21. NOTE: The parameters and body are parsed separately to ensure that each is valid alone.
     //           For example, new Function("/*", "*/ ) {") does not evaluate to a function.

@@ -184,7 +184,6 @@ pub const Instruction = enum(u8) {
     pub fn argumentCount(self: Self) u2 {
         return switch (self) {
             .resolve_binding => 3,
-            .block_declaration_instantiation,
             .evaluate_call,
             .evaluate_property_access_with_identifier_key,
             .for_declaration_binding_instantiation,
@@ -194,6 +193,7 @@ pub const Instruction = enum(u8) {
             .apply_string_or_numeric_binary_operator,
             .array_set_length,
             .binding_class_declaration_evaluation,
+            .block_declaration_instantiation,
             .class_definition_evaluation,
             .create_catch_binding,
             .evaluate_new,

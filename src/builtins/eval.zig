@@ -377,23 +377,14 @@ fn evalDeclarationInstantiation(
     }
 
     // 17. For each Parse Node f of functionsToInitialize, do
-    for (functions_to_initialize.items) |*hoistable_declaration| {
+    for (functions_to_initialize.items) |hoistable_declaration| {
         // a. Let fn be the sole element of the BoundNames of f.
-        const function_name = switch (hoistable_declaration.*) {
+        const function_name = switch (hoistable_declaration) {
             inline else => |function_declaration| function_declaration.identifier,
         }.?;
 
-        switch (hoistable_declaration.*) {
-            inline else => |*function_declaration| {
-                // Assign the function body's strictness, which is needed for the deferred bytecode generation.
-                // FIXME: This should ideally happen at parse time.
-                function_declaration.function_body.strict = strict or
-                    function_declaration.function_body.functionBodyContainsUseStrict();
-            },
-        }
-
         // b. Let fo be InstantiateFunctionObject of f with arguments lexEnv and privateEnv.
-        const function_object = try switch (hoistable_declaration.*) {
+        const function_object = try switch (hoistable_declaration) {
             .function_declaration => |function_declaration| function_declaration.instantiateOrdinaryFunctionObject(agent, lex_env, private_env),
             .generator_declaration => |generator_declaration| generator_declaration.instantiateGeneratorFunctionObject(agent, lex_env, private_env),
             .async_function_declaration => |async_function_declaration| async_function_declaration.instantiateAsyncFunctionObject(agent, lex_env, private_env),

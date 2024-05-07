@@ -283,18 +283,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     }
 
     // 16. For each Parse Node f of functionsToInitialize, do
-    for (functions_to_initialize.items) |*ptr| {
-        var hoistable_declaration = ptr.*;
-
-        switch (hoistable_declaration) {
-            inline else => |*function_declaration| {
-                // Assign the function body's strictness, which is needed for the deferred bytecode generation.
-                // FIXME: This should ideally happen at parse time.
-                function_declaration.function_body.strict = script.scriptIsStrict() or
-                    function_declaration.function_body.functionBodyContainsUseStrict();
-            },
-        }
-
+    for (functions_to_initialize.items) |hoistable_declaration| {
         // a. Let fn be the sole element of the BoundNames of f.
         const function_name = switch (hoistable_declaration) {
             inline else => |function_declaration| function_declaration.identifier,

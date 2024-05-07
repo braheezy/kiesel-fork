@@ -1176,15 +1176,7 @@ pub fn initializeEnvironment(self: *Self) Agent.Error!void {
             // iii. If d is either a FunctionDeclaration, a GeneratorDeclaration, an
             //      AsyncFunctionDeclaration, or an AsyncGeneratorDeclaration, then
             if (declaration == .hoistable_declaration) {
-                var hoistable_declaration = declaration.hoistable_declaration;
-
-                switch (hoistable_declaration) {
-                    inline else => |*function_declaration| {
-                        // Assign the function body's strictness, which is needed for the deferred bytecode generation.
-                        // FIXME: This should ideally happen at parse time.
-                        function_declaration.function_body.strict = true;
-                    },
-                }
+                const hoistable_declaration = declaration.hoistable_declaration;
 
                 // 1. Let fo be InstantiateFunctionObject of d with arguments env and privateEnv.
                 const function_object = try switch (hoistable_declaration) {

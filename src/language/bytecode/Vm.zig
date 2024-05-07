@@ -410,12 +410,7 @@ fn applyStringOrNumericBinaryOperator(
 
 /// 14.2.3 BlockDeclarationInstantiation ( code, env )
 /// https://tc39.es/ecma262/#sec-blockdeclarationinstantiation
-fn blockDeclarationInstantiation(
-    agent: *Agent,
-    code: Executable.StatementListOrCaseBlock,
-    env: Environment,
-    strict: bool,
-) Allocator.Error!void {
+fn blockDeclarationInstantiation(agent: *Agent, code: Executable.StatementListOrCaseBlock, env: Environment) Allocator.Error!void {
     // NOTE: Keeping this wrapped in a generic `Environment` makes a bunch of stuff below easier.
     std.debug.assert(env == .declarative_environment);
 
@@ -450,16 +445,7 @@ fn blockDeclarationInstantiation(
         // b. If d is either a FunctionDeclaration, a GeneratorDeclaration, an
         //    AsyncFunctionDeclaration, or an AsyncGeneratorDeclaration, then
         if (declaration == .hoistable_declaration) {
-            var hoistable_declaration = declaration.hoistable_declaration;
-
-            switch (hoistable_declaration) {
-                inline else => |*function_declaration| {
-                    // Assign the function body's strictness, which is needed for the deferred bytecode generation.
-                    // FIXME: This should ideally happen at parse time.
-                    function_declaration.function_body.strict = strict or
-                        function_declaration.function_body.functionBodyContainsUseStrict();
-                },
-            }
+            const hoistable_declaration = declaration.hoistable_declaration;
 
             // i. Let fn be the sole element of the BoundNames of d.
             const function_name = switch (hoistable_declaration) {
@@ -2187,12 +2173,10 @@ pub fn executeInstruction(
             const block = self.fetchBlock(executable);
             const old_env = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
             const block_env = try newDeclarativeEnvironment(self.agent.gc_allocator, old_env);
-            const strict = self.fetchIndex(executable) == 1;
             try blockDeclarationInstantiation(
                 self.agent,
                 block,
                 .{ .declarative_environment = block_env },
-                strict,
             );
             self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{
                 .declarative_environment = block_env,

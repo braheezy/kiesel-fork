@@ -2177,7 +2177,7 @@ pub const FunctionBody = struct {
 
     type: Type,
     statement_list: StatementList,
-    strict: ?bool = null, // Unassigned until bytecode generation
+    strict: bool,
 
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations

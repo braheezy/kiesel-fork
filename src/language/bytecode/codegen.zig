@@ -1609,8 +1609,6 @@ pub fn codegenBlock(
         .block_declaration_instantiation,
         .{ .statement_list = node.statement_list },
     );
-    const strict = ctx.contained_in_strict_mode_code;
-    try executable.addIndex(@intFromBool(strict));
 
     // 5. Let blockValue be Completion(Evaluation of StatementList).
     try codegenStatementList(node.statement_list, executable, ctx);
@@ -1641,18 +1639,6 @@ pub fn codegenStatementListItem(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    if (node == .declaration and node.declaration.* == .hoistable_declaration) {
-        switch (node.declaration.hoistable_declaration) {
-            inline else => |*function_declaration| {
-                // Assign the function body's strictness, which is needed for the deferred bytecode generation.
-                // FIXME: This should ideally happen at parse time.
-                const strict = ctx.contained_in_strict_mode_code or
-                    function_declaration.function_body.functionBodyContainsUseStrict();
-                function_declaration.function_body.strict = strict;
-            },
-        }
-    }
-
     switch (node) {
         .statement => |statement| try codegenStatement(statement.*, executable, ctx),
         .declaration => |declaration| try codegenDeclaration(declaration.*, executable, ctx),
@@ -2731,8 +2717,6 @@ pub fn codegenSwitchStatement(
         .block_declaration_instantiation,
         .{ .case_block = node.case_block },
     );
-    const strict = ctx.contained_in_strict_mode_code;
-    try executable.addIndex(@intFromBool(strict));
 
     // 7. Let R be Completion(CaseBlockEvaluation of CaseBlock with argument switchValue).
     try caseBlockEvaluation(executable, ctx, node.case_block);
@@ -2863,20 +2847,12 @@ pub fn codegenTryStatement(
 pub fn codegenFunctionExpression(
     node: ast.FunctionExpression,
     executable: *Executable,
-    ctx: *Context,
+    _: *Context,
 ) Executable.Error!void {
-    const strict = ctx.contained_in_strict_mode_code or node.function_body.functionBodyContainsUseStrict();
-
-    // Copy `node` so that we can assign the function body's strictness, which is needed for the
-    // deferred bytecode generation.
-    // FIXME: This should ideally happen at parse time.
-    var function_expression = node;
-    function_expression.function_body.strict = strict;
-
     // 1. Return InstantiateOrdinaryFunctionExpression of FunctionExpression.
     try executable.addInstructionWithFunctionOrClass(
         .instantiate_ordinary_function_expression,
-        .{ .function_expression = function_expression },
+        .{ .function_expression = node },
     );
 }
 
@@ -2885,7 +2861,7 @@ pub fn codegenFunctionBody(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    const tmp = temporaryChange(&ctx.contained_in_strict_mode_code, node.strict.?);
+    const tmp = temporaryChange(&ctx.contained_in_strict_mode_code, node.strict);
     defer tmp.restore();
     try codegenStatementList(node.statement_list, executable, ctx);
 }
@@ -2895,20 +2871,12 @@ pub fn codegenFunctionBody(
 pub fn codegenArrowFunction(
     node: ast.ArrowFunction,
     executable: *Executable,
-    ctx: *Context,
+    _: *Context,
 ) Executable.Error!void {
-    const strict = ctx.contained_in_strict_mode_code or node.function_body.functionBodyContainsUseStrict();
-
-    // Copy `node` so that we can assign the function body's strictness, which is needed for the
-    // deferred bytecode generation.
-    // FIXME: This should ideally happen at parse time.
-    var arrow_function = node;
-    arrow_function.function_body.strict = strict;
-
     // 1. Return InstantiateArrowFunctionExpression of ArrowFunction.
     try executable.addInstructionWithFunctionOrClass(
         .instantiate_arrow_function_expression,
-        .{ .arrow_function = arrow_function },
+        .{ .arrow_function = node },
     );
 }
 
@@ -2919,24 +2887,12 @@ pub fn codegenMethodDefinition(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    const strict = ctx.contained_in_strict_mode_code or switch (node.method) {
-        inline else => |expression| expression.function_body.functionBodyContainsUseStrict(),
-    };
-
-    // Copy `method` so that we can assign the function body's strictness,
-    // which is needed for the deferred bytecode generation.
-    // FIXME: This should ideally happen at parse time.
-    var method = node.method;
-    switch (method) {
-        inline else => |*expression| expression.function_body.strict = strict,
-    }
-
     try codegenClassElementName(node.class_element_name, executable, ctx);
     try executable.addInstruction(.load);
 
     try executable.addInstructionWithFunctionOrClass(
         .object_define_method,
-        switch (method) {
+        switch (node.method) {
             .method, .get, .set => |function_expression| .{ .function_expression = function_expression },
             .generator => |generator_expression| .{ .generator_expression = generator_expression },
             .@"async" => |async_function_expression| .{ .async_function_expression = async_function_expression },
@@ -2951,20 +2907,12 @@ pub fn codegenMethodDefinition(
 pub fn codegenGeneratorExpression(
     node: ast.GeneratorExpression,
     executable: *Executable,
-    ctx: *Context,
+    _: *Context,
 ) Executable.Error!void {
-    const strict = ctx.contained_in_strict_mode_code or node.function_body.functionBodyContainsUseStrict();
-
-    // Copy `node` so that we can assign the function body's strictness, which is needed for the
-    // deferred bytecode generation.
-    // FIXME: This should ideally happen at parse time.
-    var generator_expression = node;
-    generator_expression.function_body.strict = strict;
-
     // 1. Return InstantiateGeneratorFunctionExpression of GeneratorExpression.
     try executable.addInstructionWithFunctionOrClass(
         .instantiate_generator_function_expression,
-        .{ .generator_expression = generator_expression },
+        .{ .generator_expression = node },
     );
 }
 
@@ -2973,20 +2921,12 @@ pub fn codegenGeneratorExpression(
 pub fn codegenAsyncGeneratorExpression(
     node: ast.AsyncGeneratorExpression,
     executable: *Executable,
-    ctx: *Context,
+    _: *Context,
 ) Executable.Error!void {
-    const strict = ctx.contained_in_strict_mode_code or node.function_body.functionBodyContainsUseStrict();
-
-    // Copy `node` so that we can assign the function body's strictness, which is needed for the
-    // deferred bytecode generation.
-    // FIXME: This should ideally happen at parse time.
-    var async_generator_expression = node;
-    async_generator_expression.function_body.strict = strict;
-
     // 1. Return InstantiateAsyncGeneratorFunctionExpression of AsyncGeneratorExpression.
     try executable.addInstructionWithFunctionOrClass(
         .instantiate_async_generator_function_expression,
-        .{ .async_generator_expression = async_generator_expression },
+        .{ .async_generator_expression = node },
     );
 }
 
@@ -3054,20 +2994,12 @@ pub fn codegenClassElementName(
 pub fn codegenAsyncFunctionExpression(
     node: ast.AsyncFunctionExpression,
     executable: *Executable,
-    ctx: *Context,
+    _: *Context,
 ) Executable.Error!void {
-    const strict = ctx.contained_in_strict_mode_code or node.function_body.functionBodyContainsUseStrict();
-
-    // Copy `node` so that we can assign the function body's strictness, which is needed for the
-    // deferred bytecode generation.
-    // FIXME: This should ideally happen at parse time.
-    var async_function_expression = node;
-    async_function_expression.function_body.strict = strict;
-
     // 1. Return InstantiateAsyncFunctionExpression of AsyncFunctionExpression.
     try executable.addInstructionWithFunctionOrClass(
         .instantiate_async_function_expression,
-        .{ .async_function_expression = async_function_expression },
+        .{ .async_function_expression = node },
     );
 }
 
@@ -3076,20 +3008,12 @@ pub fn codegenAsyncFunctionExpression(
 pub fn codegenAsyncArrowFunction(
     node: ast.AsyncArrowFunction,
     executable: *Executable,
-    ctx: *Context,
+    _: *Context,
 ) Executable.Error!void {
-    const strict = ctx.contained_in_strict_mode_code or node.function_body.functionBodyContainsUseStrict();
-
-    // Copy `node` so that we can assign the function body's strictness, which is needed for the
-    // deferred bytecode generation.
-    // FIXME: This should ideally happen at parse time.
-    var async_arrow_function = node;
-    async_arrow_function.function_body.strict = strict;
-
     // 1. Return InstantiateAsyncArrowFunctionExpression of AsyncArrowFunction.
     try executable.addInstructionWithFunctionOrClass(
         .instantiate_async_arrow_function_expression,
-        .{ .async_arrow_function = async_arrow_function },
+        .{ .async_arrow_function = node },
     );
 }
 
