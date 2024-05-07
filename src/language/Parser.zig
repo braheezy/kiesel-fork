@@ -535,7 +535,7 @@ pub fn acceptSuperProperty(self: *Self) AcceptError!ast.SuperProperty {
     if (!(self.state.in_class_body or self.state.in_method_definition)) {
         try self.emitErrorAt(
             super_token.location,
-            "super property is only allowed in classes and method definitions",
+            "'super' property is only allowed in classes and method definitions",
             .{},
         );
         return error.UnexpectedToken;
@@ -574,7 +574,7 @@ pub fn acceptNewTarget(self: *Self) AcceptError!void {
     _ = try self.acceptKeyword("target");
 
     if (!self.state.in_function_body) {
-        try self.emitErrorAt(token.location, "new.target is only allowed in functions", .{});
+        try self.emitErrorAt(token.location, "'new.target' is only allowed in functions", .{});
         return error.UnexpectedToken;
     }
 }
@@ -588,7 +588,7 @@ pub fn acceptImportMeta(self: *Self) AcceptError!void {
     _ = try self.acceptKeyword("meta");
 
     if (!self.state.in_module) {
-        try self.emitErrorAt(token.location, "import.meta is only allowed in modules", .{});
+        try self.emitErrorAt(token.location, "'import.meta' is only allowed in modules", .{});
         return error.UnexpectedToken;
     }
 }
@@ -615,11 +615,11 @@ pub fn acceptNewExpression(self: *Self) AcceptError!ast.NewExpression {
         break :blk expression;
     };
     if (expression.* == .import_call) {
-        try self.emitErrorAt(token.location, "new expression cannot be used with import()", .{});
+        try self.emitErrorAt(token.location, "'new' expression cannot be used with 'import()'", .{});
         return error.UnexpectedToken;
     }
     if (expression.* == .super_call) {
-        try self.emitErrorAt(token.location, "new expression cannot be used with super()", .{});
+        try self.emitErrorAt(token.location, "'new' expression cannot be used with 'super()'", .{});
         return error.UnexpectedToken;
     }
     const arguments = self.acceptArguments() catch &[_]ast.Expression{};
@@ -652,7 +652,7 @@ pub fn acceptSuperCall(self: *Self) AcceptError!ast.SuperCall {
     if (!self.state.in_class_constructor) {
         try self.emitErrorAt(
             super_token.location,
-            "super() is only allowed in class constructors",
+            "'super()' is only allowed in class constructors",
             .{},
         );
         return error.UnexpectedToken;
@@ -1613,7 +1613,7 @@ pub fn acceptForInOfStatement(self: *Self) AcceptError!ast.ForInOfStatement {
     if (initializer == .expression and initializer.expression.assignmentTargetType() != .simple) {
         try self.emitErrorAt(
             initializer_location,
-            "Invalid for in/of loop initializer expression",
+            "Invalid 'for in'/'for of' loop initializer expression",
             .{},
         );
         return error.UnexpectedToken;
@@ -1621,7 +1621,7 @@ pub fn acceptForInOfStatement(self: *Self) AcceptError!ast.ForInOfStatement {
 
     const @"type": ast.ForInOfStatement.Type = if (self.core.accept(RuleSet.is(.in))) |_| blk: {
         if (maybe_await_token) |await_token| {
-            try self.emitErrorAt(await_token.location, "For in loop cannot be awaited", .{});
+            try self.emitErrorAt(await_token.location, "'for in' loop cannot be awaited", .{});
             return error.UnexpectedToken;
         }
         break :blk .in;
@@ -1649,7 +1649,7 @@ pub fn acceptContinueStatement(self: *Self) AcceptError!ast.ContinueStatement {
     if (!self.state.in_iteration_statement) {
         try self.emitErrorAt(
             state.location,
-            "Continue statement is only allowed in iteration statement",
+            "'continue' statement is only allowed in iteration statement",
             .{},
         );
         return error.UnexpectedToken;
@@ -1678,7 +1678,7 @@ pub fn acceptBreakStatement(self: *Self) AcceptError!ast.BreakStatement {
     if (!self.state.in_breakable_statement) {
         try self.emitErrorAt(
             state.location,
-            "Break statement is only allowed in iteration or switch statement",
+            "'break' statement is only allowed in iteration or 'switch' statement",
             .{},
         );
         return error.UnexpectedToken;
@@ -1705,7 +1705,7 @@ pub fn acceptReturnStatement(self: *Self) AcceptError!ast.ReturnStatement {
     _ = try self.core.accept(RuleSet.is(.@"return"));
 
     if (!self.state.in_function_body) {
-        try self.emitErrorAt(state.location, "Return statement is only allowed in functions", .{});
+        try self.emitErrorAt(state.location, "'return' statement is only allowed in functions", .{});
         return error.UnexpectedToken;
     }
 
@@ -1800,7 +1800,7 @@ pub fn acceptDefaultClause(self: *Self, has_default_clause: bool) AcceptError!as
     if (has_default_clause) {
         try self.emitErrorAt(
             token.location,
-            "Switch statement can only have one default clause",
+            "'switch' statement can only have one 'default' clause",
             .{},
         );
         return error.UnexpectedToken;
@@ -1840,7 +1840,7 @@ pub fn acceptTryStatement(self: *Self) AcceptError!ast.TryStatement {
     else |_|
         null;
     if (catch_block == null and finally_block == null) {
-        try self.emitError("Try statement requires catch or finally block", .{});
+        try self.emitError("'try' statement requires 'catch' or 'finally' block", .{});
         return error.UnexpectedToken;
     }
     return .{
