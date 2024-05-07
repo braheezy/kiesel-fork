@@ -1729,8 +1729,11 @@ pub fn acceptWithStatement(self: *Self) AcceptError!ast.WithStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    // FIXME: Emit SyntaxError in strict mode
-    _ = try self.core.accept(RuleSet.is(.with));
+    const token = try self.core.accept(RuleSet.is(.with));
+    if (self.state.in_strict_mode) {
+        try self.emitErrorAt(token.location, "'with' statement is not allowed in strict mode", .{});
+        return error.UnexpectedToken;
+    }
     _ = try self.core.accept(RuleSet.is(.@"("));
     const expression = try self.acceptExpression(.{});
     _ = try self.core.accept(RuleSet.is(.@")"));
