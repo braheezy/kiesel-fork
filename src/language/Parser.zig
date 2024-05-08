@@ -1644,11 +1644,11 @@ pub fn acceptContinueStatement(self: *Self) AcceptError!ast.ContinueStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    _ = try self.core.accept(RuleSet.is(.@"continue"));
+    const token = try self.core.accept(RuleSet.is(.@"continue"));
 
     if (!self.state.in_iteration_statement) {
         try self.emitErrorAt(
-            state.location,
+            token.location,
             "'continue' statement is only allowed in iteration statement",
             .{},
         );
@@ -1673,11 +1673,11 @@ pub fn acceptBreakStatement(self: *Self) AcceptError!ast.BreakStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    _ = try self.core.accept(RuleSet.is(.@"break"));
+    const token = try self.core.accept(RuleSet.is(.@"break"));
 
     if (!self.state.in_breakable_statement) {
         try self.emitErrorAt(
-            state.location,
+            token.location,
             "'break' statement is only allowed in iteration or 'switch' statement",
             .{},
         );
@@ -1702,10 +1702,10 @@ pub fn acceptReturnStatement(self: *Self) AcceptError!ast.ReturnStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    _ = try self.core.accept(RuleSet.is(.@"return"));
+    const token = try self.core.accept(RuleSet.is(.@"return"));
 
     if (!self.state.in_function_body) {
-        try self.emitErrorAt(state.location, "'return' statement is only allowed in functions", .{});
+        try self.emitErrorAt(token.location, "'return' statement is only allowed in functions", .{});
         return error.UnexpectedToken;
     }
 
