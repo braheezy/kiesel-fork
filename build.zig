@@ -62,6 +62,7 @@ pub fn build(b: *std.Build) void {
     });
     const parser_toolkit = b.dependency("parser_toolkit", .{});
     const zig_args = b.dependency("zig_args", .{});
+    const zig_stackinfo = b.dependency("zig_stackinfo", .{});
     const zigline = b.dependency("zigline", .{});
 
     var imports = std.ArrayList(std.Build.Module.Import).init(b.allocator);
@@ -78,6 +79,10 @@ pub fn build(b: *std.Build) void {
         .{
             .module = parser_toolkit.module("parser-toolkit"),
             .name = "ptk",
+        },
+        .{
+            .module = zig_stackinfo.module("stackinfo"),
+            .name = "stackinfo",
         },
     }) catch @panic("OOM");
     if (enable_intl) {
@@ -156,9 +161,7 @@ pub fn build(b: *std.Build) void {
     });
     unit_tests.linkLibrary(libgc.artifact("gc"));
     unit_tests.linkLibrary(libregexp.artifact("regexp"));
-    unit_tests.root_module.addImport("build-options", options.createModule());
-    unit_tests.root_module.addImport("any-pointer", any_pointer.module("any-pointer"));
-    unit_tests.root_module.addImport("ptk", parser_toolkit.module("parser-toolkit"));
+    for (imports.items) |import| unit_tests.root_module.addImport(import.name, import.module);
     if (enable_intl) {
         if (b.lazyDependency("icu4zig", .{
             .target = target,
