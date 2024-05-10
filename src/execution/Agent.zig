@@ -6,6 +6,8 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const StackInfo = @import("stackinfo").StackInfo;
+
 const builtins = @import("../builtins.zig");
 const environments = @import("environments.zig");
 const types = @import("../types.zig");
@@ -40,6 +42,7 @@ global_symbol_registry: std.StringArrayHashMap(Symbol),
 host_hooks: HostHooks,
 execution_context_stack: std.ArrayList(ExecutionContext),
 queued_jobs: std.ArrayList(QueuedJob),
+stack_info: ?StackInfo,
 
 /// [[LittleEndian]]
 little_endian: bool = builtin.cpu.arch.endian() == .little,
@@ -86,6 +89,7 @@ pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
         .host_hooks = .{},
         .execution_context_stack = undefined,
         .queued_jobs = undefined,
+        .stack_info = StackInfo.init() catch null,
     };
     self.pre_allocated = .{
         .zero = try BigInt.from(self.gc_allocator, 0),
@@ -129,6 +133,16 @@ pub fn drainJobQueue(self: *Self) void {
         }
         _ = queued_job.job.func(queued_job.job.captures) catch {};
         self.runningExecutionContext().realm = current_realm;
+    }
+}
+
+pub fn checkStackOverflow(self: *Self) error{ExceptionThrown}!void {
+    if (self.stack_info) |stack_info| {
+        const remaining_stack = @frameAddress() - stack_info.base;
+        const required_stack = 64 * 1024; // Arbitrary limit
+        if (remaining_stack < required_stack) {
+            return self.throwException(.internal_error, "Stack overflow", .{});
+        }
     }
 }
 

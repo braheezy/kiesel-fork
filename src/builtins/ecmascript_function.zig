@@ -138,8 +138,9 @@ pub const ECMAScriptFunction = MakeObject(.{
 /// https://tc39.es/ecma262/#sec-ecmascript-function-objects-call-thisargument-argumentslist
 fn call(object: Object, this_argument: Value, arguments_list: Arguments) Agent.Error!Value {
     const agent = object.agent();
-
     const function = object.as(ECMAScriptFunction);
+
+    try agent.checkStackOverflow();
 
     // 1. Let callerContext be the running execution context.
     // NOTE: This is only used to restore the context, which is a simple pop().
@@ -458,6 +459,8 @@ fn construct(
 ) Agent.Error!Object {
     const agent = object.agent();
     const function = object.as(ECMAScriptFunction);
+
+    try agent.checkStackOverflow();
 
     // 1. Let callerContext be the running execution context.
     // NOTE: This is only used to restore the context, which is a simple pop().
