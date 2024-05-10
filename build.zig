@@ -31,10 +31,24 @@ pub fn build(b: *std.Build) void {
         "Enable features marked as 'Legacy' in the spec",
     ) orelse true;
 
+    const run_result = std.ChildProcess.run(.{
+        .allocator = b.allocator,
+        .argv = &.{ "git", "rev-parse", "HEAD" },
+        .cwd_dir = b.build_root.handle,
+    }) catch @panic("Failed to get commit hash");
+    const git_rev = run_result.stdout[0..9];
+
+    const version_string = std.fmt.allocPrint(
+        b.allocator,
+        "0.1.0-dev+{s}",
+        .{git_rev},
+    ) catch @panic("OOM");
+
     const options = b.addOptions();
     options.addOption(bool, "enable_annex_b", enable_annex_b);
     options.addOption(bool, "enable_intl", enable_intl);
     options.addOption(bool, "enable_legacy", enable_legacy);
+    options.addOption([]const u8, "version_string", version_string);
 
     const any_pointer = b.dependency("any_pointer", .{});
     const libgc = b.dependency("libgc", .{
