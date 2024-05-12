@@ -1323,7 +1323,7 @@ pub const RegExpPrototype = struct {
         //     nextSourcePosition.
         if (next_source_position < string_length) {
             try accumulated_result.appendString(
-                try string.substring(agent.gc_allocator, next_source_position, string_length),
+                try string.substring(agent.gc_allocator, next_source_position, null),
             );
         }
         return Value.from(try accumulated_result.build());

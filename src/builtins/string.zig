@@ -176,7 +176,7 @@ pub fn getSubstitution(
             const ref_replacement = try str.substring(
                 agent.gc_allocator,
                 @min(tail_pos, string_length),
-                string_length,
+                null,
             );
 
             break :blk .{ ref, ref_replacement };
@@ -310,7 +310,7 @@ pub fn getSubstitution(
         template_reminder = try template_reminder.substring(
             agent.gc_allocator,
             ref_length,
-            template_reminder.utf16Length(),
+            null,
         );
 
         // k. Set result to the string-concatenation of result and refReplacement.
@@ -1343,7 +1343,7 @@ pub const StringPrototype = struct {
         const following = try string.substring(
             agent.gc_allocator,
             position.? + search_length,
-            string.utf16Length(),
+            null,
         );
 
         // 12. If functionalReplace is true, then
@@ -1535,7 +1535,7 @@ pub const StringPrototype = struct {
                     try string.substring(
                         agent.gc_allocator,
                         end_of_last_match,
-                        string.utf16Length(),
+                        null,
                     ),
                 },
             );
@@ -1777,7 +1777,7 @@ pub const StringPrototype = struct {
         }
 
         // 15. Let T be the substring of S from i.
-        const tail = try string.substring(agent.gc_allocator, i, string.utf16Length());
+        const tail = try string.substring(agent.gc_allocator, i, null);
 
         // 16. Append T to substrings.
         try substrings.append(tail);

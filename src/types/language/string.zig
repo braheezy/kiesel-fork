@@ -62,15 +62,19 @@ pub const String = struct {
         return std.mem.eql(u8, a.utf8, b.utf8);
     }
 
+    /// https://tc39.es/ecma262/#substring
     pub fn substring(
         self: Self,
         allocator: Allocator,
-        start: usize,
-        end: usize,
+        inclusive_start: usize,
+        exclusive_end: ?usize,
     ) Allocator.Error!String {
         const code_units = try self.utf16CodeUnits(allocator);
         defer allocator.free(code_units);
-        return from(std.unicode.utf16leToUtf8Alloc(allocator, code_units[start..end]) catch |err| switch (err) {
+        return from(std.unicode.utf16leToUtf8Alloc(
+            allocator,
+            code_units[inclusive_start .. exclusive_end orelse self.utf16Length()],
+        ) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             error.DanglingSurrogateHalf,
             error.ExpectedSecondSurrogateHalf,
