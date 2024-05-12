@@ -17,6 +17,8 @@ pub const String = struct {
     /// The definition of white space is the union of WhiteSpace and LineTerminator.
     pub const whitespace = tokenizer.whitespace ++ tokenizer.line_terminators;
 
+    pub const Builder = @import("String/Builder.zig");
+
     utf8: []const u8,
     utf16_length: usize,
 
@@ -165,6 +167,20 @@ pub const String = struct {
             }
         }
         unreachable;
+    }
+
+    pub fn repeat(self: Self, allocator: Allocator, n: usize) Allocator.Error!String {
+        var builder = Builder.init(allocator);
+        defer builder.deinit();
+        for (0..n) |_| try builder.appendString(self);
+        return builder.build();
+    }
+
+    pub fn concat(allocator: Allocator, strings: []const String) Allocator.Error!String {
+        var builder = Builder.init(allocator);
+        defer builder.deinit();
+        for (strings) |string| try builder.appendString(string);
+        return builder.build();
     }
 };
 

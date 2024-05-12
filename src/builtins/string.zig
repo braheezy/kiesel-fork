@@ -57,7 +57,7 @@ pub fn stringPad(
 
     // 5. Let truncatedStringFiller be the String value consisting of repeated concatenations of
     //    fillString truncated to length fillLen.
-    const truncated_string_filler_utf8 = blk: {
+    const truncated_string_filler = blk: {
         const fill_string_code_units = try fill_string.utf16CodeUnits(agent.gc_allocator);
         defer agent.gc_allocator.free(fill_string_code_units);
 
@@ -70,7 +70,7 @@ pub fn stringPad(
             @memcpy(dest, fill_string_code_units[0..dest.len]);
         }
 
-        break :blk std.unicode.utf16leToUtf8Alloc(
+        break :blk types.String.from(std.unicode.utf16leToUtf8Alloc(
             agent.gc_allocator,
             truncated_string_filler,
         ) catch |err| switch (err) {
@@ -83,18 +83,21 @@ pub fn stringPad(
                 "UTF-16 strings are not implemented yet",
                 .{},
             ),
-        };
+        });
     };
-    defer agent.gc_allocator.free(truncated_string_filler_utf8);
 
-    // 6. If placement is start, return the string-concatenation of truncatedStringFiller and S.
-    // 7. Else, return the string-concatenation of S and truncatedStringFiller.
-    return types.String.from(
-        try std.mem.concat(agent.gc_allocator, u8, switch (placement) {
-            .start => &.{ truncated_string_filler_utf8, string.utf8 },
-            .end => &.{ string.utf8, truncated_string_filler_utf8 },
+    switch (placement) {
+        // 6. If placement is start, return the string-concatenation of truncatedStringFiller and S.
+        .start => return types.String.concat(agent.gc_allocator, &.{
+            truncated_string_filler,
+            string,
         }),
-    );
+        // 7. Else, return the string-concatenation of S and truncatedStringFiller.
+        .end => return types.String.concat(agent.gc_allocator, &.{
+            string,
+            truncated_string_filler,
+        }),
+    }
 }
 
 /// 22.1.3.19.1 GetSubstitution ( matched, str, position, captures, namedCaptures, replacementTemplate )
@@ -115,7 +118,8 @@ pub fn getSubstitution(
     std.debug.assert(position <= string_length);
 
     // 3. Let result be the empty String.
-    var result = std.ArrayList(u8).init(agent.gc_allocator);
+    var result = types.String.Builder.init(agent.gc_allocator);
+    defer result.deinit();
 
     // 4. Let templateRemainder be replacementTemplate.
     var template_reminder = replacement_template;
@@ -310,11 +314,11 @@ pub fn getSubstitution(
         );
 
         // k. Set result to the string-concatenation of result and refReplacement.
-        try result.appendSlice(ref_replacement.utf8);
+        try result.appendString(ref_replacement);
     }
 
     // 6. Return result.
-    return types.String.from(try result.toOwnedSlice());
+    return result.build();
 }
 
 /// 10.4.3.1 [[GetOwnProperty]] ( P )
@@ -607,7 +611,8 @@ pub const StringConstructor = struct {
     /// https://tc39.es/ecma262/#sec-string.fromcharcode
     fn fromCodePoint(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let result be the empty String.
-        var result = std.ArrayList(u8).init(agent.gc_allocator);
+        var result = types.String.Builder.init(agent.gc_allocator);
+        defer result.deinit();
 
         // 2. For each element next of codePoints, do
         for (arguments.values) |next| {
@@ -633,24 +638,12 @@ pub const StringConstructor = struct {
             }
 
             // d. Set result to the string-concatenation of result and UTF16EncodeCodePoint(ℝ(nextCP)).
-            var out: [4]u8 = undefined;
-            const len = std.unicode.utf8Encode(
-                @intFromFloat(next_code_point.asFloat()),
-                &out,
-            ) catch |err| switch (err) {
-                error.CodepointTooLarge => unreachable,
-                error.Utf8CannotEncodeSurrogateHalf => return agent.throwException(
-                    .internal_error,
-                    "UTF-16 strings are not implemented yet",
-                    .{},
-                ),
-            };
-            try result.appendSlice(out[0..len]);
+            try result.appendCodePoint(@intFromFloat(next_code_point.asFloat()));
         }
 
         // 3. Assert: If codePoints is empty, then result is the empty String.
         // 4. Return result.
-        return Value.from(try result.toOwnedSlice());
+        return Value.from(try result.build());
     }
 };
 
@@ -878,8 +871,9 @@ pub const StringPrototype = struct {
         const string = try object.toString(agent);
 
         // 3. Let R be S.
-        var new_string = std.ArrayList(u8).init(agent.gc_allocator);
-        try new_string.appendSlice(string.utf8);
+        var result = types.String.Builder.init(agent.gc_allocator);
+        defer result.deinit();
+        try result.appendString(string);
 
         // 4. For each element next of args, do
         for (arguments.values) |next| {
@@ -887,11 +881,11 @@ pub const StringPrototype = struct {
             const next_string = try next.toString(agent);
 
             // b. Set R to the string-concatenation of R and nextString.
-            try new_string.appendSlice(next_string.utf8);
+            try result.appendString(next_string);
         }
 
         // 5. Return R.
-        return Value.from(try new_string.toOwnedSlice());
+        return Value.from(try result.build());
     }
 
     /// 22.1.3.7 String.prototype.endsWith ( searchString [ , endPosition ] )
@@ -1286,19 +1280,9 @@ pub const StringPrototype = struct {
 
         if (string.isEmpty()) return Value.from("");
 
-        const n_usize = std.math.lossyCast(usize, n);
-        const new_len = std.math.mul(
-            usize,
-            string.utf16Length(),
-            n_usize,
-        ) catch return error.OutOfMemory;
-
         // 6. Return the String value that is made from n copies of S appended together.
-        var new_string = try std.ArrayList(u8).initCapacity(agent.gc_allocator, new_len);
-        for (0..n_usize) |_| {
-            new_string.appendSliceAssumeCapacity(string.utf8);
-        }
-        return Value.from(try new_string.toOwnedSlice());
+        const n_usize = std.math.lossyCast(usize, n);
+        return Value.from(try string.repeat(agent.gc_allocator, n_usize));
     }
 
     /// 22.1.3.19 String.prototype.replace ( searchValue, replaceValue )
@@ -1534,11 +1518,7 @@ pub const StringPrototype = struct {
             };
 
             // d. Set result to the string-concatenation of result, preserved, and replacement.
-            result = types.String.from(
-                try std.mem.concat(agent.gc_allocator, u8, &.{
-                    result.utf8, preserved.utf8, replacement.utf8,
-                }),
-            );
+            result = try types.String.concat(agent.gc_allocator, &.{ result, preserved, replacement });
 
             // e. Set endOfLastMatch to p + searchLength.
             end_of_last_match = position + search_length;
@@ -1548,19 +1528,16 @@ pub const StringPrototype = struct {
         if (end_of_last_match < string.utf16Length()) {
             // a. Set result to the string-concatenation of result and the substring of string from
             //    endOfLastMatch.
-            result = types.String.from(
-                try std.mem.concat(
-                    agent.gc_allocator,
-                    u8,
-                    &.{
-                        result.utf8,
-                        (try string.substring(
-                            agent.gc_allocator,
-                            end_of_last_match,
-                            string.utf16Length(),
-                        )).utf8,
-                    },
-                ),
+            result = try types.String.concat(
+                agent.gc_allocator,
+                &.{
+                    result,
+                    try string.substring(
+                        agent.gc_allocator,
+                        end_of_last_match,
+                        string.utf16Length(),
+                    ),
+                },
             );
         }
 

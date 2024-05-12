@@ -282,7 +282,8 @@ pub fn createDynamicFunction(
     try agent.host_hooks.hostEnsureCanCompileStrings(current_realm, parameter_strings.items, body_string, false);
 
     // 12. Let P be the empty String.
-    var parameters_string: []const u8 = "";
+    var result = String.Builder.init(agent.gc_allocator);
+    defer result.deinit();
 
     // 13. If argCount > 0, then
     if (arg_count > 0) {
@@ -292,16 +293,13 @@ pub fn createDynamicFunction(
         //     i. Let nextArgString be parameterStrings[k].
         //     ii. Set P to the string-concatenation of P, "," (a comma), and nextArgString.
         //     iii. Set k to k + 1.
-        var bytes = try std.ArrayList([]const u8).initCapacity(
-            agent.gc_allocator,
-            arg_count,
-        );
-        defer bytes.deinit();
-        for (parameter_strings.items) |next_arg_string| {
-            bytes.appendAssumeCapacity(next_arg_string.utf8);
+        for (parameter_strings.items, 0..) |next_arg_string, k| {
+            if (k > 0) try result.appendChar(',');
+            try result.appendString(next_arg_string);
         }
-        parameters_string = try std.mem.join(agent.gc_allocator, ",", bytes.items);
     }
+
+    const parameters_string = try result.build();
 
     // 14. Let bodyParseString be the string-concatenation of 0x000A (LINE FEED), bodyString, and
     //     0x000A (LINE FEED).
@@ -316,7 +314,7 @@ pub fn createDynamicFunction(
     const source_string = try std.fmt.allocPrint(
         agent.gc_allocator,
         "{[prefix]s} anonymous({[parameters_string]s}\n) {{{[body_parse_string]s}}}",
-        .{ .prefix = prefix, .parameters_string = parameters_string, .body_parse_string = body_parse_string },
+        .{ .prefix = prefix, .parameters_string = parameters_string.utf8, .body_parse_string = body_parse_string },
     );
 
     // 16. Let sourceText be StringToCodePoints(sourceString).
@@ -326,7 +324,7 @@ pub fn createDynamicFunction(
     defer diagnostics.deinit();
 
     // 17. Let parameters be ParseText(P, parameterSym).
-    const parameters = Parser.parseNode(parameter_sym.type, parameter_sym.acceptFn, agent.gc_allocator, parameters_string, .{
+    const parameters = Parser.parseNode(parameter_sym.type, parameter_sym.acceptFn, agent.gc_allocator, parameters_string.utf8, .{
         .diagnostics = &diagnostics,
         .file_name = "Function",
     }) catch |err| switch (err) {

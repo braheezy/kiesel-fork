@@ -359,11 +359,7 @@ fn serializeJSONObject(
     const stepback = state.indent;
 
     // 4. Set state.[[Indent]] to the string-concatenation of state.[[Indent]] and state.[[Gap]].
-    state.indent = String.from(try std.mem.concat(
-        agent.gc_allocator,
-        u8,
-        &.{ state.indent.utf8, state.gap.utf8 },
-    ));
+    state.indent = try String.concat(agent.gc_allocator, &.{ state.indent, state.gap });
 
     // 5. If state.[[PropertyList]] is not undefined, then
     //     a. Let K be state.[[PropertyList]].
@@ -498,11 +494,7 @@ fn serializeJSONArray(
     const stepback = state.indent;
 
     // 4. Set state.[[Indent]] to the string-concatenation of state.[[Indent]] and state.[[Gap]].
-    state.indent = String.from(try std.mem.concat(
-        agent.gc_allocator,
-        u8,
-        &.{ state.indent.utf8, state.gap.utf8 },
-    ));
+    state.indent = try String.concat(agent.gc_allocator, &.{ state.indent, state.gap });
 
     // 6. Let len be ? LengthOfArrayLike(value).
     const len = try value.lengthOfArrayLike();

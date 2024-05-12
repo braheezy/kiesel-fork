@@ -319,10 +319,7 @@ fn applyStringOrNumericBinaryOperator(
             const rstr = try rprim.toString(agent);
 
             // iii. Return the string-concatenation of lstr and rstr.
-            // TODO: Implement rope strings
-            return Value.from(
-                try std.mem.concat(agent.gc_allocator, u8, &.{ lstr.utf8, rstr.utf8 }),
-            );
+            return Value.from(try String.concat(agent.gc_allocator, &.{ lstr, rstr }));
         }
 
         // d. Set lval to lprim.

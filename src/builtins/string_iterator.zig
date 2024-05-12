@@ -73,12 +73,10 @@ pub const StringIteratorPrototype = struct {
             // ii. Let nextIndex be position + cp.[[CodeUnitCount]].
             // iii. Let resultString be the substring of s from position to nextIndex.
             // iv. Set position to nextIndex.
-            // TODO: This is a bit messy, especially the `catch unreachable`s. UTF-8/UTF-16 interop
-            //       in the String type needs some love :)
-            const byte_length = std.unicode.utf8CodepointSequenceLength(code_point) catch unreachable;
-            const utf8 = try agent.gc_allocator.alloc(u8, byte_length);
-            _ = std.unicode.utf8Encode(code_point, utf8) catch unreachable;
-            const result_string = String.from(utf8);
+            var result = String.Builder.init(agent.gc_allocator);
+            defer result.deinit();
+            try result.appendCodePoint(code_point);
+            const result_string = try result.build();
 
             // v. Perform ? GeneratorYield(CreateIterResultObject(resultString, false)).
             return Value.from(try createIterResultObject(agent, Value.from(result_string), false));

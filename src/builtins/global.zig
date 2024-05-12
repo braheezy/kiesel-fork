@@ -650,7 +650,7 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const string = try string_value.toString(agent);
 
     // 3. Let R be the empty String.
-    var result = std.ArrayList([]const u8).init(agent.gc_allocator);
+    var result = String.Builder.init(agent.gc_allocator);
     defer result.deinit();
 
     // 4. Let unescapedSet be the string-concatenation of the ASCII word characters and "@*+-./".
@@ -665,9 +665,9 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     //     a. Let C be the code unit at index k within string.
     for (code_units) |c| {
         // b. If unescapedSet contains C, then
-        const s = if (c < 256 and std.mem.indexOfScalar(u8, unescaped_set, @intCast(c)) != null) blk: {
+        const s: String.Builder.Segment = if (c < 256 and std.mem.indexOfScalar(u8, unescaped_set, @intCast(c)) != null) blk: {
             // i. Let S be C.
-            break :blk try std.fmt.allocPrint(agent.gc_allocator, "{c}", .{@as(u8, @intCast(c))});
+            break :blk .{ .char = @intCast(c) };
         }
         // c. Else,
         else blk: {
@@ -677,11 +677,15 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                 // 1. Let hex be the String representation of n, formatted as an uppercase
                 //    hexadecimal number.
                 // 2. Let S be the string-concatenation of "%" and StringPad(hex, 2, "0", start).
-                break :blk try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "%{}",
-                    .{std.fmt.fmtSliceHexUpper(&.{@intCast(c)})},
-                );
+                break :blk .{
+                    .string = String.from(
+                        try std.fmt.allocPrint(
+                            agent.gc_allocator,
+                            "%{}",
+                            .{std.fmt.fmtSliceHexUpper(&.{@intCast(c)})},
+                        ),
+                    ),
+                };
             }
             // iii. Else,
             else {
@@ -690,22 +694,26 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                 // 2. Let S be the string-concatenation of "%u" and StringPad(hex, 4, "0", start).
                 var bytes = std.mem.toBytes(c);
                 std.mem.reverse(u8, &bytes);
-                break :blk try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "%u{}",
-                    .{std.fmt.fmtSliceHexUpper(&bytes)},
-                );
+                break :blk .{
+                    .string = String.from(
+                        try std.fmt.allocPrint(
+                            agent.gc_allocator,
+                            "%u{}",
+                            .{std.fmt.fmtSliceHexUpper(&bytes)},
+                        ),
+                    ),
+                };
             }
         };
 
         // d. Set R to the string-concatenation of R and S.
-        try result.append(s);
+        try result.appendSegment(s);
 
         // e. Set k to k + 1.
     }
 
     // 7. Return R.
-    return Value.from(try std.mem.concat(agent.gc_allocator, u8, result.items));
+    return Value.from(try result.build());
 }
 
 /// B.2.1.2 unescape ( string )

@@ -1176,7 +1176,7 @@ pub const RegExpPrototype = struct {
         }
 
         // 13. Let accumulatedResult be the empty String.
-        var accumulated_result = std.ArrayList(u8).init(agent.gc_allocator);
+        var accumulated_result = String.Builder.init(agent.gc_allocator);
         defer accumulated_result.deinit();
 
         // 14. Let nextSourcePosition be 0.
@@ -1304,14 +1304,14 @@ pub const RegExpPrototype = struct {
 
                 // ii. Set accumulatedResult to the string-concatenation of accumulatedResult, the
                 //     substring of S from nextSourcePosition to position, and replacement.
-                try accumulated_result.appendSlice(
-                    (try string.substring(
+                try accumulated_result.appendString(
+                    try string.substring(
                         agent.gc_allocator,
                         next_source_position,
                         position,
-                    )).utf8,
+                    ),
                 );
-                try accumulated_result.appendSlice(replacement.utf8);
+                try accumulated_result.appendString(replacement);
 
                 // iii. Set nextSourcePosition to position + matchLength.
                 next_source_position = position + matched_length;
@@ -1322,15 +1322,11 @@ pub const RegExpPrototype = struct {
         // 17. Return the string-concatenation of accumulatedResult and the substring of S from
         //     nextSourcePosition.
         if (next_source_position < string_length) {
-            try accumulated_result.appendSlice(
-                (try string.substring(
-                    agent.gc_allocator,
-                    next_source_position,
-                    string_length,
-                )).utf8,
+            try accumulated_result.appendString(
+                try string.substring(agent.gc_allocator, next_source_position, string_length),
             );
         }
-        return Value.from(try accumulated_result.toOwnedSlice());
+        return Value.from(try accumulated_result.build());
     }
 
     /// 22.2.6.12 RegExp.prototype [ @@search ] ( string )
@@ -1663,14 +1659,15 @@ pub const RegExpPrototype = struct {
         const flags_ = try (try reg_exp.get(PropertyKey.from("flags"))).toString(agent);
 
         // 5. Let result be the string-concatenation of "/", pattern, "/", and flags.
-        const result = try std.mem.concat(
-            agent.gc_allocator,
-            u8,
-            &.{ "/", pattern.utf8, "/", flags_.utf8 },
-        );
+        var result = String.Builder.init(agent.gc_allocator);
+        defer result.deinit();
+        try result.appendChar('/');
+        try result.appendString(pattern);
+        try result.appendChar('/');
+        try result.appendString(flags_);
 
         // 6. Return result.
-        return Value.from(result);
+        return Value.from(try result.build());
     }
 
     /// 22.2.6.18 get RegExp.prototype.unicode

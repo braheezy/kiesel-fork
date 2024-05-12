@@ -21,6 +21,7 @@ const Order = @import("../builtins/array_buffer.zig").Order;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
+const String = types.String;
 const Value = types.Value;
 const allocateArrayBuffer = builtins.allocateArrayBuffer;
 const arrayBufferByteLength = builtins.arrayBufferByteLength;
@@ -1660,12 +1661,16 @@ pub const TypedArrayPrototype = struct {
 
         // 4. If separator is undefined, let sep be ",".
         // 5. Else, let sep be ? ToString(separator).
-        const sep = if (separator == .undefined) "," else (try separator.toString(agent)).utf8;
+        const sep: String.Builder.Segment = if (separator == .undefined)
+            .{ .char = ',' }
+        else
+            .{ .string = try separator.toString(agent) };
 
         // 6. Let R be the empty String.
         if (len > std.math.maxInt(usize)) return error.OutOfMemory;
-        var elements = try std.ArrayList([]const u8).initCapacity(agent.gc_allocator, @intCast(len));
-        defer elements.deinit();
+        var result = String.Builder.init(agent.gc_allocator);
+        defer result.deinit();
+        try result.segments.ensureTotalCapacity(@intCast(len));
 
         // 7. Let k be 0.
         var k: u53 = 0;
@@ -1673,6 +1678,7 @@ pub const TypedArrayPrototype = struct {
         // 8. Repeat, while k < len,
         while (k < len) : (k += 1) {
             // a. If k > 0, set R to the string-concatenation of R and sep.
+            if (k > 0) try result.appendSegment(sep);
 
             // b. Let element be ! Get(O, ! ToString(𝔽(k))).
             const element = object.get(PropertyKey.from(k)) catch |err| try noexcept(err);
@@ -1683,18 +1689,14 @@ pub const TypedArrayPrototype = struct {
                 const string = element.toString(agent) catch |err| try noexcept(err);
 
                 // ii. Set R to the string-concatenation of R and S.
-                try elements.append(string.utf8);
-            } else {
-                try elements.append("");
+                try result.appendString(string);
             }
 
             // d. Set k to k + 1.
         }
 
         // 9. Return R.
-        return Value.from(
-            try std.mem.join(agent.gc_allocator, sep, elements.items),
-        );
+        return Value.from(try result.build());
     }
 
     /// 23.2.3.19 %TypedArray%.prototype.keys ( )
@@ -2747,41 +2749,42 @@ pub const TypedArrayPrototype = struct {
 
         // 3. Let separator be the implementation-defined list-separator String value appropriate
         //    for the host environment's current locale (such as ", ").
-        const separator = ", ";
+        const separator = String.from(", ");
 
         // 4. Let R be the empty String.
         if (len > std.math.maxInt(usize)) return error.OutOfMemory;
-        var elements = try std.ArrayList([]const u8).initCapacity(agent.gc_allocator, @intCast(len));
-        defer elements.deinit();
+        var result = String.Builder.init(agent.gc_allocator);
+        defer result.deinit();
+        try result.segments.ensureTotalCapacity(@intCast(len));
 
         // 5. Let k be 0.
         var k: u53 = 0;
 
         // 6. Repeat, while k < len,
         while (k < len) : (k += 1) {
-            // a. If k > 0, then
-            // i. Set R to the string-concatenation of R and separator.
+            // a. If k > 0, set R to the string-concatenation of R and separator.
+            if (k > 0) try result.appendString(separator);
 
-            // b. Let nextElement be ? Get(array, ! ToString(𝔽(k))).
-            const next_element = array.get(PropertyKey.from(k)) catch |err| try noexcept(err);
+            // b. Let element be ? Get(array, ! ToString(𝔽(k))).
+            const element = array.get(PropertyKey.from(k)) catch |err| try noexcept(err);
 
-            // c. If nextElement is neither undefined nor null, then
-            // i. Let S be ? ToString(? Invoke(nextElement, "toLocaleString")).
-            const string = try (try next_element.invokeNoArgs(
-                agent,
-                PropertyKey.from("toLocaleString"),
-            )).toString(agent);
+            // c. If element is neither undefined nor null, then
+            if (element != .undefined and element != .null) {
+                // i. Let S be ? ToString(? Invoke(element, "toLocaleString")).
+                const string = try (try element.invokeNoArgs(
+                    agent,
+                    PropertyKey.from("toLocaleString"),
+                )).toString(agent);
 
-            // ii. Set R to the string-concatenation of R and S.
-            try elements.append(string.utf8);
+                // ii. Set R to the string-concatenation of R and S.
+                try result.appendString(string);
+            }
 
             // d. Set k to k + 1.
         }
 
         // 7. Return R.
-        return Value.from(
-            try std.mem.join(agent.gc_allocator, separator, elements.items),
-        );
+        return Value.from(try result.build());
     }
 
     /// 23.2.3.32 %TypedArray%.prototype.toReversed ( )
