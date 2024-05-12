@@ -30,11 +30,11 @@ jobs:
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-riscv64
       - name: Build kiesel-linux-x86
         run: |
-          zig build -Dtarget=x86-linux-gnu -Doptimize=ReleaseSafe
+          zig build -Dtarget=x86-linux-musl -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-x86
       - name: Build kiesel-linux-x86_64
         run: |
-          zig build -Dtarget=x86_64-linux-gnu -Doptimize=ReleaseSafe
+          zig build -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-x86_64
       - name: Build kiesel-macos-aarch64
         run: |
