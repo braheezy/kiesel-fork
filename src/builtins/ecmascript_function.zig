@@ -838,7 +838,7 @@ pub fn setFunctionName(
                 const description = symbol.description;
 
                 // b. If description is undefined, set name to the empty String.
-                if (description == null) break :blk String.from("");
+                if (description == null) break :blk String.empty;
 
                 // c. Else, set name to the string-concatenation of "[", description, and "]".
                 break :blk String.from(try std.fmt.allocPrint(

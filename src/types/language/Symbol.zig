@@ -52,7 +52,7 @@ pub fn descriptiveString(self: Self, agent: *Agent) Allocator.Error![]const u8 {
     // 1. Let desc be sym's [[Description]] value.
     // 2. If desc is undefined, set desc to the empty String.
     // 3. Assert: desc is a String.
-    const description = self.description orelse String.from("");
+    const description = self.description orelse String.empty;
 
     // 4. Return the string-concatenation of "Symbol(", desc, and ")".
     return std.fmt.allocPrint(agent.gc_allocator, "Symbol({s})", .{description.utf8});
@@ -61,7 +61,7 @@ pub fn descriptiveString(self: Self, agent: *Agent) Allocator.Error![]const u8 {
 test "format" {
     const test_cases = [_]struct { Self, []const u8 }{
         .{ .{ .id = 0, .description = null }, "Symbol()" },
-        .{ .{ .id = 1, .description = String.from("") }, "Symbol(\"\")" },
+        .{ .{ .id = 1, .description = String.empty }, "Symbol(\"\")" },
         .{ .{ .id = 2, .description = String.from("foo") }, "Symbol(\"foo\")" },
     };
     for (test_cases) |test_case| {

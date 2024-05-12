@@ -78,7 +78,7 @@ pub const ErrorConstructor = struct {
             "%Error.prototype%",
             .{
                 // Non-standard
-                .error_data = .{ .name = String.from("Error"), .message = String.from("") },
+                .error_data = .{ .name = String.from("Error"), .message = String.empty },
             },
         );
 
@@ -298,7 +298,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
                 "%" ++ name ++ ".prototype%",
                 .{
                     // Non-standard
-                    .error_data = .{ .name = String.from(name), .message = String.from("") },
+                    .error_data = .{ .name = String.from(name), .message = String.empty },
                 },
             );
 
@@ -420,7 +420,7 @@ pub const AggregateErrorConstructor = struct {
             "%AggregateError.prototype%",
             .{
                 // Non-standard
-                .error_data = .{ .name = String.from("AggregateError"), .message = String.from("") },
+                .error_data = .{ .name = String.from("AggregateError"), .message = String.empty },
             },
         );
 

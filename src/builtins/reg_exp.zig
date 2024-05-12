@@ -148,11 +148,11 @@ pub fn regExpInitialize(
 ) Agent.Error!Object {
     // 1. If pattern is undefined, let P be the empty String.
     // 2. Else, let P be ? ToString(pattern).
-    const p = if (pattern == .undefined) String.from("") else try pattern.toString(agent);
+    const p = if (pattern == .undefined) String.empty else try pattern.toString(agent);
 
     // 3. If flags is undefined, let F be the empty String.
     // 4. Else, let F be ? ToString(flags).
-    const f = if (flags == .undefined) String.from("") else try flags.toString(agent);
+    const f = if (flags == .undefined) String.empty else try flags.toString(agent);
 
     // 5. If F contains any code unit other than "d", "g", "i", "m", "s", "u", "v", or "y", or if F
     //    contains any code unit more than once, throw a SyntaxError exception.

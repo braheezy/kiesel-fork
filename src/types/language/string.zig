@@ -17,6 +17,8 @@ pub const String = struct {
     /// The definition of white space is the union of WhiteSpace and LineTerminator.
     pub const whitespace = tokenizer.whitespace ++ tokenizer.line_terminators;
 
+    pub const empty: Self = from("");
+
     pub const Builder = @import("String/Builder.zig");
 
     utf8: []const u8,
@@ -186,7 +188,7 @@ pub const String = struct {
 
 test "format" {
     const test_cases = [_]struct { String, []const u8 }{
-        .{ String.from(""), "" },
+        .{ String.empty, "" },
         .{ String.from("foo"), "foo" },
         .{ String.from("123"), "123" },
     };

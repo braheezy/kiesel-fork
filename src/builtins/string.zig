@@ -231,7 +231,7 @@ pub fn getSubstitution(
                 // 2. If capture is undefined, then
                 if (capture == null) {
                     // a. Let refReplacement be the empty String.
-                    break :blk_ref_replacement types.String.from("");
+                    break :blk_ref_replacement types.String.empty;
                 }
                 // 3. Else,
                 else {
@@ -285,7 +285,7 @@ pub fn getSubstitution(
                 // 6. Else,
                 //     a. Let refReplacement be ? ToString(capture).
                 const ref_replacement = if (capture == .undefined)
-                    types.String.from("")
+                    types.String.empty
                 else
                     try capture.toString(agent);
 
@@ -549,7 +549,7 @@ pub const StringConstructor = struct {
             // 1. If value is not present, then
             if (arguments.count() == 0) {
                 // a. Let s be the empty String.
-                break :blk types.String.from("");
+                break :blk types.String.empty;
             }
             // 2. Else,
             else {
@@ -653,7 +653,7 @@ pub const StringPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try String.create(realm.agent, .{
             .fields = .{
-                .string_data = types.String.from(""),
+                .string_data = types.String.empty,
             },
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
@@ -1478,7 +1478,7 @@ pub const StringPrototype = struct {
         var end_of_last_match: usize = 0;
 
         // 13. Let result be the empty String.
-        var result = types.String.from("");
+        var result = types.String.empty;
 
         // 14. For each element p of matchPositions, do
         for (match_positions.items) |position| {

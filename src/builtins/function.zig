@@ -640,7 +640,7 @@ pub const FunctionPrototype = struct {
         //    func.[[InitialName]].
         if (func == .object and func.object.is(BuiltinFunction)) {
             const builtin_function = func.object.as(BuiltinFunction);
-            const name = builtin_function.fields.initial_name orelse String.from("");
+            const name = builtin_function.fields.initial_name orelse String.empty;
             const source_text = try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "function {}() {{ [native code] }}",

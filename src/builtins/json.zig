@@ -686,7 +686,7 @@ pub const JSON = struct {
         defer stack.deinit();
 
         // 2. Let indent be the empty String.
-        const indent = String.from("");
+        const indent = String.empty;
 
         // 3. Let PropertyList be undefined.
         var property_list: ?PropertyKeyArrayHashMap(void) = null;
@@ -792,7 +792,7 @@ pub const JSON = struct {
                 // c. If spaceMV < 1, let gap be the empty String; otherwise let gap be the String
                 //    value containing spaceMV occurrences of the code unit 0x0020 (SPACE).
                 if (space_mv < 1)
-                    break :blk String.from("")
+                    break :blk String.empty
                 else {
                     const s = try agent.gc_allocator.alloc(u8, @intFromFloat(space_mv));
                     @memset(s, ' ');
@@ -813,7 +813,7 @@ pub const JSON = struct {
             // 9. Else,
             else => blk: {
                 // a. Let gap be the empty String.
-                break :blk String.from("");
+                break :blk String.empty;
             },
         };
 
