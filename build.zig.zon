@@ -42,8 +42,8 @@
             .hash = "12203ded54c85878eea7f12744066dcb4397177395ac49a7b2aa365bf6047b623829",
         },
         .zig_stackinfo = .{
-            .url = "https://codeberg.org/linusg/zig-stackinfo/archive/35e9b5243ae54610dcc0a319cd48395a01d2d608.tar.gz",
-            .hash = "1220ac1f286c5a8c399b06a49df72b8a570931ab4e0177744e2f6b14203d0f89e4ad",
+            .url = "https://codeberg.org/linusg/zig-stackinfo/archive/0d7623922d01ee886f0e28d11b2cd3312089709e.tar.gz",
+            .hash = "122016406a2ad3f7a89acaf0b8a1122432e7529ff0124f89a7aeaf873be7d7443649",
         },
         .zigline = .{
             .url = "https://github.com/alimpfard/zigline/archive/ad7122de0aa07350ad566948b9318725247dee6b.tar.gz",
