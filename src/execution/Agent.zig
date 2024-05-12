@@ -139,7 +139,7 @@ pub fn drainJobQueue(self: *Self) void {
 pub fn checkStackOverflow(self: *Self) error{ExceptionThrown}!void {
     if (self.stack_info) |stack_info| {
         const remaining_stack = @frameAddress() - stack_info.base;
-        const required_stack = 64 * 1024; // Arbitrary limit
+        const required_stack = (if (builtin.mode == .Debug) 128 else 64) * 1024; // Arbitrary limit
         if (remaining_stack < required_stack) {
             return self.throwException(.internal_error, "Stack overflow", .{});
         }
