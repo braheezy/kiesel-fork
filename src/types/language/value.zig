@@ -1654,10 +1654,7 @@ pub fn createArrayFromList(agent: *Agent, elements: []const Value) Allocator.Err
     // 2. Let n be 0.
     // 3. For each element e of elements, do
     for (elements, 0..) |element, n| {
-        const property_key = if (n <= std.math.maxInt(u53))
-            PropertyKey.from(@as(u53, @intCast(n)))
-        else
-            PropertyKey.from(try std.fmt.allocPrint(agent.gc_allocator, "{}", .{n}));
+        const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(n)));
 
         // a. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(n)), e).
         array.createDataPropertyOrThrow(property_key, element) catch |err| try noexcept(err);
@@ -1681,10 +1678,7 @@ pub fn createArrayFromListMapToValue(
     // 2. Let n be 0.
     // 3. For each element e of elements, do
     for (elements, 0..) |element, n| {
-        const property_key = if (n <= std.math.maxInt(u53))
-            PropertyKey.from(@as(u53, @intCast(n)))
-        else
-            PropertyKey.from(try std.fmt.allocPrint(agent.gc_allocator, "{}", .{n}));
+        const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(n)));
 
         // a. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(n)), e).
         array.createDataPropertyOrThrow(

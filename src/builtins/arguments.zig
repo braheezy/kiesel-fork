@@ -231,10 +231,7 @@ pub fn createUnmappedArgumentsObject(
     // 6. Repeat, while index < len,
     for (arguments_list, 0..) |value, index| {
         // a. Let val be argumentsList[index].
-        const property_key = if (index <= std.math.maxInt(PropertyKey.IntegerIndex))
-            PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index)))
-        else
-            PropertyKey.from(try std.fmt.allocPrint(agent.gc_allocator, "{}", .{index}));
+        const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index)));
 
         // b. Perform ! CreateDataPropertyOrThrow(obj, ! ToString(𝔽(index)), val).
         object.createDataPropertyOrThrow(property_key, value) catch |err| try noexcept(err);
