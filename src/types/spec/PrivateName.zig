@@ -24,7 +24,7 @@ pub fn format(
 ) @TypeOf(writer).Error!void {
     _ = fmt;
     _ = options;
-    try writer.writeAll(self.symbol.description.?.utf8);
+    try writer.print("{}", .{self.symbol.description.?});
 }
 
 pub fn eql(a: Self, b: Self) bool {

@@ -34,9 +34,7 @@ pub fn format(
     _ = options;
     try writer.writeAll("Symbol(");
     if (self.description) |description| {
-        try writer.writeAll("\"");
-        try writer.writeAll(description.utf8);
-        try writer.writeAll("\"");
+        try writer.print("\"{}\"", .{description});
     }
     try writer.writeAll(")");
 }

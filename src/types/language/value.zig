@@ -102,11 +102,7 @@ pub const Value = union(enum) {
             .undefined => try writer.writeAll("undefined"),
             .null => try writer.writeAll("null"),
             .boolean => |boolean| try writer.writeAll(if (boolean) "true" else "false"),
-            .string => |string| {
-                try writer.writeAll("\"");
-                try writer.writeAll(string.utf8);
-                try writer.writeAll("\"");
-            },
+            .string => |string| try writer.print("\"{}\"", .{string}),
             .symbol => |symbol| try writer.print("{}", .{symbol}),
             .number => |number| try writer.print("{}", .{number}),
             .big_int => |big_int| try writer.print("{}", .{big_int}),
