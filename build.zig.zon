@@ -3,19 +3,20 @@
     .version = "0.1.0",
     .dependencies = .{
         .any_pointer = .{
-            .url = "https://github.com/MasterQ32/any-pointer/archive/60b236deb8e5f4e53aeefbd31e5d9763bcaf8322.tar.gz",
-            .hash = "1220ee116ee3e225e115f5d93167be6a06683bf1673d29674b64b9fe551548c6a69b",
+            // FIXME: This points to https://github.com/ikskuh/any-pointer/pull/9, update once merged
+            .url = "https://github.com/ikskuh/any-pointer/archive/33783d9a1acb549e57cc37aab1d0b667ea627911.tar.gz",
+            .hash = "122068e632c479fa771ed988bf36c10db5bd0b2918b92569b2fa440785e4013055a8",
         },
         .icu4zig = .{
-            .url = "https://codeberg.org/linusg/icu4zig/archive/1105ac6ba48287a16bc63bc1a3b6739699a46dc8.tar.gz",
-            .hash = "1220c23bf96f7cf763aff32a6b696a9ed25bed2c3c668deac5de9a4a3499748879bc",
+            .url = "https://codeberg.org/linusg/icu4zig/archive/15c581b56d3ee7698a2d91f8d36687be00a14077.tar.gz",
+            .hash = "1220e9f720773ea33ea076a00a1ac9e41572d3767681dc88c49effa127814621717b",
             .lazy = true,
         },
         .kiesel_runtime = .{
             // Uncommend for local development:
             // .path = "../runtime",
-            .url = "https://codeberg.org/kiesel-js/runtime/archive/eabd4772e8993a616fbe42bcc65155f6e3caa916.tar.gz",
-            .hash = "122087a5204dd4b1cb1786b86b708fff8fb166fbb7901d826cb985183bb7673b0fba",
+            .url = "https://codeberg.org/kiesel-js/runtime/archive/d5ff282483ae8123599e4df18fbf2864c5eed90f.tar.gz",
+            .hash = "122001d934e7f7bbf628ff1f41be765e864813c7da479e0b14e06d5fc3a350a1d9a8",
             .lazy = true,
         },
         .libgc = .{
@@ -29,25 +30,28 @@
         },
         // Needed for mach-o/getsect.h when building libgc for macOS
         .macos_sdk = .{
-            .url = "https://github.com/mitchellh/zig-build-macos-sdk/archive/ee70f27c08680307fa35ada92e6b2c36e0ff84c6.tar.gz",
-            .hash = "1220b415f529f1c04ed876c2b481e9f8119d353d4e3d4d7c8607ee302d2142e13eca",
+            // FIXME: This points to https://github.com/mitchellh/zig-build-macos-sdk/pull/4, update once merged
+            .url = "https://github.com/mitchellh/zig-build-macos-sdk/archive/4183dc3f446f419dccc9625f97a45fee97b0c03e.tar.gz",
+            .hash = "1220d397a6dfd4389b6bf9ecdd6be1421a919ae02adb4f658a6ccb2dac84804db07c",
             .lazy = true,
         },
         .parser_toolkit = .{
-            .url = "https://github.com/MasterQ32/parser-toolkit/archive/358a028beb32ebb193dadb6f7a954965745892a7.tar.gz",
-            .hash = "122096e52791fd03257d5c6af9421dfa0c8ba763c01ef5a9d4c022903a741cbad13a",
+            // FIXME: This points to https://github.com/ikskuh/parser-toolkit/pull/13, update once merged
+            .url = "https://github.com/ikskuh/parser-toolkit/archive/db3ccb4a07d92ebc24e7a97110386ead09b88f34.tar.gz",
+            .hash = "12206f0ade18be8db985f6a688ca7ec9ffdbb95f033c8db91760b0d13cfe27618b61",
         },
         .zig_args = .{
-            .url = "https://github.com/MasterQ32/zig-args/archive/89f18a104d9c13763b90e97d6b4ce133da8a3e2b.tar.gz",
-            .hash = "12203ded54c85878eea7f12744066dcb4397177395ac49a7b2aa365bf6047b623829",
+            // FIXME: This points to https://github.com/ikskuh/zig-args/pull/57, update once merged
+            .url = "https://github.com/ikskuh/zig-args/archive/14e1dd7b4a9bdc8dc7cb6489512249d801d92a4d.tar.gz",
+            .hash = "1220fe6ae56b668cc4a033282b5f227bfbb46a67ede6d84e9f9493fea9de339b5f37",
         },
         .zig_stackinfo = .{
             .url = "https://codeberg.org/linusg/zig-stackinfo/archive/0d7623922d01ee886f0e28d11b2cd3312089709e.tar.gz",
             .hash = "122016406a2ad3f7a89acaf0b8a1122432e7529ff0124f89a7aeaf873be7d7443649",
         },
         .zigline = .{
-            .url = "https://github.com/alimpfard/zigline/archive/ad7122de0aa07350ad566948b9318725247dee6b.tar.gz",
-            .hash = "1220fb045a65429291344e584d6dc67e70280c5dea0df028687e833dcde7426fa2c2",
+            .url = "https://github.com/alimpfard/zigline/archive/f88d45b0a633ddc172681180c6bedc7dd520b1e5.tar.gz",
+            .hash = "122075bdca30b862dd2f284f63d9c22db4b43bd922ddbdc7882f99575005edb1be6c",
         },
     },
     .paths = .{
