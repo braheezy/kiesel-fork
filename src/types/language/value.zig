@@ -1428,10 +1428,10 @@ pub fn isLessThan(
     // 3. If px is a String and py is a String, then
     if (px == .string and py == .string) {
         // a. Let lx be the length of px.
-        const lx = px.string.utf16Length();
+        const lx = px.string.length();
 
         // b. Let ly be the length of py.
-        const ly = py.string.utf16Length();
+        const ly = py.string.length();
 
         // c. For each integer i such that 0 ≤ i < min(lx, ly), in ascending order, do
         for (0..@min(lx, ly)) |i| {

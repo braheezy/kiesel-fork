@@ -104,7 +104,7 @@ pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
             }
             switch (property_key.?) {
                 .string => |string| if (string.eql(String.from("length")))
-                    return Value.from(@as(u53, @intCast(self.base.value.string.utf16Length())))
+                    return Value.from(@as(u53, @intCast(self.base.value.string.length())))
                 else
                     break :blk try self.base.value.synthesizePrototype(agent),
                 .integer_index => break :blk null,

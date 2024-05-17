@@ -274,7 +274,7 @@ fn getMatch(captures_list: CapturesList, string: String, full_unicode: bool, i: 
 /// https://tc39.es/ecma262/#sec-regexpbuiltinexec
 pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.Error!?Object {
     // 1. Let length be the length of S.
-    const length = string.utf16Length();
+    const length = string.length();
 
     // 2. Let lastIndex be ℝ(? ToLength(? Get(R, "lastIndex"))).
     var last_index = std.math.lossyCast(
@@ -511,7 +511,7 @@ pub fn advanceStringIndex(string: String, index: u53, unicode: bool) u53 {
     if (!unicode) return index + 1;
 
     // 3. Let length be the length of S.
-    const length = string.utf16Length();
+    const length = string.length();
 
     // 4. If index + 1 ≥ length, return index + 1.
     if (index + 1 >= length) return index + 1;
@@ -538,7 +538,7 @@ const Match = struct {
 fn getMatchString(agent: *Agent, string: String, match: Match) Allocator.Error!String {
     // 1. Assert: match.[[StartIndex]] ≤ match.[[EndIndex]] ≤ the length of S.
     std.debug.assert(match.start_index <= match.end_index);
-    std.debug.assert(match.end_index <= string.utf16Length());
+    std.debug.assert(match.end_index <= string.length());
 
     // 2. Return the substring of S from match.[[StartIndex]] to match.[[EndIndex]].
     return string.substring(agent.gc_allocator, match.start_index, match.end_index);
@@ -549,7 +549,7 @@ fn getMatchString(agent: *Agent, string: String, match: Match) Allocator.Error!S
 fn getMatchIndexPair(agent: *Agent, string: String, match: Match) Allocator.Error!Object {
     // 1. Assert: match.[[StartIndex]] ≤ match.[[EndIndex]] ≤ the length of S.
     std.debug.assert(match.start_index <= match.end_index);
-    std.debug.assert(match.end_index <= string.utf16Length());
+    std.debug.assert(match.end_index <= string.length());
 
     // 2. Return CreateArrayFromList(« 𝔽(match.[[StartIndex]]), 𝔽(match.[[EndIndex]]) »).
     return createArrayFromList(
@@ -1104,7 +1104,7 @@ pub const RegExpPrototype = struct {
         const string = try string_value.toString(agent);
 
         // 4. Let lengthS be the length of S.
-        const string_length = string.utf16Length();
+        const string_length = string.length();
 
         // 5. Let functionalReplace be IsCallable(replaceValue).
         const functional_replace = replace_value.isCallable();
@@ -1194,7 +1194,7 @@ pub const RegExpPrototype = struct {
             const matched = try (try result.get(PropertyKey.from(0))).toString(agent);
 
             // d. Let matchLength be the length of matched.
-            const matched_length = matched.utf16Length();
+            const matched_length = matched.length();
 
             // e. Let position be ? ToIntegerOrInfinity(? Get(result, "index")).
             const position_f64 = try (try result.get(PropertyKey.from("index"))).toIntegerOrInfinity(agent);
@@ -1507,7 +1507,7 @@ pub const RegExpPrototype = struct {
         }
 
         // 16. Let size be the length of S.
-        const size = string.utf16Length();
+        const size = string.length();
 
         // 17. Let p be 0.
         var p: u53 = 0;

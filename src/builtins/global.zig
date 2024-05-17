@@ -725,7 +725,7 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const string = try string_value.toString(agent);
 
     // 2. Let len be the length of string.
-    const len = string.utf16Length();
+    const len = string.length();
 
     // 3. Let R be the empty String.
     var result = std.ArrayList(u16).init(agent.gc_allocator);

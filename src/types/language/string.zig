@@ -44,7 +44,7 @@ pub const String = struct {
         return self.utf8.len == 0;
     }
 
-    pub inline fn utf16Length(self: Self) usize {
+    pub inline fn length(self: Self) usize {
         // NOTE: Ideally we'd calulate the UTF-16 length lazily but that requires a mutable self
         //       pointer (const-casting didn't seem to work, performance-wise).
         //       Instead, we just do it once upfront now.
@@ -73,7 +73,7 @@ pub const String = struct {
         defer allocator.free(code_units);
         return from(std.unicode.utf16leToUtf8Alloc(
             allocator,
-            code_units[inclusive_start .. exclusive_end orelse self.utf16Length()],
+            code_units[inclusive_start .. exclusive_end orelse self.length()],
         ) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             error.DanglingSurrogateHalf,
@@ -87,7 +87,7 @@ pub const String = struct {
     /// https://tc39.es/ecma262/#sec-stringindexof
     pub fn indexOf(self: Self, search_value: String, from_index: usize) ?usize {
         // 1. Let len be the length of string.
-        const len = self.utf16Length();
+        const len = self.length();
 
         // 2. If searchValue is the empty String and fromIndex ≤ len, return fromIndex.
         if (search_value.isEmpty() and from_index <= len) return from_index;
@@ -108,7 +108,7 @@ pub const String = struct {
     /// https://tc39.es/ecma262/#sec-stringlastindexof
     pub fn lastIndexOf(self: Self, search_value: String, from_index: usize) ?usize {
         // 1. Let len be the length of string.
-        const len = self.utf16Length();
+        const len = self.length();
 
         // 2. Let searchLen be the length of searchValue.
         // 3. Assert: fromIndex + searchLen ≤ len.

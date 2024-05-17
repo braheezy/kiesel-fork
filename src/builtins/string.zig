@@ -44,7 +44,7 @@ pub fn stringPad(
     placement: StringPadPlacement,
 ) Agent.Error!types.String {
     // 1. Let stringLength be the length of S.
-    const string_length = string.utf16Length();
+    const string_length = string.length();
 
     // 2. If maxLength ≤ stringLength, return S.
     if (max_length <= string_length) return string;
@@ -112,7 +112,7 @@ pub fn getSubstitution(
     replacement_template: types.String,
 ) Agent.Error!types.String {
     // 1. Let stringLength be the length of str.
-    const string_length = str.utf16Length();
+    const string_length = str.length();
 
     // 2. Assert: position ≤ stringLength.
     std.debug.assert(position <= string_length);
@@ -164,7 +164,7 @@ pub fn getSubstitution(
             const ref = types.String.from("$'");
 
             // ii. Let matchLength be the length of matched.
-            const match_length = matched.utf16Length();
+            const match_length = matched.length();
 
             // iii. Let tailPos be position + matchLength.
             const tail_pos = position +| match_length;
@@ -304,7 +304,7 @@ pub fn getSubstitution(
         };
 
         // i. Let refLength be the length of ref.
-        const ref_length = ref.utf16Length();
+        const ref_length = ref.length();
 
         // j. Set templateRemainder to the substring of templateRemainder from refLength.
         template_reminder = try template_reminder.substring(
@@ -378,7 +378,7 @@ fn ownPropertyKeys(object: Object) Allocator.Error!std.ArrayList(PropertyKey) {
     const str = object.as(String).fields.string_data;
 
     // 4. Let len be the length of str.
-    const len = str.utf16Length();
+    const len = str.length();
 
     // 1. Let keys be a new empty List.
     var keys = try std.ArrayList(PropertyKey).initCapacity(
@@ -454,7 +454,7 @@ pub fn stringCreate(agent: *Agent, value: types.String, prototype: Object) Alloc
     });
 
     // 7. Let length be the length of value.
-    const length = value.utf16Length();
+    const length = value.length();
 
     // 8. Perform ! DefinePropertyOrThrow(S, "length", PropertyDescriptor {
     //      [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
@@ -492,7 +492,7 @@ fn stringGetOwnProperty(
     const str = string.fields.string_data;
 
     // 8. Let len be the length of str.
-    const len = str.utf16Length();
+    const len = str.length();
 
     // 9. If ℝ(index) < 0 or len ≤ ℝ(index), return undefined.
     if (len <= index) return null;
@@ -762,7 +762,7 @@ pub const StringPrototype = struct {
         const string = try object.toString(agent);
 
         // 3. Let len be the length of S.
-        const len = string.utf16Length();
+        const len = string.length();
 
         // 4. Let relativeIndex be ? ToIntegerOrInfinity(index).
         const relative_index = try index.toIntegerOrInfinity(agent);
@@ -799,7 +799,7 @@ pub const StringPrototype = struct {
         const position_f64 = try pos.toIntegerOrInfinity(agent);
 
         // 4. Let size be the length of S.
-        const size = string.utf16Length();
+        const size = string.length();
 
         // 5. If position < 0 or position ≥ size, return the empty String.
         if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return Value.from("");
@@ -824,7 +824,7 @@ pub const StringPrototype = struct {
         const position_f64 = try pos.toIntegerOrInfinity(agent);
 
         // 4. Let size be the length of S.
-        const size = string.utf16Length();
+        const size = string.length();
 
         // 5. If position < 0 or position ≥ size, return NaN.
         if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return Value.nan();
@@ -850,7 +850,7 @@ pub const StringPrototype = struct {
         const position_f64 = try pos.toIntegerOrInfinity(agent);
 
         // 4. Let size be the length of S.
-        const size = string.utf16Length();
+        const size = string.length();
 
         // 5. If position < 0 or position ≥ size, return undefined.
         if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return .undefined;
@@ -916,7 +916,7 @@ pub const StringPrototype = struct {
         const search_str = try search_string.toString(agent);
 
         // 6. Let len be the length of S.
-        const len = string.utf16Length();
+        const len = string.length();
 
         // 7. If endPosition is undefined, let pos be len; else let pos be ? ToIntegerOrInfinity(endPosition).
         const pos = if (end_position == .undefined)
@@ -928,7 +928,7 @@ pub const StringPrototype = struct {
         const end = std.math.clamp(std.math.lossyCast(usize, pos), 0, len);
 
         // 9. Let searchLength be the length of searchStr.
-        const search_length = search_str.utf16Length();
+        const search_length = search_str.length();
 
         // 10. If searchLength = 0, return true.
         if (search_length == 0) return Value.from(true);
@@ -979,7 +979,7 @@ pub const StringPrototype = struct {
         const pos = try position.toIntegerOrInfinity(agent);
 
         // 8. Let len be the length of S.
-        const len = string.utf16Length();
+        const len = string.length();
 
         // 9. Let start be the result of clamping pos between 0 and len.
         const start = std.math.clamp(std.math.lossyCast(usize, pos), 0, len);
@@ -1012,7 +1012,7 @@ pub const StringPrototype = struct {
         const pos = try position.toIntegerOrInfinity(agent);
 
         // 6. Let len be the length of S.
-        const len = string.utf16Length();
+        const len = string.length();
 
         // 7. Let start be the result of clamping pos between 0 and len.
         const start = std.math.clamp(std.math.lossyCast(usize, pos), 0, len);
@@ -1067,10 +1067,10 @@ pub const StringPrototype = struct {
             Value.from(num_pos).toIntegerOrInfinity(agent) catch unreachable;
 
         // 7. Let len be the length of S.
-        const len = string.utf16Length();
+        const len = string.length();
 
         // 8. Let searchLen be the length of searchStr.
-        const search_len = search_str.utf16Length();
+        const search_len = search_str.length();
 
         // 9. Let start be the result of clamping pos between 0 and len - searchLen.
         const start = std.math.clamp(
@@ -1229,7 +1229,7 @@ pub const StringPrototype = struct {
         const int_max_length = try max_length.toLength(agent);
 
         // 3. Let stringLength be the length of S.
-        const string_length = string.utf16Length();
+        const string_length = string.length();
 
         // 4. If intMaxLength ≤ stringLength, return S.
         if (int_max_length <= string_length) return string;
@@ -1328,7 +1328,7 @@ pub const StringPrototype = struct {
         }
 
         // 7. Let searchLength be the length of searchString.
-        const search_length = search_string.utf16Length();
+        const search_length = search_string.length();
 
         // 8. Let position be StringIndexOf(string, searchString, 0).
         const position = string.indexOf(search_string, 0);
@@ -1453,7 +1453,7 @@ pub const StringPrototype = struct {
         }
 
         // 7. Let searchLength be the length of searchString.
-        const search_length = search_string.utf16Length();
+        const search_length = search_string.length();
 
         // 8. Let advanceBy be max(1, searchLength).
         const advance_by = @max(1, search_length);
@@ -1525,7 +1525,7 @@ pub const StringPrototype = struct {
         }
 
         // 15. If endOfLastMatch < the length of string, then
-        if (end_of_last_match < string.utf16Length()) {
+        if (end_of_last_match < string.length()) {
             // a. Set result to the string-concatenation of result and the substring of string from
             //    endOfLastMatch.
             result = try types.String.concat(
@@ -1595,7 +1595,7 @@ pub const StringPrototype = struct {
         const string = try object.toString(agent);
 
         // 3. Let len be the length of S.
-        const len = string.utf16Length();
+        const len = string.length();
         const len_f64: f64 = @floatFromInt(len);
 
         // 4. Let intStart be ? ToIntegerOrInfinity(start).
@@ -1700,7 +1700,7 @@ pub const StringPrototype = struct {
         }
 
         // 8. Let separatorLength be the length of R.
-        const separator_length = separator.utf16Length();
+        const separator_length = separator.length();
 
         // 9. If separatorLength = 0, then
         if (separator_length == 0) {
@@ -1709,7 +1709,7 @@ pub const StringPrototype = struct {
             const head = try string.substring(
                 agent.gc_allocator,
                 0,
-                @min(limit, string.utf16Length()),
+                @min(limit, string.length()),
             );
 
             // b. Let codeUnits be a List consisting of the sequence of code units that are the elements of head.
@@ -1820,7 +1820,7 @@ pub const StringPrototype = struct {
         const search_str = try search_string.toString(agent);
 
         // 6. Let len be the length of S.
-        const len = string.utf16Length();
+        const len = string.length();
 
         // 7. If position is undefined, let pos be 0; else let pos be ? ToIntegerOrInfinity(position).
         const pos = if (position == .undefined) 0 else try position.toIntegerOrInfinity(agent);
@@ -1829,7 +1829,7 @@ pub const StringPrototype = struct {
         const start = std.math.clamp(std.math.lossyCast(usize, pos), 0, len);
 
         // 9. Let searchLength be the length of searchStr.
-        const search_length = search_str.utf16Length();
+        const search_length = search_str.length();
 
         // 10. If searchLength = 0, return true.
         if (search_length == 0) return Value.from(true);
@@ -1863,7 +1863,7 @@ pub const StringPrototype = struct {
         const string = try object.toString(agent);
 
         // 3. Let len be the length of S.
-        const len = string.utf16Length();
+        const len = string.length();
 
         // 4. Let intStart be ? ToIntegerOrInfinity(start).
         const int_start = try start.toIntegerOrInfinity(agent);
@@ -2078,7 +2078,7 @@ pub const StringPrototype = struct {
         const string = try object.toString(agent);
 
         // 3. Let size be the length of S.
-        const size: f64 = @floatFromInt(string.utf16Length());
+        const size: f64 = @floatFromInt(string.length());
 
         // 4. Let intStart be ? ToIntegerOrInfinity(start).
         var int_start = try start.toIntegerOrInfinity(agent);

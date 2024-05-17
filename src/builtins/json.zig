@@ -804,7 +804,7 @@ pub const JSON = struct {
             .string => |string| blk: {
                 // a. If the length of space ≤ 10, let gap be space; otherwise let gap be the
                 //    substring of space from 0 to 10.
-                break :blk if (string.utf16Length() <= 10)
+                break :blk if (string.length() <= 10)
                     string
                 else
                     try string.substring(agent.gc_allocator, 0, 10);
