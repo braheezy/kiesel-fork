@@ -45,6 +45,7 @@ Further reading:
 - [Kiesel Devlog #5: Progress powered by the Shadow web engine](https://linus.dev/posts/kiesel-devlog-5/)
 - [Kiesel Devlog #6: Catching Up :^)](https://linus.dev/posts/kiesel-devlog-6/)
 - [Kiesel Devlog #7: Happy Birthday!](https://linus.dev/posts/kiesel-devlog-7/)
+- [Kiesel Devlog #8: SSR, but it's CGI](https://linus.dev/posts/kiesel-devlog-8/)
 
 ## Build
 
