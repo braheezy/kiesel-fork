@@ -76,338 +76,6 @@ pub fn codegenPrimaryExpression(
     }
 }
 
-/// 13.3.2.1 Runtime Semantics: Evaluation
-/// https://tc39.es/ecma262/#sec-property-accessors-runtime-semantics-evaluation
-pub fn codegenMemberExpression(
-    node: ast.MemberExpression,
-    executable: *Executable,
-    ctx: *Context,
-) Executable.Error!void {
-    switch (node.property) {
-        // MemberExpression : MemberExpression [ Expression ]
-        .expression => |expression| {
-            // 1. Let baseReference be ? Evaluation of MemberExpression.
-            try codegenExpression(node.expression.*, executable, ctx);
-
-            // 2. Let baseValue be ? GetValue(baseReference).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
-
-            // 3. Let strict be IsStrict(this MemberExpression).
-            const strict = ctx.contained_in_strict_mode_code;
-
-            // 4. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
-            try codegenExpression(expression.*, executable, ctx);
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
-            try executable.addInstruction(.evaluate_property_access_with_expression_key);
-            try executable.addIndex(@intFromBool(strict));
-        },
-
-        // MemberExpression : MemberExpression . IdentifierName
-        .identifier => |identifier| {
-            // 1. Let baseReference be ? Evaluation of MemberExpression.
-            try codegenExpression(node.expression.*, executable, ctx);
-
-            // 2. Let baseValue be ? GetValue(baseReference).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
-
-            // 3. Let strict be IsStrict(this MemberExpression).
-            const strict = ctx.contained_in_strict_mode_code;
-
-            // 4. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
-            try executable.addInstructionWithIdentifier(
-                .evaluate_property_access_with_identifier_key,
-                identifier,
-            );
-            try executable.addIndex(@intFromBool(strict));
-        },
-
-        // MemberExpression : MemberExpression . PrivateIdentifier
-        .private_identifier => |private_identifier| {
-            // 1. Let baseReference be ? Evaluation of MemberExpression.
-            try codegenExpression(node.expression.*, executable, ctx);
-
-            // 2. Let baseValue be ? GetValue(baseReference).
-            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
-
-            // 3. Let fieldNameString be the StringValue of PrivateIdentifier.
-            // 4. Return MakePrivateReference(baseValue, fieldNameString).
-            try executable.addInstructionWithIdentifier(
-                .make_private_reference,
-                private_identifier,
-            );
-        },
-    }
-}
-
-/// 13.3.7.1 Runtime Semantics: Evaluation
-/// https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
-pub fn codegenSuperProperty(
-    node: ast.SuperProperty,
-    executable: *Executable,
-    ctx: *Context,
-) Executable.Error!void {
-    switch (node) {
-        // SuperProperty : super [ Expression ]
-        .expression => |expression| {
-            // 1. Let env be GetThisEnvironment().
-            // 2. Let actualThis be ? env.GetThisBinding().
-            try executable.addInstruction(.load_this_value_for_make_super_property_reference);
-
-            // 3. Let propertyNameReference be ? Evaluation of Expression.
-            try codegenExpression(expression.*, executable, ctx);
-
-            // 4. Let propertyNameValue be ? GetValue(propertyNameReference).
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
-
-            // 6. Let strict be IsStrict(this SuperProperty).
-            const strict = ctx.contained_in_strict_mode_code;
-
-            // 5. Let propertyKey be ? ToPropertyKey(propertyNameValue).
-            // 7. Return ? MakeSuperPropertyReference(actualThis, propertyKey, strict).
-            try executable.addInstruction(.make_super_property_reference);
-            try executable.addIndex(@intFromBool(strict));
-        },
-
-        // SuperProperty : super . IdentifierName
-        .identifier => |identifier| {
-            // 1. Let env be GetThisEnvironment().
-            // 2. Let actualThis be ? env.GetThisBinding().
-            try executable.addInstruction(.load_this_value_for_make_super_property_reference);
-
-            // 3. Let propertyKey be StringValue of IdentifierName.
-            try executable.addInstructionWithConstant(.load_constant, Value.from(identifier));
-
-            // 4. Let strict be IsStrict(this SuperProperty).
-            const strict = ctx.contained_in_strict_mode_code;
-
-            // 5. Return ? MakeSuperPropertyReference(actualThis, propertyKey, strict).
-            try executable.addInstruction(.make_super_property_reference);
-            try executable.addIndex(@intFromBool(strict));
-        },
-    }
-}
-
-/// 13.3.12.1 Runtime Semantics: Evaluation
-/// https://tc39.es/ecma262/#sec-meta-properties-runtime-semantics-evaluation
-pub fn codegenMetaProperty(
-    node: ast.MetaProperty,
-    executable: *Executable,
-    _: *Context,
-) Executable.Error!void {
-    switch (node) {
-        // NewTarget : new . target
-        .new_target => {
-            // 1. Return GetNewTarget().
-            try executable.addInstruction(.get_new_target);
-        },
-
-        // ImportMeta : import . meta
-        .import_meta => {
-            // 1-5.
-            try executable.addInstruction(.get_or_create_import_meta);
-        },
-    }
-}
-
-/// 13.3.5.1 Runtime Semantics: Evaluation
-/// https://tc39.es/ecma262/#sec-new-operator-runtime-semantics-evaluation
-pub fn codegenNewExpression(
-    node: ast.NewExpression,
-    executable: *Executable,
-    ctx: *Context,
-) Executable.Error!void {
-    // NewExpression : new NewExpression
-    // 1. Return ? EvaluateNew(NewExpression, empty).
-    // MemberExpression : new MemberExpression Arguments
-    // 1. Return ? EvaluateNew(MemberExpression, Arguments).
-    try codegenExpression(node.expression.*, executable, ctx);
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
-
-    for (node.arguments) |argument| {
-        try codegenExpression(argument, executable, ctx);
-        if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
-    }
-
-    try executable.addInstruction(.evaluate_new);
-    try executable.addIndex(node.arguments.len);
-}
-
-/// 13.3.6.1 Runtime Semantics: Evaluation
-/// https://tc39.es/ecma262/#sec-function-calls-runtime-semantics-evaluation
-pub fn codegenCallExpression(
-    node: ast.CallExpression,
-    executable: *Executable,
-    ctx: *Context,
-) Executable.Error!void {
-    // CallExpression : CallExpression Arguments
-    // 1. Let ref be ? Evaluation of CallExpression.
-    try codegenExpression(node.expression.*, executable, ctx);
-
-    try executable.addInstruction(.push_reference);
-
-    // 2. Let func be ? GetValue(ref).
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
-
-    // TODO: 3. Let thisCall be this CallExpression.
-    // TODO: 4. Let tailCall be IsInTailPosition(thisCall).
-
-    try executable.addInstruction(.load_this_value_for_evaluate_call);
-
-    for (node.arguments) |argument| {
-        try codegenExpression(argument, executable, ctx);
-        if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
-    }
-
-    const strict = ctx.contained_in_strict_mode_code;
-
-    // 5. Return ? EvaluateCall(func, ref, Arguments, tailCall).
-    try executable.addInstruction(.evaluate_call);
-    try executable.addIndex(node.arguments.len);
-    try executable.addIndex(@intFromBool(strict));
-
-    // TODO: We should probably also clean this up if something throws beforehand...
-    try executable.addInstruction(.pop_reference);
-}
-
-/// 13.3.7.1 Runtime Semantics: Evaluation
-/// https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
-pub fn codegenSuperCall(
-    node: ast.SuperCall,
-    executable: *Executable,
-    ctx: *Context,
-) Executable.Error!void {
-    for (node.arguments) |argument| {
-        try codegenExpression(argument, executable, ctx);
-        if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
-    }
-    try executable.addInstruction(.evaluate_super_call);
-    try executable.addIndex(node.arguments.len);
-}
-
-/// 13.3.10.1 Runtime Semantics: Evaluation
-/// https://tc39.es/ecma262/#sec-import-call-runtime-semantics-evaluation
-pub fn codegenImportCall(
-    node: ast.ImportCall,
-    executable: *Executable,
-    ctx: *Context,
-) Executable.Error!void {
-    try codegenExpression(node.expression.*, executable, ctx);
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
-    try executable.addInstruction(.evaluate_import_call);
-}
-
-/// 13.3.9.1 Runtime Semantics: Evaluation
-/// https://tc39.es/ecma262/#sec-optional-chaining-evaluation
-/// 13.3.9.2 Runtime Semantics: ChainEvaluation
-/// https://tc39.es/ecma262/#sec-optional-chaining-chain-evaluation
-pub fn codegenOptionalExpression(
-    node: ast.OptionalExpression,
-    executable: *Executable,
-    ctx: *Context,
-) Executable.Error!void {
-    // 1. Let baseReference be ? Evaluation of OptionalExpression.
-    try codegenExpression(node.expression.*, executable, ctx);
-
-    if (node.property == .arguments) try executable.addInstruction(.push_reference);
-
-    // 2. Let baseValue be ? GetValue(baseReference).
-    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
-
-    // 3. If baseValue is either undefined or null, then
-    try executable.addInstruction(.load);
-    try executable.addInstructionWithConstant(.load_constant, .undefined);
-    try executable.addInstruction(.is_loosely_equal);
-
-    try executable.addInstruction(.jump_conditional);
-    const consequent_jump = try executable.addJumpIndex();
-    const alternate_jump = try executable.addJumpIndex();
-
-    // a. Return undefined.
-    try consequent_jump.setTargetHere();
-    try executable.addInstruction(.store); // Drop baseValue from the stack
-    try executable.addInstructionWithConstant(.store_constant, .undefined);
-    try executable.addInstruction(.jump);
-    const end_jump = try executable.addJumpIndex();
-
-    // 4. Return ? ChainEvaluation of OptionalChain with arguments baseValue and baseReference.
-    try alternate_jump.setTargetHere();
-
-    switch (node.property) {
-        // OptionalChain : ?. Arguments
-        .arguments => |arguments| {
-            try executable.addInstruction(.load_this_value_for_evaluate_call);
-
-            for (arguments) |argument| {
-                try codegenExpression(argument, executable, ctx);
-                if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.load);
-            }
-
-            // TODO: 1. Let thisChain be this OptionalChain.
-            // TODO: 2. Let tailCall be IsInTailPosition(thisChain).
-
-            // 3. Return ? EvaluateCall(baseValue, baseReference, Arguments, tailCall).
-            try executable.addInstruction(.evaluate_call);
-            try executable.addIndex(arguments.len);
-            const strict = ctx.contained_in_strict_mode_code;
-            try executable.addIndex(@intFromBool(strict));
-
-            // TODO: We should probably also clean this up if something throws beforehand...
-            try executable.addInstruction(.pop_reference);
-        },
-
-        // OptionalChain : ?. [ Expression ]
-        .expression => |expression| {
-            // 1. Let strict be IsStrict(this OptionalChain).
-            const strict = ctx.contained_in_strict_mode_code;
-
-            // 2. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
-            try codegenExpression(expression.*, executable, ctx);
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-            try executable.addInstruction(.load);
-            try executable.addInstruction(.evaluate_property_access_with_expression_key);
-            try executable.addIndex(@intFromBool(strict));
-        },
-
-        // OptionalChain : ?. IdentifierName
-        .identifier => |identifier| {
-            // 1. Let strict be IsStrict(this OptionalChain).
-            const strict = ctx.contained_in_strict_mode_code;
-
-            // 2. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
-            try executable.addInstructionWithIdentifier(
-                .evaluate_property_access_with_identifier_key,
-                identifier,
-            );
-            try executable.addIndex(@intFromBool(strict));
-        },
-
-        // OptionalChain : ?. PrivateIdentifier
-        .private_identifier => |private_identifier| {
-            // 1. Let fieldNameString be the StringValue of PrivateIdentifier.
-            // 2. Return MakePrivateReference(baseValue, fieldNameString).
-            try executable.addInstructionWithIdentifier(
-                .make_private_reference,
-                private_identifier,
-            );
-        },
-    }
-
-    try end_jump.setTargetHere();
-}
-
 /// 13.2.3.1 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-literals-runtime-semantics-evaluation
 pub fn codegenLiteral(
@@ -527,6 +195,55 @@ pub fn codegenObjectLiteral(
     // 3. Return obj.
 }
 
+/// 13.2.5.4 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-object-initializer-runtime-semantics-evaluation
+pub fn codegenPropertyName(
+    node: ast.PropertyName,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    switch (node) {
+        .literal_property_name => |literal| switch (literal) {
+            // LiteralPropertyName : IdentifierName
+            .identifier => |identifier| {
+                // 1. Return StringValue of IdentifierName.
+                try executable.addInstructionWithConstant(.store_constant, Value.from(identifier));
+            },
+
+            // LiteralPropertyName : StringLiteral
+            .string_literal => |string_literal| {
+                // 1. Return the SV of StringLiteral.
+                try executable.addInstructionWithConstant(
+                    .store_constant,
+                    try string_literal.stringValue(executable.allocator),
+                );
+            },
+
+            // LiteralPropertyName : NumericLiteral
+            .numeric_literal => |numeric_literal| {
+                // 1. Let nbr be the NumericValue of NumericLiteral.
+                // 2. Return ! ToString(nbr).
+                try executable.addInstructionWithConstant(
+                    .store_constant,
+                    try numeric_literal.numericValue(executable.allocator),
+                );
+            },
+        },
+
+        // ComputedPropertyName : [ AssignmentExpression ]
+        .computed_property_name => |expression| {
+            // 1. Let exprValue be ? Evaluation of AssignmentExpression.
+            try codegenExpression(expression, executable, ctx);
+
+            // 2. Let propName be ? GetValue(exprValue).
+            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+            // 3. Return ? ToPropertyKey(propName).
+            // NOTE: This is done in object_set_property
+        },
+    }
+}
+
 /// 13.2.5.5 Runtime Semantics: PropertyDefinitionEvaluation
 /// https://tc39.es/ecma262/#sec-runtime-semantics-propertydefinitionevaluation
 pub fn codegenPropertyDefinitionList(
@@ -626,55 +343,6 @@ pub fn codegenPropertyDefinition(
     }
 }
 
-/// 13.2.5.4 Runtime Semantics: Evaluation
-/// https://tc39.es/ecma262/#sec-object-initializer-runtime-semantics-evaluation
-pub fn codegenPropertyName(
-    node: ast.PropertyName,
-    executable: *Executable,
-    ctx: *Context,
-) Executable.Error!void {
-    switch (node) {
-        .literal_property_name => |literal| switch (literal) {
-            // LiteralPropertyName : IdentifierName
-            .identifier => |identifier| {
-                // 1. Return StringValue of IdentifierName.
-                try executable.addInstructionWithConstant(.store_constant, Value.from(identifier));
-            },
-
-            // LiteralPropertyName : StringLiteral
-            .string_literal => |string_literal| {
-                // 1. Return the SV of StringLiteral.
-                try executable.addInstructionWithConstant(
-                    .store_constant,
-                    try string_literal.stringValue(executable.allocator),
-                );
-            },
-
-            // LiteralPropertyName : NumericLiteral
-            .numeric_literal => |numeric_literal| {
-                // 1. Let nbr be the NumericValue of NumericLiteral.
-                // 2. Return ! ToString(nbr).
-                try executable.addInstructionWithConstant(
-                    .store_constant,
-                    try numeric_literal.numericValue(executable.allocator),
-                );
-            },
-        },
-
-        // ComputedPropertyName : [ AssignmentExpression ]
-        .computed_property_name => |expression| {
-            // 1. Let exprValue be ? Evaluation of AssignmentExpression.
-            try codegenExpression(expression, executable, ctx);
-
-            // 2. Let propName be ? GetValue(exprValue).
-            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
-            // 3. Return ? ToPropertyKey(propName).
-            // NOTE: This is done in object_set_property
-        },
-    }
-}
-
 /// 13.2.7.3 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-regular-expression-literals-runtime-semantics-evaluation
 pub fn codegenRegularExpressionLiteral(
@@ -739,6 +407,339 @@ pub fn codegenTemplateLiteral(
             try executable.addIndex(@intFromEnum(ast.BinaryExpression.Operator.@"+"));
             if (i < node.spans.len - 1) try executable.addInstruction(.load);
         }
+    }
+}
+
+/// 13.3.2.1 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-property-accessors-runtime-semantics-evaluation
+pub fn codegenMemberExpression(
+    node: ast.MemberExpression,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    switch (node.property) {
+        // MemberExpression : MemberExpression [ Expression ]
+        .expression => |expression| {
+            // 1. Let baseReference be ? Evaluation of MemberExpression.
+            try codegenExpression(node.expression.*, executable, ctx);
+
+            // 2. Let baseValue be ? GetValue(baseReference).
+            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
+
+            // 3. Let strict be IsStrict(this MemberExpression).
+            const strict = ctx.contained_in_strict_mode_code;
+
+            // 4. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
+            try codegenExpression(expression.*, executable, ctx);
+            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
+            try executable.addInstruction(.evaluate_property_access_with_expression_key);
+            try executable.addIndex(@intFromBool(strict));
+        },
+
+        // MemberExpression : MemberExpression . IdentifierName
+        .identifier => |identifier| {
+            // 1. Let baseReference be ? Evaluation of MemberExpression.
+            try codegenExpression(node.expression.*, executable, ctx);
+
+            // 2. Let baseValue be ? GetValue(baseReference).
+            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
+
+            // 3. Let strict be IsStrict(this MemberExpression).
+            const strict = ctx.contained_in_strict_mode_code;
+
+            // 4. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
+            try executable.addInstructionWithIdentifier(
+                .evaluate_property_access_with_identifier_key,
+                identifier,
+            );
+            try executable.addIndex(@intFromBool(strict));
+        },
+
+        // MemberExpression : MemberExpression . PrivateIdentifier
+        .private_identifier => |private_identifier| {
+            // 1. Let baseReference be ? Evaluation of MemberExpression.
+            try codegenExpression(node.expression.*, executable, ctx);
+
+            // 2. Let baseValue be ? GetValue(baseReference).
+            if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
+
+            // 3. Let fieldNameString be the StringValue of PrivateIdentifier.
+            // 4. Return MakePrivateReference(baseValue, fieldNameString).
+            try executable.addInstructionWithIdentifier(
+                .make_private_reference,
+                private_identifier,
+            );
+        },
+    }
+}
+
+/// 13.3.5.1 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-new-operator-runtime-semantics-evaluation
+pub fn codegenNewExpression(
+    node: ast.NewExpression,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    // NewExpression : new NewExpression
+    // 1. Return ? EvaluateNew(NewExpression, empty).
+    // MemberExpression : new MemberExpression Arguments
+    // 1. Return ? EvaluateNew(MemberExpression, Arguments).
+    try codegenExpression(node.expression.*, executable, ctx);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    try executable.addInstruction(.load);
+
+    for (node.arguments) |argument| {
+        try codegenExpression(argument, executable, ctx);
+        if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.load);
+    }
+
+    try executable.addInstruction(.evaluate_new);
+    try executable.addIndex(node.arguments.len);
+}
+
+/// 13.3.6.1 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-function-calls-runtime-semantics-evaluation
+pub fn codegenCallExpression(
+    node: ast.CallExpression,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    // CallExpression : CallExpression Arguments
+    // 1. Let ref be ? Evaluation of CallExpression.
+    try codegenExpression(node.expression.*, executable, ctx);
+
+    try executable.addInstruction(.push_reference);
+
+    // 2. Let func be ? GetValue(ref).
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    try executable.addInstruction(.load);
+
+    // TODO: 3. Let thisCall be this CallExpression.
+    // TODO: 4. Let tailCall be IsInTailPosition(thisCall).
+
+    try executable.addInstruction(.load_this_value_for_evaluate_call);
+
+    for (node.arguments) |argument| {
+        try codegenExpression(argument, executable, ctx);
+        if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.load);
+    }
+
+    const strict = ctx.contained_in_strict_mode_code;
+
+    // 5. Return ? EvaluateCall(func, ref, Arguments, tailCall).
+    try executable.addInstruction(.evaluate_call);
+    try executable.addIndex(node.arguments.len);
+    try executable.addIndex(@intFromBool(strict));
+
+    // TODO: We should probably also clean this up if something throws beforehand...
+    try executable.addInstruction(.pop_reference);
+}
+
+/// 13.3.7.1 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
+pub fn codegenSuperProperty(
+    node: ast.SuperProperty,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    switch (node) {
+        // SuperProperty : super [ Expression ]
+        .expression => |expression| {
+            // 1. Let env be GetThisEnvironment().
+            // 2. Let actualThis be ? env.GetThisBinding().
+            try executable.addInstruction(.load_this_value_for_make_super_property_reference);
+
+            // 3. Let propertyNameReference be ? Evaluation of Expression.
+            try codegenExpression(expression.*, executable, ctx);
+
+            // 4. Let propertyNameValue be ? GetValue(propertyNameReference).
+            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
+
+            // 6. Let strict be IsStrict(this SuperProperty).
+            const strict = ctx.contained_in_strict_mode_code;
+
+            // 5. Let propertyKey be ? ToPropertyKey(propertyNameValue).
+            // 7. Return ? MakeSuperPropertyReference(actualThis, propertyKey, strict).
+            try executable.addInstruction(.make_super_property_reference);
+            try executable.addIndex(@intFromBool(strict));
+        },
+
+        // SuperProperty : super . IdentifierName
+        .identifier => |identifier| {
+            // 1. Let env be GetThisEnvironment().
+            // 2. Let actualThis be ? env.GetThisBinding().
+            try executable.addInstruction(.load_this_value_for_make_super_property_reference);
+
+            // 3. Let propertyKey be StringValue of IdentifierName.
+            try executable.addInstructionWithConstant(.load_constant, Value.from(identifier));
+
+            // 4. Let strict be IsStrict(this SuperProperty).
+            const strict = ctx.contained_in_strict_mode_code;
+
+            // 5. Return ? MakeSuperPropertyReference(actualThis, propertyKey, strict).
+            try executable.addInstruction(.make_super_property_reference);
+            try executable.addIndex(@intFromBool(strict));
+        },
+    }
+}
+
+/// 13.3.7.1 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
+pub fn codegenSuperCall(
+    node: ast.SuperCall,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    // SuperCall : super Arguments
+    for (node.arguments) |argument| {
+        try codegenExpression(argument, executable, ctx);
+        if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.load);
+    }
+    try executable.addInstruction(.evaluate_super_call);
+    try executable.addIndex(node.arguments.len);
+}
+
+/// 13.3.9.1 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-optional-chaining-evaluation
+/// 13.3.9.2 Runtime Semantics: ChainEvaluation
+/// https://tc39.es/ecma262/#sec-optional-chaining-chain-evaluation
+pub fn codegenOptionalExpression(
+    node: ast.OptionalExpression,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    // 1. Let baseReference be ? Evaluation of OptionalExpression.
+    try codegenExpression(node.expression.*, executable, ctx);
+
+    if (node.property == .arguments) try executable.addInstruction(.push_reference);
+
+    // 2. Let baseValue be ? GetValue(baseReference).
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    try executable.addInstruction(.load);
+
+    // 3. If baseValue is either undefined or null, then
+    try executable.addInstruction(.load);
+    try executable.addInstructionWithConstant(.load_constant, .undefined);
+    try executable.addInstruction(.is_loosely_equal);
+
+    try executable.addInstruction(.jump_conditional);
+    const consequent_jump = try executable.addJumpIndex();
+    const alternate_jump = try executable.addJumpIndex();
+
+    // a. Return undefined.
+    try consequent_jump.setTargetHere();
+    try executable.addInstruction(.store); // Drop baseValue from the stack
+    try executable.addInstructionWithConstant(.store_constant, .undefined);
+    try executable.addInstruction(.jump);
+    const end_jump = try executable.addJumpIndex();
+
+    // 4. Return ? ChainEvaluation of OptionalChain with arguments baseValue and baseReference.
+    try alternate_jump.setTargetHere();
+
+    switch (node.property) {
+        // OptionalChain : ?. Arguments
+        .arguments => |arguments| {
+            try executable.addInstruction(.load_this_value_for_evaluate_call);
+
+            for (arguments) |argument| {
+                try codegenExpression(argument, executable, ctx);
+                if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                try executable.addInstruction(.load);
+            }
+
+            // TODO: 1. Let thisChain be this OptionalChain.
+            // TODO: 2. Let tailCall be IsInTailPosition(thisChain).
+
+            // 3. Return ? EvaluateCall(baseValue, baseReference, Arguments, tailCall).
+            try executable.addInstruction(.evaluate_call);
+            try executable.addIndex(arguments.len);
+            const strict = ctx.contained_in_strict_mode_code;
+            try executable.addIndex(@intFromBool(strict));
+
+            // TODO: We should probably also clean this up if something throws beforehand...
+            try executable.addInstruction(.pop_reference);
+        },
+
+        // OptionalChain : ?. [ Expression ]
+        .expression => |expression| {
+            // 1. Let strict be IsStrict(this OptionalChain).
+            const strict = ctx.contained_in_strict_mode_code;
+
+            // 2. Return ? EvaluatePropertyAccessWithExpressionKey(baseValue, Expression, strict).
+            try codegenExpression(expression.*, executable, ctx);
+            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
+            try executable.addInstruction(.evaluate_property_access_with_expression_key);
+            try executable.addIndex(@intFromBool(strict));
+        },
+
+        // OptionalChain : ?. IdentifierName
+        .identifier => |identifier| {
+            // 1. Let strict be IsStrict(this OptionalChain).
+            const strict = ctx.contained_in_strict_mode_code;
+
+            // 2. Return EvaluatePropertyAccessWithIdentifierKey(baseValue, IdentifierName, strict).
+            try executable.addInstructionWithIdentifier(
+                .evaluate_property_access_with_identifier_key,
+                identifier,
+            );
+            try executable.addIndex(@intFromBool(strict));
+        },
+
+        // OptionalChain : ?. PrivateIdentifier
+        .private_identifier => |private_identifier| {
+            // 1. Let fieldNameString be the StringValue of PrivateIdentifier.
+            // 2. Return MakePrivateReference(baseValue, fieldNameString).
+            try executable.addInstructionWithIdentifier(
+                .make_private_reference,
+                private_identifier,
+            );
+        },
+    }
+
+    try end_jump.setTargetHere();
+}
+
+/// 13.3.10.1 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-import-call-runtime-semantics-evaluation
+pub fn codegenImportCall(
+    node: ast.ImportCall,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    try codegenExpression(node.expression.*, executable, ctx);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    try executable.addInstruction(.load);
+    try executable.addInstruction(.evaluate_import_call);
+}
+
+/// 13.3.12.1 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-meta-properties-runtime-semantics-evaluation
+pub fn codegenMetaProperty(
+    node: ast.MetaProperty,
+    executable: *Executable,
+    _: *Context,
+) Executable.Error!void {
+    switch (node) {
+        // NewTarget : new . target
+        .new_target => {
+            // 1. Return GetNewTarget().
+            try executable.addInstruction(.get_new_target);
+        },
+
+        // ImportMeta : import . meta
+        .import_meta => {
+            // 1-5.
+            try executable.addInstruction(.get_or_create_import_meta);
+        },
     }
 }
 
@@ -964,32 +965,6 @@ pub fn codegenUnaryExpression(
             try executable.addInstruction(.logical_not);
         },
     }
-}
-
-/// 13.15.4 EvaluateStringOrNumericBinaryExpression ( leftOperand, opText, rightOperand )
-/// https://tc39.es/ecma262/#sec-evaluatestringornumericbinaryexpression
-pub fn codegenBinaryExpression(
-    node: ast.BinaryExpression,
-    executable: *Executable,
-    ctx: *Context,
-) Executable.Error!void {
-    // 1. Let lref be ? Evaluation of leftOperand.
-    try codegenExpression(node.lhs_expression.*, executable, ctx);
-
-    // 2. Let lval be ? GetValue(lref).
-    if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
-
-    // 3. Let rref be ? Evaluation of rightOperand.
-    try codegenExpression(node.rhs_expression.*, executable, ctx);
-
-    // 4. Let rval be ? GetValue(rref).
-    if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-    try executable.addInstruction(.load);
-
-    // 5. Return ? ApplyStringOrNumericBinaryOperator(lval, opText, rval).
-    try executable.addInstruction(.apply_string_or_numeric_binary_operator);
-    try executable.addIndex(@intFromEnum(node.operator));
 }
 
 /// 13.10.1 Runtime Semantics: Evaluation
@@ -1458,6 +1433,32 @@ pub fn codegenAssignmentExpression(
         try end_jump.setTargetHere();
         try executable.addInstruction(.pop_reference);
     } else unreachable;
+}
+
+/// 13.15.4 EvaluateStringOrNumericBinaryExpression ( leftOperand, opText, rightOperand )
+/// https://tc39.es/ecma262/#sec-evaluatestringornumericbinaryexpression
+pub fn codegenBinaryExpression(
+    node: ast.BinaryExpression,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    // 1. Let lref be ? Evaluation of leftOperand.
+    try codegenExpression(node.lhs_expression.*, executable, ctx);
+
+    // 2. Let lval be ? GetValue(lref).
+    if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    try executable.addInstruction(.load);
+
+    // 3. Let rref be ? Evaluation of rightOperand.
+    try codegenExpression(node.rhs_expression.*, executable, ctx);
+
+    // 4. Let rval be ? GetValue(rref).
+    if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    try executable.addInstruction(.load);
+
+    // 5. Return ? ApplyStringOrNumericBinaryOperator(lval, opText, rval).
+    try executable.addInstruction(.apply_string_or_numeric_binary_operator);
+    try executable.addIndex(@intFromEnum(node.operator));
 }
 
 /// 13.16.1 Runtime Semantics: Evaluation
