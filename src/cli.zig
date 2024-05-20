@@ -536,7 +536,15 @@ fn repl(allocator: Allocator, realm: *Realm, options: struct {
             defer self.editor.allocator.free(line);
 
             var tokenizer = kiesel.language.tokenizer.Tokenizer.init(line, null);
-            const change = kiesel.utils.temporaryChange(&kiesel.language.tokenizer.state.tokenizer, &tokenizer);
+            const change = kiesel.utils.temporaryChange(
+                &kiesel.language.tokenizer.state,
+                .{
+                    .tokenizer = &tokenizer,
+                    // Workaround to ensure the tokenizer generates template literal middle and
+                    // tail tokens even though there is no parser setting this.
+                    .parsing_template_literal = true,
+                },
+            );
             defer change.restore();
 
             while (tokenizer.next() catch null) |token| {

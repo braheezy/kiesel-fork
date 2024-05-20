@@ -239,7 +239,7 @@ pub const Tokenizer = ptk.Tokenizer(TokenType, &patterns);
 pub var state: struct {
     tokenizer: *Tokenizer = undefined,
     parsing_regular_expression: bool = false,
-    open_template_literals: usize = 0,
+    parsing_template_literal: bool = false,
 } = .{};
 
 comptime {
@@ -427,7 +427,6 @@ fn templateMatcher(str: []const u8) ?usize {
 
 fn templateHeadMatcher(str: []const u8) ?usize {
     if (parseTemplateLiteralSpan(str, .head)) |span| {
-        state.open_template_literals += 1;
         return span.text.len;
     } else |err| switch (err) {
         error.InvalidTemplateLiteralSpan => return null,
@@ -435,7 +434,7 @@ fn templateHeadMatcher(str: []const u8) ?usize {
 }
 
 fn templateMiddleMatcher(str: []const u8) ?usize {
-    if (state.open_template_literals == 0) return null;
+    if (!state.parsing_template_literal) return null;
     if (parseTemplateLiteralSpan(str, .middle)) |span|
         return span.text.len
     else |err| switch (err) {
@@ -444,9 +443,8 @@ fn templateMiddleMatcher(str: []const u8) ?usize {
 }
 
 fn templateTailMatcher(str: []const u8) ?usize {
-    if (state.open_template_literals == 0) return null;
+    if (!state.parsing_template_literal) return null;
     if (parseTemplateLiteralSpan(str, .tail)) |span| {
-        state.open_template_literals -= 1;
         return span.text.len;
     } else |err| switch (err) {
         error.InvalidTemplateLiteralSpan => return null,

@@ -216,7 +216,7 @@ pub fn parseNode(
         .core = core,
         .diagnostics = ctx.diagnostics,
     };
-    const tmp = temporaryChange(&tokenizer_.state.tokenizer, &tokenizer);
+    const tmp = temporaryChange(&tokenizer_.state, .{ .tokenizer = &tokenizer });
     defer tmp.restore();
     const ast_node: ?T = acceptFn(&parser) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
@@ -2415,6 +2415,9 @@ fn acceptRegularExpressionLiteral(self: *Self) AcceptError!ast.RegularExpression
 fn acceptTemplateLiteral(self: *Self) AcceptError!ast.TemplateLiteral {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
+
+    const tmp = temporaryChange(&tokenizer_.state.parsing_template_literal, true);
+    defer tmp.restore();
 
     var spans = std.ArrayList(ast.TemplateLiteral.Span).init(self.allocator);
     errdefer spans.deinit();
