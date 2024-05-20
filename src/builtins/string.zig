@@ -519,6 +519,7 @@ pub const StringConstructor = struct {
 
         try defineBuiltinFunction(object, "fromCharCode", fromCharCode, 1, realm);
         try defineBuiltinFunction(object, "fromCodePoint", fromCodePoint, 1, realm);
+        try defineBuiltinFunction(object, "raw", raw, 1, realm);
 
         // 22.1.2.3 String.prototype
         // https://tc39.es/ecma262/#sec-string.prototype
@@ -644,6 +645,64 @@ pub const StringConstructor = struct {
         // 3. Assert: If codePoints is empty, then result is the empty String.
         // 4. Return result.
         return Value.from(try result.build());
+    }
+
+    /// 22.1.2.4 String.raw ( template, ...substitutions )
+    /// https://tc39.es/ecma262/#sec-string.raw
+    fn raw(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const template = arguments.get(0);
+        const substitutions = if (arguments.count() <= 1) &[_]Value{} else arguments.values[1..];
+
+        // 1. Let substitutionCount be the number of elements in substitutions.
+        const substitution_count = substitutions.len;
+
+        // 2. Let cooked be ? ToObject(template).
+        const cooked = try template.toObject(agent);
+
+        // 3. Let literals be ? ToObject(? Get(cooked, "raw")).
+        const literals = try (try cooked.get(PropertyKey.from("raw"))).toObject(agent);
+
+        // 4. Let literalCount be ? LengthOfArrayLike(literals).
+        const literal_count = try literals.lengthOfArrayLike();
+
+        // 5. If literalCount ≤ 0, return the empty String.
+        if (literal_count == 0) return Value.from("");
+
+        // 6. Let R be the empty String.
+        var result = types.String.Builder.init(agent.gc_allocator);
+        defer result.deinit();
+
+        // 7. Let nextIndex be 0.
+        var next_index: u53 = 0;
+
+        // 8. Repeat,
+        while (true) : (next_index += 1) {
+            // a. Let nextLiteralVal be ? Get(literals, ! ToString(𝔽(nextIndex))).
+            const next_literal_value = try literals.get(PropertyKey.from(next_index));
+
+            // b. Let nextLiteral be ? ToString(nextLiteralVal).
+            const next_literal = try next_literal_value.toString(agent);
+
+            // c. Set R to the string-concatenation of R and nextLiteral.
+            try result.appendString(next_literal);
+
+            // d. If nextIndex + 1 = literalCount, return R.
+            if (next_index + 1 == literal_count) return Value.from(try result.build());
+
+            // e. If nextIndex < substitutionCount, then
+            if (next_index < substitution_count) {
+                // i. Let nextSubVal be substitutions[nextIndex].
+                const next_substitution_value = substitutions[@intCast(next_index)];
+
+                // ii. Let nextSub be ? ToString(nextSubVal).
+                const next_substitution = try next_substitution_value.toString(agent);
+
+                // iii. Set R to the string-concatenation of R and nextSub.
+                try result.appendString(next_substitution);
+            }
+
+            // f. Set nextIndex to nextIndex + 1.
+        }
     }
 };
 
