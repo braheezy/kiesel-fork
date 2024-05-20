@@ -134,6 +134,11 @@ fn fetchBlock(self: *Self, executable: Executable) Executable.StatementListOrCas
     return executable.blocks.items[index];
 }
 
+fn fetchTemplateLiteral(self: *Self, executable: Executable) *ast.TemplateLiteral {
+    const index = self.fetchIndex(executable);
+    return &executable.template_literals.items[index];
+}
+
 fn fetchIndex(self: *Self, executable: Executable) Executable.IndexType {
     const b1 = @intFromEnum(self.fetchInstruction(executable).?);
     const b2 = @intFromEnum(self.fetchInstruction(executable).?);
@@ -169,6 +174,104 @@ fn initializeBoundName(
             try lhs.putValue(agent, value);
         },
     }
+}
+
+/// 13.2.8.4 GetTemplateObject ( templateLiteral )
+/// https://tc39.es/ecma262/#sec-gettemplateobject
+fn getTemplateObject(
+    agent: *Agent,
+    template_literal: *ast.TemplateLiteral,
+) Allocator.Error!Object {
+    // 1. Let realm be the current Realm Record.
+    const realm = agent.currentRealm();
+
+    // 2. Let templateRegistry be realm.[[TemplateMap]].
+    // 3. For each element e of templateRegistry, do
+    if (realm.template_map.get(template_literal)) |template| {
+        // a. If e.[[Site]] is the same Parse Node as templateLiteral, then
+        //     i. Return e.[[Array]].
+        return template;
+    }
+
+    // 4. Let rawStrings be TemplateStrings of templateLiteral with argument true.
+    // 5. Assert: rawStrings is a List of Strings.
+    const raw_strings = try template_literal.templateStrings(agent.gc_allocator, true);
+    defer agent.gc_allocator.free(raw_strings);
+
+    // 6. Let cookedStrings be TemplateStrings of templateLiteral with argument false.
+    const cooked_strings = try template_literal.templateStrings(agent.gc_allocator, false);
+    defer agent.gc_allocator.free(cooked_strings);
+
+    // 7. Let count be the number of elements in the List cookedStrings.
+    const count = cooked_strings.len;
+
+    // 8. Assert: count ≤ 2**32 - 1.
+    std.debug.assert(count <= std.math.maxInt(u32));
+
+    // 9. Let template be ! ArrayCreate(count).
+    const template = arrayCreate(agent, count, null) catch |err| try noexcept(err);
+
+    // 10. Let rawObj be ! ArrayCreate(count).
+    const raw_obj = arrayCreate(agent, count, null) catch |err| try noexcept(err);
+
+    // 11. Let index be 0.
+    var index: u53 = 0;
+
+    // 12. Repeat, while index < count,
+    while (index < count) : (index += 1) {
+        // a. Let prop be ! ToString(𝔽(index)).
+        const property_key = PropertyKey.from(index);
+
+        // b. Let cookedValue be cookedStrings[index].
+        const cooked_value = cooked_strings[@intCast(index)];
+
+        // c. Perform ! DefinePropertyOrThrow(template, prop, PropertyDescriptor {
+        //      [[Value]]: cookedValue, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
+        //    }).
+        template.definePropertyOrThrow(property_key, .{
+            .value = Value.from(cooked_value),
+            .writable = false,
+            .enumerable = true,
+            .configurable = false,
+        }) catch |err| try noexcept(err);
+
+        // d. Let rawValue be the String value rawStrings[index].
+        const raw_value = raw_strings[@intCast(index)];
+
+        // e. Perform ! DefinePropertyOrThrow(rawObj, prop, PropertyDescriptor {
+        //      [[Value]]: rawValue, [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false
+        //    }).
+        raw_obj.definePropertyOrThrow(property_key, .{
+            .value = Value.from(raw_value),
+            .writable = false,
+            .enumerable = true,
+            .configurable = false,
+        }) catch |err| try noexcept(err);
+
+        // f. Set index to index + 1.
+    }
+
+    // 13. Perform ! SetIntegrityLevel(rawObj, frozen).
+    _ = raw_obj.setIntegrityLevel(.frozen) catch |err| try noexcept(err);
+
+    // 14. Perform ! DefinePropertyOrThrow(template, "raw", PropertyDescriptor {
+    //       [[Value]]: rawObj, [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false
+    //     }).
+    template.definePropertyOrThrow(PropertyKey.from("raw"), .{
+        .value = Value.from(raw_obj),
+        .writable = false,
+        .enumerable = false,
+        .configurable = false,
+    }) catch |err| try noexcept(err);
+
+    // 15. Perform ! SetIntegrityLevel(template, frozen).
+    _ = template.setIntegrityLevel(.frozen) catch |err| try noexcept(err);
+
+    // 16. Append the Record { [[Site]]: templateLiteral, [[Array]]: template } to realm.[[TemplateMap]].
+    try realm.template_map.putNoClobber(template_literal, template);
+
+    // 17. Return template.
+    return template;
 }
 
 /// 13.3.5.1.1 EvaluateNew ( constructExpr, arguments )
@@ -2630,6 +2733,10 @@ pub fn executeInstruction(
                 // b. Return importMeta.
                 self.result = Value.from(module.import_meta.?);
             }
+        },
+        .get_template_object => {
+            const template_literal = self.fetchTemplateLiteral(executable);
+            self.result = Value.from(try getTemplateObject(self.agent, template_literal));
         },
         .get_value => {
             if (self.reference) |reference| self.result = try reference.getValue(self.agent);

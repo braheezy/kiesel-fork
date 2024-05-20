@@ -5,6 +5,7 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const ast = @import("../language/ast.zig");
 const builtins = @import("../builtins.zig");
 const environments = @import("environments.zig");
 const language = @import("../language.zig");
@@ -39,7 +40,8 @@ global_object: Object,
 /// [[GlobalEnv]]
 global_env: *GlobalEnvironment,
 
-// TODO: [[TemplateMap]]
+/// [[TemplateMap]]
+template_map: std.AutoHashMap(*ast.TemplateLiteral, Object),
 
 /// [[LoadedModules]]
 loaded_modules: std.StringHashMap(Module),
@@ -75,10 +77,11 @@ pub fn create(agent: *Agent) Allocator.Error!*Self {
         // 5. Set realmRec.[[GlobalEnv]] to undefined.
         .global_env = undefined,
 
+        // 6. Set realmRec.[[TemplateMap]] to a new empty List.
+        .template_map = std.AutoHashMap(*ast.TemplateLiteral, Object).init(agent.gc_allocator),
+
         .loaded_modules = std.StringHashMap(Module).init(agent.gc_allocator),
         .host_defined = SafePointer.null_pointer,
-
-        // TODO: 6. Set realmRec.[[TemplateMap]] to a new empty List.
     };
 
     // 7. Return realmRec.

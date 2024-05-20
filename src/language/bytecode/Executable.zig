@@ -21,6 +21,7 @@ constants: ValueArrayHashMap(void, sameValue),
 identifiers: std.StringArrayHashMap(void),
 functions_and_classes: std.ArrayList(FunctionOrClass),
 blocks: std.ArrayList(StatementListOrCaseBlock),
+template_literals: std.ArrayList(ast.TemplateLiteral),
 environment_lookup_cache_size: usize = 0,
 
 pub const FunctionOrClass = union(enum) {
@@ -51,6 +52,7 @@ pub fn init(allocator: Allocator) Self {
         .identifiers = std.StringArrayHashMap(void).init(allocator),
         .functions_and_classes = std.ArrayList(FunctionOrClass).init(allocator),
         .blocks = std.ArrayList(StatementListOrCaseBlock).init(allocator),
+        .template_literals = std.ArrayList(ast.TemplateLiteral).init(allocator),
     };
 }
 
@@ -60,6 +62,7 @@ pub fn deinit(self: *Self) void {
     self.identifiers.deinit();
     self.functions_and_classes.deinit();
     self.blocks.deinit();
+    self.template_literals.deinit();
 }
 
 pub fn addInstruction(self: *Self, instruction: Instruction) Allocator.Error!void {
@@ -82,6 +85,10 @@ pub fn addFunctionOrClass(self: *Self, function_or_class: FunctionOrClass) Alloc
 
 pub fn addBlock(self: *Self, block: StatementListOrCaseBlock) Allocator.Error!void {
     try self.blocks.append(block);
+}
+
+pub fn addTemplateLiteral(self: *Self, template_literal: ast.TemplateLiteral) Allocator.Error!void {
+    try self.template_literals.append(template_literal);
 }
 
 pub fn addInstructionWithConstant(
@@ -126,6 +133,17 @@ pub fn addInstructionWithBlock(
     try self.addInstruction(instruction);
     try self.addBlock(block);
     try self.addIndex(self.blocks.items.len - 1);
+}
+
+pub fn addInstructionWithTemplateLiteral(
+    self: *Self,
+    instruction: Instruction,
+    template_literal: ast.TemplateLiteral,
+) Error!void {
+    std.debug.assert(instruction.hasTemplateLiteralIndex());
+    try self.addInstruction(instruction);
+    try self.addTemplateLiteral(template_literal);
+    try self.addIndex(self.template_literals.items.len - 1);
 }
 
 pub const JumpIndex = struct {

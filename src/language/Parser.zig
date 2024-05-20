@@ -1184,6 +1184,21 @@ pub fn acceptSequenceExpression(
     return .{ .expressions = try expressions.toOwnedSlice() };
 }
 
+pub fn acceptTaggedTemplate(
+    self: *Self,
+    primary_expression: ast.Expression,
+) AcceptError!ast.TaggedTemplate {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const template_literal = try self.acceptTemplateLiteral();
+
+    // Defer heap allocation of expression until we know this is a TaggedTemplate
+    const expression = try self.allocator.create(ast.Expression);
+    expression.* = primary_expression;
+    return .{ .expression = expression, .template_literal = template_literal };
+}
+
 pub fn acceptExpression(self: *Self, ctx: AcceptContext) AcceptError!ast.Expression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
@@ -1216,6 +1231,10 @@ pub fn acceptExpression(self: *Self, ctx: AcceptContext) AcceptError!ast.Express
         return error.UnexpectedToken;
 
     while (true) {
+        while (self.acceptTaggedTemplate(expression)) |tagged_template| {
+            expression = .{ .tagged_template = tagged_template };
+        } else |_| {}
+
         const next_token = try self.core.peek() orelse break;
         const new_ctx: AcceptContext = .{
             .precedence = getPrecedence(next_token.type),

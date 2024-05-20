@@ -374,7 +374,7 @@ pub fn codegenTemplateLiteral(
         std.debug.assert(span == .text);
         try executable.addInstructionWithConstant(
             .store_constant,
-            try span.templateValue(executable.allocator),
+            Value.from(try span.templateValue(executable.allocator)),
         );
         return;
     }
@@ -398,7 +398,7 @@ pub fn codegenTemplateLiteral(
             .text => {
                 try executable.addInstructionWithConstant(
                     .load_constant,
-                    try span.templateValue(executable.allocator),
+                    Value.from(try span.templateValue(executable.allocator)),
                 );
             },
         }
@@ -719,6 +719,90 @@ pub fn codegenImportCall(
     if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
     try executable.addInstruction(.load);
     try executable.addInstruction(.evaluate_import_call);
+}
+
+/// 13.3.11.1 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-tagged-templates-runtime-semantics-evaluation
+pub fn codegenTaggedTemplate(
+    node: ast.TaggedTemplate,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    // MemberExpression : MemberExpression TemplateLiteral
+    // CallExpression : CallExpression TemplateLiteral
+
+    // 1. Let tagRef be ? Evaluation of MemberExpression.
+    try codegenExpression(node.expression.*, executable, ctx);
+
+    try executable.addInstruction(.push_reference);
+
+    // 2. Let tagFunc be ? GetValue(tagRef).
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+    try executable.addInstruction(.load);
+
+    // TODO: 3. Let thisCall be this MemberExpression.
+    // TODO: 4. Let tailCall be IsInTailPosition(thisCall).
+
+    try executable.addInstruction(.load_this_value_for_evaluate_call);
+
+    // 13.3.8.1 Runtime Semantics: ArgumentListEvaluation
+    // https://tc39.es/ecma262/#sec-runtime-semantics-argumentlistevaluation
+
+    // TemplateLiteral : NoSubstitutionTemplate
+    if (node.template_literal.spans.len == 1) {
+        const span = node.template_literal.spans[0];
+        std.debug.assert(span == .text);
+
+        // 1. Let templateLiteral be this TemplateLiteral.
+        // 2. Let siteObj be GetTemplateObject(templateLiteral).
+        // 3. Return « siteObj ».
+        try executable.addInstructionWithTemplateLiteral(
+            .get_template_object,
+            node.template_literal,
+        );
+        try executable.addInstruction(.load);
+    }
+    // TemplateLiteral : SubstitutionTemplate
+    else {
+        // 1. Let templateLiteral be this TemplateLiteral.
+        // 2. Let siteObj be GetTemplateObject(templateLiteral).
+        try executable.addInstructionWithTemplateLiteral(
+            .get_template_object,
+            node.template_literal,
+        );
+        try executable.addInstruction(.load);
+
+        // 3. Let remaining be ? ArgumentListEvaluation of SubstitutionTemplate.
+        // 4. Return the list-concatenation of « siteObj » and remaining.
+        for (node.template_literal.spans, 0..) |span, i| {
+            // SubstitutionTemplate : TemplateHead Expression TemplateSpans
+            std.debug.assert(if (i % 2 == 0) span == .text else span == .expression);
+            switch (span) {
+                .expression => |expression| {
+                    // 1. Let firstSubRef be ? Evaluation of Expression.
+                    try codegenExpression(expression, executable, ctx);
+
+                    // 2. Let firstSub be ? GetValue(firstSubRef).
+                    if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                    try executable.addInstruction(.load);
+
+                    // 3. Let restSub be ? SubstitutionEvaluation of TemplateSpans.
+                    // 4. Assert: restSub is a possibly empty List.
+                    // 5. Return the list-concatenation of « firstSub » and restSub.
+                },
+                .text => {},
+            }
+        }
+    }
+
+    // 5. Return ? EvaluateCall(tagFunc, tagRef, TemplateLiteral, tailCall).
+    try executable.addInstruction(.evaluate_call);
+    try executable.addIndex(@divFloor(node.template_literal.spans.len, 2) + 1);
+    const strict = ctx.contained_in_strict_mode_code;
+    try executable.addIndex(@intFromBool(strict));
+
+    // TODO: We should probably also clean this up if something throws beforehand...
+    try executable.addInstruction(.pop_reference);
 }
 
 /// 13.3.12.1 Runtime Semantics: Evaluation
@@ -1502,6 +1586,7 @@ pub fn codegenExpression(
         .conditional_expression => |x| try codegenConditionalExpression(x, executable, ctx),
         .assignment_expression => |x| try codegenAssignmentExpression(x, executable, ctx),
         .sequence_expression => |x| try codegenSequenceExpression(x, executable, ctx),
+        .tagged_template => |x| try codegenTaggedTemplate(x, executable, ctx),
     }
 }
 

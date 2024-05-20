@@ -429,24 +429,61 @@ pub const RegularExpressionLiteral = struct {
 
 /// https://tc39.es/ecma262/#prod-TemplateLiteral
 pub const TemplateLiteral = struct {
-    pub const Span = union(enum) {
-        const Self = @This();
+    const Self = @This();
 
+    pub const Span = union(enum) {
         text: []const u8,
         expression: Expression,
 
-        /// https://tc39.es/ecma262/#sec-static-semantics-tv
         /// 12.9.6.1 Static Semantics: TV
-        pub fn templateValue(self: Self, allocator: Allocator) Allocator.Error!Value {
+        /// https://tc39.es/ecma262/#sec-static-semantics-tv
+        pub fn templateValue(self: Span, allocator: Allocator) Allocator.Error![]const u8 {
             std.debug.assert(self.text[0] == '`' or self.text[0] == '}');
             return if (self.text[self.text.len - 1] == '`')
-                Value.from(try stringValueImpl(allocator, self.text[1 .. self.text.len - 1]))
+                stringValueImpl(allocator, self.text[1 .. self.text.len - 1])
             else
-                Value.from(try stringValueImpl(allocator, self.text[1 .. self.text.len - 2]));
+                stringValueImpl(allocator, self.text[1 .. self.text.len - 2]);
+        }
+
+        /// 12.9.6.2 Static Semantics: TRV
+        /// https://tc39.es/ecma262/#sec-static-semantics-trv
+        pub fn templateRawValue(self: Span, allocator: Allocator) Allocator.Error![]const u8 {
+            std.debug.assert(self.text[0] == '`' or self.text[0] == '}');
+            return if (self.text[self.text.len - 1] == '`')
+                allocator.dupe(u8, self.text[1 .. self.text.len - 1])
+            else
+                allocator.dupe(u8, self.text[1 .. self.text.len - 2]);
+        }
+
+        /// 13.2.8.3 Static Semantics: TemplateString ( templateToken, raw )
+        /// https://tc39.es/ecma262/#sec-templatestring
+        pub fn templateString(self: Span, allocator: Allocator, raw: bool) Allocator.Error![]const u8 {
+            // 1. If raw is true, then
+            const string = if (raw) blk: {
+                // a. Let string be the TRV of templateToken.
+                break :blk try self.templateRawValue(allocator);
+            } else blk: {
+                // a. Let string be the TV of templateToken.
+                break :blk try self.templateValue(allocator);
+            };
+
+            // 3. Return string.
+            return string;
         }
     };
 
     spans: []const Span,
+
+    /// 13.2.8.2 Static Semantics: TemplateStrings
+    /// https://tc39.es/ecma262/#sec-static-semantics-templatestrings
+    pub fn templateStrings(self: Self, allocator: Allocator, raw: bool) Allocator.Error![]const []const u8 {
+        var template_strings = std.ArrayList([]const u8).init(allocator);
+        for (self.spans) |span| switch (span) {
+            .text => try template_strings.append(try span.templateString(allocator, raw)),
+            .expression => {},
+        };
+        return template_strings.toOwnedSlice();
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-UpdateExpression
@@ -595,6 +632,11 @@ pub const SequenceExpression = struct {
     expressions: []const Expression,
 };
 
+pub const TaggedTemplate = struct {
+    expression: *Expression,
+    template_literal: TemplateLiteral,
+};
+
 /// https://tc39.es/ecma262/#prod-Expression
 pub const Expression = union(enum) {
     const Self = @This();
@@ -617,6 +659,7 @@ pub const Expression = union(enum) {
     conditional_expression: ConditionalExpression,
     assignment_expression: AssignmentExpression,
     sequence_expression: SequenceExpression,
+    tagged_template: TaggedTemplate,
 
     /// 8.6.4 Static Semantics: AssignmentTargetType
     /// https://tc39.es/ecma262/#sec-static-semantics-assignmenttargettype

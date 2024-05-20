@@ -60,6 +60,8 @@ pub const Instruction = enum(u8) {
     get_new_target,
     /// Store the import.meta object as the result value.
     get_or_create_import_meta,
+    /// Store GetTemplateObject() as the result value.
+    get_template_object,
     /// Store GetValue() as the result value.
     get_value,
     /// Compare the last two values on the stack using the '>' operator rules.
@@ -200,6 +202,7 @@ pub const Instruction = enum(u8) {
             .evaluate_property_access_with_expression_key,
             .evaluate_super_call,
             .get_iterator,
+            .get_template_object,
             .has_private_element,
             .instantiate_arrow_function_expression,
             .instantiate_async_arrow_function_expression,
@@ -259,6 +262,14 @@ pub const Instruction = enum(u8) {
     pub fn hasBlockIndex(self: Self) bool {
         return switch (self) {
             .block_declaration_instantiation,
+            => true,
+            else => false,
+        };
+    }
+
+    pub fn hasTemplateLiteralIndex(self: Self) bool {
+        return switch (self) {
+            .get_template_object,
             => true,
             else => false,
         };
