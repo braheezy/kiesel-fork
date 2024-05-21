@@ -22,7 +22,7 @@ const PrivateName = types.PrivateName;
 const PrivateNameArrayHashMap = types.PrivateNameArrayHashMap;
 const PropertyDescriptor = spec.PropertyDescriptor;
 const Realm = execution.Realm;
-const Value = @import("value.zig").Value;
+const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const noexcept = utils.noexcept;
 const validateNonRevokedProxy = builtins.validateNonRevokedProxy;
@@ -153,16 +153,16 @@ pub fn ordinaryToPrimitive(self: Self, hint: PreferredType) Agent.Error!Value {
     const method_names = switch (hint) {
         // 1. If hint is string, then
         //     a. Let methodNames be « "toString", "valueOf" ».
-        .string => [_][]const u8{ "toString", "valueOf" },
+        .string => [_]PropertyKey{ PropertyKey.from("toString"), PropertyKey.from("valueOf") },
         // 2. Else,
         //     a. Let methodNames be « "valueOf", "toString" ».
-        else => [_][]const u8{ "valueOf", "toString" },
+        else => [_]PropertyKey{ PropertyKey.from("valueOf"), PropertyKey.from("toString") },
     };
 
     // 3. For each element name of methodNames, do
     for (method_names) |name| {
         // a. Let method be ? Get(O, name).
-        const method = try self.get(PropertyKey.from(name));
+        const method = try self.get(name);
 
         // b. If IsCallable(method) is true, then
         if (method.isCallable()) {

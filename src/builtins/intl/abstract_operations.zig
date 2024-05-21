@@ -74,7 +74,7 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
             // iii. If Type(kValue) is Object and kValue has an [[InitializedLocale]] internal slot, then
             const tag = if (k_value == .object and k_value.object.is(builtins.Intl.Locale)) blk: {
                 // 1. Let tag be kValue.[[Locale]].
-                break :blk String.from(
+                break :blk String.fromAscii(
                     try k_value.object.as(builtins.Intl.Locale).fields.locale.toString(agent.gc_allocator),
                 );
             }
@@ -87,27 +87,27 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
             // v. If IsStructurallyValidLanguageTag(tag) is false, throw a RangeError exception.
             // vi. Let canonicalizedTag be CanonicalizeUnicodeLocaleId(tag).
             // NOTE: Underscore separators are not BCP 47-compatible and must be rejected here.
-            if (std.mem.indexOfScalar(u8, tag.utf8, '_') != null) {
+            if (tag.indexOf(String.fromLiteral("_"), 0) != null) {
                 return agent.throwException(
                     .range_error,
-                    "Invalid locale identifier '{s}'",
-                    .{tag.utf8},
+                    "Invalid locale identifier '{}'",
+                    .{tag},
                 );
             }
-            const canonicalized_tag = icu4zig.Locale.init(tag.utf8) catch |err| switch (err) {
+            const canonicalized_tag = icu4zig.Locale.init(try tag.toUtf8(agent.gc_allocator)) catch |err| switch (err) {
                 error.LocaleParserLanguageError,
                 error.LocaleParserSubtagError,
                 error.LocaleParserExtensionError,
                 => return agent.throwException(
                     .range_error,
-                    "Invalid locale identifier '{s}'",
-                    .{tag.utf8},
+                    "Invalid locale identifier '{}'",
+                    .{tag},
                 ),
             };
 
             // vii. If seen does not contain canonicalizedTag, append canonicalizedTag to seen.
             for (seen.items) |locale| {
-                if (locale.normalizingEq(tag.utf8)) break;
+                if (locale.normalizingEq(try tag.toUtf8(agent.gc_allocator))) break;
             } else {
                 try seen.append(canonicalized_tag);
             }

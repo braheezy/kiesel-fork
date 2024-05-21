@@ -82,45 +82,11 @@ pub inline fn isZigString(comptime T: type) bool {
     };
 }
 
-pub fn indexOfSlice(haystack: []const []const u8, needle: []const u8) ?usize {
-    for (haystack, 0..) |value, i| {
-        if (std.mem.eql(u8, value, needle)) return i;
-    }
-    return null;
-}
-
 pub fn containsSlice(haystack: []const []const u8, needle: []const u8) bool {
-    return indexOfSlice(haystack, needle) != null;
-}
-
-pub fn trimLeft(haystack: []const u8, needles: []const []const u8) []const u8 {
-    var trimmed = haystack;
-    while (trimmed.len > 0) {
-        for (needles) |needle| {
-            if (std.mem.startsWith(u8, trimmed, needle)) {
-                trimmed = trimmed[needle.len..];
-                break;
-            }
-        } else break;
+    for (haystack) |value| {
+        if (std.mem.eql(u8, value, needle)) return true;
     }
-    return trimmed;
-}
-
-pub fn trimRight(haystack: []const u8, needles: []const []const u8) []const u8 {
-    var trimmed = haystack;
-    while (trimmed.len > 0) {
-        for (needles) |needle| {
-            if (std.mem.endsWith(u8, trimmed, needle)) {
-                trimmed = trimmed[0 .. trimmed.len - needle.len];
-                break;
-            }
-        } else break;
-    }
-    return trimmed;
-}
-
-pub fn trim(haystack: []const u8, needles: []const []const u8) []const u8 {
-    return trimLeft(trimRight(haystack, needles), needles);
+    return false;
 }
 
 pub fn formatParseError(allocator: Allocator, parse_error: ptk.Error) Allocator.Error![]const u8 {

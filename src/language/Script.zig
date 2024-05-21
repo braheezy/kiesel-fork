@@ -18,6 +18,7 @@ const Module = language.Module;
 const Parser = @import("Parser.zig");
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
+const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 
@@ -30,7 +31,7 @@ realm: *Realm,
 ecmascript_code: ast.Script,
 
 /// [[LoadedModules]]
-loaded_modules: std.StringHashMap(Module),
+loaded_modules: StringHashMap(Module),
 
 /// [[HostDefined]]
 host_defined: SafePointer,
@@ -60,7 +61,7 @@ pub fn parse(
     self.* = .{
         .realm = realm,
         .ecmascript_code = script,
-        .loaded_modules = std.StringHashMap(Module).init(agent.gc_allocator),
+        .loaded_modules = StringHashMap(Module).init(agent.gc_allocator),
         .host_defined = host_defined orelse SafePointer.null_pointer,
     };
     return self;

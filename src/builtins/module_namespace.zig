@@ -18,6 +18,7 @@ const Module = language.Module;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
+const String = types.String;
 const Value = types.Value;
 const containsSlice = utils.containsSlice;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
@@ -71,8 +72,10 @@ fn getOwnProperty(object: Object, property_key: PropertyKey) Agent.Error!?Proper
     // 2. Let exports be O.[[Exports]].
     const exports = object.as(ModuleNamespace).fields.exports;
 
+    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toUtf8(agent.gc_allocator);
+
     // 3. If exports does not contain P, return undefined.
-    if (!containsSlice(exports, (try property_key.toStringOrSymbol(agent)).string)) {
+    if (!containsSlice(exports, property_key_string)) {
         return null;
     }
 
@@ -135,8 +138,10 @@ fn hasProperty(object: Object, property_key: PropertyKey) Allocator.Error!bool {
     // 2. Let exports be O.[[Exports]].
     const exports = object.as(ModuleNamespace).fields.exports;
 
+    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toUtf8(agent.gc_allocator);
+
     // 3. If exports contains P, return true.
-    if (containsSlice(exports, (try property_key.toStringOrSymbol(agent)).string)) {
+    if (containsSlice(exports, property_key_string)) {
         return true;
     }
 
@@ -158,7 +163,7 @@ fn get(object: Object, property_key: PropertyKey, receiver: Value) Agent.Error!V
     // 2. Let exports be O.[[Exports]].
     const exports = object.as(ModuleNamespace).fields.exports;
 
-    const property_key_string = (try property_key.toStringOrSymbol(agent)).string;
+    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toUtf8(agent.gc_allocator);
 
     // 3. If exports does not contain P, return undefined.
     if (!containsSlice(exports, property_key_string)) {
@@ -215,8 +220,10 @@ fn delete(object: Object, property_key: PropertyKey) Allocator.Error!bool {
     // 2. Let exports be O.[[Exports]].
     const exports = object.as(ModuleNamespace).fields.exports;
 
+    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toUtf8(agent.gc_allocator);
+
     // 3. If exports contains P, return false.
-    if (containsSlice(exports, (try property_key.toStringOrSymbol(agent)).string)) {
+    if (containsSlice(exports, property_key_string)) {
         return false;
     }
 
@@ -227,6 +234,8 @@ fn delete(object: Object, property_key: PropertyKey) Allocator.Error!bool {
 /// 10.4.6.11 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-ownpropertykeys
 fn ownPropertyKeys(object: Object) Allocator.Error!std.ArrayList(PropertyKey) {
+    const agent = object.agent();
+
     // 1. Let exports be O.[[Exports]].
     const exports = object.as(ModuleNamespace).fields.exports;
 
@@ -235,7 +244,9 @@ fn ownPropertyKeys(object: Object) Allocator.Error!std.ArrayList(PropertyKey) {
     var keys = try ordinaryOwnPropertyKeys(object);
     try keys.ensureUnusedCapacity(exports.len);
     for (exports) |name| {
-        keys.appendAssumeCapacity(PropertyKey.from(name));
+        keys.appendAssumeCapacity(
+            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+        );
     }
     return keys;
 }

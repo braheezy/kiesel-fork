@@ -56,22 +56,14 @@ fn matchUnicodeLocaleIdentifierType(str: []const u8) bool {
 fn applyOptionsToTag(agent: *Agent, tag: String, options: Object) Agent.Error!icu4zig.Locale {
     // 1. If IsStructurallyValidLanguageTag(tag) is false, throw a RangeError exception.
     // NOTE: Underscore separators are not BCP 47-compatible and must be rejected here.
-    if (std.mem.indexOfScalar(u8, tag.utf8, '_') != null) {
-        return agent.throwException(
-            .range_error,
-            "Invalid locale identifier '{s}'",
-            .{tag.utf8},
-        );
+    if (tag.indexOf(String.fromLiteral("_"), 0) != null) {
+        return agent.throwException(.range_error, "Invalid locale identifier '{}'", .{tag});
     }
-    var canonicalized_tag = icu4zig.Locale.init(tag.utf8) catch |err| switch (err) {
+    var canonicalized_tag = icu4zig.Locale.init(try tag.toUtf8(agent.gc_allocator)) catch |err| switch (err) {
         error.LocaleParserLanguageError,
         error.LocaleParserSubtagError,
         error.LocaleParserExtensionError,
-        => return agent.throwException(
-            .range_error,
-            "Invalid locale identifier '{s}'",
-            .{tag.utf8},
-        ),
+        => return agent.throwException(.range_error, "Invalid locale identifier '{}'", .{tag}),
     };
 
     // 2. Let language be ? GetOption(options, "language", string, empty, undefined).
@@ -81,8 +73,8 @@ fn applyOptionsToTag(agent: *Agent, tag: String, options: Object) Agent.Error!ic
     if (maybe_language) |language| {
         // a. If language cannot be matched by the unicode_language_subtag Unicode locale
         //    nonterminal, throw a RangeError exception.
-        canonicalized_tag.setLanguage(language.utf8) catch {
-            return agent.throwException(.range_error, "Invalid language subtag '{s}'", .{language});
+        canonicalized_tag.setLanguage(try language.toUtf8(agent.gc_allocator)) catch {
+            return agent.throwException(.range_error, "Invalid language subtag '{}'", .{language});
         };
     }
 
@@ -93,8 +85,8 @@ fn applyOptionsToTag(agent: *Agent, tag: String, options: Object) Agent.Error!ic
     if (maybe_script) |script| {
         // a. If script cannot be matched by the unicode_script_subtag Unicode locale nonterminal,
         //    throw a RangeError exception.
-        canonicalized_tag.setScript(script.utf8) catch {
-            return agent.throwException(.range_error, "Invalid script subtag '{s}'", .{script});
+        canonicalized_tag.setScript(try script.toUtf8(agent.gc_allocator)) catch {
+            return agent.throwException(.range_error, "Invalid script subtag '{}'", .{script});
         };
     }
 
@@ -105,8 +97,8 @@ fn applyOptionsToTag(agent: *Agent, tag: String, options: Object) Agent.Error!ic
     if (maybe_region) |region| {
         // a. If region cannot be matched by the unicode_region_subtag Unicode locale nonterminal,
         //    throw a RangeError exception.
-        canonicalized_tag.setRegion(region.utf8) catch {
-            return agent.throwException(.range_error, "Invalid region subtag '{s}'", .{region});
+        canonicalized_tag.setRegion(try region.toUtf8(agent.gc_allocator)) catch {
+            return agent.throwException(.range_error, "Invalid region subtag '{}'", .{region});
         };
     }
 
@@ -164,7 +156,7 @@ fn applyUnicodeExtensionToTag(agent: *Agent, tag: icu4zig.Locale, options: Unico
     inline for (comptime std.meta.fieldNames(UnicodeExtensions)) |field_name| {
         if (@field(options, field_name)) |new_value| {
             try parts.append(field_name);
-            try parts.append(new_value.utf8);
+            try parts.append(new_value.ascii); // All extensions have been validated and should be ASCII at this point
         }
     }
     if (end != null) try parts.append(str[end.? + 1 ..]);
@@ -243,7 +235,7 @@ pub const LocaleConstructor = struct {
         // 8. If Type(tag) is Object and tag has an [[InitializedLocale]] internal slot, then
         const tag = if (tag_value == .object and tag_value.object.is(Locale)) blk: {
             // a. Let tag be tag.[[Locale]].
-            break :blk String.from(try tag_value.object.as(Locale).fields.locale.toString(agent.gc_allocator));
+            break :blk String.fromAscii(try tag_value.object.as(Locale).fields.locale.toString(agent.gc_allocator));
         }
         // 9. Else,
         else blk: {
@@ -267,11 +259,11 @@ pub const LocaleConstructor = struct {
         if (calendar != null) {
             // a. If calendar cannot be matched by the type Unicode locale nonterminal, throw a
             //    RangeError exception.
-            if (!matchUnicodeLocaleIdentifierType(calendar.?.utf8)) {
+            if (!matchUnicodeLocaleIdentifierType(try calendar.?.toUtf8(agent.gc_allocator))) {
                 return agent.throwException(
                     .range_error,
-                    "Invalid locale identifier type '{s}'",
-                    .{calendar.?.utf8},
+                    "Invalid locale identifier type '{}'",
+                    .{calendar.?},
                 );
             }
         }
@@ -286,11 +278,11 @@ pub const LocaleConstructor = struct {
         if (collation != null) {
             // a. If collation cannot be matched by the type Unicode locale nonterminal, throw a
             //    RangeError exception.
-            if (!matchUnicodeLocaleIdentifierType(collation.?.utf8)) {
+            if (!matchUnicodeLocaleIdentifierType(try collation.?.toUtf8(agent.gc_allocator))) {
                 return agent.throwException(
                     .range_error,
-                    "Invalid locale identifier type '{s}'",
-                    .{collation.?.utf8},
+                    "Invalid locale identifier type '{}'",
+                    .{collation.?},
                 );
             }
         }
@@ -304,7 +296,7 @@ pub const LocaleConstructor = struct {
             options,
             "hourCycle",
             .string,
-            &.{ String.from("h11"), String.from("h12"), String.from("h23"), String.from("h24") },
+            &.{ String.fromLiteral("h11"), String.fromLiteral("h12"), String.fromLiteral("h23"), String.fromLiteral("h24") },
             null,
         );
 
@@ -317,7 +309,7 @@ pub const LocaleConstructor = struct {
             options,
             "caseFirst",
             .string,
-            &.{ String.from("upper"), String.from("lower"), String.from("false") },
+            &.{ String.fromLiteral("upper"), String.fromLiteral("lower"), String.fromLiteral("false") },
             null,
         );
 
@@ -328,7 +320,7 @@ pub const LocaleConstructor = struct {
         const kn_value = try getOption(options, "numeric", .boolean, null, null);
 
         // 24. If kn is not undefined, set kn to ! ToString(kn).
-        const kn = if (kn_value == true) String.from("true") else if (kn_value == false) String.from("false") else null;
+        const kn = if (kn_value == true) String.fromLiteral("true") else if (kn_value == false) String.fromLiteral("false") else null;
 
         // 25. Set opt.[[kn]] to kn.
         opt.kn = kn;
@@ -341,11 +333,11 @@ pub const LocaleConstructor = struct {
         if (numbering_system != null) {
             // a. If numberingSystem cannot be matched by the type Unicode locale nonterminal,
             //    throw a RangeError exception.
-            if (!matchUnicodeLocaleIdentifierType(numbering_system.?.utf8)) {
+            if (!matchUnicodeLocaleIdentifierType(try numbering_system.?.toUtf8(agent.gc_allocator))) {
                 return agent.throwException(
                     .range_error,
-                    "Invalid locale identifier type '{s}'",
-                    .{numbering_system.?.utf8},
+                    "Invalid locale identifier type '{}'",
+                    .{numbering_system.?},
                 );
             }
         }
@@ -478,7 +470,9 @@ pub const LocalePrototype = struct {
         const locale = try this_value.requireInternalSlot(agent, Locale);
 
         // 3. Return loc.[[Locale]].
-        return Value.from(try locale.fields.locale.toString(agent.gc_allocator));
+        return Value.from(
+            String.fromAscii(try locale.fields.locale.toString(agent.gc_allocator)),
+        );
     }
 
     /// 14.3.6 get Intl.Locale.prototype.baseName
@@ -490,7 +484,9 @@ pub const LocalePrototype = struct {
 
         // 3. Let locale be loc.[[Locale]].
         // 4. Return the longest prefix of locale matched by the unicode_language_id Unicode locale nonterminal.
-        return Value.from(try locale.fields.locale.basename(agent.gc_allocator));
+        return Value.from(
+            String.fromAscii(try locale.fields.locale.basename(agent.gc_allocator)),
+        );
     }
 
     /// 14.3.7 get Intl.Locale.prototype.calendar
@@ -502,13 +498,15 @@ pub const LocalePrototype = struct {
 
         // 3. Return loc.[[Calendar]].
         return Value.from(
-            locale.fields.locale.getUnicodeExtension(
-                agent.gc_allocator,
-                "ca",
-            ) catch |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
-                error.LocaleParserExtensionError => unreachable,
-            } orelse return .undefined,
+            String.fromAscii(
+                locale.fields.locale.getUnicodeExtension(
+                    agent.gc_allocator,
+                    "ca",
+                ) catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    error.LocaleParserExtensionError => unreachable,
+                } orelse return .undefined,
+            ),
         );
     }
 
@@ -521,13 +519,15 @@ pub const LocalePrototype = struct {
 
         // 3. Return loc.[[CaseFirst]].
         return Value.from(
-            locale.fields.locale.getUnicodeExtension(
-                agent.gc_allocator,
-                "kf",
-            ) catch |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
-                error.LocaleParserExtensionError => unreachable,
-            } orelse return .undefined,
+            String.fromAscii(
+                locale.fields.locale.getUnicodeExtension(
+                    agent.gc_allocator,
+                    "kf",
+                ) catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    error.LocaleParserExtensionError => unreachable,
+                } orelse return .undefined,
+            ),
         );
     }
 
@@ -540,13 +540,15 @@ pub const LocalePrototype = struct {
 
         // 3. Return loc.[[Collation]].
         return Value.from(
-            locale.fields.locale.getUnicodeExtension(
-                agent.gc_allocator,
-                "co",
-            ) catch |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
-                error.LocaleParserExtensionError => unreachable,
-            } orelse return .undefined,
+            String.fromAscii(
+                locale.fields.locale.getUnicodeExtension(
+                    agent.gc_allocator,
+                    "co",
+                ) catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    error.LocaleParserExtensionError => unreachable,
+                } orelse return .undefined,
+            ),
         );
     }
 
@@ -559,13 +561,15 @@ pub const LocalePrototype = struct {
 
         // 3. Return loc.[[HourCycle]].
         return Value.from(
-            locale.fields.locale.getUnicodeExtension(
-                agent.gc_allocator,
-                "hc",
-            ) catch |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
-                error.LocaleParserExtensionError => unreachable,
-            } orelse return .undefined,
+            String.fromAscii(
+                locale.fields.locale.getUnicodeExtension(
+                    agent.gc_allocator,
+                    "hc",
+                ) catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    error.LocaleParserExtensionError => unreachable,
+                } orelse return .undefined,
+            ),
         );
     }
 
@@ -596,13 +600,15 @@ pub const LocalePrototype = struct {
 
         // 3. Return loc.[[NumberingSystem]].
         return Value.from(
-            locale.fields.locale.getUnicodeExtension(
-                agent.gc_allocator,
-                "nu",
-            ) catch |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
-                error.LocaleParserExtensionError => unreachable,
-            } orelse return .undefined,
+            String.fromAscii(
+                locale.fields.locale.getUnicodeExtension(
+                    agent.gc_allocator,
+                    "nu",
+                ) catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    error.LocaleParserExtensionError => unreachable,
+                } orelse return .undefined,
+            ),
         );
     }
 
@@ -614,7 +620,9 @@ pub const LocalePrototype = struct {
         const locale = try this_value.requireInternalSlot(agent, Locale);
 
         // 3. Return GetLocaleLanguage(loc.[[Locale]]).
-        return Value.from(try locale.fields.locale.language(agent.gc_allocator));
+        return Value.from(
+            String.fromAscii(try locale.fields.locale.language(agent.gc_allocator)),
+        );
     }
 
     /// 14.3.14 get Intl.Locale.prototype.script
@@ -626,7 +634,9 @@ pub const LocalePrototype = struct {
 
         // 3. Return GetLocaleScript(loc.[[Locale]]).
         return Value.from(
-            try locale.fields.locale.script(agent.gc_allocator) orelse return .undefined,
+            String.fromAscii(
+                try locale.fields.locale.script(agent.gc_allocator) orelse return .undefined,
+            ),
         );
     }
 
@@ -639,7 +649,9 @@ pub const LocalePrototype = struct {
 
         // 3. Return GetLocaleRegion(loc.[[Locale]]).
         return Value.from(
-            try locale.fields.locale.region(agent.gc_allocator) orelse return .undefined,
+            String.fromAscii(
+                try locale.fields.locale.region(agent.gc_allocator) orelse return .undefined,
+            ),
         );
     }
 };

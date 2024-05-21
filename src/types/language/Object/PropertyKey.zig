@@ -35,12 +35,13 @@ pub const PropertyKey = union(enum) {
             if (std.fmt.parseUnsigned(IntegerIndex, value, 10)) |integer_index| {
                 return .{ .integer_index = integer_index };
             } else |_| {
-                return .{ .string = String.from(value) };
+                return .{ .string = String.fromLiteral(value) };
             }
         } else if (T == String) {
             // FIXME: This should use CanonicalNumericIndexString to reject numeric strings that
             //        are not canonical.
-            if (std.fmt.parseUnsigned(IntegerIndex, value.utf8, 10)) |integer_index| {
+            if (value == .utf16) return .{ .string = value };
+            if (std.fmt.parseUnsigned(IntegerIndex, value.ascii, 10)) |integer_index| {
                 return .{ .integer_index = integer_index };
             } else |_| {
                 return .{ .string = value };
@@ -64,7 +65,7 @@ pub const PropertyKey = union(enum) {
         const len = comptime std.fmt.count("{d}", .{std.math.maxInt(IntegerIndex)});
         var buf: [len]u8 = undefined;
         const index_string = std.fmt.bufPrint(&buf, "{d}", .{index}) catch unreachable;
-        return string.eql(String.from(index_string));
+        return string.eql(String.fromAscii(index_string));
     }
 
     /// Non-standard helper to check `PropertyKey` equality without going through `sameValue()`.
@@ -94,25 +95,31 @@ pub const PropertyKey = union(enum) {
         return switch (self) {
             .string => |string| Value.from(string),
             .symbol => |symbol| Value.from(symbol),
-            .integer_index => |integer_index| Value.from(try std.fmt.allocPrint(
-                agent.gc_allocator,
-                "{}",
-                .{integer_index},
-            )),
+            .integer_index => |integer_index| Value.from(
+                String.fromAscii(
+                    try std.fmt.allocPrint(
+                        agent.gc_allocator,
+                        "{}",
+                        .{integer_index},
+                    ),
+                ),
+            ),
         };
     }
 
     /// Non-standard helper to convert a `PropertyKey` to a `[]const u8` or `Symbol` (i.e. bypassing
     /// the integer index optimization).
     pub fn toStringOrSymbol(self: Self, agent: *Agent) Allocator.Error!union(enum) {
-        string: []const u8,
+        string: String,
         symbol: Symbol,
     } {
         return switch (self) {
-            .string => |string| .{ .string = string.utf8 },
+            .string => |string| .{ .string = string },
             .symbol => |symbol| .{ .symbol = symbol },
             .integer_index => |integer_index| .{
-                .string = try std.fmt.allocPrint(agent.gc_allocator, "{}", .{integer_index}),
+                .string = String.fromAscii(
+                    try std.fmt.allocPrint(agent.gc_allocator, "{}", .{integer_index}),
+                ),
             },
         };
     }

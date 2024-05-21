@@ -11,6 +11,7 @@ const Agent = execution.Agent;
 const Environment = environments.Environment;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
+const String = types.String;
 const Value = types.Value;
 
 const Self = @This();
@@ -28,10 +29,11 @@ outer_env: ?Environment,
 /// https://tc39.es/ecma262/#sec-object-environment-records-hasbinding-n
 pub fn hasBinding(self: Self, name: []const u8) Agent.Error!bool {
     const agent = self.binding_object.agent();
+    const property_key = PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name));
 
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Let foundBinding be ? HasProperty(bindingObject, N).
-    const found_binding = try self.binding_object.hasProperty(PropertyKey.from(name));
+    const found_binding = try self.binding_object.hasProperty(property_key);
 
     // 3. If foundBinding is false, return false.
     if (!found_binding) return false;
@@ -47,7 +49,7 @@ pub fn hasBinding(self: Self, name: []const u8) Agent.Error!bool {
     // 6. If unscopables is an Object, then
     if (unscopables == .object) {
         // a. Let blocked be ToBoolean(? Get(unscopables, N)).
-        const blocked = (try unscopables.object.get(PropertyKey.from(name))).toBoolean();
+        const blocked = (try unscopables.object.get(property_key)).toBoolean();
 
         // b. If blocked is true, return false.
         if (blocked) return false;
@@ -61,15 +63,17 @@ pub fn hasBinding(self: Self, name: []const u8) Agent.Error!bool {
 /// https://tc39.es/ecma262/#sec-object-environment-records-createmutablebinding-n-d
 pub fn createMutableBinding(
     self: Self,
-    _: *Agent,
+    agent: *Agent,
     name: []const u8,
     deletable: bool,
 ) Agent.Error!void {
+    const property_key = PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name));
+
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Perform ? DefinePropertyOrThrow(bindingObject, N, PropertyDescriptor {
     //      [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: D
     //    }).
-    try self.binding_object.definePropertyOrThrow(PropertyKey.from(name), .{
+    try self.binding_object.definePropertyOrThrow(property_key, .{
         .value = .undefined,
         .writable = true,
         .enumerable = true,
@@ -110,9 +114,11 @@ pub fn setMutableBinding(
     value: Value,
     strict: bool,
 ) Agent.Error!void {
+    const property_key = PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name));
+
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Let stillExists be ? HasProperty(bindingObject, N).
-    const still_exists = try self.binding_object.hasProperty(PropertyKey.from(name));
+    const still_exists = try self.binding_object.hasProperty(property_key);
 
     // 3. If stillExists is false and S is true, throw a ReferenceError exception.
     if (!still_exists and strict) {
@@ -120,7 +126,7 @@ pub fn setMutableBinding(
     }
 
     // 4. Perform ? Set(bindingObject, N, V, S).
-    try self.binding_object.set(PropertyKey.from(name), value, if (strict) .throw else .ignore);
+    try self.binding_object.set(property_key, value, if (strict) .throw else .ignore);
 
     // 5. Return unused.
 }
@@ -133,9 +139,11 @@ pub fn getBindingValue(
     name: []const u8,
     strict: bool,
 ) Agent.Error!Value {
+    const property_key = PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name));
+
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Let value be ? HasProperty(bindingObject, N).
-    const value = try self.binding_object.hasProperty(PropertyKey.from(name));
+    const value = try self.binding_object.hasProperty(property_key);
 
     // 3. If value is false, then
     if (!value) {
@@ -145,18 +153,18 @@ pub fn getBindingValue(
     }
 
     // 4. Return ? Get(bindingObject, N).
-    return self.binding_object.get(PropertyKey.from(name));
+    return self.binding_object.get(property_key);
 }
 
 /// 9.1.1.2.7 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-object-environment-records-deletebinding-n
 pub fn deleteBinding(self: Self, name: []const u8) Agent.Error!bool {
+    const agent = self.binding_object.agent();
+    const property_key = PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name));
+
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Return ? bindingObject.[[Delete]](N).
-    return self.binding_object.internalMethods().delete(
-        self.binding_object,
-        PropertyKey.from(name),
-    );
+    return self.binding_object.internalMethods().delete(self.binding_object, property_key);
 }
 
 /// 9.1.1.2.8 HasThisBinding ( )

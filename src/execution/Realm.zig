@@ -18,6 +18,8 @@ const Module = language.Module;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const SafePointer = types.SafePointer;
+const String = types.String;
+const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 const addRestrictedFunctionProperties = builtins.addRestrictedFunctionProperties;
 const globalObjectProperties = builtins.globalObjectProperties;
@@ -44,7 +46,7 @@ global_env: *GlobalEnvironment,
 template_map: std.AutoHashMap(*ast.TemplateLiteral, Object),
 
 /// [[LoadedModules]]
-loaded_modules: std.StringHashMap(Module),
+loaded_modules: StringHashMap(Module),
 
 /// [[HostDefined]]
 host_defined: SafePointer,
@@ -80,7 +82,7 @@ pub fn create(agent: *Agent) Allocator.Error!*Self {
         // 6. Set realmRec.[[TemplateMap]] to a new empty List.
         .template_map = std.AutoHashMap(*ast.TemplateLiteral, Object).init(agent.gc_allocator),
 
-        .loaded_modules = std.StringHashMap(Module).init(agent.gc_allocator),
+        .loaded_modules = StringHashMap(Module).init(agent.gc_allocator),
         .host_defined = SafePointer.null_pointer,
     };
 
@@ -162,7 +164,7 @@ pub fn setDefaultGlobalBindings(self: *Self) Agent.Error!Object {
     // 2. For each property of the Global Object specified in clause 19, do
     for (try globalObjectProperties(self)) |property| {
         // a. Let name be the String value of the property name.
-        const name = PropertyKey.from(property[0]);
+        const name = PropertyKey.from(String.fromAscii(property[0]));
 
         // b. Let desc be the fully populated data Property Descriptor for the property, containing
         //    the specified attributes for the property. For properties listed in 19.2, 19.3, or

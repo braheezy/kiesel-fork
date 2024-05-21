@@ -19,6 +19,8 @@ const ImportEntry = language.ImportEntry;
 const Object = types.Object;
 const PrivateEnvironment = execution.PrivateEnvironment;
 const PropertyKey = types.PropertyKey;
+const String = types.String;
+const StringArrayHashMap = types.StringArrayHashMap;
 const Value = types.Value;
 const escapeSequenceMatcher = tokenizer.escapeSequenceMatcher;
 const makeConstructor = builtins.makeConstructor;
@@ -287,60 +289,75 @@ pub const NumericLiteral = struct {
     }
 };
 
-pub fn stringValueImpl(allocator: Allocator, text: []const u8) Allocator.Error![]const u8 {
-    var str = try std.ArrayList(u8).initCapacity(allocator, text.len);
-    var i: usize = 0;
-    while (i < text.len) : (i += 1) {
-        const c = text[i];
-        if (c == '\\') {
-            for (line_terminators) |line_terminator| {
-                if (std.mem.startsWith(u8, text[i + 1 ..], line_terminator)) {
-                    i += line_terminator.len;
+pub fn stringValueImpl(allocator: Allocator, text: []const u8) Allocator.Error!String {
+    var result = String.Builder.init(allocator);
+    try result.segments.ensureTotalCapacity(text.len);
+    defer result.deinit();
+    var it = std.unicode.Utf8View.initUnchecked(text).iterator();
+    while (it.nextCodepoint()) |code_point| {
+        switch (code_point) {
+            '\\' => for (line_terminators) |line_terminator| {
+                if (std.mem.startsWith(u8, text[it.i..], line_terminator)) {
+                    it.i += line_terminator.len;
                     break;
                 }
-            } else {
-                switch (text[i + 1]) {
-                    '0' => str.appendAssumeCapacity(0),
-                    'b' => str.appendAssumeCapacity(0x08),
-                    'f' => str.appendAssumeCapacity(0x0c),
-                    'n' => str.appendAssumeCapacity('\n'),
-                    'r' => str.appendAssumeCapacity('\r'),
-                    't' => str.appendAssumeCapacity('\t'),
-                    'v' => str.appendAssumeCapacity(0x0b),
-                    'x' => {
-                        const byte = std.fmt.parseInt(
-                            u8,
-                            text[i + 2 .. i + 4],
-                            16,
-                        ) catch unreachable;
-                        str.appendAssumeCapacity(byte);
-                        i += 2;
-                    },
-                    'u' => {
-                        const chars = switch (text[i + 2]) {
-                            '{' => text[i + 3 .. i + escapeSequenceMatcher(text[i..]).? - 1],
-                            else => text[i + 2 .. i + 6],
-                        };
-                        const code_point = std.fmt.parseInt(u21, chars, 16) catch unreachable;
-                        var out: [4]u8 = undefined;
-                        const len = std.unicode.utf8Encode(code_point, &out) catch |err| switch (err) {
-                            error.CodepointTooLarge => unreachable,
-                            // TODO: Handle surrogate halfs
-                            error.Utf8CannotEncodeSurrogateHalf => @as(u3, 0),
-                        };
-                        str.appendSliceAssumeCapacity(out[0..len]);
-                        i += switch (text[i + 2]) {
-                            '{' => chars.len + 2,
-                            else => 4,
-                        };
-                    },
-                    else => |next_c| str.appendAssumeCapacity(next_c),
-                }
-                i += 1;
-            }
-        } else str.appendAssumeCapacity(c);
+            } else switch (text[it.i]) {
+                '\\' => {
+                    try result.appendChar('\\');
+                    it.i += 1;
+                },
+                '0' => {
+                    try result.appendChar(0x00);
+                    it.i += 1;
+                },
+                'b' => {
+                    try result.appendChar(0x08);
+                    it.i += 1;
+                },
+                'f' => {
+                    try result.appendChar(0x0c);
+                    it.i += 1;
+                },
+                'n' => {
+                    try result.appendChar('\n');
+                    it.i += 1;
+                },
+                'r' => {
+                    try result.appendChar('\r');
+                    it.i += 1;
+                },
+                't' => {
+                    try result.appendChar('\t');
+                    it.i += 1;
+                },
+                'v' => {
+                    try result.appendChar(0x0b);
+                    it.i += 1;
+                },
+                'x' => {
+                    const chars = text[it.i + 1 .. it.i + 3];
+                    const parsed = std.fmt.parseInt(u8, chars, 16) catch unreachable;
+                    try result.appendChar(parsed);
+                    it.i += 3;
+                },
+                'u' => {
+                    const chars = switch (text[it.i + 1]) {
+                        '{' => text[it.i + 2 .. it.i + escapeSequenceMatcher(text[it.i - 1 ..]).? - 2],
+                        else => text[it.i + 1 .. it.i + 5],
+                    };
+                    const parsed = std.fmt.parseInt(u21, chars, 16) catch unreachable;
+                    try result.appendCodePoint(parsed);
+                    it.i += switch (text[it.i + 1]) {
+                        '{' => chars.len + 3,
+                        else => 5,
+                    };
+                },
+                else => {},
+            },
+            else => try result.appendCodePoint(code_point),
+        }
     }
-    return str.toOwnedSlice();
+    return result.build();
 }
 
 /// https://tc39.es/ecma262/#prod-StringLiteral
@@ -351,9 +368,9 @@ pub const StringLiteral = struct {
 
     /// 12.9.4.2 Static Semantics: SV
     /// https://tc39.es/ecma262/#sec-static-semantics-sv
-    pub fn stringValue(self: Self, allocator: Allocator) Allocator.Error!Value {
+    pub fn stringValue(self: Self, allocator: Allocator) Allocator.Error!String {
         std.debug.assert(self.text.len >= 2);
-        return Value.from(try stringValueImpl(allocator, self.text[1 .. self.text.len - 1]));
+        return stringValueImpl(allocator, self.text[1 .. self.text.len - 1]);
     }
 };
 
@@ -437,7 +454,7 @@ pub const TemplateLiteral = struct {
 
         /// 12.9.6.1 Static Semantics: TV
         /// https://tc39.es/ecma262/#sec-static-semantics-tv
-        pub fn templateValue(self: Span, allocator: Allocator) Allocator.Error![]const u8 {
+        pub fn templateValue(self: Span, allocator: Allocator) Allocator.Error!String {
             std.debug.assert(self.text[0] == '`' or self.text[0] == '}');
             return if (self.text[self.text.len - 1] == '`')
                 stringValueImpl(allocator, self.text[1 .. self.text.len - 1])
@@ -447,17 +464,17 @@ pub const TemplateLiteral = struct {
 
         /// 12.9.6.2 Static Semantics: TRV
         /// https://tc39.es/ecma262/#sec-static-semantics-trv
-        pub fn templateRawValue(self: Span, allocator: Allocator) Allocator.Error![]const u8 {
+        pub fn templateRawValue(self: Span, allocator: Allocator) Allocator.Error!String {
             std.debug.assert(self.text[0] == '`' or self.text[0] == '}');
             return if (self.text[self.text.len - 1] == '`')
-                allocator.dupe(u8, self.text[1 .. self.text.len - 1])
+                String.fromUtf8(allocator, self.text[1 .. self.text.len - 1])
             else
-                allocator.dupe(u8, self.text[1 .. self.text.len - 2]);
+                String.fromUtf8(allocator, self.text[1 .. self.text.len - 2]);
         }
 
         /// 13.2.8.3 Static Semantics: TemplateString ( templateToken, raw )
         /// https://tc39.es/ecma262/#sec-templatestring
-        pub fn templateString(self: Span, allocator: Allocator, raw: bool) Allocator.Error![]const u8 {
+        pub fn templateString(self: Span, allocator: Allocator, raw: bool) Allocator.Error!String {
             // 1. If raw is true, then
             const string = if (raw) blk: {
                 // a. Let string be the TRV of templateToken.
@@ -476,8 +493,8 @@ pub const TemplateLiteral = struct {
 
     /// 13.2.8.2 Static Semantics: TemplateStrings
     /// https://tc39.es/ecma262/#sec-static-semantics-templatestrings
-    pub fn templateStrings(self: Self, allocator: Allocator, raw: bool) Allocator.Error![]const []const u8 {
-        var template_strings = std.ArrayList([]const u8).init(allocator);
+    pub fn templateStrings(self: Self, allocator: Allocator, raw: bool) Allocator.Error![]const String {
+        var template_strings = std.ArrayList(String).init(allocator);
         for (self.spans) |span| switch (span) {
             .text => try template_strings.append(try span.templateString(allocator, raw)),
             .expression => {},
@@ -2159,7 +2176,11 @@ pub const FunctionDeclaration = struct {
             );
 
             // 4. Perform SetFunctionName(F, name).
-            try setFunctionName(function, PropertyKey.from(name), null);
+            try setFunctionName(
+                function,
+                PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+                null,
+            );
 
             // 5. Perform MakeConstructor(F).
             try makeConstructor(function, .{});
@@ -2367,7 +2388,11 @@ pub const GeneratorDeclaration = struct {
             );
 
             // 4. Perform SetFunctionName(F, name).
-            try setFunctionName(function, PropertyKey.from(name), null);
+            try setFunctionName(
+                function,
+                PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+                null,
+            );
 
             // 5. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
             const prototype = try ordinaryObjectCreate(
@@ -2507,7 +2532,11 @@ pub const AsyncGeneratorDeclaration = struct {
             );
 
             // 4. Perform SetFunctionName(F, name).
-            try setFunctionName(function, PropertyKey.from(name), null);
+            try setFunctionName(
+                function,
+                PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+                null,
+            );
 
             // 5. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
             const prototype = try ordinaryObjectCreate(
@@ -2920,7 +2949,11 @@ pub const AsyncFunctionDeclaration = struct {
             );
 
             // 4. Perform SetFunctionName(F, name).
-            try setFunctionName(function, PropertyKey.from(name), null);
+            try setFunctionName(
+                function,
+                PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+                null,
+            );
 
             // 5. Return F.
             return function;
@@ -3056,7 +3089,7 @@ pub const Module = struct {
     pub fn moduleRequests(
         self: Self,
         allocator: Allocator,
-    ) Allocator.Error![]const []const u8 {
+    ) Allocator.Error![]const String {
         // Module : [empty]
         // 1. Return a new empty List.
         // ModuleItemList : ModuleItem
@@ -3068,7 +3101,7 @@ pub const Module = struct {
         // a. If moduleNames does not contain name, then
         // i. Append name to moduleNames.
         // 4. Return moduleNames.
-        var module_requests = std.StringArrayHashMap(void).init(allocator);
+        var module_requests = StringArrayHashMap(void).init(allocator);
         defer module_requests.deinit();
         for (self.module_item_list.items) |module_item| switch (module_item) {
             // ModuleItem : StatementListItem
@@ -3082,7 +3115,7 @@ pub const Module = struct {
             // 1. Return a List whose sole element is the SV of StringLiteral.
             .import_declaration => |import_declaration| {
                 const sv = try import_declaration.module_specifier.stringValue(allocator);
-                try module_requests.put(sv.string.utf8, {});
+                try module_requests.put(sv, {});
             },
 
             .export_declaration => |export_declaration| switch (export_declaration) {
@@ -3090,7 +3123,7 @@ pub const Module = struct {
                 .export_from => |export_from| {
                     // 1. Return the ModuleRequests of FromClause.
                     const sv = try export_from.module_specifier.stringValue(allocator);
-                    try module_requests.put(sv.string.utf8, {});
+                    try module_requests.put(sv, {});
                 },
 
                 // ExportDeclaration :
@@ -3111,7 +3144,7 @@ pub const Module = struct {
                 },
             },
         };
-        return allocator.dupe([]const u8, module_requests.keys());
+        return allocator.dupe(String, module_requests.keys());
     }
 
     /// 16.2.2.2 Static Semantics: ImportEntries
@@ -3139,9 +3172,7 @@ pub const Module = struct {
                 // ImportDeclaration : import ImportClause FromClause ;
                 if (import_declaration.import_clause) |import_clause| {
                     // 1. Let module be the sole element of ModuleRequests of FromClause.
-                    const module = (try import_declaration.module_specifier.stringValue(
-                        allocator,
-                    )).string.utf8;
+                    const module = try import_declaration.module_specifier.stringValue(allocator);
 
                     // 2. Return ImportEntriesForModule of ImportClause with argument module.
                     try import_entries.appendSlice(
@@ -3429,7 +3460,7 @@ pub const ImportClause = union(enum) {
     pub fn importEntriesForModule(
         self: Self,
         allocator: Allocator,
-        module: []const u8,
+        module: String,
     ) Allocator.Error![]const ImportEntry {
         var import_entries = std.ArrayList(ImportEntry).init(allocator);
         errdefer import_entries.deinit();
@@ -3446,7 +3477,7 @@ pub const ImportClause = union(enum) {
                 //      [[ModuleRequest]]: module, [[ImportName]]: "default", [[LocalName]]: localName
                 //    }.
                 const default_entry: ImportEntry = .{
-                    .module_request = module,
+                    .module_request = try module.toUtf8(allocator),
                     .import_name = .{ .string = "default" },
                     .local_name = local_name,
                 };
@@ -3464,7 +3495,7 @@ pub const ImportClause = union(enum) {
                 //      [[ModuleRequest]]: module, [[ImportName]]: namespace-object, [[LocalName]]: localName
                 //    }.
                 const entry: ImportEntry = .{
-                    .module_request = module,
+                    .module_request = try module.toUtf8(allocator),
                     .import_name = .namespace_object,
                     .local_name = local_name,
                 };
@@ -3485,9 +3516,9 @@ pub const ImportClause = union(enum) {
                     // 1. Let importName be the StringValue of ModuleExportName.
                     const import_name = switch (module_export_name) {
                         .identifier => |identifier| identifier,
-                        .string_literal => |string_literal| (try string_literal.stringValue(
+                        .string_literal => |string_literal| try (try string_literal.stringValue(
                             allocator,
-                        )).string.utf8,
+                        )).toUtf8(allocator),
                     };
 
                     // 2. Let localName be the StringValue of ImportedBinding.
@@ -3497,7 +3528,7 @@ pub const ImportClause = union(enum) {
                     //      [[ModuleRequest]]: module, [[ImportName]]: importName, [[LocalName]]: localName
                     //    }.
                     const entry: ImportEntry = .{
-                        .module_request = module,
+                        .module_request = try module.toUtf8(allocator),
                         .import_name = .{ .string = import_name },
                         .local_name = local_name,
                     };
@@ -3514,7 +3545,7 @@ pub const ImportClause = union(enum) {
                     //      [[ModuleRequest]]: module, [[ImportName]]: localName, [[LocalName]]: localName
                     //    }.
                     const entry: ImportEntry = .{
-                        .module_request = module,
+                        .module_request = try module.toUtf8(allocator),
                         .import_name = .{ .string = local_name },
                         .local_name = local_name,
                     };

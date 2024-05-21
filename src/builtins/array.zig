@@ -53,7 +53,7 @@ fn defineOwnProperty(
     const agent = array.agent();
 
     // 1. If P is "length", then
-    if (property_key == .string and property_key.string.eql(String.from("length"))) {
+    if (property_key == .string and property_key.string.eql(String.fromLiteral("length"))) {
         // a. Return ? ArraySetLength(A, Desc).
         return arraySetLength(agent, array, property_descriptor);
     }
@@ -2655,7 +2655,7 @@ pub const ArrayPrototype = struct {
 
         // 3. Let separator be the implementation-defined list-separator String value appropriate
         //    for the host environment's current locale (such as ", ").
-        const separator = String.from(", ");
+        const separator = String.fromLiteral(", ");
 
         // 4. Let R be the empty String.
         if (len > std.math.maxInt(usize)) return error.OutOfMemory;

@@ -33,12 +33,7 @@ pub fn set(
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
 ) Allocator.Error!void {
-    const property_key_copy = switch (property_key) {
-        // Copy the string since it might outlive the source text - identifiers are just slices of that.
-        .string => |string| PropertyKey.from(try self.hash_map.allocator.dupe(u8, string.utf8)),
-        else => property_key,
-    };
-    try self.hash_map.put(property_key_copy, property_descriptor);
+    try self.hash_map.put(property_key, property_descriptor);
 }
 
 pub fn remove(self: *Self, property_key: PropertyKey) void {
@@ -47,15 +42,11 @@ pub fn remove(self: *Self, property_key: PropertyKey) void {
 }
 
 pub const PropertyKeyArrayHashMapContext = struct {
-    const hashString = std.hash_map.hashString;
-    const hashSymbol = std.hash_map.getAutoHashFn(Symbol.Id, void);
-    const hashIntegerIndex = std.hash_map.getAutoHashFn(PropertyKey.IntegerIndex, void);
-
     pub fn hash(_: anytype, property_key: PropertyKey) u64 {
         return switch (property_key) {
-            .string => |string| hashString(string.utf8),
-            .symbol => |symbol| hashSymbol({}, symbol.id),
-            .integer_index => |integer_index| hashIntegerIndex({}, integer_index),
+            .string => |string| string.hash(),
+            .symbol => |symbol| std.hash_map.getAutoHashFn(Symbol.Id, void)({}, symbol.id),
+            .integer_index => |integer_index| std.hash_map.getAutoHashFn(PropertyKey.IntegerIndex, void)({}, integer_index),
         };
     }
 

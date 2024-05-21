@@ -26,6 +26,7 @@ const Realm = execution.Realm;
 const ResolvedBindingOrAmbiguous = language.ResolvedBindingOrAmbiguous;
 const SafePointer = types.SafePointer;
 const String = types.String;
+const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const getImportedModule = language.getImportedModule;
@@ -81,10 +82,10 @@ dfs_index: ?usize,
 dfs_ancestor_index: ?usize,
 
 /// [[RequestedModules]]
-requested_modules: std.ArrayList([]const u8),
+requested_modules: std.ArrayList(String),
 
 /// [[LoadedModules]]
-loaded_modules: std.StringHashMap(Module),
+loaded_modules: StringHashMap(Module),
 
 /// [[CycleRoot]]
 cycle_root: ?*Self,
@@ -227,7 +228,7 @@ fn innerModuleLoading(
                 try agent.host_hooks.hostLoadImportedModule(
                     agent,
                     .{ .module = module.source_text_module },
-                    String.from(required),
+                    required,
                     state.host_defined,
                     .{ .graph_loading_state = state },
                 );
@@ -392,7 +393,7 @@ fn innerModuleLinking(agent: *Agent, module: Module, stack: *std.ArrayList(*Self
     // 9. For each String required of module.[[RequestedModules]], do
     for (module.source_text_module.requested_modules.items) |required| {
         // a. Let requiredModule be GetImportedModule(module, required).
-        const required_module = getImportedModule(module.source_text_module, String.from(required));
+        const required_module = getImportedModule(module.source_text_module, required);
 
         // b. Set index to ? InnerModuleLinking(requiredModule, stack, index).
         new_index = try innerModuleLinking(agent, required_module, stack, new_index);
@@ -470,7 +471,7 @@ pub fn parse(
     const body = try Parser.parse(ast.Module, agent.gc_allocator, source_text, ctx);
 
     // 3. Let requestedModules be the ModuleRequests of body.
-    var requested_modules = std.ArrayList([]const u8).init(agent.gc_allocator);
+    var requested_modules = std.ArrayList(String).init(agent.gc_allocator);
     {
         const tmp = try body.moduleRequests(agent.gc_allocator);
         defer agent.gc_allocator.free(tmp);
@@ -593,7 +594,7 @@ pub fn parse(
         .import_entries = import_entries,
         .local_export_entries = local_export_entries,
         .indirect_export_entries = indirect_export_entries,
-        .loaded_modules = std.StringHashMap(Module).init(agent.gc_allocator),
+        .loaded_modules = StringHashMap(Module).init(agent.gc_allocator),
         .dfs_index = null,
         .dfs_ancestor_index = null,
     };
@@ -777,7 +778,7 @@ fn innerModuleEvaluation(
     // 11. For each String required of module.[[RequestedModules]], do
     for (module.source_text_module.requested_modules.items) |required| {
         // a. Let requiredModule be GetImportedModule(module, required).
-        var required_module = getImportedModule(module.source_text_module, String.from(required));
+        var required_module = getImportedModule(module.source_text_module, required);
 
         // b. Set index to ? InnerModuleEvaluation(requiredModule, stack, index).
         new_index = try innerModuleEvaluation(agent, required_module, stack, new_index);
@@ -950,7 +951,7 @@ pub fn resolveExport(
             // ii. Let importedModule be GetImportedModule(module, e.[[ModuleRequest]]).
             const imported_module = getImportedModule(
                 self,
-                String.from(export_entry.module_request.?),
+                try String.fromUtf8(agent.gc_allocator, export_entry.module_request.?),
             );
 
             // iii. If e.[[ImportName]] is all, then
@@ -1011,7 +1012,10 @@ pub fn initializeEnvironment(self: *Self) Agent.Error!void {
     // 7. For each ImportEntry Record in of module.[[ImportEntries]], do
     for (self.import_entries.items) |import_entry| {
         // a. Let importedModule be GetImportedModule(module, in.[[ModuleRequest]]).
-        const imported_module = getImportedModule(self, String.from(import_entry.module_request));
+        const imported_module = getImportedModule(
+            self,
+            try String.fromUtf8(agent.gc_allocator, import_entry.module_request),
+        );
 
         const import_name = import_entry.import_name.?;
 

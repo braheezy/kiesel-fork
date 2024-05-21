@@ -299,14 +299,14 @@ pub fn createDynamicFunction(
         }
     }
 
-    const parameters_string = try result.build();
+    const parameters_string = try (try result.build()).toUtf8(agent.gc_allocator);
 
     // 14. Let bodyParseString be the string-concatenation of 0x000A (LINE FEED), bodyString, and
     //     0x000A (LINE FEED).
     const body_parse_string = try std.fmt.allocPrint(
         agent.gc_allocator,
-        "\n{s}\n",
-        .{body_string.utf8},
+        "\n{}\n",
+        .{body_string},
     );
 
     // 15. Let sourceString be the string-concatenation of prefix, " anonymous(", P, 0x000A
@@ -314,7 +314,7 @@ pub fn createDynamicFunction(
     const source_string = try std.fmt.allocPrint(
         agent.gc_allocator,
         "{[prefix]s} anonymous({[parameters_string]s}\n) {{{[body_parse_string]s}}}",
-        .{ .prefix = prefix, .parameters_string = parameters_string.utf8, .body_parse_string = body_parse_string },
+        .{ .prefix = prefix, .parameters_string = parameters_string, .body_parse_string = body_parse_string },
     );
 
     // 16. Let sourceText be StringToCodePoints(sourceString).
@@ -324,7 +324,7 @@ pub fn createDynamicFunction(
     defer diagnostics.deinit();
 
     // 17. Let parameters be ParseText(P, parameterSym).
-    const parameters = Parser.parseNode(parameter_sym.type, parameter_sym.acceptFn, agent.gc_allocator, parameters_string.utf8, .{
+    const parameters = Parser.parseNode(parameter_sym.type, parameter_sym.acceptFn, agent.gc_allocator, parameters_string, .{
         .diagnostics = &diagnostics,
         .file_name = "Function",
     }) catch |err| switch (err) {
@@ -623,11 +623,11 @@ pub const FunctionPrototype = struct {
         if (func == .object) {
             if (func.object.is(ECMAScriptFunction)) {
                 const ecmascript_function = func.object.as(ECMAScriptFunction);
-                return Value.from(ecmascript_function.fields.source_text);
+                return Value.from(try String.fromUtf8(agent.gc_allocator, ecmascript_function.fields.source_text));
             } else if (func.object.is(BuiltinFunction)) {
                 const builtin_function = func.object.as(BuiltinFunction);
                 if (builtin_function.fields.additional_fields.tryCast(*ClassConstructorFields)) |class_constructor_fields| {
-                    return Value.from(class_constructor_fields.source_text);
+                    return Value.from(try String.fromUtf8(agent.gc_allocator, class_constructor_fields.source_text));
                 }
             }
         }
@@ -646,7 +646,7 @@ pub const FunctionPrototype = struct {
                 "function {}() {{ [native code] }}",
                 .{name},
             );
-            return Value.from(source_text);
+            return Value.from(String.fromAscii(source_text));
         }
 
         // 4. If func is an Object and IsCallable(func) is true, return an implementation-defined

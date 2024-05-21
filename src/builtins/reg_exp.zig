@@ -161,8 +161,8 @@ pub fn regExpInitialize(
     // 8. If F contains "s", let s be true; else let s be false.
     // 9. If F contains "u", let u be true; else let u be false.
     // 10. If F contains "v", let v be true; else let v be false.
-    const parsed_flags = ParsedFlags.from(f.utf8) orelse {
-        return agent.throwException(.syntax_error, "Invalid RegExp flags '{s}'", .{f.utf8});
+    const parsed_flags = ParsedFlags.from(try f.toUtf8(agent.gc_allocator)) orelse {
+        return agent.throwException(.syntax_error, "Invalid RegExp flags '{}'", .{f});
     };
 
     var re_flags: c_int = 0;
@@ -186,7 +186,8 @@ pub fn regExpInitialize(
     // 15. Assert: parseResult is a Pattern Parse Node.
     var re_bytecode_len: c_int = undefined;
     var error_msg: [64]u8 = undefined;
-    const buf = try agent.gc_allocator.dupeZ(u8, p.utf8);
+    // NOTE: Despite passing in the buffer length below, this needs to be null-terminated.
+    const buf = try agent.gc_allocator.dupeZ(u8, try p.toUtf8(agent.gc_allocator));
     defer agent.gc_allocator.free(buf);
     const re_bytecode = libregexp.lre_compile(
         &re_bytecode_len,
@@ -261,12 +262,12 @@ pub fn regExpExec(agent: *Agent, reg_exp: Object, string: String) Agent.Error!?O
 
 const CapturesList = [*c][*c]u8;
 
-fn getMatch(captures_list: CapturesList, string: String, full_unicode: bool, i: usize) ?Match {
+fn getMatch(captures_list: CapturesList, string: []const u8, full_unicode: bool, i: usize) ?Match {
     if (captures_list[2 * i] == null or captures_list[2 * i + 1] == null) return null;
     const start_index = (@intFromPtr(captures_list[2 * i]) -
-        @intFromPtr(string.utf8.ptr)) >> @intFromBool(full_unicode);
+        @intFromPtr(string.ptr)) >> @intFromBool(full_unicode);
     const end_index = (@intFromPtr(captures_list[2 * i + 1]) -
-        @intFromPtr(string.utf8.ptr)) >> @intFromBool(full_unicode);
+        @intFromPtr(string.ptr)) >> @intFromBool(full_unicode);
     return .{ .start_index = start_index, .end_index = end_index };
 }
 
@@ -311,12 +312,13 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
     const full_unicode = false;
 
     // 10-13.
+    const buf = try string.toUtf8(agent.gc_allocator);
     const result = libregexp.lre_exec(
         captures_list,
         @ptrCast(re_bytecode),
-        @ptrCast(string.utf8),
+        buf.ptr,
         @intCast(last_index),
-        @intCast(string.utf8.len),
+        @intCast(buf.len),
         @intFromBool(full_unicode),
         agent,
     );
@@ -332,7 +334,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
         }
         return null;
     }
-    var match = getMatch(captures_list, string, full_unicode, 0).?;
+    var match = getMatch(captures_list, buf, full_unicode, 0).?;
     last_index = match.start_index;
 
     // 14. Let e be r.[[EndIndex]].
@@ -425,7 +427,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
         var captured_value: Value = undefined;
 
         // a. Let captureI be ith element of r.[[Captures]].
-        const capture_i = getMatch(captures_list, string, full_unicode, i);
+        const capture_i = getMatch(captures_list, buf, full_unicode, i);
 
         // b. If captureI is undefined, then
         if (capture_i == null) {
@@ -465,8 +467,11 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
             group_name_ptr += group_name.len + 1;
 
             // ii. Perform ! CreateDataPropertyOrThrow(groups, s, capturedValue).
+            const property_key = PropertyKey.from(
+                try String.fromUtf8(agent.gc_allocator, group_name),
+            );
             groups.object.createDataPropertyOrThrow(
-                PropertyKey.from(group_name),
+                property_key,
                 captured_value,
             ) catch |err| try noexcept(err);
 
@@ -520,7 +525,7 @@ pub fn advanceStringIndex(string: String, index: u53, unicode: bool) u53 {
     const code_point = string.codePointAt(@intCast(index));
 
     // 6. Return index + cp.[[CodeUnitCount]].
-    return index + (std.unicode.utf16CodepointSequenceLength(code_point) catch unreachable);
+    return index + code_point.code_unit_count;
 }
 
 /// 22.2.7.5 Match Records
@@ -630,8 +635,14 @@ fn makeMatchIndicesIndexPairArray(
             std.debug.assert(groups != .undefined);
 
             // ii. Perform ! CreateDataPropertyOrThrow(groups, groupNames[i - 1], matchIndexPair).
+            const property_key = PropertyKey.from(
+                try String.fromUtf8(
+                    agent.gc_allocator,
+                    try agent.gc_allocator.dupe(u8, group_names[i - 1].?),
+                ),
+            );
             groups.object.createDataPropertyOrThrow(
-                PropertyKey.from(try agent.gc_allocator.dupe(u8, group_names[i - 1].?)),
+                property_key,
                 match_index_pair,
             ) catch |err| try noexcept(err);
         }
@@ -885,7 +896,7 @@ pub const RegExpPrototype = struct {
 
         // 20. Return the String value whose code units are the elements of the List codeUnits. If
         //     codeUnits has no elements, the empty String is returned.
-        return Value.from(try code_units.toOwnedSlice());
+        return Value.from(String.fromAscii(try code_units.toOwnedSlice()));
     }
 
     /// 22.2.6.4.1 RegExpHasFlag ( R, codeUnit )
@@ -965,7 +976,7 @@ pub const RegExpPrototype = struct {
         const flags_ = try (try reg_exp.get(PropertyKey.from("flags"))).toString(agent);
 
         // 5. If flags does not contain "g", then
-        if (std.mem.indexOfScalar(u8, flags_.utf8, 'g') == null) {
+        if (flags_.indexOf(String.fromLiteral("g"), 0) == null) {
             // a. Return ? RegExpExec(rx, S).
             return if (try regExpExec(agent, reg_exp, string)) |object|
                 Value.from(object)
@@ -976,8 +987,8 @@ pub const RegExpPrototype = struct {
         else {
             // a. If flags contains "u" or flags contains "v", let fullUnicode be true. Otherwise,
             //    let fullUnicode be false.
-            const full_unicode = std.mem.indexOfScalar(u8, flags_.utf8, 'u') != null or
-                std.mem.indexOfScalar(u8, flags_.utf8, 'v') != null;
+            const full_unicode = flags_.indexOf(String.fromLiteral("u"), 0) != null or
+                flags_.indexOf(String.fromLiteral("v"), 0) != null;
 
             // b. Perform ? Set(rx, "lastIndex", +0𝔽, true).
             try reg_exp.set(PropertyKey.from("lastIndex"), Value.from(0), .throw);
@@ -1065,12 +1076,12 @@ pub const RegExpPrototype = struct {
 
         // 9. If flags contains "g", let global be true.
         // 10. Else, let global be false.
-        const global_ = std.mem.indexOfScalar(u8, flags_.utf8, 'g') != null;
+        const global_ = flags_.indexOf(String.fromLiteral("g"), 0) != null;
 
         // 11. If flags contains "u" or flags contains "v", let fullUnicode be true.
         // 12. Else, let fullUnicode be false.
-        const full_unicode = std.mem.indexOfScalar(u8, flags_.utf8, 'u') != null or
-            std.mem.indexOfScalar(u8, flags_.utf8, 'v') != null;
+        const full_unicode = flags_.indexOf(String.fromLiteral("u"), 0) != null or
+            flags_.indexOf(String.fromLiteral("v"), 0) != null;
 
         // 13. Return CreateRegExpStringIterator(matcher, S, global, fullUnicode).
         return Value.from(
@@ -1119,7 +1130,7 @@ pub const RegExpPrototype = struct {
         const flags_ = try (try reg_exp.get(PropertyKey.from("flags"))).toString(agent);
 
         // 8. If flags contains "g", let global be true. Otherwise, let global be false.
-        const global_ = std.mem.indexOfScalar(u8, flags_.utf8, 'g') != null;
+        const global_ = flags_.indexOf(String.fromLiteral("g"), 0) != null;
 
         // 9. If global is true, then
         if (global_) {
@@ -1164,8 +1175,8 @@ pub const RegExpPrototype = struct {
 
                 // b. If flags contains "u" or flags contains "v", let fullUnicode be true.
                 //    Otherwise, let fullUnicode be false.
-                const full_unicode = std.mem.indexOfScalar(u8, flags_.utf8, 'u') != null or
-                    std.mem.indexOfScalar(u8, flags_.utf8, 'v') != null;
+                const full_unicode = flags_.indexOf(String.fromLiteral("u"), 0) != null or
+                    flags_.indexOf(String.fromLiteral("v"), 0) != null;
 
                 // c. Let nextIndex be AdvanceStringIndex(S, thisIndex, fullUnicode).
                 const next_index = advanceStringIndex(string, this_index, full_unicode);
@@ -1423,13 +1434,8 @@ pub const RegExpPrototype = struct {
         //    by F would be parsed as a SingleLineComment rather than a RegularExpressionLiteral.
         //    If P is the empty String, this specification can be met by letting S be "(?:)".
         // 6. Return S.
-        if (pattern.isEmpty()) return String.from("(?:)");
-        const output = try allocator.alloc(
-            u8,
-            std.mem.replacementSize(u8, pattern.utf8, "/", "\\/"),
-        );
-        _ = std.mem.replace(u8, pattern.utf8, "/", "\\/", output);
-        return String.from(output);
+        if (pattern.isEmpty()) return String.fromLiteral("(?:)");
+        return pattern.replace(allocator, "/", "\\/");
     }
 
     /// 22.2.6.14 RegExp.prototype [ @@split ] ( string, limit )
@@ -1457,15 +1463,15 @@ pub const RegExpPrototype = struct {
 
         // 6. If flags contains "u" or flags contains "v", let unicodeMatching be true.
         // 7. Else, let unicodeMatching be false.
-        const unicode_matching = std.mem.indexOfScalar(u8, flags_.utf8, 'u') != null or
-            std.mem.indexOfScalar(u8, flags_.utf8, 'v') != null;
+        const unicode_matching = flags_.indexOf(String.fromLiteral("u"), 0) != null or
+            flags_.indexOf(String.fromLiteral("v"), 0) != null;
 
         // 8. If flags contains "y", let newFlags be flags.
         // 9. Else, let newFlags be the string-concatenation of flags and "y".
-        const new_flags = if (std.mem.indexOfScalar(u8, flags_.utf8, 'y') != null)
+        const new_flags = if (flags_.indexOf(String.fromLiteral("y"), 0) != null)
             flags_
         else
-            String.from(try std.fmt.allocPrint(agent.gc_allocator, "{s}y", .{flags_.utf8}));
+            try String.concat(agent.gc_allocator, &.{ flags_, String.fromLiteral("y") });
 
         // 10. Let splitter be ? Construct(C, « rx, newFlags »).
         const splitter = try constructor.construct(

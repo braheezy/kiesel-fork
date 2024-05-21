@@ -12,9 +12,9 @@ const types = @import("types.zig");
 const BigInt = types.BigInt;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
+const String = types.String;
 const Value = types.Value;
 const getArrayLength = @import("builtins/array.zig").getArrayLength;
-const getFunctionName = @import("builtins/ecmascript_function.zig").getFunctionName;
 const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferWitnessRecord;
 const ordinaryOwnPropertyKeys = builtins.ordinaryOwnPropertyKeys;
 const typedArrayElementSize = builtins.typedArrayElementSize;
@@ -465,7 +465,7 @@ fn prettyPrintStringIterator(
     try tty_config.setColor(writer, .reset);
     switch (string_iterator.fields) {
         .state => |state_| {
-            try writer.print("{pretty}", .{Value.from(state_.it.bytes)});
+            try writer.print("{pretty}", .{Value.from(state_.string)});
         },
         .completed => {
             try tty_config.setColor(writer, .dim);
@@ -543,7 +543,7 @@ fn prettyPrintIntlLocale(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Intl.Locale(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}", .{Value.from(locale.toString(agent.gc_allocator) catch return)});
+    try writer.print("{pretty}", .{Value.from(String.fromAscii(locale.toString(agent.gc_allocator) catch return))});
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
@@ -584,7 +584,7 @@ fn prettyPrintPrimitiveWrapper(
 }
 
 fn prettyPrintFunction(object: Object, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
-    const name = getFunctionName(object);
+    const name = object.data.property_storage.get(PropertyKey.from("name")).?.value.?.string;
     const tty_config = getTtyConfigForWriter(writer);
 
     if (object.is(builtins.ECMAScriptFunction)) {
@@ -598,9 +598,9 @@ fn prettyPrintFunction(object: Object, writer: anytype) PrettyPrintError(@TypeOf
     } else {
         try writer.writeAll("fn ");
     }
-    if (name.len != 0) {
+    if (!name.isEmpty()) {
         try tty_config.setColor(writer, .red);
-        try writer.writeAll(name);
+        try writer.print("{}", .{name});
         try tty_config.setColor(writer, .reset);
     } else {
         try tty_config.setColor(writer, .dim);

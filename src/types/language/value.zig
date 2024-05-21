@@ -29,7 +29,6 @@ const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const prettyPrintValue = pretty_printing.prettyPrintValue;
 const stringCreate = builtins.stringCreate;
-const trim = utils.trim;
 const validateNonRevokedProxy = builtins.validateNonRevokedProxy;
 
 const pow_2_8 = std.math.pow(f64, 2, 8);
@@ -131,7 +130,7 @@ pub const Value = union(enum) {
         if (T == bool) {
             return .{ .boolean = value };
         } else if (isZigString(T)) {
-            return .{ .string = String.from(value) };
+            return .{ .string = String.fromLiteral(value) };
         } else if (is_number) {
             return .{ .number = Number.from(value) };
         } else if (T == BigInt) {
@@ -278,16 +277,16 @@ pub const Value = union(enum) {
                     // i. If preferredType is not present, then
                     if (preferred_type == null) {
                         // 1. Let hint be "default".
-                        break :blk "default";
+                        break :blk String.fromLiteral("default");
                     }
                     break :blk switch (preferred_type.?) {
                         // ii. Else if preferredType is string, then
                         //     1. Let hint be "string".
-                        .string => "string",
+                        .string => String.fromLiteral("string"),
                         // iii. Else,
                         //     1. Assert: preferredType is number.
                         //     2. Let hint be "number".
-                        .number => "number",
+                        .number => String.fromLiteral("number"),
                     };
                 };
 
@@ -333,7 +332,7 @@ pub const Value = union(enum) {
             .big_int => |big_int| if (big_int.value.eqlZero()) {
                 return false;
             },
-            .string => |string| if (string.utf8.len == 0) {
+            .string => |string| if (string.isEmpty()) {
                 return false;
             },
             else => {},
@@ -394,7 +393,7 @@ pub const Value = union(enum) {
             .boolean => |boolean| return Number.from(@intFromBool(boolean)),
 
             // 6. If argument is a String, return StringToNumber(argument).
-            .string => |string| return stringToNumber(string),
+            .string => |string| return stringToNumber(agent.gc_allocator, string),
 
             // 7. Assert: argument is an Object.
             .object => {
@@ -660,14 +659,17 @@ pub const Value = union(enum) {
             ),
 
             // 3. If argument is undefined, return "undefined".
-            .undefined => String.from("undefined"),
+            .undefined => String.fromLiteral("undefined"),
 
             // 4. If argument is null, return "null".
-            .null => String.from("null"),
+            .null => String.fromLiteral("null"),
 
             // 5. If argument is true, return "true".
             // 6. If argument is false, return "false".
-            .boolean => |boolean| String.from(if (boolean) "true" else "false"),
+            .boolean => |boolean| if (boolean)
+                String.fromLiteral("true")
+            else
+                String.fromLiteral("false"),
 
             // 7. If argument is a Number, return Number::toString(argument, 10).
             .number => |number| number.toString(agent.gc_allocator, 10),
@@ -735,7 +737,7 @@ pub const Value = union(enum) {
 
         // 3. Return ! ToString(key).
         const string = key.toString(agent) catch |err| try noexcept(err);
-        return PropertyKey.from(string.utf8);
+        return PropertyKey.from(string);
     }
 
     /// 7.1.20 ToLength ( argument )
@@ -1278,12 +1280,12 @@ pub const Value = union(enum) {
 
 /// 7.1.4.1.1 StringToNumber ( str )
 /// https://tc39.es/ecma262/#sec-stringtonumber
-pub fn stringToNumber(string: String) Number {
+pub fn stringToNumber(allocator: Allocator, string: String) Allocator.Error!Number {
     // 1. Let literal be ParseText(str, StringNumericLiteral).
     // 2. If literal is a List of errors, return NaN.
     // 3. Return StringNumericValue of literal.
     // TODO: Implement the proper string parsing grammar!
-    const trimmed_string = trim(string.utf8, &String.whitespace);
+    const trimmed_string = try (try string.trim(allocator, .@"start+end")).toUtf8(allocator);
     if (trimmed_string.len == 0) return Number.from(0);
     if (std.mem.eql(u8, trimmed_string, "-Infinity")) return Number.from(-std.math.inf(f64));
     if (std.mem.eql(u8, trimmed_string, "+Infinity")) return Number.from(std.math.inf(f64));
@@ -1303,7 +1305,7 @@ pub fn stringToBigInt(allocator: Allocator, string: String) Allocator.Error!?Big
     // 5. Return ℤ(mv).
     // TODO: Implement the proper string parsing grammar!
     var big_int = try types.BigInt.from(allocator, 0);
-    var trimmed_string = trim(string.utf8, &String.whitespace);
+    var trimmed_string = try (try string.trim(allocator, .@"start+end")).toUtf8(allocator);
     if (trimmed_string.len == 0) return big_int;
     // Unlike std.fmt.parseFloat(), std.math.big.int.Managed.setString() doesn't like the prefix
     // so we have to cut it off manually.
@@ -1436,10 +1438,10 @@ pub fn isLessThan(
         // c. For each integer i such that 0 ≤ i < min(lx, ly), in ascending order, do
         for (0..@min(lx, ly)) |i| {
             // i. Let cx be the numeric value of the code unit at index i within px.
-            const cx = px.string.utf16CodeUnitAt(i);
+            const cx = px.string.codeUnitAt(i);
 
             // ii. Let cy be the numeric value of the code unit at index i within py.
-            const cy = py.string.utf16CodeUnitAt(i);
+            const cy = py.string.codeUnitAt(i);
 
             // iii. If cx < cy, return true.
             if (cx < cy) return true;
@@ -1804,7 +1806,7 @@ pub fn ValueArrayHashMap(comptime V: type, comptime eqlFn: fn (Value, Value) boo
 
         pub fn hash(_: Self, key: Value) u32 {
             const value_hash = switch (key) {
-                .string => |string| std.array_hash_map.hashString(string.utf8),
+                .string => |string| @as(u32, @truncate(string.hash())),
                 .number => |number| switch (number) {
                     .i32 => |n| std.array_hash_map.getAutoHashFn(i32, void)({}, n),
                     .f64 => |n| std.array_hash_map.getAutoHashFn(i64, void)({}, @bitCast(n)),
@@ -1839,7 +1841,7 @@ test "format" {
         .{ Value.from(false), "false" },
         .{ Value.from("foo"), "\"foo\"" },
         .{ Value.from(Symbol{ .id = 0, .description = null }), "Symbol()" },
-        .{ Value.from(Symbol{ .id = 0, .description = String.from("foo") }), "Symbol(\"foo\")" },
+        .{ Value.from(Symbol{ .id = 0, .description = String.fromLiteral("foo") }), "Symbol(\"foo\")" },
         .{ Value.from(BigInt{ .value = try BigInt.Value.initSet(std.testing.allocator, 123) }), "123n" },
         .{ Value.from(object), "[object Object]" },
     };
@@ -1870,9 +1872,9 @@ test "Value.from" {
     const inf = std.math.inf(f64);
     try std.testing.expectEqual(Value.from(true).boolean, true);
     try std.testing.expectEqual(Value.from(false).boolean, false);
-    try std.testing.expectEqual(Value.from("").string.utf8, "");
-    try std.testing.expectEqual(Value.from("foo").string.utf8, "foo");
-    try std.testing.expectEqual(Value.from("123").string.utf8, "123");
+    try std.testing.expectEqual(Value.from("").string.ascii, "");
+    try std.testing.expectEqual(Value.from("foo").string.ascii, "foo");
+    try std.testing.expectEqual(Value.from("123").string.ascii, "123");
     try std.testing.expectEqual(Value.from(0).number.i32, 0);
     try std.testing.expectEqual(Value.from(0.0).number.i32, 0);
     try std.testing.expectEqual(Value.from(123).number.i32, 123);

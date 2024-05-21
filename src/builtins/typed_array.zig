@@ -2749,7 +2749,7 @@ pub const TypedArrayPrototype = struct {
 
         // 3. Let separator be the implementation-defined list-separator String value appropriate
         //    for the host environment's current locale (such as ", ").
-        const separator = String.from(", ");
+        const separator = String.fromLiteral(", ");
 
         // 4. Let R be the empty String.
         if (len > std.math.maxInt(usize)) return error.OutOfMemory;
@@ -3002,7 +3002,7 @@ pub const TypedArrayPrototype = struct {
 
         // 5. Assert: name is a String.
         // 6. Return name.
-        return Value.from(name);
+        return Value.from(String.fromAscii(name));
     }
 };
 

@@ -63,20 +63,26 @@ pub const StringIteratorPrototype = struct {
             return Value.from(try createIterResultObject(agent, .undefined, true));
         }
 
-        var it = &string_iterator.fields.state.it;
+        const string = string_iterator.fields.state.string;
+        const position = string_iterator.fields.state.position;
 
         // a. Let len be the length of s.
+        const len = string.length();
+
         // b. Let position be 0.
         // c. Repeat, while position < len,
-        if (it.nextCodepoint() catch unreachable) |code_point| {
+        if (position < len) {
             // i. Let cp be CodePointAt(s, position).
+            const code_point = string.codePointAt(position);
+
             // ii. Let nextIndex be position + cp.[[CodeUnitCount]].
+            const next_index = position + code_point.code_unit_count;
+
             // iii. Let resultString be the substring of s from position to nextIndex.
+            const result_string = try string.substring(agent.gc_allocator, position, next_index);
+
             // iv. Set position to nextIndex.
-            var result = String.Builder.init(agent.gc_allocator);
-            defer result.deinit();
-            try result.appendCodePoint(code_point);
-            const result_string = try result.build();
+            string_iterator.fields.state.position = next_index;
 
             // v. Perform ? GeneratorYield(CreateIterResultObject(resultString, false)).
             return Value.from(try createIterResultObject(agent, Value.from(result_string), false));
@@ -91,7 +97,8 @@ pub const StringIteratorPrototype = struct {
 pub const StringIterator = MakeObject(.{
     .Fields = union(enum) {
         state: struct {
-            it: std.unicode.Utf16LeIterator,
+            string: String,
+            position: usize,
         },
         completed,
     },

@@ -18,6 +18,7 @@ const Arguments = types.Arguments;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
+const String = types.String;
 const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createArrayFromListMapToValue = types.createArrayFromListMapToValue;
@@ -73,7 +74,7 @@ pub const Intl = struct {
         return Value.from(
             try createArrayFromListMapToValue(agent, icu4zig.Locale, locale_list.items, struct {
                 fn mapFn(agent_: *Agent, locale: icu4zig.Locale) Allocator.Error!Value {
-                    return Value.from(try locale.toString(agent_.gc_allocator));
+                    return Value.from(String.fromAscii(try locale.toString(agent_.gc_allocator)));
                 }
             }.mapFn),
         );

@@ -25,7 +25,7 @@ base: union(enum) {
 
 /// [[ReferencedName]]
 referenced_name: union(enum) {
-    string: []const u8,
+    string: String,
     symbol: Symbol,
     private_name: PrivateName,
 },
@@ -103,7 +103,7 @@ pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
                 break :blk try self.base.value.synthesizePrototype(agent);
             }
             switch (property_key.?) {
-                .string => |string| if (string.eql(String.from("length")))
+                .string => |string| if (string.eql(String.fromLiteral("length")))
                     return Value.from(@as(u53, @intCast(self.base.value.string.length())))
                 else
                     break :blk try self.base.value.synthesizePrototype(agent),
@@ -132,7 +132,8 @@ pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
         const base = self.base.environment;
 
         // c. Return ? base.GetBindingValue(V.[[ReferencedName]], V.[[Strict]]) (see 9.1).
-        return base.getBindingValue(agent, self.referenced_name.string, self.strict);
+        const referenced_name = try self.referenced_name.string.toUtf8(agent.gc_allocator);
+        return base.getBindingValue(agent, referenced_name, self.strict);
     }
 }
 
@@ -202,7 +203,7 @@ pub fn putValue(self: Self, agent: *Agent, value: Value) Agent.Error!void {
     const base = self.base.environment;
 
     // c. Return ? base.SetMutableBinding(V.[[ReferencedName]], W, V.[[Strict]]) (see 9.1).
-    const referenced_name = self.referenced_name.string;
+    const referenced_name = try self.referenced_name.string.toUtf8(agent.gc_allocator);
     return base.setMutableBinding(agent, referenced_name, value, self.strict);
 }
 
@@ -227,5 +228,6 @@ pub fn initializeReferencedBinding(self: Self, agent: *Agent, value: Value) Agen
     const base = self.base.environment;
 
     // 4. Return ? base.InitializeBinding(V.[[ReferencedName]], W).
-    return base.initializeBinding(agent, self.referenced_name.string, value);
+    const referenced_name = try self.referenced_name.string.toUtf8(agent.gc_allocator);
+    return base.initializeBinding(agent, referenced_name, value);
 }

@@ -53,13 +53,6 @@ const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
-// Non-standard helper to get the name property of a function
-pub fn getFunctionName(function: Object) []const u8 {
-    const property_descriptor = function.data.property_storage.get(PropertyKey.from("name")).?;
-    const value = property_descriptor.value.?;
-    return value.string.utf8;
-}
-
 pub const ConstructorKind = enum {
     base,
     derived,
@@ -830,7 +823,7 @@ pub fn setFunctionName(
 
     var name = switch (if (@TypeOf(key) == PropertyKey) PropertyKeyOrPrivateName{ .property_key = key } else key) {
         .property_key => |property_key| switch (try property_key.toStringOrSymbol(agent)) {
-            .string => |string| String.from(string),
+            .string => |string| string,
 
             // 2. If name is a Symbol, then
             .symbol => |symbol| blk: {
@@ -841,11 +834,10 @@ pub fn setFunctionName(
                 if (description == null) break :blk String.empty;
 
                 // c. Else, set name to the string-concatenation of "[", description, and "]".
-                break :blk String.from(try std.fmt.allocPrint(
+                break :blk try String.concat(
                     agent.gc_allocator,
-                    "[{s}]",
-                    .{description.?.utf8},
-                ));
+                    &.{ String.fromLiteral("["), description.?, String.fromLiteral("]") },
+                );
             },
         },
         // 3. Else if name is a Private Name, then
@@ -865,8 +857,9 @@ pub fn setFunctionName(
     if (prefix != null) {
         // a. Set name to the string-concatenation of prefix, the code unit 0x0020 (SPACE), and
         //    name.
-        name = String.from(
-            try std.fmt.allocPrint(agent.gc_allocator, "{s} {}", .{ prefix.?, name }),
+        name = try String.concat(
+            agent.gc_allocator,
+            &.{ String.fromAscii(prefix.?), String.fromLiteral(" "), name },
         );
 
         // b. If F has an [[InitialName]] internal slot, then

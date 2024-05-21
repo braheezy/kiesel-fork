@@ -20,7 +20,6 @@ const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const performEval = @import("eval.zig").performEval;
-const trimLeft = utils.trimLeft;
 
 const Self = @This();
 
@@ -335,7 +334,10 @@ fn parseFloat(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const input_string = try string_value.toString(agent);
 
     // 2. Let trimmedString be ! TrimString(inputString, start).
-    const trimmed_string = trimLeft(input_string.utf8, &String.whitespace);
+    var trimmed_string = try (try input_string.trim(
+        agent.gc_allocator,
+        .start,
+    )).toUtf8(agent.gc_allocator);
 
     // 3. Let trimmed be StringToCodePoints(trimmedString).
     // 4. Let trimmedPrefix be the longest prefix of trimmed that satisfies the syntax of a
@@ -364,7 +366,10 @@ fn parseInt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const input_string = try string_value.toString(agent);
 
     // 2. Let S be ! TrimString(inputString, start).
-    var string = trimLeft(input_string.utf8, &String.whitespace);
+    var string = try (try input_string.trim(
+        agent.gc_allocator,
+        .start,
+    )).toUtf8(agent.gc_allocator);
 
     // 3. Let sign be 1.
     var sign: f64 = 1;
@@ -505,7 +510,7 @@ fn encode(
     agent: *Agent,
     string: String,
     comptime extra_unescaped: []const u8,
-) Allocator.Error![]const u8 {
+) Allocator.Error!String {
     // 3. Let alwaysUnescaped be the string-concatenation of the ASCII word characters and
     //    "-.!~*'()".
     const always_unescaped = String.ascii_word_characters ++ "-.!~*'()";
@@ -515,18 +520,18 @@ fn encode(
 
     // 1-2., 5-7.
     var buffer = std.ArrayList(u8).init(agent.gc_allocator);
-    try std.Uri.Component.percentEncode(buffer.writer(), string.utf8, struct {
+    try std.Uri.Component.percentEncode(buffer.writer(), try string.toUtf8(agent.gc_allocator), struct {
         fn isValidChar(c: u8) bool {
             return std.mem.indexOfScalar(u8, unescaped_set, c) != null;
         }
     }.isValidChar);
-    return buffer.toOwnedSlice();
+    return String.fromAscii(try buffer.toOwnedSlice());
 }
 
 /// 19.2.6.6 Decode ( string, preserveEscapeSet )
 /// https://tc39.es/ecma262/#sec-decode
-fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u8) Agent.Error![]const u8 {
-    const input = string.utf8;
+fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u8) Agent.Error!String {
+    const input = try string.toUtf8(agent.gc_allocator);
 
     // 1. Let len be the length of string.
     const len = input.len;
@@ -638,7 +643,7 @@ fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u
     }
 
     // 5. Return R.
-    return result.toOwnedSlice();
+    return String.fromUtf8(agent.gc_allocator, try result.toOwnedSlice());
 }
 
 /// B.2.1.1 escape ( string )
@@ -656,14 +661,12 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     // 4. Let unescapedSet be the string-concatenation of the ASCII word characters and "@*+-./".
     const unescaped_set = String.ascii_word_characters ++ "@*+-./";
 
-    const code_units = try string.utf16CodeUnits(agent.gc_allocator);
-    defer agent.gc_allocator.free(code_units);
-
     // 2. Let len be the length of string.
     // 5. Let k be 0.
     // 6. Repeat, while k < len,
     //     a. Let C be the code unit at index k within string.
-    for (code_units) |c| {
+    var it = string.codeUnitIterator();
+    while (it.next()) |c| {
         // b. If unescapedSet contains C, then
         const s: String.Builder.Segment = if (c < 256 and std.mem.indexOfScalar(u8, unescaped_set, @intCast(c)) != null) blk: {
             // i. Let S be C.
@@ -678,7 +681,7 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                 //    hexadecimal number.
                 // 2. Let S be the string-concatenation of "%" and StringPad(hex, 2, "0", start).
                 break :blk .{
-                    .string = String.from(
+                    .string = String.fromAscii(
                         try std.fmt.allocPrint(
                             agent.gc_allocator,
                             "%{}",
@@ -695,7 +698,7 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                 var bytes = std.mem.toBytes(c);
                 std.mem.reverse(u8, &bytes);
                 break :blk .{
-                    .string = String.from(
+                    .string = String.fromAscii(
                         try std.fmt.allocPrint(
                             agent.gc_allocator,
                             "%u{}",
@@ -728,10 +731,10 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const len = string.length();
 
     // 3. Let R be the empty String.
-    var result = std.ArrayList(u16).init(agent.gc_allocator);
+    var result = String.Builder.init(agent.gc_allocator);
     defer result.deinit();
 
-    const code_units = try string.utf16CodeUnits(agent.gc_allocator);
+    const code_units = try string.codeUnits(agent.gc_allocator);
     defer agent.gc_allocator.free(code_units);
 
     // 4. Let k be 0.
@@ -786,24 +789,11 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         }
 
         // c. Set R to the string-concatenation of R and C.
-        try result.append(c);
+        try result.appendCodeUnit(c);
 
         // d. Set k to k + 1.
     }
 
     // 6. Return R.
-    return Value.from(std.unicode.utf16leToUtf8Alloc(
-        agent.gc_allocator,
-        result.items,
-    ) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
-        error.DanglingSurrogateHalf,
-        error.ExpectedSecondSurrogateHalf,
-        error.UnexpectedSecondSurrogateHalf,
-        => return agent.throwException(
-            .internal_error,
-            "UTF-16 strings are not implemented yet",
-            .{},
-        ),
-    });
+    return Value.from(try result.build());
 }

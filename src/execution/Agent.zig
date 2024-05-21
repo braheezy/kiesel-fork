@@ -22,6 +22,7 @@ const Object = types.Object;
 const Realm = @import("Realm.zig");
 const Reference = types.Reference;
 const String = types.String;
+const StringHashMap = types.StringHashMap;
 const Symbol = types.Symbol;
 const Value = types.Value;
 const getIdentifierReference = environments.getIdentifierReference;
@@ -38,7 +39,7 @@ pre_allocated: struct {
 exception: ?Value = null,
 symbol_id: usize = 0,
 well_known_symbols: WellKnownSymbols,
-global_symbol_registry: std.StringArrayHashMap(Symbol),
+global_symbol_registry: StringHashMap(Symbol),
 host_hooks: HostHooks,
 execution_context_stack: std.ArrayList(ExecutionContext),
 queued_jobs: std.ArrayList(QueuedJob),
@@ -96,21 +97,21 @@ pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
         .one = try BigInt.from(self.gc_allocator, 1),
     };
     self.well_known_symbols = .{
-        .@"@@asyncIterator" = self.createSymbol(String.from("Symbol.asyncIterator")) catch unreachable,
-        .@"@@hasInstance" = self.createSymbol(String.from("Symbol.hasInstance")) catch unreachable,
-        .@"@@isConcatSpreadable" = self.createSymbol(String.from("Symbol.isConcatSpreadable")) catch unreachable,
-        .@"@@iterator" = self.createSymbol(String.from("Symbol.iterator")) catch unreachable,
-        .@"@@match" = self.createSymbol(String.from("Symbol.match")) catch unreachable,
-        .@"@@matchAll" = self.createSymbol(String.from("Symbol.matchAll")) catch unreachable,
-        .@"@@replace" = self.createSymbol(String.from("Symbol.replace")) catch unreachable,
-        .@"@@search" = self.createSymbol(String.from("Symbol.search")) catch unreachable,
-        .@"@@species" = self.createSymbol(String.from("Symbol.species")) catch unreachable,
-        .@"@@split" = self.createSymbol(String.from("Symbol.split")) catch unreachable,
-        .@"@@toPrimitive" = self.createSymbol(String.from("Symbol.toPrimitive")) catch unreachable,
-        .@"@@toStringTag" = self.createSymbol(String.from("Symbol.toStringTag")) catch unreachable,
-        .@"@@unscopables" = self.createSymbol(String.from("Symbol.unscopables")) catch unreachable,
+        .@"@@asyncIterator" = self.createSymbol(String.fromLiteral("Symbol.asyncIterator")) catch unreachable,
+        .@"@@hasInstance" = self.createSymbol(String.fromLiteral("Symbol.hasInstance")) catch unreachable,
+        .@"@@isConcatSpreadable" = self.createSymbol(String.fromLiteral("Symbol.isConcatSpreadable")) catch unreachable,
+        .@"@@iterator" = self.createSymbol(String.fromLiteral("Symbol.iterator")) catch unreachable,
+        .@"@@match" = self.createSymbol(String.fromLiteral("Symbol.match")) catch unreachable,
+        .@"@@matchAll" = self.createSymbol(String.fromLiteral("Symbol.matchAll")) catch unreachable,
+        .@"@@replace" = self.createSymbol(String.fromLiteral("Symbol.replace")) catch unreachable,
+        .@"@@search" = self.createSymbol(String.fromLiteral("Symbol.search")) catch unreachable,
+        .@"@@species" = self.createSymbol(String.fromLiteral("Symbol.species")) catch unreachable,
+        .@"@@split" = self.createSymbol(String.fromLiteral("Symbol.split")) catch unreachable,
+        .@"@@toPrimitive" = self.createSymbol(String.fromLiteral("Symbol.toPrimitive")) catch unreachable,
+        .@"@@toStringTag" = self.createSymbol(String.fromLiteral("Symbol.toStringTag")) catch unreachable,
+        .@"@@unscopables" = self.createSymbol(String.fromLiteral("Symbol.unscopables")) catch unreachable,
     };
-    self.global_symbol_registry = std.StringArrayHashMap(Symbol).init(self.gc_allocator);
+    self.global_symbol_registry = StringHashMap(Symbol).init(self.gc_allocator);
     self.execution_context_stack = std.ArrayList(ExecutionContext).init(self.gc_allocator);
     self.queued_jobs = std.ArrayList(QueuedJob).init(self.gc_allocator);
     return self;
@@ -195,12 +196,12 @@ pub fn createException(
     )(&realm.intrinsics);
     const message = try std.fmt.allocPrint(self.gc_allocator, fmt, args);
     const error_object = constructor.construct(
-        &.{Value.from(message)},
+        &.{Value.from(try String.fromUtf8(self.gc_allocator, message))},
         null,
     ) catch |err| try noexcept(err);
     if (exception_type == .internal_error) {
         // We don't have a dedicated type for this, but let's at least adjust the name
-        error_object.as(builtins.Error).fields.error_data.name = String.from("InternalError");
+        error_object.as(builtins.Error).fields.error_data.name = String.fromLiteral("InternalError");
     }
     return error_object;
 }
@@ -358,5 +359,5 @@ test "well_known_symbols" {
     defer agent.deinit();
     const unscopables = agent.well_known_symbols.@"@@unscopables";
     try std.testing.expectEqual(unscopables.id, 12);
-    try std.testing.expectEqualStrings(unscopables.description.?.utf8, "Symbol.unscopables");
+    try std.testing.expectEqualStrings(unscopables.description.?.ascii, "Symbol.unscopables");
 }

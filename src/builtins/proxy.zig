@@ -774,7 +774,7 @@ fn ownPropertyKeys(object: Object) Agent.Error!std.ArrayList(PropertyKey) {
         PropertyKey,
         void,
         PropertyKeyArrayHashMapContext,
-        80,
+        std.hash_map.default_max_load_percentage,
     );
 
     // 1. Perform ? ValidateNonRevokedProxy(O).

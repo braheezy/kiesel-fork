@@ -216,10 +216,10 @@ pub const SymbolConstructor = struct {
 
         // 2. For each element e of the GlobalSymbolRegistry List, do
         //     a. If e.[[Key]] is stringKey, return e.[[Symbol]].
-        if (agent.global_symbol_registry.get(string_key.utf8)) |symbol| return Value.from(symbol);
+        if (agent.global_symbol_registry.get(string_key)) |symbol| return Value.from(symbol);
 
         // 3. Assert: GlobalSymbolRegistry does not currently contain an entry for stringKey.
-        std.debug.assert(!agent.global_symbol_registry.contains(string_key.utf8));
+        std.debug.assert(!agent.global_symbol_registry.contains(string_key));
 
         // 4. Let newSymbol be a new Symbol whose [[Description]] is stringKey.
         const new_symbol = agent.createSymbol(string_key) catch |err| switch (err) {
@@ -231,7 +231,7 @@ pub const SymbolConstructor = struct {
         };
 
         // 5. Append the Record { [[Key]]: stringKey, [[Symbol]]: newSymbol } to the GlobalSymbolRegistry List.
-        try agent.global_symbol_registry.putNoClobber(string_key.utf8, new_symbol);
+        try agent.global_symbol_registry.putNoClobber(string_key, new_symbol);
 
         // 6. Return newSymbol.
         return Value.from(new_symbol);
@@ -360,9 +360,10 @@ pub const Symbol = MakeObject(.{
 /// https://tc39.es/ecma262/#sec-keyforsymbol
 pub fn keyForSymbol(agent: *Agent, symbol: types.Symbol) ?String {
     // 1. For each element e of the GlobalSymbolRegistry List, do
-    for (agent.global_symbol_registry.values()) |entry| {
+    var it = agent.global_symbol_registry.iterator();
+    while (it.next()) |entry| {
         // a. If SameValue(e.[[Symbol]], sym) is true, return e.[[Key]].
-        if (entry.id == symbol.id) return entry.description;
+        if (entry.value_ptr.id == symbol.id) return entry.key_ptr.*;
     }
 
     // 2. Assert: GlobalSymbolRegistry does not currently contain an entry for sym.

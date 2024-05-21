@@ -16,6 +16,7 @@ const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
+const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
@@ -359,10 +360,12 @@ pub const NumberPrototype = struct {
         //         v. Set m to the string-concatenation of a, ".", and b.
         // 12. Return the string-concatenation of s and m.
         return Value.from(
-            try std.fmt.allocPrint(
-                agent.gc_allocator,
-                "{s}{d:.[2]}",
-                .{ sign, x, fraction_digits },
+            String.fromAscii(
+                try std.fmt.allocPrint(
+                    agent.gc_allocator,
+                    "{s}{d:.[2]}",
+                    .{ sign, x, fraction_digits },
+                ),
             ),
         );
     }
@@ -494,10 +497,12 @@ pub const NumberPrototype = struct {
                 // vi. Return the string-concatenation of s, m, the code unit 0x0065 (LATIN SMALL
                 //     LETTER E), c, and d.
                 return Value.from(
-                    try std.fmt.allocPrint(
-                        agent.gc_allocator,
-                        "{s}{s}e{c}{d}",
-                        .{ sign, number_string, exponent_sign, exponent },
+                    String.fromAscii(
+                        try std.fmt.allocPrint(
+                            agent.gc_allocator,
+                            "{s}{s}e{c}{d}",
+                            .{ sign, number_string, exponent_sign, exponent },
+                        ),
                     ),
                 );
             }
@@ -506,7 +511,9 @@ pub const NumberPrototype = struct {
         // 11. If e = p - 1, return the string-concatenation of s and m.
         if (exponent == precision - 1) {
             return Value.from(
-                try std.fmt.allocPrint(agent.gc_allocator, "{s}{s}", .{ sign, number_string }),
+                String.fromAscii(
+                    try std.fmt.allocPrint(agent.gc_allocator, "{s}{s}", .{ sign, number_string }),
+                ),
             );
         }
 
@@ -534,7 +541,9 @@ pub const NumberPrototype = struct {
 
         // 14. Return the string-concatenation of s and m.
         return Value.from(
-            try std.fmt.allocPrint(agent.gc_allocator, "{s}{s}", .{ sign, number_string }),
+            String.fromAscii(
+                try std.fmt.allocPrint(agent.gc_allocator, "{s}{s}", .{ sign, number_string }),
+            ),
         );
     }
 

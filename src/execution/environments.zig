@@ -16,6 +16,7 @@ const Object = types.Object;
 const PrivateName = types.PrivateName;
 const Reference = types.Reference;
 const SourceTextModule = language.SourceTextModule;
+const String = types.String;
 const Value = types.Value;
 
 pub const DeclarativeEnvironment = @import("environments/DeclarativeEnvironment.zig");
@@ -210,7 +211,8 @@ pub fn getIdentifierReference(
                     .{ .environment = environment }
                 else
                     .unresolvable,
-                .referenced_name = .{ .string = name },
+                // FIXME: This may be any UTF-8 string! We need an allocator or pass it in as a string.
+                .referenced_name = .{ .string = String.fromAscii(name) },
                 .strict = strict,
                 .this_value = null,
             };
@@ -229,7 +231,8 @@ pub fn getIdentifierReference(
             //    }.
             return .{
                 .base = .{ .environment = env.? },
-                .referenced_name = .{ .string = name },
+                // FIXME: This may be any UTF-8 string! We need an allocator or pass it in as a string.
+                .referenced_name = .{ .string = String.fromAscii(name) },
                 .strict = strict,
                 .this_value = null,
             };
@@ -250,7 +253,8 @@ pub fn getIdentifierReference(
                 //    }.
                 return .{
                     .base = .unresolvable,
-                    .referenced_name = .{ .string = name },
+                    // FIXME: This may be any UTF-8 string! We need an allocator or pass it in as a string.
+                    .referenced_name = .{ .string = String.fromAscii(name) },
                     .strict = strict,
                     .this_value = null,
                 };

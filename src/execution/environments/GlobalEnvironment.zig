@@ -16,6 +16,7 @@ const Object = types.Object;
 const ObjectEnvironment = environments.ObjectEnvironment;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
+const String = types.String;
 const Value = types.Value;
 
 const Self = @This();
@@ -148,6 +149,8 @@ pub fn getBindingValue(
 /// 9.1.1.4.7 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-global-environment-records-deletebinding-n
 pub fn deleteBinding(self: *Self, name: []const u8) Agent.Error!bool {
+    const agent = self.object_record.binding_object.agent();
+
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, then
     if (self.declarative_record.hasBinding(name)) {
@@ -160,7 +163,9 @@ pub fn deleteBinding(self: *Self, name: []const u8) Agent.Error!bool {
     const global_object = self.object_record.binding_object;
 
     // 5. Let existingProp be ? HasOwnProperty(globalObject, N).
-    const existing_prop = try global_object.hasOwnProperty(PropertyKey.from(name));
+    const existing_prop = try global_object.hasOwnProperty(
+        PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+    );
 
     // 6. If existingProp is true, then
     if (existing_prop) {
@@ -229,12 +234,16 @@ pub fn hasLexicalDeclaration(self: Self, name: []const u8) bool {
 /// 9.1.1.4.15 CanDeclareGlobalVar ( N )
 /// https://tc39.es/ecma262/#sec-candeclareglobalvar
 pub fn canDeclareGlobalVar(self: *Self, name: []const u8) Agent.Error!bool {
+    const agent = self.object_record.binding_object.agent();
+
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
     // 2. Let globalObject be ObjRec.[[BindingObject]].
     const global_object = self.object_record.binding_object;
 
     // 3. Let hasProperty be ? HasOwnProperty(globalObject, N).
-    const has_property = try global_object.hasOwnProperty(PropertyKey.from(name));
+    const has_property = try global_object.hasOwnProperty(
+        PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+    );
 
     // 4. If hasProperty is true, return true.
     if (has_property) return true;
@@ -246,6 +255,8 @@ pub fn canDeclareGlobalVar(self: *Self, name: []const u8) Agent.Error!bool {
 /// 9.1.1.4.16 CanDeclareGlobalFunction ( N )
 /// https://tc39.es/ecma262/#sec-candeclareglobalfunction
 pub fn canDeclareGlobalFunction(self: *Self, name: []const u8) Agent.Error!bool {
+    const agent = self.object_record.binding_object.agent();
+
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
     // 2. Let globalObject be ObjRec.[[BindingObject]].
     const global_object = self.object_record.binding_object;
@@ -253,7 +264,7 @@ pub fn canDeclareGlobalFunction(self: *Self, name: []const u8) Agent.Error!bool 
     // 3. Let existingProp be ? globalObject.[[GetOwnProperty]](N).
     const existing_prop = try global_object.internalMethods().getOwnProperty(
         global_object,
-        PropertyKey.from(name),
+        PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
     ) orelse {
 
         // 4. If existingProp is undefined, return ? IsExtensible(globalObject).
@@ -286,7 +297,9 @@ pub fn createGlobalVarBinding(
     const global_object = self.object_record.binding_object;
 
     // 3. Let hasProperty be ? HasOwnProperty(globalObject, N).
-    const has_property = try global_object.hasOwnProperty(PropertyKey.from(name));
+    const has_property = try global_object.hasOwnProperty(
+        PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+    );
 
     // 4. Let extensible be ? IsExtensible(globalObject).
     const extensible = try global_object.isExtensible();
@@ -317,7 +330,8 @@ pub fn createGlobalFunctionBinding(
     value: Value,
     deletable: bool,
 ) Agent.Error!void {
-    const property_key = PropertyKey.from(name);
+    const agent = self.object_record.binding_object.agent();
+    const property_key = PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name));
 
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
     // 2. Let globalObject be ObjRec.[[BindingObject]].

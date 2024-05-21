@@ -310,7 +310,7 @@ pub fn getImportedModule(referrer: *SourceTextModule, specifier: String) Module 
     //    invoking this abstract operation.
     // 2. Let record be the Record in referrer.[[LoadedModules]] whose [[Specifier]] is specifier.
     // 3. Return record.[[Module]].
-    return referrer.loaded_modules.get(specifier.utf8).?;
+    return referrer.loaded_modules.get(specifier).?;
 }
 
 /// 16.2.1.9 FinishLoadingImportedModule ( referrer, specifier, payload, result )
@@ -327,7 +327,7 @@ pub fn finishLoadingImportedModule(
         switch (referrer) {
             inline else => |r| {
                 const module = result catch unreachable;
-                const get_or_put_result = try r.loaded_modules.getOrPut(specifier.utf8);
+                const get_or_put_result = try r.loaded_modules.getOrPut(specifier);
 
                 // a. If referrer.[[LoadedModules]] contains a Record whose [[Specifier]] is
                 //    specifier, then

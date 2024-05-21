@@ -20,6 +20,7 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
+const String = types.String;
 const Value = types.Value;
 const addEntriesFromIterable = builtins.addEntriesFromIterable;
 const createArrayFromList = types.createArrayFromList;
@@ -821,34 +822,34 @@ pub const ObjectPrototype = struct {
         // zig fmt: off
         // 5. If isArray is true, let builtinTag be "Array".
         const builtin_tag = if (is_array)
-            "Array"
+            String.fromLiteral("Array")
         // 6. Else if O has a [[ParameterMap]] internal slot, let builtinTag be "Arguments".
         else if (object.is(builtins.Arguments))
-            "Arguments"
+            String.fromLiteral("Arguments")
         // 7. Else if O has a [[Call]] internal method, let builtinTag be "Function".
         else if (object.internalMethods().call) |_|
-            "Function"
+            String.fromLiteral("Function")
         // 8. Else if O has an [[ErrorData]] internal slot, let builtinTag be "Error".
         else if (object.is(builtins.Error))
-            "Error"
+            String.fromLiteral("Error")
         // 9. Else if O has a [[BooleanData]] internal slot, let builtinTag be "Boolean".
         else if (object.is(builtins.Boolean))
-            "Boolean"
+            String.fromLiteral("Boolean")
         // 10. Else if O has a [[NumberData]] internal slot, let builtinTag be "Number".
         else if (object.is(builtins.Number))
-            "Number"
+            String.fromLiteral("Number")
         // 11. Else if O has a [[StringData]] internal slot, let builtinTag be "String".
         else if (object.is(builtins.String))
-            "String"
+            String.fromLiteral("String")
         // 12. Else if O has a [[DateValue]] internal slot, let builtinTag be "Date".
         else if (object.is(builtins.Date))
-            "Date"
+            String.fromLiteral("Date")
         // 13. Else if O has a [[RegExpMatcher]] internal slot, let builtinTag be "RegExp".
         else if (object.is(builtins.RegExp))
-            "RegExp"
+            String.fromLiteral("RegExp")
         // 14. Else, let builtinTag be "Object".
         else
-            "Object";
+            String.fromLiteral("Object");
         // zig fmt: on
 
         // 15. Let tag be ? Get(O, @@toStringTag).
@@ -856,12 +857,17 @@ pub const ObjectPrototype = struct {
 
         // 16. If tag is not a String, set tag to builtinTag.
         const tag = switch (tag_value) {
-            .string => |string| string.utf8,
+            .string => |string| string,
             else => builtin_tag,
         };
 
         // 17. Return the string-concatenation of "[object ", tag, and "]".
-        return Value.from(try std.fmt.allocPrint(agent.gc_allocator, "[object {s}]", .{tag}));
+        return Value.from(
+            try String.concat(
+                agent.gc_allocator,
+                &.{ String.fromLiteral("[object "), tag, String.fromLiteral("]") },
+            ),
+        );
     }
 
     /// 20.1.3.7 Object.prototype.valueOf ( )

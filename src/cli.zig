@@ -91,19 +91,20 @@ const ScriptOrModuleHostDefined = struct {
     base_dir: std.fs.Dir,
 };
 
-fn resolveModulePath(agent: *Agent, script_or_module: ScriptOrModule, specifier: []const u8) Agent.Error![]const u8 {
+fn resolveModulePath(agent: *Agent, script_or_module: ScriptOrModule, specifier: String) Agent.Error![]const u8 {
     const base_dir: std.fs.Dir = switch (script_or_module) {
         inline else => |x| x.host_defined.cast(*ScriptOrModuleHostDefined).base_dir,
     };
+    const specifier_utf8 = try specifier.toUtf8(agent.gc_allocator);
     if (builtin.os.tag == .wasi) {
-        return std.fs.path.resolve(agent.gc_allocator, &.{specifier});
+        return std.fs.path.resolve(agent.gc_allocator, &.{specifier_utf8});
     }
-    return base_dir.realpathAlloc(agent.gc_allocator, specifier) catch |err| switch (err) {
+    return base_dir.realpathAlloc(agent.gc_allocator, specifier_utf8) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         else => return agent.throwException(
             .internal_error,
             "Failed to import '{s}': {s}",
-            .{ specifier, @errorName(err) },
+            .{ specifier_utf8, @errorName(err) },
         ),
     };
 }
@@ -212,7 +213,7 @@ const Kiesel = struct {
         defer diagnostics.deinit();
 
         // 3. Let s be ParseScript(sourceText, realm, hostDefined).
-        const script = Script.parse(source_text.utf8, realm, host_defined, .{
+        const script = Script.parse(try source_text.toUtf8(agent.gc_allocator), realm, host_defined, .{
             .diagnostics = &diagnostics,
             .file_name = "evalScript",
         }) catch |err| switch (err) {
@@ -257,7 +258,7 @@ const Kiesel = struct {
         const bytes = readFile(
             agent.gc_allocator,
             std.fs.cwd(),
-            path.utf8,
+            try path.toUtf8(agent.gc_allocator),
         ) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             else => return agent.throwException(
@@ -269,7 +270,7 @@ const Kiesel = struct {
         if (!std.unicode.utf8ValidateSlice(bytes)) {
             return agent.throwException(.type_error, "Invalid UTF-8", .{});
         }
-        return Value.from(bytes);
+        return Value.from(try String.fromUtf8(agent.gc_allocator, bytes));
     }
 
     fn readLine(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
@@ -288,7 +289,7 @@ const Kiesel = struct {
         if (!std.unicode.utf8ValidateSlice(bytes)) {
             return agent.throwException(.type_error, "Invalid UTF-8", .{});
         }
-        return Value.from(bytes);
+        return Value.from(try String.fromUtf8(agent.gc_allocator, bytes));
     }
 
     fn readStdin(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
@@ -306,7 +307,7 @@ const Kiesel = struct {
         if (!std.unicode.utf8ValidateSlice(bytes)) {
             return agent.throwException(.type_error, "Invalid UTF-8", .{});
         }
-        return Value.from(bytes);
+        return Value.from(try String.fromUtf8(agent.gc_allocator, bytes));
     }
 
     fn sleep(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
@@ -327,7 +328,10 @@ const Kiesel = struct {
         const path = try arguments.get(0).toString(agent);
         const contents = try arguments.get(1).toString(agent);
 
-        const file = std.fs.cwd().createFile(path.utf8, .{}) catch |err| {
+        const file = std.fs.cwd().createFile(
+            try path.toUtf8(agent.gc_allocator),
+            .{},
+        ) catch |err| {
             return agent.throwException(
                 .type_error,
                 "Error while opening file: {s}",
@@ -335,7 +339,7 @@ const Kiesel = struct {
             );
         };
         defer file.close();
-        file.writeAll(contents.utf8) catch |err| {
+        file.writeAll(try contents.toUtf8(agent.gc_allocator)) catch |err| {
             return agent.throwException(
                 .type_error,
                 "Error while writing file: {s}",
@@ -445,7 +449,7 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
                 .path => |path| resolveModulePath(
                     agent,
                     script_or_module,
-                    path,
+                    try String.fromUtf8(agent.gc_allocator, path),
                 ) catch |err| break :blk err,
             };
             const module_cache_key: ModuleCacheKey = .{
@@ -779,8 +783,8 @@ pub fn main() !u8 {
         ) Allocator.Error!void {
             const result = blk: {
                 const module_path = switch (referrer) {
-                    .script => |script| resolveModulePath(agent_, .{ .script = script }, specifier.utf8),
-                    .module => |module| resolveModulePath(agent_, .{ .module = module }, specifier.utf8),
+                    .script => |script| resolveModulePath(agent_, .{ .script = script }, specifier),
+                    .module => |module| resolveModulePath(agent_, .{ .module = module }, specifier),
                     .realm => unreachable,
                 } catch |err| break :blk err;
                 const module_cache_key: ModuleCacheKey = .{

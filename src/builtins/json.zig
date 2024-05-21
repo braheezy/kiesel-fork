@@ -32,7 +32,9 @@ fn convertJsonValue(agent: *Agent, value: std.json.Value) Allocator.Error!Value 
         .bool => |x| Value.from(x),
         .float => |x| Value.from(x),
         .integer => |x| Value.from(@as(f64, @floatFromInt(x))),
-        .string => |x| Value.from(try agent.gc_allocator.dupe(u8, x)),
+        .string => |x| Value.from(
+            try String.fromUtf8(agent.gc_allocator, try agent.gc_allocator.dupe(u8, x)),
+        ),
         .number_string => |x| Value.from(std.fmt.parseFloat(f64, x) catch unreachable),
         .array => |x| blk: {
             const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
@@ -53,7 +55,12 @@ fn convertJsonValue(agent: *Agent, value: std.json.Value) Allocator.Error!Value 
             var it = x.iterator();
             while (it.next()) |entry| {
                 object.createDataPropertyOrThrow(
-                    PropertyKey.from(entry.key_ptr.*),
+                    PropertyKey.from(
+                        try String.fromUtf8(
+                            agent.gc_allocator,
+                            try agent.gc_allocator.dupe(u8, entry.key_ptr.*),
+                        ),
+                    ),
                     try convertJsonValue(agent, entry.value_ptr.*),
                 ) catch |err| try noexcept(err);
             }
@@ -231,11 +238,11 @@ fn serializeJSONProperty(
 
     switch (value) {
         // 5. If value is null, return "null".
-        .null => return String.from("null"),
+        .null => return String.fromLiteral("null"),
 
         // 6. If value is true, return "true".
         // 7. If value is false, return "false".
-        .boolean => |boolean| return if (boolean) String.from("true") else String.from("false"),
+        .boolean => |boolean| return if (boolean) String.fromLiteral("true") else String.fromLiteral("false"),
 
         // 8. If value is a String, return QuoteJSONString(value).
         .string => |string| return try quoteJSONString(agent, string),
@@ -246,7 +253,7 @@ fn serializeJSONProperty(
             if (number.isFinite()) return try number.toString(agent.gc_allocator, 10);
 
             // b. Return "null".
-            return String.from("null");
+            return String.fromLiteral("null");
         },
 
         else => {},
@@ -281,9 +288,8 @@ fn quoteJSONString(agent: *Agent, value: String) Allocator.Error!String {
     try product.append('"');
 
     // 2. For each code point C of StringToCodePoints(value), do
-    const code_units = try value.utf16CodeUnits(agent.gc_allocator);
-    defer agent.gc_allocator.free(code_units);
-    for (code_units) |c| {
+    var it = value.codeUnitIterator();
+    while (it.next()) |c| {
         // a. If C is listed in the “Code Point” column of Table 76, then
         if (c == 0x08 or c == 0x09 or c == 0x0A or c == 0x0C or c == 0x0D or c == 0x22 or c == 0x5C) {
             // i. Set product to the string-concatenation of product and the escape sequence for C
@@ -325,7 +331,7 @@ fn quoteJSONString(agent: *Agent, value: String) Allocator.Error!String {
     try product.append('"');
 
     // 4. Return product.
-    return String.from(try product.toOwnedSlice());
+    return String.fromUtf8(agent.gc_allocator, try product.toOwnedSlice());
 }
 
 /// 25.5.2.4 UnicodeEscape ( C )
@@ -400,14 +406,14 @@ fn serializeJSONObject(
             // iv. Set member to the string-concatenation of member and strP.
             const member = try std.fmt.allocPrint(
                 agent.gc_allocator,
-                "{s}:{s}{s}",
+                "{}:{s}{}",
                 .{
-                    (try quoteJSONString(
+                    try quoteJSONString(
                         agent,
-                        String.from((try property_key.toStringOrSymbol(agent)).string),
-                    )).utf8,
+                        (try property_key.toStringOrSymbol(agent)).string,
+                    ),
                     if (!state.gap.isEmpty()) " " else "",
-                    str_property.?.utf8,
+                    str_property.?,
                 },
             );
 
@@ -419,7 +425,7 @@ fn serializeJSONObject(
     // 9. If partial is empty, then
     const final = if (partial.items.len == 0) blk: {
         // a. Let final be "{}".
-        break :blk String.from("{}");
+        break :blk String.fromLiteral("{}");
     }
     // 10. Else,
     else blk: {
@@ -432,7 +438,8 @@ fn serializeJSONObject(
             const properties = try std.mem.join(agent.gc_allocator, ",", partial.items);
 
             // ii. Let final be the string-concatenation of "{", properties, and "}".
-            break :blk String.from(
+            break :blk String.fromUtf8(
+                agent.gc_allocator,
                 try std.fmt.allocPrint(agent.gc_allocator, "{{{s}}}", .{properties}),
             );
         }
@@ -440,11 +447,7 @@ fn serializeJSONObject(
         else {
             // i. Let separator be the string-concatenation of the code unit 0x002C (COMMA), the
             //    code unit 0x000A (LINE FEED), and state.[[Indent]].
-            const separator = try std.fmt.allocPrint(
-                agent.gc_allocator,
-                ",\n{s}",
-                .{state.indent.utf8},
-            );
+            const separator = try std.fmt.allocPrint(agent.gc_allocator, ",\n{}", .{state.indent});
 
             // ii. Let properties be the String value formed by concatenating all the element
             //     Strings of partial with each adjacent pair of Strings separated with separator.
@@ -454,11 +457,12 @@ fn serializeJSONObject(
 
             // iii. Let final be the string-concatenation of "{", the code unit 0x000A (LINE FEED),
             //      state.[[Indent]], properties, the code unit 0x000A (LINE FEED), stepback, and "}".
-            break :blk String.from(
+            break :blk String.fromUtf8(
+                agent.gc_allocator,
                 try std.fmt.allocPrint(
                     agent.gc_allocator,
-                    "{{\n{s}{s}\n{s}}}",
-                    .{ state.indent.utf8, properties, stepback },
+                    "{{\n{}{s}\n{s}}}",
+                    .{ state.indent, properties, stepback },
                 ),
             );
         }
@@ -524,7 +528,7 @@ fn serializeJSONArray(
         // c. Else,
         else {
             // i. Append strP to partial.
-            partial.appendAssumeCapacity(str_property.?.utf8);
+            partial.appendAssumeCapacity(try str_property.?.toUtf8(agent.gc_allocator));
         }
 
         // d. Set index to index + 1.
@@ -533,7 +537,7 @@ fn serializeJSONArray(
     // 9. If partial is empty, then
     const final = if (partial.items.len == 0) blk: {
         // a. Let final be "[]".
-        break :blk String.from("[]");
+        break :blk String.fromLiteral("[]");
     }
     // 10. Else,
     else blk: {
@@ -546,7 +550,8 @@ fn serializeJSONArray(
             const properties = try std.mem.join(agent.gc_allocator, ",", partial.items);
 
             // ii. Let final be the string-concatenation of "[", properties, and "]".
-            break :blk String.from(
+            break :blk try String.fromUtf8(
+                agent.gc_allocator,
                 try std.fmt.allocPrint(agent.gc_allocator, "[{s}]", .{properties}),
             );
         }
@@ -557,7 +562,7 @@ fn serializeJSONArray(
             const separator = try std.fmt.allocPrint(
                 agent.gc_allocator,
                 ",\n{s}",
-                .{state.indent.utf8},
+                .{state.indent},
             );
 
             // ii. Let properties be the String value formed by concatenating all the element
@@ -568,11 +573,12 @@ fn serializeJSONArray(
 
             // iii. Let final be the string-concatenation of "[", the code unit 0x000A (LINE FEED),
             //      state.[[Indent]], properties, the code unit 0x000A (LINE FEED), stepback, and "]".
-            break :blk String.from(
+            break :blk try String.fromUtf8(
+                agent.gc_allocator,
                 try std.fmt.allocPrint(
                     agent.gc_allocator,
                     "[\n{s}{s}\n{s}]",
-                    .{ state.indent.utf8, properties, stepback.utf8 },
+                    .{ state.indent, properties, stepback },
                 ),
             );
         }
@@ -632,7 +638,7 @@ pub const JSON = struct {
         const completion = std.json.parseFromSlice(
             std.json.Value,
             agent.gc_allocator,
-            json_string.utf8,
+            try json_string.toUtf8(agent.gc_allocator),
             .{},
         ) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
@@ -796,7 +802,7 @@ pub const JSON = struct {
                 else {
                     const s = try agent.gc_allocator.alloc(u8, @intFromFloat(space_mv));
                     @memset(s, ' ');
-                    break :blk String.from(s);
+                    break :blk String.fromAscii(s);
                 }
             },
 

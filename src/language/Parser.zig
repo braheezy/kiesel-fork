@@ -256,8 +256,28 @@ fn emitErrorAt(
     try self.diagnostics.emit(location, .@"error", fmt, args);
 }
 
+fn utf8StringValue(allocator: Allocator, text: []const u8) Allocator.Error!?[]const u8 {
+    const string = try ast.stringValueImpl(allocator, text);
+    return switch (string) {
+        .ascii => |ascii| ascii,
+        .utf16 => |utf16| std.unicode.utf16LeToUtf8Alloc(
+            allocator,
+            utf16,
+        ) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.DanglingSurrogateHalf,
+            error.ExpectedSecondSurrogateHalf,
+            error.UnexpectedSecondSurrogateHalf,
+            => return null,
+        },
+    };
+}
+
 fn unescapeIdentifier(self: *Self, token: Tokenizer.Token) AcceptError![]const u8 {
-    const identifier = try ast.stringValueImpl(self.allocator, token.text);
+    const identifier = (try utf8StringValue(
+        self.allocator,
+        token.text,
+    )) orelse return error.UnexpectedToken;
     if (token.type == .identifier) {
         // TODO: Handle UnicodeIDStart and UnicodeIDContinue
         const start_chars = "$_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -368,7 +388,10 @@ pub fn acceptIdentifierName(self: *Self) AcceptError!ast.Identifier {
         break :blk reserved_word_token_types;
     };
     const token = try self.core.accept(RuleSet.oneOf(.{.identifier} ++ reserved_word_token_types));
-    return ast.stringValueImpl(self.allocator, token.text);
+    return (try utf8StringValue(
+        self.allocator,
+        token.text,
+    )) orelse return error.UnexpectedToken;
 }
 
 pub fn acceptIdentifierReference(self: *Self) AcceptError!ast.IdentifierReference {

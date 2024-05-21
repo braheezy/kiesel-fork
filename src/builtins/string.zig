@@ -58,32 +58,18 @@ pub fn stringPad(
     // 5. Let truncatedStringFiller be the String value consisting of repeated concatenations of
     //    fillString truncated to length fillLen.
     const truncated_string_filler = blk: {
-        const fill_string_code_units = try fill_string.utf16CodeUnits(agent.gc_allocator);
+        const fill_string_code_units = try fill_string.codeUnits(agent.gc_allocator);
         defer agent.gc_allocator.free(fill_string_code_units);
 
-        const truncated_string_filler = try agent.gc_allocator.alloc(u16, fill_len);
-        defer agent.gc_allocator.free(truncated_string_filler);
+        const repeated_code_units = try agent.gc_allocator.alloc(u16, fill_len);
 
         var i: usize = 0;
         while (i < fill_len) : (i += fill_string_code_units.len) {
-            const dest = truncated_string_filler[i..@min(i + fill_string_code_units.len, fill_len)];
+            const dest = repeated_code_units[i..@min(i + fill_string_code_units.len, fill_len)];
             @memcpy(dest, fill_string_code_units[0..dest.len]);
         }
 
-        break :blk types.String.from(std.unicode.utf16leToUtf8Alloc(
-            agent.gc_allocator,
-            truncated_string_filler,
-        ) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.DanglingSurrogateHalf,
-            error.ExpectedSecondSurrogateHalf,
-            error.UnexpectedSecondSurrogateHalf,
-            => return agent.throwException(
-                .internal_error,
-                "UTF-16 strings are not implemented yet",
-                .{},
-            ),
-        });
+        break :blk types.String.fromUtf16(repeated_code_units);
     };
 
     switch (placement) {
@@ -129,19 +115,19 @@ pub fn getSubstitution(
         // a. NOTE: The following steps isolate ref (a prefix of templateRemainder), determine
         //    refReplacement (its replacement), and then append that replacement to result.
         // b. If templateRemainder starts with "$$", then
-        const ref, const ref_replacement = if (std.mem.startsWith(u8, template_reminder.utf8, "$$")) blk: {
+        const ref, const ref_replacement = if (template_reminder.startsWith(types.String.fromLiteral("$$"))) blk: {
             // i. Let ref be "$$".
-            const ref = types.String.from("$$");
+            const ref = types.String.fromLiteral("$$");
 
             // ii. Let refReplacement be "$".
-            const ref_replacement = types.String.from("$");
+            const ref_replacement = types.String.fromLiteral("$");
 
             break :blk .{ ref, ref_replacement };
         }
         // c. Else if templateRemainder starts with "$`", then
-        else if (std.mem.startsWith(u8, template_reminder.utf8, "$`")) blk: {
+        else if (template_reminder.startsWith(types.String.fromLiteral("$`"))) blk: {
             // i. Let ref be "$`".
-            const ref = types.String.from("$`");
+            const ref = types.String.fromLiteral("$`");
 
             // ii. Let refReplacement be the substring of str from 0 to position.
             const ref_replacement = try str.substring(agent.gc_allocator, 0, position);
@@ -149,9 +135,9 @@ pub fn getSubstitution(
             break :blk .{ ref, ref_replacement };
         }
         // d. Else if templateRemainder starts with "$&", then
-        else if (std.mem.startsWith(u8, template_reminder.utf8, "$&")) blk: {
+        else if (template_reminder.startsWith(types.String.fromLiteral("$&"))) blk: {
             // i. Let ref be "$&".
-            const ref = types.String.from("$&");
+            const ref = types.String.fromLiteral("$&");
 
             // ii. Let refReplacement be matched.
             const ref_replacement = matched;
@@ -159,9 +145,9 @@ pub fn getSubstitution(
             break :blk .{ ref, ref_replacement };
         }
         // e. Else if templateRemainder starts with "$'" (0x0024 (DOLLAR SIGN) followed by 0x0027 (APOSTROPHE)), then
-        else if (std.mem.startsWith(u8, template_reminder.utf8, "$'")) blk: {
+        else if (template_reminder.startsWith(types.String.fromLiteral("$'"))) blk: {
             // i. Let ref be "$'".
-            const ref = types.String.from("$'");
+            const ref = types.String.fromLiteral("$'");
 
             // ii. Let matchLength be the length of matched.
             const match_length = matched.length();
@@ -182,18 +168,22 @@ pub fn getSubstitution(
             break :blk .{ ref, ref_replacement };
         }
         // f. Else if templateRemainder starts with "$" followed by 1 or more decimal digits, then
-        else if (template_reminder.utf8.len >= 2 and
-            template_reminder.utf8[0] == '$' and
-            std.ascii.isDigit(template_reminder.utf8[1]))
+        else if (template_reminder.length() >= 2 and
+            template_reminder.codeUnitAt(0) == '$' and
+            std.ascii.isDigit(@truncate(template_reminder.codeUnitAt(1))))
         blk: {
             // i. If templateRemainder starts with "$" followed by 2 or more decimal digits, let
             //    digitCount be 2. Otherwise, let digitCount be 1.
-            var digit_count: usize = if (template_reminder.utf8.len >= 3 and
-                std.ascii.isDigit(template_reminder.utf8[1]) and
-                std.ascii.isDigit(template_reminder.utf8[2])) 2 else 1;
+            var digit_count: usize = if (template_reminder.length() >= 3 and
+                std.ascii.isDigit(@truncate(template_reminder.codeUnitAt(1))) and
+                std.ascii.isDigit(@truncate(template_reminder.codeUnitAt(2)))) 2 else 1;
 
             // ii. Let digits be the substring of templateRemainder from 1 to 1 + digitCount.
-            var digits = template_reminder.utf8[1 .. 1 + digit_count];
+            var digits = (try template_reminder.substring(
+                agent.gc_allocator,
+                1,
+                1 + digit_count,
+            )).ascii;
 
             // iii. Let index be ℝ(StringToNumber(digits)).
             var index = std.fmt.parseInt(usize, digits, 10) catch unreachable;
@@ -248,14 +238,14 @@ pub fn getSubstitution(
             break :blk .{ ref, ref_replacement };
         }
         // g. Else if templateRemainder starts with "$<", then
-        else if (std.mem.startsWith(u8, template_reminder.utf8, "$<")) blk: {
+        else if (template_reminder.startsWith(types.String.fromLiteral("$<"))) blk: {
             // i. Let gtPos be StringIndexOf(templateRemainder, ">", 0).
-            const gt_pos = template_reminder.indexOf(types.String.from(">"), 0);
+            const gt_pos = template_reminder.indexOf(types.String.fromLiteral(">"), 0);
 
             // ii. If gtPos is not-found or namedCaptures is undefined, then
             if (gt_pos == null or named_captures == null) {
                 // 1. Let ref be "$<".
-                const ref = types.String.from("$<");
+                const ref = types.String.fromLiteral("$<");
 
                 // 2. Let refReplacement be ref.
                 const ref_replacement = ref;
@@ -579,7 +569,8 @@ pub const StringConstructor = struct {
     /// https://tc39.es/ecma262/#sec-string.fromcharcode
     fn fromCharCode(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let result be the empty String.
-        var result = try std.ArrayList(u16).initCapacity(agent.gc_allocator, arguments.count());
+        var result = types.String.Builder.init(agent.gc_allocator);
+        try result.segments.ensureTotalCapacity(arguments.count());
         defer result.deinit();
 
         // 2. For each element next of codeUnits, do
@@ -588,24 +579,11 @@ pub const StringConstructor = struct {
             const next_code_unit = try next.toUint16(agent);
 
             // b. Set result to the string-concatenation of result and nextCU.
-            result.appendAssumeCapacity(next_code_unit);
+            try result.appendCodeUnit(next_code_unit);
         }
 
         // 3. Return result.
-        return Value.from(std.unicode.utf16leToUtf8Alloc(
-            agent.gc_allocator,
-            result.items,
-        ) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.DanglingSurrogateHalf,
-            error.ExpectedSecondSurrogateHalf,
-            error.UnexpectedSecondSurrogateHalf,
-            => return agent.throwException(
-                .internal_error,
-                "UTF-16 strings are not implemented yet",
-                .{},
-            ),
-        });
+        return Value.from(try result.build());
     }
 
     /// 22.1.2.2 String.fromCodePoint ( ...codePoints )
@@ -891,7 +869,7 @@ pub const StringPrototype = struct {
 
         // 6. Return the Number value for the numeric value of the code unit at index position
         //    within the String S.
-        return Value.from(string.utf16CodeUnitAt(position));
+        return Value.from(string.codeUnitAt(position));
     }
 
     /// 22.1.3.4 String.prototype.codePointAt ( pos )
@@ -916,8 +894,10 @@ pub const StringPrototype = struct {
         const position: usize = @intFromFloat(position_f64);
 
         // 6. Let cp be CodePointAt(S, position).
+        const code_point = string.codePointAt(position);
+
         // 7. Return 𝔽(cp.[[CodePoint]]).
-        return Value.from(string.codePointAt(position));
+        return Value.from(code_point.code_point);
     }
 
     /// 22.1.3.5 String.prototype.concat ( ...args )
@@ -1094,10 +1074,8 @@ pub const StringPrototype = struct {
         // 2. Let S be ? ToString(O).
         const string = try object.toString(agent);
 
-        // TODO: 3. Return IsStringWellFormedUnicode(S).
-        // NOTE: We only store valid UTF-8 strings so this always returns true for now.
-        _ = string;
-        return Value.from(true);
+        // 3. Return IsStringWellFormedUnicode(S).
+        return Value.from(string.isWellFormedUnicode());
     }
 
     /// 22.1.3.11 String.prototype.lastIndexOf ( searchString [ , position ] )
@@ -1206,7 +1184,7 @@ pub const StringPrototype = struct {
                 _ = try flags.requireObjectCoercible(agent);
 
                 // iii. If ? ToString(flags) does not contain "g", throw a TypeError exception.
-                if (std.mem.indexOfScalar(u8, (try flags.toString(agent)).utf8, 'g') == null) {
+                if ((try flags.toString(agent)).indexOf(types.String.fromLiteral("g"), 0) == null) {
                     return agent.throwException(
                         .type_error,
                         "RegExp object must have the 'g' flag set",
@@ -1297,7 +1275,7 @@ pub const StringPrototype = struct {
         //    the code unit 0x0020 (SPACE).
         // 6. Else, set fillString to ? ToString(fillString).
         const fill_string = if (fill_string_value == .undefined)
-            types.String.from(" ")
+            types.String.fromLiteral(" ")
         else
             try fill_string_value.toString(agent);
 
@@ -1440,11 +1418,7 @@ pub const StringPrototype = struct {
 
         // 14. Return the string-concatenation of preceding, replacement, and following.
         return Value.from(
-            try std.mem.join(
-                agent.gc_allocator,
-                "",
-                &.{ preceding.utf8, replacement.utf8, following.utf8 },
-            ),
+            try types.String.concat(agent.gc_allocator, &.{ preceding, replacement, following }),
         );
     }
 
@@ -1471,7 +1445,7 @@ pub const StringPrototype = struct {
                 _ = try flags.requireObjectCoercible(agent);
 
                 // iii. If ? ToString(flags) does not contain "g", throw a TypeError exception.
-                if (std.mem.indexOfScalar(u8, (try flags.toString(agent)).utf8, 'g') == null) {
+                if ((try flags.toString(agent)).indexOf(types.String.fromLiteral("g"), 0) == null) {
                     return agent.throwException(
                         .type_error,
                         "RegExp object must have the 'g' flag set",
@@ -1772,23 +1746,15 @@ pub const StringPrototype = struct {
             );
 
             // b. Let codeUnits be a List consisting of the sequence of code units that are the elements of head.
-            const code_units = try head.utf16CodeUnits(agent.gc_allocator);
+            const code_units = try head.codeUnits(agent.gc_allocator);
 
             // c. Return CreateArrayFromList(codeUnits).
             return Value.from(
                 try createArrayFromListMapToValue(agent, u16, code_units, struct {
                     fn mapFn(agent_: *Agent, code_unit: u16) Allocator.Error!Value {
-                        return Value.from(std.unicode.utf16leToUtf8Alloc(
-                            agent_.gc_allocator,
-                            &.{code_unit},
-                        ) catch |err| switch (err) {
-                            error.OutOfMemory => return error.OutOfMemory,
-                            error.DanglingSurrogateHalf,
-                            error.ExpectedSecondSurrogateHalf,
-                            error.UnexpectedSecondSurrogateHalf,
-                            // TODO: Implement UTF-16 strings
-                            => return Value.from("\u{fffd}"),
-                        });
+                        var s = try agent_.gc_allocator.alloc(u16, 1);
+                        s[0] = code_unit;
+                        return Value.from(types.String.fromUtf16(s));
                     }
                 }.mapFn),
             );
@@ -1954,7 +1920,7 @@ pub const StringPrototype = struct {
     fn toLocaleLowerCase(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const object = try this_value.requireObjectCoercible(agent);
         const string = try object.toString(agent);
-        const lower = try std.ascii.allocLowerString(agent.gc_allocator, string.utf8);
+        const lower = try string.toLowerCase(agent.gc_allocator);
         return Value.from(lower);
     }
 
@@ -1963,7 +1929,7 @@ pub const StringPrototype = struct {
     fn toLocaleUpperCase(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const object = try this_value.requireObjectCoercible(agent);
         const string = try object.toString(agent);
-        const lower = try std.ascii.allocUpperString(agent.gc_allocator, string.utf8);
+        const lower = try string.toUpperCase(agent.gc_allocator);
         return Value.from(lower);
     }
 
@@ -1980,7 +1946,7 @@ pub const StringPrototype = struct {
         // 4. Let lowerText be the result of toLowercase(sText), according to the Unicode Default
         //    Case Conversion algorithm.
         // 5. Let L be CodePointsToString(lowerText).
-        const lower = try std.ascii.allocLowerString(agent.gc_allocator, string.utf8);
+        const lower = try string.toLowerCase(agent.gc_allocator);
 
         // 6. Return L.
         return Value.from(lower);
@@ -2008,7 +1974,7 @@ pub const StringPrototype = struct {
         // 4. Let upperText be the result of toUppercase(sText), according to the Unicode Default
         //    Case Conversion algorithm.
         // 5. Let U be CodePointsToString(upperText).
-        const upper = try std.ascii.allocUpperString(agent.gc_allocator, string.utf8);
+        const upper = try string.toUpperCase(agent.gc_allocator);
 
         // 6. Return U.
         return Value.from(upper);
@@ -2023,9 +1989,40 @@ pub const StringPrototype = struct {
         // 2. Let S be ? ToString(O).
         const string = try object.toString(agent);
 
-        // TODO: 3-7.
-        // NOTE: We only store valid UTF-8 strings so this always returns the original string for now.
-        return Value.from(string);
+        // 3. Let strLen be the length of S.
+        const str_len = string.length();
+
+        // 4. Let k be 0.
+        var k: usize = 0;
+
+        // 5. Let result be the empty String.
+        var result = types.String.Builder.init(agent.gc_allocator);
+        defer result.deinit();
+
+        // 6. Repeat, while k < strLen,
+        while (k < str_len) {
+            // a. Let cp be CodePointAt(S, k).
+            const code_point = string.codePointAt(k);
+
+            // b. If cp.[[IsUnpairedSurrogate]] is true, then
+            if (code_point.is_unpaired_surrogate) {
+                // i. Set result to the string-concatenation of result and 0xFFFD
+                //    (REPLACEMENT CHARACTER).
+                try result.appendCodePoint(std.unicode.replacement_character);
+            }
+            // c. Else,
+            else {
+                // i. Set result to the string-concatenation of result and
+                //    UTF16EncodeCodePoint(cp.[[CodePoint]]).
+                try result.appendCodePoint(code_point.code_point);
+            }
+
+            // d. Set k to k + cp.[[CodeUnitCount]].
+            k += code_point.code_unit_count;
+        }
+
+        // 7. Return result.
+        return Value.from(try result.build());
     }
 
     /// 22.1.3.32 String.prototype.trim ( )
@@ -2042,7 +2039,7 @@ pub const StringPrototype = struct {
         agent: *Agent,
         string_value: Value,
         where: enum { start, end, @"start+end" },
-    ) Agent.Error![]const u8 {
+    ) Agent.Error!types.String {
         // 1. Let str be ? RequireObjectCoercible(string).
         const str = try string_value.requireObjectCoercible(agent);
 
@@ -2054,14 +2051,14 @@ pub const StringPrototype = struct {
             .start => blk: {
                 // a. Let T be the String value that is a copy of S with leading white space
                 //    removed.
-                break :blk utils.trimLeft(string.utf8, &types.String.whitespace);
+                break :blk try string.trim(agent.gc_allocator, .start);
             },
 
             // 4. Else if where is end, then
             .end => blk: {
                 // a. Let T be the String value that is a copy of S with trailing white space
                 //    removed.
-                break :blk utils.trimRight(string.utf8, &types.String.whitespace);
+                break :blk try string.trim(agent.gc_allocator, .end);
             },
 
             // 5. Else,
@@ -2069,7 +2066,7 @@ pub const StringPrototype = struct {
             .@"start+end" => blk: {
                 // b. Let T be the String value that is a copy of S with both leading and trailing
                 //    white space removed.
-                break :blk utils.trim(string.utf8, &types.String.whitespace);
+                break :blk try string.trim(agent.gc_allocator, .@"start+end");
             },
         };
 
@@ -2115,11 +2112,10 @@ pub const StringPrototype = struct {
         //    the following steps when called:
         //    [...]
         // 4. Return CreateIteratorFromClosure(closure, "%StringIteratorPrototype%", %StringIteratorPrototype%).
-        const it = std.unicode.Utf16LeIterator.init(try string.utf16CodeUnits(agent.gc_allocator));
         return Value.from(try StringIterator.create(agent, .{
             .prototype = try realm.intrinsics.@"%StringIteratorPrototype%"(),
             .fields = .{
-                .state = .{ .it = it },
+                .state = .{ .string = string, .position = 0 },
             },
         }));
     }
@@ -2205,10 +2201,8 @@ pub const StringPrototype = struct {
             // b. Let escapedV be the String value that is the same as V except that each
             //    occurrence of the code unit 0x0022 (QUOTATION MARK) in V has been replaced with
             //    the six code unit sequence "&quot;".
-            const value_string_escaped = try std.mem.replaceOwned(
-                u8,
+            const value_string_escaped = try value_string.replace(
                 agent.gc_allocator,
-                value_string.utf8,
                 "\"",
                 "&quot;",
             );
@@ -2221,12 +2215,13 @@ pub const StringPrototype = struct {
             // - the code unit 0x0022 (QUOTATION MARK)
             // - escapedV
             // - the code unit 0x0022 (QUOTATION MARK)
-            return types.String.from(
+            return types.String.fromUtf8(
+                agent.gc_allocator,
                 try std.fmt.allocPrint(
                     agent.gc_allocator,
-                    "<{[tag]s} {[attribute]s}=\"{[value]s}\">{[string]s}</{[tag]s}>",
+                    "<{[tag]s} {[attribute]s}=\"{[value]s}\">{[string]}</{[tag]s}>",
                     .{
-                        .string = string.utf8,
+                        .string = string,
                         .tag = tag,
                         .attribute = attr.name,
                         .value = value_string_escaped,
@@ -2235,11 +2230,12 @@ pub const StringPrototype = struct {
             );
         }
 
-        return types.String.from(
+        return types.String.fromUtf8(
+            agent.gc_allocator,
             try std.fmt.allocPrint(
                 agent.gc_allocator,
-                "<{[tag]s}>{[string]s}</{[tag]s}>",
-                .{ .string = string.utf8, .tag = tag },
+                "<{[tag]s}>{[string]}</{[tag]s}>",
+                .{ .string = string, .tag = tag },
             ),
         );
     }

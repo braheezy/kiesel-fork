@@ -618,7 +618,11 @@ fn instantiateOrdinaryFunctionExpression(
         );
 
         // 9. Perform SetFunctionName(closure, name).
-        try setFunctionName(closure, PropertyKey.from(name), null);
+        try setFunctionName(
+            closure,
+            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+            null,
+        );
 
         // 10. Perform MakeConstructor(closure).
         try makeConstructor(closure, .{});
@@ -657,7 +661,11 @@ fn instantiateOrdinaryFunctionExpression(
         );
 
         // 6. Perform SetFunctionName(closure, name).
-        try setFunctionName(closure, PropertyKey.from(name), null);
+        try setFunctionName(
+            closure,
+            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+            null,
+        );
 
         // 7. Perform MakeConstructor(closure).
         try makeConstructor(closure, .{});
@@ -702,7 +710,11 @@ fn instantiateArrowFunctionExpression(
     );
 
     // 6. Perform SetFunctionName(closure, name).
-    try setFunctionName(closure, PropertyKey.from(name), null);
+    try setFunctionName(
+        closure,
+        PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+        null,
+    );
 
     // 7. Return closure.
     return closure;
@@ -1137,7 +1149,11 @@ fn instantiateGeneratorFunctionExpression(
         );
 
         // 9. Perform SetFunctionName(closure, name).
-        try setFunctionName(closure, PropertyKey.from(name), null);
+        try setFunctionName(
+            closure,
+            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+            null,
+        );
 
         // 10. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1189,7 +1205,11 @@ fn instantiateGeneratorFunctionExpression(
         );
 
         // 6. Perform SetFunctionName(closure, name).
-        try setFunctionName(closure, PropertyKey.from(name), null);
+        try setFunctionName(
+            closure,
+            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+            null,
+        );
 
         // 7. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1258,7 +1278,11 @@ fn instantiateAsyncGeneratorFunctionExpression(
         );
 
         // 9. Perform SetFunctionName(closure, name).
-        try setFunctionName(closure, PropertyKey.from(name), null);
+        try setFunctionName(
+            closure,
+            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+            null,
+        );
 
         // 10. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1310,7 +1334,11 @@ fn instantiateAsyncGeneratorFunctionExpression(
         );
 
         // 6. Perform SetFunctionName(closure, name).
-        try setFunctionName(closure, PropertyKey.from(name), null);
+        try setFunctionName(
+            closure,
+            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+            null,
+        );
 
         // 7. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1585,7 +1613,8 @@ fn classDefinitionEvaluation(
             }
             // ii. Else,
             else {
-                var symbol = agent.createSymbol(String.from(declared_name)) catch |err| switch (err) {
+                const description = try String.fromUtf8(agent.gc_allocator, declared_name);
+                var symbol = agent.createSymbol(description) catch |err| switch (err) {
                     error.Overflow => return agent.throwException(
                         .internal_error,
                         "Maximum number of symbols exceeded",
@@ -1784,7 +1813,11 @@ fn classDefinitionEvaluation(
         makeClassConstructor(function.as(builtins.ECMAScriptFunction));
 
         // d. Perform SetFunctionName(F, className).
-        try setFunctionName(function, PropertyKey.from(class_name), null);
+        try setFunctionName(
+            function,
+            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, class_name)),
+            null,
+        );
 
         break :blk function;
     };
@@ -2113,7 +2146,11 @@ fn instantiateAsyncFunctionExpression(
         );
 
         // 9. Perform SetFunctionName(closure, name).
-        try setFunctionName(closure, PropertyKey.from(name), null);
+        try setFunctionName(
+            closure,
+            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+            null,
+        );
 
         // 10. Perform ! funcEnv.InitializeBinding(name, closure).
         func_env.initializeBinding(agent, name, Value.from(closure));
@@ -2149,7 +2186,11 @@ fn instantiateAsyncFunctionExpression(
         );
 
         // 6. Perform SetFunctionName(closure, name).
-        try setFunctionName(closure, PropertyKey.from(name), null);
+        try setFunctionName(
+            closure,
+            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+            null,
+        );
 
         // 7. Return closure.
         return closure;
@@ -2195,7 +2236,11 @@ fn instantiateAsyncArrowFunctionExpression(
     );
 
     // 8. Perform SetFunctionName(closure, name).
-    try setFunctionName(closure, PropertyKey.from(name), null);
+    try setFunctionName(
+        closure,
+        PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
+        null,
+    );
 
     // 9. Return closure.
     return closure;
@@ -2443,7 +2488,11 @@ pub fn executeInstruction(
                 const base = reference.base.environment;
 
                 // c. Return ? base.DeleteBinding(ref.[[ReferencedName]]).
-                self.result = Value.from(try base.deleteBinding(reference.referenced_name.string));
+                self.result = Value.from(
+                    try base.deleteBinding(
+                        try reference.referenced_name.string.toUtf8(self.agent.gc_allocator),
+                    ),
+                );
             }
         },
         .evaluate_call => {
@@ -2469,7 +2518,7 @@ pub fn executeInstruction(
             if (maybe_reference) |reference| {
                 if (!reference.isPropertyReference() and
                     reference.referenced_name == .string and
-                    std.mem.eql(u8, reference.referenced_name.string, "eval") and
+                    reference.referenced_name.string.eql(String.fromLiteral("eval")) and
 
                     // a. If SameValue(func, %eval%) is true, then
                     function.object.sameValue(eval))
@@ -2587,7 +2636,9 @@ pub fn executeInstruction(
             //    }.
             self.reference = .{
                 .base = .{ .value = base_value },
-                .referenced_name = .{ .string = property_name_string },
+                .referenced_name = .{
+                    .string = try String.fromUtf8(self.agent.gc_allocator, property_name_string),
+                },
                 .strict = strict,
                 .this_value = null,
             };

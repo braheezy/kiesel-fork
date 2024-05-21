@@ -10,6 +10,7 @@ const Environment = execution.Environment;
 const Executable = @import("Executable.zig");
 const IteratorKind = types.IteratorKind;
 const PropertyKey = types.PropertyKey;
+const String = types.String;
 const Value = types.Value;
 const noexcept = utils.noexcept;
 const temporaryChange = utils.temporaryChange;
@@ -107,7 +108,7 @@ pub fn codegenLiteral(
         // Literal : StringLiteral
         .string => |string_literal| {
             // 1. Return the SV of StringLiteral as defined in 12.9.4.2.
-            const value = try string_literal.stringValue(executable.allocator);
+            const value = Value.from(try string_literal.stringValue(executable.allocator));
             try executable.addInstructionWithConstant(.store_constant, value);
         },
     }
@@ -207,26 +208,23 @@ pub fn codegenPropertyName(
             // LiteralPropertyName : IdentifierName
             .identifier => |identifier| {
                 // 1. Return StringValue of IdentifierName.
-                try executable.addInstructionWithConstant(.store_constant, Value.from(identifier));
+                const value = Value.from(try String.fromUtf8(executable.allocator, identifier));
+                try executable.addInstructionWithConstant(.store_constant, value);
             },
 
             // LiteralPropertyName : StringLiteral
             .string_literal => |string_literal| {
                 // 1. Return the SV of StringLiteral.
-                try executable.addInstructionWithConstant(
-                    .store_constant,
-                    try string_literal.stringValue(executable.allocator),
-                );
+                const value = Value.from(try string_literal.stringValue(executable.allocator));
+                try executable.addInstructionWithConstant(.store_constant, value);
             },
 
             // LiteralPropertyName : NumericLiteral
             .numeric_literal => |numeric_literal| {
                 // 1. Let nbr be the NumericValue of NumericLiteral.
                 // 2. Return ! ToString(nbr).
-                try executable.addInstructionWithConstant(
-                    .store_constant,
-                    try numeric_literal.numericValue(executable.allocator),
-                );
+                const value = try numeric_literal.numericValue(executable.allocator);
+                try executable.addInstructionWithConstant(.store_constant, value);
             },
         },
 
@@ -290,7 +288,10 @@ pub fn codegenPropertyDefinition(
         // PropertyDefinition : IdentifierReference
         .identifier_reference => |identifier_reference| {
             // 1. Let propName be StringValue of IdentifierReference.
-            try executable.addInstructionWithConstant(.load_constant, Value.from(identifier_reference));
+            const property_name = Value.from(
+                try String.fromUtf8(executable.allocator, identifier_reference),
+            );
+            try executable.addInstructionWithConstant(.load_constant, property_name);
 
             // 2. Let exprValue be ? Evaluation of IdentifierReference.
             try codegenIdentifierReference(identifier_reference, executable, ctx);
@@ -351,10 +352,12 @@ pub fn codegenRegularExpressionLiteral(
     _: *Context,
 ) Executable.Error!void {
     // 1. Let pattern be CodePointsToString(BodyText of RegularExpressionLiteral).
-    try executable.addInstructionWithConstant(.load_constant, Value.from(node.pattern));
+    const pattern = Value.from(try String.fromUtf8(executable.allocator, node.pattern));
+    try executable.addInstructionWithConstant(.load_constant, pattern);
 
     // 2. Let flags be CodePointsToString(FlagText of RegularExpressionLiteral).
-    try executable.addInstructionWithConstant(.load_constant, Value.from(node.flags));
+    const flags = Value.from(try String.fromUtf8(executable.allocator, node.flags));
+    try executable.addInstructionWithConstant(.load_constant, flags);
 
     // 3. Return ! RegExpCreate(pattern, flags).
     try executable.addInstruction(.reg_exp_create);
@@ -578,7 +581,10 @@ pub fn codegenSuperProperty(
             try executable.addInstruction(.load_this_value_for_make_super_property_reference);
 
             // 3. Let propertyKey be StringValue of IdentifierName.
-            try executable.addInstructionWithConstant(.load_constant, Value.from(identifier));
+            const property_key = Value.from(
+                try String.fromUtf8(executable.allocator, identifier),
+            );
+            try executable.addInstructionWithConstant(.load_constant, property_key);
 
             // 4. Let strict be IsStrict(this SuperProperty).
             const strict = ctx.contained_in_strict_mode_code;

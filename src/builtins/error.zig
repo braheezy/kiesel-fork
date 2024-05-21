@@ -78,7 +78,7 @@ pub const ErrorConstructor = struct {
             "%Error.prototype%",
             .{
                 // Non-standard
-                .error_data = .{ .name = String.from("Error"), .message = String.empty },
+                .error_data = .{ .name = String.fromLiteral("Error"), .message = String.empty },
             },
         );
 
@@ -118,9 +118,9 @@ fn internalSet(
     receiver: Value,
 ) Agent.Error!bool {
     if (property_key == .string and value == .string) {
-        if (property_key.string.eql(String.from("name"))) {
+        if (property_key.string.eql(String.fromLiteral("name"))) {
             object.as(Error).fields.error_data.name = value.string;
-        } else if (property_key.string.eql(String.from("message"))) {
+        } else if (property_key.string.eql(String.fromLiteral("message"))) {
             object.as(Error).fields.error_data.message = value.string;
         }
     }
@@ -170,24 +170,27 @@ pub const ErrorPrototype = struct {
         const name = try object.get(PropertyKey.from("name"));
 
         // 4. If name is undefined, set name to "Error"; otherwise set name to ? ToString(name).
-        const name_string = if (name == .undefined) "Error" else (try name.toString(agent)).utf8;
+        const name_string = if (name == .undefined) String.fromLiteral("Error") else try name.toString(agent);
 
         // 5. Let msg be ? Get(O, "message").
         const msg = try object.get(PropertyKey.from("message"));
 
         // 6. If msg is undefined, set msg to the empty String; otherwise set msg to ? ToString(msg).
-        const msg_string = if (msg == .undefined) "" else (try msg.toString(agent)).utf8;
+        const msg_string = if (msg == .undefined) String.empty else try msg.toString(agent);
 
         // 7. If name is the empty String, return msg.
-        if (name_string.len == 0) return Value.from(msg_string);
+        if (name_string.isEmpty()) return Value.from(msg_string);
 
         // 8. If msg is the empty String, return name.
-        if (msg_string.len == 0) return Value.from(name_string);
+        if (msg_string.isEmpty()) return Value.from(name_string);
 
         // 9. Return the string-concatenation of name, the code unit 0x003A (COLON), the code unit
         //    0x0020 (SPACE), and msg.
         return Value.from(
-            try std.fmt.allocPrint(agent.gc_allocator, "{s}: {s}", .{ name_string, msg_string }),
+            try String.concat(
+                agent.gc_allocator,
+                &.{ name_string, String.fromLiteral(": "), msg_string },
+            ),
         );
     }
 };
@@ -298,7 +301,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
                 "%" ++ name ++ ".prototype%",
                 .{
                     // Non-standard
-                    .error_data = .{ .name = String.from(name), .message = String.empty },
+                    .error_data = .{ .name = String.fromLiteral(name), .message = String.empty },
                 },
             );
 
@@ -420,7 +423,7 @@ pub const AggregateErrorConstructor = struct {
             "%AggregateError.prototype%",
             .{
                 // Non-standard
-                .error_data = .{ .name = String.from("AggregateError"), .message = String.empty },
+                .error_data = .{ .name = String.fromLiteral("AggregateError"), .message = String.empty },
             },
         );
 

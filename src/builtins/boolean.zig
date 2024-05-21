@@ -133,7 +133,7 @@ pub const BooleanPrototype = struct {
         const b = try thisBooleanValue(agent, this_value);
 
         // 2. If b is true, return "true"; else return "false".
-        return Value.from(if (b) "true" else "false");
+        return if (b) Value.from("true") else Value.from("false");
     }
 
     /// 20.3.3.3 Boolean.prototype.valueOf ( )

@@ -491,7 +491,7 @@ pub fn timeClip(time: f64) f64 {
 
 /// 21.4.1.32 Date Time String Format
 /// https://tc39.es/ecma262/#sec-date-time-string-format
-pub fn parseDateTimeString(string: []const u8) f64 {
+pub fn parseDateTimeString(string: String) f64 {
     const invalid = std.math.nan(f64);
     // Yes, this is abuse of the std.fmt.Parser :)
     // TODO: Handle short forms (missing month/date/seconds/milliseconds), and probably rewrite
@@ -518,7 +518,12 @@ pub fn parseDateTimeString(string: []const u8) f64 {
             return if (parser.pos + n < parser.buf.len) parser.buf[parser.pos + n] else null;
         }
     };
-    var parser: std.fmt.Parser = .{ .buf = string };
+    var parser: std.fmt.Parser = .{
+        .buf = switch (string) {
+            .ascii => |ascii| ascii,
+            .utf16 => return invalid,
+        },
+    };
     const sign: ?u8 = if (old_parser.maybe(&parser, '-')) '-' else if (old_parser.maybe(&parser, '+')) '+' else null;
     const year_string = old_parser.until(&parser, '-');
     if (!old_parser.maybe(&parser, '-')) return invalid;
@@ -734,7 +739,7 @@ pub const DateConstructor = struct {
             const now_: f64 = @floatFromInt(std.time.milliTimestamp());
 
             // b. Return ToDateString(now).
-            return Value.from(try toDateString(agent.gc_allocator, now_));
+            return Value.from(String.fromAscii(try toDateString(agent.gc_allocator, now_)));
         }
 
         // 2. Let numberOfArgs be the number of elements in values.
@@ -766,7 +771,7 @@ pub const DateConstructor = struct {
                     //    String.
                     // 2. Let tv be the result of parsing v as a date, in exactly the same manner
                     //    as for the parse method (21.4.3.2).
-                    break :blk_tv parseDateTimeString(primitive_value.string.utf8);
+                    break :blk_tv parseDateTimeString(primitive_value.string);
                 }
                 // iii. Else,
                 else {
@@ -846,7 +851,7 @@ pub const DateConstructor = struct {
     /// https://tc39.es/ecma262/#sec-date.now
     fn parse(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const string = try arguments.get(0).toString(agent);
-        return Value.from(parseDateTimeString(string.utf8));
+        return Value.from(parseDateTimeString(string));
     }
 
     /// 21.4.3.4 Date.UTC ( year [ , month [ , date [ , hours [ , minutes [ , seconds [ , ms ] ] ] ] ] ] )
@@ -1969,7 +1974,7 @@ pub const DatePrototype = struct {
         const t = localTime(time_value);
 
         // 6. Return DateString(t).
-        return Value.from(try dateString(agent.gc_allocator, t));
+        return Value.from(String.fromAscii(try dateString(agent.gc_allocator, t)));
     }
 
     /// 21.4.4.36 Date.prototype.toISOString ( )
@@ -2002,7 +2007,7 @@ pub const DatePrototype = struct {
             if (year >= 0 and year <= 9999) 4 else 6,
         );
 
-        return Value.from(try std.fmt.allocPrint(
+        return Value.from(String.fromAscii(try std.fmt.allocPrint(
             agent.gc_allocator,
             "{s}{s}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}Z",
             .{
@@ -2015,7 +2020,7 @@ pub const DatePrototype = struct {
                 secFromTime(time_value),
                 msFromTime(time_value),
             },
-        ));
+        )));
     }
 
     /// 21.4.4.37 Date.prototype.toJSON ( key )
@@ -2077,7 +2082,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. Return ToDateString(tv).
-        return Value.from(try toDateString(agent.gc_allocator, time_value));
+        return Value.from(String.fromAscii(try toDateString(agent.gc_allocator, time_value)));
     }
 
     /// 21.4.4.42 Date.prototype.toTimeString ( )
@@ -2097,10 +2102,10 @@ pub const DatePrototype = struct {
         const t = localTime(time_value);
 
         // 6. Return the string-concatenation of TimeString(t) and TimeZoneString(tv).
-        return Value.from(try std.mem.concat(agent.gc_allocator, u8, &.{
+        return Value.from(String.fromAscii(try std.mem.concat(agent.gc_allocator, u8, &.{
             try timeString(agent.gc_allocator, t),
             try timeZoneString(agent.gc_allocator, time_value),
-        }));
+        })));
     }
 
     /// 21.4.4.43 Date.prototype.toUTCString ( )
@@ -2139,7 +2144,7 @@ pub const DatePrototype = struct {
         // 11. Return the string-concatenation of weekday, ",", the code unit 0x0020 (SPACE), day,
         //     the code unit 0x0020 (SPACE), month, the code unit 0x0020 (SPACE), yearSign,
         //     paddedYear, the code unit 0x0020 (SPACE), and TimeString(tv).
-        return Value.from(try std.fmt.allocPrint(
+        return Value.from(String.fromAscii(try std.fmt.allocPrint(
             agent.gc_allocator,
             "{s}, {:0>2} {s} {s}{s} {s}",
             .{
@@ -2150,7 +2155,7 @@ pub const DatePrototype = struct {
                 padded_year,
                 try timeString(agent.gc_allocator, time_value),
             },
-        ));
+        )));
     }
 
     /// 21.4.4.44 Date.prototype.valueOf ( )
@@ -2182,12 +2187,12 @@ pub const DatePrototype = struct {
         const hint = hint_value.string;
 
         // 3. If hint is either "string" or "default", then
-        const try_first: PreferredType = if (hint.eql(String.from("string")) or hint.eql(String.from("default"))) blk: {
+        const try_first: PreferredType = if (hint.eql(String.fromLiteral("string")) or hint.eql(String.fromLiteral("default"))) blk: {
             // a. Let tryFirst be string.
             break :blk .string;
         }
         // 4. Else if hint is "number", then
-        else if (hint.eql(String.from("number"))) blk: {
+        else if (hint.eql(String.fromLiteral("number"))) blk: {
             // a. Let tryFirst be number.
             break :blk .number;
         }
