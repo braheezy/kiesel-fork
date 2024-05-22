@@ -56,7 +56,7 @@ export fn lre_realloc(@"opaque": ?*anyopaque, maybe_ptr: ?*anyopaque, size: usiz
 }
 
 comptime {
-    @setEvalBranchQuota(20_000);
+    @setEvalBranchQuota(200_000);
     for (std.meta.declarations(libregexp)) |declaration| {
         if (std.mem.startsWith(u8, declaration.name, "LRE_FLAG_")) {
             const flag = @field(libregexp, declaration.name);
