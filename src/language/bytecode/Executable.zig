@@ -19,12 +19,10 @@ allocator: Allocator,
 instructions: std.ArrayList(Instruction),
 constants: ValueArrayHashMap(void, sameValue),
 identifiers: std.StringArrayHashMap(void),
-functions_and_classes: std.ArrayList(FunctionOrClass),
-blocks: std.ArrayList(StatementListOrCaseBlock),
-template_literals: std.ArrayList(ast.TemplateLiteral),
+ast_nodes: std.ArrayList(AstNode),
 environment_lookup_cache_size: usize = 0,
 
-pub const FunctionOrClass = union(enum) {
+pub const AstNode = union(enum) {
     arrow_function: ast.ArrowFunction,
     async_arrow_function: ast.AsyncArrowFunction,
     async_function_expression: ast.AsyncFunctionExpression,
@@ -33,11 +31,9 @@ pub const FunctionOrClass = union(enum) {
     class_declaration: ast.ClassDeclaration,
     function_expression: ast.FunctionExpression,
     generator_expression: ast.GeneratorExpression,
-};
-
-pub const StatementListOrCaseBlock = union(enum) {
     statement_list: ast.StatementList,
     case_block: ast.CaseBlock,
+    template_literal: ast.TemplateLiteral,
 };
 
 pub const IndexType = u16;
@@ -50,9 +46,7 @@ pub fn init(allocator: Allocator) Self {
         .instructions = std.ArrayList(Instruction).init(allocator),
         .constants = ValueArrayHashMap(void, sameValue).init(allocator),
         .identifiers = std.StringArrayHashMap(void).init(allocator),
-        .functions_and_classes = std.ArrayList(FunctionOrClass).init(allocator),
-        .blocks = std.ArrayList(StatementListOrCaseBlock).init(allocator),
-        .template_literals = std.ArrayList(ast.TemplateLiteral).init(allocator),
+        .ast_nodes = std.ArrayList(AstNode).init(allocator),
     };
 }
 
@@ -60,9 +54,7 @@ pub fn deinit(self: *Self) void {
     self.instructions.deinit();
     self.constants.deinit();
     self.identifiers.deinit();
-    self.functions_and_classes.deinit();
-    self.blocks.deinit();
-    self.template_literals.deinit();
+    self.ast_nodes.deinit();
 }
 
 pub fn addInstruction(self: *Self, instruction: Instruction) Allocator.Error!void {
@@ -79,16 +71,8 @@ pub fn addIdentifier(self: *Self, identifier: ast.Identifier) Allocator.Error!us
     return result.index;
 }
 
-pub fn addFunctionOrClass(self: *Self, function_or_class: FunctionOrClass) Allocator.Error!void {
-    try self.functions_and_classes.append(function_or_class);
-}
-
-pub fn addBlock(self: *Self, block: StatementListOrCaseBlock) Allocator.Error!void {
-    try self.blocks.append(block);
-}
-
-pub fn addTemplateLiteral(self: *Self, template_literal: ast.TemplateLiteral) Allocator.Error!void {
-    try self.template_literals.append(template_literal);
+pub fn addAstNode(self: *Self, ast_node: AstNode) Allocator.Error!void {
+    try self.ast_nodes.append(ast_node);
 }
 
 pub fn addInstructionWithConstant(
@@ -113,37 +97,15 @@ pub fn addInstructionWithIdentifier(
     try self.addIndex(index);
 }
 
-pub fn addInstructionWithFunctionOrClass(
+pub fn addInstructionWithAstNode(
     self: *Self,
     instruction: Instruction,
-    function_or_class: FunctionOrClass,
+    ast_node: AstNode,
 ) Error!void {
-    std.debug.assert(instruction.hasFunctionOrClassIndex());
+    std.debug.assert(instruction.hasAstNodeIndex());
     try self.addInstruction(instruction);
-    try self.addFunctionOrClass(function_or_class);
-    try self.addIndex(self.functions_and_classes.items.len - 1);
-}
-
-pub fn addInstructionWithBlock(
-    self: *Self,
-    instruction: Instruction,
-    block: StatementListOrCaseBlock,
-) Error!void {
-    std.debug.assert(instruction.hasBlockIndex());
-    try self.addInstruction(instruction);
-    try self.addBlock(block);
-    try self.addIndex(self.blocks.items.len - 1);
-}
-
-pub fn addInstructionWithTemplateLiteral(
-    self: *Self,
-    instruction: Instruction,
-    template_literal: ast.TemplateLiteral,
-) Error!void {
-    std.debug.assert(instruction.hasTemplateLiteralIndex());
-    try self.addInstruction(instruction);
-    try self.addTemplateLiteral(template_literal);
-    try self.addIndex(self.template_literals.items.len - 1);
+    try self.addAstNode(ast_node);
+    try self.addIndex(self.ast_nodes.items.len - 1);
 }
 
 pub const JumpIndex = struct {

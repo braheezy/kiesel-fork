@@ -762,9 +762,9 @@ pub fn codegenTaggedTemplate(
         // 1. Let templateLiteral be this TemplateLiteral.
         // 2. Let siteObj be GetTemplateObject(templateLiteral).
         // 3. Return « siteObj ».
-        try executable.addInstructionWithTemplateLiteral(
+        try executable.addInstructionWithAstNode(
             .get_template_object,
-            node.template_literal,
+            .{ .template_literal = node.template_literal },
         );
         try executable.addInstruction(.load);
     }
@@ -772,9 +772,9 @@ pub fn codegenTaggedTemplate(
     else {
         // 1. Let templateLiteral be this TemplateLiteral.
         // 2. Let siteObj be GetTemplateObject(templateLiteral).
-        try executable.addInstructionWithTemplateLiteral(
+        try executable.addInstructionWithAstNode(
             .get_template_object,
-            node.template_literal,
+            .{ .template_literal = node.template_literal },
         );
         try executable.addInstruction(.load);
 
@@ -1697,7 +1697,7 @@ pub fn codegenBlock(
     // 2. Let blockEnv be NewDeclarativeEnvironment(oldEnv).
     // 3. Perform BlockDeclarationInstantiation(StatementList, blockEnv).
     // 4. Set the running execution context's LexicalEnvironment to blockEnv.
-    try executable.addInstructionWithBlock(
+    try executable.addInstructionWithAstNode(
         .block_declaration_instantiation,
         .{ .statement_list = node.statement_list },
     );
@@ -2805,7 +2805,7 @@ pub fn codegenSwitchStatement(
     // 4. Let blockEnv be NewDeclarativeEnvironment(oldEnv).
     // 5. Perform BlockDeclarationInstantiation(CaseBlock, blockEnv).
     // 6. Set the running execution context's LexicalEnvironment to blockEnv.
-    try executable.addInstructionWithBlock(
+    try executable.addInstructionWithAstNode(
         .block_declaration_instantiation,
         .{ .case_block = node.case_block },
     );
@@ -2942,7 +2942,7 @@ pub fn codegenFunctionExpression(
     _: *Context,
 ) Executable.Error!void {
     // 1. Return InstantiateOrdinaryFunctionExpression of FunctionExpression.
-    try executable.addInstructionWithFunctionOrClass(
+    try executable.addInstructionWithAstNode(
         .instantiate_ordinary_function_expression,
         .{ .function_expression = node },
     );
@@ -2966,7 +2966,7 @@ pub fn codegenArrowFunction(
     _: *Context,
 ) Executable.Error!void {
     // 1. Return InstantiateArrowFunctionExpression of ArrowFunction.
-    try executable.addInstructionWithFunctionOrClass(
+    try executable.addInstructionWithAstNode(
         .instantiate_arrow_function_expression,
         .{ .arrow_function = node },
     );
@@ -2982,7 +2982,7 @@ pub fn codegenMethodDefinition(
     try codegenClassElementName(node.class_element_name, executable, ctx);
     try executable.addInstruction(.load);
 
-    try executable.addInstructionWithFunctionOrClass(
+    try executable.addInstructionWithAstNode(
         .object_define_method,
         switch (node.method) {
             .method, .get, .set => |function_expression| .{ .function_expression = function_expression },
@@ -3002,7 +3002,7 @@ pub fn codegenGeneratorExpression(
     _: *Context,
 ) Executable.Error!void {
     // 1. Return InstantiateGeneratorFunctionExpression of GeneratorExpression.
-    try executable.addInstructionWithFunctionOrClass(
+    try executable.addInstructionWithAstNode(
         .instantiate_generator_function_expression,
         .{ .generator_expression = node },
     );
@@ -3016,7 +3016,7 @@ pub fn codegenAsyncGeneratorExpression(
     _: *Context,
 ) Executable.Error!void {
     // 1. Return InstantiateAsyncGeneratorFunctionExpression of AsyncGeneratorExpression.
-    try executable.addInstructionWithFunctionOrClass(
+    try executable.addInstructionWithAstNode(
         .instantiate_async_generator_function_expression,
         .{ .async_generator_expression = node },
     );
@@ -3032,7 +3032,7 @@ pub fn codegenClassDeclaration(
     // ClassDeclaration : class BindingIdentifier ClassTail
     // 1. Perform ? BindingClassDeclarationEvaluation of this ClassDeclaration.
     try executable.addInstruction(.load);
-    try executable.addInstructionWithFunctionOrClass(
+    try executable.addInstructionWithAstNode(
         .binding_class_declaration_evaluation,
         .{ .class_declaration = node },
     );
@@ -3050,7 +3050,7 @@ pub fn codegenClassExpression(
 ) Executable.Error!void {
     // ClassExpression : class ClassTail
     // ClassExpression : class BindingIdentifier ClassTail
-    try executable.addInstructionWithFunctionOrClass(
+    try executable.addInstructionWithAstNode(
         .class_definition_evaluation,
         .{ .class_expression = node },
     );
@@ -3089,7 +3089,7 @@ pub fn codegenAsyncFunctionExpression(
     _: *Context,
 ) Executable.Error!void {
     // 1. Return InstantiateAsyncFunctionExpression of AsyncFunctionExpression.
-    try executable.addInstructionWithFunctionOrClass(
+    try executable.addInstructionWithAstNode(
         .instantiate_async_function_expression,
         .{ .async_function_expression = node },
     );
@@ -3103,7 +3103,7 @@ pub fn codegenAsyncArrowFunction(
     _: *Context,
 ) Executable.Error!void {
     // 1. Return InstantiateAsyncArrowFunctionExpression of AsyncArrowFunction.
-    try executable.addInstructionWithFunctionOrClass(
+    try executable.addInstructionWithAstNode(
         .instantiate_async_arrow_function_expression,
         .{ .async_arrow_function = node },
     );
@@ -3196,7 +3196,7 @@ pub fn codegenExportDeclaration(
         .default_class_declaration => |class_declaration| {
             // 1. Let value be ? BindingClassDeclarationEvaluation of ClassDeclaration.
             try executable.addInstruction(.load);
-            try executable.addInstructionWithFunctionOrClass(
+            try executable.addInstructionWithAstNode(
                 .binding_class_declaration_evaluation,
                 .{ .class_declaration = class_declaration },
             );

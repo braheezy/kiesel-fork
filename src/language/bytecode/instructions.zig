@@ -243,10 +243,12 @@ pub const Instruction = enum(u8) {
         };
     }
 
-    pub fn hasFunctionOrClassIndex(self: Self) bool {
+    pub fn hasAstNodeIndex(self: Self) bool {
         return switch (self) {
             .binding_class_declaration_evaluation,
+            .block_declaration_instantiation,
             .class_definition_evaluation,
+            .get_template_object,
             .instantiate_arrow_function_expression,
             .instantiate_async_arrow_function_expression,
             .instantiate_async_function_expression,
@@ -254,22 +256,6 @@ pub const Instruction = enum(u8) {
             .instantiate_generator_function_expression,
             .instantiate_ordinary_function_expression,
             .object_define_method,
-            => true,
-            else => false,
-        };
-    }
-
-    pub fn hasBlockIndex(self: Self) bool {
-        return switch (self) {
-            .block_declaration_instantiation,
-            => true,
-            else => false,
-        };
-    }
-
-    pub fn hasTemplateLiteralIndex(self: Self) bool {
-        return switch (self) {
-            .get_template_object,
             => true,
             else => false,
         };

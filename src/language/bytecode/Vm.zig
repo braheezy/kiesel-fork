@@ -124,19 +124,9 @@ fn fetchIdentifier(self: *Self, executable: Executable) []const u8 {
     return executable.identifiers.unmanaged.entries.get(index).key;
 }
 
-fn fetchFunctionOrClass(self: *Self, executable: Executable) Executable.FunctionOrClass {
+fn fetchAstNode(self: *Self, executable: Executable) *Executable.AstNode {
     const index = self.fetchIndex(executable);
-    return executable.functions_and_classes.items[index];
-}
-
-fn fetchBlock(self: *Self, executable: Executable) Executable.StatementListOrCaseBlock {
-    const index = self.fetchIndex(executable);
-    return executable.blocks.items[index];
-}
-
-fn fetchTemplateLiteral(self: *Self, executable: Executable) *ast.TemplateLiteral {
-    const index = self.fetchIndex(executable);
-    return &executable.template_literals.items[index];
+    return &executable.ast_nodes.items[index];
 }
 
 fn fetchIndex(self: *Self, executable: Executable) Executable.IndexType {
@@ -510,13 +500,15 @@ fn applyStringOrNumericBinaryOperator(
 
 /// 14.2.3 BlockDeclarationInstantiation ( code, env )
 /// https://tc39.es/ecma262/#sec-blockdeclarationinstantiation
-fn blockDeclarationInstantiation(agent: *Agent, code: Executable.StatementListOrCaseBlock, env: Environment) Allocator.Error!void {
+fn blockDeclarationInstantiation(agent: *Agent, code: Executable.AstNode, env: Environment) Allocator.Error!void {
     // NOTE: Keeping this wrapped in a generic `Environment` makes a bunch of stuff below easier.
     std.debug.assert(env == .declarative_environment);
 
     // 1. let declarations be the LexicallyScopedDeclarations of code.
     const declarations = switch (code) {
-        inline else => |node| try node.lexicallyScopedDeclarations(agent.gc_allocator),
+        .statement_list => |node| try node.lexicallyScopedDeclarations(agent.gc_allocator),
+        .case_block => |node| try node.lexicallyScopedDeclarations(agent.gc_allocator),
+        else => unreachable,
     };
     defer agent.gc_allocator.free(declarations);
 
@@ -2303,7 +2295,7 @@ pub fn executeInstruction(
             self.result = Value.from(array);
         },
         .binding_class_declaration_evaluation => {
-            const class_declaration = self.fetchFunctionOrClass(executable).class_declaration;
+            const class_declaration = self.fetchAstNode(executable).class_declaration;
             self.result = Value.from(try bindingClassDeclarationEvaluation(self.agent, class_declaration));
         },
         .bitwise_not => {
@@ -2315,12 +2307,12 @@ pub fn executeInstruction(
             };
         },
         .block_declaration_instantiation => {
-            const block = self.fetchBlock(executable);
+            const block = self.fetchAstNode(executable);
             const old_env = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
             const block_env = try newDeclarativeEnvironment(self.agent.gc_allocator, old_env);
             try blockDeclarationInstantiation(
                 self.agent,
-                block,
+                block.*,
                 .{ .declarative_environment = block_env },
             );
             self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{
@@ -2328,7 +2320,7 @@ pub fn executeInstruction(
             };
         },
         .class_definition_evaluation => {
-            const class_expression = self.fetchFunctionOrClass(executable).class_expression;
+            const class_expression = self.fetchAstNode(executable).class_expression;
 
             // ClassExpression : class BindingIdentifier ClassTail
             if (class_expression.identifier) |identifier| {
@@ -2786,7 +2778,7 @@ pub fn executeInstruction(
             }
         },
         .get_template_object => {
-            const template_literal = self.fetchTemplateLiteral(executable);
+            const template_literal = &self.fetchAstNode(executable).template_literal;
             self.result = Value.from(try getTemplateObject(self.agent, template_literal));
         },
         .get_value => {
@@ -2892,7 +2884,7 @@ pub fn executeInstruction(
             self.result = Value.from(try lval.instanceofOperator(self.agent, rval));
         },
         .instantiate_arrow_function_expression => {
-            const arrow_function = self.fetchFunctionOrClass(executable).arrow_function;
+            const arrow_function = self.fetchAstNode(executable).arrow_function;
             const closure = try instantiateArrowFunctionExpression(
                 self.agent,
                 arrow_function,
@@ -2901,7 +2893,7 @@ pub fn executeInstruction(
             self.result = Value.from(closure);
         },
         .instantiate_async_arrow_function_expression => {
-            const async_arrow_function = self.fetchFunctionOrClass(executable).async_arrow_function;
+            const async_arrow_function = self.fetchAstNode(executable).async_arrow_function;
             const closure = try instantiateAsyncArrowFunctionExpression(
                 self.agent,
                 async_arrow_function,
@@ -2910,7 +2902,7 @@ pub fn executeInstruction(
             self.result = Value.from(closure);
         },
         .instantiate_async_function_expression => {
-            const async_function_expression = self.fetchFunctionOrClass(executable).async_function_expression;
+            const async_function_expression = self.fetchAstNode(executable).async_function_expression;
             const closure = try instantiateAsyncFunctionExpression(
                 self.agent,
                 async_function_expression,
@@ -2919,7 +2911,7 @@ pub fn executeInstruction(
             self.result = Value.from(closure);
         },
         .instantiate_async_generator_function_expression => {
-            const async_generator_expression = self.fetchFunctionOrClass(executable).async_generator_expression;
+            const async_generator_expression = self.fetchAstNode(executable).async_generator_expression;
             const closure = try instantiateAsyncGeneratorFunctionExpression(
                 self.agent,
                 async_generator_expression,
@@ -2928,7 +2920,7 @@ pub fn executeInstruction(
             self.result = Value.from(closure);
         },
         .instantiate_generator_function_expression => {
-            const generator_expression = self.fetchFunctionOrClass(executable).generator_expression;
+            const generator_expression = self.fetchAstNode(executable).generator_expression;
             const closure = try instantiateGeneratorFunctionExpression(
                 self.agent,
                 generator_expression,
@@ -2937,7 +2929,7 @@ pub fn executeInstruction(
             self.result = Value.from(closure);
         },
         .instantiate_ordinary_function_expression => {
-            const function_expression = self.fetchFunctionOrClass(executable).function_expression;
+            const function_expression = self.fetchAstNode(executable).function_expression;
             const closure = try instantiateOrdinaryFunctionExpression(
                 self.agent,
                 function_expression,
@@ -3078,7 +3070,7 @@ pub fn executeInstruction(
             self.result = Value.from(object);
         },
         .object_define_method => {
-            const function_or_class = self.fetchFunctionOrClass(executable);
+            const function_or_class = self.fetchAstNode(executable);
             const method_type: ast.MethodDefinition.Type = @enumFromInt((self.fetchIndex(executable)));
             const method = switch (method_type) {
                 inline else => |@"type"| @unionInit(
