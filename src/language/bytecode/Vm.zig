@@ -2686,8 +2686,7 @@ pub fn executeInstruction(
             self.result = Value.from(result);
         },
         .for_declaration_binding_instantiation => {
-            const name = self.fetchIdentifier(executable);
-            const is_constant_declaration = self.fetchIndex(executable) == 1;
+            const lexical_declaration = self.fetchAstNode(executable).lexical_declaration;
 
             // iii. Let iterationEnv be NewDeclarativeEnvironment(oldEnv).
             const old_env = self.lexical_environment_stack.getLast();
@@ -2697,10 +2696,13 @@ pub fn executeInstruction(
 
             // 14.7.5.4 Runtime Semantics: ForDeclarationBindingInstantiation
             // https://tc39.es/ecma262/#sec-runtime-semantics-fordeclarationbindinginstantiation
-            {
-                // 1. For each element name of the BoundNames of ForBinding, do
+            const bound_names = try lexical_declaration.boundNames(self.agent.gc_allocator);
+            defer self.agent.gc_allocator.free(bound_names);
+
+            // 1. For each element name of the BoundNames of ForBinding, do
+            for (bound_names) |name| {
                 // a. If IsConstantDeclaration of LetOrConst is true, then
-                if (is_constant_declaration) {
+                if (lexical_declaration.isConstantDeclaration()) {
                     // i. Perform ! environment.CreateImmutableBinding(name, true).
                     environment.createImmutableBinding(
                         self.agent,

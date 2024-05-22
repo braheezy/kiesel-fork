@@ -34,6 +34,7 @@ pub const AstNode = union(enum) {
     statement_list: ast.StatementList,
     case_block: ast.CaseBlock,
     template_literal: ast.TemplateLiteral,
+    lexical_declaration: ast.LexicalDeclaration,
 };
 
 pub const IndexType = u16;
@@ -205,6 +206,7 @@ pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
             .array_set_length,
             .binding_class_declaration_evaluation,
             .class_definition_evaluation,
+            .for_declaration_binding_instantiation,
             .instantiate_arrow_function_expression,
             .instantiate_async_arrow_function_expression,
             .instantiate_async_function_expression,
@@ -241,15 +243,6 @@ pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
                 try writer.print(
                     "{s} [{}] (strict: {}, environment_lookup_cache_index: {})",
                     .{ identifier, identifier_index, strict, environment_lookup_cache_index },
-                );
-            },
-            .for_declaration_binding_instantiation => {
-                const identifier_index = iterator.instruction_args[0].?;
-                const is_constant_declaration = iterator.instruction_args[1].? == 1;
-                const identifier = self.identifiers.unmanaged.entries.get(identifier_index).key;
-                try writer.print(
-                    "{s} [{}] (is_constant_declaration: {})",
-                    .{ identifier, identifier_index, is_constant_declaration },
                 );
             },
             .has_private_element, .make_private_reference, .resolve_private_identifier => {

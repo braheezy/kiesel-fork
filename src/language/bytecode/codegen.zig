@@ -2139,14 +2139,10 @@ pub fn codegenForStatement(
             //     b. Else,
             //         i. Perform ! loopEnv.CreateMutableBinding(dn, false).
             // 6. Set the running execution context's LexicalEnvironment to loopEnv.
-            const bound_names = try lexical_declaration.boundNames(executable.allocator);
-            defer executable.allocator.free(bound_names);
-            try executable.addInstructionWithIdentifier(
+            try executable.addInstructionWithAstNode(
                 .for_declaration_binding_instantiation,
-                bound_names[0],
+                .{ .lexical_declaration = lexical_declaration },
             );
-            const is_constant_declaration = lexical_declaration.isConstantDeclaration();
-            try executable.addIndex(@intFromBool(is_constant_declaration));
 
             // 7. Let forDcl be Completion(Evaluation of LexicalDeclaration).
             try codegenLexicalDeclaration(lexical_declaration, executable, ctx);
@@ -2457,14 +2453,11 @@ fn forInOfBodyEvaluation(
         // iii. Let iterationEnv be NewDeclarativeEnvironment(oldEnv).
         // iv. Perform ForDeclarationBindingInstantiation of lhs with argument iterationEnv.
         // v. Set the running execution context's LexicalEnvironment to iterationEnv.
-        const bound_names = try lhs.for_declaration.boundNames(executable.allocator);
-        defer executable.allocator.free(bound_names);
-        try executable.addInstructionWithIdentifier(
+        const lexical_declaration = lhs.for_declaration;
+        try executable.addInstructionWithAstNode(
             .for_declaration_binding_instantiation,
-            bound_names[0],
+            .{ .lexical_declaration = lexical_declaration },
         );
-        const is_constant_declaration = lhs.for_declaration.isConstantDeclaration();
-        try executable.addIndex(@intFromBool(is_constant_declaration));
 
         // vi. If destructuring is true, then
         if (destructuring) {
