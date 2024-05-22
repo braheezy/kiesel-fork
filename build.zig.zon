@@ -3,8 +3,7 @@
     .version = "0.1.0",
     .dependencies = .{
         .any_pointer = .{
-            // FIXME: This points to https://github.com/ikskuh/any-pointer/pull/9, update once merged
-            .url = "https://github.com/ikskuh/any-pointer/archive/33783d9a1acb549e57cc37aab1d0b667ea627911.tar.gz",
+            .url = "https://github.com/ikskuh/any-pointer/archive/33851c78c2dd6bd1921dee2aac17a441b285aec7.tar.gz",
             .hash = "122068e632c479fa771ed988bf36c10db5bd0b2918b92569b2fa440785e4013055a8",
         },
         .icu4zig = .{
@@ -20,9 +19,8 @@
             .lazy = true,
         },
         .libgc = .{
-            // FIXME: This points to https://github.com/ivmai/bdwgc/pull/632, update once merged
-            .url = "https://github.com/ivmai/bdwgc/archive/6151f8530d7440fcc7360e9741bcd81ee9551ba1.tar.gz",
-            .hash = "1220ab6a76b36fa9d056dd99dcea0b4cbf86ef0a98e4e7c77041ae1daa244dfef1a1",
+            .url = "https://github.com/ivmai/bdwgc/archive/b1fe06200d716cd63d3ec321654fb4d03d610240.tar.gz",
+            .hash = "122083a8023ca7ce5f2c9ee0108d7013b5e77a437e8ea4efdced3d9abb69927ac821",
         },
         .libregexp = .{
             .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/f9aa9a5994753a08202cb5f632bd398c85528a39.tar.gz",
@@ -36,13 +34,11 @@
             .lazy = true,
         },
         .parser_toolkit = .{
-            // FIXME: This points to https://github.com/ikskuh/parser-toolkit/pull/13, update once merged
-            .url = "https://github.com/ikskuh/parser-toolkit/archive/db3ccb4a07d92ebc24e7a97110386ead09b88f34.tar.gz",
+            .url = "https://github.com/ikskuh/parser-toolkit/archive/9349d087a3216ebea27cc99b5b4bd8affe234816.tar.gz",
             .hash = "12206f0ade18be8db985f6a688ca7ec9ffdbb95f033c8db91760b0d13cfe27618b61",
         },
         .zig_args = .{
-            // FIXME: This points to https://github.com/ikskuh/zig-args/pull/57, update once merged
-            .url = "https://github.com/ikskuh/zig-args/archive/14e1dd7b4a9bdc8dc7cb6489512249d801d92a4d.tar.gz",
+            .url = "https://github.com/ikskuh/zig-args/archive/872272205d95bdba33798c94e72c5387a31bc806.tar.gz",
             .hash = "1220fe6ae56b668cc4a033282b5f227bfbb46a67ede6d84e9f9493fea9de339b5f37",
         },
         .zig_stackinfo = .{
