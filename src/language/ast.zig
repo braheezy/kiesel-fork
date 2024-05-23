@@ -2,6 +2,11 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const libregexp = @cImport({
+    @cInclude("cutils.h"); // For the BOOL typedef
+    @cInclude("libregexp.h");
+});
+
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const language = @import("../language.zig");
@@ -425,21 +430,53 @@ pub const RegularExpressionLiteral = struct {
     pattern: []const u8,
     flags: []const u8,
 
+    const ValidationResult = union(enum) {
+        valid,
+        invalid_pattern: []const u8,
+        invalid_flags,
+    };
+
     /// 13.2.7.2 Static Semantics: IsValidRegularExpressionLiteral ( literal )
     /// https://tc39.es/ecma262/#sec-isvalidregularexpressionliteral
-    pub fn isValidRegularExpressionLiteral(self: Self) enum {
-        valid,
-        invalid_pattern,
-        invalid_flags,
-    } {
+    pub fn isValidRegularExpressionLiteral(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error!ValidationResult {
         // 1. Let flags be FlagText of literal.
         // 2. If flags contains any code points other than d, g, i, m, s, u, v, or y, or if flags
         //    contains any code point more than once, return false.
-        _ = reg_exp.ParsedFlags.from(self.flags) orelse return .invalid_flags;
+        const parsed_flags = reg_exp.ParsedFlags.from(self.flags) orelse return .invalid_flags;
 
-        // TODO: 3-8.
-        // The only way we have right now to validate a regex pattern is `libregexp.lre_compile()`,
-        // which would be wasteful to call here. At the very least we'd have to reuse the bytecode.
+        // 3. If flags contains u, let u be true; else let u be false.
+        // 4. If flags contains v, let v be true; else let v be false.
+        // 5. Let patternText be the BodyText of literal.
+        // 6. If u is false and v is false, then
+        //     a. Let stringValue be CodePointsToString(patternText).
+        //     b. Set patternText to the sequence of code points resulting from interpreting each
+        //        of the 16-bit elements of stringValue as a Unicode BMP code point. UTF-16
+        //        decoding is not applied to the elements.
+        // 7. Let parseResult be ParsePattern(patternText, u, v).
+        // 8. If parseResult is a Parse Node, return true; else return false.
+        var re_bytecode_len: c_int = undefined;
+        var error_msg: [64]u8 = undefined;
+        // NOTE: Despite passing in the buffer length below, this needs to be null-terminated.
+        const buf = try allocator.dupeZ(u8, self.pattern);
+        defer allocator.free(buf);
+        var @"opaque": reg_exp.LreOpaque = .{ .allocator = allocator };
+        // TODO: Plumb the resulting bytecode into the created RegExp object somehow.
+        _ = libregexp.lre_compile(
+            &re_bytecode_len,
+            &error_msg,
+            error_msg.len,
+            buf.ptr,
+            buf.len,
+            parsed_flags.asLreFlags(),
+            &@"opaque",
+        ) orelse {
+            const str = std.mem.span(@as([*:0]const u8, @ptrCast(&error_msg)));
+            if (std.mem.eql(u8, str, "out of memory")) return error.OutOfMemory;
+            return .{ .invalid_pattern = try allocator.dupe(u8, str) };
+        };
         return .valid;
     }
 };

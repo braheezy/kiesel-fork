@@ -2416,23 +2416,26 @@ fn acceptRegularExpressionLiteral(self: *Self) AcceptError!ast.RegularExpression
     defer tmp.restore();
 
     const token = try self.core.accept(RuleSet.is(.regular_expression));
-    var regular_expression_literal = parseRegularExpressionLiteral(token.text, .complete) catch unreachable;
-    switch (regular_expression_literal.isValidRegularExpressionLiteral()) {
-        .invalid_pattern => {
-            try self.emitErrorAt(token.location, "Invalid RegExp pattern", .{});
+    const regular_expression_literal = parseRegularExpressionLiteral(token.text, .complete) catch unreachable;
+    const pattern = regular_expression_literal.pattern;
+    const flags = regular_expression_literal.flags;
+    switch (try regular_expression_literal.isValidRegularExpressionLiteral(self.allocator)) {
+        .invalid_pattern => |str| {
+            try self.emitErrorAt(token.location, "Invalid RegExp pattern: {s}", .{str});
             return error.UnexpectedToken;
         },
         .invalid_flags => {
             var flags_location = token.location;
-            flags_location.column += @intCast(regular_expression_literal.pattern.len + 2);
-            try self.emitErrorAt(flags_location, "Invalid RegExp flags", .{});
+            flags_location.column += @intCast(pattern.len + 2);
+            try self.emitErrorAt(flags_location, "Invalid RegExp flags '{s}'", .{flags});
             return error.UnexpectedToken;
         },
         .valid => {},
     }
-    regular_expression_literal.pattern = try self.allocator.dupe(u8, regular_expression_literal.pattern);
-    regular_expression_literal.flags = try self.allocator.dupe(u8, regular_expression_literal.flags);
-    return regular_expression_literal;
+    return .{
+        .pattern = try self.allocator.dupe(u8, pattern),
+        .flags = try self.allocator.dupe(u8, flags),
+    };
 }
 
 fn acceptTemplateLiteral(self: *Self) AcceptError!ast.TemplateLiteral {
