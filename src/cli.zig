@@ -176,11 +176,10 @@ const Kiesel = struct {
     }
 
     fn createRealm(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
-        const realm = try Realm.create(agent);
-        try realm.setRealmGlobalObject(null, null);
-        const global_object = try realm.setDefaultGlobalBindings();
-        try initializeGlobalObject(realm, global_object);
-        return Value.from(global_object);
+        try Realm.initializeHostDefinedRealm(agent, .{});
+        const realm = agent.currentRealm();
+        _ = agent.execution_context_stack.pop();
+        return Value.from(realm.global_object);
     }
 
     fn detachArrayBuffer(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
@@ -864,8 +863,7 @@ pub fn main() !u8 {
 
     try Realm.initializeHostDefinedRealm(&agent, .{});
     const realm = agent.currentRealm();
-    const global_object = realm.global_object;
-    try initializeGlobalObject(realm, global_object);
+    try initializeGlobalObject(realm, realm.global_object);
 
     if (path_arg) |path| {
         const source_text = try readFile(allocator, std.fs.cwd(), path);
