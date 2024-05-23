@@ -216,9 +216,7 @@ pub fn regExpInitialize(
     //     }.
     // 20. Set obj.[[RegExpRecord]] to rer.
     // 21. Set obj.[[RegExpMatcher]] to CompilePattern of parseResult with argument rer.
-    var re_bytecode_slice: []u8 = @as(*[0]u8, @ptrCast(re_bytecode));
-    re_bytecode_slice.len = @intCast(re_bytecode_len);
-    object.as(RegExp).fields.re_bytecode = re_bytecode_slice;
+    object.as(RegExp).fields.re_bytecode = re_bytecode[0..@intCast(re_bytecode_len)];
 
     // 22. Perform ? Set(obj, "lastIndex", +0𝔽, true).
     try object.set(PropertyKey.from("lastIndex"), Value.from(0), .throw);
@@ -262,12 +260,12 @@ pub fn regExpExec(agent: *Agent, reg_exp: Object, string: String) Agent.Error!?O
 
 const CapturesList = [*c][*c]u8;
 
-fn getMatch(captures_list: CapturesList, string: []const u8, full_unicode: bool, i: usize) ?Match {
+fn getMatch(captures_list: CapturesList, string: []const u8, shift: bool, i: usize) ?Match {
     if (captures_list[2 * i] == null or captures_list[2 * i + 1] == null) return null;
     const start_index = (@intFromPtr(captures_list[2 * i]) -
-        @intFromPtr(string.ptr)) >> @intFromBool(full_unicode);
+        @intFromPtr(string.ptr)) >> @intFromBool(shift);
     const end_index = (@intFromPtr(captures_list[2 * i + 1]) -
-        @intFromPtr(string.ptr)) >> @intFromBool(full_unicode);
+        @intFromPtr(string.ptr)) >> @intFromBool(shift);
     return .{ .start_index = start_index, .end_index = end_index };
 }
 
@@ -305,21 +303,23 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
         last_index = 0;
     }
 
-    // 8. Let matcher be R.[[RegExpMatcher]].
-
-    // TODO: 9. If flags contains "u" or flags contains "v", let fullUnicode be true; else let fullUnicode be false.
-    // NOTE: This is being used as a shift value, we must pass the right kind of string to libregexp for that to work.
-    const full_unicode = false;
-
-    // 10-13.
-    const buf = try string.toUtf8(agent.gc_allocator);
+    // 8-13.
+    const shift = string == .utf16;
+    const buf = switch (string) {
+        .ascii => |ascii| ascii,
+        .utf16 => |utf16| std.mem.sliceAsBytes(utf16),
+    };
     const result = libregexp.lre_exec(
         captures_list,
         @ptrCast(re_bytecode),
         buf.ptr,
         @intCast(last_index),
         @intCast(buf.len),
-        @intFromBool(full_unicode),
+        // 0 = 8 bit chars, 1 = 16 bit chars, 2 = 16 bit chars, UTF-16
+        switch (string) {
+            .ascii => 0,
+            .utf16 => 2,
+        },
         agent,
     );
 
@@ -334,7 +334,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
         }
         return null;
     }
-    var match = getMatch(captures_list, buf, full_unicode, 0).?;
+    var match = getMatch(captures_list, buf, shift, 0).?;
     last_index = match.start_index;
 
     // 14. Let e be r.[[EndIndex]].
@@ -389,12 +389,12 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
     try indices.append(match);
 
     // 28. Let matchedSubstr be GetMatchString(S, match).
-    const matched_substr = Value.from(try getMatchString(agent, string, match));
+    const matched_substr = try getMatchString(agent, string, match);
 
     // 29. Perform ! CreateDataPropertyOrThrow(A, "0", matchedSubstr).
     array.createDataPropertyOrThrow(
         PropertyKey.from(0),
-        matched_substr,
+        Value.from(matched_substr),
     ) catch |err| try noexcept(err);
 
     var group_name_ptr = libregexp.lre_get_groupnames(@ptrCast(re_bytecode));
@@ -427,7 +427,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
         var captured_value: Value = undefined;
 
         // a. Let captureI be ith element of r.[[Captures]].
-        const capture_i = getMatch(captures_list, buf, full_unicode, i);
+        const capture_i = getMatch(captures_list, buf, shift, i);
 
         // b. If captureI is undefined, then
         if (capture_i == null) {
