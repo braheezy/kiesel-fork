@@ -415,7 +415,10 @@ pub fn parseTemplateLiteralSpan(
             },
         },
         .middle => for (str, 0..) |c, i| switch (c) {
-            '`' => return error.InvalidTemplateLiteralSpan,
+            '`' => switch (state) {
+                .backslash => state = .character,
+                else => return error.InvalidTemplateLiteralSpan,
+            },
             '}' => switch (state) {
                 .start => state = .expression_end,
                 .expression_end, .character, .backslash => state = .character,
