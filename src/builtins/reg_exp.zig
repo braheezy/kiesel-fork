@@ -95,6 +95,19 @@ pub const ParsedFlags = packed struct(u8) {
         if (parsed_flags.u and parsed_flags.v) return null;
         return parsed_flags;
     }
+
+    pub fn asLreFlags(self: Self) c_int {
+        var flags: c_int = 0;
+        if (self.d) flags |= FLAG_HAS_INDICES;
+        if (self.g) flags |= libregexp.LRE_FLAG_GLOBAL;
+        if (self.i) flags |= libregexp.LRE_FLAG_IGNORECASE;
+        if (self.m) flags |= libregexp.LRE_FLAG_MULTILINE;
+        if (self.s) flags |= libregexp.LRE_FLAG_DOTALL;
+        if (self.u) flags |= libregexp.LRE_FLAG_UNICODE;
+        if (self.v) flags |= libregexp.LRE_FLAG_UNICODE_SETS;
+        if (self.y) flags |= libregexp.LRE_FLAG_STICKY;
+        return flags;
+    }
 };
 
 /// 22.2.3.1 RegExpCreate ( P, F )
@@ -169,16 +182,6 @@ pub fn regExpInitialize(
         return agent.throwException(.syntax_error, "Invalid RegExp flags '{}'", .{f});
     };
 
-    var re_flags: c_int = 0;
-    if (parsed_flags.d) re_flags |= FLAG_HAS_INDICES;
-    if (parsed_flags.g) re_flags |= libregexp.LRE_FLAG_GLOBAL;
-    if (parsed_flags.i) re_flags |= libregexp.LRE_FLAG_IGNORECASE;
-    if (parsed_flags.m) re_flags |= libregexp.LRE_FLAG_MULTILINE;
-    if (parsed_flags.s) re_flags |= libregexp.LRE_FLAG_DOTALL;
-    if (parsed_flags.u) re_flags |= libregexp.LRE_FLAG_UNICODE;
-    if (parsed_flags.v) re_flags |= libregexp.LRE_FLAG_UNICODE_SETS;
-    if (parsed_flags.y) re_flags |= libregexp.LRE_FLAG_STICKY;
-
     // TODO: 11. If u is true or v is true, then
     //     a. Let patternText be StringToCodePoints(P).
     // 12. Else,
@@ -200,7 +203,7 @@ pub fn regExpInitialize(
         error_msg.len,
         buf.ptr,
         buf.len,
-        re_flags,
+        parsed_flags.asLreFlags(),
         &@"opaque",
     ) orelse {
         const str = std.mem.span(@as([*:0]const u8, @ptrCast(&error_msg)));
