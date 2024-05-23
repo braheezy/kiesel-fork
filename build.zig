@@ -35,14 +35,17 @@ pub fn build(b: *std.Build) void {
         .allocator = b.allocator,
         .argv = &.{ "git", "rev-parse", "HEAD" },
         .cwd_dir = b.build_root.handle,
-    }) catch @panic("Failed to get commit hash");
-    const git_rev = run_result.stdout[0..9];
+    }) catch null;
 
-    const version_string = std.fmt.allocPrint(
-        b.allocator,
-        "0.1.0-dev+{s}",
-        .{git_rev},
-    ) catch @panic("OOM");
+    var version_string: []const u8 = "0.1.0-dev";
+    if (run_result != null and run_result.?.stdout.len != 0) {
+        const git_rev = run_result.?.stdout[0..9];
+        version_string = std.fmt.allocPrint(
+            b.allocator,
+            "{s}+{s}",
+            .{ version_string, git_rev },
+        ) catch @panic("OOM");
+    }
 
     const options = b.addOptions();
     options.addOption(bool, "enable_annex_b", enable_annex_b);
