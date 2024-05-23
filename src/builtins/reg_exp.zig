@@ -39,19 +39,23 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const sameValue = types.sameValue;
 
+pub const LreOpaque = struct {
+    allocator: Allocator,
+};
+
 export fn lre_check_stack_overflow(_: ?*anyopaque, _: usize) c_int {
     // TODO: Implement stack overflow check
     return 0;
 }
 
 export fn lre_realloc(@"opaque": ?*anyopaque, maybe_ptr: ?*anyopaque, size: usize) ?*anyopaque {
-    const agent = @as(*Agent, @alignCast(@ptrCast(@"opaque".?)));
+    const lre_opaque = @as(*LreOpaque, @alignCast(@ptrCast(@"opaque".?)));
     if (maybe_ptr) |ptr| {
         var old_mem: []u8 = @as(*[0]u8, @ptrCast(ptr));
         old_mem.len = gc.GcAllocator.alignedAllocSize(old_mem.ptr);
-        return if (agent.gc_allocator.realloc(old_mem, size)) |slice| slice.ptr else |_| null;
+        return if (lre_opaque.allocator.realloc(old_mem, size)) |slice| slice.ptr else |_| null;
     } else {
-        return if (agent.gc_allocator.alloc(u8, size)) |slice| slice.ptr else |_| null;
+        return if (lre_opaque.allocator.alloc(u8, size)) |slice| slice.ptr else |_| null;
     }
 }
 
@@ -189,6 +193,7 @@ pub fn regExpInitialize(
     // NOTE: Despite passing in the buffer length below, this needs to be null-terminated.
     const buf = try agent.gc_allocator.dupeZ(u8, try p.toUtf8(agent.gc_allocator));
     defer agent.gc_allocator.free(buf);
+    var @"opaque": LreOpaque = .{ .allocator = agent.gc_allocator };
     const re_bytecode = libregexp.lre_compile(
         &re_bytecode_len,
         &error_msg,
@@ -196,7 +201,7 @@ pub fn regExpInitialize(
         buf.ptr,
         buf.len,
         re_flags,
-        agent,
+        &@"opaque",
     ) orelse {
         const str = std.mem.span(@as([*:0]const u8, @ptrCast(&error_msg)));
         if (std.mem.eql(u8, str, "out of memory")) return error.OutOfMemory;
@@ -309,6 +314,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
         .ascii => |ascii| ascii,
         .utf16 => |utf16| std.mem.sliceAsBytes(utf16),
     };
+    var @"opaque": LreOpaque = .{ .allocator = agent.gc_allocator };
     const result = libregexp.lre_exec(
         captures_list,
         @ptrCast(re_bytecode),
@@ -320,7 +326,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
             .ascii => 0,
             .utf16 => 2,
         },
-        agent,
+        &@"opaque",
     );
 
     if (result < 0) return error.OutOfMemory;
