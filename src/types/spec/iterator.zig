@@ -34,26 +34,40 @@ pub const Iterator = struct {
 
     /// 7.4.4 IteratorNext ( iteratorRecord [ , value ] )
     /// https://tc39.es/ecma262/#sec-iteratornext
-    pub fn next(self: Self, value_: ?Value) Agent.Error!Object {
+    pub fn next(self: *Self, value_: ?Value) Agent.Error!Object {
         const agent = self.iterator.agent();
 
         // 1. If value is not present, then
-        const result = if (value_ == null) blk: {
-            // a. Let result be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
-            break :blk try self.next_method.callNoArgs(agent, Value.from(self.iterator));
+        const result_completion = if (value_ == null) blk: {
+            // a. Let result be Completion(Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]])).
+            break :blk self.next_method.callNoArgs(agent, Value.from(self.iterator));
         }
         // 2. Else,
         else blk: {
-            // a. Let result be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]], « value »).
-            break :blk try self.next_method.call(agent, Value.from(self.iterator), &.{value_.?});
+            // a. Let result be Completion(Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]], « value »)).
+            break :blk self.next_method.call(agent, Value.from(self.iterator), &.{value_.?});
         };
 
-        // 3. If result is not an Object, throw a TypeError exception.
+        // 3. If result is a throw completion, then
+        // 4. Set result to ! result.
+        const result = result_completion catch |err| {
+            // a. Set iteratorRecord.[[Done]] to true.
+            self.done = true;
+
+            // b. Return ? result.
+            return err;
+        };
+
+        // 5. If result is not an Object, then
         if (result != .object) {
+            // a. Set iteratorRecord.[[Done]] to true.
+            self.done = true;
+
+            // b. Throw a TypeError exception.
             return agent.throwException(.type_error, "{} is not an Object", .{result});
         }
 
-        // 4. Return result.
+        // 6. Return result.
         return result.object;
     }
 
@@ -73,38 +87,14 @@ pub const Iterator = struct {
 
     /// 7.4.7 IteratorStep ( iteratorRecord )
     /// https://tc39.es/ecma262/#sec-iteratorstep
-    pub fn step(self: Self) Agent.Error!?Object {
+    pub fn step(self: *Self) Agent.Error!?Object {
         // 1. Let result be ? IteratorNext(iteratorRecord).
         const result = try next(self, null);
 
-        // 2. Let done be ? IteratorComplete(result).
-        const done = try complete(result);
-
-        // 3. If done is true, return false.
-        if (done) return null;
-
-        // 4. Return result.
-        return result;
-    }
-
-    /// 7.4.8 IteratorStepValue ( iteratorRecord )
-    /// https://tc39.es/ecma262/#sec-iteratorstepvalue
-    pub fn stepValue(self: *Self) Agent.Error!?Value {
-        // 1. Let result be Completion(IteratorNext(iteratorRecord)).
-        // 2. If result is a throw completion, then
-        // 3. Set result to ! result.
-        const result = self.next(null) catch |err| {
-            // a. Set iteratorRecord.[[Done]] to true.
-            self.done = true;
-
-            // b. Return ? result.
-            return err;
-        };
-
-        // 4. Let done be Completion(IteratorComplete(result)).
-        // 5. If done is a throw completion, then
-        // 6. Set done to ! done.
-        const done = Iterator.complete(result) catch |err| {
+        // 2. Let done be Completion(IteratorComplete(result)).
+        // 3. If done is a throw completion, then
+        // 4. Set done to ! done.
+        const done = complete(result) catch |err| {
             // a. Set iteratorRecord.[[Done]] to true.
             self.done = true;
 
@@ -112,7 +102,7 @@ pub const Iterator = struct {
             return err;
         };
 
-        // 7. If done is true, then
+        // 5. If done is true, then
         if (done) {
             // a. Set iteratorRecord.[[Done]] to true.
             self.done = true;
@@ -121,16 +111,32 @@ pub const Iterator = struct {
             return null;
         }
 
-        // 8. Let value be Completion(Get(result, "value")).
-        // 9. If value is a throw completion, then
-        const value_ = result.get(PropertyKey.from("value")) catch |err| {
+        // 6. Return result.
+        return result;
+    }
+
+    /// 7.4.8 IteratorStepValue ( iteratorRecord )
+    /// https://tc39.es/ecma262/#sec-iteratorstepvalue
+    pub fn stepValue(self: *Self) Agent.Error!?Value {
+        // 1. Let result be ? IteratorStep(iteratorRecord).
+        const result = try self.step();
+
+        // 2. If result is done, then
+        if (result == null) {
+            // a. Return done.
+            return null;
+        }
+
+        // 3. Let value be Completion(IteratorValue(result)).
+        // 4. If value is a throw completion, then
+        const value_ = value(result.?) catch |err| {
             // a. Set iteratorRecord.[[Done]] to true.
             self.done = true;
 
             return err;
         };
 
-        // 10. Return ? value.
+        // 5. Return ? value.
         return value_;
     }
 

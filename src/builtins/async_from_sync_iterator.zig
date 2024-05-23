@@ -94,7 +94,7 @@ pub const AsyncFromSyncIteratorPrototype = struct {
         ) catch |err| try noexcept(err);
 
         // 4. Let syncIteratorRecord be O.[[SyncIteratorRecord]].
-        const sync_iterator = async_from_sync_iterator.fields.sync_iterator;
+        var sync_iterator = async_from_sync_iterator.fields.sync_iterator;
 
         // 5. If value is present, then
         const result = (if (maybe_value) |value| blk: {
