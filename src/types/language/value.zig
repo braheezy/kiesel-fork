@@ -1283,7 +1283,7 @@ pub const Value = union(enum) {
 pub fn stringToNumber(allocator: Allocator, string: String) Allocator.Error!Number {
     // 1. Let literal be ParseText(str, StringNumericLiteral).
     // 2. If literal is a List of errors, return NaN.
-    // 3. Return StringNumericValue of literal.
+    // 3. Return the StringNumericValue of literal.
     // TODO: Implement the proper string parsing grammar!
     const trimmed_string = try (try string.trim(allocator, .@"start+end")).toUtf8(allocator);
     if (trimmed_string.len == 0) return Number.from(0);

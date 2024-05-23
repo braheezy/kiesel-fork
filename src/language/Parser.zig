@@ -770,13 +770,13 @@ pub fn acceptUpdateExpression(
         @"type" = .postfix;
     }
 
-    // It is an early Syntax Error if AssignmentTargetType of LeftHandSideExpression is not simple.
+    // It is an early Syntax Error if the AssignmentTargetType of LeftHandSideExpression is not simple.
     if (@"type" == .prefix and expression.assignmentTargetType() != .simple) {
         try self.emitErrorAt(state.location, "Invalid left-hand side in update expression", .{});
         return error.UnexpectedToken;
     }
 
-    // It is an early Syntax Error if AssignmentTargetType of UnaryExpression is not simple.
+    // It is an early Syntax Error if the AssignmentTargetType of UnaryExpression is not simple.
     if (@"type" == .postfix and expression.assignmentTargetType() != .simple) {
         try self.emitErrorAt(state.location, "Invalid right-hand side in update expression", .{});
         return error.UnexpectedToken;
@@ -1172,7 +1172,7 @@ pub fn acceptAssignmentExpression(
     };
 
     // If LeftHandSideExpression is neither an ObjectLiteral nor an ArrayLiteral, it is a Syntax
-    // Error if AssignmentTargetType of LeftHandSideExpression is not simple.
+    // Error if the AssignmentTargetType of LeftHandSideExpression is not simple.
     if (primary_expression.assignmentTargetType() != .simple) {
         try self.emitErrorAt(state.location, "Invalid left-hand side in assignment expression", .{});
         return error.UnexpectedToken;
@@ -1651,7 +1651,7 @@ pub fn acceptForInOfStatement(self: *Self) AcceptError!ast.ForInOfStatement {
         return error.UnexpectedToken;
 
     // If LeftHandSideExpression is neither an ObjectLiteral nor an ArrayLiteral, it is a Syntax
-    // Error if AssignmentTargetType of LeftHandSideExpression is not simple.
+    // Error if the AssignmentTargetType of LeftHandSideExpression is not simple.
     if (initializer == .expression and initializer.expression.assignmentTargetType() != .simple) {
         try self.emitErrorAt(
             initializer_location,
@@ -2395,7 +2395,7 @@ fn acceptClassElementName(self: *Self) AcceptError!ast.ClassElementName {
     if (self.acceptPropertyName()) |property_name| {
         return .{ .property_name = property_name };
     } else |_| if (self.acceptPrivateIdentifier()) |private_identifier| {
-        // It is a Syntax Error if StringValue of PrivateIdentifier is "#constructor".
+        // It is a Syntax Error if the StringValue of PrivateIdentifier is "#constructor".
         if (std.mem.eql(u8, private_identifier, "constructor")) {
             try self.emitErrorAt(
                 location,

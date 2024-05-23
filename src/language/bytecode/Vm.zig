@@ -183,12 +183,12 @@ fn getTemplateObject(
         return template;
     }
 
-    // 4. Let rawStrings be TemplateStrings of templateLiteral with argument true.
+    // 4. Let rawStrings be the TemplateStrings of templateLiteral with argument true.
     // 5. Assert: rawStrings is a List of Strings.
     const raw_strings = try template_literal.templateStrings(agent.gc_allocator, true);
     defer agent.gc_allocator.free(raw_strings);
 
-    // 6. Let cookedStrings be TemplateStrings of templateLiteral with argument false.
+    // 6. Let cookedStrings be the TemplateStrings of templateLiteral with argument false.
     const cooked_strings = try template_literal.templateStrings(agent.gc_allocator, false);
     defer agent.gc_allocator.free(cooked_strings);
 
@@ -578,7 +578,7 @@ fn instantiateOrdinaryFunctionExpression(
         // 1. Assert: name is not present.
         std.debug.assert(default_name == null);
 
-        // 2. Set name to StringValue of BindingIdentifier.
+        // 2. Set name to the StringValue of BindingIdentifier.
         const name = identifier;
 
         // 3. Let outerEnv be the running execution context's LexicalEnvironment.
@@ -1109,7 +1109,7 @@ fn instantiateGeneratorFunctionExpression(
         // 1. Assert: name is not present.
         std.debug.assert(default_name == null);
 
-        // 2. Set name to StringValue of BindingIdentifier.
+        // 2. Set name to the StringValue of BindingIdentifier.
         const name = identifier;
 
         // 3. Let outerEnv be the running execution context's LexicalEnvironment.
@@ -1238,7 +1238,7 @@ fn instantiateAsyncGeneratorFunctionExpression(
         // 1. Assert: name is not present.
         std.debug.assert(default_name == null);
 
-        // 2. Set name to StringValue of BindingIdentifier.
+        // 2. Set name to the StringValue of BindingIdentifier.
         const name = identifier;
 
         // 3. Let outerEnv be the running execution context's LexicalEnvironment.
@@ -1699,7 +1699,7 @@ fn classDefinitionEvaluation(
     const prototype = try ordinaryObjectCreate(agent, prototype_parent);
 
     // 10. If ClassBody is not present, let constructor be empty.
-    // 11. Else, let constructor be ConstructorMethod of ClassBody.
+    // 11. Else, let constructor be the ConstructorMethod of ClassBody.
     const constructor = class_tail.class_body.constructorMethod();
 
     // 12. Set the running execution context's LexicalEnvironment to classEnv.
@@ -1836,7 +1836,7 @@ fn classDefinitionEvaluation(
     ) catch |err| try noexcept(err);
 
     // 19. If ClassBody[opt] is not present, let elements be a new empty List.
-    // 20. Else, let elements be NonConstructorElements of ClassBody.
+    // 20. Else, let elements be the NonConstructorElements of ClassBody.
     const elements = try class_tail.class_body.nonConstructorElements(agent.gc_allocator);
     defer agent.gc_allocator.free(elements);
 
@@ -2040,7 +2040,7 @@ fn bindingClassDeclarationEvaluation(
 ) Agent.Error!Object {
     // ClassDeclaration : class BindingIdentifier ClassTail
     if (class_declaration.identifier) |identifier| {
-        // 1. Let className be StringValue of BindingIdentifier.
+        // 1. Let className be the StringValue of BindingIdentifier.
         const class_name = identifier;
 
         // 2. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments className and className.
@@ -2106,7 +2106,7 @@ fn instantiateAsyncFunctionExpression(
         // 1. Assert: name is not present.
         std.debug.assert(default_name == null);
 
-        // 2. Set name to StringValue of BindingIdentifier.
+        // 2. Set name to the StringValue of BindingIdentifier.
         const name = identifier;
 
         // 3. Let outerEnv be the running execution context's LexicalEnvironment.
@@ -2324,7 +2324,7 @@ pub fn executeInstruction(
 
             // ClassExpression : class BindingIdentifier ClassTail
             if (class_expression.identifier) |identifier| {
-                // 1. Let className be StringValue of BindingIdentifier.
+                // 1. Let className be the StringValue of BindingIdentifier.
                 const class_name = identifier;
 
                 // 2. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments className and className.
@@ -2614,7 +2614,7 @@ pub fn executeInstruction(
         // 13.3.4 EvaluatePropertyAccessWithIdentifierKey ( baseValue, identifierName, strict )
         // https://tc39.es/ecma262/#sec-evaluate-property-access-with-identifier-key
         .evaluate_property_access_with_identifier_key => {
-            // 1. Let propertyNameString be StringValue of identifierName.
+            // 1. Let propertyNameString be the StringValue of identifierName.
             const property_name_string = self.fetchIdentifier(executable);
 
             const strict = self.fetchIndex(executable) == 1;
@@ -3149,7 +3149,7 @@ pub fn executeInstruction(
             self.reference = try self.agent.resolveBinding(name, null, strict, lookup_cache_entry);
         },
         .resolve_private_identifier => {
-            // 1. Let privateIdentifier be StringValue of PrivateIdentifier.
+            // 1. Let privateIdentifier be the StringValue of PrivateIdentifier.
             const private_identifier = self.fetchIdentifier(executable);
 
             // 2. Let privateEnvRec be the running execution context's PrivateEnvironment.

@@ -344,7 +344,7 @@ fn parseFloat(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     //    StrDecimalLiteral, which might be trimmed itself. If there is no such prefix, return NaN.
     // 5. Let parsedNumber be ParseText(trimmedPrefix, StrDecimalLiteral).
     // 6. Assert: parsedNumber is a Parse Node.
-    // 7. Return StringNumericValue of parsedNumber.
+    // 7. Return the StringNumericValue of parsedNumber.
     if (std.mem.startsWith(u8, trimmed_string, "-Infinity")) return Value.negativeInfinity();
     if (std.mem.startsWith(u8, trimmed_string, "+Infinity")) return Value.infinity();
     if (std.mem.startsWith(u8, trimmed_string, "Infinity")) return Value.infinity();

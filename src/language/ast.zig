@@ -442,7 +442,7 @@ pub const RegularExpressionLiteral = struct {
         self: Self,
         allocator: Allocator,
     ) Allocator.Error!ValidationResult {
-        // 1. Let flags be FlagText of literal.
+        // 1. Let flags be the FlagText of literal.
         // 2. If flags contains any code points other than d, g, i, m, s, u, v, or y, or if flags
         //    contains any code point more than once, return false.
         const parsed_flags = reg_exp.ParsedFlags.from(self.flags) orelse return .invalid_flags;
@@ -721,7 +721,7 @@ pub const Expression = union(enum) {
         switch (self) {
             .primary_expression => |primary_expression| switch (primary_expression) {
                 .identifier_reference => |identifier_reference| {
-                    // TODO: 1. If IsStrict(this IdentifierReference) is true and StringValue of
+                    // TODO: 1. If IsStrict(this IdentifierReference) is true and the StringValue of
                     //          Identifier is either "eval" or "arguments", return invalid.
                     if (false and
                         (std.mem.eql(u8, identifier_reference.identifier, "eval") or
@@ -734,7 +734,7 @@ pub const Expression = union(enum) {
                 .parenthesized_expression => |parenthesized_expression| {
                     // 1. Let expr be the ParenthesizedExpression that is covered by
                     //    CoverParenthesizedExpressionAndArrowParameterList.
-                    // 2. Return AssignmentTargetType of expr.
+                    // 2. Return the AssignmentTargetType of expr.
                     return parenthesized_expression.expression.assignmentTargetType();
                 },
                 else => {},
@@ -965,8 +965,8 @@ pub const StatementList = struct {
         allocator: Allocator,
     ) Allocator.Error![]const LexicallyScopedDeclaration {
         // StatementList : StatementList StatementListItem
-        // 1. Let declarations1 be LexicallyScopedDeclarations of StatementList.
-        // 2. Let declarations2 be LexicallyScopedDeclarations of StatementListItem.
+        // 1. Let declarations1 be the LexicallyScopedDeclarations of StatementList.
+        // 2. Let declarations2 be the LexicallyScopedDeclarations of StatementListItem.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         var declarations = std.ArrayList(LexicallyScopedDeclaration).init(allocator);
         for (self.items) |item| {
@@ -982,8 +982,8 @@ pub const StatementList = struct {
         allocator: Allocator,
     ) Allocator.Error![]const Identifier {
         // StatementList : StatementList StatementListItem
-        // 1. Let names1 be VarDeclaredNames of StatementList.
-        // 2. Let names2 be VarDeclaredNames of StatementListItem.
+        // 1. Let names1 be the VarDeclaredNames of StatementList.
+        // 2. Let names2 be the VarDeclaredNames of StatementListItem.
         // 3. Return the list-concatenation of names1 and names2.
         // StatementListItem : Declaration
         // 1. Return a new empty List.
@@ -1001,8 +1001,8 @@ pub const StatementList = struct {
         allocator: Allocator,
     ) Allocator.Error![]const VarScopedDeclaration {
         // StatementList : StatementList StatementListItem
-        // 1. Let declarations1 be VarScopedDeclarations of StatementList.
-        // 2. Let declarations2 be VarScopedDeclarations of StatementListItem.
+        // 1. Let declarations1 be the VarScopedDeclarations of StatementList.
+        // 2. Let declarations2 be the VarScopedDeclarations of StatementListItem.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         // StatementListItem : Declaration
         // 1. Return a new empty List.
@@ -1020,8 +1020,8 @@ pub const StatementList = struct {
         allocator: Allocator,
     ) Allocator.Error![]const LexicallyScopedDeclaration {
         // StatementList : StatementList StatementListItem
-        // 1. Let declarations1 be TopLevelLexicallyScopedDeclarations of StatementList.
-        // 2. Let declarations2 be TopLevelLexicallyScopedDeclarations of StatementListItem.
+        // 1. Let declarations1 be the TopLevelLexicallyScopedDeclarations of StatementList.
+        // 2. Let declarations2 be the TopLevelLexicallyScopedDeclarations of StatementListItem.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         var declarations = std.ArrayList(LexicallyScopedDeclaration).init(allocator);
         for (self.items) |item| {
@@ -1037,16 +1037,16 @@ pub const StatementList = struct {
         allocator: Allocator,
     ) Allocator.Error![]const Identifier {
         // StatementList : StatementList StatementListItem
-        // 1. Let names1 be TopLevelVarDeclaredNames of StatementList.
-        // 2. Let names2 be TopLevelVarDeclaredNames of StatementListItem.
+        // 1. Let names1 be the TopLevelVarDeclaredNames of StatementList.
+        // 2. Let names2 be the TopLevelVarDeclaredNames of StatementListItem.
         // 3. Return the list-concatenation of names1 and names2.
         var var_declared_names = std.ArrayList(Identifier).init(allocator);
         for (self.items) |item| switch (item) {
             // StatementListItem : Statement
             .statement => |statement| {
-                // TODO: 1. If Statement is Statement : LabelledStatement , return
+                // TODO: 1. If Statement is Statement : LabelledStatement , return the
                 //          TopLevelVarDeclaredNames of Statement.
-                // 2. Return VarDeclaredNames of Statement.
+                // 2. Return the VarDeclaredNames of Statement.
                 try var_declared_names.appendSlice(try statement.varDeclaredNames(allocator));
             },
             // StatementListItem : Declaration
@@ -1073,16 +1073,16 @@ pub const StatementList = struct {
         allocator: Allocator,
     ) Allocator.Error![]const VarScopedDeclaration {
         // StatementList : StatementList StatementListItem
-        // 1. Let declarations1 be TopLevelVarScopedDeclarations of StatementList.
-        // 2. Let declarations2 be TopLevelVarScopedDeclarations of StatementListItem.
+        // 1. Let declarations1 be the TopLevelVarScopedDeclarations of StatementList.
+        // 2. Let declarations2 be the TopLevelVarScopedDeclarations of StatementListItem.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
         for (self.items) |item| switch (item) {
             // StatementListItem : Statement
             .statement => |statement| {
-                // TODO: 1. If Statement is Statement : LabelledStatement , return
+                // TODO: 1. If Statement is Statement : LabelledStatement , return the
                 //          TopLevelVarScopedDeclarations of Statement.
-                // 2. Return VarScopedDeclarations of Statement.
+                // 2. Return the VarScopedDeclarations of Statement.
                 try variable_declarations.appendSlice(try statement.varScopedDeclarations(allocator));
             },
             // StatementListItem : Declaration
@@ -1090,7 +1090,7 @@ pub const StatementList = struct {
                 switch (declaration.*) {
                     // 1. If Declaration is Declaration : HoistableDeclaration , then
                     .hoistable_declaration => |hoistable_declaration| {
-                        // a. Let declaration be DeclarationPart of HoistableDeclaration.
+                        // a. Let declaration be the DeclarationPart of HoistableDeclaration.
                         // b. Return « declaration ».
                         try variable_declarations.append(.{ .hoistable_declaration = hoistable_declaration });
                     },
@@ -1133,14 +1133,14 @@ pub const StatementListItem = union(enum) {
         switch (self) {
             // StatementListItem : Statement
             .statement => {
-                // TODO: 1. If Statement is Statement : LabelledStatement , return
+                // TODO: 1. If Statement is Statement : LabelledStatement , return the
                 //          LexicallyScopedDeclarations of LabelledStatement.
                 // 2. Return a new empty List.
             },
 
             // StatementListItem : Declaration
             .declaration => |declaration| switch (declaration.*) {
-                // 1. Return a List whose sole element is DeclarationPart of Declaration.
+                // 1. Return a List whose sole element is the DeclarationPart of Declaration.
                 .hoistable_declaration => |hoistable_declaration| try declarations.append(.{ .hoistable_declaration = hoistable_declaration }),
                 .class_declaration => |class_declaration| try declarations.append(.{ .class_declaration = class_declaration }),
                 .lexical_declaration => |lexical_declaration| try declarations.append(.{ .lexical_declaration = lexical_declaration }),
@@ -1316,7 +1316,7 @@ pub const VariableDeclarationList = struct {
         allocator: Allocator,
     ) Allocator.Error![]const Identifier {
         // VariableStatement : var VariableDeclarationList ;
-        // 1. Return BoundNames of VariableDeclarationList.
+        // 1. Return the BoundNames of VariableDeclarationList.
         return self.boundNames(allocator);
     }
 
@@ -1327,8 +1327,8 @@ pub const VariableDeclarationList = struct {
         allocator: Allocator,
     ) Allocator.Error![]const Identifier {
         // VariableDeclarationList : VariableDeclarationList , VariableDeclaration
-        // 1. Let names1 be BoundNames of VariableDeclarationList.
-        // 2. Let names2 be BoundNames of VariableDeclaration.
+        // 1. Let names1 be the BoundNames of VariableDeclarationList.
+        // 2. Let names2 be the BoundNames of VariableDeclaration.
         // 3. Return the list-concatenation of names1 and names2.
         // VariableDeclaration : BindingIdentifier Initializer[opt]
         // 1. Return the BoundNames of BindingIdentifier.
@@ -1351,7 +1351,7 @@ pub const VariableDeclarationList = struct {
         // VariableDeclarationList : VariableDeclaration
         // 1. Return « VariableDeclaration ».
         // VariableDeclarationList : VariableDeclarationList , VariableDeclaration
-        // 1. Let declarations1 be VarScopedDeclarations of VariableDeclarationList.
+        // 1. Let declarations1 be the VarScopedDeclarations of VariableDeclarationList.
         // 2. Return the list-concatenation of declarations1 and « VariableDeclaration ».
         var variable_declarations = try std.ArrayList(VarScopedDeclaration).initCapacity(
             allocator,
@@ -1450,8 +1450,8 @@ pub const IfStatement = struct {
         allocator: Allocator,
     ) Allocator.Error![]const Identifier {
         // IfStatement : if ( Expression ) Statement else Statement
-        // 1. Let names1 be VarDeclaredNames of the first Statement.
-        // 2. Let names2 be VarDeclaredNames of the second Statement.
+        // 1. Let names1 be the VarDeclaredNames of the first Statement.
+        // 2. Let names2 be the VarDeclaredNames of the second Statement.
         // 3. Return the list-concatenation of names1 and names2.
         if (self.alternate_statement) |alternate_statement| {
             var var_declared_names = std.ArrayList(Identifier).init(allocator);
@@ -1472,8 +1472,8 @@ pub const IfStatement = struct {
         allocator: Allocator,
     ) Allocator.Error![]const VarScopedDeclaration {
         // IfStatement : if ( Expression ) Statement else Statement
-        // 1. Let declarations1 be VarScopedDeclarations of the first Statement.
-        // 2. Let declarations2 be VarScopedDeclarations of the second Statement.
+        // 1. Let declarations1 be the VarScopedDeclarations of the first Statement.
+        // 2. Let declarations2 be the VarScopedDeclarations of the second Statement.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         if (self.alternate_statement) |alternate_statement| {
             var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
@@ -1578,8 +1578,8 @@ pub const ForStatement = struct {
         allocator: Allocator,
     ) Allocator.Error![]const Identifier {
         // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
-        // 1. Let names1 be BoundNames of VariableDeclarationList.
-        // 2. Let names2 be VarDeclaredNames of Statement.
+        // 1. Let names1 be the BoundNames of VariableDeclarationList.
+        // 2. Let names2 be the VarDeclaredNames of Statement.
         // 3. Return the list-concatenation of names1 and names2.
         if (self.initializer) |initializer| switch (initializer) {
             .variable_statement => {
@@ -1605,8 +1605,8 @@ pub const ForStatement = struct {
         allocator: Allocator,
     ) Allocator.Error![]const VarScopedDeclaration {
         // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
-        // 1. Let declarations1 be VarScopedDeclarations of VariableDeclarationList.
-        // 2. Let declarations2 be VarScopedDeclarations of Statement.
+        // 1. Let declarations1 be the VarScopedDeclarations of VariableDeclarationList.
+        // 2. Let declarations2 be the VarScopedDeclarations of Statement.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         if (self.initializer) |initializer| switch (initializer) {
             .variable_statement => {
@@ -1706,7 +1706,7 @@ pub const ForInOfStatement = struct {
         //     for await ( var ForBinding of AssignmentExpression ) Statement
         else {
             // 1. Let declarations1 be « ForBinding ».
-            // 2. Let declarations2 be VarScopedDeclarations of Statement.
+            // 2. Let declarations2 be the VarScopedDeclarations of Statement.
             // 3. Return the list-concatenation of declarations1 and declarations2.
             var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
             try variable_declarations.append(.{
@@ -1815,13 +1815,13 @@ pub const CaseBlock = struct {
         // CaseBlock : { CaseClauses[opt] DefaultClause CaseClauses[opt] }
         // 1. If the first CaseClauses is present, let declarations1 be the LexicallyScopedDeclarations of the first CaseClauses.
         // 2. Else, let declarations1 be a new empty List.
-        // 3. Let declarations2 be LexicallyScopedDeclarations of DefaultClause.
+        // 3. Let declarations2 be the LexicallyScopedDeclarations of DefaultClause.
         // 4. If the second CaseClauses is present, let declarations3 be the LexicallyScopedDeclarations of the second CaseClauses.
         // 5. Else, let declarations3 be a new empty List.
         // 6. Return the list-concatenation of declarations1, declarations2, and declarations3.
         // CaseClauses : CaseClauses CaseClause
-        // 1. Let declarations1 be LexicallyScopedDeclarations of CaseClauses.
-        // 2. Let declarations2 be LexicallyScopedDeclarations of CaseClause.
+        // 1. Let declarations1 be the LexicallyScopedDeclarations of CaseClauses.
+        // 2. Let declarations2 be the LexicallyScopedDeclarations of CaseClause.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         var declarations = std.ArrayList(LexicallyScopedDeclaration).init(allocator);
         for (self.items) |item| switch (item) {
@@ -1841,13 +1841,13 @@ pub const CaseBlock = struct {
         // CaseBlock : { CaseClauses[opt] DefaultClause CaseClauses[opt] }
         // 1. If the first CaseClauses is present, let names1 be the VarDeclaredNames of the first CaseClauses.
         // 2. Else, let names1 be a new empty List.
-        // 3. Let names2 be VarDeclaredNames of DefaultClause.
+        // 3. Let names2 be the VarDeclaredNames of DefaultClause.
         // 4. If the second CaseClauses is present, let names3 be the VarDeclaredNames of the second CaseClauses.
         // 5. Else, let names3 be a new empty List.
         // 6. Return the list-concatenation of names1, names2, and names3.
         // CaseClauses : CaseClauses CaseClause
-        // 1. Let names1 be VarDeclaredNames of CaseClauses.
-        // 2. Let names2 be VarDeclaredNames of CaseClause.
+        // 1. Let names1 be the VarDeclaredNames of CaseClauses.
+        // 2. Let names2 be the VarDeclaredNames of CaseClause.
         // 3. Return the list-concatenation of names1 and names2.
         var var_declared_names = std.ArrayList(Identifier).init(allocator);
         for (self.items) |item| switch (item) {
@@ -1867,13 +1867,13 @@ pub const CaseBlock = struct {
         // CaseBlock : { CaseClauses[opt] DefaultClause CaseClauses[opt] }
         // 1. If the first CaseClauses is present, let declarations1 be the VarScopedDeclarations of the first CaseClauses.
         // 2. Else, let declarations1 be a new empty List.
-        // 3. Let declarations2 be VarScopedDeclarations of DefaultClause.
+        // 3. Let declarations2 be the VarScopedDeclarations of DefaultClause.
         // 4. If the second CaseClauses is present, let declarations3 be the VarScopedDeclarations of the second CaseClauses.
         // 5. Else, let declarations3 be a new empty List.
         // 6. Return the list-concatenation of declarations1, declarations2, and declarations3.
         // CaseClauses : CaseClauses CaseClause
-        // 1. Let declarations1 be VarScopedDeclarations of CaseClauses.
-        // 2. Let declarations2 be VarScopedDeclarations of CaseClause.
+        // 1. Let declarations1 be the VarScopedDeclarations of CaseClauses.
+        // 2. Let declarations2 be the VarScopedDeclarations of CaseClause.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
         for (self.items) |item| switch (item) {
@@ -1991,17 +1991,17 @@ pub const TryStatement = struct {
         allocator: Allocator,
     ) Allocator.Error![]const Identifier {
         // TryStatement : try Block Catch
-        // 1. Let names1 be VarDeclaredNames of Block.
-        // 2. Let names2 be VarDeclaredNames of Catch.
+        // 1. Let names1 be the VarDeclaredNames of Block.
+        // 2. Let names2 be the VarDeclaredNames of Catch.
         // 3. Return the list-concatenation of names1 and names2.
         // TryStatement : try Block Finally
-        // 1. Let names1 be VarDeclaredNames of Block.
-        // 2. Let names2 be VarDeclaredNames of Finally.
+        // 1. Let names1 be the VarDeclaredNames of Block.
+        // 2. Let names2 be the VarDeclaredNames of Finally.
         // 3. Return the list-concatenation of names1 and names2.
         // TryStatement : try Block Catch Finally
-        // 1. Let names1 be VarDeclaredNames of Block.
-        // 2. Let names2 be VarDeclaredNames of Catch.
-        // 3. Let names3 be VarDeclaredNames of Finally.
+        // 1. Let names1 be the VarDeclaredNames of Block.
+        // 2. Let names2 be the VarDeclaredNames of Catch.
+        // 3. Let names3 be the VarDeclaredNames of Finally.
         // 4. Return the list-concatenation of names1, names2, and names3.
         // Catch : catch ( CatchParameter ) Block
         // 1. Return the VarDeclaredNames of Block.
@@ -2023,17 +2023,17 @@ pub const TryStatement = struct {
         allocator: Allocator,
     ) Allocator.Error![]const VarScopedDeclaration {
         // TryStatement : try Block Catch
-        // 1. Let declarations1 be VarScopedDeclarations of Block.
-        // 2. Let declarations2 be VarScopedDeclarations of Catch.
+        // 1. Let declarations1 be the VarScopedDeclarations of Block.
+        // 2. Let declarations2 be the VarScopedDeclarations of Catch.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         // TryStatement : try Block Finally
-        // 1. Let declarations1 be VarScopedDeclarations of Block.
-        // 2. Let declarations2 be VarScopedDeclarations of Finally.
+        // 1. Let declarations1 be the VarScopedDeclarations of Block.
+        // 2. Let declarations2 be the VarScopedDeclarations of Finally.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         // TryStatement : try Block Catch Finally
-        // 1. Let declarations1 be VarScopedDeclarations of Block.
-        // 2. Let declarations2 be VarScopedDeclarations of Catch.
-        // 3. Let declarations3 be VarScopedDeclarations of Finally.
+        // 1. Let declarations1 be the VarScopedDeclarations of Block.
+        // 2. Let declarations2 be the VarScopedDeclarations of Catch.
+        // 3. Let declarations3 be the VarScopedDeclarations of Finally.
         // 4. Return the list-concatenation of declarations1, declarations2, and declarations3.
         // Catch : catch ( CatchParameter ) Block
         // 1. Return the VarScopedDeclarations of Block.
@@ -2065,8 +2065,8 @@ pub const FormalParameters = struct {
     pub fn boundNames(self: Self, allocator: Allocator) Allocator.Error![]const []const u8 {
         var bound_names = try std.ArrayList([]const u8).initCapacity(allocator, self.items.len);
         // FormalParameterList : FormalParameterList , FormalParameter
-        // 1. Let names1 be BoundNames of FormalParameterList.
-        // 2. Let names2 be BoundNames of FormalParameter.
+        // 1. Let names1 be the BoundNames of FormalParameterList.
+        // 2. Let names2 be the BoundNames of FormalParameter.
         // 3. Return the list-concatenation of names1 and names2.
         for (self.items) |item| {
             // BindingElement : BindingPattern Initializer[opt]
@@ -2193,7 +2193,7 @@ pub const FunctionDeclaration = struct {
 
         // FunctionDeclaration : function BindingIdentifier ( FormalParameters ) { FunctionBody }
         if (self.identifier) |identifier| {
-            // 1. Let name be StringValue of BindingIdentifier.
+            // 1. Let name be the StringValue of BindingIdentifier.
             const name = identifier;
 
             // 2. Let sourceText be the source text matched by FunctionDeclaration.
@@ -2302,7 +2302,7 @@ pub const FunctionBody = struct {
         // FunctionStatementList : [empty]
         // 1. Return a new empty List.
         // FunctionStatementList : StatementList
-        // 1. Return TopLevelVarDeclaredNames of StatementList.
+        // 1. Return the TopLevelVarDeclaredNames of StatementList.
         return self.statement_list.topLevelVarDeclaredNames(allocator);
     }
 
@@ -2405,7 +2405,7 @@ pub const GeneratorDeclaration = struct {
 
         // GeneratorDeclaration : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
         if (self.identifier) |identifier| {
-            // 1. Let name be StringValue of BindingIdentifier.
+            // 1. Let name be the StringValue of BindingIdentifier.
             const name = identifier;
 
             // 2. Let sourceText be the source text matched by GeneratorDeclaration.
@@ -2549,7 +2549,7 @@ pub const AsyncGeneratorDeclaration = struct {
 
         // AsyncGeneratorDeclaration : async function * BindingIdentifier ( FormalParameters ) { AsyncGeneratorBody }
         if (self.identifier) |identifier| {
-            // 1. Let name be StringValue of BindingIdentifier.
+            // 1. Let name be the StringValue of BindingIdentifier.
             const name = identifier;
 
             // 2. Let sourceText be the source text matched by AsyncGeneratorDeclaration.
@@ -2703,12 +2703,12 @@ pub const ClassBody = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-constructormethod
     pub fn constructorMethod(self: Self) ?MethodDefinition {
         // ClassElementList : ClassElement
-        // 1. If ClassElementKind of ClassElement is constructor-method, return ClassElement.
+        // 1. If the ClassElementKind of ClassElement is constructor-method, return ClassElement.
         // 2. Return empty.
         // ClassElementList : ClassElementList ClassElement
-        // 1. Let head be ConstructorMethod of ClassElementList.
+        // 1. Let head be the ConstructorMethod of ClassElementList.
         // 2. If head is not empty, return head.
-        // 3. If ClassElementKind of ClassElement is constructor-method, return ClassElement.
+        // 3. If the ClassElementKind of ClassElement is constructor-method, return ClassElement.
         // 4. Return empty.
         for (self.class_element_list.items) |class_element| {
             if (class_element.classElementKind() == .constructor_method) {
@@ -2725,12 +2725,12 @@ pub const ClassBody = struct {
         allocator: Allocator,
     ) Allocator.Error![]const ClassElement {
         // ClassElementList : ClassElement
-        // 1. If ClassElementKind of ClassElement is non-constructor-method, then
+        // 1. If the ClassElementKind of ClassElement is non-constructor-method, then
         //     a. Return « ClassElement ».
         // 2. Return a new empty List.
         // ClassElementList : ClassElementList ClassElement
-        // 1. Let list be NonConstructorElements of ClassElementList.
-        // 2. If ClassElementKind of ClassElement is non-constructor-method, then
+        // 1. Let list be the NonConstructorElements of ClassElementList.
+        // 2. If the ClassElementKind of ClassElement is non-constructor-method, then
         //     a. Append ClassElement to the end of list.
         // 3. Return list.
         var class_elements = try std.ArrayList(ClassElement).initCapacity(
@@ -2752,8 +2752,8 @@ pub const ClassBody = struct {
         allocator: Allocator,
     ) Allocator.Error![]const PrivateIdentifier {
         // ClassElementList : ClassElementList ClassElement
-        // 1. Let names1 be PrivateBoundIdentifiers of ClassElementList.
-        // 2. Let names2 be PrivateBoundIdentifiers of ClassElement.
+        // 1. Let names1 be the PrivateBoundIdentifiers of ClassElementList.
+        // 2. Let names2 be the PrivateBoundIdentifiers of ClassElement.
         // 3. Return the list-concatenation of names1 and names2.
         var private_bound_identifiers = std.ArrayList(PrivateIdentifier).init(allocator);
         for (self.class_element_list.items) |class_element| {
@@ -2776,7 +2776,7 @@ pub const ClassBody = struct {
                 // AsyncGeneratorMethod :
                 //     async * ClassElementName ( UniqueFormalParameters ) { AsyncGeneratorBody }
                 .method_definition, .static_method_definition => |method_definition| {
-                    // 1. Return PrivateBoundIdentifiers of ClassElementName.
+                    // 1. Return the PrivateBoundIdentifiers of ClassElementName.
                     switch (method_definition.class_element_name) {
                         // ClassElementName : PrivateIdentifier
                         .private_identifier => |private_identifier| {
@@ -2792,7 +2792,7 @@ pub const ClassBody = struct {
 
                 // FieldDefinition : ClassElementName Initializer[opt]
                 .field_definition, .static_field_definition => |field_definition| {
-                    // 1. Return PrivateBoundIdentifiers of ClassElementName.
+                    // 1. Return the PrivateBoundIdentifiers of ClassElementName.
                     switch (field_definition.class_element_name) {
                         // ClassElementName : PrivateIdentifier
                         .private_identifier => |private_identifier| {
@@ -2839,7 +2839,7 @@ pub const ClassElement = union(enum) {
         switch (self) {
             // ClassElement : MethodDefinition
             .method_definition => |method_definition| {
-                // 1. If PropName of MethodDefinition is "constructor", return constructor-method.
+                // 1. If the PropName of MethodDefinition is "constructor", return constructor-method.
                 if (method_definition.class_element_name == .property_name and
                     method_definition.class_element_name.property_name == .literal_property_name and
                     method_definition.class_element_name.property_name.literal_property_name == .identifier and
@@ -2966,7 +2966,7 @@ pub const AsyncFunctionDeclaration = struct {
 
         // AsyncFunctionDeclaration : async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
         if (self.identifier) |identifier| {
-            // 1. Let name be StringValue of BindingIdentifier.
+            // 1. Let name be the StringValue of BindingIdentifier.
             const name = identifier;
 
             // 2. Let sourceText be the source text matched by AsyncFunctionDeclaration.
@@ -3052,7 +3052,7 @@ pub const Script = struct {
         // Script : [empty]
         // 1. Return a new empty List.
         // ScriptBody : StatementList
-        // 1. Return TopLevelLexicallyScopedDeclarations of StatementList.
+        // 1. Return the TopLevelLexicallyScopedDeclarations of StatementList.
         return self.statement_list.topLevelLexicallyScopedDeclarations(allocator);
     }
 
@@ -3065,7 +3065,7 @@ pub const Script = struct {
         // Script : [empty]
         // 1. Return a new empty List.
         // ScriptBody : StatementList
-        // 1. Return TopLevelVarDeclaredNames of StatementList.
+        // 1. Return the TopLevelVarDeclaredNames of StatementList.
         return self.statement_list.topLevelVarDeclaredNames(allocator);
     }
 
@@ -3078,7 +3078,7 @@ pub const Script = struct {
         // Script : [empty]
         // 1. Return a new empty List.
         // ScriptBody : StatementList
-        // 1. Return TopLevelVarScopedDeclarations of StatementList.
+        // 1. Return the TopLevelVarScopedDeclarations of StatementList.
         return self.statement_list.topLevelVarScopedDeclarations(allocator);
     }
 
@@ -3106,8 +3106,8 @@ pub const Module = struct {
         // Module : [empty]
         // 1. Return a new empty List.
         // ModuleItemList : ModuleItemList ModuleItem
-        // 1. Let declarations1 be LexicallyScopedDeclarations of ModuleItemList.
-        // 2. Let declarations2 be LexicallyScopedDeclarations of ModuleItem.
+        // 1. Let declarations1 be the LexicallyScopedDeclarations of ModuleItemList.
+        // 2. Let declarations2 be the LexicallyScopedDeclarations of ModuleItem.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         return self.module_item_list.lexicallyScopedDeclarations(allocator);
     }
@@ -3130,10 +3130,10 @@ pub const Module = struct {
         // Module : [empty]
         // 1. Return a new empty List.
         // ModuleItemList : ModuleItem
-        // 1. Return ModuleRequests of ModuleItem.
+        // 1. Return the ModuleRequests of ModuleItem.
         // ModuleItemList : ModuleItemList ModuleItem
-        // 1. Let moduleNames be ModuleRequests of ModuleItemList.
-        // 2. Let additionalNames be ModuleRequests of ModuleItem.
+        // 1. Let moduleNames be the ModuleRequests of ModuleItemList.
+        // 2. Let additionalNames be the ModuleRequests of ModuleItem.
         // 3. For each String name of additionalNames, do
         // a. If moduleNames does not contain name, then
         // i. Append name to moduleNames.
@@ -3147,7 +3147,7 @@ pub const Module = struct {
             },
 
             // ImportDeclaration : import ImportClause FromClause ;
-            // 1. Return ModuleRequests of FromClause.
+            // 1. Return the ModuleRequests of FromClause.
             // ModuleSpecifier : StringLiteral
             // 1. Return a List whose sole element is the SV of StringLiteral.
             .import_declaration => |import_declaration| {
@@ -3193,8 +3193,8 @@ pub const Module = struct {
         // Module : [empty]
         // 1. Return a new empty List.
         // ModuleItemList : ModuleItemList ModuleItem
-        // 1. Let entries1 be ImportEntries of ModuleItemList.
-        // 2. Let entries2 be ImportEntries of ModuleItem.
+        // 1. Let entries1 be the ImportEntries of ModuleItemList.
+        // 2. Let entries2 be the ImportEntries of ModuleItem.
         // 3. Return the list-concatenation of entries1 and entries2.
         var import_entries = std.ArrayList(ImportEntry).init(allocator);
         errdefer import_entries.deinit();
@@ -3208,10 +3208,10 @@ pub const Module = struct {
             .import_declaration => |import_declaration| {
                 // ImportDeclaration : import ImportClause FromClause ;
                 if (import_declaration.import_clause) |import_clause| {
-                    // 1. Let module be the sole element of ModuleRequests of FromClause.
+                    // 1. Let module be the sole element of the ModuleRequests of FromClause.
                     const module = try import_declaration.module_specifier.stringValue(allocator);
 
-                    // 2. Return ImportEntriesForModule of ImportClause with argument module.
+                    // 2. Return the ImportEntriesForModule of ImportClause with argument module.
                     try import_entries.appendSlice(
                         try import_clause.importEntriesForModule(allocator, module),
                     );
@@ -3232,8 +3232,8 @@ pub const Module = struct {
         // Module : [empty]
         // 1. Return a new empty List.
         // ModuleItemList : ModuleItemList ModuleItem
-        // 1. Let entries1 be ExportEntries of ModuleItemList.
-        // 2. Let entries2 be ExportEntries of ModuleItem.
+        // 1. Let entries1 be the ExportEntries of ModuleItemList.
+        // 2. Let entries2 be the ExportEntries of ModuleItem.
         // 3. Return the list-concatenation of entries1 and entries2.
         var export_entries = std.ArrayList(ExportEntry).init(allocator);
         for (self.module_item_list.items) |module_item| switch (module_item) {
@@ -3246,7 +3246,7 @@ pub const Module = struct {
             .export_declaration => |export_declaration| switch (export_declaration) {
                 // ExportDeclaration : export ExportFromClause FromClause ;
                 .export_from => {
-                    // TODO: 1. Let module be the sole element of ModuleRequests of FromClause.
+                    // TODO: 1. Let module be the sole element of the ModuleRequests of FromClause.
                     // TODO: 2. Return ExportEntriesForModule of ExportFromClause with argument module.
                 },
 
@@ -3307,7 +3307,7 @@ pub const Module = struct {
 
                 // ExportDeclaration : export default HoistableDeclaration
                 .default_hoistable_declaration => |hoistable_declaration| {
-                    // 1. Let names be BoundNames of HoistableDeclaration.
+                    // 1. Let names be the BoundNames of HoistableDeclaration.
                     const names = try hoistable_declaration.boundNames(allocator);
                     defer allocator.free(names);
 
@@ -3328,7 +3328,7 @@ pub const Module = struct {
 
                 // ExportDeclaration : export default ClassDeclaration
                 .default_class_declaration => |class_declaration| {
-                    // 1. Let names be BoundNames of ClassDeclaration.
+                    // 1. Let names be the BoundNames of ClassDeclaration.
                     const names = try class_declaration.boundNames(allocator);
                     defer allocator.free(names);
 
@@ -3401,7 +3401,7 @@ pub const ModuleItemList = struct {
 
                 // ExportDeclaration : export Declaration
                 .declaration => |declaration| {
-                    // 1. Return a List whose sole element is DeclarationPart of Declaration.
+                    // 1. Return a List whose sole element is the DeclarationPart of Declaration.
                     switch (declaration.*) {
                         .hoistable_declaration => |hoistable_declaration| try declarations.append(.{ .hoistable_declaration = hoistable_declaration }),
                         .class_declaration => |class_declaration| try declarations.append(.{ .class_declaration = class_declaration }),
@@ -3411,7 +3411,7 @@ pub const ModuleItemList = struct {
 
                 // ExportDeclaration : export default HoistableDeclaration
                 .default_hoistable_declaration => |hoistable_declaration| {
-                    // 1. Return a List whose sole element is DeclarationPart of HoistableDeclaration.
+                    // 1. Return a List whose sole element is the DeclarationPart of HoistableDeclaration.
                     try declarations.append(.{ .hoistable_declaration = hoistable_declaration });
                 },
 
@@ -3438,13 +3438,13 @@ pub const ModuleItemList = struct {
         allocator: Allocator,
     ) Allocator.Error![]const VarScopedDeclaration {
         // ModuleItemList : ModuleItemList ModuleItem
-        // 1. Let declarations1 be VarScopedDeclarations of ModuleItemList.
-        // 2. Let declarations2 be VarScopedDeclarations of ModuleItem.
+        // 1. Let declarations1 be the VarScopedDeclarations of ModuleItemList.
+        // 2. Let declarations2 be the VarScopedDeclarations of ModuleItem.
         // 3. Return the list-concatenation of declarations1 and declarations2.
         // ModuleItem : ImportDeclaration
         // 1. Return a new empty List.
         // ModuleItem : ExportDeclaration
-        // 1. If ExportDeclaration is export VariableStatement, return VarScopedDeclarations of VariableStatement.
+        // 1. If ExportDeclaration is export VariableStatement, return the VarScopedDeclarations of VariableStatement.
         // 2. Return a new empty List.
         var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
         for (self.items) |item| switch (item) {
@@ -3507,7 +3507,7 @@ pub const ImportClause = union(enum) {
 
             // ImportedDefaultBinding : ImportedBinding
             .imported_default_binding => |imported_binding| {
-                // 1. Let localName be the sole element of BoundNames of ImportedBinding.
+                // 1. Let localName be the sole element of the BoundNames of ImportedBinding.
                 const local_name = imported_binding;
 
                 // 2. Let defaultEntry be the ImportEntry Record {
@@ -3575,7 +3575,7 @@ pub const ImportClause = union(enum) {
                 }
                 // ImportSpecifier : ImportedBinding
                 else {
-                    // 1. Let localName be the sole element of BoundNames of ImportedBinding.
+                    // 1. Let localName be the sole element of the BoundNames of ImportedBinding.
                     const local_name = import_specifier.imported_binding;
 
                     // 2. Let entry be the ImportEntry Record {

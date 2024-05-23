@@ -478,7 +478,7 @@ pub fn parse(
         try requested_modules.appendSlice(tmp);
     }
 
-    // 4. Let importEntries be ImportEntries of body.
+    // 4. Let importEntries be the ImportEntries of body.
     var import_entries = std.ArrayList(ImportEntry).init(agent.gc_allocator);
     {
         const tmp = try body.importEntries(agent.gc_allocator);
@@ -497,7 +497,7 @@ pub fn parse(
 
     // TODO: 8-9.
 
-    // 9. Let exportEntries be ExportEntries of body.
+    // 9. Let exportEntries be the ExportEntries of body.
     const export_entries = try body.exportEntries(agent.gc_allocator);
     defer agent.gc_allocator.free(export_entries);
 

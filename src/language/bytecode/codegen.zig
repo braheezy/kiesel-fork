@@ -207,7 +207,7 @@ pub fn codegenPropertyName(
         .literal_property_name => |literal| switch (literal) {
             // LiteralPropertyName : IdentifierName
             .identifier => |identifier| {
-                // 1. Return StringValue of IdentifierName.
+                // 1. Return the StringValue of IdentifierName.
                 const value = Value.from(try String.fromUtf8(executable.allocator, identifier));
                 try executable.addInstructionWithConstant(.store_constant, value);
             },
@@ -287,7 +287,7 @@ pub fn codegenPropertyDefinition(
 
         // PropertyDefinition : IdentifierReference
         .identifier_reference => |identifier_reference| {
-            // 1. Let propName be StringValue of IdentifierReference.
+            // 1. Let propName be the StringValue of IdentifierReference.
             const property_name = Value.from(
                 try String.fromUtf8(executable.allocator, identifier_reference),
             );
@@ -580,7 +580,7 @@ pub fn codegenSuperProperty(
             // 2. Let actualThis be ? env.GetThisBinding().
             try executable.addInstruction(.load_this_value_for_make_super_property_reference);
 
-            // 3. Let propertyKey be StringValue of IdentifierName.
+            // 3. Let propertyKey be the StringValue of IdentifierName.
             const property_key = Value.from(
                 try String.fromUtf8(executable.allocator, identifier),
             );
@@ -1777,7 +1777,7 @@ pub fn codegenLexicalBinding(
     if (node.initializer) |initializer| {
         try executable.addInstruction(.load);
 
-        // 1. Let bindingId be StringValue of BindingIdentifier.
+        // 1. Let bindingId be the StringValue of BindingIdentifier.
         // 2. Let lhs be ! ResolveBinding(bindingId).
         try executable.addInstructionWithIdentifier(.resolve_binding, node.binding_identifier);
         const strict = ctx.contained_in_strict_mode_code;
@@ -1866,7 +1866,7 @@ pub fn codegenVariableDeclaration(
 ) Executable.Error!void {
     // VariableDeclaration : BindingIdentifier Initializer
     if (node.initializer) |initializer| {
-        // 1. Let bindingId be StringValue of BindingIdentifier.
+        // 1. Let bindingId be the StringValue of BindingIdentifier.
         // 2. Let lhs be ? ResolveBinding(bindingId).
         try executable.addInstruction(.load);
         try executable.addInstructionWithIdentifier(.resolve_binding, node.binding_identifier);
@@ -2467,7 +2467,7 @@ fn forInOfBodyEvaluation(
         // vii. Else,
         else {
             // 1. Assert: lhs binds a single name.
-            // 2. Let lhsName be the sole element of BoundNames of lhs.
+            // 2. Let lhsName be the sole element of the BoundNames of lhs.
             const lhs_name = lhs.for_declaration.binding_list.items[0].binding_identifier;
 
             // 3. Let lhsRef be ! ResolveBinding(lhsName).
@@ -3063,7 +3063,7 @@ pub fn codegenClassElementName(
 
         // ClassElementName : PrivateIdentifier
         .private_identifier => |private_identifier| {
-            // 1. Let privateIdentifier be StringValue of PrivateIdentifier.
+            // 1. Let privateIdentifier be the StringValue of PrivateIdentifier.
             // 2. Let privateEnvRec be the running execution context's PrivateEnvironment.
             // 3. Let names be privateEnvRec.[[Names]].
             // 4. Assert: Exactly one element of names is a Private Name whose [[Description]] is privateIdentifier.
@@ -3194,7 +3194,7 @@ pub fn codegenExportDeclaration(
                 .{ .class_declaration = class_declaration },
             );
 
-            // 2. Let className be the sole element of BoundNames of ClassDeclaration.
+            // 2. Let className be the sole element of the BoundNames of ClassDeclaration.
             const class_name = class_declaration.identifier;
 
             // 3. If className is "*default*", then
