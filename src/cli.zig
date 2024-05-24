@@ -179,6 +179,7 @@ const Kiesel = struct {
         try Realm.initializeHostDefinedRealm(agent, .{});
         const realm = agent.currentRealm();
         _ = agent.execution_context_stack.pop();
+        try initializeGlobalObject(realm, realm.global_object);
         return Value.from(realm.global_object);
     }
 
