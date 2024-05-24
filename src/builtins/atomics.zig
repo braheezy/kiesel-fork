@@ -29,7 +29,9 @@ const isTypedArrayOutOfBounds = builtins.isTypedArrayOutOfBounds;
 const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferWitnessRecord;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
+const numericToRawBytes = builtins.numericToRawBytes;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+const rawBytesToNumeric = builtins.rawBytesToNumeric;
 const sameValue = types.sameValue;
 const setValueInBuffer = builtins.setValueInBuffer;
 const typedArrayElementSize = builtins.typedArrayElementSize;
@@ -420,6 +422,7 @@ pub const Atomics = struct {
 
         try defineBuiltinFunction(object, "add", add, 3, realm);
         try defineBuiltinFunction(object, "and", @"and", 3, realm);
+        try defineBuiltinFunction(object, "compareExchange", compareExchange, 4, realm);
         try defineBuiltinFunction(object, "exchange", exchange, 3, realm);
         try defineBuiltinFunction(object, "isLockFree", isLockFree, 1, realm);
         try defineBuiltinFunction(object, "load", load, 2, realm);
@@ -473,6 +476,124 @@ pub const Atomics = struct {
         //     a. Return ByteListBitwiseOp(&, xBytes, yBytes).
         // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, and).
         return atomicReadModifyWrite(agent, typed_array, index, value, .And);
+    }
+
+    /// 25.4.6 Atomics.compareExchange ( typedArray, index, expectedValue, replacementValue )
+    /// https://tc39.es/ecma262/#sec-atomics.compareexchange
+    fn compareExchange(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const typed_array_value = arguments.get(0);
+        const index = arguments.get(1);
+        const expected_value = arguments.get(2);
+        const replacement_value = arguments.get(3);
+
+        // 1. Let byteIndexInBuffer be ? ValidateAtomicAccessOnIntegerTypedArray(typedArray, index).
+        const byte_index_in_buffer = try validateAtomicAccessOnIntegerTypedArray(
+            agent,
+            typed_array_value,
+            index,
+            null,
+        );
+        const typed_array = typed_array_value.object.as(builtins.TypedArray);
+
+        // 2. Let buffer be typedArray.[[ViewedArrayBuffer]].
+        const buffer = typed_array.fields.viewed_array_buffer;
+
+        // 3. Let block be buffer.[[ArrayBufferData]].
+        const block = buffer.arrayBufferData().?;
+
+        // 4. If typedArray.[[ContentType]] is bigint, then
+        const expected, const replacement = if (typed_array.fields.content_type == .bigint) .{
+            // a. Let expected be ? ToBigInt(expectedValue).
+            Value.from(try expected_value.toBigInt(agent)),
+
+            // b. Let replacement be ? ToBigInt(replacementValue).
+            Value.from(try replacement_value.toBigInt(agent)),
+        }
+        // 5. Else,
+        else .{
+            // a. Let expected be 𝔽(? ToIntegerOrInfinity(expectedValue)).
+            Value.from(try expected_value.toIntegerOrInfinity(agent)),
+
+            // b. Let replacement be 𝔽(? ToIntegerOrInfinity(replacementValue)).
+            Value.from(try replacement_value.toIntegerOrInfinity(agent)),
+        };
+
+        // 6. Perform ? RevalidateAtomicAccess(typedArray, byteIndexInBuffer).
+        try revalidateAtomicAccess(agent, typed_array, byte_index_in_buffer);
+
+        // 7. Let elementType be TypedArrayElementType(typedArray).
+        // 8. Let elementSize be TypedArrayElementSize(typedArray).
+        // 9. Let isLittleEndian be the value of the [[LittleEndian]] field of the surrounding agent's Agent Record.
+        const is_little_endian = agent.little_endian;
+        inline for (builtins.typed_array_element_types) |entry| {
+            const name, const @"type" = entry;
+            if (!@"type".isUnclampedIntegerElementType()) continue;
+            // Bypass 'expected 32-bit integer type or smaller; found 64-bit integer type' for @cmpxchgStrong()
+            if (comptime @bitSizeOf(@"type".T) > builtin.target.ptrBitWidth()) {
+                return agent.throwException(
+                    .internal_error,
+                    "Atomic operation on {s} not supported on this platform",
+                    .{name},
+                );
+            }
+            if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
+                // 10. Let expectedBytes be NumericToRawBytes(elementType, expected, isLittleEndian).
+                const expected_bytes = try numericToRawBytes(
+                    agent,
+                    @"type",
+                    expected,
+                    is_little_endian,
+                );
+
+                // 11. Let replacementBytes be NumericToRawBytes(elementType, replacement, isLittleEndian).
+                const replacement_bytes = try numericToRawBytes(
+                    agent,
+                    @"type",
+                    replacement,
+                    is_little_endian,
+                );
+
+                const raw_bytes_read = block.items[@intCast(byte_index_in_buffer)..@intCast(byte_index_in_buffer + @"type".elementSize())];
+                var previous = std.mem.bytesToValue(@"type".T, raw_bytes_read);
+
+                // 12. If IsSharedArrayBuffer(buffer) is true, then
+                if (buffer == .shared_array_buffer) {
+                    // a. Let rawBytesRead be AtomicCompareExchangeInSharedBlock(block,
+                    //    byteIndexInBuffer, elementSize, expectedBytes, replacementBytes).
+                    const ptr = std.mem.bytesAsValue(@"type".T, raw_bytes_read);
+                    _ = @cmpxchgStrong(
+                        @"type".T,
+                        @as(*@"type".T, @alignCast(ptr)),
+                        std.mem.bytesToValue(@"type".T, &expected_bytes),
+                        std.mem.bytesToValue(@"type".T, &replacement_bytes),
+                        .seq_cst,
+                        .seq_cst,
+                    );
+                }
+                // 13. Else,
+                else {
+                    // a. Let rawBytesRead be a List of length elementSize whose elements are the
+                    //    sequence of elementSize bytes starting with block[byteIndexInBuffer].
+                    // b. If ByteListEqual(rawBytesRead, expectedBytes) is true, then
+                    if (std.mem.eql(u8, raw_bytes_read, &expected_bytes)) {
+                        // i. Store the individual bytes of replacementBytes into block, starting
+                        //    at block[byteIndexInBuffer].
+                        @memcpy(raw_bytes_read, &replacement_bytes);
+                    }
+                }
+
+                // 14. Return RawBytesToNumeric(elementType, rawBytesRead, isLittleEndian).
+                const value = rawBytesToNumeric(
+                    @"type",
+                    std.mem.asBytes(&previous),
+                    is_little_endian,
+                );
+                return if (@"type".isBigIntElementType())
+                    Value.from(try BigInt.from(agent.gc_allocator, value))
+                else
+                    Value.from(value);
+            }
+        } else unreachable;
     }
 
     /// 25.4.7 Atomics.exchange ( typedArray, index, value )
