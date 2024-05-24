@@ -423,6 +423,7 @@ pub const Atomics = struct {
         try defineBuiltinFunction(object, "exchange", exchange, 3, realm);
         try defineBuiltinFunction(object, "isLockFree", isLockFree, 1, realm);
         try defineBuiltinFunction(object, "load", load, 2, realm);
+        try defineBuiltinFunction(object, "notify", notify, 3, realm);
         try defineBuiltinFunction(object, "or", @"or", 3, realm);
         try defineBuiltinFunction(object, "store", store, 3, realm);
         try defineBuiltinFunction(object, "sub", sub, 3, realm);
@@ -551,6 +552,58 @@ pub const Atomics = struct {
                     Value.from(value);
             }
         } else unreachable;
+    }
+
+    /// 25.4.15 Atomics.notify ( typedArray, index, count )
+    /// https://tc39.es/ecma262/#sec-atomics.notify
+    fn notify(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const typed_array_value = arguments.get(0);
+        const index = arguments.get(1);
+        const count_value = arguments.get(2);
+
+        // 1. Let byteIndexInBuffer be ? ValidateAtomicAccessOnIntegerTypedArray(typedArray, index, true).
+        const byte_index_in_buffer = try validateAtomicAccessOnIntegerTypedArray(
+            agent,
+            typed_array_value,
+            index,
+            true,
+        );
+        const typed_array = typed_array_value.object.as(builtins.TypedArray);
+
+        // 2. If count is undefined, then
+        const count = if (count_value == .undefined) blk: {
+            // a. Let c be +∞.
+            break :blk std.math.inf(f64);
+        }
+        // 3. Else,
+        else blk: {
+            // a. Let intCount be ? ToIntegerOrInfinity(count).
+            const int_count = try count_value.toIntegerOrInfinity(agent);
+
+            // b. Let c be max(intCount, 0).
+            break :blk @max(int_count, 0);
+        };
+
+        // 4. Let buffer be typedArray.[[ViewedArrayBuffer]].
+        const buffer = typed_array.fields.viewed_array_buffer;
+
+        // 6. If IsSharedArrayBuffer(buffer) is false, return +0𝔽.
+        // 5. Let block be buffer.[[ArrayBufferData]].
+        const block = switch (buffer) {
+            .array_buffer => return Value.from(0),
+            .shared_array_buffer => |shared_array_buffer| &shared_array_buffer.fields.array_buffer_data,
+        };
+
+        // TODO: 7. Let WL be GetWaiterList(block, byteIndexInBuffer).
+        _ = block;
+        _ = byte_index_in_buffer;
+
+        // TODO: 8-12.
+        _ = count;
+        const n = 0;
+
+        // 13. Return 𝔽(n).
+        return Value.from(n);
     }
 
     /// 25.4.10 Atomics.or ( typedArray, index, value )
