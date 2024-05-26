@@ -618,10 +618,15 @@ pub const Number = union(enum) {
         // TODO: Implement steps 5-12 according to spec!
         return String.fromAscii(try switch (self) {
             .f64 => |x| if (x > @as(f64, 1e-7) and x < @as(f64, 1e21))
-                std.fmt.allocPrint(allocator, "{0d}", .{x})
+                std.fmt.allocPrint(allocator, "{d}", .{x})
             else
-                std.fmt.allocPrint(allocator, "{0e}", .{x}),
-            .i32 => |x| std.fmt.allocPrint(allocator, "{}", .{x}),
+                std.fmt.allocPrint(allocator, "{e}", .{x}),
+            .i32 => |x| switch (radix) {
+                2 => std.fmt.allocPrint(allocator, "{b}", .{x}),
+                8 => std.fmt.allocPrint(allocator, "{o}", .{x}),
+                16 => std.fmt.allocPrint(allocator, "{x}", .{x}),
+                else => std.fmt.allocPrint(allocator, "{d}", .{x}),
+            },
         });
     }
 };
