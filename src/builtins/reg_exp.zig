@@ -5,10 +5,7 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
-const libregexp = @cImport({
-    @cInclude("cutils.h"); // For the BOOL typedef
-    @cInclude("libregexp.h");
-});
+const libregexp = @import("../c/libregexp.zig").libregexp;
 
 const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");

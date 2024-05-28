@@ -2,9 +2,7 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
-const libgc = @cImport({
-    @cInclude("gc/gc.h");
-});
+const libgc = @import("./c/libgc.zig").libgc;
 
 pub const libgc_version_string = std.fmt.comptimePrint("{}.{}.{}", .{
     libgc.GC_VERSION_MAJOR,

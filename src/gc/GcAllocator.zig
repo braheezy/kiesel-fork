@@ -6,9 +6,7 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
-const libgc = @cImport({
-    @cInclude("gc/gc.h");
-});
+const libgc = @import("../c/libgc.zig").libgc;
 
 pub const vtable: Allocator.VTable = .{
     .alloc = alloc,
