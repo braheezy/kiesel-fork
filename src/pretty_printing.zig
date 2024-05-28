@@ -24,22 +24,16 @@ const SeenObjects = std.AutoHashMap(AnyPointer, usize);
 const State = struct {
     seen_objects: SeenObjects,
     print_in_progress: bool,
+    tty_config: std.io.tty.Config,
 };
 
-var fba_buf: [@sizeOf(*anyopaque) * 1024]u8 = undefined;
+var fba_buf: [64 * 1024]u8 = undefined;
 var fba = std.heap.FixedBufferAllocator.init(&fba_buf);
-var state: State = .{
+pub var state: State = .{
     .seen_objects = SeenObjects.init(fba.allocator()),
     .print_in_progress = false,
+    .tty_config = undefined, // Set whenever an `Agent` is created
 };
-
-fn getTtyConfigForWriter(writer: anytype) std.io.tty.Config {
-    const file = if (@TypeOf(writer.context) == std.fs.File)
-        writer.context
-    else
-        std.io.getStdOut();
-    return std.io.tty.detectConfig(file);
-}
 
 fn PrettyPrintError(comptime Writer: type) type {
     return Writer.Error || if (builtin.os.tag == .windows)
@@ -54,7 +48,7 @@ fn prettyPrintArray(
 ) PrettyPrintError(@TypeOf(writer))!void {
     const property_storage = array.data.property_storage;
     const length = getArrayLength(@constCast(array).object());
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("[");
@@ -87,7 +81,7 @@ fn prettyPrintArrayBuffer(
     array_buffer: *const builtins.ArrayBuffer,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("ArrayBuffer(");
@@ -125,7 +119,7 @@ fn prettyPrintArrayIterator(
     array_iterator: *const builtins.ArrayIterator,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("%ArrayIterator%(");
@@ -149,7 +143,7 @@ fn prettyPrintAsyncGenerator(
     _: *const builtins.AsyncGenerator,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("AsyncGenerator()");
@@ -163,7 +157,7 @@ fn prettyPrintDataView(
     const viewed_array_buffer = date.fields.viewed_array_buffer;
     const byte_length = date.fields.byte_length;
     const byte_offset = date.fields.byte_offset;
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("DataView(");
@@ -185,7 +179,7 @@ fn prettyPrintDate(
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
     const date_value = date.fields.date_value;
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Date(");
@@ -200,7 +194,7 @@ fn prettyPrintError(
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
     const error_data = @"error".fields.error_data;
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .red);
     if (error_data.message.isEmpty()) {
@@ -215,7 +209,7 @@ fn prettyPrintGenerator(
     _: *const builtins.Generator,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Generator()");
@@ -227,7 +221,7 @@ fn prettyPrintMap(
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
     const map_data = map.fields.map_data;
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Map(");
@@ -248,7 +242,7 @@ fn prettyPrintMapIterator(
     map_iterator: *const builtins.MapIterator,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("%MapIterator%(");
@@ -273,7 +267,7 @@ fn prettyPrintPromise(
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
     const promise_state = promise.fields.promise_state;
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Promise(");
@@ -311,7 +305,7 @@ fn prettyPrintProxy(
 ) PrettyPrintError(@TypeOf(writer))!void {
     const proxy_target = proxy.fields.proxy_target;
     const proxy_handler = proxy.fields.proxy_handler;
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Proxy(");
@@ -337,7 +331,7 @@ fn prettyPrintRegExp(
 ) PrettyPrintError(@TypeOf(writer))!void {
     const original_source = reg_exp.fields.original_source;
     const original_flags = reg_exp.fields.original_flags;
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("RegExp(");
@@ -352,7 +346,7 @@ fn prettyPrintRegExpStringIterator(
     reg_exp_string_iterator: *const builtins.RegExpStringIterator,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("%RegExpStringIterator%(");
@@ -380,7 +374,7 @@ fn prettyPrintSet(
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
     const set_data = set.fields.set_data;
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Set(");
@@ -401,7 +395,7 @@ fn prettyPrintSetIterator(
     set_iterator: *const builtins.SetIterator,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("%SetIterator%(");
@@ -425,7 +419,7 @@ fn prettyPrintSharedArrayBuffer(
     shared_array_buffer: *const builtins.SharedArrayBuffer,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("SharedArrayBuffer(");
@@ -458,7 +452,7 @@ fn prettyPrintStringIterator(
     string_iterator: *const builtins.StringIterator,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("%StringIterator%(");
@@ -482,7 +476,7 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
     const agent = typed_array.data.agent;
     const typed_array_name = typed_array.fields.typed_array_name;
     const viewed_array_buffer = typed_array.fields.viewed_array_buffer;
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.print("{s}(", .{typed_array_name});
@@ -538,7 +532,7 @@ fn prettyPrintIntlLocale(
 ) PrettyPrintError(@TypeOf(writer))!void {
     const agent = intl_locale.data.agent;
     const locale = intl_locale.fields.locale;
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Intl.Locale(");
@@ -553,7 +547,7 @@ fn prettyPrintPrimitiveWrapper(
     object: anytype,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     const T = std.meta.Child(@TypeOf(object));
     const name = blk: {
@@ -585,7 +579,7 @@ fn prettyPrintPrimitiveWrapper(
 
 fn prettyPrintFunction(object: Object, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
     const name = object.data.property_storage.get(PropertyKey.from("name")).?.value.?.string;
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     if (object.is(builtins.ECMAScriptFunction)) {
         const function_body = object.as(builtins.ECMAScriptFunction).fields.ecmascript_code;
@@ -613,7 +607,7 @@ fn prettyPrintObject(object: Object, writer: anytype) PrettyPrintError(@TypeOf(w
     const property_storage = object.data.property_storage;
     const property_keys = ordinaryOwnPropertyKeys(object) catch return;
     const length = property_keys.items.len;
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("{");
@@ -668,7 +662,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
         state.print_in_progress = false;
     };
 
-    const tty_config = getTtyConfigForWriter(writer);
+    const tty_config = state.tty_config;
 
     if (value == .object) {
         const object = value.object;

@@ -10,6 +10,7 @@ const StackInfo = @import("stackinfo").StackInfo;
 
 const builtins = @import("../builtins.zig");
 const environments = @import("environments.zig");
+const pretty_printing = @import("../pretty_printing.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
@@ -43,12 +44,37 @@ global_symbol_registry: StringHashMap(Symbol),
 host_hooks: HostHooks,
 execution_context_stack: std.ArrayList(ExecutionContext),
 queued_jobs: std.ArrayList(QueuedJob),
-stack_info: ?StackInfo,
+platform: Platform,
 
 /// [[LittleEndian]]
 little_endian: bool = builtin.cpu.arch.endian() == .little,
 
+pub const Platform = struct {
+    stdout: std.io.AnyWriter,
+    stderr: std.io.AnyWriter,
+    tty_config: std.io.tty.Config,
+    stack_info: ?StackInfo,
+
+    // `any()` captures a pointer to the writer, so these have to stick around.
+    const has_fd_t = @hasDecl(std.posix.system, "fd_t");
+    var _stdout_writer: if (has_fd_t) std.fs.File.Writer else void = undefined;
+    var _stderr_writer: if (has_fd_t) std.fs.File.Writer else void = undefined;
+
+    pub fn default() Platform {
+        if (!has_fd_t) @panic("Platform.default() not usable on this target");
+        _stdout_writer = std.io.getStdOut().writer();
+        _stderr_writer = std.io.getStdErr().writer();
+        return .{
+            .stdout = _stdout_writer.any(),
+            .stderr = _stderr_writer.any(),
+            .tty_config = std.io.tty.detectConfig(std.io.getStdOut()),
+            .stack_info = StackInfo.init() catch null,
+        };
+    }
+};
+
 pub const Options = struct {
+    platform: ?Platform = null,
     debug: struct {
         print_ast: bool = false,
         print_bytecode: bool = false,
@@ -81,6 +107,8 @@ pub const QueuedJob = struct {
 };
 
 pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
+    const platform = options.platform orelse Platform.default();
+    pretty_printing.state.tty_config = platform.tty_config;
     var self: Self = .{
         .gc_allocator = gc_allocator,
         .options = options,
@@ -90,7 +118,7 @@ pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
         .host_hooks = .{},
         .execution_context_stack = undefined,
         .queued_jobs = undefined,
-        .stack_info = StackInfo.init() catch null,
+        .platform = platform,
     };
     self.pre_allocated = .{
         .zero = try BigInt.from(self.gc_allocator, 0),
@@ -138,7 +166,7 @@ pub fn drainJobQueue(self: *Self) void {
 }
 
 pub fn checkStackOverflow(self: *Self) error{ExceptionThrown}!void {
-    if (self.stack_info) |stack_info| {
+    if (self.platform.stack_info) |stack_info| {
         const remaining_stack = @frameAddress() - stack_info.base;
         const required_stack = (if (builtin.mode == .Debug) 128 else 64) * 1024; // Arbitrary limit
         if (remaining_stack < required_stack) {

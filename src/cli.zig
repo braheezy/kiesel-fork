@@ -240,7 +240,7 @@ const Kiesel = struct {
     }
 
     fn print(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const stdout = std.io.getStdOut().writer();
+        const stdout = agent.platform.stdout;
         const value = arguments.get(0);
         const options = try coerceOptionsToObject(agent, arguments.get(1));
         const newline = try getOption(options, "newline", .boolean, null, true);
@@ -350,8 +350,6 @@ const Kiesel = struct {
     }
 };
 
-const RunError = Allocator.Error || std.fs.File.WriteError;
-
 fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: struct {
     base_dir: std.fs.Dir,
     origin: union(enum) {
@@ -361,10 +359,10 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
     },
     module: bool = false,
     print_promise_rejection_warnings: bool = true,
-}) RunError!?Value {
-    const stdout = std.io.getStdOut().writer();
-    const stderr = std.io.getStdErr().writer();
+}) !?Value {
     const agent = realm.agent;
+    const stdout = agent.platform.stdout;
+    const stderr = agent.platform.stderr;
 
     const host_defined = SafePointer.make(*ScriptOrModuleHostDefined, blk: {
         const ptr = try realm.agent.gc_allocator.create(ScriptOrModuleHostDefined);
@@ -517,12 +515,10 @@ fn getHistoryPath(allocator: Allocator) GetHistoryPathError![]const u8 {
     return history_path;
 }
 
-const ReplError = GetHistoryPathError || Editor.Error;
-
 fn repl(allocator: Allocator, realm: *Realm, options: struct {
     module: bool = false,
     print_promise_rejection_warnings: bool = true,
-}) ReplError!void {
+}) !void {
     const stdout = std.io.getStdOut().writer();
 
     try stdout.writeAll(repl_preamble);
@@ -652,7 +648,7 @@ fn repl(allocator: Allocator, realm: *Realm, options: struct {
 fn replBasic(allocator: Allocator, realm: *Realm, options: struct {
     module: bool = false,
     print_promise_rejection_warnings: bool = true,
-}) ReplError!void {
+}) !void {
     const stdin = std.io.getStdIn().reader();
     const stdout = std.io.getStdOut().writer();
 

@@ -145,12 +145,7 @@ pub fn addIndex(self: *Self, index: usize) Error!void {
     try self.instructions.append(@enumFromInt(bytes[1]));
 }
 
-pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
-    const file = if (@TypeOf(writer.context) == std.fs.File)
-        writer.context
-    else
-        std.io.getStdOut();
-    const tty_config = std.io.tty.detectConfig(file);
+pub fn print(self: Self, writer: anytype, tty_config: std.io.tty.Config) @TypeOf(writer).Error!void {
     var iterator: InstructionIterator = .{ .instructions = self.instructions.items };
     while (iterator.next()) |instruction| {
         try writer.print("{:>[1]}: ", .{
