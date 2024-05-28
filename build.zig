@@ -31,7 +31,7 @@ pub fn build(b: *std.Build) void {
         "Enable features marked as 'Legacy' in the spec",
     ) orelse true;
 
-    const run_result = std.ChildProcess.run(.{
+    const run_result = std.process.Child.run(.{
         .allocator = b.allocator,
         .argv = &.{ "git", "rev-parse", "HEAD" },
         .cwd_dir = b.build_root.handle,
