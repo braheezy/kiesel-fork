@@ -65,7 +65,7 @@ pub fn build(b: *std.Build) void {
     });
     const parser_toolkit = b.dependency("parser_toolkit", .{});
     const zig_args = b.dependency("zig_args", .{});
-    const zig_stackinfo = b.dependency("zig_stackinfo", .{});
+    const zig_stackinfo = b.dependency("zig_stackinfo", .{ .target = target });
     const zigline = b.dependency("zigline", .{});
 
     var imports = std.ArrayList(std.Build.Module.Import).init(b.allocator);
