@@ -30,6 +30,16 @@ pub fn build(b: *std.Build) void {
         "enable-legacy",
         "Enable features marked as 'Legacy' in the spec",
     ) orelse true;
+    const enable_libgc = b.option(
+        bool,
+        "enable-libgc",
+        "Enable building with libgc (uses stubs otherwise)",
+    ) orelse true;
+    const enable_libregexp = b.option(
+        bool,
+        "enable-libregexp",
+        "Enable building with libregexp (uses stubs otherwise)",
+    ) orelse true;
 
     const run_result = std.process.Child.run(.{
         .allocator = b.allocator,
@@ -51,6 +61,8 @@ pub fn build(b: *std.Build) void {
     options.addOption(bool, "enable_annex_b", enable_annex_b);
     options.addOption(bool, "enable_intl", enable_intl);
     options.addOption(bool, "enable_legacy", enable_legacy);
+    options.addOption(bool, "enable_libgc", enable_libgc);
+    options.addOption(bool, "enable_libregexp", enable_libregexp);
     options.addOption([]const u8, "version_string", version_string);
 
     const any_pointer = b.dependency("any_pointer", .{});
@@ -104,16 +116,20 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/kiesel.zig"),
         .imports = imports.items,
     });
-    kiesel.addIncludePath(.{
-        .cwd_relative = libgc.builder.getInstallPath(.header, ""),
-    });
-    if (target.result.os.tag == .macos) {
-        if (b.lazyImport(@This(), "macos_sdk")) |build_macos_sdk| {
-            build_macos_sdk.addPaths(libgc.artifact("gc"));
+    if (enable_libgc) {
+        kiesel.addIncludePath(.{
+            .cwd_relative = libgc.builder.getInstallPath(.header, ""),
+        });
+        if (target.result.os.tag == .macos) {
+            if (b.lazyImport(@This(), "macos_sdk")) |build_macos_sdk| {
+                build_macos_sdk.addPaths(libgc.artifact("gc"));
+            }
         }
+        kiesel.linkLibrary(libgc.artifact("gc"));
     }
-    kiesel.linkLibrary(libgc.artifact("gc"));
-    kiesel.linkLibrary(libregexp.artifact("regexp"));
+    if (enable_libregexp) {
+        kiesel.linkLibrary(libregexp.artifact("regexp"));
+    }
 
     const exe = b.addExecutable(.{
         .name = "kiesel",
