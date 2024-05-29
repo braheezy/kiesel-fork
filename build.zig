@@ -131,12 +131,20 @@ pub fn build(b: *std.Build) void {
         kiesel.linkLibrary(libregexp.artifact("regexp"));
     }
 
-    const exe = b.addExecutable(.{
-        .name = "kiesel",
-        .root_source_file = b.path("src/cli.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
+    const exe = switch (target.result.os.tag) {
+        .uefi => b.addExecutable(.{
+            .name = "bootx64",
+            .root_source_file = b.path("src/uefi.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+        else => b.addExecutable(.{
+            .name = "kiesel",
+            .root_source_file = b.path("src/cli.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    };
     if (enable_intl) {
         if (b.lazyDependency("icu4zig", .{
             .target = target,
@@ -161,9 +169,23 @@ pub fn build(b: *std.Build) void {
     exe.root_module.addImport("zigline", zigline.module("zigline"));
     if (optimize != .Debug) exe.root_module.strip = true;
 
-    b.installArtifact(exe);
+    b.getInstallStep().dependOn(&b.addInstallArtifact(exe, .{
+        .dest_dir = switch (target.result.os.tag) {
+            .uefi => .{ .override = .{ .custom = "EFI/BOOT" } },
+            else => .default,
+        },
+    }).step);
 
-    const run_cmd = b.addRunArtifact(exe);
+    const run_cmd = switch (target.result.os.tag) {
+        .uefi => b.addSystemCommand(&.{
+            "qemu-system-x86_64",
+            "-bios",
+            "OVMF.fd",
+            "-drive",
+            "format=raw,file=fat:rw:zig-out",
+        }),
+        else => b.addRunArtifact(exe),
+    };
     run_cmd.step.dependOn(b.getInstallStep());
 
     if (b.args) |args| {
