@@ -29,7 +29,7 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
-const sameValueZero = types.sameValueZero;
+const sameValue = types.sameValue;
 
 /// 24.1.1.2 AddEntriesFromIterable ( target, iterable, adder )
 /// https://tc39.es/ecma262/#sec-add-entries-from-iterable
@@ -246,14 +246,17 @@ pub const MapPrototype = struct {
     /// 24.1.3.3 Map.prototype.delete ( key )
     /// https://tc39.es/ecma262/#sec-map.prototype.delete
     fn delete(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const key = arguments.get(0);
+        var key = arguments.get(0);
 
         // 1. Let M be the this value.
         // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
         const map = try this_value.requireInternalSlot(agent, Map);
 
-        // 3. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and SameValueZero(p.[[Key]], key) is true, then
+        // 3. Set key to CanonicalizeKeyedCollectionKey(key).
+        key = key.canonicalizeKeyedCollectionKey();
+
+        // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
+        //     a. If p.[[Key]] is not empty and p.[[Key]] is key, then
         //         i. Set p.[[Key]] to empty.
         //         ii. Set p.[[Value]] to empty.
         //         iii. Return true.
@@ -265,7 +268,7 @@ pub const MapPrototype = struct {
             return Value.from(true);
         }
 
-        // 4. Return false.
+        // 5. Return false.
         return Value.from(false);
     }
 
@@ -334,32 +337,38 @@ pub const MapPrototype = struct {
     /// 24.1.3.6 Map.prototype.get ( key )
     /// https://tc39.es/ecma262/#sec-map.prototype.get
     fn get(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const key = arguments.get(0);
+        var key = arguments.get(0);
 
         // 1. Let M be the this value.
         // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
         const map = try this_value.requireInternalSlot(agent, Map);
 
-        // 3. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and SameValueZero(p.[[Key]], key) is true, return p.[[Value]].
+        // 3. Set key to CanonicalizeKeyedCollectionKey(key).
+        key = key.canonicalizeKeyedCollectionKey();
+
+        // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
+        //     a. If p.[[Key]] is not empty and p.[[Key]] is key, return p.[[Value]].
         if (map.fields.map_data.get(key)) |value| return value;
 
-        // 4. Return undefined.
+        // 5. Return undefined.
         return .undefined;
     }
 
     /// 24.1.3.7 Map.prototype.has ( key )
     /// https://tc39.es/ecma262/#sec-map.prototype.has
     fn has(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const key = arguments.get(0);
+        var key = arguments.get(0);
 
         // 1. Let M be the this value.
         // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
         const map = try this_value.requireInternalSlot(agent, Map);
 
-        // 3. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and SameValueZero(p.[[Key]], key) is true, return true.
-        // 4. Return false.
+        // 3. Set key to CanonicalizeKeyedCollectionKey(key).
+        key = key.canonicalizeKeyedCollectionKey();
+
+        // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
+        //     a. If p.[[Key]] is not empty and p.[[Key]] is key, return true.
+        // 5. Return false.
         return Value.from(map.fields.map_data.contains(key));
     }
 
@@ -383,14 +392,13 @@ pub const MapPrototype = struct {
         // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
         const map = try this_value.requireInternalSlot(agent, Map);
 
-        // 3. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and SameValueZero(p.[[Key]], key) is true, then
+        // 3. Set key to CanonicalizeKeyedCollectionKey(key).
+        key = key.canonicalizeKeyedCollectionKey();
+
+        // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
+        //     a. If p.[[Key]] is not empty and p.[[Key]] is key, then
         //         i. Set p.[[Value]] to value.
         //         ii. Return M.
-
-        // 4. If key is -0𝔽, set key to +0𝔽.
-        if (key == .number and key.number.isNegativeZero()) key = Value.from(0);
-
         // 5. Let p be the Record { [[Key]]: key, [[Value]]: value }.
         // 6. Append p to M.[[MapData]].
         const result = try map.fields.map_data.getOrPut(key);
@@ -432,7 +440,7 @@ pub const MapPrototype = struct {
     }
 };
 
-const MapData = ValueArrayHashMap(Value, sameValueZero);
+const MapData = ValueArrayHashMap(Value, sameValue);
 const IterableKeys = std.ArrayList(?Value);
 
 /// 24.1.4 Properties of Map Instances

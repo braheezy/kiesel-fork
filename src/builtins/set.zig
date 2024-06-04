@@ -30,7 +30,7 @@ const getIteratorFromMethod = types.getIteratorFromMethod;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreateWithType = builtins.ordinaryObjectCreateWithType;
-const sameValueZero = types.sameValueZero;
+const sameValue = types.sameValue;
 
 /// 24.2.1.1 Set Records
 /// https://tc39.es/ecma262/#sec-set-records
@@ -133,15 +133,16 @@ fn setDataHas(set_data: SetData, value: Value) bool {
 /// 24.2.1.4 SetDataIndex ( setData, value )
 /// https://tc39.es/ecma262/#sec-setdataindex
 fn setDataIndex(set_data: SetData, value: Value) ?usize {
-    // 1. Let size be the number of elements in setData.
-    // 2. Let index be 0.
-    // 3. Repeat, while index < size,
+    // 1. Set value to CanonicalizeKeyedCollectionKey(value).
+    // 2. Let size be the number of elements in setData.
+    // 3. Let index be 0.
+    // 4. Repeat, while index < size,
     //    a. Let e be setData[index].
-    //    b. If e is not empty and SameValueZero(e, value) is true, then
+    //    b. If e is not empty and e is value, then
     //       i. Return index.
     //    c. Set index to index + 1.
-    // 4. Return not-found.
-    return set_data.getIndex(value);
+    // 5. Return not-found.
+    return set_data.getIndex(value.canonicalizeKeyedCollectionKey());
 }
 
 /// 24.2.1.5 SetDataSize ( setData )
@@ -299,13 +300,12 @@ pub const SetPrototype = struct {
         // 2. Perform ? RequireInternalSlot(S, [[SetData]]).
         const set = try this_value.requireInternalSlot(agent, Set);
 
-        // 3. For each element e of S.[[SetData]], do
-        //     a. If e is not empty and SameValueZero(e, value) is true, then
+        // 3. Set value to CanonicalizeKeyedCollectionKey(value).
+        value = value.canonicalizeKeyedCollectionKey();
+
+        // 4. For each element e of S.[[SetData]], do
+        //     a. If e is not empty and e is value, then
         //         i. Return S.
-
-        // 4. If value is -0𝔽, set value to +0𝔽.
-        if (value == .number and value.number.isNegativeZero()) value = Value.from(0);
-
         // 5. Append value to S.[[SetData]].
         const result = try set.fields.set_data.getOrPut(value);
         if (!result.found_existing) {
@@ -341,14 +341,17 @@ pub const SetPrototype = struct {
     /// 24.2.4.4 Set.prototype.delete ( value )
     /// https://tc39.es/ecma262/#sec-set.prototype.delete
     fn delete(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const value = arguments.get(0);
+        var value = arguments.get(0);
 
         // 1. Let S be the this value.
         // 2. Perform ? RequireInternalSlot(S, [[SetData]]).
         const set = try this_value.requireInternalSlot(agent, Set);
 
-        // 3. For each element e of S.[[SetData]], do
-        //     a. If e is not empty and SameValueZero(e, value) is true, then
+        // 3. Set value to CanonicalizeKeyedCollectionKey(value).
+        value = value.canonicalizeKeyedCollectionKey();
+
+        // 4. For each element e of S.[[SetData]], do
+        //     a. If e is not empty and e is value, then
         //         i. Replace the element of S.[[SetData]] whose value is e with an element whose
         //            value is empty.
         //         ii. Return true.
@@ -360,7 +363,7 @@ pub const SetPrototype = struct {
             return Value.from(true);
         }
 
-        // 4. Return false.
+        // 5. Return false.
         return Value.from(false);
     }
 
@@ -428,11 +431,8 @@ pub const SetPrototype = struct {
             //     i. Set next to ? IteratorStepValue(keysIter).
             //     ii. If next is not done, then
             while (try keys_iter.stepValue()) |next_| {
-                // 1. If next is -0𝔽, set next to +0𝔽.
-                const next = if (next_ == .number and next_.number.isNegativeZero())
-                    Value.from(0)
-                else
-                    next_;
+                // 1. Set next to CanonicalizeKeyedCollectionKey(next).
+                const next = next_.canonicalizeKeyedCollectionKey();
 
                 // 2. Let valueIndex be SetDataIndex(resultSetData, next).
                 const maybe_value_index = setDataIndex(result_set_data, next);
@@ -521,15 +521,18 @@ pub const SetPrototype = struct {
     /// 24.2.4.8 Set.prototype.has ( value )
     /// https://tc39.es/ecma262/#sec-set.prototype.has
     fn has(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const value = arguments.get(0);
+        var value = arguments.get(0);
 
         // 1. Let S be the this value.
         // 2. Perform ? RequireInternalSlot(S, [[SetData]]).
         const set = try this_value.requireInternalSlot(agent, Set);
 
-        // 3. For each element e of S.[[SetData]], do
-        //     a. If e is not empty and SameValueZero(e, value) is true, return true.
-        // 4. Return false.
+        // 3. Set value to CanonicalizeKeyedCollectionKey(value).
+        value = value.canonicalizeKeyedCollectionKey();
+
+        // 4. For each element e of S.[[SetData]], do
+        //     a. If e is not empty and e is value, return true.
+        // 5. Return false.
         return Value.from(set.fields.set_data.contains(value));
     }
 
@@ -602,11 +605,8 @@ pub const SetPrototype = struct {
             //     i. Set next to ? IteratorStepValue(keysIter).
             //     ii. If next is not done, then
             while (try keys_iter.stepValue()) |next_| {
-                // 1. If next is -0𝔽, set next to +0𝔽.
-                const next = if (next_ == .number and next_.number.isNegativeZero())
-                    Value.from(0)
-                else
-                    next_;
+                // 1. Set next to CanonicalizeKeyedCollectionKey(next).
+                const next = next_.canonicalizeKeyedCollectionKey();
 
                 // 2. NOTE: Because other is an arbitrary object, it is possible for its "keys"
                 //    iterator to produce the same value more than once.
@@ -850,11 +850,8 @@ pub const SetPrototype = struct {
         //     a. Set next to ? IteratorStepValue(keysIter).
         //     b. If next is not done, then
         while (try keys_iter.stepValue()) |next_| {
-            // i. If next is -0𝔽, set next to +0𝔽.
-            const next = if (next_ == .number and next_.number.isNegativeZero())
-                Value.from(0)
-            else
-                next_;
+            // i. Set next to CanonicalizeKeyedCollectionKey(next).
+            const next = next_.canonicalizeKeyedCollectionKey();
 
             // ii. Let resultIndex be SetDataIndex(resultSetData, next).
             const maybe_result_index = setDataIndex(result_set_data, next);
@@ -917,11 +914,8 @@ pub const SetPrototype = struct {
         //     a. Set next to ? IteratorStepValue(keysIter).
         //     b. If next is not done, then
         while (try keys_iter.stepValue()) |next_| {
-            // i. If next is -0𝔽, set next to +0𝔽.
-            const next = if (next_ == .number and next_.number.isNegativeZero())
-                Value.from(0)
-            else
-                next_;
+            // i. Set next to CanonicalizeKeyedCollectionKey(next).
+            const next = next_.canonicalizeKeyedCollectionKey();
 
             // ii. If SetDataHas(resultSetData, next) is false, then
             //     1. Append next to resultSetData.
@@ -955,7 +949,7 @@ pub const SetPrototype = struct {
     }
 };
 
-const SetData = ValueArrayHashMap(void, sameValueZero);
+const SetData = ValueArrayHashMap(void, sameValue);
 const IterableValues = std.ArrayList(?Value);
 
 /// 24.2.4 Properties of Set Instances

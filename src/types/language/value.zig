@@ -1160,11 +1160,8 @@ pub const Value = union(enum) {
                 // i. Assert: keyCoercion is zero.
                 std.debug.assert(key_coercion == .zero);
 
-                // ii. If key is -0𝔽, set key to +0𝔽.
-                break :blk if (key == .number and key.number.isNegativeZero())
-                    Value.from(0)
-                else
-                    key;
+                // ii. Set key to CanonicalizeKeyedCollectionKey(key).
+                break :blk key.canonicalizeKeyedCollectionKey();
             };
 
             // i. Perform AddValueToKeyedGroup(groups, key, value).
@@ -1241,6 +1238,16 @@ pub const Value = union(enum) {
 
         // 5. Return ? OrdinaryHasInstance(target, V).
         return target.ordinaryHasInstance(self);
+    }
+
+    /// 24.5.1 CanonicalizeKeyedCollectionKey ( key )
+    /// https://tc39.es/ecma262/#sec-canonicalizekeyedcollectionkey
+    pub fn canonicalizeKeyedCollectionKey(self: Self) Self {
+        // 1. If key is -0𝔽, return +0𝔽.
+        if (self == .number and self.number.isNegativeZero()) return Value.from(0);
+
+        // 2. Return key.
+        return self;
     }
 
     /// 27.2.1.6 IsPromise ( x )
