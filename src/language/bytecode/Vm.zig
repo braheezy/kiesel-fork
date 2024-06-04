@@ -2457,20 +2457,23 @@ pub fn executeInstruction(
                 // c. Let baseObj be ? ToObject(ref.[[Base]]).
                 const base_obj = try reference.base.value.toObject(self.agent);
 
-                // d. Let deleteStatus be ? baseObj.[[Delete]](ref.[[ReferencedName]]).
-                const referenced_name = switch (reference.referenced_name) {
+                // d. If ref.[[ReferencedName]] is not a property key, then
+                const property_key = switch (reference.referenced_name.value) {
                     .string => |string| PropertyKey.from(string),
                     .symbol => |symbol| PropertyKey.from(symbol),
-                    .private_name => unreachable,
+                    // i. Set ref.[[ReferencedName]] to ? ToPropertyKey(ref.[[ReferencedName]]).
+                    else => try reference.referenced_name.value.toPropertyKey(self.agent),
                 };
-                const delete_status = try base_obj.internalMethods().delete(base_obj, referenced_name);
 
-                // e. If deleteStatus is false and ref.[[Strict]] is true, throw a TypeError exception.
+                // e. Let deleteStatus be ? baseObj.[[Delete]](ref.[[ReferencedName]]).
+                const delete_status = try base_obj.internalMethods().delete(base_obj, property_key);
+
+                // f. If deleteStatus is false and ref.[[Strict]] is true, throw a TypeError exception.
                 if (!delete_status and reference.strict) {
                     return self.agent.throwException(.type_error, "Could not delete property", .{});
                 }
 
-                // f. Return deleteStatus.
+                // g. Return deleteStatus.
                 self.result = Value.from(delete_status);
             }
             // 5. Else,
@@ -2480,11 +2483,8 @@ pub fn executeInstruction(
                 const base = reference.base.environment;
 
                 // c. Return ? base.DeleteBinding(ref.[[ReferencedName]]).
-                self.result = Value.from(
-                    try base.deleteBinding(
-                        try reference.referenced_name.string.toUtf8(self.agent.gc_allocator),
-                    ),
-                );
+                const referenced_name = try reference.referenced_name.value.string.toUtf8(self.agent.gc_allocator);
+                self.result = Value.from(try base.deleteBinding(referenced_name));
             }
         },
         .evaluate_call => {
@@ -2509,8 +2509,9 @@ pub fn executeInstruction(
             //    ref.[[ReferencedName]] is "eval", then
             if (maybe_reference) |reference| {
                 if (!reference.isPropertyReference() and
-                    reference.referenced_name == .string and
-                    reference.referenced_name.string.eql(String.fromLiteral("eval")) and
+                    reference.referenced_name == .value and
+                    reference.referenced_name.value == .string and
+                    reference.referenced_name.value.string.eql(String.fromLiteral("eval")) and
 
                     // a. If SameValue(func, %eval%) is true, then
                     function.object.sameValue(eval))
@@ -2592,21 +2593,19 @@ pub fn executeInstruction(
             const strict = self.fetchIndex(executable) == 1;
             const base_value = self.stack.pop();
 
-            // 3. Let propertyKey be ? ToPropertyKey(propertyNameValue).
-            const property_key = try property_name_value.toPropertyKey(self.agent);
+            // 3. NOTE: In most cases, ToPropertyKey will be performed on propertyNameValue
+            //    immediately after this step. However, in the case of a[b] = c, it will not be
+            //    performed until after evaluation of c.
 
             // 4. Return the Reference Record {
             //      [[Base]]: baseValue,
-            //      [[ReferencedName]]: propertyKey,
+            //      [[ReferencedName]]: propertyNameValue,
             //      [[Strict]]: strict,
             //      [[ThisValue]]: empty
             //    }.
             self.reference = .{
                 .base = .{ .value = base_value },
-                .referenced_name = switch (try property_key.toStringOrSymbol(self.agent)) {
-                    .string => |string| .{ .string = string },
-                    .symbol => |symbol| .{ .symbol = symbol },
-                },
+                .referenced_name = .{ .value = property_name_value },
                 .strict = strict,
                 .this_value = null,
             };
@@ -2629,7 +2628,9 @@ pub fn executeInstruction(
             self.reference = .{
                 .base = .{ .value = base_value },
                 .referenced_name = .{
-                    .string = try String.fromUtf8(self.agent.gc_allocator, property_name_string),
+                    .value = Value.from(
+                        try String.fromUtf8(self.agent.gc_allocator, property_name_string),
+                    ),
                 },
                 .strict = strict,
                 .this_value = null,
@@ -3037,10 +3038,9 @@ pub fn executeInstruction(
         // 13.3.7.3 MakeSuperPropertyReference ( actualThis, propertyKey, strict )
         // https://tc39.es/ecma262/#sec-makesuperpropertyreference
         .make_super_property_reference => {
-            const property_name_value = self.stack.pop();
+            const property_key = self.stack.pop();
             const strict = self.fetchIndex(executable) == 1;
             const actual_this = self.stack.pop();
-            const property_key = try property_name_value.toPropertyKey(self.agent);
 
             // 1. Let env be GetThisEnvironment().
             const env = self.agent.getThisEnvironment();
@@ -3056,10 +3056,7 @@ pub fn executeInstruction(
             //    }.
             self.reference = .{
                 .base = .{ .value = base_value },
-                .referenced_name = switch (try property_key.toStringOrSymbol(self.agent)) {
-                    .string => |string| .{ .string = string },
-                    .symbol => |symbol| .{ .symbol = symbol },
-                },
+                .referenced_name = .{ .value = property_key },
                 .strict = strict,
                 .this_value = actual_this,
             };

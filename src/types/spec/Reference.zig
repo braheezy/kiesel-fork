@@ -25,8 +25,7 @@ base: union(enum) {
 
 /// [[ReferencedName]]
 referenced_name: union(enum) {
-    string: String,
-    symbol: Symbol,
+    value: Value,
     private_name: PrivateName,
 },
 
@@ -77,38 +76,29 @@ pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
 
     // 2. If IsUnresolvableReference(V) is true, throw a ReferenceError exception.
     if (self.isUnresolvableReference()) {
-        return switch (self.referenced_name) {
-            .string => |string| agent.throwException(
-                .reference_error,
-                "'{s}' is not defined",
-                .{string},
-            ),
-            else => agent.throwException(.reference_error, "Cannot resolve reference", .{}),
-        };
+        return agent.throwException(
+            .reference_error,
+            "'{}' is not defined",
+            .{self.referenced_name.value.string},
+        );
     }
 
     // 3. If IsPropertyReference(V) is true, then
     if (self.isPropertyReference()) {
-        const property_key = switch (self.referenced_name) {
-            .string => |string| PropertyKey.from(string),
-            .symbol => |symbol| PropertyKey.from(symbol),
-            .private_name => null,
-        };
-
         // a. Let baseObj be ? ToObject(V.[[Base]]).
         // NOTE: For property lookups on primitives we can directly go to the prototype instead
         //       of creating a wrapper object, or return the value for `"string".length`.
         const base_object = blk: {
-            if (self.base.value != .string or property_key == null) {
+            if (self.base.value != .string or self.referenced_name == .private_name) {
                 break :blk try self.base.value.synthesizePrototype(agent);
             }
-            switch (property_key.?) {
+            switch (self.referenced_name.value) {
                 .string => |string| if (string.eql(String.fromLiteral("length")))
                     return Value.from(@as(u53, @intCast(self.base.value.string.length())))
                 else
                     break :blk try self.base.value.synthesizePrototype(agent),
-                .integer_index => break :blk null,
                 .symbol => break :blk try self.base.value.synthesizePrototype(agent),
+                else => break :blk null,
             }
         } orelse try self.base.value.toObject(agent);
 
@@ -118,10 +108,18 @@ pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
             return base_object.privateGet(self.referenced_name.private_name);
         }
 
-        // c. Return ? baseObj.[[Get]](V.[[ReferencedName]], GetThisValue(V)).
+        // c. If V.[[ReferencedName]] is not a property key, then
+        const property_key = switch (self.referenced_name.value) {
+            .string => |string| PropertyKey.from(string),
+            .symbol => |symbol| PropertyKey.from(symbol),
+            // i. Set V.[[ReferencedName]] to ? ToPropertyKey(V.[[ReferencedName]]).
+            else => try self.referenced_name.value.toPropertyKey(agent),
+        };
+
+        // d. Return ? baseObj.[[Get]](V.[[ReferencedName]], GetThisValue(V)).
         return base_object.internalMethods().get(
             base_object,
-            property_key.?,
+            property_key,
             self.getThisValue(),
         );
     }
@@ -132,7 +130,7 @@ pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
         const base = self.base.environment;
 
         // c. Return ? base.GetBindingValue(V.[[ReferencedName]], V.[[Strict]]) (see 9.1).
-        const referenced_name = try self.referenced_name.string.toUtf8(agent.gc_allocator);
+        const referenced_name = try self.referenced_name.value.string.toUtf8(agent.gc_allocator);
         return base.getBindingValue(agent, referenced_name, self.strict);
     }
 }
@@ -149,8 +147,8 @@ pub fn putValue(self: Self, agent: *Agent, value: Value) Agent.Error!void {
         if (self.strict) {
             return agent.throwException(
                 .reference_error,
-                "'{s}' is not defined",
-                .{self.referenced_name.string},
+                "'{}' is not defined",
+                .{self.referenced_name.value.string},
             );
         }
 
@@ -158,7 +156,7 @@ pub fn putValue(self: Self, agent: *Agent, value: Value) Agent.Error!void {
         const global_obj = agent.getGlobalObject();
 
         // c. Perform ? Set(globalObj, V.[[ReferencedName]], W, false).
-        try global_obj.set(PropertyKey.from(self.referenced_name.string), value, .ignore);
+        try global_obj.set(PropertyKey.from(self.referenced_name.value.string), value, .ignore);
 
         // d. Return unused.
         return;
@@ -175,25 +173,28 @@ pub fn putValue(self: Self, agent: *Agent, value: Value) Agent.Error!void {
             return base_object.privateSet(self.referenced_name.private_name, value);
         }
 
-        // c. Let succeeded be ? baseObj.[[Set]](V.[[ReferencedName]], W, GetThisValue(V)).
-        const referenced_name = switch (self.referenced_name) {
+        // c. If V.[[ReferencedName]] is not a property key, then
+        const property_key = switch (self.referenced_name.value) {
             .string => |string| PropertyKey.from(string),
             .symbol => |symbol| PropertyKey.from(symbol),
-            .private_name => unreachable,
+            // i. Set V.[[ReferencedName]] to ? ToPropertyKey(V.[[ReferencedName]]).
+            else => try self.referenced_name.value.toPropertyKey(agent),
         };
+
+        // d. Let succeeded be ? baseObj.[[Set]](V.[[ReferencedName]], W, GetThisValue(V)).
         const succeeded = try base_object.internalMethods().set(
             base_object,
-            referenced_name,
+            property_key,
             value,
             self.getThisValue(),
         );
 
-        // d. If succeeded is false and V.[[Strict]] is true, throw a TypeError exception.
+        // e. If succeeded is false and V.[[Strict]] is true, throw a TypeError exception.
         if (!succeeded and self.strict) {
             return agent.throwException(.type_error, "Could not set property", .{});
         }
 
-        // e. Return unused.
+        // f. Return unused.
         return;
     }
 
@@ -203,7 +204,7 @@ pub fn putValue(self: Self, agent: *Agent, value: Value) Agent.Error!void {
     const base = self.base.environment;
 
     // c. Return ? base.SetMutableBinding(V.[[ReferencedName]], W, V.[[Strict]]) (see 9.1).
-    const referenced_name = try self.referenced_name.string.toUtf8(agent.gc_allocator);
+    const referenced_name = try self.referenced_name.value.string.toUtf8(agent.gc_allocator);
     return base.setMutableBinding(agent, referenced_name, value, self.strict);
 }
 
@@ -228,6 +229,6 @@ pub fn initializeReferencedBinding(self: Self, agent: *Agent, value: Value) Agen
     const base = self.base.environment;
 
     // 4. Return ? base.InitializeBinding(V.[[ReferencedName]], W).
-    const referenced_name = try self.referenced_name.string.toUtf8(agent.gc_allocator);
+    const referenced_name = try self.referenced_name.value.string.toUtf8(agent.gc_allocator);
     return base.initializeBinding(agent, referenced_name, value);
 }

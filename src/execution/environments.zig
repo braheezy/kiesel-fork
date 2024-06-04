@@ -212,7 +212,7 @@ pub fn getIdentifierReference(
                 else
                     .unresolvable,
                 // FIXME: This may be any UTF-8 string! We need an allocator or pass it in as a string.
-                .referenced_name = .{ .string = String.fromAscii(name) },
+                .referenced_name = .{ .value = Value.from(String.fromAscii(name)) },
                 .strict = strict,
                 .this_value = null,
             };
@@ -232,7 +232,7 @@ pub fn getIdentifierReference(
             return .{
                 .base = .{ .environment = env.? },
                 // FIXME: This may be any UTF-8 string! We need an allocator or pass it in as a string.
-                .referenced_name = .{ .string = String.fromAscii(name) },
+                .referenced_name = .{ .value = Value.from(String.fromAscii(name)) },
                 .strict = strict,
                 .this_value = null,
             };
@@ -254,7 +254,7 @@ pub fn getIdentifierReference(
                 return .{
                     .base = .unresolvable,
                     // FIXME: This may be any UTF-8 string! We need an allocator or pass it in as a string.
-                    .referenced_name = .{ .string = String.fromAscii(name) },
+                    .referenced_name = .{ .value = Value.from(String.fromAscii(name)) },
                     .strict = strict,
                     .this_value = null,
                 };

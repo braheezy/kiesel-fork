@@ -565,11 +565,14 @@ pub fn codegenSuperProperty(
             if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
             try executable.addInstruction(.load);
 
-            // 6. Let strict be IsStrict(this SuperProperty).
+            // 5. Let strict be IsStrict(this SuperProperty).
             const strict = ctx.contained_in_strict_mode_code;
 
-            // 5. Let propertyKey be ? ToPropertyKey(propertyNameValue).
-            // 7. Return ? MakeSuperPropertyReference(actualThis, propertyKey, strict).
+            // 6. NOTE: In most cases, ToPropertyKey will be performed on propertyNameValue
+            //    immediately after this step. However, in the case of super[b] = c, it will not be
+            //    performed until after evaluation of c.
+
+            // 7. Return ? MakeSuperPropertyReference(actualThis, propertyNameValue, strict).
             try executable.addInstruction(.make_super_property_reference);
             try executable.addIndex(@intFromBool(strict));
         },
@@ -1328,7 +1331,8 @@ pub fn codegenAssignmentExpression(
         // TODO: b. If IsAnonymousFunctionDefinition(AssignmentExpression) and IsIdentifierRef of
         //          LeftHandSideExpression are both true, then
         if (false) {
-            // i. Let rval be ? NamedEvaluation of AssignmentExpression with argument lref.[[ReferencedName]].
+            // i. Let lhs be the StringValue of LeftHandSideExpression.
+            // ii. Let rval be ? NamedEvaluation of AssignmentExpression with argument lhs.
         }
         // c. Else,
         else {
@@ -1409,7 +1413,8 @@ pub fn codegenAssignmentExpression(
         // TODO: 5. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and IsIdentifierRef
         //          of LeftHandSideExpression is true, then
         if (false) {
-            // a. Let rval be ? NamedEvaluation of AssignmentExpression with argument lref.[[ReferencedName]].
+            // a. Let lhs be the StringValue of LeftHandSideExpression.
+            // b. Let rval be ? NamedEvaluation of AssignmentExpression with argument lhs.
         }
         // 6. Else,
         else {
@@ -1453,7 +1458,8 @@ pub fn codegenAssignmentExpression(
         // TODO: 5. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and IsIdentifierRef
         //          of LeftHandSideExpression is true, then
         if (false) {
-            // a. Let rval be ? NamedEvaluation of AssignmentExpression with argument lref.[[ReferencedName]].
+            // a. Let lhs be the StringValue of LeftHandSideExpression.
+            // b. Let rval be ? NamedEvaluation of AssignmentExpression with argument lhs.
         }
         // 6. Else,
         else {
@@ -1499,7 +1505,8 @@ pub fn codegenAssignmentExpression(
         // TODO: 4. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and
         //          IsIdentifierRef of LeftHandSideExpression is true, then
         if (false) {
-            // a. Let rval be ? NamedEvaluation of AssignmentExpression with argument lref.[[ReferencedName]].
+            // a. Let lhs be the StringValue of LeftHandSideExpression.
+            // b. Let rval be ? NamedEvaluation of AssignmentExpression with argument lhs.
         }
         // 5. Else,
         else {
