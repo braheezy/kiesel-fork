@@ -1086,7 +1086,7 @@ fn proxyCreate(agent: *Agent, target: Value, handler: Value) Agent.Error!Object 
 /// https://tc39.es/ecma262/#sec-properties-of-the-proxy-constructor
 pub const ProxyConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 2,
             .name = "Proxy",
             .realm = realm,
@@ -1100,7 +1100,7 @@ pub const ProxyConstructor = struct {
 
     /// 28.2.1.1 Proxy ( target, handler )
     /// https://tc39.es/ecma262/#sec-proxy-target-handler
-    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const target = arguments.get(0);
         const handler = arguments.get(1);
 
@@ -1158,7 +1158,7 @@ pub const ProxyConstructor = struct {
 
         // 3. Let revoker be CreateBuiltinFunction(revokerClosure, 0, "", « [[RevocableProxy]] »).
         const additional_fields = try agent.gc_allocator.create(AdditionalFields);
-        const revoker = try createBuiltinFunction(agent, .{ .regular = revoker_closure }, .{
+        const revoker = try createBuiltinFunction(agent, .{ .function = revoker_closure }, .{
             .length = 0,
             .name = "",
             .additional_fields = SafePointer.make(*AdditionalFields, additional_fields),

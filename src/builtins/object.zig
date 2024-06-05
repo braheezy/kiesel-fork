@@ -40,7 +40,7 @@ pub const ObjectConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object_ {
         // 20.1.2 Properties of the Object Constructor
         // https://tc39.es/ecma262/#sec-properties-of-the-object-constructor
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Object",
             .realm = realm,
@@ -96,7 +96,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.1.1 Object ( [ value ] )
     /// https://tc39.es/ecma262/#sec-object-value
-    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object_) Agent.Error!Value {
+    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object_) Agent.Error!Value {
         const realm = agent.currentRealm();
         const value = arguments.get(0);
 
@@ -361,7 +361,7 @@ pub const ObjectConstructor = struct {
         }.func;
 
         // 5. Let adder be CreateBuiltinFunction(closure, 2, "", « »).
-        const adder = try createBuiltinFunction(agent, .{ .regular = closure }, .{
+        const adder = try createBuiltinFunction(agent, .{ .function = closure }, .{
             .length = 2,
             .name = "",
             .additional_fields = SafePointer.make(*Captures, captures),

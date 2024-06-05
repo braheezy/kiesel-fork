@@ -294,7 +294,7 @@ fn setViewValue(
 /// https://tc39.es/ecma262/#sec-properties-of-the-dataview-constructor
 pub const DataViewConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "DataView",
             .realm = realm,
@@ -323,7 +323,7 @@ pub const DataViewConstructor = struct {
 
     /// 25.3.2.1 DataView ( buffer [ , byteOffset [ , byteLength ] ] )
     /// https://tc39.es/ecma262/#sec-dataview-buffer-byteoffset-bytelength
-    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const buffer_value = arguments.get(0);
         const byte_offset = arguments.get(1);
         const byte_length = arguments.get(2);

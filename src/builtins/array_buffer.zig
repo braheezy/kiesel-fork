@@ -612,7 +612,7 @@ pub fn getModifySetValueInBuffer(
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-constructor
 pub const ArrayBufferConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "ArrayBuffer",
             .realm = realm,
@@ -644,7 +644,7 @@ pub const ArrayBufferConstructor = struct {
 
     /// 25.1.4.1 ArrayBuffer ( length [ , options ] )
     /// https://tc39.es/ecma262/#sec-arraybuffer-length
-    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const length = arguments.get(0);
         const options = arguments.get(1);
 

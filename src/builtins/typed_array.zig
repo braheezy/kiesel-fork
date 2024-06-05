@@ -623,7 +623,7 @@ fn typedArraySetElement(agent: *Agent, typed_array: *const TypedArray, index: f6
 /// https://tc39.es/ecma262/#sec-properties-of-the-%typedarray%-intrinsic-object
 pub const TypedArrayConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "TypedArray",
             .realm = realm,
@@ -656,7 +656,7 @@ pub const TypedArrayConstructor = struct {
 
     /// 23.2.1.1 %TypedArray% ( )
     /// https://tc39.es/ecma262/#sec-%typedarray%
-    fn behaviour(agent: *Agent, _: Arguments, _: ?Object) Agent.Error!Value {
+    fn constructor(agent: *Agent, _: Arguments, _: ?Object) Agent.Error!Value {
         // 1. Throw a TypeError exception.
         return agent.throwException(
             .type_error,
@@ -673,11 +673,11 @@ pub const TypedArrayConstructor = struct {
         const this_arg = arguments.get(2);
 
         // 1. Let C be the this value.
-        const constructor = this_value;
+        const constructor_ = this_value;
 
         // 2. If IsConstructor(C) is false, throw a TypeError exception.
-        if (!constructor.isConstructor()) {
-            return agent.throwException(.type_error, "{} is not a constructor", .{constructor});
+        if (!constructor_.isConstructor()) {
+            return agent.throwException(.type_error, "{} is not a constructor", .{constructor_});
         }
 
         // 3. If mapfn is undefined, then
@@ -715,7 +715,7 @@ pub const TypedArrayConstructor = struct {
             // c. Let targetObj be ? TypedArrayCreateFromConstructor(C, « 𝔽(len) »).
             const target_object = try typedArrayCreateFromConstructor(
                 agent,
-                constructor.object,
+                constructor_.object,
                 &.{Value.from(@as(u53, @intCast(len)))},
             );
 
@@ -766,7 +766,7 @@ pub const TypedArrayConstructor = struct {
         // 10. Let targetObj be ? TypedArrayCreateFromConstructor(C, « 𝔽(len) »).
         const target_object = try typedArrayCreateFromConstructor(
             agent,
-            constructor.object,
+            constructor_.object,
             &.{Value.from(len)},
         );
 
@@ -812,17 +812,17 @@ pub const TypedArrayConstructor = struct {
         const len = arguments.count();
 
         // 2. Let C be the this value.
-        const constructor = this_value;
+        const constructor_ = this_value;
 
         // 3. If IsConstructor(C) is false, throw a TypeError exception.
-        if (!constructor.isConstructor()) {
-            return agent.throwException(.type_error, "{} is not a constructor", .{constructor});
+        if (!constructor_.isConstructor()) {
+            return agent.throwException(.type_error, "{} is not a constructor", .{constructor_});
         }
 
         // 4. Let newObj be ? TypedArrayCreateFromConstructor(C, « 𝔽(len) »).
         const new_object = try typedArrayCreateFromConstructor(
             agent,
-            constructor.object,
+            constructor_.object,
             &.{Value.from(@as(u53, @intCast(len)))},
         );
 
@@ -3703,7 +3703,7 @@ fn allocateTypedArrayBuffer(
 fn MakeTypedArrayConstructor(comptime name: []const u8) type {
     return struct {
         pub fn create(realm: *Realm) Allocator.Error!Object {
-            const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+            const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
                 .length = 3,
                 .name = name,
                 .realm = realm,
@@ -3746,7 +3746,7 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
 
         /// 23.2.5.1 TypedArray ( ...args )
         /// https://tc39.es/ecma262/#sec-typedarray
-        fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+        fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
             // 1. If NewTarget is undefined, throw a TypeError exception.
             if (new_target == null) {
                 return agent.throwException(

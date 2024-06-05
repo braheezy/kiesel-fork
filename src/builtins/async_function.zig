@@ -27,7 +27,7 @@ const noexcept = utils.noexcept;
 /// https://tc39.es/ecma262/#sec-async-function-constructor-properties
 pub const AsyncFunctionConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "AsyncFunction",
             .realm = realm,
@@ -61,12 +61,12 @@ pub const AsyncFunctionConstructor = struct {
 
     /// 27.7.1.1 AsyncFunction ( ...parameterArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-async-function-constructor-arguments
-    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const parameter_args = arguments.values[0..arguments.count() -| 1];
         const maybe_body_arg = arguments.getOrNull(arguments.count() -| 1);
 
         // 1. Let C be the active function object.
-        const constructor = agent.activeFunctionObject();
+        const constructor_ = agent.activeFunctionObject();
 
         // 2. If bodyArg is not present, set bodyArg to the empty String.
         const body_arg = maybe_body_arg orelse Value.from("");
@@ -74,7 +74,7 @@ pub const AsyncFunctionConstructor = struct {
         // 3. Return ? CreateDynamicFunction(C, NewTarget, async, parameterArgs, bodyArg).
         return Value.from(try createDynamicFunction(
             agent,
-            constructor,
+            constructor_,
             new_target,
             .@"async",
             parameter_args,

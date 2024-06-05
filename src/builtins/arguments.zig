@@ -434,7 +434,7 @@ fn makeArgGetter(agent: *Agent, name: []const u8, env: Environment) Allocator.Er
 
     // 2. Let getter be CreateBuiltinFunction(getterClosure, 0, "", « »).
     // 3. NOTE: getter is never directly accessible to ECMAScript code.
-    const getter = try createBuiltinFunction(agent, .{ .regular = getter_closure }, .{
+    const getter = try createBuiltinFunction(agent, .{ .function = getter_closure }, .{
         .length = 1,
         .name = "",
         .additional_fields = SafePointer.make(*Captures, captures),
@@ -472,7 +472,7 @@ fn makeArgSetter(agent: *Agent, name: []const u8, env: Environment) Allocator.Er
 
     // 2. Let setter be CreateBuiltinFunction(setterClosure, 1, "", « »).
     // 3. NOTE: setter is never directly accessible to ECMAScript code.
-    const setter = try createBuiltinFunction(agent, .{ .regular = setter_closure }, .{
+    const setter = try createBuiltinFunction(agent, .{ .function = setter_closure }, .{
         .length = 1,
         .name = "",
         .additional_fields = SafePointer.make(*Captures, captures),

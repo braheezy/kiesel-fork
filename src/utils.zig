@@ -137,8 +137,8 @@ inline fn getPropertyKey(comptime name: []const u8, agent: *Agent) PropertyKey {
 pub fn defineBuiltinAccessor(
     object: Object,
     comptime name: []const u8,
-    getter: ?*const Behaviour.RegularFn,
-    setter: ?*const Behaviour.RegularFn,
+    getter: ?*const Behaviour.Function,
+    setter: ?*const Behaviour.Function,
     realm: *Realm,
 ) Allocator.Error!void {
     return defineBuiltinAccessorWithAttributes(
@@ -154,8 +154,8 @@ pub fn defineBuiltinAccessor(
 pub fn defineBuiltinAccessorWithAttributes(
     object: Object,
     comptime name: []const u8,
-    getter: ?*const Behaviour.RegularFn,
-    setter: ?*const Behaviour.RegularFn,
+    getter: ?*const Behaviour.Function,
+    setter: ?*const Behaviour.Function,
     realm: *Realm,
     attributes: struct {
         enumerable: bool,
@@ -163,17 +163,17 @@ pub fn defineBuiltinAccessorWithAttributes(
     },
 ) Allocator.Error!void {
     std.debug.assert(getter != null or setter != null);
-    const getter_function = if (getter) |behaviour| blk: {
+    const getter_function = if (getter) |function| blk: {
         const function_name = std.fmt.comptimePrint("get {s}", .{comptime getFunctionName(name)});
-        break :blk try createBuiltinFunction(realm.agent, .{ .regular = behaviour }, .{
+        break :blk try createBuiltinFunction(realm.agent, .{ .function = function }, .{
             .length = 0,
             .name = function_name,
             .realm = realm,
         });
     } else null;
-    const setter_function = if (setter) |behaviour| blk: {
+    const setter_function = if (setter) |function| blk: {
         const function_name = std.fmt.comptimePrint("set {s}", .{comptime getFunctionName(name)});
-        break :blk try createBuiltinFunction(realm.agent, .{ .regular = behaviour }, .{
+        break :blk try createBuiltinFunction(realm.agent, .{ .function = function }, .{
             .length = 0,
             .name = function_name,
             .realm = realm,
@@ -192,23 +192,23 @@ pub fn defineBuiltinAccessorWithAttributes(
 pub fn defineBuiltinFunction(
     object: Object,
     comptime name: []const u8,
-    behaviour: *const Behaviour.RegularFn,
+    function: *const Behaviour.Function,
     length: u32,
     realm: *Realm,
 ) Allocator.Error!void {
     const function_name = comptime getFunctionName(name);
-    const function = try createBuiltinFunction(realm.agent, .{ .regular = behaviour }, .{
+    const builtin_function = try createBuiltinFunction(realm.agent, .{ .function = function }, .{
         .length = length,
         .name = function_name,
         .realm = realm,
     });
-    try defineBuiltinProperty(object, name, Value.from(function));
+    try defineBuiltinProperty(object, name, Value.from(builtin_function));
 }
 
 pub fn defineBuiltinFunctionWithAttributes(
     object: Object,
     comptime name: []const u8,
-    behaviour: *const Behaviour.RegularFn,
+    function: *const Behaviour.Function,
     length: u32,
     realm: *Realm,
     attributes: struct {
@@ -218,13 +218,13 @@ pub fn defineBuiltinFunctionWithAttributes(
     },
 ) Allocator.Error!void {
     const function_name = comptime getFunctionName(name);
-    const function = try createBuiltinFunction(realm.agent, .{ .regular = behaviour }, .{
+    const builtin_function = try createBuiltinFunction(realm.agent, .{ .function = function }, .{
         .length = length,
         .name = function_name,
         .realm = realm,
     });
     try defineBuiltinProperty(object, name, PropertyDescriptor{
-        .value = Value.from(function),
+        .value = Value.from(builtin_function),
         .writable = attributes.writable,
         .enumerable = attributes.enumerable,
         .configurable = attributes.configurable,

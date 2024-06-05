@@ -30,7 +30,7 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 pub const SymbolConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
         const agent = realm.agent;
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "Symbol",
             .realm = realm,
@@ -180,7 +180,7 @@ pub const SymbolConstructor = struct {
 
     /// 20.4.1.1 Symbol ( [ description ] )
     /// https://tc39.es/ecma262/#sec-symbol-description
-    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const description = arguments.get(0);
 
         // 1. If NewTarget is not undefined, throw a TypeError exception.

@@ -159,7 +159,7 @@ fn setDataSize(set_data: SetData) usize {
 /// https://tc39.es/ecma262/#sec-properties-of-the-set-constructor
 pub const SetConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "Set",
             .realm = realm,
@@ -190,7 +190,7 @@ pub const SetConstructor = struct {
 
     /// 24.2.2.1 Set ( [ iterable ] )
     /// https://tc39.es/ecma262/#sec-set-iterable
-    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const iterable = arguments.get(0);
 
         // 1. If NewTarget is undefined, throw a TypeError exception.

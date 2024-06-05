@@ -26,11 +26,11 @@ const setFunctionLength = ecmascript_function.setFunctionLength;
 const setFunctionName = ecmascript_function.setFunctionName;
 
 pub const Behaviour = union(enum) {
-    pub const RegularFn = fn (*Agent, Value, Arguments) Agent.Error!Value;
-    pub const ConstructorFn = fn (*Agent, Arguments, ?Object) Agent.Error!Value;
+    pub const Function = fn (*Agent, Value, Arguments) Agent.Error!Value;
+    pub const Constructor = fn (*Agent, Arguments, ?Object) Agent.Error!Value;
 
-    regular: *const RegularFn,
-    constructor: *const ConstructorFn,
+    function: *const Function,
+    constructor: *const Constructor,
 };
 
 pub const ClassConstructorFields = struct {
@@ -96,7 +96,7 @@ pub fn construct(
 /// https://tc39.es/ecma262/#sec-builtincallorconstruct
 pub fn builtinCallOrConstruct(
     agent: *Agent,
-    function: *BuiltinFunction,
+    builtin_function: *BuiltinFunction,
     this_argument: ?Value,
     arguments_list: Arguments,
     new_target: ?Object,
@@ -111,11 +111,11 @@ pub fn builtinCallOrConstruct(
     // 3. Let calleeContext be a new execution context.
     const callee_context: ExecutionContext = .{
         // 4. Set the Function of calleeContext to F.
-        .function = function.object(),
+        .function = builtin_function.object(),
 
         // 5. Let calleeRealm be F.[[Realm]].
         // 6. Set the Realm of calleeContext to calleeRealm.
-        .realm = function.fields.realm,
+        .realm = builtin_function.fields.realm,
 
         // 7. Set the ScriptOrModule of calleeContext to null.
         .script_or_module = null,
@@ -133,9 +133,9 @@ pub fn builtinCallOrConstruct(
     //     the named parameters. newTarget provides the NewTarget value.
     // 11. NOTE: If F is defined in this document, “the specification of F” is the behaviour
     //     specified for it via algorithm steps or other means.
-    const result = switch (function.fields.behaviour) {
-        .regular => |regularFn| regularFn(agent, this_argument.?, arguments_list),
-        .constructor => |constructorFn| constructorFn(agent, arguments_list, new_target),
+    const result = switch (builtin_function.fields.behaviour) {
+        .function => |function| function(agent, this_argument.?, arguments_list),
+        .constructor => |constructor| constructor(agent, arguments_list, new_target),
     };
 
     // 12. Remove calleeContext from the execution context stack and restore callerContext as the

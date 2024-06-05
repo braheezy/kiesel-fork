@@ -104,7 +104,7 @@ pub fn allocateSharedArrayBuffer(
 /// https://tc39.es/ecma262/#sec-sharedarraybuffer-constructor
 pub const SharedArrayBufferConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "SharedArrayBuffer",
             .realm = realm,
@@ -135,7 +135,7 @@ pub const SharedArrayBufferConstructor = struct {
 
     /// 25.2.3.1 SharedArrayBuffer ( length [ , options ] )
     /// https://tc39.es/ecma262/#sec-sharedarraybuffer-length
-    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const length = arguments.get(0);
         const options = arguments.get(1);
 

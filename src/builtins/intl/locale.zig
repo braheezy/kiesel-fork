@@ -168,7 +168,7 @@ fn applyUnicodeExtensionToTag(agent: *Agent, tag: icu4zig.Locale, options: Unico
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-constructor
 pub const LocaleConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Locale",
             .realm = realm,
@@ -197,7 +197,7 @@ pub const LocaleConstructor = struct {
 
     /// 14.1.1 Intl.Locale ( tag [ , options ] )
     /// https://tc39.es/ecma402/#sec-Intl.Locale
-    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const tag_value = arguments.get(0);
         const options_value = arguments.get(1);
 

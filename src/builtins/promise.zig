@@ -209,7 +209,7 @@ pub fn createResolvingFunctions(
 
     // 4. Let resolve be CreateBuiltinFunction(stepsResolve, lengthResolve, "", « [[Promise]],
     //    [[AlreadyResolved]] »).
-    const resolve = try createBuiltinFunction(agent, .{ .regular = steps_resolve }, .{
+    const resolve = try createBuiltinFunction(agent, .{ .function = steps_resolve }, .{
         .length = length_resolve,
         .name = "",
         .additional_fields = SafePointer.make(*AdditionalFields, additional_fields),
@@ -262,7 +262,7 @@ pub fn createResolvingFunctions(
 
     // 9. Let reject be CreateBuiltinFunction(stepsReject, lengthReject, "", « [[Promise]],
     //    [[AlreadyResolved]] »).
-    const reject = try createBuiltinFunction(agent, .{ .regular = steps_reject }, .{
+    const reject = try createBuiltinFunction(agent, .{ .function = steps_reject }, .{
         .length = length_reject,
         .name = "",
         .additional_fields = SafePointer.make(*AdditionalFields, additional_fields),
@@ -364,7 +364,7 @@ pub fn newPromiseCapability(agent: *Agent, constructor: Value) Agent.Error!Promi
 
     // 5. Let executor be CreateBuiltinFunction(executorClosure, 2, "", « »).
     const additional_fields = try agent.gc_allocator.create(AdditionalFields);
-    const executor = try createBuiltinFunction(agent, .{ .regular = executor_closure }, .{
+    const executor = try createBuiltinFunction(agent, .{ .function = executor_closure }, .{
         .length = 2,
         .name = "",
         .additional_fields = SafePointer.make(*AdditionalFields, additional_fields),
@@ -821,7 +821,7 @@ fn performPromiseAll(
         // g. Let onFulfilled be CreateBuiltinFunction(steps, length, "", « [[AlreadyCalled]],
         //    [[Index]], [[Values]], [[Capability]], [[RemainingElements]] »).
         const additional_fields = try agent.gc_allocator.create(AdditionalFields);
-        const on_fulfilled = try createBuiltinFunction(agent, .{ .regular = steps }, .{
+        const on_fulfilled = try createBuiltinFunction(agent, .{ .function = steps }, .{
             .length = length,
             .name = "",
             .additional_fields = SafePointer.make(*AdditionalFields, additional_fields),
@@ -1013,7 +1013,7 @@ fn performPromiseAllSettled(
         // g. Let onFulfilled be CreateBuiltinFunction(stepsFulfilled, lengthFulfilled, "",
         //    « [[AlreadyCalled]], [[Index]], [[Values]], [[Capability]], [[RemainingElements]] »).
         const on_fulfilled_additional_fields = try agent.gc_allocator.create(AdditionalFields);
-        const on_fulfilled = try createBuiltinFunction(agent, .{ .regular = steps_fulfilled }, .{
+        const on_fulfilled = try createBuiltinFunction(agent, .{ .function = steps_fulfilled }, .{
             .length = length_fulfilled,
             .name = "",
             .additional_fields = SafePointer.make(*AdditionalFields, on_fulfilled_additional_fields),
@@ -1123,7 +1123,7 @@ fn performPromiseAllSettled(
         // p. Let onRejected be CreateBuiltinFunction(stepsRejected, lengthRejected, "",
         //    « [[AlreadyCalled]], [[Index]], [[Values]], [[Capability]], [[RemainingElements]] »).
         const on_rejected_additional_fields = try agent.gc_allocator.create(AdditionalFields);
-        const on_rejected = try createBuiltinFunction(agent, .{ .regular = steps_rejected }, .{
+        const on_rejected = try createBuiltinFunction(agent, .{ .function = steps_rejected }, .{
             .length = length_rejected,
             .name = "",
             .additional_fields = SafePointer.make(*AdditionalFields, on_rejected_additional_fields),
@@ -1320,7 +1320,7 @@ fn performPromiseAny(
         // g. Let onRejected be CreateBuiltinFunction(stepsRejected, lengthRejected, "",
         //    « [[AlreadyCalled]], [[Index]], [[Errors]], [[Capability]], [[RemainingElements]] »).
         const additional_fields = try agent.gc_allocator.create(AdditionalFields);
-        const on_rejected = try createBuiltinFunction(agent, .{ .regular = steps_rejected }, .{
+        const on_rejected = try createBuiltinFunction(agent, .{ .function = steps_rejected }, .{
             .length = length_rejected,
             .name = "",
             .additional_fields = SafePointer.make(*AdditionalFields, additional_fields),
@@ -1506,7 +1506,7 @@ pub fn performPromiseThen(
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-constructor
 pub const PromiseConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Promise",
             .realm = realm,
@@ -1544,7 +1544,7 @@ pub const PromiseConstructor = struct {
 
     /// 27.2.3.1 Promise ( executor )
     /// https://tc39.es/ecma262/#sec-promise-executor
-    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const executor = arguments.get(0);
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
@@ -1619,13 +1619,13 @@ pub const PromiseConstructor = struct {
         const iterable = arguments.get(0);
 
         // 1. Let C be the this value.
-        const constructor = this_value;
+        const constructor_ = this_value;
 
         // 2. Let promiseCapability be ? NewPromiseCapability(C).
-        const promise_capability = try newPromiseCapability(agent, constructor);
+        const promise_capability = try newPromiseCapability(agent, constructor_);
 
         // 3. Let promiseResolve be Completion(GetPromiseResolve(C)).
-        const promise_resolve = getPromiseResolve(agent, constructor.object) catch |err| {
+        const promise_resolve = getPromiseResolve(agent, constructor_.object) catch |err| {
             // 4. IfAbruptRejectPromise(promiseResolve, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
@@ -1640,7 +1640,7 @@ pub const PromiseConstructor = struct {
         var result = performPromiseAll(
             agent,
             &iterator,
-            constructor.object,
+            constructor_.object,
             promise_capability,
             promise_resolve,
         );
@@ -1666,13 +1666,13 @@ pub const PromiseConstructor = struct {
         const iterable = arguments.get(0);
 
         // 1. Let C be the this value.
-        const constructor = this_value;
+        const constructor_ = this_value;
 
         // 2. Let promiseCapability be ? NewPromiseCapability(C).
-        const promise_capability = try newPromiseCapability(agent, constructor);
+        const promise_capability = try newPromiseCapability(agent, constructor_);
 
         // 3. Let promiseResolve be Completion(GetPromiseResolve(C)).
-        const promise_resolve = getPromiseResolve(agent, constructor.object) catch |err| {
+        const promise_resolve = getPromiseResolve(agent, constructor_.object) catch |err| {
             // 4. IfAbruptRejectPromise(promiseResolve, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
@@ -1687,7 +1687,7 @@ pub const PromiseConstructor = struct {
         var result = performPromiseAllSettled(
             agent,
             &iterator,
-            constructor.object,
+            constructor_.object,
             promise_capability,
             promise_resolve,
         );
@@ -1713,13 +1713,13 @@ pub const PromiseConstructor = struct {
         const iterable = arguments.get(0);
 
         // 1. Let C be the this value.
-        const constructor = this_value;
+        const constructor_ = this_value;
 
         // 2. Let promiseCapability be ? NewPromiseCapability(C).
-        const promise_capability = try newPromiseCapability(agent, constructor);
+        const promise_capability = try newPromiseCapability(agent, constructor_);
 
         // 3. Let promiseResolve be Completion(GetPromiseResolve(C)).
-        const promise_resolve = getPromiseResolve(agent, constructor.object) catch |err| {
+        const promise_resolve = getPromiseResolve(agent, constructor_.object) catch |err| {
             // 4. IfAbruptRejectPromise(promiseResolve, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
@@ -1734,7 +1734,7 @@ pub const PromiseConstructor = struct {
         var result = performPromiseAny(
             agent,
             &iterator,
-            constructor.object,
+            constructor_.object,
             promise_capability,
             promise_resolve,
         );
@@ -1760,13 +1760,13 @@ pub const PromiseConstructor = struct {
         const iterable = arguments.get(0);
 
         // 1. Let C be the this value.
-        const constructor = this_value;
+        const constructor_ = this_value;
 
         // 2. Let promiseCapability be ? NewPromiseCapability(C).
-        const promise_capability = try newPromiseCapability(agent, constructor);
+        const promise_capability = try newPromiseCapability(agent, constructor_);
 
         // 3. Let promiseResolve be Completion(GetPromiseResolve(C)).
-        const promise_resolve = getPromiseResolve(agent, constructor.object) catch |err| {
+        const promise_resolve = getPromiseResolve(agent, constructor_.object) catch |err| {
             // 4. IfAbruptRejectPromise(promiseResolve, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
@@ -1781,7 +1781,7 @@ pub const PromiseConstructor = struct {
         var result = performPromiseRace(
             agent,
             &iterator,
-            constructor.object,
+            constructor_.object,
             promise_capability,
             promise_resolve,
         );
@@ -1807,10 +1807,10 @@ pub const PromiseConstructor = struct {
         const reason = arguments.get(0);
 
         // 1. Let C be the this value.
-        const constructor = this_value;
+        const constructor_ = this_value;
 
         // 2. Let promiseCapability be ? NewPromiseCapability(C).
-        const promise_capability = try newPromiseCapability(agent, constructor);
+        const promise_capability = try newPromiseCapability(agent, constructor_);
 
         // 3. Perform ? Call(promiseCapability.[[Reject]], undefined, « r »).
         _ = try Value.from(promise_capability.reject).call(agent, undefined, &.{reason});
@@ -1825,15 +1825,15 @@ pub const PromiseConstructor = struct {
         const resolution = arguments.get(0);
 
         // 1. Let C be the this value.
-        const constructor = this_value;
+        const constructor_ = this_value;
 
         // 2. If C is not an Object, throw a TypeError exception.
-        if (constructor != .object) {
-            return agent.throwException(.type_error, "{} is not an Object", .{constructor});
+        if (constructor_ != .object) {
+            return agent.throwException(.type_error, "{} is not an Object", .{constructor_});
         }
 
         // 3. Return ? PromiseResolve(C, x).
-        return Value.from(try promiseResolve(agent, constructor.object, resolution));
+        return Value.from(try promiseResolve(agent, constructor_.object, resolution));
     }
 
     /// 1 Promise.try ( callbackfn, ...args )
@@ -1843,15 +1843,15 @@ pub const PromiseConstructor = struct {
         const args = arguments.values[1..];
 
         // 1. Let C be the this value.
-        const constructor = this_value;
+        const constructor_ = this_value;
 
         // 2. If C is not an Object, throw a TypeError exception.
-        if (constructor != .object) {
-            return agent.throwException(.type_error, "{} is not an Object", .{constructor});
+        if (constructor_ != .object) {
+            return agent.throwException(.type_error, "{} is not an Object", .{constructor_});
         }
 
         // 3. Let promiseCapability be ? NewPromiseCapability(C).
-        const promise_capability = try newPromiseCapability(agent, constructor);
+        const promise_capability = try newPromiseCapability(agent, constructor_);
 
         // 4. Let status be Completion(Call(callbackfn, undefined, args)).
         const status = callbackfn.call(agent, .undefined, args);
@@ -1886,10 +1886,10 @@ pub const PromiseConstructor = struct {
         const realm = agent.currentRealm();
 
         // 1. Let C be the this value.
-        const constructor = this_value;
+        const constructor_ = this_value;
 
         // 2. Let promiseCapability be ? NewPromiseCapability(C).
-        const promise_capability = try newPromiseCapability(agent, constructor);
+        const promise_capability = try newPromiseCapability(agent, constructor_);
 
         // 3. Let obj be OrdinaryObjectCreate(%Object.prototype%).
         const object = try ordinaryObjectCreate(
@@ -2036,7 +2036,7 @@ pub const PromisePrototype = struct {
 
                     // iv. Let valueThunk be CreateBuiltinFunction(returnValue, 0, "", « »).
                     const value_thunk = try createBuiltinFunction(agent_, .{
-                        .regular = return_value,
+                        .function = return_value,
                     }, .{
                         .length = 0,
                         .name = "",
@@ -2054,7 +2054,7 @@ pub const PromisePrototype = struct {
 
             // b. Let thenFinally be CreateBuiltinFunction(thenFinallyClosure, 1, "", « »).
             then_finally = Value.from(
-                try createBuiltinFunction(agent, .{ .regular = then_finally_closure }, .{
+                try createBuiltinFunction(agent, .{ .function = then_finally_closure }, .{
                     .length = 1,
                     .name = "",
                     .additional_fields = SafePointer.make(*Captures, captures),
@@ -2095,7 +2095,7 @@ pub const PromisePrototype = struct {
 
                     // iv. Let thrower be CreateBuiltinFunction(throwReason, 0, "", « »).
                     const thrower = try createBuiltinFunction(agent_, .{
-                        .regular = throw_reason,
+                        .function = throw_reason,
                     }, .{
                         .length = 0,
                         .name = "",
@@ -2113,7 +2113,7 @@ pub const PromisePrototype = struct {
 
             // d. Let catchFinally be CreateBuiltinFunction(catchFinallyClosure, 1, "", « »).
             catch_finally = Value.from(
-                try createBuiltinFunction(agent, .{ .regular = catch_finally_closure }, .{
+                try createBuiltinFunction(agent, .{ .function = catch_finally_closure }, .{
                     .length = 1,
                     .name = "",
                     .additional_fields = SafePointer.make(*Captures, captures),

@@ -175,7 +175,7 @@ fn continueDynamicImport(
     }.func;
 
     // 5. Let onRejected be CreateBuiltinFunction(rejectedClosure, 1, "", « »).
-    const on_rejected = try createBuiltinFunction(agent, .{ .regular = rejected_closure }, .{
+    const on_rejected = try createBuiltinFunction(agent, .{ .function = rejected_closure }, .{
         .length = 1,
         .name = "",
         .additional_fields = SafePointer.make(*RejectedClosureCaptures, rejected_closure_captures),
@@ -260,7 +260,7 @@ fn continueDynamicImport(
             }.func;
 
             // e. Let onFulfilled be CreateBuiltinFunction(fulfilledClosure, 0, "", « »).
-            const on_fulfilled = try createBuiltinFunction(agent_, .{ .regular = fulfilled_closure }, .{
+            const on_fulfilled = try createBuiltinFunction(agent_, .{ .function = fulfilled_closure }, .{
                 .length = 0,
                 .name = "",
                 .additional_fields = SafePointer.make(*FulfilledClosureCaptures, fulfilled_closure_captures),
@@ -281,7 +281,7 @@ fn continueDynamicImport(
     }.func;
 
     // 7. Let linkAndEvaluate be CreateBuiltinFunction(linkAndEvaluateClosure, 0, "", « »).
-    const link_and_evaluate = try createBuiltinFunction(agent, .{ .regular = link_and_evaluate_closure }, .{
+    const link_and_evaluate = try createBuiltinFunction(agent, .{ .function = link_and_evaluate_closure }, .{
         .length = 0,
         .name = "",
         .additional_fields = SafePointer.make(

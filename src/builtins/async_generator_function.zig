@@ -24,7 +24,7 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgeneratorfunction
 pub const AsyncGeneratorFunctionConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "AsyncGeneratorFunction",
             .realm = realm,
@@ -45,12 +45,12 @@ pub const AsyncGeneratorFunctionConstructor = struct {
 
     /// 27.4.1.1 AsyncGeneratorFunction ( ...parameterArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-asyncgeneratorfunction
-    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const parameter_args = arguments.values[0..arguments.count() -| 1];
         const maybe_body_arg = arguments.getOrNull(arguments.count() -| 1);
 
         // 1. Let C be the active function object.
-        const constructor = agent.activeFunctionObject();
+        const constructor_ = agent.activeFunctionObject();
 
         // 2. If bodyArg is not present, set bodyArg to the empty String.
         const body_arg = maybe_body_arg orelse Value.from("");
@@ -58,7 +58,7 @@ pub const AsyncGeneratorFunctionConstructor = struct {
         // 3. Return ? CreateDynamicFunction(C, NewTarget, async-generator, parameterArgs, bodyArg).
         return Value.from(try createDynamicFunction(
             agent,
-            constructor,
+            constructor_,
             new_target,
             .async_generator,
             parameter_args,

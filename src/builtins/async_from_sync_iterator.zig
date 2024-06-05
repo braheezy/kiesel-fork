@@ -340,7 +340,7 @@ fn asyncFromSyncIteratorContinuation(agent: *Agent, result: Object, promise_capa
 
     // 9. Let onFulfilled be CreateBuiltinFunction(unwrap, 1, "", « »).
     const on_fulfilled = Value.from(
-        try createBuiltinFunction(agent, .{ .regular = unwrap }, .{
+        try createBuiltinFunction(agent, .{ .function = unwrap }, .{
             .length = 1,
             .name = "",
             .additional_fields = SafePointer.make(*Captures, captures),

@@ -33,7 +33,7 @@ const Self = @This();
 /// https://tc39.es/ecma262/#sec-properties-of-the-error-constructor
 pub const ErrorConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Error",
             .realm = realm,
@@ -62,7 +62,7 @@ pub const ErrorConstructor = struct {
 
     /// 20.5.1.1 Error ( message [ , options ] )
     /// https://tc39.es/ecma262/#sec-error-message
-    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const message = arguments.get(0);
         const options = arguments.get(1);
 
@@ -250,7 +250,7 @@ pub const URIErrorPrototype = MakeNativeErrorPrototype("URIError");
 fn MakeNativeErrorConstructor(comptime name: []const u8) type {
     return struct {
         pub fn create(realm: *Realm) Allocator.Error!Object {
-            const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+            const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
                 .length = 1,
                 .name = name,
                 .realm = realm,
@@ -281,7 +281,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
 
         /// 20.5.6.1.1 NativeError ( message [ , options ] )
         /// https://tc39.es/ecma262/#sec-nativeerror
-        fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+        fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
             const message = arguments.get(0);
             const options = arguments.get(1);
 
@@ -377,7 +377,7 @@ fn MakeNativeError() type {
 /// https://tc39.es/ecma262/#sec-aggregate-error-constructor
 pub const AggregateErrorConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 2,
             .name = "AggregateError",
             .realm = realm,
@@ -406,7 +406,7 @@ pub const AggregateErrorConstructor = struct {
 
     /// 20.5.7.1.1 AggregateError ( errors, message [ , options ] )
     /// https://tc39.es/ecma262/#sec-aggregate-error
-    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const errors = arguments.get(0);
         const message = arguments.get(1);
         const options = arguments.get(2);

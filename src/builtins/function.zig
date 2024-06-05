@@ -50,7 +50,7 @@ fn GrammarSymbol(comptime T: type) type {
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-constructor
 pub const FunctionConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Function",
             .realm = realm,
@@ -79,12 +79,12 @@ pub const FunctionConstructor = struct {
 
     /// 20.2.1.1 Function ( ...parameterArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-function-p1-p2-pn-body
-    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const parameter_args = arguments.values[0..arguments.count() -| 1];
         const maybe_body_arg = arguments.getOrNull(arguments.count() -| 1);
 
         // 1. Let C be the active function object.
-        const constructor = agent.activeFunctionObject();
+        const constructor_ = agent.activeFunctionObject();
 
         // 2. If bodyArg is not present, set bodyArg to the empty String.
         const body_arg = maybe_body_arg orelse Value.from("");
@@ -92,7 +92,7 @@ pub const FunctionConstructor = struct {
         // 3. Return ? CreateDynamicFunction(C, NewTarget, normal, parameterArgs, bodyArg).
         return Value.from(try createDynamicFunction(
             agent,
-            constructor,
+            constructor_,
             new_target,
             .normal,
             parameter_args,
@@ -463,7 +463,7 @@ pub fn createDynamicFunction(
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-prototype-object
 pub const FunctionPrototype = struct {
     pub fn createNoinit(realm: *Realm) Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .regular = behaviour }, .{
+        return createBuiltinFunction(realm.agent, .{ .function = function }, .{
             .length = 0,
             .name = "",
             .realm = realm,
@@ -483,7 +483,7 @@ pub const FunctionPrototype = struct {
         });
     }
 
-    fn behaviour(_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
+    fn function(_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         return .undefined;
     }
 
@@ -533,7 +533,7 @@ pub const FunctionPrototype = struct {
         }
 
         // 3. Let F be ? BoundFunctionCreate(Target, thisArg, args).
-        const function = try boundFunctionCreate(agent, target.object, this_arg, args);
+        const function_ = try boundFunctionCreate(agent, target.object, this_arg, args);
 
         // 4. Let L be 0.
         var length: f64 = 0;
@@ -576,7 +576,7 @@ pub const FunctionPrototype = struct {
         }
 
         // 7. Perform SetFunctionLength(F, L).
-        try setFunctionLength(function, length);
+        try setFunctionLength(function_, length);
 
         // 8. Let targetName be ? Get(Target, "name").
         var target_name = try target.object.get(PropertyKey.from("name"));
@@ -585,10 +585,10 @@ pub const FunctionPrototype = struct {
         if (target_name != .string) target_name = Value.from("");
 
         // 10. Perform SetFunctionName(F, targetName, "bound").
-        try setFunctionName(function, PropertyKey.from(target_name.string), "bound");
+        try setFunctionName(function_, PropertyKey.from(target_name.string), "bound");
 
         // 11. Return F.
-        return Value.from(function);
+        return Value.from(function_);
     }
 
     /// 20.2.3.3 Function.prototype.call ( thisArg, ...args )

@@ -356,7 +356,7 @@ pub fn arraySetLength(
 /// https://tc39.es/ecma262/#sec-properties-of-the-array-constructor
 pub const ArrayConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Array",
             .realm = realm,
@@ -394,7 +394,7 @@ pub const ArrayConstructor = struct {
 
     /// 23.1.1.1 Array ( ...values )
     /// https://tc39.es/ecma262/#sec-array
-    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         // 1. If NewTarget is undefined, let newTarget be the active function object; else let newTarget be NewTarget.
         const new_target_ = new_target orelse agent.activeFunctionObject();
 
@@ -488,7 +488,7 @@ pub const ArrayConstructor = struct {
         const this_arg = arguments.get(2);
 
         // 1. Let C be the this value.
-        const constructor = this_value;
+        const constructor_ = this_value;
 
         // 2. If mapfn is undefined, then
         const mapping = if (map_fn == .undefined) blk: {
@@ -515,9 +515,9 @@ pub const ArrayConstructor = struct {
         // 5. If usingIterator is not undefined, then
         if (using_iterator != null) {
             // a. If IsConstructor(C) is true, then
-            const array = if (constructor.isConstructor()) blk: {
+            const array = if (constructor_.isConstructor()) blk: {
                 // i. Let A be ? Construct(C).
-                break :blk try constructor.object.constructNoArgs();
+                break :blk try constructor_.object.constructNoArgs();
             }
             // b. Else,
             else blk: {
@@ -594,9 +594,9 @@ pub const ArrayConstructor = struct {
         const len = try array_like.lengthOfArrayLike();
 
         // 9. If IsConstructor(C) is true, then
-        const array = if (constructor.isConstructor()) blk: {
+        const array = if (constructor_.isConstructor()) blk: {
             // a. Let A be ? Construct(C, « 𝔽(len) »).
-            break :blk try constructor.object.construct(&.{Value.from(len)}, null);
+            break :blk try constructor_.object.construct(&.{Value.from(len)}, null);
         }
         // 10. Else,
         else blk: {
@@ -658,13 +658,13 @@ pub const ArrayConstructor = struct {
         const len_number = Value.from(@as(u53, @intCast(len)));
 
         // 3. Let C be the this value.
-        const constructor = this_value;
+        const constructor_ = this_value;
 
         // 4. If IsConstructor(C) is true, then
         const array = blk: {
-            if (constructor.isConstructor()) {
+            if (constructor_.isConstructor()) {
                 // a. Let A be ? Construct(C, « lenNumber »).
-                break :blk try constructor.object.construct(&.{len_number}, null);
+                break :blk try constructor_.object.construct(&.{len_number}, null);
             }
             // 5. Else,
             else {

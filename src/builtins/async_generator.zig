@@ -663,7 +663,7 @@ pub fn asyncGeneratorAwaitReturn(agent: *Agent, generator: *AsyncGenerator) Allo
 
     // 11. Let onFulfilled be CreateBuiltinFunction(fulfilledClosure, 1, "", « »).
     const on_fulfilled = Value.from(
-        try createBuiltinFunction(agent, .{ .regular = fulfilled_closure }, .{
+        try createBuiltinFunction(agent, .{ .function = fulfilled_closure }, .{
             .length = 1,
             .name = "",
             .additional_fields = SafePointer.make(*Captures, captures),
@@ -698,7 +698,7 @@ pub fn asyncGeneratorAwaitReturn(agent: *Agent, generator: *AsyncGenerator) Allo
 
     // 13. Let onRejected be CreateBuiltinFunction(rejectedClosure, 1, "", « »).
     const on_rejected = Value.from(
-        try createBuiltinFunction(agent, .{ .regular = rejected_closure }, .{
+        try createBuiltinFunction(agent, .{ .function = rejected_closure }, .{
             .length = 1,
             .name = "",
             .additional_fields = SafePointer.make(*Captures, captures),

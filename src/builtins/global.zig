@@ -261,7 +261,7 @@ pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]Nam
 fn GlobalFunction(comptime options: struct { name: []const u8, length: u32 }) type {
     return struct {
         pub fn create(realm: *Realm) Allocator.Error!Object {
-            return createBuiltinFunction(realm.agent, .{ .regular = @field(Self, options.name) }, .{
+            return createBuiltinFunction(realm.agent, .{ .function = @field(Self, options.name) }, .{
                 .length = options.length,
                 .name = options.name,
                 .realm = realm,

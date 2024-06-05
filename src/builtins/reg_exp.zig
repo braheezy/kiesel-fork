@@ -662,7 +662,7 @@ fn makeMatchIndicesIndexPairArray(
 /// https://tc39.es/ecma262/#sec-properties-of-the-regexp-constructor
 pub const RegExpConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 2,
             .name = "RegExp",
             .realm = realm,
@@ -693,19 +693,19 @@ pub const RegExpConstructor = struct {
 
     /// 22.2.4.1 RegExp ( pattern, flags )
     /// https://tc39.es/ecma262/#sec-regexp-pattern-flags
-    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const pattern = arguments.get(0);
         const flags = arguments.get(1);
 
         // 1. Let patternIsRegExp be ? IsRegExp(pattern).
         const pattern_is_regexp = try pattern.isRegExp();
 
-        var constructor: Object = undefined;
+        var constructor_: Object = undefined;
 
         // 2. If NewTarget is undefined, then
         if (new_target == null) {
             // a. Let newTarget be the active function object.
-            constructor = agent.activeFunctionObject();
+            constructor_ = agent.activeFunctionObject();
 
             // b. If patternIsRegExp is true and flags is undefined, then
             if (pattern_is_regexp and flags == .undefined) {
@@ -713,13 +713,13 @@ pub const RegExpConstructor = struct {
                 const pattern_constructor = try pattern.object.get(PropertyKey.from("constructor"));
 
                 // ii. If SameValue(newTarget, patternConstructor) is true, return pattern.
-                if (sameValue(Value.from(constructor), pattern_constructor)) return pattern;
+                if (sameValue(Value.from(constructor_), pattern_constructor)) return pattern;
             }
         }
         // 3. Else,
         else {
             // a. Let newTarget be NewTarget.
-            constructor = new_target.?;
+            constructor_ = new_target.?;
         }
 
         var p: Value = undefined;
@@ -765,7 +765,7 @@ pub const RegExpConstructor = struct {
         }
 
         // 7. Let O be ? RegExpAlloc(newTarget).
-        const object = try regExpAlloc(agent, constructor);
+        const object = try regExpAlloc(agent, constructor_);
 
         // 8. Return ? RegExpInitialize(O, P, F).
         return Value.from(try regExpInitialize(agent, object, p, f));

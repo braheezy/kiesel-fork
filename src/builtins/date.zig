@@ -699,7 +699,7 @@ pub fn toDateString(allocator: Allocator, time_value: f64) Allocator.Error![]con
 /// https://tc39.es/ecma262/#sec-properties-of-the-date-constructor
 pub const DateConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = behaviour }, .{
+        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 7,
             .name = "Date",
             .realm = realm,
@@ -732,7 +732,7 @@ pub const DateConstructor = struct {
 
     /// 21.4.2.1 Date ( ...values )
     /// https://tc39.es/ecma262/#sec-date
-    fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         // 1. If NewTarget is undefined, then
         if (new_target == null) {
             // a. Let now be the time value (UTC) identifying the current time.
