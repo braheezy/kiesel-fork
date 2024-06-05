@@ -159,8 +159,8 @@ pub const MapConstructor = struct {
         const items = arguments.get(0);
         const callback_fn = arguments.get(1);
 
-        // 1. Let groups be ? GroupBy(items, callbackfn, zero).
-        const groups = try items.groupBy(agent, callback_fn, .zero);
+        // 1. Let groups be ? GroupBy(items, callbackfn, collection).
+        const groups = try items.groupBy(agent, callback_fn, .collection);
 
         // 2. Let map be ! Construct(%Map%).
         const map = (try realm.intrinsics.@"%Map%"()).constructNoArgs() catch |err| try noexcept(err);

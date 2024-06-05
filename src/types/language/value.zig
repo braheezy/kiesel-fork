@@ -1081,12 +1081,12 @@ pub const Value = union(enum) {
         }
     }
 
-    const KeyCoercion = enum { property, zero };
+    const KeyCoercion = enum { property, collection };
 
     fn GroupByContainer(comptime key_coercion: KeyCoercion) type {
         return switch (key_coercion) {
             .property => PropertyKeyArrayHashMap(std.ArrayList(Value)),
-            .zero => ValueArrayHashMap(std.ArrayList(Value), sameValue),
+            .collection => ValueArrayHashMap(std.ArrayList(Value), sameValue),
         };
     }
 
@@ -1157,8 +1157,8 @@ pub const Value = union(enum) {
             }
             // h. Else,
             else blk: {
-                // i. Assert: keyCoercion is zero.
-                std.debug.assert(key_coercion == .zero);
+                // i. Assert: keyCoercion is collection.
+                std.debug.assert(key_coercion == .collection);
 
                 // ii. Set key to CanonicalizeKeyedCollectionKey(key).
                 break :blk key.canonicalizeKeyedCollectionKey();
