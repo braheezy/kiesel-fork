@@ -168,7 +168,7 @@ pub const SetConstructor = struct {
 
         try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
 
-        // 24.2.2.1 Set.prototype
+        // 24.2.3.1 Set.prototype
         // https://tc39.es/ecma262/#sec-set.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Set.prototype%"()),
@@ -177,7 +177,7 @@ pub const SetConstructor = struct {
             .configurable = false,
         });
 
-        // 24.2.3.3 Set.prototype.constructor
+        // 24.2.4.3 Set.prototype.constructor
         // https://tc39.es/ecma262/#sec-set.prototype.constructor
         try defineBuiltinProperty(
             realm.intrinsics.@"%Set.prototype%"() catch unreachable,
@@ -188,7 +188,7 @@ pub const SetConstructor = struct {
         return object;
     }
 
-    /// 24.2.1.1 Set ( [ iterable ] )
+    /// 24.2.2.1 Set ( [ iterable ] )
     /// https://tc39.es/ecma262/#sec-set-iterable
     fn behaviour(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const iterable = arguments.get(0);
@@ -238,7 +238,7 @@ pub const SetConstructor = struct {
         return Value.from(set);
     }
 
-    /// 24.2.2.2 get Set [ @@species ]
+    /// 24.2.3.2 get Set [ @@species ]
     /// https://tc39.es/ecma262/#sec-get-set-@@species
     fn @"@@species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
@@ -270,16 +270,16 @@ pub const SetPrototype = struct {
         try defineBuiltinFunction(object, "union", @"union", 1, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
 
-        // 24.2.4.8 Set.prototype.keys ( )
+        // 24.2.4.13 Set.prototype.keys ( )
         // https://tc39.es/ecma262/#sec-set.prototype.keys
         const @"%Set.prototype.values%" = object.propertyStorage().get(PropertyKey.from("values")).?;
         try defineBuiltinProperty(object, "keys", @"%Set.prototype.values%");
 
-        // 24.2.4.11 Set.prototype [ @@iterator ] ( )
+        // 24.2.4.18 Set.prototype [ @@iterator ] ( )
         // https://tc39.es/ecma262/#sec-set.prototype-@@iterator
         try defineBuiltinProperty(object, "@@iterator", @"%Set.prototype.values%");
 
-        // 24.2.4.12 Set.prototype [ @@toStringTag ]
+        // 24.2.4.19 Set.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-set.prototype-@@tostringtag
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
             .value = Value.from("Set"),
@@ -952,7 +952,7 @@ pub const SetPrototype = struct {
 const SetData = ValueArrayHashMap(void, sameValue);
 const IterableValues = std.ArrayList(?Value);
 
-/// 24.2.4 Properties of Set Instances
+/// 24.2.5 Properties of Set Instances
 /// https://tc39.es/ecma262/#sec-properties-of-set-instances
 pub const Set = MakeObject(.{
     .Fields = struct {
