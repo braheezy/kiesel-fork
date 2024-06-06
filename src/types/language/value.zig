@@ -1302,12 +1302,15 @@ pub fn stringToBigInt(allocator: Allocator, string: String) Allocator.Error!?Big
     // so we have to cut it off manually.
     const base: u8 = if (std.ascii.startsWithIgnoreCase(trimmed_string, "0b")) blk: {
         trimmed_string = trimmed_string[2..];
+        if (trimmed_string.len == 0) return null;
         break :blk 2;
     } else if (std.ascii.startsWithIgnoreCase(trimmed_string, "0o")) blk: {
         trimmed_string = trimmed_string[2..];
+        if (trimmed_string.len == 0) return null;
         break :blk 8;
     } else if (std.ascii.startsWithIgnoreCase(trimmed_string, "0x")) blk: {
         trimmed_string = trimmed_string[2..];
+        if (trimmed_string.len == 0) return null;
         break :blk 16;
     } else blk: {
         break :blk 10;
