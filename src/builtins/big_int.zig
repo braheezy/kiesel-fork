@@ -117,8 +117,8 @@ pub const BigIntConstructor = struct {
 /// 21.2.1.1.1 NumberToBigInt ( number )
 /// https://tc39.es/ecma262/#sec-numbertobigint
 fn numberToBigInt(agent: *Agent, number: Number) Agent.Error!types.BigInt {
-    // 1. If IsIntegralNumber(number) is false, throw a RangeError exception.
-    if (!Value.from(number).isIntegralNumber()) {
+    // 1. If number is not an integral Number, throw a RangeError exception.
+    if (!number.isIntegral()) {
         return agent.throwException(
             .range_error,
             "Cannot convert non-integral number to BigInt",

@@ -129,6 +129,11 @@ pub const Number = union(enum) {
         };
     }
 
+    /// https://tc39.es/ecma262/#integral-number
+    pub inline fn isIntegral(self: Self) bool {
+        return !self.isFinite() and @trunc(self.asFloat()) == self.asFloat();
+    }
+
     pub inline fn truncate(self: Self) Self {
         return switch (self) {
             .f64 => |x| .{ .f64 = @trunc(x) },
@@ -323,7 +328,7 @@ pub const Number = union(enum) {
         std.debug.assert(exponent.isFinite() and !exponent.isZero());
 
         // 12. If base < -0𝔽 and exponent is not an integral Number, return NaN.
-        if (base.asFloat() < 0 and @trunc(exponent.asFloat()) != exponent.asFloat())
+        if (base.asFloat() < 0 and !exponent.isIntegral())
             return .{ .f64 = std.math.nan(f64) };
 
         // 13. Return an implementation-approximated Number value representing the result of

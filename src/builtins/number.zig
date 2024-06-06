@@ -209,8 +209,11 @@ pub const NumberConstructor = struct {
     fn isInteger(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const number = arguments.get(0);
 
-        // 1. Return IsIntegralNumber(number).
-        return Value.from(number.isIntegralNumber());
+        // 1. If number is an integral Number, return true.
+        if (number == .number and number.number.isIntegral()) return Value.from(true);
+
+        // 2. Return false.
+        return Value.from(false);
     }
 
     /// 21.1.2.4 Number.isNaN ( number )
@@ -233,8 +236,8 @@ pub const NumberConstructor = struct {
     fn isSafeInteger(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const number = arguments.get(0);
 
-        // 1. If IsIntegralNumber(number) is true, then
-        if (number.isIntegralNumber()) {
+        // 1. If number is an integral Number, then
+        if (number == .number and number.number.isIntegral()) {
             // a. If abs(ℝ(number)) ≤ 2**53 - 1, return true.
             if (@abs(number.number.asFloat()) <= @as(f64, @floatFromInt(std.math.maxInt(u53)))) {
                 return Value.from(true);

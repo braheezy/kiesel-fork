@@ -828,23 +828,7 @@ pub const Value = union(enum) {
         return false;
     }
 
-    /// 7.2.6 IsIntegralNumber ( argument )
-    /// https://tc39.es/ecma262/#sec-isintegralnumber
-    pub fn isIntegralNumber(self: Self) bool {
-        // 1. If argument is not a Number, return false.
-        if (self != .number) return false;
-
-        // 2. If argument is not finite, return false.
-        if (!self.number.isFinite()) return false;
-
-        // 3. If truncate(ℝ(argument)) ≠ ℝ(argument), return false.
-        if (self.number.truncate().asFloat() != self.number.asFloat()) return false;
-
-        // 4. Return true.
-        return true;
-    }
-
-    /// 7.2.8 IsRegExp ( argument )
+    /// 7.2.6 IsRegExp ( argument )
     /// https://tc39.es/ecma262/#sec-isregexp
     pub fn isRegExp(self: Self) Agent.Error!bool {
         // 1. If argument is not an Object, return false.
@@ -1625,8 +1609,8 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) Agent.Error!bool {
 
         // b. If ℝ(x) = ℝ(y), return true; otherwise return false.
         // TODO: Implement more efficient BigInt to f64 comparison
-        if ((x == .number and !x.isIntegralNumber()) or
-            (y == .number and !y.isIntegralNumber())) return false;
+        if ((x == .number and !x.number.isIntegral()) or
+            (y == .number and !y.number.isIntegral())) return false;
         return (try x.toString(agent)).eql(try y.toString(agent));
     }
 

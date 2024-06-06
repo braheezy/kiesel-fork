@@ -512,7 +512,7 @@ fn isValidIntegerIndex(typed_array: *const TypedArray, index: f64) bool {
     // 1. If IsDetachedBuffer(O.[[ViewedArrayBuffer]]) is true, return false.
     if (isDetachedBuffer(typed_array.fields.viewed_array_buffer)) return false;
 
-    // 2. If IsIntegralNumber(index) is false, return false.
+    // 2. If index is not an integral Number, return false.
     if (@trunc(index) != index) return false;
 
     // 3. If index is -0𝔽, return false.

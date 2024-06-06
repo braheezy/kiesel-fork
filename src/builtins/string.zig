@@ -471,7 +471,7 @@ fn stringGetOwnProperty(
     // 1. If P is not a String, return undefined.
     // 2. Let index be CanonicalNumericIndexString(P).
     // 3. If index is undefined, return undefined.
-    // 4. If IsIntegralNumber(index) is false, return undefined.
+    // 4. If index is not an integral Number, return undefined.
     // 5. If index is -0𝔽, return undefined.
     if (property_key != .integer_index) return null;
     if (property_key.integer_index > std.math.maxInt(usize) - 1) return null;
@@ -598,8 +598,8 @@ pub const StringConstructor = struct {
             // a. Let nextCP be ? ToNumber(next).
             const next_code_point = try next.toNumber(agent);
 
-            // b. If IsIntegralNumber(nextCP) is false, throw a RangeError exception.
-            if (!Value.from(next_code_point).isIntegralNumber()) {
+            // b. If nextCP is not an integral Number, throw a RangeError exception.
+            if (!next_code_point.isIntegral()) {
                 return agent.throwException(
                     .range_error,
                     "Cannot convert non-integral number to code point",
