@@ -615,7 +615,7 @@ fn get(object: Object, property_key: PropertyKey, receiver: Value) Agent.Error!V
         }
 
         // b. If IsAccessorDescriptor(targetDesc) is true and targetDesc.[[Get]] is undefined, then
-        if (target_descriptor.?.isAccessorDescriptor() and target_descriptor.?.get == null) {
+        if (target_descriptor.?.isAccessorDescriptor() and target_descriptor.?.get.? == null) {
             // i. If trapResult is not undefined, throw a TypeError exception.
             if (trap_result != .undefined) {
                 return agent.throwException(
@@ -685,7 +685,7 @@ fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value)
         // b. If IsAccessorDescriptor(targetDesc) is true, then
         if (target_descriptor.?.isAccessorDescriptor()) {
             // i. If targetDesc.[[Set]] is undefined, throw a TypeError exception.
-            if (target_descriptor.?.set == null) {
+            if (target_descriptor.?.set.? == null) {
                 return agent.throwException(
                     .type_error,
                     "Proxy 'set' trap must not return true when attempting to set the value of a non-configurable accessor property with no setter on target",
