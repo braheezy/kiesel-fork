@@ -128,7 +128,7 @@ pub const ObjectConstructor = struct {
     /// https://tc39.es/ecma262/#sec-object.assign
     fn assign(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const target = arguments.get(0);
-        const sources = arguments.values[1..];
+        const sources = if (arguments.count() <= 1) &[_]Value{} else arguments.values[1..];
 
         // 1. Let to be ? ToObject(target).
         const to = try target.toObject(agent);

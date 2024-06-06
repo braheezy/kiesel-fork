@@ -1840,7 +1840,7 @@ pub const PromiseConstructor = struct {
     /// https://tc39.es/proposal-promise-try/#sec-promise.try
     fn @"try"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callbackfn = arguments.get(0);
-        const args = arguments.values[1..];
+        const args = if (arguments.count() <= 1) &[_]Value{} else arguments.values[1..];
 
         // 1. Let C be the this value.
         const constructor_ = this_value;
