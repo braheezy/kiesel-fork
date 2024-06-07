@@ -955,6 +955,13 @@ pub const StatementList = struct {
 
     items: []const StatementListItem,
 
+    pub fn hasLexicallyScopedDeclarations(self: Self) bool {
+        for (self.items) |item| {
+            if (item.hasLexicallyScopedDeclarations()) return true;
+        }
+        return false;
+    }
+
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn lexicallyScopedDeclarations(
@@ -1119,6 +1126,14 @@ pub const StatementListItem = union(enum) {
 
     statement: *Statement,
     declaration: *Declaration,
+
+    pub fn hasLexicallyScopedDeclarations(self: Self) bool {
+        switch (self) {
+            // TODO: Handle LabelledStatement
+            .statement => return false,
+            .declaration => return true,
+        }
+    }
 
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations

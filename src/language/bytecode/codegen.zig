@@ -1697,24 +1697,30 @@ pub fn codegenBlock(
         return;
     }
 
-    // Block : { StatementList }
-    // 1. Let oldEnv be the running execution context's LexicalEnvironment.
-    try executable.addInstruction(.push_lexical_environment);
+    const has_lexically_scoped_declarations = node.statement_list.hasLexicallyScopedDeclarations();
 
-    // 2. Let blockEnv be NewDeclarativeEnvironment(oldEnv).
-    // 3. Perform BlockDeclarationInstantiation(StatementList, blockEnv).
-    // 4. Set the running execution context's LexicalEnvironment to blockEnv.
-    try executable.addInstructionWithAstNode(
-        .block_declaration_instantiation,
-        .{ .statement_list = node.statement_list },
-    );
+    // Block : { StatementList }
+    if (has_lexically_scoped_declarations) {
+        // 1. Let oldEnv be the running execution context's LexicalEnvironment.
+        try executable.addInstruction(.push_lexical_environment);
+
+        // 2. Let blockEnv be NewDeclarativeEnvironment(oldEnv).
+        // 3. Perform BlockDeclarationInstantiation(StatementList, blockEnv).
+        // 4. Set the running execution context's LexicalEnvironment to blockEnv.
+        try executable.addInstructionWithAstNode(
+            .block_declaration_instantiation,
+            .{ .statement_list = node.statement_list },
+        );
+    }
 
     // 5. Let blockValue be Completion(Evaluation of StatementList).
     try codegenStatementList(node.statement_list, executable, ctx);
 
     // 6. Set the running execution context's LexicalEnvironment to oldEnv.
-    try executable.addInstruction(.restore_lexical_environment);
-    try executable.addInstruction(.pop_lexical_environment);
+    if (has_lexically_scoped_declarations) {
+        try executable.addInstruction(.restore_lexical_environment);
+        try executable.addInstruction(.pop_lexical_environment);
+    }
 
     // 7. Return ? blockValue.
 }
