@@ -131,7 +131,7 @@ pub const Number = union(enum) {
 
     /// https://tc39.es/ecma262/#integral-number
     pub inline fn isIntegral(self: Self) bool {
-        return !self.isFinite() and @trunc(self.asFloat()) == self.asFloat();
+        return self.isFinite() and @trunc(self.asFloat()) == self.asFloat();
     }
 
     pub inline fn truncate(self: Self) Self {
@@ -245,9 +245,7 @@ pub const Number = union(enum) {
             // a. If exponent > +0𝔽, then
             if (exponent.asFloat() > 0) {
                 // i. If exponent is an odd integral Number, return -∞𝔽. Otherwise, return +∞𝔽.
-                if (std.math.isFinite(exponent.asFloat()) and
-                    @trunc(exponent.asFloat()) == exponent.asFloat() and
-                    @mod(exponent.asFloat(), 2) != 0)
+                if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
                     return .{ .f64 = -std.math.inf(f64) }
                 else
                     return .{ .f64 = std.math.inf(f64) };
@@ -255,9 +253,7 @@ pub const Number = union(enum) {
             // b. Else,
             else {
                 // i. If exponent is an odd integral Number, return -0𝔽. Otherwise, return +0𝔽.
-                if (std.math.isFinite(exponent.asFloat()) and
-                    @trunc(exponent.asFloat()) == exponent.asFloat() and
-                    @mod(exponent.asFloat(), 2) != 0)
+                if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
                     return .{ .f64 = -0.0 }
                 else
                     return .{ .i32 = 0 };
@@ -278,9 +274,7 @@ pub const Number = union(enum) {
             // a. If exponent > +0𝔽, then
             if (exponent.asFloat() > 0) {
                 // i. If exponent is an odd integral Number, return -0𝔽. Otherwise, return +0𝔽.
-                if (std.math.isFinite(exponent.asFloat()) and
-                    @trunc(exponent.asFloat()) == exponent.asFloat() and
-                    @mod(exponent.asFloat(), 2) != 0)
+                if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
                     return .{ .f64 = -0.0 }
                 else
                     return .{ .i32 = 0 };
@@ -288,9 +282,7 @@ pub const Number = union(enum) {
             // b. Else,
             else {
                 // i. If exponent is an odd integral Number, return -∞𝔽. Otherwise, return +∞𝔽.
-                if (std.math.isFinite(exponent.asFloat()) and
-                    @trunc(exponent.asFloat()) == exponent.asFloat() and
-                    @mod(exponent.asFloat(), 2) != 0)
+                if (exponent.isIntegral() and @mod(exponent.asFloat(), 2) != 0)
                     return .{ .f64 = -std.math.inf(f64) }
                 else
                     return .{ .f64 = std.math.inf(f64) };
