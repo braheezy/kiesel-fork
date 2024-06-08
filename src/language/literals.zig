@@ -114,7 +114,7 @@ pub fn parseNumericLiteral(
         },
         '.' => switch (state) {
             .start => state = .fraction_period,
-            .integer_digit, .fraction_digit, .fraction_period, .exponent_digit => {
+            .integer_digit, .fraction_digit, .fraction_period, .exponent_digit, .big_int_suffix => {
                 if (state == .integer_digit and system == .decimal and production == .regular) {
                     state = .fraction_period;
                 } else if (state == .fraction_period and i == 1) {
