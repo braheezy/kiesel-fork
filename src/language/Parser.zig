@@ -305,6 +305,55 @@ fn unescapeIdentifier(self: *Self, token: Tokenizer.Token) AcceptError![]const u
     return identifier;
 }
 
+fn ensureSimpleParameterList(
+    self: *Self,
+    formal_parameters: ast.FormalParameters,
+    location: ptk.Location,
+) AcceptError!void {
+    if (!formal_parameters.isSimpleParameterList()) {
+        try self.emitErrorAt(
+            location,
+            "Function with 'use strict' directive must have a simple parameter list",
+            .{},
+        );
+        return error.UnexpectedToken;
+    }
+}
+
+fn ensureUniqueParameterNames(
+    self: *Self,
+    reason: enum { strict, arrow, method },
+    formal_parameters: ast.FormalParameters,
+    location: ptk.Location,
+) AcceptError!void {
+    var seen_bound_names = std.StringHashMap(void).init(self.allocator);
+    defer seen_bound_names.deinit();
+    const bound_names = try formal_parameters.boundNames(self.allocator);
+    defer self.allocator.free(bound_names);
+    for (bound_names) |bound_name| {
+        if (try seen_bound_names.fetchPut(bound_name, {})) |_| {
+            switch (reason) {
+                .strict => try self.emitErrorAt(
+                    location,
+                    "Function must not have duplicate parameter names in strict mode",
+                    .{},
+                ),
+                .arrow => try self.emitErrorAt(
+                    location,
+                    "Arrow function must not have duplicate parameter names",
+                    .{},
+                ),
+                .method => try self.emitErrorAt(
+                    location,
+                    "Method must not have duplicate parameter names",
+                    .{},
+                ),
+            }
+            return error.UnexpectedToken;
+        }
+    }
+}
+
 /// 5.1.5.8 [no LineTerminator here]
 /// https://tc39.es/ecma262/#sec-no-lineterminator-here
 fn noLineTerminatorHere(self: *Self) AcceptError!void {
@@ -1939,12 +1988,18 @@ pub fn acceptFunctionDeclaration(self: *Self) AcceptError!ast.FunctionDeclaratio
         };
         return err;
     };
-    _ = try self.core.accept(RuleSet.is(.@"("));
+    const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
     const function_body = try self.acceptFunctionBody(.normal);
     _ = try self.core.accept(RuleSet.is(.@"}"));
+    if (function_body.strict) {
+        try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
+    }
+    if (function_body.functionBodyContainsUseStrict()) {
+        try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
+    }
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
         u8,
@@ -1966,12 +2021,18 @@ pub fn acceptFunctionExpression(self: *Self) AcceptError!ast.FunctionExpression 
     // We need to do this after consuming the 'function' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     const identifier = self.acceptBindingIdentifier() catch null;
-    _ = try self.core.accept(RuleSet.is(.@"("));
+    const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
     const function_body = try self.acceptFunctionBody(.normal);
     _ = try self.core.accept(RuleSet.is(.@"}"));
+    if (function_body.strict) {
+        try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
+    }
+    if (function_body.functionBodyContainsUseStrict()) {
+        try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
+    }
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
         u8,
@@ -2010,6 +2071,7 @@ pub fn acceptArrowFunction(self: *Self) AcceptError!ast.ArrowFunction {
 
     var start_offset: usize = undefined;
     var formal_parameters: ast.FormalParameters = undefined;
+    const location = (try self.core.peek() orelse return error.UnexpectedToken).location;
     if (self.acceptBindingIdentifier()) |identifier| {
         // We need to do this after consuming the identifier token to skip preceeding whitespace.
         start_offset = self.core.tokenizer.offset - identifier.len;
@@ -2051,6 +2113,10 @@ pub fn acceptArrowFunction(self: *Self) AcceptError!ast.ArrowFunction {
             .strict = self.state.in_strict_mode,
         };
     };
+    try self.ensureUniqueParameterNames(.arrow, formal_parameters, location);
+    if (function_body.functionBodyContainsUseStrict()) {
+        try self.ensureSimpleParameterList(formal_parameters, location);
+    }
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
         u8,
@@ -2109,7 +2175,7 @@ pub fn acceptMethodDefinition(
             tmp2 = temporaryChange(&self.state.in_class_constructor, true);
         }
     }
-    _ = try self.core.accept(RuleSet.is(.@"("));
+    const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
@@ -2121,6 +2187,10 @@ pub fn acceptMethodDefinition(
     };
     const function_body = try self.acceptFunctionBody(function_body_type);
     _ = try self.core.accept(RuleSet.is(.@"}"));
+    try self.ensureUniqueParameterNames(.method, formal_parameters, open_parenthesis_token.location);
+    if (function_body.functionBodyContainsUseStrict()) {
+        try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
+    }
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
         u8,
@@ -2149,12 +2219,18 @@ fn acceptGeneratorDeclaration(self: *Self) AcceptError!ast.GeneratorDeclaration 
         try self.emitError("Generator declaration must have a binding identifier", .{});
         return err;
     };
-    _ = try self.core.accept(RuleSet.is(.@"("));
+    const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
     const function_body = try self.acceptFunctionBody(.generator);
     _ = try self.core.accept(RuleSet.is(.@"}"));
+    if (function_body.strict) {
+        try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
+    }
+    if (function_body.functionBodyContainsUseStrict()) {
+        try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
+    }
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
         u8,
@@ -2177,12 +2253,18 @@ pub fn acceptGeneratorExpression(self: *Self) AcceptError!ast.GeneratorExpressio
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     _ = try self.core.accept(RuleSet.is(.@"*"));
     const identifier = self.acceptBindingIdentifier() catch null;
-    _ = try self.core.accept(RuleSet.is(.@"("));
+    const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
     const function_body = try self.acceptFunctionBody(.generator);
     _ = try self.core.accept(RuleSet.is(.@"}"));
+    if (function_body.strict) {
+        try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
+    }
+    if (function_body.functionBodyContainsUseStrict()) {
+        try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
+    }
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
         u8,
@@ -2210,12 +2292,18 @@ fn acceptAsyncGeneratorDeclaration(self: *Self) AcceptError!ast.AsyncGeneratorDe
         try self.emitError("Async generator declaration must have a binding identifier", .{});
         return err;
     };
-    _ = try self.core.accept(RuleSet.is(.@"("));
+    const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
     const function_body = try self.acceptFunctionBody(.async_generator);
     _ = try self.core.accept(RuleSet.is(.@"}"));
+    if (function_body.strict) {
+        try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
+    }
+    if (function_body.functionBodyContainsUseStrict()) {
+        try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
+    }
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
         u8,
@@ -2240,12 +2328,18 @@ pub fn acceptAsyncGeneratorExpression(self: *Self) AcceptError!ast.AsyncGenerato
     _ = try self.core.accept(RuleSet.is(.function));
     _ = try self.core.accept(RuleSet.is(.@"*"));
     const identifier = self.acceptBindingIdentifier() catch null;
-    _ = try self.core.accept(RuleSet.is(.@"("));
+    const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
     const function_body = try self.acceptFunctionBody(.async_generator);
     _ = try self.core.accept(RuleSet.is(.@"}"));
+    if (function_body.strict) {
+        try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
+    }
+    if (function_body.functionBodyContainsUseStrict()) {
+        try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
+    }
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
         u8,
@@ -2479,12 +2573,18 @@ fn acceptAsyncFunctionDeclaration(self: *Self) AcceptError!ast.AsyncFunctionDecl
         };
         return err;
     };
-    _ = try self.core.accept(RuleSet.is(.@"("));
+    const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
     const function_body = try self.acceptFunctionBody(.@"async");
     _ = try self.core.accept(RuleSet.is(.@"}"));
+    if (function_body.strict) {
+        try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
+    }
+    if (function_body.functionBodyContainsUseStrict()) {
+        try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
+    }
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
         u8,
@@ -2508,12 +2608,18 @@ pub fn acceptAsyncFunctionExpression(self: *Self) AcceptError!ast.AsyncFunctionE
     try self.noLineTerminatorHere();
     _ = try self.core.accept(RuleSet.is(.function));
     const identifier = self.acceptBindingIdentifier() catch null;
-    _ = try self.core.accept(RuleSet.is(.@"("));
+    const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
     const function_body = try self.acceptFunctionBody(.@"async");
     _ = try self.core.accept(RuleSet.is(.@"}"));
+    if (function_body.strict) {
+        try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
+    }
+    if (function_body.functionBodyContainsUseStrict()) {
+        try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
+    }
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
         u8,
@@ -2536,6 +2642,7 @@ pub fn acceptAsyncArrowFunction(self: *Self) AcceptError!ast.AsyncArrowFunction 
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
     try self.noLineTerminatorHere();
     var formal_parameters: ast.FormalParameters = undefined;
+    const location = (try self.core.peek() orelse return error.UnexpectedToken).location;
     if (self.acceptBindingIdentifier()) |identifier| {
         var formal_parameters_items = try std.ArrayList(ast.FormalParameters.Item).initCapacity(
             self.allocator,
@@ -2573,6 +2680,10 @@ pub fn acceptAsyncArrowFunction(self: *Self) AcceptError!ast.AsyncArrowFunction 
             .strict = self.state.in_strict_mode,
         };
     };
+    try self.ensureUniqueParameterNames(.arrow, formal_parameters, location);
+    if (function_body.functionBodyContainsUseStrict()) {
+        try self.ensureSimpleParameterList(formal_parameters, location);
+    }
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
         u8,
