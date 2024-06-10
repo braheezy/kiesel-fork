@@ -6,6 +6,9 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const icu4zig = @import("icu4zig");
+
+const build_options = @import("build-options");
 const tokenizer = @import("../../language/tokenizer.zig");
 
 fn utf8IsAscii(utf8: []const u8) bool {
@@ -356,6 +359,21 @@ pub const String = union(enum) {
                 return fromAscii(output);
             },
             .utf16 => |utf16| {
+                if (build_options.enable_intl) {
+                    // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not
+                    //       handled correctly here.
+                    const utf8 = try self.toUtf8(allocator);
+                    defer allocator.free(utf8);
+                    const data_provider = icu4zig.DataProvider.init();
+                    defer data_provider.deinit();
+                    const case_mapper = icu4zig.CaseMapper.init(data_provider);
+                    defer case_mapper.deinit();
+                    const locale = icu4zig.Locale.init(null) catch unreachable;
+                    defer locale.deinit();
+                    const utf8_lowercase = try case_mapper.lowercase(allocator, utf8, locale);
+                    defer allocator.free(utf8_lowercase);
+                    return fromUtf8(allocator, utf8_lowercase);
+                }
                 const output = try allocator.alloc(u16, utf16.len);
                 for (utf16, 0..) |c, i| {
                     output[i] = if (c < 128) std.ascii.toLower(@intCast(c)) else c;
@@ -376,6 +394,21 @@ pub const String = union(enum) {
                 return fromAscii(output);
             },
             .utf16 => |utf16| {
+                if (build_options.enable_intl) {
+                    // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not
+                    //       handled correctly here.
+                    const utf8 = try self.toUtf8(allocator);
+                    defer allocator.free(utf8);
+                    const data_provider = icu4zig.DataProvider.init();
+                    defer data_provider.deinit();
+                    const case_mapper = icu4zig.CaseMapper.init(data_provider);
+                    defer case_mapper.deinit();
+                    const locale = icu4zig.Locale.init(null) catch unreachable;
+                    defer locale.deinit();
+                    const utf8_uppercase = try case_mapper.uppercase(allocator, utf8, locale);
+                    defer allocator.free(utf8_uppercase);
+                    return fromUtf8(allocator, utf8_uppercase);
+                }
                 const output = try allocator.alloc(u16, utf16.len);
                 for (utf16, 0..) |c, i| {
                     output[i] = if (c < 128) std.ascii.toUpper(@intCast(c)) else c;
