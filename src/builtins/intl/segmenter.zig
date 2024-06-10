@@ -150,6 +150,15 @@ pub const SegmenterPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        // 18.3.2 Intl.Segmenter.prototype [ @@toStringTag ]
+        // https://tc39.es/ecma402/#sec-intl.segmenter.prototype-@@tostringtag
+        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+            .value = Value.from("Intl.Segmenter"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
         return object;
     }
 };
