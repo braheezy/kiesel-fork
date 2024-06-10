@@ -68,6 +68,7 @@ pub const Tag = enum(u32) {
 
     // ECMA-402
     intl_locale,
+    intl_segmenter,
 
     // Custom
     _,

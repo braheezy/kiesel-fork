@@ -34,6 +34,9 @@ pub const Intl = struct {
     pub const Locale = @import("./intl/locale.zig").Locale;
     pub const LocaleConstructor = @import("./intl/locale.zig").LocaleConstructor;
     pub const LocalePrototype = @import("./intl/locale.zig").LocalePrototype;
+    pub const Segmenter = @import("./intl/segmenter.zig").Segmenter;
+    pub const SegmenterConstructor = @import("./intl/segmenter.zig").SegmenterConstructor;
+    pub const SegmenterPrototype = @import("./intl/segmenter.zig").SegmenterPrototype;
 
     pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
@@ -55,6 +58,15 @@ pub const Intl = struct {
         // https://tc39.es/ecma402/#sec-intl.locale-intro
         try defineBuiltinProperty(object, "Locale", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.Locale%"()),
+            .writable = true,
+            .enumerable = false,
+            .configurable = true,
+        });
+
+        // 8.2.9 Intl.Segmenter ( . . . )
+        // https://tc39.es/ecma402/#sec-intl.segmenter-intro
+        try defineBuiltinProperty(object, "Segmenter", PropertyDescriptor{
+            .value = Value.from(try realm.intrinsics.@"%Intl.Segmenter%"()),
             .writable = true,
             .enumerable = false,
             .configurable = true,

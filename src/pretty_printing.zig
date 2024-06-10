@@ -543,6 +543,27 @@ fn prettyPrintIntlLocale(
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintIntlSegmenter(
+    intl_segmenter: *const builtins.Intl.Segmenter,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    const agent = intl_segmenter.data.agent;
+    const locale = intl_segmenter.fields.locale;
+    const segmenter_granularity = intl_segmenter.fields.segmenter_granularity;
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Intl.Segmenter(");
+    try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}, granularity: {pretty}", .{
+        Value.from(String.fromAscii(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(String.fromAscii(@tagName(segmenter_granularity))),
+    });
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintPrimitiveWrapper(
     object: anytype,
     writer: anytype,
@@ -701,6 +722,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.TypedArray, prettyPrintTypedArray },
         } ++ if (build_options.enable_intl) .{
             .{ builtins.Intl.Locale, prettyPrintIntlLocale },
+            .{ builtins.Intl.Segmenter, prettyPrintIntlSegmenter },
         } else .{}) |entry| {
             const T, const prettyPrintFn = entry;
             if (object.is(T)) return prettyPrintFn(object.as(T), writer);

@@ -10,10 +10,12 @@ const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
 
 const Agent = execution.Agent;
+const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const String = types.String;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 const LocaleList = std.ArrayList(icu4zig.Locale);
 
@@ -118,4 +120,27 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
 
     // 8. Return seen.
     return seen;
+}
+
+/// 9.2.9 GetOptionsObject ( options )
+/// https://tc39.es/ecma402/#sec-getoptionsobject
+pub fn getOptionsObject(agent: *Agent, options: Value) Agent.Error!Object {
+    // 1. If options is undefined, then
+    if (options == .undefined) {
+        // a. Return OrdinaryObjectCreate(null).
+        return ordinaryObjectCreate(agent, null);
+    }
+
+    // 2. If options is an Object, then
+    if (options == .object) {
+        // a. Return options.
+        return options.object;
+    }
+
+    // 3. Throw a TypeError exception.
+    return agent.throwException(
+        .type_error,
+        "Options must either be an object or undefined",
+        .{},
+    );
 }
