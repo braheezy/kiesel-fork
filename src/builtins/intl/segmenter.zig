@@ -18,15 +18,19 @@ const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getOption = types.getOption;
 const getOptionsObject = abstract_operations.getOptionsObject;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 18.2 Properties of the Intl.Segmenter Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-segmenter-constructor
@@ -150,6 +154,8 @@ pub const SegmenterPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
+
         // 18.3.2 Intl.Segmenter.prototype [ @@toStringTag ]
         // https://tc39.es/ecma402/#sec-intl.segmenter.prototype-@@tostringtag
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
@@ -160,6 +166,39 @@ pub const SegmenterPrototype = struct {
         });
 
         return object;
+    }
+
+    /// 18.3.4 Intl.Segmenter.prototype.resolvedOptions ( )
+    /// https://tc39.es/ecma402/#sec-intl.segmenter.prototype.resolvedoptions
+    fn resolvedOptions(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        const realm = agent.currentRealm();
+
+        // 1. Let segmenter be the this value.
+        // 2. Perform ? RequireInternalSlot(segmenter, [[InitializedSegmenter]]).
+        const segmenter = try this_value.requireInternalSlot(agent, Segmenter);
+
+        // 3. Let options be OrdinaryObjectCreate(%Object.prototype%).
+        const options = try ordinaryObjectCreate(
+            agent,
+            try realm.intrinsics.@"%Object.prototype%"(),
+        );
+
+        // 4. For each row of Table 28, except the header row, in table order, do
+        //     a. Let p be the Property value of the current row.
+        //     b. Let v be the value of segmenter's internal slot whose name is the Internal Slot value of the current row.
+        //     c. Assert: v is not undefined.
+        //     d. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("locale"),
+            Value.from(String.fromAscii(try segmenter.fields.locale.toString(agent.gc_allocator))),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("granularity"),
+            Value.from(String.fromAscii(@tagName(segmenter.fields.segmenter_granularity))),
+        ) catch |err| try noexcept(err);
+
+        // 5. Return options.
+        return Value.from(options);
     }
 };
 
