@@ -37,6 +37,8 @@ pub const Intl = struct {
     pub const Segmenter = @import("./intl/segmenter.zig").Segmenter;
     pub const SegmenterConstructor = @import("./intl/segmenter.zig").SegmenterConstructor;
     pub const SegmenterPrototype = @import("./intl/segmenter.zig").SegmenterPrototype;
+    pub const IntlSegmentsPrototype = @import("./intl/segmenter.zig").IntlSegmentsPrototype;
+    pub const IntlSegmentIteratorPrototype = @import("./intl/segmenter.zig").IntlSegmentIteratorPrototype;
 
     pub fn create(realm: *Realm) Allocator.Error!Object {
         const object = try builtins.Object.create(realm.agent, .{
