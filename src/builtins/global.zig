@@ -734,7 +734,7 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     var result = String.Builder.init(agent.gc_allocator);
     defer result.deinit();
 
-    const code_units = try string.codeUnits(agent.gc_allocator);
+    const code_units = try string.toUtf16(agent.gc_allocator);
     defer agent.gc_allocator.free(code_units);
 
     // 4. Let k be 0.

@@ -101,16 +101,19 @@ pub const String = union(enum) {
         };
     }
 
-    pub fn codeUnitIterator(self: Self) CodeUnitIterator {
-        return .{ .index = 0, .string = self };
+    pub fn toUtf16(self: Self, allocator: Allocator) Allocator.Error![]const u16 {
+        return switch (self) {
+            .ascii => |ascii| blk: {
+                const utf16 = try allocator.alloc(u16, ascii.len);
+                for (ascii, 0..) |c, i| utf16[i] = c;
+                break :blk utf16;
+            },
+            .utf16 => |utf16| allocator.dupe(u16, utf16),
+        };
     }
 
-    pub fn codeUnits(self: Self, allocator: Allocator) Allocator.Error![]const u16 {
-        if (self.isEmpty()) return &.{};
-        var it = self.codeUnitIterator();
-        var code_units = try allocator.alloc(u16, self.length());
-        while (it.next()) |c| code_units[it.index - 1] = c;
-        return code_units;
+    pub fn codeUnitIterator(self: Self) CodeUnitIterator {
+        return .{ .index = 0, .string = self };
     }
 
     pub fn eql(a: Self, b: Self) bool {

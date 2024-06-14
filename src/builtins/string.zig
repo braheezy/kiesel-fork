@@ -58,7 +58,7 @@ pub fn stringPad(
     // 5. Let truncatedStringFiller be the String value consisting of repeated concatenations of
     //    fillString truncated to length fillLen.
     const truncated_string_filler = blk: {
-        const fill_string_code_units = try fill_string.codeUnits(agent.gc_allocator);
+        const fill_string_code_units = try fill_string.toUtf16(agent.gc_allocator);
         defer agent.gc_allocator.free(fill_string_code_units);
 
         const repeated_code_units = try agent.gc_allocator.alloc(u16, fill_len);
@@ -1746,7 +1746,7 @@ pub const StringPrototype = struct {
             );
 
             // b. Let codeUnits be a List consisting of the sequence of code units that are the elements of head.
-            const code_units = try head.codeUnits(agent.gc_allocator);
+            const code_units = try head.toUtf16(agent.gc_allocator);
 
             // c. Return CreateArrayFromList(codeUnits).
             return Value.from(
