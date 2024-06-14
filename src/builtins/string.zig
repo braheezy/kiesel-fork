@@ -1752,9 +1752,16 @@ pub const StringPrototype = struct {
             return Value.from(
                 try createArrayFromListMapToValue(agent, u16, code_units, struct {
                     fn mapFn(agent_: *Agent, code_unit: u16) Allocator.Error!Value {
-                        var s = try agent_.gc_allocator.alloc(u16, 1);
-                        s[0] = code_unit;
-                        return Value.from(types.String.fromUtf16(s));
+                        const code_unit_string = if (code_unit > 0x7F) blk: {
+                            var utf16 = try agent_.gc_allocator.alloc(u16, 1);
+                            utf16[0] = code_unit;
+                            break :blk types.String.fromUtf16(utf16);
+                        } else blk: {
+                            var ascii = try agent_.gc_allocator.alloc(u8, 1);
+                            ascii[0] = @intCast(code_unit);
+                            break :blk types.String.fromAscii(ascii);
+                        };
+                        return Value.from(code_unit_string);
                     }
                 }.mapFn),
             );
