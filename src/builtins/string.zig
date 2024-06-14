@@ -705,6 +705,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "indexOf", indexOf, 1, realm);
         try defineBuiltinFunction(object, "isWellFormed", isWellFormed, 0, realm);
         try defineBuiltinFunction(object, "lastIndexOf", lastIndexOf, 1, realm);
+        try defineBuiltinFunction(object, "localeCompare", localeCompare, 1, realm);
         try defineBuiltinFunction(object, "match", match, 1, realm);
         try defineBuiltinFunction(object, "matchAll", matchAll, 1, realm);
         try defineBuiltinFunction(object, "padEnd", padEnd, 1, realm);
@@ -1123,6 +1124,40 @@ pub const StringPrototype = struct {
             Value.from(@as(u53, @intCast(result)))
         else
             Value.from(-1);
+    }
+
+    /// 22.1.3.12 String.prototype.localeCompare ( that [ , reserved1 [ , reserved2 ] ] )
+    /// https://tc39.es/ecma262/#sec-string.prototype.localecompare
+    fn localeCompare(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const that = arguments.get(0);
+
+        // 1. Let O be ? RequireObjectCoercible(this value).
+        const object = try this_value.requireObjectCoercible(agent);
+
+        // 2. Let S be ? ToString(O).
+        const string = try object.toString(agent);
+
+        // 3. Let thatValue be ? ToString(that).
+        const that_value = try that.toString(agent);
+
+        const order = if (string == .ascii and that_value == .ascii) blk: {
+            break :blk std.mem.order(u8, string.ascii, that_value.ascii);
+        } else if (string == .utf16 and that_value == .utf16) blk: {
+            break :blk std.mem.order(u16, string.utf16, that_value.utf16);
+        } else if (string == .ascii and that_value == .utf16) blk: {
+            const string_utf16 = try string.toUtf16(agent.gc_allocator);
+            defer agent.gc_allocator.free(string_utf16);
+            break :blk std.mem.order(u16, string_utf16, that_value.utf16);
+        } else if (string == .utf16 and that_value == .ascii) blk: {
+            const that_value_utf16 = try that_value.toUtf16(agent.gc_allocator);
+            defer agent.gc_allocator.free(that_value_utf16);
+            break :blk std.mem.order(u16, string.utf16, that_value_utf16);
+        } else unreachable;
+        return switch (order) {
+            .lt => Value.from(-1),
+            .gt => Value.from(1),
+            .eq => Value.from(0),
+        };
     }
 
     /// 22.1.3.13 String.prototype.match ( regexp )
