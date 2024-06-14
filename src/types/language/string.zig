@@ -92,7 +92,7 @@ pub const String = union(enum) {
 
     pub fn toUtf8(self: Self, allocator: Allocator) Allocator.Error![]const u8 {
         return switch (self) {
-            .ascii => |ascii| ascii,
+            .ascii => |ascii| allocator.dupe(u8, ascii),
             .utf16 => |utf16| std.fmt.allocPrint(
                 allocator,
                 "{}",
