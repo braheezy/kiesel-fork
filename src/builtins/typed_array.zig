@@ -3218,7 +3218,7 @@ pub fn compareTypedArrayElements(
 
 /// 23.2.5.1.1 AllocateTypedArray ( constructorName, newTarget, defaultProto [ , length ] )
 /// https://tc39.es/ecma262/#sec-allocatetypedarray
-fn allocateTypedArray(
+pub fn allocateTypedArray(
     agent: *Agent,
     comptime constructor_name: []const u8,
     new_target: Object,
