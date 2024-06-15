@@ -354,6 +354,25 @@ fn ensureUniqueParameterNames(
     }
 }
 
+fn ensureAllowedParameterNames(
+    self: *Self,
+    formal_parameters: ast.FormalParameters,
+    location: ptk.Location,
+) AcceptError!void {
+    const bound_names = try formal_parameters.boundNames(self.allocator);
+    defer self.allocator.free(bound_names);
+    for (bound_names) |bound_name| {
+        if (std.mem.eql(u8, bound_name, "eval") or std.mem.eql(u8, bound_name, "arguments")) {
+            try self.emitErrorAt(
+                location,
+                "Function must not have parameter named '{s}' in strict mode",
+                .{bound_name},
+            );
+            return error.UnexpectedToken;
+        }
+    }
+}
+
 /// 5.1.5.8 [no LineTerminator here]
 /// https://tc39.es/ecma262/#sec-no-lineterminator-here
 fn noLineTerminatorHere(self: *Self) AcceptError!void {
@@ -1996,6 +2015,7 @@ pub fn acceptFunctionDeclaration(self: *Self) AcceptError!ast.FunctionDeclaratio
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
+        try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
@@ -2029,6 +2049,7 @@ pub fn acceptFunctionExpression(self: *Self) AcceptError!ast.FunctionExpression 
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
+        try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
@@ -2114,6 +2135,9 @@ pub fn acceptArrowFunction(self: *Self) AcceptError!ast.ArrowFunction {
         };
     };
     try self.ensureUniqueParameterNames(.arrow, formal_parameters, location);
+    if (function_body.strict) {
+        try self.ensureAllowedParameterNames(formal_parameters, location);
+    }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, location);
     }
@@ -2227,6 +2251,7 @@ fn acceptGeneratorDeclaration(self: *Self) AcceptError!ast.GeneratorDeclaration 
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
+        try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
@@ -2261,6 +2286,7 @@ pub fn acceptGeneratorExpression(self: *Self) AcceptError!ast.GeneratorExpressio
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
+        try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
@@ -2300,6 +2326,7 @@ fn acceptAsyncGeneratorDeclaration(self: *Self) AcceptError!ast.AsyncGeneratorDe
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
+        try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
@@ -2336,6 +2363,7 @@ pub fn acceptAsyncGeneratorExpression(self: *Self) AcceptError!ast.AsyncGenerato
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
+        try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
@@ -2581,6 +2609,7 @@ fn acceptAsyncFunctionDeclaration(self: *Self) AcceptError!ast.AsyncFunctionDecl
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
+        try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
@@ -2616,6 +2645,7 @@ pub fn acceptAsyncFunctionExpression(self: *Self) AcceptError!ast.AsyncFunctionE
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
+        try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
@@ -2681,6 +2711,9 @@ pub fn acceptAsyncArrowFunction(self: *Self) AcceptError!ast.AsyncArrowFunction 
         };
     };
     try self.ensureUniqueParameterNames(.arrow, formal_parameters, location);
+    if (function_body.strict) {
+        try self.ensureAllowedParameterNames(formal_parameters, location);
+    }
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, location);
     }
