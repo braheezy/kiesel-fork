@@ -531,13 +531,14 @@ fn encode(
 /// 19.2.6.6 Decode ( string, preserveEscapeSet )
 /// https://tc39.es/ecma262/#sec-decode
 fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u8) Agent.Error!String {
-    const input = try string.toUtf8(agent.gc_allocator);
+    const input = try string.toUtf16(agent.gc_allocator);
 
     // 1. Let len be the length of string.
     const len = input.len;
 
     // 2. Let R be the empty String.
-    var result = std.ArrayList(u8).init(agent.gc_allocator);
+    var result = String.Builder.init(agent.gc_allocator);
+    defer result.deinit();
 
     // 3. Let k be 0.
     var k: usize = 0;
@@ -548,7 +549,7 @@ fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u
         const c = input[k];
 
         // b. Let S be C.
-        var s: []const u8 = &.{c};
+        var s: String.Builder.Segment = .{ .code_unit = c };
 
         // c. If C is the code unit 0x0025 (PERCENT SIGN), then
         if (c == '%') {
@@ -561,8 +562,8 @@ fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u
             const escape_ = input[k .. k + 3];
 
             // iii. Let B be ParseHexOctet(string, k + 1).
-            // iv. If B is not an integer, throw a URIError exception.
-            const byte = std.fmt.parseInt(u8, escape_[1..], 16) catch {
+            const byte = parseHexOctet(input, k + 1) orelse {
+                // iv. If B is not an integer, throw a URIError exception.
                 return agent.throwException(.uri_error, "Escape sequence must be hex digits", .{});
             };
 
@@ -578,9 +579,9 @@ fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u
                 // 2. If preserveEscapeSet contains asciiChar, set S to escape. Otherwise, set S to
                 //    asciiChar.
                 s = if (std.mem.indexOfScalar(u8, preserve_escape_set, byte) != null)
-                    escape_
+                    .{ .string = String.fromUtf16(escape_) }
                 else
-                    &.{byte};
+                    .{ .code_unit = byte };
             }
             // viii. Else,
             else {
@@ -608,8 +609,8 @@ fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u
                     }
 
                     // d. Let continuationByte be ParseHexOctet(string, k + 1).
-                    // e. If continuationByte is not an integer, throw a URIError exception.
-                    const continuation_byte = std.fmt.parseInt(u8, input[k + 1 .. k + 3], 16) catch {
+                    const continuation_byte = parseHexOctet(input, k + 1) orelse {
+                        // e. If continuationByte is not an integer, throw a URIError exception.
                         return agent.throwException(.uri_error, "Escape sequence must be hex digits", .{});
                     };
 
@@ -625,25 +626,50 @@ fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u
                 // 5. Assert: The length of Octets is n.
                 // 6. If Octets does not contain a valid UTF-8 encoding of a Unicode code point,
                 //    throw a URIError exception.
-                if (!std.unicode.utf8ValidateSlice(octets[0..byte_sequence_length.?])) {
+                const code_point = std.unicode.utf8Decode(octets[0..byte_sequence_length.?]) catch {
                     return agent.throwException(.uri_error, "Invalid UTF-8 byte sequence", .{});
-                }
+                };
 
                 // 7. Let V be the code point obtained by applying the UTF-8 transformation to
                 //    Octets, that is, from a List of octets into a 21-bit value.
                 // 8. Set S to UTF16EncodeCodePoint(V).
-                s = octets[0..byte_sequence_length.?];
+                s = .{ .code_point = code_point };
             }
         }
 
         // d. Set R to the string-concatenation of R and S.
-        try result.appendSlice(s);
+        try result.appendSegment(s);
 
         // e. Set k to k + 1.
     }
 
     // 5. Return R.
-    return String.fromUtf8(agent.gc_allocator, try result.toOwnedSlice());
+    return result.build();
+}
+
+/// 19.2.6.7 ParseHexOctet ( string, position )
+/// https://tc39.es/ecma262/#sec-parsehexoctet
+fn parseHexOctet(string: []const u16, position: usize) ?u8 {
+    // 1. Let len be the length of string.
+    const len = string.len;
+
+    // 2. Assert: position + 2 ≤ len.
+    std.debug.assert(position + 2 <= len);
+
+    // 3. Let hexDigits be the substring of string from position to position + 2.
+    const hex_digits = string[position .. position + 2];
+
+    // 4. Let parseResult be ParseText(hexDigits, HexDigits[~Sep]).
+    // 5. If parseResult is not a Parse Node, return parseResult.
+    // 6. Let n be the MV of parseResult.
+    // 7. Assert: n is in the inclusive interval from 0 to 255.
+    var buf: [2]u8 = undefined;
+    buf[0] = std.math.cast(u8, hex_digits[0]) orelse return null;
+    buf[1] = std.math.cast(u8, hex_digits[1]) orelse return null;
+    const n = std.fmt.parseInt(u8, &buf, 16) catch return null;
+
+    // 8. Return n.
+    return n;
 }
 
 /// B.2.1.1 escape ( string )
