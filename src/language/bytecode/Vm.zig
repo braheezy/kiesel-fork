@@ -1371,9 +1371,9 @@ fn classFieldDefinitionEvaluation(
         )).value.?;
         if (value.toPrivateName()) |private_name| {
             break :blk .{ .private_name = private_name };
-        } else if (value.toPropertyKey(agent)) |property_key| {
-            break :blk .{ .property_key = property_key };
-        } else |err| try noexcept(err);
+        }
+        const property_key = try value.toPropertyKey(agent);
+        break :blk .{ .property_key = property_key };
     };
 
     // 2. If Initializer is present, then
