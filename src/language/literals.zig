@@ -294,10 +294,13 @@ pub fn parseRegularExpressionLiteral(
         backslash,
     } = .start;
     var closing_slash_index: usize = 0;
+    var in_character_class: bool = false;
     for (str, 0..) |c, i| switch (c) {
         '/' => switch (state) {
             .start => state = .opening_slash,
-            .pattern_character => {
+            .pattern_character => if (in_character_class) {
+                state = .pattern_character;
+            } else {
                 state = .closing_slash;
                 closing_slash_index = i;
             },
@@ -312,6 +315,22 @@ pub fn parseRegularExpressionLiteral(
         'a'...'z' => switch (state) {
             .opening_slash, .pattern_character, .backslash => state = .pattern_character,
             .closing_slash, .flag_character => state = .flag_character,
+            else => return error.InvalidRegularExpressionLiteral,
+        },
+        '[' => switch (state) {
+            .opening_slash, .pattern_character => {
+                state = .pattern_character;
+                in_character_class = true;
+            },
+            .backslash => state = .pattern_character,
+            else => return error.InvalidRegularExpressionLiteral,
+        },
+        ']' => switch (state) {
+            .opening_slash, .pattern_character => {
+                state = .pattern_character;
+                in_character_class = false;
+            },
+            .backslash => state = .pattern_character,
             else => return error.InvalidRegularExpressionLiteral,
         },
         else => {
