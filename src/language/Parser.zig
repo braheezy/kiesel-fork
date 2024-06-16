@@ -2155,7 +2155,10 @@ pub fn acceptArrowFunction(self: *Self) AcceptError!ast.ArrowFunction {
 
 pub fn acceptMethodDefinition(
     self: *Self,
-    method_type: ?ast.MethodDefinition.Type,
+    parsed: ?struct {
+        method_type: ast.MethodDefinition.Type,
+        start_offset: usize,
+    },
 ) AcceptError!ast.MethodDefinition {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
@@ -2166,33 +2169,54 @@ pub fn acceptMethodDefinition(
     var tmp2: ?TemporaryChange(bool) = null;
     defer if (tmp2) |tmp| tmp.restore();
 
-    if (method_type == null) {
-        if (self.core.accept(RuleSet.is(.@"*"))) |_|
-            return acceptMethodDefinition(self, .generator)
-        else |_| {}
-    }
-
-    const start_offset = blk: {
+    const start_offset = if (parsed) |p| p.start_offset else blk: {
         defer self.core.restoreState(state);
         const next_token = (self.core.nextToken() catch null) orelse break :blk 0;
         break :blk self.core.tokenizer.offset - next_token.text.len;
     };
 
+    if (parsed == null) {
+        if (self.core.accept(RuleSet.is(.@"*"))) |_|
+            return acceptMethodDefinition(self, .{
+                .method_type = .generator,
+                .start_offset = start_offset,
+            })
+        else |_| {}
+    }
+
     const class_element_name = try self.acceptClassElementName();
-    if (method_type == null and
+    if (parsed == null and
         class_element_name == .property_name and
         class_element_name.property_name == .literal_property_name and
         class_element_name.property_name.literal_property_name == .identifier)
     {
         const identifier = class_element_name.property_name.literal_property_name.identifier;
         if (self.core.peek() catch null) |next_token| if (next_token.type != .@"(") {
-            if (std.mem.eql(u8, identifier, "get")) return acceptMethodDefinition(self, .get);
-            if (std.mem.eql(u8, identifier, "set")) return acceptMethodDefinition(self, .set);
-            if (std.mem.eql(u8, identifier, "async")) return acceptMethodDefinition(self, .@"async");
+            if (std.mem.eql(u8, identifier, "get")) {
+                return acceptMethodDefinition(self, .{
+                    .method_type = .get,
+                    .start_offset = start_offset,
+                });
+            }
+            if (std.mem.eql(u8, identifier, "set")) {
+                return acceptMethodDefinition(self, .{
+                    .method_type = .set,
+                    .start_offset = start_offset,
+                });
+            }
+            if (std.mem.eql(u8, identifier, "async")) {
+                return acceptMethodDefinition(self, .{
+                    .method_type = .@"async",
+                    .start_offset = start_offset,
+                });
+            }
         };
         if (std.mem.eql(u8, identifier, "async")) {
             if (self.core.accept(RuleSet.is(.@"*"))) |_|
-                return acceptMethodDefinition(self, .async_generator)
+                return acceptMethodDefinition(self, .{
+                    .method_type = .async_generator,
+                    .start_offset = start_offset,
+                })
             else |_| {}
         }
         if (self.state.in_class_body and std.mem.eql(u8, identifier, "constructor")) {
@@ -2203,7 +2227,7 @@ pub fn acceptMethodDefinition(
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
     _ = try self.core.accept(RuleSet.is(.@"{"));
-    const function_body_type: ast.FunctionBody.Type = switch (method_type orelse .method) {
+    const function_body_type: ast.FunctionBody.Type = switch (if (parsed) |p| p.method_type else .method) {
         .method, .get, .set => .normal,
         .generator => .generator,
         .@"async" => .@"async",
@@ -2220,7 +2244,7 @@ pub fn acceptMethodDefinition(
         u8,
         self.core.tokenizer.source[start_offset..end_offset],
     );
-    const method = switch (method_type orelse .method) {
+    const method = switch (if (parsed) |p| p.method_type else .method) {
         inline else => |@"type"| @unionInit(ast.MethodDefinition.Method, @tagName(@"type"), .{
             .identifier = null,
             .formal_parameters = formal_parameters,
