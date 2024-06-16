@@ -316,7 +316,7 @@ fn quoteJSONString(agent: *Agent, value: String) Allocator.Error!String {
         else {
             // i. Set product to the string-concatenation of product and UTF16EncodeCodePoint(C).
             try product.appendSlice(
-                std.unicode.utf16leToUtf8Alloc(agent.gc_allocator, &.{c}) catch |err| switch (err) {
+                std.unicode.utf16LeToUtf8Alloc(agent.gc_allocator, &.{c}) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
                     error.DanglingSurrogateHalf,
                     error.ExpectedSecondSurrogateHalf,

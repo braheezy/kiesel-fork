@@ -800,7 +800,7 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
             // NOTE: This will succeed if all code points are ASCII, which is required for the hex
             //       parsing to work anyway.
             var buf: [4]u8 = undefined;
-            if (std.unicode.utf16leToUtf8(&buf, hex_digits) catch null) |end| {
+            if (std.unicode.utf16LeToUtf8(&buf, hex_digits) catch null) |end| {
                 // v. Let parseResult be ParseText(hexDigits, HexDigits[~Sep]).
                 // vi. If parseResult is a Parse Node, then
                 if (std.fmt.parseInt(u16, buf[0..end], 16)) |n| {
