@@ -2205,20 +2205,19 @@ pub fn acceptMethodDefinition(
                 });
             }
             if (std.mem.eql(u8, identifier, "async")) {
-                return acceptMethodDefinition(self, .{
-                    .method_type = .@"async",
-                    .start_offset = start_offset,
-                });
+                if (self.core.accept(RuleSet.is(.@"*"))) |_|
+                    return acceptMethodDefinition(self, .{
+                        .method_type = .async_generator,
+                        .start_offset = start_offset,
+                    })
+                else |_| {
+                    return acceptMethodDefinition(self, .{
+                        .method_type = .@"async",
+                        .start_offset = start_offset,
+                    });
+                }
             }
         };
-        if (std.mem.eql(u8, identifier, "async")) {
-            if (self.core.accept(RuleSet.is(.@"*"))) |_|
-                return acceptMethodDefinition(self, .{
-                    .method_type = .async_generator,
-                    .start_offset = start_offset,
-                })
-            else |_| {}
-        }
         if (self.state.in_class_body and std.mem.eql(u8, identifier, "constructor")) {
             tmp2 = temporaryChange(&self.state.in_class_constructor, true);
         }
