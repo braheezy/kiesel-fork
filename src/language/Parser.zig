@@ -24,6 +24,7 @@ allocator: Allocator,
 core: ParserCore,
 diagnostics: *ptk.Diagnostics,
 state: struct {
+    in_async_function_body: bool = false,
     in_breakable_statement: bool = false,
     in_class_body: bool = false,
     in_class_constructor: bool = false,
@@ -1308,6 +1309,8 @@ pub fn acceptExpression(self: *Self, ctx: AcceptContext) AcceptError!ast.Express
         .{ .super_call = super_call }
     else |_| if (self.acceptImportCall()) |import_call|
         .{ .import_call = import_call }
+    else |_| if (self.acceptAwaitExpression()) |await_expression|
+        .{ .await_expression = await_expression }
     else |_| if (self.acceptPrimaryExpression()) |primary_expression|
         .{ .primary_expression = primary_expression }
     else |_| if (self.acceptPrivateIdentifier()) |private_identifier|
@@ -2074,8 +2077,14 @@ pub fn acceptFunctionBody(
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const tmp = temporaryChange(&self.state.in_function_body, true);
-    defer tmp.restore();
+    const tmp1 = temporaryChange(&self.state.in_function_body, true);
+    defer tmp1.restore();
+
+    const tmp2 = temporaryChange(&self.state.in_async_function_body, switch (@"type") {
+        .@"async", .async_generator => true,
+        else => false,
+    });
+    defer tmp2.restore();
 
     const statement_list = try self.acceptStatementList(.{ .update_strict_mode = true });
     const strict = self.state.in_strict_mode or statement_list.containsDirective("use strict");
@@ -2684,6 +2693,18 @@ pub fn acceptAsyncFunctionExpression(self: *Self) AcceptError!ast.AsyncFunctionE
         .function_body = function_body,
         .source_text = source_text,
     };
+}
+
+pub fn acceptAwaitExpression(self: *Self) AcceptError!ast.AwaitExpression {
+    if (!(self.state.in_async_function_body or self.state.in_module)) return error.UnexpectedToken;
+
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"await"));
+    const expression = try self.allocator.create(ast.Expression);
+    expression.* = try self.acceptExpression(.{});
+    return .{ .expression = expression };
 }
 
 pub fn acceptAsyncArrowFunction(self: *Self) AcceptError!ast.AsyncArrowFunction {

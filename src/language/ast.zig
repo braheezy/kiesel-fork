@@ -710,6 +710,7 @@ pub const Expression = union(enum) {
     conditional_expression: ConditionalExpression,
     assignment_expression: AssignmentExpression,
     sequence_expression: SequenceExpression,
+    await_expression: AwaitExpression,
     tagged_template: TaggedTemplate,
 
     /// 8.6.4 Static Semantics: AssignmentTargetType
@@ -3040,6 +3041,11 @@ pub const AsyncFunctionExpression = struct {
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
     source_text: []const u8,
+};
+
+/// https://tc39.es/ecma262/#prod-AwaitExpression
+pub const AwaitExpression = struct {
+    expression: *Expression,
 };
 
 /// https://tc39.es/ecma262/#prod-AsyncArrowFunction

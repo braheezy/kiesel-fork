@@ -282,6 +282,11 @@ pub fn printSequenceExpression(node: ast.SequenceExpression, writer: anytype, in
     }
 }
 
+pub fn printAwaitExpression(node: ast.AwaitExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("AwaitExpression", writer, indentation);
+    try printExpression(node.expression.*, writer, indentation + 1);
+}
+
 pub fn printTaggedTemplate(node: ast.TaggedTemplate, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("TaggedTemplate", writer, indentation);
     try printExpression(node.expression.*, writer, indentation + 1);
@@ -309,6 +314,7 @@ pub fn printExpression(node: ast.Expression, writer: anytype, indentation: usize
         .conditional_expression => |x| try printConditionalExpression(x, writer, indentation + 1),
         .assignment_expression => |x| try printAssignmentExpression(x, writer, indentation + 1),
         .sequence_expression => |x| try printSequenceExpression(x, writer, indentation + 1),
+        .await_expression => |x| try printAwaitExpression(x, writer, indentation + 1),
         .tagged_template => |x| try printTaggedTemplate(x, writer, indentation + 1),
     }
 }

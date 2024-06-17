@@ -37,6 +37,7 @@ const SafePointer = types.SafePointer;
 const String = types.String;
 const Value = types.Value;
 const arrayCreate = builtins.arrayCreate;
+const @"await" = builtins.@"await";
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createForInIterator = builtins.createForInIterator;
 const defineMethodProperty = builtins.defineMethodProperty;
@@ -2293,6 +2294,10 @@ pub fn executeInstruction(
                 // d. Set nextIndex to nextIndex + 1.
             }
             self.result = Value.from(array);
+        },
+        .@"await" => {
+            const value = self.result.?;
+            self.result = try @"await"(self.agent, value);
         },
         .binding_class_declaration_evaluation => {
             const class_declaration = self.fetchAstNode(executable).class_declaration;

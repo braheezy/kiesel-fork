@@ -1599,6 +1599,7 @@ pub fn codegenExpression(
         .conditional_expression => |x| try codegenConditionalExpression(x, executable, ctx),
         .assignment_expression => |x| try codegenAssignmentExpression(x, executable, ctx),
         .sequence_expression => |x| try codegenSequenceExpression(x, executable, ctx),
+        .await_expression => |x| try codegenAwaitExpression(x, executable, ctx),
         .tagged_template => |x| try codegenTaggedTemplate(x, executable, ctx),
     }
 }
@@ -3094,11 +3095,31 @@ pub fn codegenAsyncFunctionExpression(
     executable: *Executable,
     _: *Context,
 ) Executable.Error!void {
+    // AsyncFunctionExpression :
+    //     async function BindingIdentifieropt ( FormalParameters ) { AsyncFunctionBody }
     // 1. Return InstantiateAsyncFunctionExpression of AsyncFunctionExpression.
     try executable.addInstructionWithAstNode(
         .instantiate_async_function_expression,
         .{ .async_function_expression = node },
     );
+}
+
+/// 15.8.5 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-async-function-definitions-runtime-semantics-evaluation
+pub fn codegenAwaitExpression(
+    node: ast.AwaitExpression,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    // AwaitExpression : await UnaryExpression
+    // 1. Let exprRef be ? Evaluation of UnaryExpression.
+    try codegenExpression(node.expression.*, executable, ctx);
+
+    // 2. Let value be ? GetValue(exprRef).
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+    // 3. Return ? Await(value).
+    try executable.addInstruction(.@"await");
 }
 
 /// 15.9.5 Runtime Semantics: Evaluation

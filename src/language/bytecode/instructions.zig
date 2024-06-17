@@ -16,6 +16,8 @@ pub const Instruction = enum(u8) {
     array_set_length,
     /// Spread value into an array.
     array_spread_value,
+    /// Store Await() as the result value.
+    @"await",
     /// Store BindingClassDeclarationEvaluation() as the result value.
     binding_class_declaration_evaluation,
     /// Apply bitwise NOT to the last value on the stack and store it as the result value.
