@@ -17,11 +17,14 @@ const Object = types.Object;
 const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
+const SafePointer = types.SafePointer;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createDynamicFunction = builtins.createDynamicFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const noexcept = utils.noexcept;
+const performPromiseThen = builtins.performPromiseThen;
+const promiseResolve = builtins.promiseResolve;
 
 /// 27.7.2 Properties of the AsyncFunction Constructor
 /// https://tc39.es/ecma262/#sec-async-function-constructor-properties
@@ -216,4 +219,112 @@ pub fn asyncBlockStart(
     result catch |err| try noexcept(err);
 
     // 8. Return unused.
+}
+
+/// 27.7.5.3 Await ( value )
+/// https://tc39.es/ecma262/#await
+pub fn @"await"(agent: *Agent, value: Value) Agent.Error!Value {
+    const realm = agent.currentRealm();
+    // 1. Let asyncContext be the running execution context.
+    const async_context = agent.runningExecutionContext();
+
+    // 2. Let promise be ? PromiseResolve(%Promise%, value).
+    const promise = try promiseResolve(agent, try realm.intrinsics.@"%Promise%"(), value);
+
+    const Captures = struct {
+        async_context: *ExecutionContext,
+    };
+    const captures = try agent.gc_allocator.create(Captures);
+    captures.* = .{ .async_context = async_context };
+
+    // 3. Let fulfilledClosure be a new Abstract Closure with parameters (v) that captures
+    //    asyncContext and performs the following steps when called:
+    const fulfilled_closure = struct {
+        fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
+            const function_ = agent_.activeFunctionObject();
+            const captures_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+            const async_context_ = captures_.async_context;
+            const v = arguments_.get(0);
+
+            // a. Let prevContext be the running execution context.
+            const previous_context = agent_.runningExecutionContext();
+
+            // TODO: b. Suspend prevContext.
+
+            // c. Push asyncContext onto the execution context stack; asyncContext is now the
+            //    running execution context.
+            try agent_.execution_context_stack.append(async_context_.*);
+
+            // TODO: d-e.
+            _ = v;
+            _ = previous_context;
+
+            // f. Return undefined.
+            return .undefined;
+        }
+    }.func;
+
+    // 4. Let onFulfilled be CreateBuiltinFunction(fulfilledClosure, 1, "", « »).
+    const on_fulfilled = Value.from(
+        try createBuiltinFunction(agent, .{ .function = fulfilled_closure }, .{
+            .length = 1,
+            .name = "",
+            .additional_fields = SafePointer.make(*Captures, captures),
+        }),
+    );
+
+    // 5. Let rejectedClosure be a new Abstract Closure with parameters (reason) that captures
+    //    asyncContext and performs the following steps when called:
+    const rejected_closure = struct {
+        fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
+            const function_ = agent_.activeFunctionObject();
+            const captures_ = function_.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+            const async_context_ = captures_.async_context;
+            const reason = arguments_.get(0);
+
+            // a. Let prevContext be the running execution context.
+            const previous_context = agent_.runningExecutionContext();
+
+            // TODO: b. Suspend prevContext.
+
+            // c. Push asyncContext onto the execution context stack; asyncContext is now the
+            //    running execution context.
+            try agent_.execution_context_stack.append(async_context_.*);
+
+            // TODO: d-e.
+            _ = reason;
+            _ = previous_context;
+
+            // f. Return undefined.
+            return .undefined;
+        }
+    }.func;
+
+    // 6. Let onRejected be CreateBuiltinFunction(rejectedClosure, 1, "", « »).
+    const on_rejected = Value.from(
+        try createBuiltinFunction(agent, .{ .function = rejected_closure }, .{
+            .length = 1,
+            .name = "",
+            .additional_fields = SafePointer.make(*Captures, captures),
+        }),
+    );
+
+    // 7. Perform PerformPromiseThen(promise, onFulfilled, onRejected).
+    _ = try performPromiseThen(
+        agent,
+        promise.as(builtins.Promise),
+        on_fulfilled,
+        on_rejected,
+        null,
+    );
+
+    // TODO: 8-12.
+    switch (promise.as(builtins.Promise).fields.promise_state) {
+        .pending => return Value.from(promise), // `await properAwait()` :)
+        .rejected => {
+            agent.exception = promise.as(builtins.Promise).fields.promise_result;
+            return error.ExceptionThrown;
+        },
+        .fulfilled => return promise.as(builtins.Promise).fields.promise_result,
+    }
 }

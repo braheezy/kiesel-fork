@@ -208,6 +208,7 @@ pub const asyncGeneratorEnqueue = async_generator.asyncGeneratorEnqueue;
 pub const asyncGeneratorResume = async_generator.asyncGeneratorResume;
 pub const asyncGeneratorStart = async_generator.asyncGeneratorStart;
 pub const asyncGeneratorValidate = async_generator.asyncGeneratorValidate;
+pub const @"await" = async_function.@"await";
 pub const boundFunctionCreate = bound_function.boundFunctionCreate;
 pub const cloneArrayBuffer = array_buffer.cloneArrayBuffer;
 pub const createArrayIterator = array_iterator.createArrayIterator;
