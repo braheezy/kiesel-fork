@@ -1016,7 +1016,7 @@ fn methodDefinitionEvaluation(
             //    sourceText, UniqueFormalParameters, AsyncGeneratorBody, non-lexical-this, env, privateEnv).
             const closure = try ordinaryFunctionCreate(
                 agent,
-                try realm.intrinsics.@"%AsyncFunction.prototype%"(),
+                try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"(),
                 source_text,
                 async_generator_expression.formal_parameters,
                 async_generator_expression.function_body,
