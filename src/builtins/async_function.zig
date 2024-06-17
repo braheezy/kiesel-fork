@@ -43,19 +43,6 @@ pub const AsyncFunctionConstructor = struct {
             .configurable = false,
         });
 
-        // 27.7.3.1 AsyncFunction.prototype.constructor
-        // https://tc39.es/ecma262/#sec-async-function-prototype-properties-constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%AsyncFunction.prototype%"() catch unreachable,
-            "constructor",
-            PropertyDescriptor{
-                .value = Value.from(object),
-                .writable = false,
-                .enumerable = false,
-                .configurable = true,
-            },
-        );
-
         return object;
     }
 
@@ -87,9 +74,30 @@ pub const AsyncFunctionConstructor = struct {
 /// https://tc39.es/ecma262/#sec-async-function-prototype-properties
 pub const AsyncFunctionPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        const object = try createNoinit(realm);
+        init(realm, object);
+        return object;
+    }
+
+    pub fn createNoinit(realm: *Realm) Allocator.Error!Object {
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
+
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+        // 27.7.3.1 AsyncFunction.prototype.constructor
+        // https://tc39.es/ecma262/#sec-async-function-prototype-properties-constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            PropertyDescriptor{
+                .value = Value.from(try realm.intrinsics.@"%AsyncFunction%"()),
+                .writable = false,
+                .enumerable = false,
+                .configurable = true,
+            },
+        );
 
         // 27.7.3.2 AsyncFunction.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-async-function-prototype-properties-toStringTag
@@ -99,8 +107,6 @@ pub const AsyncFunctionPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 };
 
