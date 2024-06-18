@@ -29,6 +29,7 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getArrayBufferMaxByteLengthOption = builtins.getArrayBufferMaxByteLengthOption;
 const isFixedLengthArrayBuffer = builtins.isFixedLengthArrayBuffer;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const data_block_max_byte_length = types.data_block_max_byte_length;
 
 /// 25.2.2.1 AllocateSharedArrayBuffer ( constructor, byteLength [ , maxByteLength ] )
 /// https://tc39.es/ecma262/#sec-allocatesharedarraybuffer
@@ -48,6 +49,12 @@ pub fn allocateSharedArrayBuffer(
     if (allocating_growable_buffer) {
         // a. If byteLength > maxByteLength, throw a RangeError exception.
         if (byte_length > max_byte_length.?) {
+            return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
+        }
+
+        // NOTE: Checking for a reasonable size below the theoretical limit is non-standard but also
+        //       done in other engines (and tested by test262)
+        if (max_byte_length.? > data_block_max_byte_length) {
             return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
         }
 

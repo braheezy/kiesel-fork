@@ -20,6 +20,7 @@ pub const createIterResultObject = iterator.createIterResultObject;
 pub const createSharedByteDataBlock = data_block.createSharedByteDataBlock;
 pub const getIterator = iterator.getIterator;
 pub const getIteratorFromMethod = iterator.getIteratorFromMethod;
+pub const data_block_max_byte_length = data_block.data_block_max_byte_length;
 
 test {
     _ = data_block;

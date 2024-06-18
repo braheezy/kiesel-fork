@@ -30,6 +30,7 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const sameValue = types.sameValue;
+const data_block_max_byte_length = types.data_block_max_byte_length;
 
 pub const ArrayBufferLike = union(enum) {
     const Self = @This();
@@ -78,6 +79,12 @@ pub fn allocateArrayBuffer(
     if (allocating_resizable_buffer) {
         // a. If byteLength > maxByteLength, throw a RangeError exception.
         if (byte_length > max_byte_length.?) {
+            return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
+        }
+
+        // NOTE: Checking for a reasonable size below the theoretical limit is non-standard but also
+        //       done in other engines (and tested by test262)
+        if (max_byte_length.? > data_block_max_byte_length) {
             return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
         }
 

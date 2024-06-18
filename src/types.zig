@@ -42,6 +42,7 @@ pub const isLooselyEqual = language.isLooselyEqual;
 pub const isStrictlyEqual = language.isStrictlyEqual;
 pub const sameValue = language.sameValue;
 pub const sameValueZero = language.sameValueZero;
+pub const data_block_max_byte_length = spec.data_block_max_byte_length;
 
 pub const SafePointer = @import("any-pointer").SafePointer;
 
