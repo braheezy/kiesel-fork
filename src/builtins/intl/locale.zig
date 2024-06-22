@@ -51,72 +51,59 @@ fn matchUnicodeLocaleIdentifierType(str: []const u8) bool {
     return true;
 }
 
-/// 14.1.2 ApplyOptionsToTag ( tag, options )
-/// https://tc39.es/ecma402/#sec-apply-options-to-tag
-fn applyOptionsToTag(agent: *Agent, tag: String, options: Object) Agent.Error!icu4zig.Locale {
-    // 1. If IsStructurallyValidLanguageTag(tag) is false, throw a RangeError exception.
-    // NOTE: Underscore separators are not BCP 47-compatible and must be rejected here.
-    if (tag.indexOf(String.fromLiteral("_"), 0) != null) {
-        return agent.throwException(.range_error, "Invalid locale identifier '{}'", .{tag});
-    }
-    var canonicalized_tag = icu4zig.Locale.init(try tag.toUtf8(agent.gc_allocator)) catch |err| switch (err) {
-        error.LocaleParserLanguageError,
-        error.LocaleParserSubtagError,
-        error.LocaleParserExtensionError,
-        => return agent.throwException(.range_error, "Invalid locale identifier '{}'", .{tag}),
-    };
+/// 14.1.2 UpdateLanguageId ( tag, options )
+/// https://tc39.es/ecma402/#sec-updatelanguageid
+fn updateLanguageId(agent: *Agent, tag: icu4zig.Locale, options: Object) Agent.Error!icu4zig.Locale {
+    var new_tag = tag.clone();
 
-    // 2. Let language be ? GetOption(options, "language", string, empty, undefined).
+    // 1. Let languageId be the longest prefix of tag matched by the unicode_language_id Unicode
+    //    locale nonterminal.
+    // 2. Let language be ? GetOption(options, "language", string, empty, GetLocaleLanguage(languageId)).
     const maybe_language = try getOption(options, "language", .string, null, null);
 
-    // 3. If language is not undefined, then
+    // 3. If language cannot be matched by the unicode_language_subtag Unicode locale nonterminal,
+    //    throw a RangeError exception.
     if (maybe_language) |language| {
-        // a. If language cannot be matched by the unicode_language_subtag Unicode locale
-        //    nonterminal, throw a RangeError exception.
-        canonicalized_tag.setLanguage(try language.toUtf8(agent.gc_allocator)) catch {
+        new_tag.setLanguage(try language.toUtf8(agent.gc_allocator)) catch {
             return agent.throwException(.range_error, "Invalid language subtag '{}'", .{language});
         };
     }
 
-    // 4. Let script be ? GetOption(options, "script", string, empty, undefined).
+    // 4. Let script be ? GetOption(options, "script", string, empty, GetLocaleScript(languageId)).
     const maybe_script = try getOption(options, "script", .string, null, null);
 
     // 5. If script is not undefined, then
     if (maybe_script) |script| {
         // a. If script cannot be matched by the unicode_script_subtag Unicode locale nonterminal,
         //    throw a RangeError exception.
-        canonicalized_tag.setScript(try script.toUtf8(agent.gc_allocator)) catch {
+        new_tag.setScript(try script.toUtf8(agent.gc_allocator)) catch {
             return agent.throwException(.range_error, "Invalid script subtag '{}'", .{script});
         };
     }
 
-    // 6. Let region be ? GetOption(options, "region", string, empty, undefined).
+    // 6. Let region be ? GetOption(options, "region", string, empty, GetLocaleRegion(languageId)).
     const maybe_region = try getOption(options, "region", .string, null, null);
 
     // 7. If region is not undefined, then
     if (maybe_region) |region| {
         // a. If region cannot be matched by the unicode_region_subtag Unicode locale nonterminal,
         //    throw a RangeError exception.
-        canonicalized_tag.setRegion(try region.toUtf8(agent.gc_allocator)) catch {
+        new_tag.setRegion(try region.toUtf8(agent.gc_allocator)) catch {
             return agent.throwException(.range_error, "Invalid region subtag '{}'", .{region});
         };
     }
 
-    // 8. Set tag to CanonicalizeUnicodeLocaleId(tag).
-    // 9. Assert: tag can be matched by the unicode_locale_id Unicode locale nonterminal.
-    // NOTE: This is done continuously when using the setters above.
-
-    // 10-19.
+    // 8-13.
     // NOTE: These are done as part of step 3.a., 5.a., and 7.a.
 
-    // 20. Return CanonicalizeUnicodeLocaleId(tag).
-    return canonicalized_tag;
+    // 14. Return newTag.
+    return new_tag;
 }
 
-/// 14.1.3 ApplyUnicodeExtensionToTag ( tag, options, relevantExtensionKeys )
-/// https://tc39.es/ecma402/#sec-apply-unicode-extension-to-tag
-fn applyUnicodeExtensionToTag(agent: *Agent, tag: icu4zig.Locale, options: UnicodeExtensions) Allocator.Error!icu4zig.Locale {
-    // 1-10.
+/// 14.1.3 MakeLocaleRecord ( tag, options, relevantExtensionKeys )
+/// https://tc39.es/ecma402/#sec-makelocalerecord
+fn makeLocaleRecord(agent: *Agent, tag: icu4zig.Locale, options: UnicodeExtensions) Allocator.Error!icu4zig.Locale {
+    // 1-8.
     // This code ain't nice, I know.
     const str = try tag.toString(agent.gc_allocator);
     var unicode_extensions = str;
@@ -227,13 +214,13 @@ pub const LocaleConstructor = struct {
             .{ .locale = undefined },
         );
 
-        // 7. If Type(tag) is not String or Object, throw a TypeError exception.
+        // 7. If tag is not a String and tag is not an Object, throw a TypeError exception.
         if (tag_value != .string and tag_value != .object) {
             return agent.throwException(.type_error, "Locale must be string or object", .{});
         }
 
-        // 8. If Type(tag) is Object and tag has an [[InitializedLocale]] internal slot, then
-        const tag = if (tag_value == .object and tag_value.object.is(Locale)) blk: {
+        // 8. If tag an is Object and tag has an [[InitializedLocale]] internal slot, then
+        const tag_string = if (tag_value == .object and tag_value.object.is(Locale)) blk: {
             // a. Let tag be tag.[[Locale]].
             break :blk String.fromAscii(try tag_value.object.as(Locale).fields.locale.toString(agent.gc_allocator));
         }
@@ -246,16 +233,29 @@ pub const LocaleConstructor = struct {
         // 10. Set options to ? CoerceOptionsToObject(options).
         const options = try coerceOptionsToObject(agent, options_value);
 
-        // 11. Set tag to ? ApplyOptionsToTag(tag, options).
-        var tag_locale = try applyOptionsToTag(agent, tag, options);
+        // 11. If IsStructurallyValidLanguageTag(tag) is false, throw a RangeError exception.
+        // 12. Set tag to CanonicalizeUnicodeLocaleId(tag).
+        // NOTE: Underscore separators are not BCP 47-compatible and must be rejected here.
+        if (tag_string.indexOf(String.fromLiteral("_"), 0) != null) {
+            return agent.throwException(.range_error, "Invalid locale identifier '{}'", .{tag_string});
+        }
+        var tag = icu4zig.Locale.init(try tag_string.toUtf8(agent.gc_allocator)) catch |err| switch (err) {
+            error.LocaleParserLanguageError,
+            error.LocaleParserSubtagError,
+            error.LocaleParserExtensionError,
+            => return agent.throwException(.range_error, "Invalid locale identifier '{}'", .{tag_string}),
+        };
 
-        // 12. Let opt be a new Record.
+        // 13. Set tag to ? UpdateLanguageId(tag, options).
+        tag = try updateLanguageId(agent, tag, options);
+
+        // 14. Let opt be a new Record.
         var opt: UnicodeExtensions = .{};
 
-        // 13. Let calendar be ? GetOption(options, "calendar", string, empty, undefined).
+        // 15. Let calendar be ? GetOption(options, "calendar", string, empty, undefined).
         const calendar = try getOption(options, "calendar", .string, null, null);
 
-        // 14. If calendar is not undefined, then
+        // 16. If calendar is not undefined, then
         if (calendar != null) {
             // a. If calendar cannot be matched by the type Unicode locale nonterminal, throw a
             //    RangeError exception.
@@ -268,13 +268,13 @@ pub const LocaleConstructor = struct {
             }
         }
 
-        // 15. Set opt.[[ca]] to calendar.
+        // 17. Set opt.[[ca]] to calendar.
         opt.ca = calendar;
 
-        // 16. Let collation be ? GetOption(options, "collation", string, empty, undefined).
+        // 18. Let collation be ? GetOption(options, "collation", string, empty, undefined).
         const collation = try getOption(options, "collation", .string, null, null);
 
-        // 17. If collation is not undefined, then
+        // 19. If collation is not undefined, then
         if (collation != null) {
             // a. If collation cannot be matched by the type Unicode locale nonterminal, throw a
             //    RangeError exception.
@@ -287,10 +287,10 @@ pub const LocaleConstructor = struct {
             }
         }
 
-        // 18. Set opt.[[co]] to collation.
+        // 20. Set opt.[[co]] to collation.
         opt.co = collation;
 
-        // 19. Let hc be ? GetOption(options, "hourCycle", string, « "h11", "h12", "h23", "h24" »,
+        // 21. Let hc be ? GetOption(options, "hourCycle", string, « "h11", "h12", "h23", "h24" »,
         //     undefined).
         const hc = try getOption(
             options,
@@ -300,10 +300,10 @@ pub const LocaleConstructor = struct {
             null,
         );
 
-        // 20. Set opt.[[hc]] to hc.
+        // 22. Set opt.[[hc]] to hc.
         opt.hc = hc;
 
-        // 21. Let kf be ? GetOption(options, "caseFirst", string, « "upper", "lower", "false" »,
+        // 23. Let kf be ? GetOption(options, "caseFirst", string, « "upper", "lower", "false" »,
         //     undefined).
         const kf = try getOption(
             options,
@@ -313,23 +313,23 @@ pub const LocaleConstructor = struct {
             null,
         );
 
-        // 22. Set opt.[[kf]] to kf.
+        // 24. Set opt.[[kf]] to kf.
         opt.kf = kf;
 
-        // 23. Let kn be ? GetOption(options, "numeric", boolean, empty, undefined).
+        // 25. Let kn be ? GetOption(options, "numeric", boolean, empty, undefined).
         const kn_value = try getOption(options, "numeric", .boolean, null, null);
 
-        // 24. If kn is not undefined, set kn to ! ToString(kn).
+        // 26. If kn is not undefined, set kn to ! ToString(kn).
         const kn = if (kn_value == true) String.fromLiteral("true") else if (kn_value == false) String.fromLiteral("false") else null;
 
-        // 25. Set opt.[[kn]] to kn.
+        // 27. Set opt.[[kn]] to kn.
         opt.kn = kn;
 
-        // 26. Let numberingSystem be ? GetOption(options, "numberingSystem", string, empty,
+        // 28. Let numberingSystem be ? GetOption(options, "numberingSystem", string, empty,
         //     undefined).
         const numbering_system = try getOption(options, "numberingSystem", .string, null, null);
 
-        // 27. If numberingSystem is not undefined, then
+        // 29. If numberingSystem is not undefined, then
         if (numbering_system != null) {
             // a. If numberingSystem cannot be matched by the type Unicode locale nonterminal,
             //    throw a RangeError exception.
@@ -342,30 +342,30 @@ pub const LocaleConstructor = struct {
             }
         }
 
-        // 28. Set opt.[[nu]] to numberingSystem.
+        // 30. Set opt.[[nu]] to numberingSystem.
         opt.nu = numbering_system;
 
-        // 29. Let r be ApplyUnicodeExtensionToTag(tag, opt, relevantExtensionKeys).
-        tag_locale = try applyUnicodeExtensionToTag(agent, tag_locale, opt);
+        // 31. Let r be MakeLocaleRecord(tag, opt, relevantExtensionKeys).
+        tag = try makeLocaleRecord(agent, tag, opt);
 
         locale.as(Locale).fields = .{
             // NOTE: The ICU4X locale stores all of this for us :)
-            // 30. Set locale.[[Locale]] to r.[[locale]].
-            // 31. Set locale.[[Calendar]] to r.[[ca]].
-            // 32. Set locale.[[Collation]] to r.[[co]].
-            // 33. Set locale.[[HourCycle]] to r.[[hc]].
-            // 34. If relevantExtensionKeys contains "kf", then
+            // 32. Set locale.[[Locale]] to r.[[locale]].
+            // 33. Set locale.[[Calendar]] to r.[[ca]].
+            // 34. Set locale.[[Collation]] to r.[[co]].
+            // 35. Set locale.[[HourCycle]] to r.[[hc]].
+            // 36. If relevantExtensionKeys contains "kf", then
             //     a. Set locale.[[CaseFirst]] to r.[[kf]].
-            // 35. If relevantExtensionKeys contains "kn", then
+            // 37. If relevantExtensionKeys contains "kn", then
             //     a. If SameValue(r.[[kn]], "true") is true or r.[[kn]] is the empty String, then
             //         i. Set locale.[[Numeric]] to true.
             //     b. Else,
             //         i. Set locale.[[Numeric]] to false.
-            // 36. Set locale.[[NumberingSystem]] to r.[[nu]].
-            .locale = tag_locale,
+            // 38. Set locale.[[NumberingSystem]] to r.[[nu]].
+            .locale = tag,
         };
 
-        // 37. Return locale.
+        // 39. Return locale.
         return Value.from(locale);
     }
 };
