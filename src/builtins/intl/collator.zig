@@ -18,6 +18,7 @@ const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
 const String = types.String;
@@ -26,9 +27,12 @@ const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const coerceOptionsToObject = abstract_operations.coerceOptionsToObject;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getOption = types.getOption;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 10.2 Properties of the Intl.Collator Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-the-intl-collator-constructor
@@ -265,6 +269,7 @@ pub const CollatorPrototype = struct {
         });
 
         try defineBuiltinAccessor(object, "compare", compare, null, realm);
+        try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
         // 10.3.2 Intl.Collator.prototype [ @@toStringTag ]
         // https://tc39.es/ecma402/#sec-intl.collator.prototype-@@tostringtag
@@ -333,6 +338,64 @@ pub const CollatorPrototype = struct {
 
         // 4. Return collator.[[BoundCompare]].
         return Value.from(collator.fields.bound_compare.?);
+    }
+
+    /// 10.3.4 Intl.Collator.prototype.resolvedOptions ( )
+    /// https://tc39.es/ecma402/#sec-intl.collator.prototype.resolvedoptions
+    fn resolvedOptions(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        const realm = agent.currentRealm();
+
+        // 1. Let collator be the this value.
+        // 2. Perform ? RequireInternalSlot(collator, [[InitializedCollator]]).
+        const collator = try this_value.requireInternalSlot(agent, Collator);
+
+        // 3. Let options be OrdinaryObjectCreate(%Object.prototype%).
+        const options = try ordinaryObjectCreate(
+            agent,
+            try realm.intrinsics.@"%Object.prototype%"(),
+        );
+
+        // 4. For each row of Table 4, except the header row, in table order, do
+        //     a. Let p be the Property value of the current row.
+        //     b. Let v be the value of collator's internal slot whose name is the Internal Slot value of the current row.
+        //     c. If the current row has an Extension Key value, then
+        //         i. Let extensionKey be the Extension Key value of the current row.
+        //         ii. If %Intl.Collator%.[[RelevantExtensionKeys]] does not contain extensionKey, then
+        //             1. Set v to undefined.
+        //     d. If v is not undefined, then
+        //         i. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        const resolved_options = collator.fields.resolvedOptions();
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("locale"),
+            Value.from(String.fromAscii(try collator.fields.locale.toString(agent.gc_allocator))),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("usage"),
+            Value.from(resolved_options.usage),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("sensitivity"),
+            Value.from(resolved_options.sensitivity),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("ignorePunctuation"),
+            Value.from(resolved_options.ignore_punctuation),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("collation"),
+            Value.from(resolved_options.collation),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("numeric"),
+            Value.from(resolved_options.numeric),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("caseFirst"),
+            Value.from(resolved_options.case_first),
+        ) catch |err| try noexcept(err);
+
+        // 5. Return options.
+        return Value.from(options);
     }
 };
 
