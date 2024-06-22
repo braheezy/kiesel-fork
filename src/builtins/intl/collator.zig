@@ -262,6 +262,15 @@ pub const CollatorPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        // 10.3.2 Intl.Collator.prototype [ @@toStringTag ]
+        // https://tc39.es/ecma402/#sec-intl.collator.prototype-@@tostringtag
+        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+            .value = Value.from("Intl.Collator"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
         return object;
     }
 };
