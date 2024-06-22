@@ -3,6 +3,8 @@ const std = @import("std");
 
 const Color = std.io.tty.Color;
 
+const icu4zig = @import("icu4zig");
+
 const AnyPointer = @import("any-pointer").AnyPointer;
 
 const build_options = @import("build-options");
@@ -526,6 +528,34 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintIntlCollator(
+    intl_collator: *const builtins.Intl.Collator,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    const agent = intl_collator.data.agent;
+    const locale = intl_collator.fields.locale;
+    const tty_config = state.tty_config;
+
+    const resolved_options = intl_collator.fields.resolvedOptions();
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Intl.Collator(");
+    try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}, usage: {pretty}, sensitivity: {pretty}, ignorePunctuation: " ++
+        "{pretty}, collation: {pretty}, numeric: {pretty}, caseFirst: {pretty}", .{
+        Value.from(String.fromAscii(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(resolved_options.usage),
+        Value.from(resolved_options.sensitivity),
+        Value.from(resolved_options.ignore_punctuation),
+        Value.from(resolved_options.collation),
+        Value.from(resolved_options.numeric),
+        Value.from(resolved_options.case_first),
+    });
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintIntlLocale(
     intl_locale: *const builtins.Intl.Locale,
     writer: anytype,
@@ -721,6 +751,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.Symbol, prettyPrintPrimitiveWrapper },
             .{ builtins.TypedArray, prettyPrintTypedArray },
         } ++ if (build_options.enable_intl) .{
+            .{ builtins.Intl.Collator, prettyPrintIntlCollator },
             .{ builtins.Intl.Locale, prettyPrintIntlLocale },
             .{ builtins.Intl.Segmenter, prettyPrintIntlSegmenter },
         } else .{}) |entry| {

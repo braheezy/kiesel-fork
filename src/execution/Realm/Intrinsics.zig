@@ -76,6 +76,8 @@ lazy_intrinsics: struct {
     @"%Int32Array%": ?Object = null,
     @"%Int32Array.prototype%": ?Object = null,
     @"%Intl%": ?Object = null,
+    @"%Intl.Collator%": ?Object = null,
+    @"%Intl.Collator.prototype%": ?Object = null,
     @"%Intl.Locale%": ?Object = null,
     @"%Intl.Locale.prototype%": ?Object = null,
     @"%Intl.Segmenter%": ?Object = null,
@@ -348,6 +350,12 @@ pub fn @"%Int32Array.prototype%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%Intl%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Intl%", builtins.Intl);
+}
+pub fn @"%Intl.Collator%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Intl.Collator%", builtins.Intl.CollatorConstructor);
+}
+pub fn @"%Intl.Collator.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Intl.Collator.prototype%", builtins.Intl.CollatorPrototype);
 }
 pub fn @"%Intl.Locale%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Intl.Locale%", builtins.Intl.LocaleConstructor);

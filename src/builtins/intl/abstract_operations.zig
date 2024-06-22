@@ -144,3 +144,16 @@ pub fn getOptionsObject(agent: *Agent, options: Value) Agent.Error!Object {
         .{},
     );
 }
+
+/// 9.2.10 CoerceOptionsToObject ( options )
+/// https://tc39.es/ecma402/#sec-coerceoptionstoobject
+pub fn coerceOptionsToObject(agent: *Agent, options: Value) Agent.Error!Object {
+    // 1. If options is undefined, then
+    if (options == .undefined) {
+        // a. Return OrdinaryObjectCreate(null).
+        return ordinaryObjectCreate(agent, null);
+    }
+
+    // 2. Return ? ToObject(options).
+    return options.toObject(agent);
+}

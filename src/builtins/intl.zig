@@ -31,6 +31,9 @@ comptime {
 }
 
 pub const Intl = struct {
+    pub const Collator = @import("./intl/collator.zig").Collator;
+    pub const CollatorConstructor = @import("./intl/collator.zig").CollatorConstructor;
+    pub const CollatorPrototype = @import("./intl/collator.zig").CollatorPrototype;
     pub const Locale = @import("./intl/locale.zig").Locale;
     pub const LocaleConstructor = @import("./intl/locale.zig").LocaleConstructor;
     pub const LocalePrototype = @import("./intl/locale.zig").LocalePrototype;
@@ -52,6 +55,15 @@ pub const Intl = struct {
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
             .value = Value.from("Intl"),
             .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
+        // 8.2.1 Intl.Collator ( . . . )
+        // https://tc39.es/ecma402/#sec-intl.collator-intro
+        try defineBuiltinProperty(object, "Collator", PropertyDescriptor{
+            .value = Value.from(try realm.intrinsics.@"%Intl.Collator%"()),
+            .writable = true,
             .enumerable = false,
             .configurable = true,
         });
