@@ -28,9 +28,8 @@
         },
         // Needed for mach-o/getsect.h when building libgc for macOS
         .macos_sdk = .{
-            // FIXME: This points to https://github.com/mitchellh/zig-build-macos-sdk/pull/4, update once merged
-            .url = "https://github.com/mitchellh/zig-build-macos-sdk/archive/4183dc3f446f419dccc9625f97a45fee97b0c03e.tar.gz",
-            .hash = "1220d397a6dfd4389b6bf9ecdd6be1421a919ae02adb4f658a6ccb2dac84804db07c",
+            .url = "https://github.com/mitchellh/zig-build-macos-sdk/archive/a4ea24f105902111633c6ae9f888b676ac5e36df.tar.gz",
+            .hash = "12209cc9ee372456eda52b71cf9ae77dcc707fa42c9f9d68996b5bf7495b53229c2e",
             .lazy = true,
         },
         .parser_toolkit = .{
@@ -46,8 +45,7 @@
             .hash = "12207b3a0abfdf208a6f456d31f3f03054dda60db0d8e88065aee202a3195f8b00e0",
         },
         .zigline = .{
-            // FIXME: This points to https://github.com/alimpfard/zigline/pull/18, update once merged
-            .url = "https://github.com/alimpfard/zigline/archive/a9e41b2b897c2c7b9752f00fd2ea452972d7f7ce.tar.gz",
+            .url = "https://github.com/alimpfard/zigline/archive/501d068514215bcad2e0bbf2449873558d313741.tar.gz",
             .hash = "1220391df38627008551e1f35da79f959fdc58f2643c306d69ec6b1343f936d71361",
         },
     },
