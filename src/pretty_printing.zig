@@ -207,6 +207,17 @@ fn prettyPrintError(
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintFinalizationRegistry(
+    _: *const builtins.FinalizationRegistry,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("FinalizationRegistry()");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintGenerator(
     _: *const builtins.Generator,
     writer: anytype,
@@ -735,6 +746,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.DataView, prettyPrintDataView },
             .{ builtins.Date, prettyPrintDate },
             .{ builtins.Error, prettyPrintError },
+            .{ builtins.FinalizationRegistry, prettyPrintFinalizationRegistry },
             .{ builtins.Generator, prettyPrintGenerator },
             .{ builtins.Map, prettyPrintMap },
             .{ builtins.MapIterator, prettyPrintMapIterator },
