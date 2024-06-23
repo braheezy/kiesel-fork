@@ -567,6 +567,29 @@ fn prettyPrintIntlCollator(
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintIntlListFormat(
+    intl_list_format: *const builtins.Intl.ListFormat,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    const agent = intl_list_format.data.agent;
+    const locale = intl_list_format.fields.locale;
+    const type_ = intl_list_format.fields.type;
+    const style = intl_list_format.fields.style;
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Intl.ListFormat(");
+    try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}, type: {pretty}, style: {pretty}", .{
+        Value.from(String.fromAscii(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(String.fromAscii(@tagName(type_))),
+        Value.from(String.fromAscii(@tagName(style))),
+    });
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintIntlLocale(
     intl_locale: *const builtins.Intl.Locale,
     writer: anytype,
@@ -764,6 +787,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.TypedArray, prettyPrintTypedArray },
         } ++ if (build_options.enable_intl) .{
             .{ builtins.Intl.Collator, prettyPrintIntlCollator },
+            .{ builtins.Intl.ListFormat, prettyPrintIntlListFormat },
             .{ builtins.Intl.Locale, prettyPrintIntlLocale },
             .{ builtins.Intl.Segmenter, prettyPrintIntlSegmenter },
         } else .{}) |entry| {

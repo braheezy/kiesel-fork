@@ -69,6 +69,7 @@ pub const Tag = enum(u32) {
 
     // ECMA-402
     intl_collator,
+    intl_list_format,
     intl_locale,
     intl_segmenter,
     intl_segments,
