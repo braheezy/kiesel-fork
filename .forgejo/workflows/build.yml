@@ -41,9 +41,7 @@ jobs:
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-x86_64
       - name: Build kiesel-macos-aarch64
         run: |
-          # TODO: Re-enable Intl on macOS once possible
-          #       See https://codeberg.org/kiesel-js/kiesel/issues/22
-          zig build -Dtarget=aarch64-macos-none -Doptimize=ReleaseSafe -Denable-intl=false
+          zig build -Dtarget=aarch64-macos-none -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-macos-aarch64
       - name: Build kiesel-windows-aarch64.exe
         run: |
