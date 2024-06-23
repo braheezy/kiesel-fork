@@ -183,6 +183,15 @@ pub const ListFormatPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        // 13.3.2 Intl.ListFormat.prototype [ @@toStringTag ]
+        // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype-toStringTag
+        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+            .value = Value.from("Intl.ListFormat"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
         return object;
     }
 };
