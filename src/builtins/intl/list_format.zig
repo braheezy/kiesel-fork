@@ -23,7 +23,9 @@ const String = types.String;
 const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
+const getIterator = types.getIterator;
 const getOption = types.getOption;
 const getOptionsObject = abstract_operations.getOptionsObject;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -183,6 +185,8 @@ pub const ListFormatPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "format", format, 1, realm);
+
         // 13.3.2 Intl.ListFormat.prototype [ @@toStringTag ]
         // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype-toStringTag
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
@@ -193,6 +197,26 @@ pub const ListFormatPrototype = struct {
         });
 
         return object;
+    }
+
+    /// 13.3.3 Intl.ListFormat.prototype.format ( list )
+    /// https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype.format
+    fn format(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const list = arguments.get(0);
+
+        // 1. Let lf be the this value.
+        // 2. Perform ? RequireInternalSlot(lf, [[InitializedListFormat]]).
+        const list_format = try this_value.requireInternalSlot(agent, ListFormat);
+
+        // 3. Let stringList be ? StringListFromIterable(list).
+        const string_list = try stringListFromIterable(agent, list);
+        defer {
+            for (string_list) |string| agent.gc_allocator.free(string);
+            agent.gc_allocator.free(string_list);
+        }
+
+        // 4. Return FormatList(lf, stringList).
+        return Value.from(try formatList(agent.gc_allocator, list_format, string_list));
     }
 };
 
@@ -223,3 +247,71 @@ pub const ListFormat = MakeObject(.{
     },
     .tag = .intl_list_format,
 });
+
+/// 13.5.3 FormatList ( listFormat, list )
+/// https://tc39.es/ecma402/#sec-formatlist
+fn formatList(
+    allocator: Allocator,
+    list_format: *const ListFormat,
+    list: []const []const u8,
+) Allocator.Error!String {
+    const data_provider = icu4zig.DataProvider.init();
+    defer data_provider.deinit();
+    const list_formatter = icu4zig.ListFormatter.init(
+        data_provider,
+        list_format.fields.locale,
+        .{
+            .type = switch (list_format.fields.type) {
+                .conjunction => .@"and",
+                .disjunction => .@"or",
+                .unit => .unit,
+            },
+            .length = switch (list_format.fields.style) {
+                .long => .wide,
+                .short => .short,
+                .narrow => .narrow,
+            },
+        },
+    );
+    defer list_formatter.deinit();
+    return String.fromUtf8(allocator, try list_formatter.format(allocator, list));
+}
+
+/// 13.5.5 StringListFromIterable ( iterable )
+/// https://tc39.es/ecma402/#sec-createstringlistfromiterable
+fn stringListFromIterable(agent: *Agent, iterable: Value) Agent.Error![]const []const u8 {
+    // 1. If iterable is undefined, then
+    if (iterable == .undefined) {
+        // a. Return a new empty List.
+        return &.{};
+    }
+
+    // 2. Let iteratorRecord be ? GetIterator(iterable, sync).
+    var iterator = try getIterator(agent, iterable, .sync);
+
+    // 3. Let list be a new empty List.
+    var list = std.ArrayList([]const u8).init(agent.gc_allocator);
+
+    // 4. Repeat,
+    //     a. Let next be ? IteratorStepValue(iteratorRecord).
+    //     b. If next is done, then
+    //         i. Return list.
+    while (try iterator.stepValue()) |next| {
+        // c. If next is not a String, then
+        if (next != .string) {
+            // i. Let error be ThrowCompletion(a newly created TypeError object).
+            const @"error" = agent.throwException(
+                .type_error,
+                "Iterable must return string items",
+                .{},
+            );
+
+            // ii. Return ? IteratorClose(iteratorRecord, error).
+            return iterator.close(@as(Agent.Error![]const []const u8, @"error"));
+        }
+
+        // d. Append next to list.
+        try list.append(try next.string.toUtf8(agent.gc_allocator));
+    }
+    return list.toOwnedSlice();
+}
