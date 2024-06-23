@@ -18,6 +18,7 @@ const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
@@ -28,7 +29,9 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
 const getOption = types.getOption;
 const getOptionsObject = abstract_operations.getOptionsObject;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 13.2 Properties of the Intl.ListFormat Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-constructor
@@ -186,6 +189,7 @@ pub const ListFormatPrototype = struct {
         });
 
         try defineBuiltinFunction(object, "format", format, 1, realm);
+        try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
         // 13.3.2 Intl.ListFormat.prototype [ @@toStringTag ]
         // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype-toStringTag
@@ -217,6 +221,43 @@ pub const ListFormatPrototype = struct {
 
         // 4. Return FormatList(lf, stringList).
         return Value.from(try formatList(agent.gc_allocator, list_format, string_list));
+    }
+
+    /// 13.3.5 Intl.ListFormat.prototype.resolvedOptions ( )
+    /// https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype.resolvedoptions
+    fn resolvedOptions(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        const realm = agent.currentRealm();
+
+        // 1. Let lf be the this value.
+        // 2. Perform ? RequireInternalSlot(lf, [[InitializedListFormat]]).
+        const list_format = try this_value.requireInternalSlot(agent, ListFormat);
+
+        // 3. Let options be OrdinaryObjectCreate(%Object.prototype%).
+        const options = try ordinaryObjectCreate(
+            agent,
+            try realm.intrinsics.@"%Object.prototype%"(),
+        );
+
+        // 4. For each row of Table 20, except the header row, in table order, do
+        //     a. Let p be the Property value of the current row.
+        //     b. Let v be the value of lf's internal slot whose name is the Internal Slot value of the current row.
+        //     c. Assert: v is not undefined.
+        //     d. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("locale"),
+            Value.from(String.fromAscii(try list_format.fields.locale.toString(agent.gc_allocator))),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("type"),
+            Value.from(String.fromAscii(@tagName(list_format.fields.type))),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("style"),
+            Value.from(String.fromAscii(@tagName(list_format.fields.style))),
+        ) catch |err| try noexcept(err);
+
+        // 5. Return options.
+        return Value.from(options);
     }
 };
 
