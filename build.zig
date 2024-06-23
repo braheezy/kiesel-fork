@@ -70,6 +70,9 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .BUILD_SHARED_LIBS = false,
+        .enable_gcj_support = false,
+        .enable_java_finalization = false,
+        .disable_gc_debug = true,
     });
     const libregexp = b.dependency("libregexp", .{
         .target = target,
