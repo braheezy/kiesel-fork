@@ -109,6 +109,7 @@ pub const FinalizationRegistryPrototype = struct {
         });
 
         try defineBuiltinFunction(object, "register", register, 2, realm);
+        try defineBuiltinFunction(object, "unregister", unregister, 1, realm);
 
         // 26.2.3.4 FinalizationRegistry.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-finalization-registry.prototype-@@tostringtag
@@ -172,6 +173,29 @@ pub const FinalizationRegistryPrototype = struct {
 
         // 8. Return undefined.
         return .undefined;
+    }
+
+    /// 26.2.3.3 FinalizationRegistry.prototype.unregister ( unregisterToken )
+    /// https://tc39.es/ecma262/#sec-finalization-registry.prototype.unregister
+    fn unregister(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const unregister_token = arguments.get(0);
+
+        // 1. Let finalizationRegistry be the this value.
+        // 2. Perform ? RequireInternalSlot(finalizationRegistry, [[Cells]]).
+        const finalization_registry = try this_value.requireInternalSlot(agent, FinalizationRegistry);
+
+        // 3. If CanBeHeldWeakly(unregisterToken) is false, throw a TypeError exception.
+        if (!unregister_token.canBeHeldWeakly(agent)) {
+            return agent.throwException(
+                .type_error,
+                "Value {} cannot be held weakly",
+                .{unregister_token},
+            );
+        }
+
+        // TODO: 4-6.
+        _ = finalization_registry;
+        return Value.from(false);
     }
 };
 
