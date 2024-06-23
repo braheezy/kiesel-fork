@@ -25,6 +25,7 @@ const Symbol = @import("Symbol.zig");
 const arrayCreate = builtins.arrayCreate;
 const getIterator = types.getIterator;
 const isZigString = utils.isZigString;
+const keyForSymbol = builtins.keyForSymbol;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const prettyPrintValue = pretty_printing.prettyPrintValue;
@@ -1153,6 +1154,19 @@ pub const Value = union(enum) {
 
             // j. Set k to k + 1.
         }
+    }
+
+    /// 9.13 CanBeHeldWeakly ( v )
+    /// https://tc39.es/ecma262/#sec-canbeheldweakly
+    pub fn canBeHeldWeakly(self: Self, agent: *Agent) bool {
+        // 1. If v is an Object, return true.
+        if (self == .object) return true;
+
+        // 2. If v is a Symbol and KeyForSymbol(v) is undefined, return true.
+        if (self == .symbol and keyForSymbol(agent, self.symbol) == null) return true;
+
+        // 3. Return false.
+        return false;
     }
 
     /// 10.1.15 RequireInternalSlot ( O, internalSlot )

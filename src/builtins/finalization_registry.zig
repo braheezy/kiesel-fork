@@ -19,8 +19,10 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const sameValue = types.sameValue;
 
 /// 26.2.1 The FinalizationRegistry Constructor
 /// https://tc39.es/ecma262/#sec-finalization-registry-constructor
@@ -106,6 +108,8 @@ pub const FinalizationRegistryPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "register", register, 2, realm);
+
         // 26.2.3.4 FinalizationRegistry.prototype [ @@toStringTag ]
         // https://tc39.es/ecma262/#sec-finalization-registry.prototype-@@tostringtag
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
@@ -116,6 +120,58 @@ pub const FinalizationRegistryPrototype = struct {
         });
 
         return object;
+    }
+
+    /// 26.2.3.2 FinalizationRegistry.prototype.register ( target, heldValue [ , unregisterToken ] )
+    /// https://tc39.es/ecma262/#sec-finalization-registry.prototype.register
+    fn register(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const target = arguments.get(0);
+        const held_value = arguments.get(1);
+        const unregister_token = arguments.get(2);
+        var maybe_unregister_token: ?Value = unregister_token;
+
+        // 1. Let finalizationRegistry be the this value.
+        // 2. Perform ? RequireInternalSlot(finalizationRegistry, [[Cells]]).
+        const finalization_registry = try this_value.requireInternalSlot(agent, FinalizationRegistry);
+
+        // 3. If CanBeHeldWeakly(target) is false, throw a TypeError exception.
+        if (!target.canBeHeldWeakly(agent)) {
+            return agent.throwException(
+                .type_error,
+                "Value {} cannot be held weakly",
+                .{target},
+            );
+        }
+
+        // 4. If SameValue(target, heldValue) is true, throw a TypeError exception.
+        if (sameValue(target, held_value)) {
+            return agent.throwException(
+                .type_error,
+                "Target and held value must not be the same",
+                .{},
+            );
+        }
+
+        // 5. If CanBeHeldWeakly(unregisterToken) is false, then
+        if (!unregister_token.canBeHeldWeakly(agent)) {
+            // a. If unregisterToken is not undefined, throw a TypeError exception.
+            if (unregister_token != .undefined) {
+                return agent.throwException(
+                    .type_error,
+                    "Value {} cannot be held weakly",
+                    .{unregister_token},
+                );
+            }
+
+            // b. Set unregisterToken to empty.
+            maybe_unregister_token = null;
+        }
+
+        // TODO: 6-7.
+        _ = finalization_registry;
+
+        // 8. Return undefined.
+        return .undefined;
     }
 };
 
