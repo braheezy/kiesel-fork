@@ -106,6 +106,15 @@ pub const FinalizationRegistryPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        // 26.2.3.4 FinalizationRegistry.prototype [ @@toStringTag ]
+        // https://tc39.es/ecma262/#sec-finalization-registry.prototype-@@tostringtag
+        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+            .value = Value.from("FinalizationRegistry"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
         return object;
     }
 };
