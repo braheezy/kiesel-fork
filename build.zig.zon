@@ -37,8 +37,8 @@
             .hash = "12206f0ade18be8db985f6a688ca7ec9ffdbb95f033c8db91760b0d13cfe27618b61",
         },
         .zig_args = .{
-            .url = "https://github.com/ikskuh/zig-args/archive/872272205d95bdba33798c94e72c5387a31bc806.tar.gz",
-            .hash = "1220fe6ae56b668cc4a033282b5f227bfbb46a67ede6d84e9f9493fea9de339b5f37",
+            .url = "https://github.com/ikskuh/zig-args/archive/03af1b6c5bfda9646a562c861055024daed5b238.tar.gz",
+            .hash = "1220904d2fdcd970dd0d216211d092eb3ef6da01117163cc9393ab845a1d66c029d9",
         },
         .zig_stackinfo = .{
             .url = "https://codeberg.org/linusg/zig-stackinfo/archive/9d02cd3077250fe7b0cbaef9eafd5c7e40c84b89.tar.gz",
