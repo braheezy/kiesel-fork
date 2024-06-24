@@ -156,6 +156,15 @@ pub const PluralRulesPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        // 16.3.2 Intl.PluralRules.prototype [ @@toStringTag ]
+        // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype-tostringtag
+        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+            .value = Value.from("Intl.PluralRules"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
         return object;
     }
 };
