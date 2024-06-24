@@ -607,6 +607,27 @@ fn prettyPrintIntlLocale(
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintIntlPluralRules(
+    intl_plural_rules: *const builtins.Intl.PluralRules,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    const agent = intl_plural_rules.data.agent;
+    const locale = intl_plural_rules.fields.locale;
+    const type_ = intl_plural_rules.fields.type;
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Intl.PluralRules(");
+    try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}, type: {pretty}", .{
+        Value.from(String.fromAscii(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(String.fromAscii(@tagName(type_))),
+    });
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintIntlSegmenter(
     intl_segmenter: *const builtins.Intl.Segmenter,
     writer: anytype,
@@ -789,6 +810,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.Intl.Collator, prettyPrintIntlCollator },
             .{ builtins.Intl.ListFormat, prettyPrintIntlListFormat },
             .{ builtins.Intl.Locale, prettyPrintIntlLocale },
+            .{ builtins.Intl.PluralRules, prettyPrintIntlPluralRules },
             .{ builtins.Intl.Segmenter, prettyPrintIntlSegmenter },
         } else .{}) |entry| {
             const T, const prettyPrintFn = entry;

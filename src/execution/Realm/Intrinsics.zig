@@ -84,6 +84,8 @@ lazy_intrinsics: struct {
     @"%Intl.ListFormat.prototype%": ?Object = null,
     @"%Intl.Locale%": ?Object = null,
     @"%Intl.Locale.prototype%": ?Object = null,
+    @"%Intl.PluralRules%": ?Object = null,
+    @"%Intl.PluralRules.prototype%": ?Object = null,
     @"%Intl.Segmenter%": ?Object = null,
     @"%Intl.Segmenter.prototype%": ?Object = null,
     @"%IntlSegmentsPrototype%": ?Object = null,
@@ -378,6 +380,12 @@ pub fn @"%Intl.Locale%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%Intl.Locale.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Intl.Locale.prototype%", builtins.Intl.LocalePrototype);
+}
+pub fn @"%Intl.PluralRules%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Intl.PluralRules%", builtins.Intl.PluralRulesConstructor);
+}
+pub fn @"%Intl.PluralRules.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Intl.PluralRules.prototype%", builtins.Intl.PluralRulesPrototype);
 }
 pub fn @"%Intl.Segmenter%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Intl.Segmenter%", builtins.Intl.SegmenterConstructor);

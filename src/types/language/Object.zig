@@ -71,6 +71,7 @@ pub const Tag = enum(u32) {
     intl_collator,
     intl_list_format,
     intl_locale,
+    intl_plural_rules,
     intl_segmenter,
     intl_segments,
     intl_segment_iterator,
