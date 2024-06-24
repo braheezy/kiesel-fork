@@ -16,6 +16,7 @@ const utils = @import("../../utils.zig");
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
+const Number = types.Number;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
@@ -24,6 +25,7 @@ const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const coerceOptionsToObject = abstract_operations.coerceOptionsToObject;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getOption = types.getOption;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
@@ -156,6 +158,8 @@ pub const PluralRulesPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "select", select, 1, realm);
+
         // 16.3.2 Intl.PluralRules.prototype [ @@toStringTag ]
         // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype-tostringtag
         try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
@@ -166,6 +170,24 @@ pub const PluralRulesPrototype = struct {
         });
 
         return object;
+    }
+
+    /// 16.3.3 Intl.PluralRules.prototype.select ( value )
+    /// https://tc39.es/ecma402/#sec-intl.pluralrules.prototype.select
+    fn select(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const value = arguments.get(0);
+
+        // 1. Let pr be the this value.
+        // 2. Perform ? RequireInternalSlot(pr, [[InitializedPluralRules]]).
+        const plural_rules = try this_value.requireInternalSlot(agent, PluralRules);
+
+        // 3. Let n be ? ToNumber(value).
+        const n = try value.toNumber(agent);
+
+        // 4. Return ResolvePlural(pr, n).[[PluralCategory]].
+        return Value.from(
+            String.fromAscii(@tagName(resolvePlural(plural_rules, n).plural_category)),
+        );
     }
 };
 
@@ -186,3 +208,45 @@ pub const PluralRules = MakeObject(.{
     },
     .tag = .intl_plural_rules,
 });
+
+/// 16.5.4 ResolvePlural ( pluralRules, n )
+/// https://tc39.es/ecma402/#sec-resolveplural
+pub fn resolvePlural(plural_rules_object: *const PluralRules, n: Number) struct {
+    /// [[PluralCategory]]
+    plural_category: icu4zig.PluralRules.Category,
+
+    // TODO: [[FormattedString]]
+} {
+    // 1. If n is not a finite Number, then
+    if (!n.isFinite()) {
+        // a. Let s be ! ToString(n).
+        // b. Return the Record { [[PluralCategory]]: "other", [[FormattedString]]: s }.
+        return .{ .plural_category = .other };
+    }
+
+    // 2. Let locale be pluralRules.[[Locale]].
+    const locale = plural_rules_object.fields.locale;
+
+    // 3. Let type be pluralRules.[[Type]].
+    const @"type" = plural_rules_object.fields.type;
+
+    // TODO: 4. Let res be FormatNumericToString(pluralRules, ℝ(n)).
+    // TODO: 5. Let s be res.[[FormattedString]].
+
+    // 6. Let operands be GetOperands(s).
+    // 7. Let p be PluralRuleSelect(locale, type, n, operands).
+    const data_provider = icu4zig.DataProvider.init();
+    defer data_provider.deinit();
+    const plural_rules = icu4zig.PluralRules.init(data_provider, locale, switch (@"type") {
+        .cardinal => .cardinal,
+        .ordinal => .ordinal,
+    });
+    defer plural_rules.deinit();
+    const plural_category = plural_rules.categoryFor(switch (n) {
+        .i32 => |value| .{ .i32 = value },
+        .f64 => |value| .{ .f64 = value },
+    }) catch unreachable;
+
+    // 8. Return the Record { [[PluralCategory]]: p, [[FormattedString]]: s }.
+    return .{ .plural_category = plural_category };
+}
