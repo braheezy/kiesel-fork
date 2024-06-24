@@ -19,16 +19,20 @@ const MakeObject = types.MakeObject;
 const Number = types.Number;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const coerceOptionsToObject = abstract_operations.coerceOptionsToObject;
+const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getOption = types.getOption;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 16.2 Properties of the Intl.PluralRules Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-constructor
@@ -159,6 +163,7 @@ pub const PluralRulesPrototype = struct {
         });
 
         try defineBuiltinFunction(object, "select", select, 1, realm);
+        try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
         // 16.3.2 Intl.PluralRules.prototype [ @@toStringTag ]
         // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype-tostringtag
@@ -188,6 +193,79 @@ pub const PluralRulesPrototype = struct {
         return Value.from(
             String.fromAscii(@tagName(resolvePlural(plural_rules, n).plural_category)),
         );
+    }
+
+    /// 16.3.5 Intl.PluralRules.prototype.resolvedOptions ( )
+    /// https://tc39.es/ecma402/#sec-intl.pluralrules.prototype.resolvedoptions
+    fn resolvedOptions(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        const realm = agent.currentRealm();
+
+        // 1. Let pr be the this value.
+        // 2. Perform ? RequireInternalSlot(pr, [[InitializedPluralRules]]).
+        const plural_rules = try this_value.requireInternalSlot(agent, PluralRules);
+
+        // 3. Let options be OrdinaryObjectCreate(%Object.prototype%).
+        const options = try ordinaryObjectCreate(
+            agent,
+            try realm.intrinsics.@"%Object.prototype%"(),
+        );
+
+        // 4. Let pluralCategories be a List of Strings containing all possible results of
+        //    PluralRuleSelect for the selected locale pr.[[Locale]].
+        const plural_categories = blk: {
+            const data_provider = icu4zig.DataProvider.init();
+            defer data_provider.deinit();
+            const plural_rules_ = icu4zig.PluralRules.init(
+                data_provider,
+                plural_rules.fields.locale,
+                switch (plural_rules.fields.type) {
+                    .cardinal => .cardinal,
+                    .ordinal => .ordinal,
+                },
+            );
+            defer plural_rules_.deinit();
+            const plural_categories = plural_rules_.categories();
+            var array_list = std.ArrayList(Value).init(agent.gc_allocator);
+            if (plural_categories.zero) try array_list.append(Value.from("zero"));
+            if (plural_categories.one) try array_list.append(Value.from("one"));
+            if (plural_categories.two) try array_list.append(Value.from("two"));
+            if (plural_categories.few) try array_list.append(Value.from("few"));
+            if (plural_categories.many) try array_list.append(Value.from("many"));
+            if (plural_categories.other) try array_list.append(Value.from("other"));
+            break :blk array_list;
+        };
+        defer plural_categories.deinit();
+
+        // 5. For each row of Table 25, except the header row, in table order, do
+        //     a. Let p be the Property value of the current row.
+        //     b. If p is "pluralCategories", then
+        //         i. Let v be CreateArrayFromList(pluralCategories).
+        //     c. Else,
+        //         i. Let v be the value of pr's internal slot whose name is the Internal Slot value of the current row.
+        //     d. If v is not undefined, then
+        //         i. If there is a Conversion value in the current row, then
+        //             1. Assert: The Conversion value of the current row is number.
+        //             2. Set v to 𝔽(v).
+        //         ii. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("locale"),
+            Value.from(String.fromAscii(try plural_rules.fields.locale.toString(agent.gc_allocator))),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("type"),
+            Value.from(String.fromAscii(@tagName(plural_rules.fields.type))),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("pluralCategories"),
+            Value.from(try createArrayFromList(agent, plural_categories.items)),
+        ) catch |err| try noexcept(err);
+
+        // TODO: minimumIntegerDigits, minimumFractionDigits, maximumFractionDigits,
+        //       minimumSignificantDigits, maximumSignificantDigits, roundingIncrement,
+        //       roundingMode, roundingPriority, trailingZeroDisplay
+
+        // 6. Return options.
+        return Value.from(options);
     }
 };
 
