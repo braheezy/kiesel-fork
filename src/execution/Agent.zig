@@ -26,6 +26,7 @@ const String = types.String;
 const StringHashMap = types.StringHashMap;
 const Symbol = types.Symbol;
 const Value = types.Value;
+const WellKnownSymbols = @import("Agent/WellKnownSymbols.zig");
 const getIdentifierReference = environments.getIdentifierReference;
 const noexcept = utils.noexcept;
 
@@ -83,24 +84,6 @@ pub const Options = struct {
 
 pub const Error = Allocator.Error || error{ExceptionThrown};
 
-/// 6.1.5.1 Well-Known Symbols
-/// https://tc39.es/ecma262/#sec-well-known-symbols
-pub const WellKnownSymbols = struct {
-    @"@@asyncIterator": Symbol,
-    @"@@hasInstance": Symbol,
-    @"@@isConcatSpreadable": Symbol,
-    @"@@iterator": Symbol,
-    @"@@match": Symbol,
-    @"@@matchAll": Symbol,
-    @"@@replace": Symbol,
-    @"@@search": Symbol,
-    @"@@species": Symbol,
-    @"@@split": Symbol,
-    @"@@toPrimitive": Symbol,
-    @"@@toStringTag": Symbol,
-    @"@@unscopables": Symbol,
-};
-
 pub const QueuedJob = struct {
     job: Job,
     realm: ?*Realm,
@@ -124,21 +107,7 @@ pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
         .zero = try BigInt.from(self.gc_allocator, 0),
         .one = try BigInt.from(self.gc_allocator, 1),
     };
-    self.well_known_symbols = .{
-        .@"@@asyncIterator" = self.createSymbol(String.fromLiteral("Symbol.asyncIterator")) catch unreachable,
-        .@"@@hasInstance" = self.createSymbol(String.fromLiteral("Symbol.hasInstance")) catch unreachable,
-        .@"@@isConcatSpreadable" = self.createSymbol(String.fromLiteral("Symbol.isConcatSpreadable")) catch unreachable,
-        .@"@@iterator" = self.createSymbol(String.fromLiteral("Symbol.iterator")) catch unreachable,
-        .@"@@match" = self.createSymbol(String.fromLiteral("Symbol.match")) catch unreachable,
-        .@"@@matchAll" = self.createSymbol(String.fromLiteral("Symbol.matchAll")) catch unreachable,
-        .@"@@replace" = self.createSymbol(String.fromLiteral("Symbol.replace")) catch unreachable,
-        .@"@@search" = self.createSymbol(String.fromLiteral("Symbol.search")) catch unreachable,
-        .@"@@species" = self.createSymbol(String.fromLiteral("Symbol.species")) catch unreachable,
-        .@"@@split" = self.createSymbol(String.fromLiteral("Symbol.split")) catch unreachable,
-        .@"@@toPrimitive" = self.createSymbol(String.fromLiteral("Symbol.toPrimitive")) catch unreachable,
-        .@"@@toStringTag" = self.createSymbol(String.fromLiteral("Symbol.toStringTag")) catch unreachable,
-        .@"@@unscopables" = self.createSymbol(String.fromLiteral("Symbol.unscopables")) catch unreachable,
-    };
+    self.well_known_symbols = WellKnownSymbols.init(&self);
     self.global_symbol_registry = StringHashMap(Symbol).init(self.gc_allocator);
     self.execution_context_stack = std.ArrayList(ExecutionContext).init(self.gc_allocator);
     self.queued_jobs = std.ArrayList(QueuedJob).init(self.gc_allocator);
