@@ -6,8 +6,6 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
-const StackInfo = @import("stackinfo").StackInfo;
-
 const builtins = @import("../builtins.zig");
 const environments = @import("environments.zig");
 const pretty_printing = @import("../pretty_printing.zig");
@@ -50,29 +48,7 @@ platform: Platform,
 /// [[LittleEndian]]
 little_endian: bool = builtin.cpu.arch.endian() == .little,
 
-pub const Platform = struct {
-    stdout: std.io.AnyWriter,
-    stderr: std.io.AnyWriter,
-    tty_config: std.io.tty.Config,
-    stack_info: ?StackInfo,
-
-    // `any()` captures a pointer to the writer, so these have to stick around.
-    const has_fd_t = @hasDecl(std.posix.system, "fd_t");
-    var _stdout_writer: if (has_fd_t) std.fs.File.Writer else void = undefined;
-    var _stderr_writer: if (has_fd_t) std.fs.File.Writer else void = undefined;
-
-    pub fn default() Platform {
-        if (!has_fd_t) @panic("Platform.default() not usable on this target");
-        _stdout_writer = std.io.getStdOut().writer();
-        _stderr_writer = std.io.getStdErr().writer();
-        return .{
-            .stdout = _stdout_writer.any(),
-            .stderr = _stderr_writer.any(),
-            .tty_config = std.io.tty.detectConfig(std.io.getStdOut()),
-            .stack_info = StackInfo.init() catch null,
-        };
-    }
-};
+pub const Platform = @import("Agent/Platform.zig");
 
 pub const Options = struct {
     platform: ?Platform = null,

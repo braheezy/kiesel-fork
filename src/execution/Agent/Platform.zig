@@ -1,0 +1,27 @@
+const std = @import("std");
+
+const stackinfo = @import("stackinfo");
+
+const Self = @This();
+
+stdout: std.io.AnyWriter,
+stderr: std.io.AnyWriter,
+tty_config: std.io.tty.Config,
+stack_info: ?stackinfo.StackInfo,
+
+// `any()` captures a pointer to the writer, so these have to stick around.
+const has_fd_t = @hasDecl(std.posix.system, "fd_t");
+var stdout_writer: if (has_fd_t) std.fs.File.Writer else void = undefined;
+var stderr_writer: if (has_fd_t) std.fs.File.Writer else void = undefined;
+
+pub fn default() Self {
+    if (!has_fd_t) @panic("Platform.default() not usable on this target");
+    stdout_writer = std.io.getStdOut().writer();
+    stderr_writer = std.io.getStdErr().writer();
+    return .{
+        .stdout = stdout_writer.any(),
+        .stderr = stderr_writer.any(),
+        .tty_config = std.io.tty.detectConfig(std.io.getStdOut()),
+        .stack_info = stackinfo.StackInfo.init() catch null,
+    };
+}
