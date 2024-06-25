@@ -165,7 +165,7 @@ pub const SegmenterConstructor = struct {
         const resolved_locale = if (requested_locales.items.len != 0)
             requested_locales.items[0]
         else
-            icu4zig.Locale.init(null) catch unreachable;
+            agent.platform.default_locale;
 
         // 10. Set segmenter.[[Locale]] to r.[[Locale]].
         segmenter.as(Segmenter).fields.locale = resolved_locale;

@@ -187,7 +187,7 @@ pub const CollatorConstructor = struct {
             const resolved_locale_string = try requested_locales.items[0].toString(agent.gc_allocator);
             var it = std.mem.splitSequence(u8, resolved_locale_string, "-x-");
             break :blk icu4zig.Locale.init(it.next().?) catch unreachable;
-        } else icu4zig.Locale.init(null) catch unreachable;
+        } else agent.platform.default_locale;
 
         // 25. Set collator.[[Locale]] to r.[[Locale]].
         collator.as(Collator).fields.locale = resolved_locale;

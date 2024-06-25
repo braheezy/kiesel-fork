@@ -96,6 +96,7 @@ pub fn deinit(self: *Self) void {
     self.global_symbol_registry.deinit();
     self.execution_context_stack.deinit();
     self.queued_jobs.deinit();
+    self.platform.deinit();
 }
 
 pub fn drainJobQueue(self: *Self) void {

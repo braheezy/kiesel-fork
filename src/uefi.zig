@@ -63,6 +63,7 @@ pub fn main() std.os.uefi.Status {
             .stderr = stderr_writer.any(),
             .tty_config = .no_color,
             .stack_info = null,
+            .default_locale = {},
         },
     }) catch |err| switch (err) {
         error.OutOfMemory => return .OutOfResources,
