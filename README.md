@@ -80,6 +80,7 @@ Usage: kiesel [options] [file]
 
 Options:
   -c, --command                            Run the given code instead of reading from a file
+  -d, --debug                              Enable debug mode
       --disable-gc                         Disable garbage collection
   -m, --module                             Run code as a module instead of a script
       --print-ast                          Print the parsed AST

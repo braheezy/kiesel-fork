@@ -515,7 +515,24 @@ fn getHistoryPath(allocator: Allocator) GetHistoryPathError![]const u8 {
     return history_path;
 }
 
+fn printValueDebugInfo(
+    writer: anytype,
+    tty_config: std.io.tty.Config,
+    value: Value,
+) @TypeOf(writer).Error!void {
+    // Porffor REPL my beloved 💜
+    try tty_config.setColor(writer, .blue);
+    switch (value) {
+        .number => |number| try writer.print(" (type: {s})", .{@tagName(number)}),
+        .string => |string| try writer.print(" (type: {s})", .{@tagName(string)}),
+        .symbol => |symbol| try writer.print(" (id: {})", .{symbol.id}),
+        else => {},
+    }
+    try tty_config.setColor(writer, .reset);
+}
+
 fn repl(allocator: Allocator, realm: *Realm, options: struct {
+    debug: bool = false,
     module: bool = false,
     print_promise_rejection_warnings: bool = true,
 }) !void {
@@ -638,7 +655,12 @@ fn repl(allocator: Allocator, realm: *Realm, options: struct {
             .module = options.module,
             .print_promise_rejection_warnings = options.print_promise_rejection_warnings,
         })) |result| {
-            try stdout.print("{pretty}\n", .{result});
+            try stdout.print("{pretty}", .{result});
+            if (options.debug) {
+                const tty_config = realm.agent.platform.tty_config;
+                try printValueDebugInfo(stdout, tty_config, result);
+            }
+            try stdout.writeAll("\n");
         }
         // Handled exception & printed something, carry on
         else continue;
@@ -646,6 +668,7 @@ fn repl(allocator: Allocator, realm: *Realm, options: struct {
 }
 
 fn replBasic(allocator: Allocator, realm: *Realm, options: struct {
+    debug: bool = false,
     module: bool = false,
     print_promise_rejection_warnings: bool = true,
 }) !void {
@@ -679,6 +702,11 @@ fn replBasic(allocator: Allocator, realm: *Realm, options: struct {
             .print_promise_rejection_warnings = options.print_promise_rejection_warnings,
         })) |result| {
             try stdout.print("{pretty}\n", .{result});
+            if (options.debug) {
+                const tty_config = realm.agent.platform.tty_config;
+                try printValueDebugInfo(stdout, tty_config, result);
+            }
+            try stdout.writeAll("\n");
         }
         // Handled exception & printed something, carry on
         else continue;
@@ -695,6 +723,7 @@ pub fn main() !u8 {
 
     const Options = struct {
         command: ?[]const u8 = null,
+        debug: bool = false,
         @"disable-gc": bool = false,
         module: bool = false,
         @"print-ast": bool = false,
@@ -707,6 +736,7 @@ pub fn main() !u8 {
 
         pub const shorthands = .{
             .c = "command",
+            .d = "debug",
             .m = "module",
             .p = "print-result",
             .v = "version",
@@ -717,6 +747,7 @@ pub fn main() !u8 {
             .usage_summary = "[options] [file]",
             .option_docs = .{
                 .command = "Run the given code instead of reading from a file",
+                .debug = "Enable debug mode",
                 .@"disable-gc" = "Disable garbage collection",
                 .module = "Run code as a module instead of a script",
                 .@"print-ast" = "Print the parsed AST",
@@ -889,11 +920,13 @@ pub fn main() !u8 {
         } else return 1;
     } else if (builtin.os.tag != .wasi) {
         try repl(allocator, realm, .{
+            .debug = parsed_args.options.debug,
             .module = parsed_args.options.module,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
         });
     } else {
         try replBasic(allocator, realm, .{
+            .debug = parsed_args.options.debug,
             .module = parsed_args.options.module,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
         });
