@@ -1632,6 +1632,7 @@ pub fn codegenStatement(
         .continue_statement => |x| try codegenContinueStatement(x, executable, ctx),
         .break_statement => |x| try codegenBreakStatement(x, executable, ctx),
         .return_statement => |x| try codegenReturnStatement(x, executable, ctx),
+        .labelled_statement => |x| try codegenLabelledStatement(x, executable, ctx),
         .with_statement => |x| try codegenWithStatement(x, executable, ctx),
         .throw_statement => |x| try codegenThrowStatement(x, executable, ctx),
         .try_statement => |x| try codegenTryStatement(x, executable, ctx),
@@ -2829,6 +2830,34 @@ pub fn codegenSwitchStatement(
     try executable.addInstruction(.pop_lexical_environment);
 
     // 9. Return R.
+}
+
+/// 14.13.3 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-labelled-statements-runtime-semantics-evaluation
+pub fn codegenLabelledStatement(
+    node: ast.LabelledStatement,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    // 1. Return ? LabelledEvaluation of this LabelledStatement with argument « ».
+
+    // 14.13.4 Runtime Semantics: LabelledEvaluation
+    // https://tc39.es/ecma262/#sec-runtime-semantics-labelledevaluation
+    // TODO: Implement labelled break and continue
+
+    switch (node.labelled_item) {
+        // LabelledItem : FunctionDeclaration
+        .function_declaration => {
+            // 1. Return ? Evaluation of FunctionDeclaration.
+        },
+
+        // Statement :
+        //     [...]
+        .statement => |statement| {
+            // 1. Return ? Evaluation of Statement.
+            try codegenStatement(statement.*, executable, ctx);
+        },
+    }
 }
 
 /// 14.14.1 Runtime Semantics: Evaluation

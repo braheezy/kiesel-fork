@@ -1361,6 +1361,8 @@ pub fn acceptStatement(self: *Self) AcceptError!*ast.Statement {
         statement.* = .{ .variable_statement = variable_statement }
     else |_| if (self.core.accept(RuleSet.is(.@";"))) |_|
         statement.* = .empty_statement
+    else |_| if (self.acceptLabelledStatement()) |labelled_statement|
+        statement.* = .{ .labelled_statement = labelled_statement }
     else |_| if (self.acceptExpressionStatement()) |expression_statement|
         statement.* = .{ .expression_statement = expression_statement }
     else |_| if (self.acceptIfStatement()) |if_statement|
@@ -1595,6 +1597,33 @@ pub fn acceptBindingRestElement(self: *Self) AcceptError!ast.BindingRestElement 
     _ = try self.core.accept(RuleSet.is(.@"..."));
     const identifier = try self.acceptBindingIdentifier();
     return .{ .identifier = identifier };
+}
+
+pub fn acceptLabelledStatement(self: *Self) AcceptError!ast.LabelledStatement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const label_identifier = try self.acceptLabelIdentifier();
+    _ = try self.core.accept(RuleSet.is(.@":"));
+    const location = (try self.core.peek() orelse return error.UnexpectedToken).location;
+    const labelled_item: ast.LabelledStatement.LabelledItem = if (self.acceptFunctionDeclaration()) |function_declaration|
+        .{ .function_declaration = function_declaration }
+    else |_| if (self.acceptStatement()) |statement|
+        .{ .statement = statement }
+    else |_|
+        return error.UnexpectedToken;
+    // TODO: Make this dependent on the `enable-annex-b` build flag
+    // LabelledItem : FunctionDeclaration
+    // - It is a Syntax Error if any source text that is strict mode code is matched by this production.
+    if (self.state.in_strict_mode and labelled_item == .function_declaration) {
+        try self.emitErrorAt(
+            location,
+            "Labelled function declaration is not permitted in strict mode",
+            .{},
+        );
+        return error.UnexpectedToken;
+    }
+    return .{ .label_identifier = label_identifier, .labelled_item = labelled_item };
 }
 
 pub fn acceptExpressionStatement(self: *Self) AcceptError!ast.ExpressionStatement {

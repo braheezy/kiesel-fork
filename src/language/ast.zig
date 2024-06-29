@@ -782,6 +782,7 @@ pub const Statement = union(enum) {
     break_statement: BreakStatement,
     return_statement: ReturnStatement,
     with_statement: WithStatement,
+    labelled_statement: LabelledStatement,
     throw_statement: ThrowStatement,
     try_statement: TryStatement,
     debugger_statement,
@@ -834,6 +835,7 @@ pub const Statement = union(enum) {
                 .switch_statement => |switch_statement| return switch_statement.varDeclaredNames(allocator),
             },
             .with_statement => |with_statement| return with_statement.varDeclaredNames(allocator),
+            .labelled_statement => |labelled_statement| return labelled_statement.varDeclaredNames(allocator),
             .try_statement => |try_statement| return try_statement.varDeclaredNames(allocator),
         }
     }
@@ -873,6 +875,7 @@ pub const Statement = union(enum) {
                 .switch_statement => |switch_statement| return switch_statement.varScopedDeclarations(allocator),
             },
             .with_statement => |with_statement| return with_statement.varScopedDeclarations(allocator),
+            .labelled_statement => |labelled_statement| return labelled_statement.varScopedDeclarations(allocator),
             .try_statement => |try_statement| return try_statement.varScopedDeclarations(allocator),
         }
     }
@@ -1049,8 +1052,12 @@ pub const StatementList = struct {
         for (self.items) |item| switch (item) {
             // StatementListItem : Statement
             .statement => |statement| {
-                // TODO: 1. If Statement is Statement : LabelledStatement , return the
-                //          TopLevelVarDeclaredNames of Statement.
+                // 1. If Statement is Statement : LabelledStatement , return the
+                //    TopLevelVarDeclaredNames of Statement.
+                if (statement.* == .labelled_statement) {
+                    return statement.labelled_statement.topLevelVarDeclaredNames(allocator);
+                }
+
                 // 2. Return the VarDeclaredNames of Statement.
                 try var_declared_names.appendSlice(try statement.varDeclaredNames(allocator));
             },
@@ -1085,8 +1092,12 @@ pub const StatementList = struct {
         for (self.items) |item| switch (item) {
             // StatementListItem : Statement
             .statement => |statement| {
-                // TODO: 1. If Statement is Statement : LabelledStatement , return the
-                //          TopLevelVarScopedDeclarations of Statement.
+                // 1. If Statement is Statement : LabelledStatement , return the
+                //    TopLevelVarScopedDeclarations of Statement.
+                if (statement.* == .labelled_statement) {
+                    return statement.labelled_statement.topLevelVarScopedDeclarations(allocator);
+                }
+
                 // 2. Return the VarScopedDeclarations of Statement.
                 try variable_declarations.appendSlice(try statement.varScopedDeclarations(allocator));
             },
@@ -1129,11 +1140,13 @@ pub const StatementListItem = union(enum) {
     declaration: *Declaration,
 
     pub fn hasLexicallyScopedDeclarations(self: Self) bool {
-        switch (self) {
-            // TODO: Handle LabelledStatement
-            .statement => return false,
-            .declaration => return true,
-        }
+        return switch (self) {
+            .statement => |statement| switch (statement.*) {
+                .labelled_statement => |labelled_statement| labelled_statement.hasLexicallyScopedDeclarations(),
+                else => false,
+            },
+            .declaration => true,
+        };
     }
 
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
@@ -1145,10 +1158,15 @@ pub const StatementListItem = union(enum) {
         var declarations = std.ArrayList(LexicallyScopedDeclaration).init(allocator);
         switch (self) {
             // StatementListItem : Statement
-            .statement => {
-                // TODO: 1. If Statement is Statement : LabelledStatement , return the
-                //          LexicallyScopedDeclarations of LabelledStatement.
+            .statement => |statement| switch (statement.*) {
+                // 1. If Statement is Statement : LabelledStatement , return the
+                //    LexicallyScopedDeclarations of LabelledStatement.
+                .labelled_statement => |labelled_statement| {
+                    try declarations.appendSlice(try labelled_statement.lexicallyScopedDeclarations(allocator));
+                },
+
                 // 2. Return a new empty List.
+                else => {},
             },
 
             // StatementListItem : Declaration
@@ -1980,6 +1998,157 @@ pub const DefaultClause = struct {
         // 1. If the StatementList is present, return the VarScopedDeclarations of StatementList.
         // 2. Return a new empty List.
         return self.statement_list.varScopedDeclarations(allocator);
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-LabelledStatement
+pub const LabelledStatement = struct {
+    const Self = @This();
+
+    pub const LabelledItem = union(enum) {
+        statement: *Statement,
+        function_declaration: FunctionDeclaration,
+    };
+
+    label_identifier: Identifier,
+    labelled_item: LabelledItem,
+
+    pub fn hasLexicallyScopedDeclarations(self: Self) bool {
+        return switch (self.labelled_item) {
+            .statement => false,
+            .function_declaration => true,
+        };
+    }
+
+    /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
+    pub fn lexicallyScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const LexicallyScopedDeclaration {
+        //  LabelledStatement : LabelIdentifier : LabelledItem
+        // 1. Return the LexicallyScopedDeclarations of LabelledItem.
+        switch (self.labelled_item) {
+            // LabelledItem : Statement
+            .statement => {
+                // 1. Return a new empty List.
+                return &.{};
+            },
+
+            // LabelledItem : FunctionDeclaration
+            .function_declaration => |function_declaration| {
+                // 1. Return « FunctionDeclaration ».
+                var declarations = std.ArrayList(LexicallyScopedDeclaration).init(allocator);
+                try declarations.append(.{
+                    .hoistable_declaration = .{ .function_declaration = function_declaration },
+                });
+                return declarations.toOwnedSlice();
+            },
+        }
+    }
+
+    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
+    pub fn varDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        switch (self.labelled_item) {
+            // LabelledStatement : LabelIdentifier : LabelledItem
+            .statement => |statement| {
+                // 1. Return the VarDeclaredNames of LabelledItem.
+                return statement.varDeclaredNames(allocator);
+            },
+
+            // LabelledItem : FunctionDeclaration
+            .function_declaration => {
+                // 1. Return a new empty List.
+                return &.{};
+            },
+        }
+    }
+
+    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
+    pub fn varScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VarScopedDeclaration {
+        switch (self.labelled_item) {
+            //  LabelledStatement : LabelIdentifier : LabelledItem
+            .statement => |statement| {
+                // 1. Return the VarScopedDeclarations of LabelledItem.
+                return statement.varScopedDeclarations(allocator);
+            },
+
+            // LabelledItem : FunctionDeclaration
+            .function_declaration => {
+                // 1. Return a new empty List.
+                return &.{};
+            },
+        }
+    }
+
+    /// 8.2.10 Static Semantics: TopLevelVarDeclaredNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-toplevelvardeclarednames
+    pub fn topLevelVarDeclaredNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        // LabelledStatement : LabelIdentifier : LabelledItem
+        // 1. Return the TopLevelVarDeclaredNames of LabelledItem.
+        switch (self.labelled_item) {
+            // LabelledItem : Statement
+            .statement => |statement| {
+                // 1. If Statement is Statement : LabelledStatement , return the
+                //    TopLevelVarDeclaredNames of Statement.
+                if (statement.* == .labelled_statement) {
+                    return statement.labelled_statement.topLevelVarDeclaredNames(allocator);
+                }
+
+                // 2. Return the VarDeclaredNames of Statement.
+                return statement.varDeclaredNames(allocator);
+            },
+
+            // LabelledItem : FunctionDeclaration
+            .function_declaration => |function_declaration| {
+                // 1. Return the BoundNames of FunctionDeclaration.
+                return function_declaration.boundNames(allocator);
+            },
+        }
+    }
+
+    /// 8.2.11 Static Semantics: TopLevelVarScopedDeclarations
+    /// https://tc39.es/ecma262/#sec-static-semantics-toplevelvarscopeddeclarations
+    pub fn topLevelVarScopedDeclarations(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const VarScopedDeclaration {
+        // LabelledStatement : LabelIdentifier : LabelledItem
+        // 1. Return the TopLevelVarScopedDeclarations of LabelledItem.
+        switch (self.labelled_item) {
+            // LabelledItem : Statement
+            .statement => |statement| {
+                // 1. If Statement is Statement : LabelledStatement , return the
+                //    TopLevelVarScopedDeclarations of Statement.
+                if (statement.* == .labelled_statement) {
+                    return statement.labelled_statement.topLevelVarScopedDeclarations(allocator);
+                }
+
+                // 2. Return the VarScopedDeclarations of Statement.
+                return statement.varScopedDeclarations(allocator);
+            },
+
+            // LabelledItem : FunctionDeclaration
+            .function_declaration => |function_declaration| {
+                // 1. Return « FunctionDeclaration ».
+                var variable_declarations = std.ArrayList(VarScopedDeclaration).init(allocator);
+                try variable_declarations.append(.{
+                    .hoistable_declaration = .{ .function_declaration = function_declaration },
+                });
+                return variable_declarations.toOwnedSlice();
+            },
+        }
     }
 };
 

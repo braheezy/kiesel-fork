@@ -332,6 +332,7 @@ pub fn printStatement(node: ast.Statement, writer: anytype, indentation: usize) 
         .break_statement => |x| try printBreakStatement(x, writer, indentation + 1),
         .return_statement => |x| try printReturnStatement(x, writer, indentation + 1),
         .with_statement => |x| try printWithStatement(x, writer, indentation + 1),
+        .labelled_statement => |x| try printLabelledStatement(x, writer, indentation + 1),
         .throw_statement => |x| try printThrowStatement(x, writer, indentation + 1),
         .try_statement => |x| try printTryStatement(x, writer, indentation + 1),
         .debugger_statement => try print("debugger", writer, indentation + 1),
@@ -573,6 +574,15 @@ pub fn printCaseClause(node: ast.CaseClause, writer: anytype, indentation: usize
 pub fn printDefaultClause(node: ast.DefaultClause, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("DefaultClause", writer, indentation);
     try printStatementList(node.statement_list, writer, indentation + 1);
+}
+
+pub fn printLabelledStatement(node: ast.LabelledStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("LabelledStatement", writer, indentation);
+    try print(node.label_identifier, writer, indentation + 1);
+    switch (node.labelled_item) {
+        .statement => |statement| try printStatement(statement.*, writer, indentation + 1),
+        .function_declaration => |function_declaration| try printFunctionDeclaration(function_declaration, writer, indentation + 1),
+    }
 }
 
 pub fn printThrowStatement(node: ast.ThrowStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
