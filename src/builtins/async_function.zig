@@ -319,6 +319,7 @@ pub fn @"await"(agent: *Agent, value: Value) Agent.Error!Value {
     );
 
     // TODO: 8-12.
+    agent.drainJobQueue();
     switch (promise.as(builtins.Promise).fields.promise_state) {
         .pending => return Value.from(promise), // `await properAwait()` :)
         .rejected => {
