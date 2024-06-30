@@ -2263,6 +2263,10 @@ pub fn codegenForInOfStatement(
         .for_binding => .var_binding,
         .for_declaration => .lexical_binding,
     };
+    const iterator_kind: IteratorKind = switch (node.type) {
+        .async_of => .@"async",
+        else => .sync,
+    };
     const break_jump = try forInOfHeadEvaluation(
         executable,
         ctx,
@@ -2277,7 +2281,7 @@ pub fn codegenForInOfStatement(
         break_jump,
         iteration_kind,
         lhs_kind,
-        null,
+        iterator_kind,
     );
 }
 
@@ -2353,7 +2357,7 @@ fn forInOfBodyEvaluation(
     iteration_kind: ForInOfIterationKind,
     lhs_kind: ForInOfLhsKind,
     // TODO: label_set
-    maybe_iterator_kind: ?IteratorKind,
+    iterator_kind: IteratorKind,
 ) Executable.Error!void {
     _ = iteration_kind;
     // NOTE: The iterator is created by forInOfHeadEvaluation() and needs to be pushed onto the
@@ -2362,8 +2366,7 @@ fn forInOfBodyEvaluation(
     try executable.addInstruction(.push_iterator);
 
     // 1. If iteratorKind is not present, set iteratorKind to sync.
-    const iterator_kind = maybe_iterator_kind orelse .sync;
-    _ = iterator_kind;
+    // NOTE: This is always passed in at the call site.
 
     // 2. Let oldEnv be the running execution context's LexicalEnvironment.
     try executable.addInstruction(.push_lexical_environment);
@@ -2388,7 +2391,9 @@ fn forInOfBodyEvaluation(
     try executable.addIndex(0); // No arguments
     try executable.addIndex(0); // Strictness doesn't matter here
 
-    // TODO: b. If iteratorKind is async, set nextResult to ? Await(nextResult).
+    // b. If iteratorKind is async, set nextResult to ? Await(nextResult).
+    if (iterator_kind == .@"async") try executable.addInstruction(.@"await");
+
     // TODO: c. If nextResult is not an Object, throw a TypeError exception.
 
     // Store result object on the stack for later `.value` access
