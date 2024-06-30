@@ -249,14 +249,9 @@ pub fn @"await"(agent: *Agent, value: Value) Agent.Error!Value {
             // a. Let prevContext be the running execution context.
             const previous_context = agent_.runningExecutionContext();
 
-            // TODO: b. Suspend prevContext.
-
-            // c. Push asyncContext onto the execution context stack; asyncContext is now the
-            //    running execution context.
-            try agent_.execution_context_stack.append(async_context_.*);
-
-            // TODO: d-e.
+            // TODO: b-e.
             _ = v;
+            _ = async_context_;
             _ = previous_context;
 
             // f. Return undefined.
@@ -285,14 +280,9 @@ pub fn @"await"(agent: *Agent, value: Value) Agent.Error!Value {
             // a. Let prevContext be the running execution context.
             const previous_context = agent_.runningExecutionContext();
 
-            // TODO: b. Suspend prevContext.
-
-            // c. Push asyncContext onto the execution context stack; asyncContext is now the
-            //    running execution context.
-            try agent_.execution_context_stack.append(async_context_.*);
-
-            // TODO: d-e.
+            // TODO: b-e.
             _ = reason;
+            _ = async_context_;
             _ = previous_context;
 
             // f. Return undefined.
