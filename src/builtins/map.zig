@@ -256,7 +256,7 @@ pub const MapPrototype = struct {
         key = key.canonicalizeKeyedCollectionKey();
 
         // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and p.[[Key]] is key, then
+        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, then
         //         i. Set p.[[Key]] to empty.
         //         ii. Set p.[[Value]] to empty.
         //         iii. Return true.
@@ -347,7 +347,7 @@ pub const MapPrototype = struct {
         key = key.canonicalizeKeyedCollectionKey();
 
         // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and p.[[Key]] is key, return p.[[Value]].
+        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return p.[[Value]].
         if (map.fields.map_data.get(key)) |value| return value;
 
         // 5. Return undefined.
@@ -367,7 +367,7 @@ pub const MapPrototype = struct {
         key = key.canonicalizeKeyedCollectionKey();
 
         // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and p.[[Key]] is key, return true.
+        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return true.
         // 5. Return false.
         return Value.from(map.fields.map_data.contains(key));
     }
@@ -396,7 +396,7 @@ pub const MapPrototype = struct {
         key = key.canonicalizeKeyedCollectionKey();
 
         // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and p.[[Key]] is key, then
+        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, then
         //         i. Set p.[[Value]] to value.
         //         ii. Return M.
         // 5. Let p be the Record { [[Key]]: key, [[Value]]: value }.

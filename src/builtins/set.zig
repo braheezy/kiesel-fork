@@ -138,7 +138,7 @@ fn setDataIndex(set_data: SetData, value: Value) ?usize {
     // 3. Let index be 0.
     // 4. Repeat, while index < size,
     //    a. Let e be setData[index].
-    //    b. If e is not empty and e is value, then
+    //    b. If e is not empty and SameValue(e, value) is true, then
     //       i. Return index.
     //    c. Set index to index + 1.
     // 5. Return not-found.
@@ -304,7 +304,7 @@ pub const SetPrototype = struct {
         value = value.canonicalizeKeyedCollectionKey();
 
         // 4. For each element e of S.[[SetData]], do
-        //     a. If e is not empty and e is value, then
+        //     a. If e is not empty and SameValue(e, value) is true, then
         //         i. Return S.
         // 5. Append value to S.[[SetData]].
         const result = try set.fields.set_data.getOrPut(value);
@@ -351,7 +351,7 @@ pub const SetPrototype = struct {
         value = value.canonicalizeKeyedCollectionKey();
 
         // 4. For each element e of S.[[SetData]], do
-        //     a. If e is not empty and e is value, then
+        //     a. If e is not empty and SameValue(e, value) is true, then
         //         i. Replace the element of S.[[SetData]] whose value is e with an element whose
         //            value is empty.
         //         ii. Return true.
@@ -531,7 +531,7 @@ pub const SetPrototype = struct {
         value = value.canonicalizeKeyedCollectionKey();
 
         // 4. For each element e of S.[[SetData]], do
-        //     a. If e is not empty and e is value, return true.
+        //     a. If e is not empty and SameValue(e, value) is true, return true.
         // 5. Return false.
         return Value.from(set.fields.set_data.contains(value));
     }
