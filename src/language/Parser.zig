@@ -1529,13 +1529,28 @@ pub fn acceptLexicalBinding(self: *Self) AcceptError!ast.LexicalBinding {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const binding_identifier = try self.acceptBindingIdentifier();
-    var initializer: ?ast.Expression = null;
-    if (self.core.accept(RuleSet.is(.@"="))) |_| {
-        const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
-        initializer = try self.acceptExpression(ctx);
-    } else |_| {}
-    return .{ .binding_identifier = binding_identifier, .initializer = initializer };
+    const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
+    if (self.acceptBindingIdentifier()) |binding_identifier| {
+        var initializer: ?ast.Expression = null;
+        if (self.core.accept(RuleSet.is(.@"="))) |_| {
+            initializer = try self.acceptExpression(ctx);
+        } else |_| {}
+        return .{
+            .binding_identifier = .{
+                .binding_identifier = binding_identifier,
+                .initializer = initializer,
+            },
+        };
+    } else |_| if (self.acceptBindingPattern()) |binding_pattern| {
+        _ = try self.core.accept(RuleSet.is(.@"="));
+        const initializer = try self.acceptExpression(ctx);
+        return .{
+            .binding_pattern = .{
+                .binding_pattern = binding_pattern,
+                .initializer = initializer,
+            },
+        };
+    } else |_| return error.UnexpectedToken;
 }
 
 pub fn acceptVariableStatement(
@@ -1578,16 +1593,78 @@ pub fn acceptVariableDeclaration(self: *Self) AcceptError!ast.VariableDeclaratio
     return .{ .binding_identifier = binding_identifier, .initializer = initializer };
 }
 
+pub fn acceptBindingPattern(self: *Self) AcceptError!ast.BindingPattern {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    if (self.acceptObjectBindingPattern()) |object_binding_pattern|
+        return .{ .object_binding_pattern = object_binding_pattern }
+    else |_| if (self.acceptArrayBindingPattern()) |array_binding_pattern|
+        return .{ .array_binding_pattern = array_binding_pattern }
+    else |_|
+        return error.UnexpectedToken;
+}
+
+pub fn acceptObjectBindingPattern(self: *Self) AcceptError!ast.ObjectBindingPattern {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    // TODO: Implement object binding patterns
+    return error.UnexpectedToken;
+}
+
+pub fn acceptArrayBindingPattern(self: *Self) AcceptError!ast.ArrayBindingPattern {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    // TODO: Parse all kinds of array binging patterns
+    var elements = std.ArrayList(ast.ArrayBindingPattern.Element).init(self.allocator);
+    _ = try self.core.accept(RuleSet.is(.@"["));
+    while (self.acceptBindingIdentifier()) |binding_identifier| {
+        try elements.append(.{
+            .binding_element = .{
+                .single_name_binding = .{
+                    .binding_identifier = binding_identifier,
+                    .initializer = null,
+                },
+            },
+        });
+        _ = self.core.accept(RuleSet.is(.@",")) catch break;
+    } else |_| {}
+    _ = try self.core.accept(RuleSet.is(.@"]"));
+    return .{ .elements = try elements.toOwnedSlice() };
+}
+
 pub fn acceptBindingElement(self: *Self) AcceptError!ast.BindingElement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const identifier = try self.acceptBindingIdentifier();
+    if (self.acceptSingleNameBinding()) |single_name_binding|
+        return .{ .single_name_binding = single_name_binding }
+    else |_| if (self.acceptBindingPattern()) |binding_pattern| {
+        const initializer = if (self.core.accept(RuleSet.is(.@"="))) |_|
+            try self.acceptExpression(.{})
+        else |_|
+            null;
+        return .{
+            .binding_pattern = .{
+                .binding_pattern = binding_pattern,
+                .initializer = initializer,
+            },
+        };
+    } else |_| return error.UnexpectedToken;
+}
+
+pub fn acceptSingleNameBinding(self: *Self) AcceptError!ast.SingleNameBinding {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const binding_identifier = try self.acceptBindingIdentifier();
     const initializer = if (self.core.accept(RuleSet.is(.@"="))) |_|
         try self.acceptExpression(.{})
     else |_|
         null;
-    return .{ .identifier = identifier, .initializer = initializer };
+    return .{ .binding_identifier = binding_identifier, .initializer = initializer };
 }
 
 pub fn acceptBindingRestElement(self: *Self) AcceptError!ast.BindingRestElement {
@@ -1595,8 +1672,12 @@ pub fn acceptBindingRestElement(self: *Self) AcceptError!ast.BindingRestElement 
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.@"..."));
-    const identifier = try self.acceptBindingIdentifier();
-    return .{ .identifier = identifier };
+    if (self.acceptBindingIdentifier()) |binding_identifier|
+        return .{ .binding_identifier = binding_identifier }
+    else |_| if (self.acceptBindingPattern()) |binding_pattern|
+        return .{ .binding_pattern = binding_pattern }
+    else |_|
+        return error.UnexpectedToken;
 }
 
 pub fn acceptLabelledStatement(self: *Self) AcceptError!ast.LabelledStatement {
@@ -1743,8 +1824,8 @@ pub fn acceptForInOfStatement(self: *Self) AcceptError!ast.ForInOfStatement {
     const initializer_location = (try self.core.peek() orelse return error.UnexpectedToken).location;
     const initializer: ast.ForInOfStatement.Initializer = if (self.core.accept(RuleSet.is(.@"var"))) |_|
         .{ .for_binding = try self.acceptBindingIdentifier() }
-    else |_| if (self.acceptLexicalDeclaration(true)) |lexical_declaration|
-        .{ .for_declaration = lexical_declaration }
+    else |_| if (self.acceptForDeclaration()) |for_declaration|
+        .{ .for_declaration = for_declaration }
     else |_| if (self.acceptExpression(.{ .forbidden = &.{.in} })) |expression|
         .{ .expression = expression }
     else |_|
@@ -1780,6 +1861,32 @@ pub fn acceptForInOfStatement(self: *Self) AcceptError!ast.ForInOfStatement {
         .expression = expression,
         .consequent_statement = consequent_statement,
     };
+}
+
+pub fn acceptForDeclaration(self: *Self) AcceptError!ast.ForDeclaration {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const let_or_const = self.acceptKeyword("let") catch try self.core.accept(RuleSet.is(.@"const"));
+    const @"type": ast.LexicalDeclaration.Type = switch (let_or_const.type) {
+        .identifier => .let,
+        .@"const" => .@"const",
+        else => unreachable,
+    };
+    const for_binding = try self.acceptForBinding();
+    return .{ .type = @"type", .for_binding = for_binding };
+}
+
+pub fn acceptForBinding(self: *Self) AcceptError!ast.ForBinding {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    if (self.acceptBindingIdentifier()) |binding_identifier|
+        return .{ .binding_identifier = binding_identifier }
+    else |_| if (self.acceptBindingPattern()) |binding_pattern|
+        return .{ .binding_pattern = binding_pattern }
+    else |_|
+        return error.UnexpectedToken;
 }
 
 pub fn acceptContinueStatement(self: *Self) AcceptError!ast.ContinueStatement {
@@ -2131,16 +2238,21 @@ pub fn acceptArrowFunction(self: *Self) AcceptError!ast.ArrowFunction {
     var start_offset: usize = undefined;
     var formal_parameters: ast.FormalParameters = undefined;
     const location = (try self.core.peek() orelse return error.UnexpectedToken).location;
-    if (self.acceptBindingIdentifier()) |identifier| {
+    if (self.acceptBindingIdentifier()) |binding_identifier| {
         // We need to do this after consuming the identifier token to skip preceeding whitespace.
-        start_offset = self.core.tokenizer.offset - identifier.len;
+        start_offset = self.core.tokenizer.offset - binding_identifier.len;
         var formal_parameters_items = try std.ArrayList(ast.FormalParameters.Item).initCapacity(
             self.allocator,
             1,
         );
         formal_parameters_items.appendAssumeCapacity(.{
             .formal_parameter = .{
-                .binding_element = .{ .identifier = identifier, .initializer = null },
+                .binding_element = .{
+                    .single_name_binding = .{
+                        .binding_identifier = binding_identifier,
+                        .initializer = null,
+                    },
+                },
             },
         });
         formal_parameters = .{ .items = try formal_parameters_items.toOwnedSlice() };
@@ -2746,14 +2858,19 @@ pub fn acceptAsyncArrowFunction(self: *Self) AcceptError!ast.AsyncArrowFunction 
     try self.noLineTerminatorHere();
     var formal_parameters: ast.FormalParameters = undefined;
     const location = (try self.core.peek() orelse return error.UnexpectedToken).location;
-    if (self.acceptBindingIdentifier()) |identifier| {
+    if (self.acceptBindingIdentifier()) |binding_identifier| {
         var formal_parameters_items = try std.ArrayList(ast.FormalParameters.Item).initCapacity(
             self.allocator,
             1,
         );
         formal_parameters_items.appendAssumeCapacity(.{
             .formal_parameter = .{
-                .binding_element = .{ .identifier = identifier, .initializer = null },
+                .binding_element = .{
+                    .single_name_binding = .{
+                        .binding_identifier = binding_identifier,
+                        .initializer = null,
+                    },
+                },
             },
         });
         formal_parameters = .{ .items = try formal_parameters_items.toOwnedSlice() };

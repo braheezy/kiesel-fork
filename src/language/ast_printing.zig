@@ -406,11 +406,15 @@ pub fn printBindingList(node: ast.BindingList, writer: anytype, indentation: usi
 
 pub fn printLexicalBinding(node: ast.LexicalBinding, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("LexicalBinding", writer, indentation);
-    try print("binding_identifier:", writer, indentation + 1);
-    try print(node.binding_identifier, writer, indentation + 2);
-    if (node.initializer) |initializer| {
-        try print("initializer:", writer, indentation + 1);
-        try printExpression(initializer, writer, indentation + 2);
+    switch (node) {
+        .binding_identifier => |binding_identifier| {
+            try print(binding_identifier.binding_identifier, writer, indentation + 1);
+            if (binding_identifier.initializer) |initializer| try printExpression(initializer, writer, indentation + 1);
+        },
+        .binding_pattern => |binding_pattern| {
+            try printBindingPattern(binding_pattern.binding_pattern, writer, indentation + 1);
+            try printExpression(binding_pattern.initializer, writer, indentation + 1);
+        },
     }
 }
 
@@ -436,9 +440,43 @@ pub fn printVariableDeclaration(node: ast.VariableDeclaration, writer: anytype, 
     }
 }
 
+pub fn printBindingPattern(node: ast.BindingPattern, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("BindingPattern", writer, indentation);
+    switch (node) {
+        .object_binding_pattern => |object_binding_pattern| try printObjectBindingPattern(object_binding_pattern, writer, indentation + 1),
+        .array_binding_pattern => |array_binding_pattern| try printArrayBindingPattern(array_binding_pattern, writer, indentation + 1),
+    }
+}
+
+pub fn printObjectBindingPattern(node: ast.ObjectBindingPattern, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("ObjectBindingPattern", writer, indentation);
+    // TODO: Implement object binding patterns
+    _ = node;
+}
+
+pub fn printArrayBindingPattern(node: ast.ArrayBindingPattern, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("ArrayBindingPattern", writer, indentation);
+    for (node.elements) |element| switch (element) {
+        .elision => try print("<elision>", writer, indentation + 1),
+        .binding_element => |binding_element| try printBindingElement(binding_element, writer, indentation + 1),
+        .binding_rest_element => |binding_rest_element| try printBindingRestElement(binding_rest_element, writer, indentation + 1),
+    };
+}
+
 pub fn printBindingElement(node: ast.BindingElement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("BindingElement", writer, indentation);
-    try print(node.identifier, writer, indentation + 1);
+    switch (node) {
+        .single_name_binding => |single_name_binding| try printSingleNameBinding(single_name_binding, writer, indentation + 1),
+        .binding_pattern => |binding_pattern| {
+            try printBindingPattern(binding_pattern.binding_pattern, writer, indentation + 1);
+            if (binding_pattern.initializer) |initializer| try printExpression(initializer, writer, indentation + 1);
+        },
+    }
+}
+
+pub fn printSingleNameBinding(node: ast.SingleNameBinding, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("SingleNameBinding", writer, indentation);
+    try print(node.binding_identifier, writer, indentation + 1);
     if (node.initializer) |initializer| {
         try print("initializer:", writer, indentation + 1);
         try printExpression(initializer, writer, indentation + 2);
@@ -447,7 +485,10 @@ pub fn printBindingElement(node: ast.BindingElement, writer: anytype, indentatio
 
 pub fn printBindingRestElement(node: ast.BindingRestElement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("BindingRestElement", writer, indentation);
-    try print(node.identifier, writer, indentation + 1);
+    switch (node) {
+        .binding_identifier => |binding_identifier| try print(binding_identifier, writer, indentation + 1),
+        .binding_pattern => |binding_pattern| try printBindingPattern(binding_pattern, writer, indentation + 1),
+    }
 }
 
 pub fn printExpressionStatement(node: ast.ExpressionStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
@@ -523,11 +564,25 @@ pub fn printForInOfStatement(node: ast.ForInOfStatement, writer: anytype, indent
             try print("var", writer, indentation + 1);
             try print(identifier, writer, indentation + 1);
         },
-        .for_declaration => |lexical_declaration| try printLexicalDeclaration(lexical_declaration, writer, indentation + 1),
+        .for_declaration => |for_declaration| try printForDeclaration(for_declaration, writer, indentation + 1),
     }
     try print(@tagName(node.type), writer, indentation + 1);
     try printExpression(node.expression, writer, indentation + 1);
     try printStatement(node.consequent_statement.*, writer, indentation + 1);
+}
+
+pub fn printForDeclaration(node: ast.ForDeclaration, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("ForDeclaration", writer, indentation);
+    try print(@tagName(node.type), writer, indentation + 1);
+    try printForBinding(node.for_binding, writer, indentation + 1);
+}
+
+pub fn printForBinding(node: ast.ForBinding, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    // Omit printing 'ForBinding' here, it's implied and only adds nesting.
+    switch (node) {
+        .binding_identifier => |binding_identifier| try print(binding_identifier, writer, indentation + 1),
+        .binding_pattern => |binding_pattern| try printBindingPattern(binding_pattern, writer, indentation + 1),
+    }
 }
 
 pub fn printContinueStatement(node: ast.ContinueStatement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {

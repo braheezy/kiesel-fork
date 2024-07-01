@@ -77,6 +77,57 @@ pub fn codegenPrimaryExpression(
     }
 }
 
+/// 8.6.2 Runtime Semantics: BindingInitialization
+/// https://tc39.es/ecma262/#sec-runtime-semantics-bindinginitialization
+fn bindingInitialization(
+    node: ast.BindingPattern,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    // NOTE: RHS value is on the stack
+    const strict = ctx.contained_in_strict_mode_code;
+    switch (node) {
+        .object_binding_pattern => {
+            // TODO: Implement object binding patterns
+        },
+        .array_binding_pattern => |array_binding_pattern| {
+            for (array_binding_pattern.elements, 0..) |element, i| switch (element) {
+                .elision => {},
+                .binding_element => |binding_element| {
+                    try executable.addInstruction(.load); // Save RHS
+
+                    // Resolve binding and push reference
+                    const identifier = binding_element.single_name_binding.binding_identifier;
+                    try executable.addInstructionWithIdentifier(.resolve_binding, identifier);
+                    try executable.addIndex(@intFromBool(strict));
+                    try executable.addIndex(ctx.environment_lookup_cache_index);
+                    ctx.environment_lookup_cache_index += 1;
+                    try executable.addInstruction(.push_reference);
+
+                    // Evaluate `rhs[n]`
+                    try executable.addInstruction(.load);
+                    try executable.addInstructionWithConstant(
+                        .load_constant,
+                        Value.from(@as(u53, @intCast(i))),
+                    );
+                    try executable.addInstruction(.evaluate_property_access_with_expression_key);
+                    try executable.addIndex(@intFromBool(strict));
+                    try executable.addInstruction(.get_value);
+
+                    // Initialize binding and pop reference
+                    try executable.addInstruction(.initialize_referenced_binding);
+                    try executable.addInstruction(.pop_reference);
+
+                    try executable.addInstruction(.store); // Restore RHS
+                },
+                .binding_rest_element => {
+                    // TODO: Implement binding rest elements
+                },
+            };
+        },
+    }
+}
+
 /// 13.2.3.1 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-literals-runtime-semantics-evaluation
 pub fn codegenLiteral(
@@ -1788,58 +1839,84 @@ pub fn codegenLexicalBinding(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    // LexicalBinding : BindingIdentifier Initializer
-    if (node.initializer) |initializer| {
-        try executable.addInstruction(.load);
+    switch (node) {
+        .binding_identifier => |binding_identifier| {
+            // LexicalBinding : BindingIdentifier Initializer
+            if (binding_identifier.initializer) |initializer| {
+                try executable.addInstruction(.load);
 
-        // 1. Let bindingId be the StringValue of BindingIdentifier.
-        // 2. Let lhs be ! ResolveBinding(bindingId).
-        try executable.addInstructionWithIdentifier(.resolve_binding, node.binding_identifier);
-        const strict = ctx.contained_in_strict_mode_code;
-        try executable.addIndex(@intFromBool(strict));
-        try executable.addIndex(ctx.environment_lookup_cache_index);
-        ctx.environment_lookup_cache_index += 1;
-        try executable.addInstruction(.push_reference);
+                // 1. Let bindingId be the StringValue of BindingIdentifier.
+                // 2. Let lhs be ! ResolveBinding(bindingId).
+                try executable.addInstructionWithIdentifier(
+                    .resolve_binding,
+                    binding_identifier.binding_identifier,
+                );
+                const strict = ctx.contained_in_strict_mode_code;
+                try executable.addIndex(@intFromBool(strict));
+                try executable.addIndex(ctx.environment_lookup_cache_index);
+                ctx.environment_lookup_cache_index += 1;
+                try executable.addInstruction(.push_reference);
 
-        // TODO: 3. If IsAnonymousFunctionDefinition(Initializer) is true, then
-        if (false) {
-            // a. Let value be ? NamedEvaluation of Initializer with argument bindingId.
-        }
-        // 4. Else,
-        else {
-            // a. Let rhs be ? Evaluation of Initializer.
-            try codegenExpression(initializer, executable, ctx);
+                // TODO: 3. If IsAnonymousFunctionDefinition(Initializer) is true, then
+                if (false) {
+                    // a. Let value be ? NamedEvaluation of Initializer with argument bindingId.
+                }
+                // 4. Else,
+                else {
+                    // a. Let rhs be ? Evaluation of Initializer.
+                    try codegenExpression(initializer, executable, ctx);
 
-            // b. Let value be ? GetValue(rhs).
-            if (initializer.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        }
+                    // b. Let value be ? GetValue(rhs).
+                    if (initializer.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                }
 
-        // 5. Perform ! InitializeReferencedBinding(lhs, value).
-        try executable.addInstruction(.initialize_referenced_binding);
-        try executable.addInstruction(.pop_reference);
+                // 5. Perform ! InitializeReferencedBinding(lhs, value).
+                try executable.addInstruction(.initialize_referenced_binding);
+                try executable.addInstruction(.pop_reference);
 
-        // 6. Return empty.
-        try executable.addInstruction(.store);
-    }
-    // LexicalBinding : BindingIdentifier
-    else {
-        try executable.addInstruction(.load);
+                // 6. Return empty.
+                try executable.addInstruction(.store);
+            }
+            // LexicalBinding : BindingIdentifier
+            else {
+                try executable.addInstruction(.load);
 
-        // 1. Let lhs be ! ResolveBinding(StringValue of BindingIdentifier).
-        try executable.addInstructionWithIdentifier(.resolve_binding, node.binding_identifier);
-        const strict = ctx.contained_in_strict_mode_code;
-        try executable.addIndex(@intFromBool(strict));
-        try executable.addIndex(ctx.environment_lookup_cache_index);
-        ctx.environment_lookup_cache_index += 1;
-        try executable.addInstruction(.push_reference);
+                // 1. Let lhs be ! ResolveBinding(StringValue of BindingIdentifier).
+                try executable.addInstructionWithIdentifier(
+                    .resolve_binding,
+                    binding_identifier.binding_identifier,
+                );
+                const strict = ctx.contained_in_strict_mode_code;
+                try executable.addIndex(@intFromBool(strict));
+                try executable.addIndex(ctx.environment_lookup_cache_index);
+                ctx.environment_lookup_cache_index += 1;
+                try executable.addInstruction(.push_reference);
 
-        // 2. Perform ! InitializeReferencedBinding(lhs, undefined).
-        try executable.addInstructionWithConstant(.store_constant, .undefined);
-        try executable.addInstruction(.initialize_referenced_binding);
-        try executable.addInstruction(.pop_reference);
+                // 2. Perform ! InitializeReferencedBinding(lhs, undefined).
+                try executable.addInstructionWithConstant(.store_constant, .undefined);
+                try executable.addInstruction(.initialize_referenced_binding);
+                try executable.addInstruction(.pop_reference);
 
-        // 3. Return empty.
-        try executable.addInstruction(.store);
+                // 3. Return empty.
+                try executable.addInstruction(.store);
+            }
+        },
+        // LexicalBinding : BindingPattern Initializer
+        .binding_pattern => |binding_pattern| {
+            try executable.addInstruction(.load);
+
+            // 1. Let rhs be ? Evaluation of Initializer.
+            try codegenExpression(binding_pattern.initializer, executable, ctx);
+
+            // 2. Let value be ? GetValue(rhs).
+            if (binding_pattern.initializer.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+            // 3. Let env be the running execution context's LexicalEnvironment.
+            // 4. Return ? BindingInitialization of BindingPattern with arguments value and env.
+            try bindingInitialization(binding_pattern.binding_pattern, executable, ctx);
+
+            try executable.addInstruction(.store);
+        },
     }
 }
 
@@ -2374,8 +2451,12 @@ fn forInOfBodyEvaluation(
     // 3. Let V be undefined.
     try executable.addInstructionWithConstant(.load_constant, .undefined);
 
-    // TODO: 4. Let destructuring be IsDestructuring of lhs.
-    const destructuring = false;
+    // 4. Let destructuring be IsDestructuring of lhs.
+    const destructuring = switch (lhs) {
+        .expression => false, // TODO: Support AssignmentPattern
+        .for_binding => false,
+        .for_declaration => |for_declaration| for_declaration.for_binding == .binding_pattern,
+    };
 
     // 5. If destructuring is true and lhsKind is assignment, then
     if (destructuring and lhs_kind == .assignment) {
@@ -2470,10 +2551,33 @@ fn forInOfBodyEvaluation(
         // ii. Assert: lhs is a ForDeclaration.
         std.debug.assert(lhs == .for_declaration);
 
+        // Synthesize a LexicalDeclaration from the ForDeclaration so they can share the same codegen
+        const lexical_declaration: ast.LexicalDeclaration = blk: {
+            const lexical_binding: ast.LexicalBinding = switch (lhs.for_declaration.for_binding) {
+                .binding_identifier => |binding_identifier| .{
+                    .binding_identifier = .{
+                        .binding_identifier = binding_identifier,
+                        .initializer = null,
+                    },
+                },
+                .binding_pattern => |binding_pattern| .{
+                    .binding_pattern = .{
+                        .binding_pattern = binding_pattern,
+                        .initializer = undefined,
+                    },
+                },
+            };
+            var items = std.ArrayList(ast.LexicalBinding).init(executable.allocator);
+            try items.append(lexical_binding);
+            break :blk .{
+                .type = lhs.for_declaration.type,
+                .binding_list = .{ .items = try items.toOwnedSlice() },
+            };
+        };
+
         // iii. Let iterationEnv be NewDeclarativeEnvironment(oldEnv).
         // iv. Perform ForDeclarationBindingInstantiation of lhs with argument iterationEnv.
         // v. Set the running execution context's LexicalEnvironment to iterationEnv.
-        const lexical_declaration = lhs.for_declaration;
         try executable.addInstructionWithAstNode(
             .for_declaration_binding_instantiation,
             .{ .lexical_declaration = lexical_declaration },
@@ -2481,14 +2585,19 @@ fn forInOfBodyEvaluation(
 
         // vi. If destructuring is true, then
         if (destructuring) {
-            // TODO: 1. Let status be Completion(ForDeclarationBindingInitialization of lhs with
-            //          arguments nextValue and iterationEnv).
+            // 1. Let status be Completion(ForDeclarationBindingInitialization of lhs with
+            //    arguments nextValue and iterationEnv).
+            try bindingInitialization(
+                lhs.for_declaration.for_binding.binding_pattern,
+                executable,
+                ctx,
+            );
         }
         // vii. Else,
         else {
             // 1. Assert: lhs binds a single name.
             // 2. Let lhsName be the sole element of the BoundNames of lhs.
-            const lhs_name = lhs.for_declaration.binding_list.items[0].binding_identifier;
+            const lhs_name = lhs.for_declaration.for_binding.binding_identifier;
 
             // 3. Let lhsRef be ! ResolveBinding(lhsName).
             try executable.addInstructionWithIdentifier(.resolve_binding, lhs_name);

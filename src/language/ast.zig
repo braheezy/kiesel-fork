@@ -1307,11 +1307,17 @@ pub const BindingList = struct {
 };
 
 /// https://tc39.es/ecma262/#prod-LexicalBinding
-pub const LexicalBinding = struct {
+pub const LexicalBinding = union(enum) {
     const Self = @This();
 
-    binding_identifier: Identifier,
-    initializer: ?Expression,
+    binding_identifier: struct {
+        binding_identifier: Identifier,
+        initializer: ?Expression,
+    },
+    binding_pattern: struct {
+        binding_pattern: BindingPattern,
+        initializer: Expression,
+    },
 
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
@@ -1319,13 +1325,20 @@ pub const LexicalBinding = struct {
         self: Self,
         allocator: Allocator,
     ) Allocator.Error![]const Identifier {
-        // LexicalBinding : BindingIdentifier Initializer[opt]
-        // 1. Return the BoundNames of BindingIdentifier.
-        // LexicalBinding : BindingPattern Initializer
-        // TODO: 1. Return the BoundNames of BindingPattern.
-        var bound_names = std.ArrayList(Identifier).init(allocator);
-        try bound_names.append(self.binding_identifier);
-        return bound_names.toOwnedSlice();
+        switch (self) {
+            // LexicalBinding : BindingIdentifier Initializer[opt]
+            .binding_identifier => |binding_identifier| {
+                // 1. Return the BoundNames of BindingIdentifier.
+                var bound_names = std.ArrayList(Identifier).init(allocator);
+                try bound_names.append(binding_identifier.binding_identifier);
+                return bound_names.toOwnedSlice();
+            },
+            // LexicalBinding : BindingPattern Initializer
+            .binding_pattern => |binding_pattern| {
+                // 1. Return the BoundNames of BindingPattern.
+                return binding_pattern.binding_pattern.boundNames(allocator);
+            },
+        }
     }
 };
 
@@ -1401,57 +1414,142 @@ pub const VariableDeclaration = struct {
     initializer: ?Expression,
 };
 
-/// https://tc39.es/ecma262/#prod-BindingElement
-pub const BindingElement = struct {
+/// https://tc39.es/ecma262/#prod-BindingPattern
+pub const BindingPattern = union(enum) {
     const Self = @This();
 
-    identifier: Identifier,
-    initializer: ?Expression,
-    // TODO: Binding patterns
+    object_binding_pattern: ObjectBindingPattern,
+    array_binding_pattern: ArrayBindingPattern,
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn boundNames(
+        self: Self,
+        allocator: Allocator,
+    ) Allocator.Error![]const Identifier {
+        var bound_names = std.ArrayList(Identifier).init(allocator);
+        switch (self) {
+            // ObjectBindingPattern : { }
+            // ObjectBindingPattern : { BindingPropertyList , BindingRestProperty }
+            .object_binding_pattern => {
+                // TODO: Implement object binding patterns
+            },
+
+            // ArrayBindingPattern : [ Elision[opt] ]
+            //     1. Return a new empty List.
+            .array_binding_pattern => |array_binding_pattern| for (array_binding_pattern.elements) |element| switch (element) {
+                .elision => {},
+                // BindingElement : BindingPattern Initializer[opt]
+                .binding_element => |binding_element| switch (binding_element) {
+                    // SingleNameBinding : BindingIdentifier Initializer[opt]
+                    .single_name_binding => |single_name_binding| {
+                        // 1. Return the BoundNames of BindingIdentifier.
+                        try bound_names.append(single_name_binding.binding_identifier);
+                    },
+                    // BindingElement : BindingPattern Initializer[opt]
+                    .binding_pattern => |binding_pattern| {
+                        // 1. Return the BoundNames of BindingPattern.
+                        try bound_names.appendSlice(try binding_pattern.binding_pattern.boundNames(allocator));
+                    },
+                },
+                .binding_rest_element => |binding_rest_element| switch (binding_rest_element) {
+                    .binding_identifier => |binding_identifier| try bound_names.append(binding_identifier),
+                    .binding_pattern => |binding_pattern| try bound_names.appendSlice(try binding_pattern.boundNames(allocator)),
+                },
+            },
+        }
+        return bound_names.toOwnedSlice();
+    }
+
+    /// 15.1.2 Static Semantics: ContainsExpression
+    /// https://tc39.es/ecma262/#sec-static-semantics-containsexpression
+    pub fn containsExpression(_: Self) bool {
+        // TODO: Implement this properly, for now we only parse single-name bindings without
+        //       initializers so this is fine.
+        return false;
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-ObjectBindingPattern
+pub const ObjectBindingPattern = struct {
+    // TODO: Implement object binding patterns
+};
+
+/// https://tc39.es/ecma262/#prod-ArrayBindingPattern
+pub const ArrayBindingPattern = struct {
+    pub const Element = union(enum) {
+        elision,
+        binding_element: BindingElement,
+        binding_rest_element: BindingRestElement,
+    };
+
+    elements: []const Element,
+};
+
+/// https://tc39.es/ecma262/#prod-BindingElement
+pub const BindingElement = union(enum) {
+    const Self = @This();
+
+    single_name_binding: SingleNameBinding,
+    binding_pattern: struct {
+        binding_pattern: BindingPattern,
+        initializer: ?Expression,
+    },
 
     /// 15.1.2 Static Semantics: ContainsExpression
     /// https://tc39.es/ecma262/#sec-static-semantics-containsexpression
     pub fn containsExpression(self: Self) bool {
-        // TODO: BindingElement : BindingPattern Initializer
+        // BindingElement : BindingPattern Initializer
         // 1. Return true.
         // SingleNameBinding : BindingIdentifier
         // 1. Return false.
         // SingleNameBinding : BindingIdentifier Initializer
         // 1. Return true.
-        return self.initializer != null;
+        return switch (self) {
+            .binding_pattern => |binding_pattern| binding_pattern.binding_pattern.containsExpression(),
+            .single_name_binding => |single_name_binding| single_name_binding.initializer != null,
+        };
     }
 
     /// 15.1.3 Static Semantics: IsSimpleParameterList
     /// https://tc39.es/ecma262/#sec-static-semantics-issimpleparameterlist
     pub fn isSimpleParameterList(self: Self) bool {
-        // TODO: BindingElement : BindingPattern
+        // BindingElement : BindingPattern
         // 1. Return false.
-        // TODO: BindingElement : BindingPattern Initializer
+        // BindingElement : BindingPattern Initializer
         // 1. Return false.
         // SingleNameBinding : BindingIdentifier
         // 1. Return true.
         // SingleNameBinding : BindingIdentifier Initializer
         // 1. Return false.
-        return self.initializer == null;
+        return self == .single_name_binding and self.single_name_binding.initializer == null;
     }
 };
 
+/// https://tc39.es/ecma262/#prod-SingleNameBinding
+pub const SingleNameBinding = struct {
+    binding_identifier: Identifier,
+    initializer: ?Expression,
+};
+
 /// https://tc39.es/ecma262/#prod-BindingRestElement
-pub const BindingRestElement = struct {
+pub const BindingRestElement = union(enum) {
     const Self = @This();
 
-    identifier: Identifier,
-    // TODO: Binding patterns
+    binding_identifier: Identifier,
+    binding_pattern: BindingPattern,
 
     /// 15.1.2 Static Semantics: ContainsExpression
     /// https://tc39.es/ecma262/#sec-static-semantics-containsexpression
-    pub fn containsExpression(_: Self) bool {
+    pub fn containsExpression(self: Self) bool {
         // BindingRestElement : ... BindingIdentifier
         // 1. Return false.
-        return false;
-
-        // TODO: BindingRestElement : ... BindingPattern
+        // BindingRestElement : ... BindingPattern
         // 1. Return ContainsExpression of BindingPattern.
+        return switch (self) {
+            .binding_identifier => false,
+            .binding_pattern => |binding_pattern| binding_pattern.containsExpression(),
+        };
     }
 };
 
@@ -1670,7 +1768,7 @@ pub const ForInOfStatement = struct {
     pub const Initializer = union(enum) {
         expression: Expression,
         for_binding: Identifier,
-        for_declaration: LexicalDeclaration,
+        for_declaration: ForDeclaration,
     };
 
     type: Type,
@@ -1747,6 +1845,18 @@ pub const ForInOfStatement = struct {
             return variable_declarations.toOwnedSlice();
         }
     }
+};
+
+/// https://tc39.es/ecma262/#prod-ForDeclaration
+pub const ForDeclaration = struct {
+    type: LexicalDeclaration.Type,
+    for_binding: ForBinding,
+};
+
+/// https://tc39.es/ecma262/#prod-ForBinding
+pub const ForBinding = union(enum) {
+    binding_identifier: Identifier,
+    binding_pattern: BindingPattern,
 };
 
 /// https://tc39.es/ecma262/#prod-ContinueStatement
@@ -2245,7 +2355,7 @@ pub const FormalParameters = struct {
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn boundNames(self: Self, allocator: Allocator) Allocator.Error![]const []const u8 {
-        var bound_names = try std.ArrayList([]const u8).initCapacity(allocator, self.items.len);
+        var bound_names = std.ArrayList([]const u8).init(allocator);
         // FormalParameterList : FormalParameterList , FormalParameter
         // 1. Let names1 be the BoundNames of FormalParameterList.
         // 2. Let names2 be the BoundNames of FormalParameter.
@@ -2255,11 +2365,16 @@ pub const FormalParameters = struct {
             // 1. Return the BoundNames of BindingPattern.
             // SingleNameBinding : BindingIdentifier Initializer[opt]
             // 1. Return the BoundNames of BindingIdentifier.
-            const name = switch (item) {
-                .formal_parameter => |formal_parameter| formal_parameter.binding_element.identifier,
-                .function_rest_parameter => |function_rest_parameter| function_rest_parameter.binding_rest_element.identifier,
-            };
-            bound_names.appendAssumeCapacity(name);
+            switch (item) {
+                .formal_parameter => |formal_parameter| switch (formal_parameter.binding_element) {
+                    .single_name_binding => |single_name_binding| try bound_names.append(single_name_binding.binding_identifier),
+                    .binding_pattern => |binding_pattern| try bound_names.appendSlice(try binding_pattern.binding_pattern.boundNames(allocator)),
+                },
+                .function_rest_parameter => |function_rest_parameter| switch (function_rest_parameter.binding_rest_element) {
+                    .binding_identifier => |binding_identifier| try bound_names.append(binding_identifier),
+                    .binding_pattern => |binding_pattern| try bound_names.appendSlice(try binding_pattern.boundNames(allocator)),
+                },
+            }
         }
         return bound_names.toOwnedSlice();
     }

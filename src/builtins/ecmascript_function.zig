@@ -1149,8 +1149,15 @@ fn functionDeclarationInstantiation(
     for (formals.items, 0..) |item, i| {
         switch (item) {
             .formal_parameter => |formal_parameter| {
-                const name = formal_parameter.binding_element.identifier;
-                const initializer = formal_parameter.binding_element.initializer;
+                const name = switch (formal_parameter.binding_element) {
+                    .single_name_binding => |single_name_binding| single_name_binding.binding_identifier,
+                    .binding_pattern => return agent.throwException(
+                        .internal_error,
+                        "Binding patterns in function parameters are not supported yet",
+                        .{},
+                    ),
+                };
+                const initializer = formal_parameter.binding_element.single_name_binding.initializer;
                 var value = arguments_list.get(i);
                 const reference = try agent.resolveBinding(name, environment, strict, null);
                 if (initializer != null and value == .undefined) {
@@ -1166,7 +1173,14 @@ fn functionDeclarationInstantiation(
                     try reference.initializeReferencedBinding(agent, value);
             },
             .function_rest_parameter => |function_rest_parameter| {
-                const name = function_rest_parameter.binding_rest_element.identifier;
+                const name = switch (function_rest_parameter.binding_rest_element) {
+                    .binding_identifier => |binding_identifier| binding_identifier,
+                    .binding_pattern => return agent.throwException(
+                        .internal_error,
+                        "Binding patterns in function parameters are not supported yet",
+                        .{},
+                    ),
+                };
                 const reference = try agent.resolveBinding(name, environment, strict, null);
                 const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
                 const rest = arguments_list.values[@min(i, arguments_list.values.len)..];
