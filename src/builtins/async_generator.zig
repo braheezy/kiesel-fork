@@ -600,7 +600,7 @@ pub fn asyncGeneratorAwaitReturn(agent: *Agent, generator: *AsyncGenerator) Allo
     std.debug.assert(completion.type == .@"return");
 
     // 6. Let promiseCompletion be Completion(PromiseResolve(%Promise%, completion.[[Value]])).
-    // 8. Assert: promiseCompletion.[[Type]] is normal.
+    // 8. Assert: promiseCompletion is a normal completion.
     // 9. Let promise be promiseCompletion.[[Value]].
     const promise = promiseResolve(
         agent,
