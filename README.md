@@ -46,6 +46,7 @@ Further reading:
 - [Kiesel Devlog #6: Catching Up :^)](https://linus.dev/posts/kiesel-devlog-6/)
 - [Kiesel Devlog #7: Happy Birthday!](https://linus.dev/posts/kiesel-devlog-7/)
 - [Kiesel Devlog #8: SSR, but it's CGI](https://linus.dev/posts/kiesel-devlog-8/)
+- [Kiesel Devlog #9: JavaScript on a Printer](https://linus.dev/posts/kiesel-devlog-9/)
 
 ## Build
 
