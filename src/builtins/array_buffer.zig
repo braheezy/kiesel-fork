@@ -627,7 +627,7 @@ pub const ArrayBufferConstructor = struct {
         });
 
         try defineBuiltinFunction(object, "isView", isView, 1, realm);
-        try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
+        try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 25.1.5.2 ArrayBuffer.prototype
         // https://tc39.es/ecma262/#sec-arraybuffer.prototype
@@ -694,9 +694,9 @@ pub const ArrayBufferConstructor = struct {
         return Value.from(arg.object.is(builtins.DataView) or arg.object.is(builtins.TypedArray));
     }
 
-    /// 25.1.5.3 get ArrayBuffer [ @@species ]
-    /// https://tc39.es/ecma262/#sec-get-arraybuffer-@@species
-    fn @"@@species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    /// 25.1.5.3 get ArrayBuffer [ %Symbol.species% ]
+    /// https://tc39.es/ecma262/#sec-get-arraybuffer-%symbol.species%
+    fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -719,9 +719,9 @@ pub const ArrayBufferPrototype = struct {
         try defineBuiltinFunction(object, "transfer", transfer, 0, realm);
         try defineBuiltinFunction(object, "transferToFixedLength", transferToFixedLength, 0, realm);
 
-        // 25.1.6.7 ArrayBuffer.prototype [ @@toStringTag ]
-        // https://tc39.es/ecma262/#sec-arraybuffer.prototype-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 25.1.6.7 ArrayBuffer.prototype [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma262/#sec-arraybuffer.prototype-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("ArrayBuffer"),
             .writable = false,
             .enumerable = false,

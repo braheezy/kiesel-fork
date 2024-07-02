@@ -392,9 +392,9 @@ pub const LocalePrototype = struct {
         try defineBuiltinAccessor(object, "script", script, null, realm);
         try defineBuiltinAccessor(object, "region", region, null, realm);
 
-        // 14.3.2 Intl.Locale.prototype[ @@toStringTag ]
-        // https://tc39.es/ecma402/#sec-Intl.Locale.prototype-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 14.3.2 Intl.Locale.prototype[ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma402/#sec-Intl.Locale.prototype-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.Locale"),
             .writable = false,
             .enumerable = false,

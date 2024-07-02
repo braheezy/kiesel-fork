@@ -940,7 +940,7 @@ pub const DatePrototype = struct {
         try defineBuiltinFunction(object, "toTimeString", toTimeString, 0, realm);
         try defineBuiltinFunction(object, "toUTCString", toUTCString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
-        try defineBuiltinFunctionWithAttributes(object, "@@toPrimitive", @"@@toPrimitive", 1, realm, .{
+        try defineBuiltinFunctionWithAttributes(object, "%Symbol.toPrimitive%", @"%Symbol.toPrimitive%", 1, realm, .{
             .writable = false,
             .enumerable = false,
             .configurable = true,
@@ -2169,9 +2169,9 @@ pub const DatePrototype = struct {
         return Value.from(date_object.fields.date_value);
     }
 
-    /// 21.4.4.45 Date.prototype [ @@toPrimitive ] ( hint )
-    /// https://tc39.es/ecma262/#sec-date.prototype-@@toprimitive
-    fn @"@@toPrimitive"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+    /// 21.4.4.45 Date.prototype [ %Symbol.toPrimitive% ] ( hint )
+    /// https://tc39.es/ecma262/#sec-date.prototype-%symbol.toprimitive%
+    fn @"%Symbol.toPrimitive%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const hint_value = arguments.get(0);
 
         // 1. Let O be the this value.

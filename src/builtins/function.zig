@@ -476,7 +476,7 @@ pub const FunctionPrototype = struct {
         try defineBuiltinFunction(object, "bind", bind, 1, realm);
         try defineBuiltinFunction(object, "call", call, 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
-        try defineBuiltinFunctionWithAttributes(object, "@@hasInstance", @"@@hasInstance", 1, realm, .{
+        try defineBuiltinFunctionWithAttributes(object, "%Symbol.hasInstance%", @"%Symbol.hasInstance%", 1, realm, .{
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -658,9 +658,9 @@ pub const FunctionPrototype = struct {
         return agent.throwException(.type_error, "{} is not a function", .{func});
     }
 
-    /// 20.2.3.6 Function.prototype [ @@hasInstance ] ( V )
-    /// https://tc39.es/ecma262/#sec-function.prototype-@@hasinstance
-    fn @"@@hasInstance"(_: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+    /// 20.2.3.6 Function.prototype [ %Symbol.hasInstance% ] ( V )
+    /// https://tc39.es/ecma262/#sec-function.prototype-%symbol.hasinstance%
+    fn @"%Symbol.hasInstance%"(_: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
 
         // 1. Let F be the this value.

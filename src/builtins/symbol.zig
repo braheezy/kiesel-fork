@@ -40,7 +40,7 @@ pub const SymbolConstructor = struct {
         // 20.4.2.1 Symbol.asyncIterator
         // https://tc39.es/ecma262/#sec-symbol.asynciterator
         try defineBuiltinProperty(object, "asyncIterator", PropertyDescriptor{
-            .value = Value.from(agent.well_known_symbols.@"@@asyncIterator"),
+            .value = Value.from(agent.well_known_symbols.@"%Symbol.asyncIterator%"),
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -51,7 +51,7 @@ pub const SymbolConstructor = struct {
         // 20.4.2.3 Symbol.hasInstance
         // https://tc39.es/ecma262/#sec-symbol.hasinstance
         try defineBuiltinProperty(object, "hasInstance", PropertyDescriptor{
-            .value = Value.from(agent.well_known_symbols.@"@@hasInstance"),
+            .value = Value.from(agent.well_known_symbols.@"%Symbol.hasInstance%"),
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -60,7 +60,7 @@ pub const SymbolConstructor = struct {
         // 20.4.2.4 Symbol.isConcatSpreadable
         // https://tc39.es/ecma262/#sec-symbol.isconcatspreadable
         try defineBuiltinProperty(object, "isConcatSpreadable", PropertyDescriptor{
-            .value = Value.from(agent.well_known_symbols.@"@@isConcatSpreadable"),
+            .value = Value.from(agent.well_known_symbols.@"%Symbol.isConcatSpreadable%"),
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -69,7 +69,7 @@ pub const SymbolConstructor = struct {
         // 20.4.2.5 Symbol.iterator
         // https://tc39.es/ecma262/#sec-symbol.iterator
         try defineBuiltinProperty(object, "iterator", PropertyDescriptor{
-            .value = Value.from(agent.well_known_symbols.@"@@iterator"),
+            .value = Value.from(agent.well_known_symbols.@"%Symbol.iterator%"),
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -80,7 +80,7 @@ pub const SymbolConstructor = struct {
         // 20.4.2.7 Symbol.match
         // https://tc39.es/ecma262/#sec-symbol.match
         try defineBuiltinProperty(object, "match", PropertyDescriptor{
-            .value = Value.from(agent.well_known_symbols.@"@@match"),
+            .value = Value.from(agent.well_known_symbols.@"%Symbol.match%"),
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -89,7 +89,7 @@ pub const SymbolConstructor = struct {
         // 20.4.2.8 Symbol.matchAll
         // https://tc39.es/ecma262/#sec-symbol.matchall
         try defineBuiltinProperty(object, "matchAll", PropertyDescriptor{
-            .value = Value.from(agent.well_known_symbols.@"@@matchAll"),
+            .value = Value.from(agent.well_known_symbols.@"%Symbol.matchAll%"),
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -107,7 +107,7 @@ pub const SymbolConstructor = struct {
         // 20.4.2.10 Symbol.replace
         // https://tc39.es/ecma262/#sec-symbol.replace
         try defineBuiltinProperty(object, "replace", PropertyDescriptor{
-            .value = Value.from(agent.well_known_symbols.@"@@replace"),
+            .value = Value.from(agent.well_known_symbols.@"%Symbol.replace%"),
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -116,7 +116,7 @@ pub const SymbolConstructor = struct {
         // 20.4.2.11 Symbol.search
         // https://tc39.es/ecma262/#sec-symbol.search
         try defineBuiltinProperty(object, "search", PropertyDescriptor{
-            .value = Value.from(agent.well_known_symbols.@"@@search"),
+            .value = Value.from(agent.well_known_symbols.@"%Symbol.search%"),
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -125,7 +125,7 @@ pub const SymbolConstructor = struct {
         // 20.4.2.12 Symbol.species
         // https://tc39.es/ecma262/#sec-symbol.species
         try defineBuiltinProperty(object, "species", PropertyDescriptor{
-            .value = Value.from(agent.well_known_symbols.@"@@species"),
+            .value = Value.from(agent.well_known_symbols.@"%Symbol.species%"),
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -134,7 +134,7 @@ pub const SymbolConstructor = struct {
         // 20.4.2.13 Symbol.split
         // https://tc39.es/ecma262/#sec-symbol.split
         try defineBuiltinProperty(object, "split", PropertyDescriptor{
-            .value = Value.from(agent.well_known_symbols.@"@@split"),
+            .value = Value.from(agent.well_known_symbols.@"%Symbol.split%"),
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -143,7 +143,7 @@ pub const SymbolConstructor = struct {
         // 20.4.2.14 Symbol.toPrimitive
         // https://tc39.es/ecma262/#sec-symbol.toprimitive
         try defineBuiltinProperty(object, "toPrimitive", PropertyDescriptor{
-            .value = Value.from(agent.well_known_symbols.@"@@toPrimitive"),
+            .value = Value.from(agent.well_known_symbols.@"%Symbol.toPrimitive%"),
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -152,7 +152,7 @@ pub const SymbolConstructor = struct {
         // 20.4.2.15 Symbol.toStringTag
         // https://tc39.es/ecma262/#sec-symbol.tostringtag
         try defineBuiltinProperty(object, "toStringTag", PropertyDescriptor{
-            .value = Value.from(agent.well_known_symbols.@"@@toStringTag"),
+            .value = Value.from(agent.well_known_symbols.@"%Symbol.toStringTag%"),
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -161,7 +161,7 @@ pub const SymbolConstructor = struct {
         // 20.4.2.16 Symbol.unscopables
         // https://tc39.es/ecma262/#sec-symbol.unscopables
         try defineBuiltinProperty(object, "unscopables", PropertyDescriptor{
-            .value = Value.from(agent.well_known_symbols.@"@@unscopables"),
+            .value = Value.from(agent.well_known_symbols.@"%Symbol.unscopables%"),
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -263,15 +263,15 @@ pub const SymbolPrototype = struct {
         try defineBuiltinAccessor(object, "description", description, null, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
-        try defineBuiltinFunctionWithAttributes(object, "@@toPrimitive", @"@@toPrimitive", 1, realm, .{
+        try defineBuiltinFunctionWithAttributes(object, "%Symbol.toPrimitive%", @"%Symbol.toPrimitive%", 1, realm, .{
             .writable = false,
             .enumerable = false,
             .configurable = true,
         });
 
-        // 20.4.3.6 Symbol.prototype [ @@toStringTag ]
-        // https://tc39.es/ecma262/#sec-symbol.prototype-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 20.4.3.6 Symbol.prototype [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma262/#sec-symbol.prototype-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Symbol"),
             .writable = false,
             .enumerable = false,
@@ -337,9 +337,9 @@ pub const SymbolPrototype = struct {
         return Value.from(try thisSymbolValue(agent, this_value));
     }
 
-    /// 20.4.3.5 Symbol.prototype [ @@toPrimitive ] ( hint )
-    /// https://tc39.es/ecma262/#sec-symbol.prototype-@@toprimitive
-    fn @"@@toPrimitive"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    /// 20.4.3.5 Symbol.prototype [ %Symbol.toPrimitive% ] ( hint )
+    /// https://tc39.es/ecma262/#sec-symbol.prototype-%symbol.toprimitive%
+    fn @"%Symbol.toPrimitive%"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return ? ThisSymbolValue(this value).
         // NOTE: The argument is ignored.
         return Value.from(try thisSymbolValue(agent, this_value));

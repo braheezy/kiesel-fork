@@ -271,9 +271,9 @@ pub const CollatorPrototype = struct {
         try defineBuiltinAccessor(object, "compare", compare, null, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
-        // 10.3.2 Intl.Collator.prototype [ @@toStringTag ]
-        // https://tc39.es/ecma402/#sec-intl.collator.prototype-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 10.3.2 Intl.Collator.prototype [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma402/#sec-intl.collator.prototype-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.Collator"),
             .writable = false,
             .enumerable = false,

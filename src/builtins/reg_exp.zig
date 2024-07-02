@@ -669,7 +669,7 @@ pub const RegExpConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
-        try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
+        try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 22.2.5.1 RegExp.prototype
         // https://tc39.es/ecma262/#sec-regexp.prototype
@@ -771,9 +771,9 @@ pub const RegExpConstructor = struct {
         return Value.from(try regExpInitialize(agent, object, p, f));
     }
 
-    /// 22.2.5.2 get RegExp [ @@species ]
-    /// https://tc39.es/ecma262/#sec-get-regexp-@@species
-    fn @"@@species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    /// 22.2.5.2 get RegExp [ %Symbol.species% ]
+    /// https://tc39.es/ecma262/#sec-get-regexp-%symbol.species%
+    fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -793,13 +793,13 @@ pub const RegExpPrototype = struct {
         try defineBuiltinAccessor(object, "global", global, null, realm);
         try defineBuiltinAccessor(object, "hasIndices", hasIndices, null, realm);
         try defineBuiltinAccessor(object, "ignoreCase", ignoreCase, null, realm);
-        try defineBuiltinFunction(object, "@@match", @"@@match", 1, realm);
-        try defineBuiltinFunction(object, "@@matchAll", @"@@matchAll", 1, realm);
+        try defineBuiltinFunction(object, "%Symbol.match%", @"%Symbol.match%", 1, realm);
+        try defineBuiltinFunction(object, "%Symbol.matchAll%", @"%Symbol.matchAll%", 1, realm);
         try defineBuiltinAccessor(object, "multiline", multiline, null, realm);
-        try defineBuiltinFunction(object, "@@replace", @"@@replace", 2, realm);
-        try defineBuiltinFunction(object, "@@search", @"@@search", 1, realm);
+        try defineBuiltinFunction(object, "%Symbol.replace%", @"%Symbol.replace%", 2, realm);
+        try defineBuiltinFunction(object, "%Symbol.search%", @"%Symbol.search%", 1, realm);
         try defineBuiltinAccessor(object, "source", source, null, realm);
-        try defineBuiltinFunction(object, "@@split", @"@@split", 2, realm);
+        try defineBuiltinFunction(object, "%Symbol.split%", @"%Symbol.split%", 2, realm);
         try defineBuiltinAccessor(object, "sticky", sticky, null, realm);
         try defineBuiltinFunction(object, "test", @"test", 1, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
@@ -963,9 +963,9 @@ pub const RegExpPrototype = struct {
         return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_IGNORECASE);
     }
 
-    /// 22.2.6.8 RegExp.prototype [ @@match ] ( string )
-    /// https://tc39.es/ecma262/#sec-regexp.prototype-@@match
-    fn @"@@match"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+    /// 22.2.6.8 RegExp.prototype [ %Symbol.match% ] ( string )
+    /// https://tc39.es/ecma262/#sec-regexp.prototype-%symbol.match%
+    fn @"%Symbol.match%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const string_value = arguments.get(0);
 
         // 1. Let rx be the this value.
@@ -1049,9 +1049,9 @@ pub const RegExpPrototype = struct {
         }
     }
 
-    /// 22.2.6.9 RegExp.prototype [ @@matchAll ] ( string )
-    /// https://tc39.es/ecma262/#sec-regexp-prototype-matchall
-    fn @"@@matchAll"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+    /// 22.2.6.9 RegExp.prototype [ %Symbol.matchAll% ] ( string )
+    /// https://tc39.es/ecma262/#sec-regexp-prototype-%symbol.matchall%
+    fn @"%Symbol.matchAll%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const string_value = arguments.get(0);
         const realm = agent.currentRealm();
 
@@ -1104,9 +1104,9 @@ pub const RegExpPrototype = struct {
         return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_MULTILINE);
     }
 
-    /// 22.2.6.11 RegExp.prototype [ @@replace ] ( string, replaceValue )
-    /// https://tc39.es/ecma262/#sec-regexp.prototype-@@replace
-    fn @"@@replace"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+    /// 22.2.6.11 RegExp.prototype [ %Symbol.replace% ] ( string, replaceValue )
+    /// https://tc39.es/ecma262/#sec-regexp.prototype-%symbol.replace%
+    fn @"%Symbol.replace%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const string_value = arguments.get(0);
         var replace_value = arguments.get(1);
 
@@ -1346,9 +1346,9 @@ pub const RegExpPrototype = struct {
         return Value.from(try accumulated_result.build());
     }
 
-    /// 22.2.6.12 RegExp.prototype [ @@search ] ( string )
-    /// https://tc39.es/ecma262/#sec-regexp.prototype-@@search
-    fn @"@@search"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+    /// 22.2.6.12 RegExp.prototype [ %Symbol.search% ] ( string )
+    /// https://tc39.es/ecma262/#sec-regexp.prototype-%symbol.search%
+    fn @"%Symbol.search%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const string_value = arguments.get(0);
 
         // 1. Let rx be the this value.
@@ -1444,9 +1444,9 @@ pub const RegExpPrototype = struct {
         return pattern.replace(allocator, "/", "\\/");
     }
 
-    /// 22.2.6.14 RegExp.prototype [ @@split ] ( string, limit )
-    /// https://tc39.es/ecma262/#sec-regexp.prototype-@@split
-    fn @"@@split"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+    /// 22.2.6.14 RegExp.prototype [ %Symbol.split% ] ( string, limit )
+    /// https://tc39.es/ecma262/#sec-regexp.prototype-%symbol.split%
+    fn @"%Symbol.split%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const string_value = arguments.get(0);
         const limit_value = arguments.get(1);

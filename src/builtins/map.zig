@@ -93,7 +93,7 @@ pub const MapConstructor = struct {
         });
 
         try defineBuiltinFunction(object, "groupBy", groupBy, 2, realm);
-        try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
+        try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 24.1.2.2 Map.prototype
         // https://tc39.es/ecma262/#sec-map.prototype
@@ -180,9 +180,9 @@ pub const MapConstructor = struct {
         return Value.from(map);
     }
 
-    /// 24.1.2.3 get Map [ @@species ]
-    /// https://tc39.es/ecma262/#sec-get-map-@@species
-    fn @"@@species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    /// 24.1.2.3 get Map [ %Symbol.species% ]
+    /// https://tc39.es/ecma262/#sec-get-map-%symbol.species%
+    fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -207,14 +207,14 @@ pub const MapPrototype = struct {
         try defineBuiltinAccessor(object, "size", size, null, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
 
-        // 24.1.3.12 Map.prototype [ @@iterator ] ( )
-        // https://tc39.es/ecma262/#sec-map.prototype-@@iterator
+        // 24.1.3.12 Map.prototype [ %Symbol.iterator% ] ( )
+        // https://tc39.es/ecma262/#sec-map.prototype-%symbol.iterator%
         const @"%Map.prototype.entries%" = object.propertyStorage().get(PropertyKey.from("entries")).?;
-        try defineBuiltinProperty(object, "@@iterator", @"%Map.prototype.entries%");
+        try defineBuiltinProperty(object, "%Symbol.iterator%", @"%Map.prototype.entries%");
 
-        // 24.1.3.13 Map.prototype [ @@toStringTag ]
-        // https://tc39.es/ecma262/#sec-map.prototype-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 24.1.3.13 Map.prototype [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma262/#sec-map.prototype-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Map"),
             .writable = false,
             .enumerable = false,

@@ -501,9 +501,9 @@ pub const DataViewPrototype = struct {
         try defineBuiltinFunction(object, "setUint16", setUint16, 2, realm);
         try defineBuiltinFunction(object, "setUint32", setUint32, 2, realm);
 
-        // 25.3.4.25 DataView.prototype [ @@toStringTag ]
-        // https://tc39.es/ecma262/#sec-dataview.prototype-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 25.3.4.25 DataView.prototype [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma262/#sec-dataview.prototype-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("DataView"),
             .writable = false,
             .enumerable = false,

@@ -1732,7 +1732,7 @@ fn classDefinitionEvaluation(
                 var result = if (class_constructor_fields.constructor_kind == .derived) blk: {
                     // 1. NOTE: This branch behaves similarly to constructor(...args) { super(...args); }.
                     //    The most notable distinction is that while the aforementioned ECMAScript
-                    //    source text observably calls the @@iterator method on %Array.prototype%,
+                    //    source text observably calls the %Symbol.iterator% method on %Array.prototype%,
                     //    this function does not.
 
                     // 2. Let func be ! F.[[GetPrototypeOf]]().

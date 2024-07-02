@@ -55,9 +55,9 @@ pub const SetIteratorPrototype = struct {
 
         try defineBuiltinFunction(object, "next", next, 0, realm);
 
-        // 24.2.5.2.2 %SetIteratorPrototype% [ @@toStringTag ]
-        // https://tc39.es/ecma262/#sec-%setiteratorprototype%-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 24.2.5.2.2 %SetIteratorPrototype% [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma262/#sec-%setiteratorprototype%-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Set Iterator"),
             .writable = false,
             .enumerable = false,

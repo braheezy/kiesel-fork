@@ -64,9 +64,9 @@ pub const RegExpStringIteratorPrototype = struct {
 
         try defineBuiltinFunction(object, "next", next, 0, realm);
 
-        // 22.2.9.2.2 %RegExpStringIteratorPrototype% [ @@toStringTag ]
-        // https://tc39.es/ecma262/#sec-%regexpstringiteratorprototype%-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 22.2.9.2.2 %RegExpStringIteratorPrototype% [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma262/#sec-%regexpstringiteratorprototype%-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("RegExp String Iterator"),
             .writable = false,
             .enumerable = false,

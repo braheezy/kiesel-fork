@@ -55,9 +55,9 @@ pub const MapIteratorPrototype = struct {
 
         try defineBuiltinFunction(object, "next", next, 0, realm);
 
-        // 23.1.5.2.2 %ArrayIteratorPrototype% [ @@toStringTag ]
-        // https://tc39.es/ecma262/#sec-%arrayiteratorprototype%-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 23.1.5.2.2 %ArrayIteratorPrototype% [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma262/#sec-%arrayiteratorprototype%-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Map Iterator"),
             .writable = false,
             .enumerable = false,

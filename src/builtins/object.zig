@@ -852,8 +852,8 @@ pub const ObjectPrototype = struct {
             String.fromLiteral("Object");
         // zig fmt: on
 
-        // 15. Let tag be ? Get(O, @@toStringTag).
-        const tag_value = try object.get(PropertyKey.from(agent.well_known_symbols.@"@@toStringTag"));
+        // 15. Let tag be ? Get(O, %Symbol.toStringTag%).
+        const tag_value = try object.get(PropertyKey.from(agent.well_known_symbols.@"%Symbol.toStringTag%"));
 
         // 16. If tag is not a String, set tag to builtinTag.
         const tag = switch (tag_value) {

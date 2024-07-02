@@ -245,18 +245,18 @@ pub fn getIterator(
 ) Agent.Error!Iterator {
     // 1. If kind is async, then
     const method = if (kind == .@"async") blk: {
-        // a. Let method be ? GetMethod(obj, @@asyncIterator).
+        // a. Let method be ? GetMethod(obj, %Symbol.asyncIterator%).
         const method = try object.getMethod(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"@@asyncIterator"),
+            PropertyKey.from(agent.well_known_symbols.@"%Symbol.asyncIterator%"),
         );
 
         // b. If method is undefined, then
         if (method == null) {
-            // i. Let syncMethod be ? GetMethod(obj, @@iterator).
+            // i. Let syncMethod be ? GetMethod(obj, %Symbol.iterator%).
             const sync_method = try object.getMethod(
                 agent,
-                PropertyKey.from(agent.well_known_symbols.@"@@iterator"),
+                PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
             );
 
             // ii. If syncMethod is undefined, throw a TypeError exception.
@@ -279,10 +279,10 @@ pub fn getIterator(
     }
     // 2. Else,
     else blk: {
-        // a. Let method be ? GetMethod(obj, @@iterator).
+        // a. Let method be ? GetMethod(obj, %Symbol.iterator%).
         break :blk try object.getMethod(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"@@iterator"),
+            PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
         );
     };
 

@@ -266,10 +266,10 @@ pub const Value = union(enum) {
     pub fn toPrimitive(self: Self, agent: *Agent, preferred_type: ?PreferredType) Agent.Error!Value {
         // 1. If input is an Object, then
         if (self == .object) {
-            // a. Let exoticToPrim be ? GetMethod(input, @@toPrimitive).
+            // a. Let exoticToPrim be ? GetMethod(input, %Symbol.toPrimitive%).
             const maybe_exotic_to_primitive = try self.getMethod(
                 agent,
-                PropertyKey.from(agent.well_known_symbols.@"@@toPrimitive"),
+                PropertyKey.from(agent.well_known_symbols.@"%Symbol.toPrimitive%"),
             );
 
             // b. If exoticToPrim is not undefined, then
@@ -835,9 +835,9 @@ pub const Value = union(enum) {
         // 1. If argument is not an Object, return false.
         if (self != .object) return false;
 
-        // 2. Let matcher be ? Get(argument, @@match).
+        // 2. Let matcher be ? Get(argument, %Symbol.match%).
         const matcher = try self.object.get(
-            PropertyKey.from(self.object.agent().well_known_symbols.@"@@match"),
+            PropertyKey.from(self.object.agent().well_known_symbols.@"%Symbol.match%"),
         );
 
         // 3. If matcher is not undefined, return ToBoolean(matcher).
@@ -1217,10 +1217,10 @@ pub const Value = union(enum) {
             );
         }
 
-        // 2. Let instOfHandler be ? GetMethod(target, @@hasInstance).
+        // 2. Let instOfHandler be ? GetMethod(target, %Symbol.hasInstance%).
         const maybe_instanceof_handler = try target.getMethod(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"@@hasInstance"),
+            PropertyKey.from(agent.well_known_symbols.@"%Symbol.hasInstance%"),
         );
 
         // 3. If instOfHandler is not undefined, then

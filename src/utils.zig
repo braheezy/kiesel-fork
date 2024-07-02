@@ -121,17 +121,21 @@ pub fn formatParseErrorHint(
 // https://tc39.es/ecma262/#sec-ecmascript-standard-built-in-objects.
 
 fn getFunctionName(comptime name: []const u8) []const u8 {
-    return if (comptime std.mem.startsWith(u8, name, "@@"))
-        std.fmt.comptimePrint("[Symbol.{s}]", .{name[2..]})
-    else
-        name;
+    if (comptime std.mem.startsWith(u8, name, "%Symbol.")) {
+        comptime std.debug.assert(std.mem.endsWith(u8, name, "%"));
+        return std.fmt.comptimePrint("[{s}]", .{name[1 .. name.len - 1]});
+    } else {
+        return name;
+    }
 }
 
 inline fn getPropertyKey(comptime name: []const u8, agent: *Agent) PropertyKey {
-    return if (comptime std.mem.startsWith(u8, name, "@@"))
-        PropertyKey.from(@field(agent.well_known_symbols, name))
-    else
-        PropertyKey.from(name);
+    if (comptime std.mem.startsWith(u8, name, "%Symbol.")) {
+        comptime std.debug.assert(std.mem.endsWith(u8, name, "%"));
+        return PropertyKey.from(@field(agent.well_known_symbols, name));
+    } else {
+        return PropertyKey.from(name);
+    }
 }
 
 pub fn defineBuiltinAccessor(

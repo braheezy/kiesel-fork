@@ -186,10 +186,10 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: u64) Ag
 
     // 5. If C is an Object, then
     if (constructor == .object) {
-        // a. Set C to ? Get(C, @@species).
+        // a. Set C to ? Get(C, %Symbol.species%).
         constructor = try constructor.get(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"@@species"),
+            PropertyKey.from(agent.well_known_symbols.@"%Symbol.species%"),
         );
 
         // b. If C is null, set C to undefined.
@@ -366,7 +366,7 @@ pub const ArrayConstructor = struct {
         try defineBuiltinFunction(object, "from", from, 1, realm);
         try defineBuiltinFunction(object, "isArray", isArray, 1, realm);
         try defineBuiltinFunction(object, "of", of, 0, realm);
-        try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
+        try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 23.1.2.4 Array.prototype
         // https://tc39.es/ecma262/#sec-array.prototype
@@ -506,10 +506,10 @@ pub const ArrayConstructor = struct {
             break :blk true;
         };
 
-        // 4. Let usingIterator be ? GetMethod(items, @@iterator).
+        // 4. Let usingIterator be ? GetMethod(items, %Symbol.iterator%).
         const using_iterator = try items.getMethod(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"@@iterator"),
+            PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
         );
 
         // 5. If usingIterator is not undefined, then
@@ -694,9 +694,9 @@ pub const ArrayConstructor = struct {
         return Value.from(array);
     }
 
-    /// 23.1.2.5 get Array [ @@species ]
-    /// https://tc39.es/ecma262/#sec-get-array-@@species
-    fn @"@@species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    /// 23.1.2.5 get Array [ %Symbol.species% ]
+    /// https://tc39.es/ecma262/#sec-get-array-%symbol.species%
+    fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -751,16 +751,16 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "values", values, 0, realm);
         try defineBuiltinFunction(object, "with", with, 2, realm);
 
-        // 23.1.3.40 Array.prototype [ @@iterator ] ( )
-        // https://tc39.es/ecma262/#sec-array.prototype-@@iterator
+        // 23.1.3.40 Array.prototype [ %Symbol.iterator% ] ( )
+        // https://tc39.es/ecma262/#sec-array.prototype-%symbol.iterator%
         // NOTE: We can't use the intrinsic getter for this while creating the underlying prototype
         //       object, as it hasn't been finalized yet.
         const @"%Array.prototype.values%" = object.propertyStorage().get(PropertyKey.from("values")).?;
-        try defineBuiltinProperty(object, "@@iterator", @"%Array.prototype.values%");
+        try defineBuiltinProperty(object, "%Symbol.iterator%", @"%Array.prototype.values%");
 
-        // 23.1.3.41 Array.prototype [ @@unscopables ]
-        // https://tc39.es/ecma262/#sec-array.prototype-@@unscopables
-        try defineBuiltinProperty(object, "@@unscopables", PropertyDescriptor{
+        // 23.1.3.41 Array.prototype [ %Symbol.unscopables% ]
+        // https://tc39.es/ecma262/#sec-array.prototype-%symbol.unscopables%
+        try defineBuiltinProperty(object, "%Symbol.unscopables%", PropertyDescriptor{
             .value = blk: {
                 // 1. Let unscopableList be OrdinaryObjectCreate(null).
                 const unscopable_list = try ordinaryObjectCreate(realm.agent, null);
@@ -925,9 +925,9 @@ pub const ArrayPrototype = struct {
         // 1. If O is not an Object, return false.
         if (value != .object) return false;
 
-        // 2. Let spreadable be ? Get(O, @@isConcatSpreadable).
+        // 2. Let spreadable be ? Get(O, %Symbol.isConcatSpreadable%).
         const spreadable = try value.object.get(
-            PropertyKey.from(agent.well_known_symbols.@"@@isConcatSpreadable"),
+            PropertyKey.from(agent.well_known_symbols.@"%Symbol.isConcatSpreadable%"),
         );
 
         // 3. If spreadable is not undefined, return ToBoolean(spreadable).

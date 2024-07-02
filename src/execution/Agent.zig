@@ -331,7 +331,7 @@ test "well_known_symbols" {
     const gc = @import("../gc.zig");
     var agent = try init(gc.allocator(), .{});
     defer agent.deinit();
-    const unscopables = agent.well_known_symbols.@"@@unscopables";
+    const unscopables = agent.well_known_symbols.@"%Symbol.unscopables%";
     try std.testing.expectEqual(unscopables.id, 12);
     try std.testing.expectEqualStrings(unscopables.description.?.ascii, "Symbol.unscopables");
 }

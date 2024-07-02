@@ -434,9 +434,9 @@ pub const Atomics = struct {
         try defineBuiltinFunction(object, "waitAsync", waitAsync, 4, realm);
         try defineBuiltinFunction(object, "xor", xor, 3, realm);
 
-        // 25.4.17 Atomics [ @@toStringTag ]
-        // https://tc39.es/ecma262/#sec-atomics-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 25.4.17 Atomics [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma262/#sec-atomics-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Atomics"),
             .writable = false,
             .enumerable = false,

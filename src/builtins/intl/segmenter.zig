@@ -210,9 +210,9 @@ pub const SegmenterPrototype = struct {
         try defineBuiltinFunction(object, "segment", segment, 1, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
-        // 18.3.2 Intl.Segmenter.prototype [ @@toStringTag ]
-        // https://tc39.es/ecma402/#sec-intl.segmenter.prototype-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 18.3.2 Intl.Segmenter.prototype [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma402/#sec-intl.segmenter.prototype-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.Segmenter"),
             .writable = false,
             .enumerable = false,
@@ -328,7 +328,7 @@ pub const IntlSegmentsPrototype = struct {
         });
 
         try defineBuiltinFunction(object, "containing", containing, 1, realm);
-        try defineBuiltinFunction(object, "@@iterator", @"@@iterator", 0, realm);
+        try defineBuiltinFunction(object, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
 
         return object;
     }
@@ -379,9 +379,9 @@ pub const IntlSegmentsPrototype = struct {
         );
     }
 
-    /// 18.5.2.2 %IntlSegmentsPrototype% [ @@iterator ] ( )
-    /// https://tc39.es/ecma402/#sec-%intlsegmentsprototype%-@@iterator
-    fn @"@@iterator"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    /// 18.5.2.2 %IntlSegmentsPrototype% [ %Symbol.iterator% ] ( )
+    /// https://tc39.es/ecma402/#sec-%intlsegmentsprototype%-%symbol.iterator%
+    fn @"%Symbol.iterator%"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let segments be the this value.
         // 2. Perform ? RequireInternalSlot(segments, [[SegmentsSegmenter]]).
         const segments = try this_value.requireInternalSlot(agent, Segments);
@@ -449,9 +449,9 @@ pub const IntlSegmentIteratorPrototype = struct {
 
         try defineBuiltinFunction(object, "next", next, 0, realm);
 
-        // 18.6.2.2 %IntlSegmentIteratorPrototype% [ @@toStringTag ]
-        // https://tc39.es/ecma402/#sec-%intlsegmentiteratorprototype%.@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 18.6.2.2 %IntlSegmentIteratorPrototype% [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma402/#sec-%intlsegmentiteratorprototype%.%Symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Segmenter String Iterator"),
             .writable = false,
             .enumerable = false,

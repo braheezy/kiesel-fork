@@ -166,7 +166,7 @@ pub const SetConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
-        try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
+        try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 24.2.3.1 Set.prototype
         // https://tc39.es/ecma262/#sec-set.prototype
@@ -238,9 +238,9 @@ pub const SetConstructor = struct {
         return Value.from(set);
     }
 
-    /// 24.2.3.2 get Set [ @@species ]
-    /// https://tc39.es/ecma262/#sec-get-set-@@species
-    fn @"@@species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    /// 24.2.3.2 get Set [ %Symbol.species% ]
+    /// https://tc39.es/ecma262/#sec-get-set-%symbol.species%
+    fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -275,13 +275,13 @@ pub const SetPrototype = struct {
         const @"%Set.prototype.values%" = object.propertyStorage().get(PropertyKey.from("values")).?;
         try defineBuiltinProperty(object, "keys", @"%Set.prototype.values%");
 
-        // 24.2.4.18 Set.prototype [ @@iterator ] ( )
-        // https://tc39.es/ecma262/#sec-set.prototype-@@iterator
-        try defineBuiltinProperty(object, "@@iterator", @"%Set.prototype.values%");
+        // 24.2.4.18 Set.prototype [ %Symbol.iterator% ] ( )
+        // https://tc39.es/ecma262/#sec-set.prototype-%symbol.iterator%
+        try defineBuiltinProperty(object, "%Symbol.iterator%", @"%Set.prototype.values%");
 
-        // 24.2.4.19 Set.prototype [ @@toStringTag ]
-        // https://tc39.es/ecma262/#sec-set.prototype-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 24.2.4.19 Set.prototype [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma262/#sec-set.prototype-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Set"),
             .writable = false,
             .enumerable = false,

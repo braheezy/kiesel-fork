@@ -41,9 +41,9 @@ pub fn hasBinding(self: Self, name: []const u8) Agent.Error!bool {
     // 4. If envRec.[[IsWithEnvironment]] is false, return true.
     if (!self.is_with_environment) return true;
 
-    // 5. Let unscopables be ? Get(bindingObject, @@unscopables).
+    // 5. Let unscopables be ? Get(bindingObject, %Symbol.unscopables%).
     const unscopables = try self.binding_object.get(
-        PropertyKey.from(agent.well_known_symbols.@"@@unscopables"),
+        PropertyKey.from(agent.well_known_symbols.@"%Symbol.unscopables%"),
     );
 
     // 6. If unscopables is an Object, then

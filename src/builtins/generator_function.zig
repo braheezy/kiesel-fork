@@ -101,9 +101,9 @@ pub const GeneratorFunctionPrototype = struct {
             .configurable = true,
         });
 
-        // 27.3.3.3 GeneratorFunction.prototype [ @@toStringTag ]
-        // https://tc39.es/ecma262/#sec-generatorfunction.prototype-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 27.3.3.3 GeneratorFunction.prototype [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma262/#sec-generatorfunction.prototype-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("GeneratorFunction"),
             .writable = false,
             .enumerable = false,

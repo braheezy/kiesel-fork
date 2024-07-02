@@ -632,7 +632,7 @@ pub const TypedArrayConstructor = struct {
 
         try defineBuiltinFunction(object, "from", from, 1, realm);
         try defineBuiltinFunction(object, "of", of, 0, realm);
-        try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
+        try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 23.2.2.3 %TypedArray%.prototype
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype
@@ -696,10 +696,10 @@ pub const TypedArrayConstructor = struct {
             break :blk true;
         };
 
-        // 5. Let usingIterator be ? GetMethod(source, @@iterator).
+        // 5. Let usingIterator be ? GetMethod(source, %Symbol.iterator%).
         const using_iterator = try source.getMethod(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"@@iterator"),
+            PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
         );
 
         // 6. If usingIterator is not undefined, then
@@ -844,9 +844,9 @@ pub const TypedArrayConstructor = struct {
         return Value.from(new_object);
     }
 
-    /// 23.2.2.4 get %TypedArray% [ @@species ]
-    /// https://tc39.es/ecma262/#sec-get-%typedarray%-@@species
-    fn @"@@species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    /// 23.2.2.4 get %TypedArray% [ %Symbol.species% ]
+    /// https://tc39.es/ecma262/#sec-get-%typedarray%-%symbol.species%
+    fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -894,16 +894,16 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinFunction(object, "toSorted", toSorted, 1, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
         try defineBuiltinFunction(object, "with", with, 2, realm);
-        try defineBuiltinAccessor(object, "@@toStringTag", @"@@toStringTag", null, realm);
+        try defineBuiltinAccessor(object, "%Symbol.toStringTag%", @"%Symbol.toStringTag%", null, realm);
 
         // 23.2.3.34 %TypedArray%.prototype.toString ( )
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype.tostring
         try defineBuiltinProperty(object, "toString", Value.from(try realm.intrinsics.@"%Array.prototype.toString%"()));
 
-        // 23.2.3.37 %TypedArray%.prototype [ @@iterator ] ( )
-        // https://tc39.es/ecma262/#sec-%typedarray%.prototype-@@iterator
+        // 23.2.3.37 %TypedArray%.prototype [ %Symbol.iterator% ] ( )
+        // https://tc39.es/ecma262/#sec-%typedarray%.prototype-%symbol.iterator%
         const @"%TypedArray.prototype.values%" = object.propertyStorage().get(PropertyKey.from("values")).?;
-        try defineBuiltinProperty(object, "@@iterator", @"%TypedArray.prototype.values%");
+        try defineBuiltinProperty(object, "%Symbol.iterator%", @"%TypedArray.prototype.values%");
 
         return object;
     }
@@ -2984,9 +2984,9 @@ pub const TypedArrayPrototype = struct {
         return Value.from(new_typed_array);
     }
 
-    /// 23.2.3.38 get %TypedArray%.prototype [ @@toStringTag ]
-    /// https://tc39.es/ecma262/#sec-get-%typedarray%.prototype-@@tostringtag
-    fn @"@@toStringTag"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    /// 23.2.3.38 get %TypedArray%.prototype [ %Symbol.toStringTag% ]
+    /// https://tc39.es/ecma262/#sec-get-%typedarray%.prototype-%symbol.tostringtag%
+    fn @"%Symbol.toStringTag%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. If O is not an Object, return undefined.
         const object_ = switch (this_value) {
@@ -3838,10 +3838,10 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
                                 !first_argument.object.is(builtins.SharedArrayBuffer),
                         );
 
-                        // 2. Let usingIterator be ? GetMethod(firstArgument, @@iterator).
+                        // 2. Let usingIterator be ? GetMethod(firstArgument, %Symbol.iterator%).
                         const using_iterator = try first_argument.getMethod(
                             agent,
-                            PropertyKey.from(agent.well_known_symbols.@"@@iterator"),
+                            PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
                         );
 
                         // 3. If usingIterator is not undefined, then

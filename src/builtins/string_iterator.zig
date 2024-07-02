@@ -32,9 +32,9 @@ pub const StringIteratorPrototype = struct {
 
         try defineBuiltinFunction(object, "next", next, 0, realm);
 
-        // 22.1.5.1.2 %StringIteratorPrototype% [ @@toStringTag ]
-        // https://tc39.es/ecma262/#sec-%stringiteratorprototype%-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 22.1.5.1.2 %StringIteratorPrototype% [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma262/#sec-%stringiteratorprototype%-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("String Iterator"),
             .writable = false,
             .enumerable = false,

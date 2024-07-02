@@ -102,9 +102,9 @@ pub const AsyncFunctionPrototype = struct {
             },
         );
 
-        // 27.7.3.2 AsyncFunction.prototype [ @@toStringTag ]
+        // 27.7.3.2 AsyncFunction.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-async-function-prototype-properties-toStringTag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("AsyncFunction"),
             .writable = false,
             .enumerable = false,

@@ -118,7 +118,7 @@ pub const SharedArrayBufferConstructor = struct {
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
 
-        try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
+        try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 25.2.4.1 SharedArrayBuffer.prototype
         // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype
@@ -172,9 +172,9 @@ pub const SharedArrayBufferConstructor = struct {
         );
     }
 
-    /// 25.2.4.2 get SharedArrayBuffer [ @@species ]
-    /// https://tc39.es/ecma262/#sec-sharedarraybuffer-@@species
-    fn @"@@species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    /// 25.2.4.2 get SharedArrayBuffer [ %Symbol.species% ]
+    /// https://tc39.es/ecma262/#sec-sharedarraybuffer-%symbol.species%
+    fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -194,9 +194,9 @@ pub const SharedArrayBufferPrototype = struct {
         try defineBuiltinAccessor(object, "maxByteLength", maxByteLength, null, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
 
-        // 25.2.5.7 SharedArrayBuffer.prototype [ @@toStringTag ]
-        // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 25.2.5.7 SharedArrayBuffer.prototype [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("SharedArrayBuffer"),
             .writable = false,
             .enumerable = false,

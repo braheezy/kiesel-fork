@@ -191,9 +191,9 @@ pub const ListFormatPrototype = struct {
         try defineBuiltinFunction(object, "format", format, 1, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
-        // 13.3.2 Intl.ListFormat.prototype [ @@toStringTag ]
+        // 13.3.2 Intl.ListFormat.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype-toStringTag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.ListFormat"),
             .writable = false,
             .enumerable = false,

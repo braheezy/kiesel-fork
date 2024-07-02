@@ -44,9 +44,9 @@ pub const GeneratorPrototype = struct {
             .configurable = true,
         });
 
-        // 27.5.1.5 %GeneratorPrototype% [ @@toStringTag ]
-        // https://tc39.es/ecma262/#sec-generator.prototype-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 27.5.1.5 %GeneratorPrototype% [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma262/#sec-generator.prototype-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Generator"),
             .writable = false,
             .enumerable = false,

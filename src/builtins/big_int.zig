@@ -148,9 +148,9 @@ pub const BigIntPrototype = struct {
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
 
-        // 21.2.3.5 BigInt.prototype [ @@toStringTag ]
-        // https://tc39.es/ecma262/#sec-bigint.prototype-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 21.2.3.5 BigInt.prototype [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma262/#sec-bigint.prototype-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("BigInt"),
             .writable = false,
             .enumerable = false,

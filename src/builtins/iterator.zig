@@ -22,14 +22,14 @@ pub const IteratorPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
-        try defineBuiltinFunction(object, "@@iterator", @"@@iterator", 0, realm);
+        try defineBuiltinFunction(object, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
 
         return object;
     }
 
-    /// 27.1.2.1 %IteratorPrototype% [ @@iterator ] ( )
-    /// https://tc39.es/ecma262/#sec-%iteratorprototype%-@@iterator
-    fn @"@@iterator"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    /// 27.1.2.1 %IteratorPrototype% [ %Symbol.iterator% ] ( )
+    /// https://tc39.es/ecma262/#sec-%iteratorprototype%-%symbol.iterator%
+    fn @"%Symbol.iterator%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }

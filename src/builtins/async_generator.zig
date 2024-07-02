@@ -51,9 +51,9 @@ pub const AsyncGeneratorPrototype = struct {
             .configurable = true,
         });
 
-        // 27.6.1.5 %AsyncGeneratorPrototype% [ @@toStringTag ]
+        // 27.6.1.5 %AsyncGeneratorPrototype% [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-asyncgenerator-prototype-tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("AsyncGenerator"),
             .writable = false,
             .enumerable = false,

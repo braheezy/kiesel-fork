@@ -600,9 +600,9 @@ pub const JSON = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
-        // 25.5.3 JSON [ @@toStringTag ]
-        // https://tc39.es/ecma262/#sec-json-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 25.5.3 JSON [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma262/#sec-json-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("JSON"),
             .writable = false,
             .enumerable = false,

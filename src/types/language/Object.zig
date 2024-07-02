@@ -482,9 +482,9 @@ pub fn speciesConstructor(self: Self, default_constructor: Self) Agent.Error!Sel
         return self.agent().throwException(.type_error, "{} is not an Object", .{constructor});
     }
 
-    // 4. Let S be ? Get(C, @@species).
+    // 4. Let S be ? Get(C, %Symbol.species%).
     const species = try constructor.object.get(
-        PropertyKey.from(self.agent().well_known_symbols.@"@@species"),
+        PropertyKey.from(self.agent().well_known_symbols.@"%Symbol.species%"),
     );
 
     // 5. If S is either undefined or null, return defaultConstructor.

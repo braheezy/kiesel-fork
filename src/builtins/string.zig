@@ -156,9 +156,9 @@ pub fn getSubstitution(
             const tail_pos = position +| match_length;
 
             // iv. Let refReplacement be the substring of str from min(tailPos, stringLength).
-            // v. NOTE: tailPos can exceed stringLength only if this abstract operation was invoked by
-            //    a call to the intrinsic @@replace method of %RegExp.prototype% on an object whose
-            //    "exec" property is not the intrinsic %RegExp.prototype.exec%.
+            // v. NOTE: tailPos can exceed stringLength only if this abstract operation was invoked
+            //    by a call to the intrinsic %Symbol.replace% method of %RegExp.prototype% on an
+            //    object whose "exec" property is not the intrinsic %RegExp.prototype.exec%.
             const ref_replacement = try str.substring(
                 agent.gc_allocator,
                 @min(tail_pos, string_length),
@@ -728,7 +728,7 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "trimEnd", trimEnd, 0, realm);
         try defineBuiltinFunction(object, "trimStart", trimStart, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
-        try defineBuiltinFunction(object, "@@iterator", @"@@iterator", 0, realm);
+        try defineBuiltinFunction(object, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
 
         if (build_options.enable_annex_b) {
             try defineBuiltinFunction(object, "substr", substr, 2, realm);
@@ -1170,10 +1170,10 @@ pub const StringPrototype = struct {
 
         // 2. If regexp is neither undefined nor null, then
         if (regexp != .undefined and regexp != .null) {
-            // a. Let matcher be ? GetMethod(regexp, @@match).
+            // a. Let matcher be ? GetMethod(regexp, %Symbol.match%).
             const matcher = try regexp.getMethod(
                 agent,
-                PropertyKey.from(agent.well_known_symbols.@"@@match"),
+                PropertyKey.from(agent.well_known_symbols.@"%Symbol.match%"),
             );
 
             // b. If matcher is not undefined, then
@@ -1189,10 +1189,10 @@ pub const StringPrototype = struct {
         // 4. Let rx be ? RegExpCreate(regexp, undefined).
         const rx = try regExpCreate(agent, regexp, .undefined);
 
-        // 5. Return ? Invoke(rx, @@match, « S »).
+        // 5. Return ? Invoke(rx, %Symbol.match%, « S »).
         return Value.from(rx).invoke(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"@@match"),
+            PropertyKey.from(agent.well_known_symbols.@"%Symbol.match%"),
             &.{Value.from(string)},
         );
     }
@@ -1228,10 +1228,10 @@ pub const StringPrototype = struct {
                 }
             }
 
-            // c. Let matcher be ? GetMethod(regexp, @@matchAll).
+            // c. Let matcher be ? GetMethod(regexp, %Symbol.matchAll%).
             const matcher = try regexp.getMethod(
                 agent,
-                PropertyKey.from(agent.well_known_symbols.@"@@matchAll"),
+                PropertyKey.from(agent.well_known_symbols.@"%Symbol.matchAll%"),
             );
 
             // d. If matcher is not undefined, then
@@ -1247,10 +1247,10 @@ pub const StringPrototype = struct {
         // 4. Let rx be ? RegExpCreate(regexp, "g").
         const rx = try regExpCreate(agent, regexp, Value.from("g"));
 
-        // 5. Return ? Invoke(rx, @@matchAll, « S »).
+        // 5. Return ? Invoke(rx, %Symbol.matchAll%, « S »).
         return Value.from(rx).invoke(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"@@matchAll"),
+            PropertyKey.from(agent.well_known_symbols.@"%Symbol.matchAll%"),
             &.{Value.from(string)},
         );
     }
@@ -1368,10 +1368,10 @@ pub const StringPrototype = struct {
 
         // 2. If searchValue is neither undefined nor null, then
         if (search_value != .undefined and search_value != .null) {
-            // a. Let replacer be ? GetMethod(searchValue, @@replace).
+            // a. Let replacer be ? GetMethod(searchValue, %Symbol.replace%).
             const replacer = try search_value.getMethod(
                 agent,
-                PropertyKey.from(agent.well_known_symbols.@"@@replace"),
+                PropertyKey.from(agent.well_known_symbols.@"%Symbol.replace%"),
             );
 
             // b. If replacer is not undefined, then
@@ -1489,10 +1489,10 @@ pub const StringPrototype = struct {
                 }
             }
 
-            // c. Let replacer be ? GetMethod(searchValue, @@replace).
+            // c. Let replacer be ? GetMethod(searchValue, %Symbol.replace%).
             const replacer = try search_value.getMethod(
                 agent,
-                PropertyKey.from(agent.well_known_symbols.@"@@replace"),
+                PropertyKey.from(agent.well_known_symbols.@"%Symbol.replace%"),
             );
 
             // d. If replacer is not undefined, then
@@ -1623,10 +1623,10 @@ pub const StringPrototype = struct {
 
         // 2. If regexp is neither undefined nor null, then
         if (regexp != .undefined and regexp != .null) {
-            // a. Let searcher be ? GetMethod(regexp, @@search).
+            // a. Let searcher be ? GetMethod(regexp, %Symbol.search%).
             const searcher = try regexp.getMethod(
                 agent,
-                PropertyKey.from(agent.well_known_symbols.@"@@search"),
+                PropertyKey.from(agent.well_known_symbols.@"%Symbol.search%"),
             );
 
             // b. If searcher is not undefined, then
@@ -1642,10 +1642,10 @@ pub const StringPrototype = struct {
         // 4. Let rx be ? RegExpCreate(regexp, undefined).
         const rx = try regExpCreate(agent, regexp, .undefined);
 
-        // 5. Return ? Invoke(rx, @@search, « string »).
+        // 5. Return ? Invoke(rx, %Symbol.search%, « string »).
         return Value.from(rx).invoke(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"@@search"),
+            PropertyKey.from(agent.well_known_symbols.@"%Symbol.search%"),
             &.{Value.from(string)},
         );
     }
@@ -1727,10 +1727,10 @@ pub const StringPrototype = struct {
 
         // 2. If separator is neither undefined nor null, then
         if (separator_value != .undefined and separator_value != .null) {
-            // a. Let splitter be ? GetMethod(separator, @@split).
+            // a. Let splitter be ? GetMethod(separator, %Symbol.split%).
             const splitter = try separator_value.getMethod(
                 agent,
-                PropertyKey.from(agent.well_known_symbols.@"@@split"),
+                PropertyKey.from(agent.well_known_symbols.@"%Symbol.split%"),
             );
 
             // b. If splitter is not undefined, then
@@ -2139,9 +2139,9 @@ pub const StringPrototype = struct {
         return Value.from(try thisStringValue(agent, this_value));
     }
 
-    /// 22.1.3.36 String.prototype [ @@iterator ] ( )
-    /// https://tc39.es/ecma262/#sec-string.prototype-@@iterator
-    fn @"@@iterator"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    /// 22.1.3.36 String.prototype [ %Symbol.iterator% ] ( )
+    /// https://tc39.es/ecma262/#sec-string.prototype-%symbol.iterator%
+    fn @"%Symbol.iterator%"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
 
         // 1. Let O be ? RequireObjectCoercible(this value).

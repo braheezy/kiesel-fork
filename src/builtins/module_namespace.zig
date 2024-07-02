@@ -307,9 +307,9 @@ pub fn moduleNamespaceCreate(
 
     // 8. Create own properties of M corresponding to the definitions in 28.3.
     {
-        // 28.3.1 @@toStringTag
-        // https://tc39.es/ecma262/#sec-@@tostringtag
-        try defineBuiltinProperty(namespace, "@@toStringTag", PropertyDescriptor{
+        // 28.3.1 %Symbol.toStringTag%
+        // https://tc39.es/ecma262/#sec-%symbol.tostringtag%
+        try defineBuiltinProperty(namespace, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Module"),
             .writable = false,
             .enumerable = false,

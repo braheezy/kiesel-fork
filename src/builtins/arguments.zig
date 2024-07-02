@@ -239,10 +239,10 @@ pub fn createUnmappedArgumentsObject(
         // c. Set index to index + 1.
     }
 
-    // 7. Perform ! DefinePropertyOrThrow(obj, @@iterator, PropertyDescriptor {
+    // 7. Perform ! DefinePropertyOrThrow(obj, %Symbol.iterator%, PropertyDescriptor {
     //      [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //    }).
-    object.definePropertyOrThrow(PropertyKey.from(agent.well_known_symbols.@"@@iterator"), .{
+    object.definePropertyOrThrow(PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"), .{
         .value = Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
         .writable = true,
         .enumerable = false,
@@ -384,10 +384,10 @@ pub fn createMappedArgumentsObject(
         // c. Set index to index - 1.
     }
 
-    // 20. Perform ! DefinePropertyOrThrow(obj, @@iterator, PropertyDescriptor {
+    // 20. Perform ! DefinePropertyOrThrow(obj, %Symbol.iterator%, PropertyDescriptor {
     //       [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true
     //     }).
-    object.definePropertyOrThrow(PropertyKey.from(agent.well_known_symbols.@"@@iterator"), .{
+    object.definePropertyOrThrow(PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"), .{
         .value = Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
         .writable = true,
         .enumerable = false,

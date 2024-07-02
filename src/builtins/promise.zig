@@ -1521,7 +1521,7 @@ pub const PromiseConstructor = struct {
         try defineBuiltinFunction(object, "resolve", resolve, 1, realm);
         try defineBuiltinFunction(object, "try", @"try", 1, realm);
         try defineBuiltinFunction(object, "withResolvers", withResolvers, 0, realm);
-        try defineBuiltinAccessor(object, "@@species", @"@@species", null, realm);
+        try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 27.2.4.4 Promise.prototype
         // https://tc39.es/ecma262/#sec-promise.prototype
@@ -1919,9 +1919,9 @@ pub const PromiseConstructor = struct {
         return Value.from(object);
     }
 
-    /// 27.2.4.9 get Promise [ @@species ]
-    /// https://tc39.es/ecma262/#sec-get-promise-@@species
-    fn @"@@species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    /// 27.2.4.9 get Promise [ %Symbol.species% ]
+    /// https://tc39.es/ecma262/#sec-get-promise-%symbol.species%
+    fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -1939,9 +1939,9 @@ pub const PromisePrototype = struct {
         try defineBuiltinFunction(object, "finally", finally, 1, realm);
         try defineBuiltinFunction(object, "then", then, 2, realm);
 
-        // 27.2.5.5 Promise.prototype [ @@toStringTag ]
-        // https://tc39.es/ecma262/#sec-promise.prototype-@@tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        // 27.2.5.5 Promise.prototype [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma262/#sec-promise.prototype-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Promise"),
             .writable = false,
             .enumerable = false,

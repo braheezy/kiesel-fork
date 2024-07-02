@@ -22,14 +22,14 @@ pub const AsyncIteratorPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
-        try defineBuiltinFunction(object, "@@asyncIterator", @"@@asyncIterator", 0, realm);
+        try defineBuiltinFunction(object, "%Symbol.asyncIterator%", @"%Symbol.asyncIterator%", 0, realm);
 
         return object;
     }
 
-    /// 27.1.3.1 %AsyncIteratorPrototype% [ @@asyncIterator ] ( )
-    /// https://tc39.es/ecma262/#sec-asynciteratorprototype-asynciterator
-    fn @"@@asyncIterator"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    /// 27.1.3.1 %AsyncIteratorPrototype% [ %Symbol.asyncIterator% ] ( )
+    /// https://tc39.es/ecma262/#sec-%asynciteratorprototype%-%symbol.asynciterator%
+    fn @"%Symbol.asyncIterator%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }

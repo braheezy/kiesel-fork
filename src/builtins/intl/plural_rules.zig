@@ -165,9 +165,9 @@ pub const PluralRulesPrototype = struct {
         try defineBuiltinFunction(object, "select", select, 1, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
-        // 16.3.2 Intl.PluralRules.prototype [ @@toStringTag ]
+        // 16.3.2 Intl.PluralRules.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype-tostringtag
-        try defineBuiltinProperty(object, "@@toStringTag", PropertyDescriptor{
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl.PluralRules"),
             .writable = false,
             .enumerable = false,
