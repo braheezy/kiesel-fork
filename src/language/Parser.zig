@@ -1612,13 +1612,10 @@ pub fn acceptObjectBindingPattern(self: *Self) AcceptError!ast.ObjectBindingPatt
     // TODO: Parse all kinds of object binging patterns
     var properties = std.ArrayList(ast.ObjectBindingPattern.Property).init(self.allocator);
     _ = try self.core.accept(RuleSet.is(.@"{"));
-    while (self.acceptBindingIdentifier()) |binding_identifier| {
+    while (self.acceptSingleNameBinding()) |single_name_binding| {
         try properties.append(.{
             .binding_property = .{
-                .single_name_binding = .{
-                    .binding_identifier = binding_identifier,
-                    .initializer = null,
-                },
+                .single_name_binding = single_name_binding,
             },
         });
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
@@ -1634,13 +1631,10 @@ pub fn acceptArrayBindingPattern(self: *Self) AcceptError!ast.ArrayBindingPatter
     // TODO: Parse all kinds of array binging patterns
     var elements = std.ArrayList(ast.ArrayBindingPattern.Element).init(self.allocator);
     _ = try self.core.accept(RuleSet.is(.@"["));
-    while (self.acceptBindingIdentifier()) |binding_identifier| {
+    while (self.acceptSingleNameBinding()) |single_name_binding| {
         try elements.append(.{
             .binding_element = .{
-                .single_name_binding = .{
-                    .binding_identifier = binding_identifier,
-                    .initializer = null,
-                },
+                .single_name_binding = single_name_binding,
             },
         });
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
@@ -1656,8 +1650,9 @@ pub fn acceptBindingElement(self: *Self) AcceptError!ast.BindingElement {
     if (self.acceptSingleNameBinding()) |single_name_binding|
         return .{ .single_name_binding = single_name_binding }
     else |_| if (self.acceptBindingPattern()) |binding_pattern| {
+        const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
         const initializer = if (self.core.accept(RuleSet.is(.@"="))) |_|
-            try self.acceptExpression(.{})
+            try self.acceptExpression(ctx)
         else |_|
             null;
         return .{
@@ -1674,8 +1669,9 @@ pub fn acceptSingleNameBinding(self: *Self) AcceptError!ast.SingleNameBinding {
     errdefer self.core.restoreState(state);
 
     const binding_identifier = try self.acceptBindingIdentifier();
+    const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
     const initializer = if (self.core.accept(RuleSet.is(.@"="))) |_|
-        try self.acceptExpression(.{})
+        try self.acceptExpression(ctx)
     else |_|
         null;
     return .{ .binding_identifier = binding_identifier, .initializer = initializer };

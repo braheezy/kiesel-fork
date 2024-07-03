@@ -1473,9 +1473,18 @@ pub const BindingPattern = union(enum) {
 
     /// 15.1.2 Static Semantics: ContainsExpression
     /// https://tc39.es/ecma262/#sec-static-semantics-containsexpression
-    pub fn containsExpression(_: Self) bool {
-        // TODO: Implement this properly, for now we only parse single-name bindings without
-        //       initializers so this is fine.
+    pub fn containsExpression(self: Self) bool {
+        switch (self) {
+            .object_binding_pattern => |object_binding_pattern| for (object_binding_pattern.properties) |property| switch (property) {
+                .binding_property => |binding_property| if (binding_property.containsExpression()) return true,
+                .binding_rest_property => {},
+            },
+            .array_binding_pattern => |array_binding_pattern| for (array_binding_pattern.elements) |element| switch (element) {
+                .elision => {},
+                .binding_element => |binding_element| if (binding_element.containsExpression()) return true,
+                .binding_rest_element => |binding_rest_element| if (binding_rest_element.containsExpression()) return true,
+            },
+        }
         return false;
     }
 };
@@ -1513,6 +1522,19 @@ pub const BindingProperty = union(enum) {
     const Self = @This();
 
     single_name_binding: SingleNameBinding,
+
+    /// 15.1.2 Static Semantics: ContainsExpression
+    /// https://tc39.es/ecma262/#sec-static-semantics-containsexpression
+    pub fn containsExpression(self: Self) bool {
+        // TODO: BindingProperty : PropertyName : BindingElement
+        // SingleNameBinding : BindingIdentifier
+        // 1. Return false.
+        // SingleNameBinding : BindingIdentifier Initializer
+        // 1. Return true.
+        return switch (self) {
+            .single_name_binding => |single_name_binding| single_name_binding.initializer != null,
+        };
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-BindingElement

@@ -77,6 +77,64 @@ pub fn codegenPrimaryExpression(
     }
 }
 
+fn codegenSingleNameBinding(
+    node: ast.SingleNameBinding,
+    executable: *Executable,
+    ctx: *Context,
+    property: Value,
+) Executable.Error!void {
+    const strict = ctx.contained_in_strict_mode_code;
+
+    try executable.addInstruction(.load); // Save RHS
+
+    // Resolve binding and push reference
+    const identifier = node.binding_identifier;
+    try executable.addInstructionWithIdentifier(.resolve_binding, identifier);
+    try executable.addIndex(@intFromBool(strict));
+    try executable.addIndex(ctx.environment_lookup_cache_index);
+    ctx.environment_lookup_cache_index += 1;
+    try executable.addInstruction(.push_reference);
+
+    // Evaluate `rhs[n]`
+    try executable.addInstruction(.load);
+    try executable.addInstructionWithConstant(.load_constant, property);
+    try executable.addInstruction(.evaluate_property_access_with_expression_key);
+    try executable.addIndex(@intFromBool(strict));
+    try executable.addInstruction(.get_value);
+
+    if (node.initializer) |initializer| {
+        try executable.addInstruction(.load); // Save RHS
+
+        try executable.addInstruction(.load);
+        try executable.addInstructionWithConstant(.load_constant, .undefined);
+        try executable.addInstruction(.is_strictly_equal);
+
+        try executable.addInstruction(.jump_conditional);
+        const consequent_jump = try executable.addJumpIndex();
+        const alternate_jump = try executable.addJumpIndex();
+
+        try consequent_jump.setTargetHere();
+        try executable.addInstruction(.store); // Drop RHS from the stack
+
+        try codegenExpression(initializer, executable, ctx);
+        if (initializer.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+        try executable.addInstruction(.jump);
+        const end_jump = try executable.addJumpIndex();
+
+        try alternate_jump.setTargetHere();
+        try executable.addInstruction(.store); // Restore RHS
+
+        try end_jump.setTargetHere();
+    }
+
+    // Initialize binding and pop reference
+    try executable.addInstruction(.initialize_referenced_binding);
+    try executable.addInstruction(.pop_reference);
+
+    try executable.addInstruction(.store); // Restore RHS
+}
+
 /// 8.6.2 Runtime Semantics: BindingInitialization
 /// https://tc39.es/ecma262/#sec-runtime-semantics-bindinginitialization
 fn bindingInitialization(
@@ -85,36 +143,18 @@ fn bindingInitialization(
     ctx: *Context,
 ) Executable.Error!void {
     // NOTE: RHS value is on the stack
-    const strict = ctx.contained_in_strict_mode_code;
     switch (node) {
         .object_binding_pattern => |object_binding_pattern| {
             for (object_binding_pattern.properties) |element| switch (element) {
                 .binding_property => |binding_property| {
-                    try executable.addInstruction(.load); // Save RHS
-
-                    // Resolve binding and push reference
-                    const identifier = binding_property.single_name_binding.binding_identifier;
-                    try executable.addInstructionWithIdentifier(.resolve_binding, identifier);
-                    try executable.addIndex(@intFromBool(strict));
-                    try executable.addIndex(ctx.environment_lookup_cache_index);
-                    ctx.environment_lookup_cache_index += 1;
-                    try executable.addInstruction(.push_reference);
-
-                    // Evaluate `rhs[name]`
-                    try executable.addInstruction(.load);
-                    try executable.addInstructionWithConstant(
-                        .load_constant,
-                        Value.from(try String.fromUtf8(executable.allocator, identifier)),
+                    try codegenSingleNameBinding(
+                        binding_property.single_name_binding,
+                        executable,
+                        ctx,
+                        Value.from(
+                            try String.fromUtf8(executable.allocator, binding_property.single_name_binding.binding_identifier),
+                        ),
                     );
-                    try executable.addInstruction(.evaluate_property_access_with_expression_key);
-                    try executable.addIndex(@intFromBool(strict));
-                    try executable.addInstruction(.get_value);
-
-                    // Initialize binding and pop reference
-                    try executable.addInstruction(.initialize_referenced_binding);
-                    try executable.addInstruction(.pop_reference);
-
-                    try executable.addInstruction(.store); // Restore RHS
                 },
                 .binding_rest_property => {
                     // TODO: Implement binding rest properties
@@ -125,31 +165,12 @@ fn bindingInitialization(
             for (array_binding_pattern.elements, 0..) |element, i| switch (element) {
                 .elision => {},
                 .binding_element => |binding_element| {
-                    try executable.addInstruction(.load); // Save RHS
-
-                    // Resolve binding and push reference
-                    const identifier = binding_element.single_name_binding.binding_identifier;
-                    try executable.addInstructionWithIdentifier(.resolve_binding, identifier);
-                    try executable.addIndex(@intFromBool(strict));
-                    try executable.addIndex(ctx.environment_lookup_cache_index);
-                    ctx.environment_lookup_cache_index += 1;
-                    try executable.addInstruction(.push_reference);
-
-                    // Evaluate `rhs[n]`
-                    try executable.addInstruction(.load);
-                    try executable.addInstructionWithConstant(
-                        .load_constant,
+                    try codegenSingleNameBinding(
+                        binding_element.single_name_binding,
+                        executable,
+                        ctx,
                         Value.from(@as(u53, @intCast(i))),
                     );
-                    try executable.addInstruction(.evaluate_property_access_with_expression_key);
-                    try executable.addIndex(@intFromBool(strict));
-                    try executable.addInstruction(.get_value);
-
-                    // Initialize binding and pop reference
-                    try executable.addInstruction(.initialize_referenced_binding);
-                    try executable.addInstruction(.pop_reference);
-
-                    try executable.addInstruction(.store); // Restore RHS
                 },
                 .binding_rest_element => {
                     // TODO: Implement binding rest elements
