@@ -1431,8 +1431,18 @@ pub const BindingPattern = union(enum) {
         switch (self) {
             // ObjectBindingPattern : { }
             // ObjectBindingPattern : { BindingPropertyList , BindingRestProperty }
-            .object_binding_pattern => {
-                // TODO: Implement object binding patterns
+            .object_binding_pattern => |object_binding_pattern| for (object_binding_pattern.properties) |property| switch (property) {
+                .binding_property => |binding_property| switch (binding_property) {
+                    // SingleNameBinding : BindingIdentifier Initializer[opt]
+                    .single_name_binding => |single_name_binding| {
+                        // 1. Return the BoundNames of BindingIdentifier.
+                        try bound_names.append(single_name_binding.binding_identifier);
+                    },
+                    // TODO: BindingProperty : PropertyName : BindingElement
+                },
+                .binding_rest_property => |binding_rest_property| {
+                    try bound_names.append(binding_rest_property.binding_identifier);
+                },
             },
 
             // ArrayBindingPattern : [ Elision[opt] ]
@@ -1472,7 +1482,12 @@ pub const BindingPattern = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-ObjectBindingPattern
 pub const ObjectBindingPattern = struct {
-    // TODO: Implement object binding patterns
+    pub const Property = union(enum) {
+        binding_property: BindingProperty,
+        binding_rest_property: BindingRestProperty,
+    };
+
+    properties: []const Property,
 };
 
 /// https://tc39.es/ecma262/#prod-ArrayBindingPattern
@@ -1484,6 +1499,20 @@ pub const ArrayBindingPattern = struct {
     };
 
     elements: []const Element,
+};
+
+/// https://tc39.es/ecma262/#prod-BindingRestProperty
+pub const BindingRestProperty = struct {
+    const Self = @This();
+
+    binding_identifier: Identifier,
+};
+
+/// https://tc39.es/ecma262/#prod-BindingProperty
+pub const BindingProperty = union(enum) {
+    const Self = @This();
+
+    single_name_binding: SingleNameBinding,
 };
 
 /// https://tc39.es/ecma262/#prod-BindingElement

@@ -450,8 +450,10 @@ pub fn printBindingPattern(node: ast.BindingPattern, writer: anytype, indentatio
 
 pub fn printObjectBindingPattern(node: ast.ObjectBindingPattern, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("ObjectBindingPattern", writer, indentation);
-    // TODO: Implement object binding patterns
-    _ = node;
+    for (node.properties) |element| switch (element) {
+        .binding_property => |binding_property| try printBindingProperty(binding_property, writer, indentation + 1),
+        .binding_rest_property => |binding_rest_property| try printBindingRestProperty(binding_rest_property, writer, indentation + 1),
+    };
 }
 
 pub fn printArrayBindingPattern(node: ast.ArrayBindingPattern, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
@@ -461,6 +463,18 @@ pub fn printArrayBindingPattern(node: ast.ArrayBindingPattern, writer: anytype, 
         .binding_element => |binding_element| try printBindingElement(binding_element, writer, indentation + 1),
         .binding_rest_element => |binding_rest_element| try printBindingRestElement(binding_rest_element, writer, indentation + 1),
     };
+}
+
+pub fn printBindingRestProperty(node: ast.BindingRestProperty, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("BindingRestProperty", writer, indentation);
+    try print(node.binding_identifier, writer, indentation + 1);
+}
+
+pub fn printBindingProperty(node: ast.BindingProperty, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("BindingProperty", writer, indentation);
+    switch (node) {
+        .single_name_binding => |single_name_binding| try printSingleNameBinding(single_name_binding, writer, indentation + 1),
+    }
 }
 
 pub fn printBindingElement(node: ast.BindingElement, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {

@@ -87,8 +87,39 @@ fn bindingInitialization(
     // NOTE: RHS value is on the stack
     const strict = ctx.contained_in_strict_mode_code;
     switch (node) {
-        .object_binding_pattern => {
-            // TODO: Implement object binding patterns
+        .object_binding_pattern => |object_binding_pattern| {
+            for (object_binding_pattern.properties) |element| switch (element) {
+                .binding_property => |binding_property| {
+                    try executable.addInstruction(.load); // Save RHS
+
+                    // Resolve binding and push reference
+                    const identifier = binding_property.single_name_binding.binding_identifier;
+                    try executable.addInstructionWithIdentifier(.resolve_binding, identifier);
+                    try executable.addIndex(@intFromBool(strict));
+                    try executable.addIndex(ctx.environment_lookup_cache_index);
+                    ctx.environment_lookup_cache_index += 1;
+                    try executable.addInstruction(.push_reference);
+
+                    // Evaluate `rhs[name]`
+                    try executable.addInstruction(.load);
+                    try executable.addInstructionWithConstant(
+                        .load_constant,
+                        Value.from(try String.fromUtf8(executable.allocator, identifier)),
+                    );
+                    try executable.addInstruction(.evaluate_property_access_with_expression_key);
+                    try executable.addIndex(@intFromBool(strict));
+                    try executable.addInstruction(.get_value);
+
+                    // Initialize binding and pop reference
+                    try executable.addInstruction(.initialize_referenced_binding);
+                    try executable.addInstruction(.pop_reference);
+
+                    try executable.addInstruction(.store); // Restore RHS
+                },
+                .binding_rest_property => {
+                    // TODO: Implement binding rest properties
+                },
+            };
         },
         .array_binding_pattern => |array_binding_pattern| {
             for (array_binding_pattern.elements, 0..) |element, i| switch (element) {

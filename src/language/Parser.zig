@@ -1609,8 +1609,22 @@ pub fn acceptObjectBindingPattern(self: *Self) AcceptError!ast.ObjectBindingPatt
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    // TODO: Implement object binding patterns
-    return error.UnexpectedToken;
+    // TODO: Parse all kinds of object binging patterns
+    var properties = std.ArrayList(ast.ObjectBindingPattern.Property).init(self.allocator);
+    _ = try self.core.accept(RuleSet.is(.@"{"));
+    while (self.acceptBindingIdentifier()) |binding_identifier| {
+        try properties.append(.{
+            .binding_property = .{
+                .single_name_binding = .{
+                    .binding_identifier = binding_identifier,
+                    .initializer = null,
+                },
+            },
+        });
+        _ = self.core.accept(RuleSet.is(.@",")) catch break;
+    } else |_| {}
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+    return .{ .properties = try properties.toOwnedSlice() };
 }
 
 pub fn acceptArrayBindingPattern(self: *Self) AcceptError!ast.ArrayBindingPattern {
