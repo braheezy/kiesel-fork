@@ -20,10 +20,6 @@ pub fn allocator() Allocator {
     };
 }
 
-pub fn enable() void {
-    libgc.GC_enable();
-}
-
 pub fn disable() void {
     libgc.GC_disable();
 }
