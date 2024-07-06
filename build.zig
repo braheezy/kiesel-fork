@@ -157,6 +157,7 @@ pub fn build(b: *std.Build) void {
             });
             if (b.lazyImport(@This(), "icu4zig")) |build_icu4zig| {
                 build_icu4zig.link(exe, icu4x);
+                exe.root_module.addImport("icu4zig", icu4zig.module("icu4zig"));
             }
         }
     }

@@ -2,6 +2,7 @@ const builtin = @import("builtin");
 const std = @import("std");
 
 const args = @import("args");
+const icu4zig = @import("icu4zig");
 const kiesel = @import("kiesel");
 const kiesel_runtime = @import("kiesel-runtime");
 
@@ -793,6 +794,19 @@ pub fn main() !u8 {
         },
     });
     defer agent.deinit();
+
+    if (kiesel.build_options.enable_intl) {
+        if (std.process.getEnvVarOwned(allocator, "LANG")) |lang| {
+            defer allocator.free(lang);
+            const lang_trimmed = if (std.mem.indexOf(u8, lang, ".UTF-8")) |index|
+                lang[0..index]
+            else
+                lang;
+            if (icu4zig.Locale.init(lang_trimmed)) |locale|
+                agent.platform.default_locale = locale
+            else |_| {}
+        } else |_| {}
+    }
 
     tracked_promise_rejections = @TypeOf(tracked_promise_rejections).init(agent.gc_allocator);
     defer tracked_promise_rejections.deinit();
