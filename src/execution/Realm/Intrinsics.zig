@@ -5,6 +5,8 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const AnyPointer = @import("any-pointer").AnyPointer;
+
 const builtins = @import("../../builtins.zig");
 const types = @import("../../types.zig");
 
@@ -18,132 +20,135 @@ realm: *Realm,
 
 // Not stored as top-level properties so we can have methods of the same names
 lazy_intrinsics: struct {
-    @"%AggregateError%": ?Object = null,
-    @"%AggregateError.prototype%": ?Object = null,
-    @"%Array%": ?Object = null,
-    @"%Array.prototype%": ?Object = null,
-    @"%Array.prototype.toString%": ?Object = null,
-    @"%Array.prototype.values%": ?Object = null,
-    @"%ArrayBuffer%": ?Object = null,
-    @"%ArrayBuffer.prototype%": ?Object = null,
-    @"%ArrayIteratorPrototype%": ?Object = null,
-    @"%AsyncFromSyncIteratorPrototype%": ?Object = null,
-    @"%AsyncFunction%": ?Object = null,
-    @"%AsyncFunction.prototype%": ?Object = null,
-    @"%AsyncGeneratorFunction%": ?Object = null,
-    @"%AsyncGeneratorFunction.prototype%": ?Object = null,
-    @"%AsyncGeneratorPrototype%": ?Object = null,
-    @"%AsyncIteratorPrototype%": ?Object = null,
-    @"%Atomics%": ?Object = null,
-    @"%BigInt%": ?Object = null,
-    @"%BigInt.prototype%": ?Object = null,
-    @"%BigInt64Array%": ?Object = null,
-    @"%BigInt64Array.prototype%": ?Object = null,
-    @"%BigUint64Array%": ?Object = null,
-    @"%BigUint64Array.prototype%": ?Object = null,
-    @"%Boolean%": ?Object = null,
-    @"%Boolean.prototype%": ?Object = null,
-    @"%DataView%": ?Object = null,
-    @"%DataView.prototype%": ?Object = null,
-    @"%Date%": ?Object = null,
-    @"%Date.prototype%": ?Object = null,
-    @"%decodeURI%": ?Object = null,
-    @"%decodeURIComponent%": ?Object = null,
-    @"%encodeURI%": ?Object = null,
-    @"%encodeURIComponent%": ?Object = null,
-    @"%Error%": ?Object = null,
-    @"%Error.prototype%": ?Object = null,
-    @"%escape%": ?Object = null,
-    @"%eval%": ?Object = null,
-    @"%EvalError%": ?Object = null,
-    @"%EvalError.prototype%": ?Object = null,
-    @"%FinalizationRegistry%": ?Object = null,
-    @"%FinalizationRegistry.prototype%": ?Object = null,
-    @"%Float16Array%": ?Object = null,
-    @"%Float16Array.prototype%": ?Object = null,
-    @"%Float32Array%": ?Object = null,
-    @"%Float32Array.prototype%": ?Object = null,
-    @"%Float64Array%": ?Object = null,
-    @"%Float64Array.prototype%": ?Object = null,
-    @"%ForInIteratorPrototype%": ?Object = null,
-    @"%Function%": ?Object = null,
-    @"%Function.prototype%": ?Object = null,
-    @"%GeneratorFunction%": ?Object = null,
-    @"%GeneratorFunction.prototype%": ?Object = null,
-    @"%GeneratorPrototype%": ?Object = null,
-    @"%Int8Array%": ?Object = null,
-    @"%Int8Array.prototype%": ?Object = null,
-    @"%Int16Array%": ?Object = null,
-    @"%Int16Array.prototype%": ?Object = null,
-    @"%Int32Array%": ?Object = null,
-    @"%Int32Array.prototype%": ?Object = null,
-    @"%Intl%": ?Object = null,
-    @"%Intl.Collator%": ?Object = null,
-    @"%Intl.Collator.prototype%": ?Object = null,
-    @"%Intl.ListFormat%": ?Object = null,
-    @"%Intl.ListFormat.prototype%": ?Object = null,
-    @"%Intl.Locale%": ?Object = null,
-    @"%Intl.Locale.prototype%": ?Object = null,
-    @"%Intl.PluralRules%": ?Object = null,
-    @"%Intl.PluralRules.prototype%": ?Object = null,
-    @"%Intl.Segmenter%": ?Object = null,
-    @"%Intl.Segmenter.prototype%": ?Object = null,
-    @"%IntlSegmentsPrototype%": ?Object = null,
-    @"%IntlSegmentIteratorPrototype%": ?Object = null,
-    @"%isFinite%": ?Object = null,
-    @"%isNaN%": ?Object = null,
-    @"%IteratorPrototype%": ?Object = null,
-    @"%JSON%": ?Object = null,
-    @"%Map%": ?Object = null,
-    @"%Map.prototype%": ?Object = null,
-    @"%MapIteratorPrototype%": ?Object = null,
-    @"%Math%": ?Object = null,
-    @"%Number%": ?Object = null,
-    @"%Number.prototype%": ?Object = null,
-    @"%Object%": ?Object = null,
-    @"%Object.prototype%": ?Object = null,
-    @"%Object.prototype.toString%": ?Object = null,
-    @"%parseFloat%": ?Object = null,
-    @"%parseInt%": ?Object = null,
-    @"%Promise%": ?Object = null,
-    @"%Promise.prototype%": ?Object = null,
-    @"%Proxy%": ?Object = null,
-    @"%RangeError%": ?Object = null,
-    @"%RangeError.prototype%": ?Object = null,
-    @"%ReferenceError%": ?Object = null,
-    @"%ReferenceError.prototype%": ?Object = null,
-    @"%Reflect%": ?Object = null,
-    @"%RegExp%": ?Object = null,
-    @"%RegExp.prototype%": ?Object = null,
-    @"%RegExpStringIteratorPrototype%": ?Object = null,
-    @"%Set%": ?Object = null,
-    @"%Set.prototype%": ?Object = null,
-    @"%SetIteratorPrototype%": ?Object = null,
-    @"%SharedArrayBuffer%": ?Object = null,
-    @"%SharedArrayBuffer.prototype%": ?Object = null,
-    @"%String%": ?Object = null,
-    @"%String.prototype%": ?Object = null,
-    @"%StringIteratorPrototype%": ?Object = null,
-    @"%Symbol%": ?Object = null,
-    @"%Symbol.prototype%": ?Object = null,
-    @"%SyntaxError%": ?Object = null,
-    @"%SyntaxError.prototype%": ?Object = null,
-    @"%ThrowTypeError%": ?Object = null,
-    @"%TypedArray%": ?Object = null,
-    @"%TypedArray.prototype%": ?Object = null,
-    @"%TypeError%": ?Object = null,
-    @"%TypeError.prototype%": ?Object = null,
-    @"%Uint8Array%": ?Object = null,
-    @"%Uint8Array.prototype%": ?Object = null,
-    @"%Uint8ClampedArray%": ?Object = null,
-    @"%Uint8ClampedArray.prototype%": ?Object = null,
-    @"%Uint16Array%": ?Object = null,
-    @"%Uint16Array.prototype%": ?Object = null,
-    @"%Uint32Array%": ?Object = null,
-    @"%Uint32Array.prototype%": ?Object = null,
-    @"%unescape%": ?Object = null,
-    @"%URIError%": ?Object = null,
-    @"%URIError.prototype%": ?Object = null,
+    // Using a null ptr allows us to avoid using extra memory for optionals.
+    const null_intrinsic: Object = .{ .data = undefined, .ptr = AnyPointer.null_pointer, .tag = undefined };
+
+    @"%AggregateError%": Object = null_intrinsic,
+    @"%AggregateError.prototype%": Object = null_intrinsic,
+    @"%Array%": Object = null_intrinsic,
+    @"%Array.prototype%": Object = null_intrinsic,
+    @"%Array.prototype.toString%": Object = null_intrinsic,
+    @"%Array.prototype.values%": Object = null_intrinsic,
+    @"%ArrayBuffer%": Object = null_intrinsic,
+    @"%ArrayBuffer.prototype%": Object = null_intrinsic,
+    @"%ArrayIteratorPrototype%": Object = null_intrinsic,
+    @"%AsyncFromSyncIteratorPrototype%": Object = null_intrinsic,
+    @"%AsyncFunction%": Object = null_intrinsic,
+    @"%AsyncFunction.prototype%": Object = null_intrinsic,
+    @"%AsyncGeneratorFunction%": Object = null_intrinsic,
+    @"%AsyncGeneratorFunction.prototype%": Object = null_intrinsic,
+    @"%AsyncGeneratorPrototype%": Object = null_intrinsic,
+    @"%AsyncIteratorPrototype%": Object = null_intrinsic,
+    @"%Atomics%": Object = null_intrinsic,
+    @"%BigInt%": Object = null_intrinsic,
+    @"%BigInt.prototype%": Object = null_intrinsic,
+    @"%BigInt64Array%": Object = null_intrinsic,
+    @"%BigInt64Array.prototype%": Object = null_intrinsic,
+    @"%BigUint64Array%": Object = null_intrinsic,
+    @"%BigUint64Array.prototype%": Object = null_intrinsic,
+    @"%Boolean%": Object = null_intrinsic,
+    @"%Boolean.prototype%": Object = null_intrinsic,
+    @"%DataView%": Object = null_intrinsic,
+    @"%DataView.prototype%": Object = null_intrinsic,
+    @"%Date%": Object = null_intrinsic,
+    @"%Date.prototype%": Object = null_intrinsic,
+    @"%decodeURI%": Object = null_intrinsic,
+    @"%decodeURIComponent%": Object = null_intrinsic,
+    @"%encodeURI%": Object = null_intrinsic,
+    @"%encodeURIComponent%": Object = null_intrinsic,
+    @"%Error%": Object = null_intrinsic,
+    @"%Error.prototype%": Object = null_intrinsic,
+    @"%escape%": Object = null_intrinsic,
+    @"%eval%": Object = null_intrinsic,
+    @"%EvalError%": Object = null_intrinsic,
+    @"%EvalError.prototype%": Object = null_intrinsic,
+    @"%FinalizationRegistry%": Object = null_intrinsic,
+    @"%FinalizationRegistry.prototype%": Object = null_intrinsic,
+    @"%Float16Array%": Object = null_intrinsic,
+    @"%Float16Array.prototype%": Object = null_intrinsic,
+    @"%Float32Array%": Object = null_intrinsic,
+    @"%Float32Array.prototype%": Object = null_intrinsic,
+    @"%Float64Array%": Object = null_intrinsic,
+    @"%Float64Array.prototype%": Object = null_intrinsic,
+    @"%ForInIteratorPrototype%": Object = null_intrinsic,
+    @"%Function%": Object = null_intrinsic,
+    @"%Function.prototype%": Object = null_intrinsic,
+    @"%GeneratorFunction%": Object = null_intrinsic,
+    @"%GeneratorFunction.prototype%": Object = null_intrinsic,
+    @"%GeneratorPrototype%": Object = null_intrinsic,
+    @"%Int8Array%": Object = null_intrinsic,
+    @"%Int8Array.prototype%": Object = null_intrinsic,
+    @"%Int16Array%": Object = null_intrinsic,
+    @"%Int16Array.prototype%": Object = null_intrinsic,
+    @"%Int32Array%": Object = null_intrinsic,
+    @"%Int32Array.prototype%": Object = null_intrinsic,
+    @"%Intl%": Object = null_intrinsic,
+    @"%Intl.Collator%": Object = null_intrinsic,
+    @"%Intl.Collator.prototype%": Object = null_intrinsic,
+    @"%Intl.ListFormat%": Object = null_intrinsic,
+    @"%Intl.ListFormat.prototype%": Object = null_intrinsic,
+    @"%Intl.Locale%": Object = null_intrinsic,
+    @"%Intl.Locale.prototype%": Object = null_intrinsic,
+    @"%Intl.PluralRules%": Object = null_intrinsic,
+    @"%Intl.PluralRules.prototype%": Object = null_intrinsic,
+    @"%Intl.Segmenter%": Object = null_intrinsic,
+    @"%Intl.Segmenter.prototype%": Object = null_intrinsic,
+    @"%IntlSegmentsPrototype%": Object = null_intrinsic,
+    @"%IntlSegmentIteratorPrototype%": Object = null_intrinsic,
+    @"%isFinite%": Object = null_intrinsic,
+    @"%isNaN%": Object = null_intrinsic,
+    @"%IteratorPrototype%": Object = null_intrinsic,
+    @"%JSON%": Object = null_intrinsic,
+    @"%Map%": Object = null_intrinsic,
+    @"%Map.prototype%": Object = null_intrinsic,
+    @"%MapIteratorPrototype%": Object = null_intrinsic,
+    @"%Math%": Object = null_intrinsic,
+    @"%Number%": Object = null_intrinsic,
+    @"%Number.prototype%": Object = null_intrinsic,
+    @"%Object%": Object = null_intrinsic,
+    @"%Object.prototype%": Object = null_intrinsic,
+    @"%Object.prototype.toString%": Object = null_intrinsic,
+    @"%parseFloat%": Object = null_intrinsic,
+    @"%parseInt%": Object = null_intrinsic,
+    @"%Promise%": Object = null_intrinsic,
+    @"%Promise.prototype%": Object = null_intrinsic,
+    @"%Proxy%": Object = null_intrinsic,
+    @"%RangeError%": Object = null_intrinsic,
+    @"%RangeError.prototype%": Object = null_intrinsic,
+    @"%ReferenceError%": Object = null_intrinsic,
+    @"%ReferenceError.prototype%": Object = null_intrinsic,
+    @"%Reflect%": Object = null_intrinsic,
+    @"%RegExp%": Object = null_intrinsic,
+    @"%RegExp.prototype%": Object = null_intrinsic,
+    @"%RegExpStringIteratorPrototype%": Object = null_intrinsic,
+    @"%Set%": Object = null_intrinsic,
+    @"%Set.prototype%": Object = null_intrinsic,
+    @"%SetIteratorPrototype%": Object = null_intrinsic,
+    @"%SharedArrayBuffer%": Object = null_intrinsic,
+    @"%SharedArrayBuffer.prototype%": Object = null_intrinsic,
+    @"%String%": Object = null_intrinsic,
+    @"%String.prototype%": Object = null_intrinsic,
+    @"%StringIteratorPrototype%": Object = null_intrinsic,
+    @"%Symbol%": Object = null_intrinsic,
+    @"%Symbol.prototype%": Object = null_intrinsic,
+    @"%SyntaxError%": Object = null_intrinsic,
+    @"%SyntaxError.prototype%": Object = null_intrinsic,
+    @"%ThrowTypeError%": Object = null_intrinsic,
+    @"%TypedArray%": Object = null_intrinsic,
+    @"%TypedArray.prototype%": Object = null_intrinsic,
+    @"%TypeError%": Object = null_intrinsic,
+    @"%TypeError.prototype%": Object = null_intrinsic,
+    @"%Uint8Array%": Object = null_intrinsic,
+    @"%Uint8Array.prototype%": Object = null_intrinsic,
+    @"%Uint8ClampedArray%": Object = null_intrinsic,
+    @"%Uint8ClampedArray.prototype%": Object = null_intrinsic,
+    @"%Uint16Array%": Object = null_intrinsic,
+    @"%Uint16Array.prototype%": Object = null_intrinsic,
+    @"%Uint32Array%": Object = null_intrinsic,
+    @"%Uint32Array.prototype%": Object = null_intrinsic,
+    @"%unescape%": Object = null_intrinsic,
+    @"%URIError%": Object = null_intrinsic,
+    @"%URIError.prototype%": Object = null_intrinsic,
 } = .{},
 
 inline fn lazyIntrinsic(
@@ -152,7 +157,7 @@ inline fn lazyIntrinsic(
     comptime T: type,
 ) Allocator.Error!Object {
     const intrinsic = &@field(self.lazy_intrinsics, name);
-    if (intrinsic.* == null) {
+    if (intrinsic.ptr.isNull()) {
         // Intrinsics that have a dependency on themselves need to use two-stage initialization
         // when first created, otherwise create() goes into infinite recursion.
         // Once the intrinsic is no longer null, regular create() can be used.
@@ -161,14 +166,14 @@ inline fn lazyIntrinsic(
             // Sanity check to ensure there is no dependency loop - creating the object must not
             // (indirectly) rely on itself. If something within `createNoInit()` assigned the
             // intrinsic it has been created twice and overwriting it would be a mistake.
-            std.debug.assert(intrinsic.* == null);
+            std.debug.assert(intrinsic.ptr.isNull());
             intrinsic.* = object;
             try T.init(self.realm, object);
         } else {
             intrinsic.* = try T.create(self.realm);
         }
     }
-    return intrinsic.*.?;
+    return intrinsic.*;
 }
 
 pub fn @"%AggregateError%"(self: *Self) Allocator.Error!Object {
@@ -185,21 +190,21 @@ pub fn @"%Array.prototype%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%Array.prototype.toString%"(self: *Self) Allocator.Error!Object {
     const intrinsic = &self.lazy_intrinsics.@"%Array.prototype.toString%";
-    if (intrinsic.* == null) {
+    if (intrinsic.ptr.isNull()) {
         const array_prototype = try @"%Array.prototype%"(self);
         const property_descriptor = array_prototype.data.property_storage.get(PropertyKey.from("toString"));
         intrinsic.* = property_descriptor.?.value.?.object;
     }
-    return intrinsic.*.?;
+    return intrinsic.*;
 }
 pub fn @"%Array.prototype.values%"(self: *Self) Allocator.Error!Object {
     const intrinsic = &self.lazy_intrinsics.@"%Array.prototype.values%";
-    if (intrinsic.* == null) {
+    if (intrinsic.ptr.isNull()) {
         const array_prototype = try @"%Array.prototype%"(self);
         const property_descriptor = array_prototype.data.property_storage.get(PropertyKey.from("values"));
         intrinsic.* = property_descriptor.?.value.?.object;
     }
-    return intrinsic.*.?;
+    return intrinsic.*;
 }
 pub fn @"%ArrayBuffer%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%ArrayBuffer%", builtins.ArrayBufferConstructor);
@@ -437,12 +442,12 @@ pub fn @"%Object.prototype%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%Object.prototype.toString%"(self: *Self) Allocator.Error!Object {
     const intrinsic = &self.lazy_intrinsics.@"%Object.prototype.toString%";
-    if (intrinsic.* == null) {
+    if (intrinsic.ptr.isNull()) {
         const object_prototype = try @"%Object.prototype%"(self);
         const property_descriptor = object_prototype.data.property_storage.get(PropertyKey.from("toString"));
         intrinsic.* = property_descriptor.?.value.?.object;
     }
-    return intrinsic.*.?;
+    return intrinsic.*;
 }
 pub fn @"%parseFloat%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%parseFloat%", builtins.global_functions.ParseFloat);
