@@ -1,5 +1,4 @@
-const build_options = @import("build-options");
-
+pub const build_options = @import("build-options");
 pub const builtins = @import("builtins.zig");
 pub const execution = @import("execution.zig");
 pub const gc = @import("gc.zig");
