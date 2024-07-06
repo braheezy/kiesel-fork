@@ -718,13 +718,10 @@ pub const Expression = union(enum) {
     pub fn assignmentTargetType(self: Self) enum { simple, invalid } {
         switch (self) {
             .primary_expression => |primary_expression| switch (primary_expression) {
-                .identifier_reference => |identifier_reference| {
-                    // TODO: 1. If IsStrict(this IdentifierReference) is true and the StringValue of
-                    //          Identifier is either "eval" or "arguments", return invalid.
-                    if (false and
-                        (std.mem.eql(u8, identifier_reference.identifier, "eval") or
-                        std.mem.eql(u8, identifier_reference.identifier, "arguments")))
-                        return .invalid;
+                .identifier_reference => {
+                    // 1. If IsStrict(this IdentifierReference) is true and the StringValue of
+                    //    Identifier is either "eval" or "arguments", return invalid.
+                    // NOTE: This is handled separately in the parser to get a better error message.
 
                     // 2. Return simple.
                     return .simple;

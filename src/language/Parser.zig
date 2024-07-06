@@ -323,7 +323,7 @@ fn ensureSimpleParameterList(
 
 fn ensureUniqueParameterNames(
     self: *Self,
-    reason: enum { strict, arrow, method },
+    kind: enum { strict, arrow, method },
     formal_parameters: ast.FormalParameters,
     location: ptk.Location,
 ) AcceptError!void {
@@ -333,7 +333,7 @@ fn ensureUniqueParameterNames(
     defer self.allocator.free(bound_names);
     for (bound_names) |bound_name| {
         if (try seen_bound_names.fetchPut(bound_name, {})) |_| {
-            switch (reason) {
+            switch (kind) {
                 .strict => try self.emitErrorAt(
                     location,
                     "Function must not have duplicate parameter names in strict mode",
@@ -363,14 +363,37 @@ fn ensureAllowedParameterNames(
     const bound_names = try formal_parameters.boundNames(self.allocator);
     defer self.allocator.free(bound_names);
     for (bound_names) |bound_name| {
-        if (std.mem.eql(u8, bound_name, "eval") or std.mem.eql(u8, bound_name, "arguments")) {
-            try self.emitErrorAt(
+        try self.ensureAllowedIdentifier(.function_parameter, bound_name, location);
+    }
+}
+
+fn ensureAllowedIdentifier(
+    self: *Self,
+    kind: enum { binding_identifier, identifier_reference, function_parameter },
+    value: []const u8,
+    location: ptk.Location,
+) AcceptError!void {
+    if (std.mem.eql(u8, value, "eval") or
+        std.mem.eql(u8, value, "arguments"))
+    {
+        switch (kind) {
+            .binding_identifier => try self.emitErrorAt(
                 location,
-                "Function must not have parameter named '{s}' in strict mode",
-                .{bound_name},
-            );
-            return error.UnexpectedToken;
+                "Binding identifier named '{s}' is not allowed in strict mode",
+                .{value},
+            ),
+            .identifier_reference => try self.emitErrorAt(
+                location,
+                "Identifier reference named '{s}' is not allowed in strict mode",
+                .{value},
+            ),
+            .function_parameter => try self.emitErrorAt(
+                location,
+                "Function parameter named '{s}' is not allowed in strict mode",
+                .{value},
+            ),
         }
+        return error.UnexpectedToken;
     }
 }
 
@@ -487,7 +510,15 @@ pub fn acceptBindingIdentifier(self: *Self) AcceptError!ast.Identifier {
     errdefer self.core.restoreState(state);
 
     const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .@"await" }));
-    return self.unescapeIdentifier(token);
+    const string_value = try self.unescapeIdentifier(token);
+
+    // It is a Syntax Error if IsStrict(this production) is true and the StringValue of Identifier
+    // is either "arguments" or "eval".
+    if (self.state.in_strict_mode) {
+        try self.ensureAllowedIdentifier(.binding_identifier, string_value, token.location);
+    }
+
+    return string_value;
 }
 
 pub fn acceptLabelIdentifier(self: *Self) AcceptError!ast.Identifier {
@@ -851,6 +882,17 @@ pub fn acceptUpdateExpression(
         return error.UnexpectedToken;
     }
 
+    if (self.state.in_strict_mode and
+        expression.* == .primary_expression and
+        expression.primary_expression == .identifier_reference)
+    {
+        try self.ensureAllowedIdentifier(
+            .identifier_reference,
+            expression.primary_expression.identifier_reference,
+            state.location,
+        );
+    }
+
     return .{
         .type = @"type",
         .operator = operator,
@@ -1202,6 +1244,9 @@ pub fn acceptAssignmentExpression(
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    // TODO: Pass this in, here it points after the LHS
+    const primary_expression_location = state.location;
+
     const token = try self.core.accept(RuleSet.oneOf(.{
         .@"=",
         .@"*=",
@@ -1243,8 +1288,23 @@ pub fn acceptAssignmentExpression(
     // If LeftHandSideExpression is neither an ObjectLiteral nor an ArrayLiteral, it is a Syntax
     // Error if the AssignmentTargetType of LeftHandSideExpression is not simple.
     if (primary_expression.assignmentTargetType() != .simple) {
-        try self.emitErrorAt(state.location, "Invalid left-hand side in assignment expression", .{});
+        try self.emitErrorAt(
+            primary_expression_location,
+            "Invalid left-hand side in assignment expression",
+            .{},
+        );
         return error.UnexpectedToken;
+    }
+
+    if (self.state.in_strict_mode and
+        primary_expression == .primary_expression and
+        primary_expression.primary_expression == .identifier_reference)
+    {
+        try self.ensureAllowedIdentifier(
+            .identifier_reference,
+            primary_expression.primary_expression.identifier_reference,
+            primary_expression_location,
+        );
     }
 
     // Defer heap allocation of expression until we know this is an AssignmentExpression
@@ -1852,6 +1912,18 @@ pub fn acceptForInOfStatement(self: *Self) AcceptError!ast.ForInOfStatement {
         return error.UnexpectedToken;
     }
 
+    if (self.state.in_strict_mode and
+        initializer == .expression and
+        initializer.expression == .primary_expression and
+        initializer.expression.primary_expression == .identifier_reference)
+    {
+        try self.ensureAllowedIdentifier(
+            .identifier_reference,
+            initializer.expression.primary_expression.identifier_reference,
+            initializer_location,
+        );
+    }
+
     const @"type": ast.ForInOfStatement.Type = if (self.core.accept(RuleSet.is(.in))) |_| blk: {
         if (maybe_await_token) |await_token| {
             try self.emitErrorAt(await_token.location, "'for in' loop cannot be awaited", .{});
@@ -2150,7 +2222,8 @@ pub fn acceptFunctionDeclaration(self: *Self) AcceptError!ast.FunctionDeclaratio
     _ = try self.core.accept(RuleSet.is(.function));
     // We need to do this after consuming the 'function' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
-    const identifier = self.acceptBindingIdentifier() catch |err| {
+    const binding_identifier_location = (try self.core.peek() orelse return error.UnexpectedToken).location;
+    const binding_identifier = self.acceptBindingIdentifier() catch |err| {
         if (self.core.peek() catch null) |next_token| if (next_token.type == .@"(") {
             try self.emitError("Function declaration must have a binding identifier", .{});
         };
@@ -2163,6 +2236,7 @@ pub fn acceptFunctionDeclaration(self: *Self) AcceptError!ast.FunctionDeclaratio
     const function_body = try self.acceptFunctionBody(.normal);
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
+        try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier, binding_identifier_location);
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
@@ -2175,7 +2249,7 @@ pub fn acceptFunctionDeclaration(self: *Self) AcceptError!ast.FunctionDeclaratio
         self.core.tokenizer.source[start_offset..end_offset],
     );
     return .{
-        .identifier = identifier,
+        .identifier = binding_identifier,
         .formal_parameters = formal_parameters,
         .function_body = function_body,
         .source_text = source_text,
@@ -2189,7 +2263,8 @@ pub fn acceptFunctionExpression(self: *Self) AcceptError!ast.FunctionExpression 
     _ = try self.core.accept(RuleSet.is(.function));
     // We need to do this after consuming the 'function' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
-    const identifier = self.acceptBindingIdentifier() catch null;
+    const binding_identifier_location = (try self.core.peek() orelse return error.UnexpectedToken).location;
+    const binding_identifier = self.acceptBindingIdentifier() catch null;
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -2197,6 +2272,9 @@ pub fn acceptFunctionExpression(self: *Self) AcceptError!ast.FunctionExpression 
     const function_body = try self.acceptFunctionBody(.normal);
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
+        if (binding_identifier != null) {
+            try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier.?, binding_identifier_location);
+        }
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
@@ -2209,7 +2287,7 @@ pub fn acceptFunctionExpression(self: *Self) AcceptError!ast.FunctionExpression 
         self.core.tokenizer.source[start_offset..end_offset],
     );
     return .{
-        .identifier = identifier,
+        .identifier = binding_identifier,
         .formal_parameters = formal_parameters,
         .function_body = function_body,
         .source_text = source_text,
@@ -2422,7 +2500,8 @@ fn acceptGeneratorDeclaration(self: *Self) AcceptError!ast.GeneratorDeclaration 
     // We need to do this after consuming the 'function' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     _ = try self.core.accept(RuleSet.is(.@"*"));
-    const identifier = self.acceptBindingIdentifier() catch |err| {
+    const binding_identifier_location = (try self.core.peek() orelse return error.UnexpectedToken).location;
+    const binding_identifier = self.acceptBindingIdentifier() catch |err| {
         try self.emitError("Generator declaration must have a binding identifier", .{});
         return err;
     };
@@ -2433,6 +2512,7 @@ fn acceptGeneratorDeclaration(self: *Self) AcceptError!ast.GeneratorDeclaration 
     const function_body = try self.acceptFunctionBody(.generator);
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
+        try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier, binding_identifier_location);
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
@@ -2445,7 +2525,7 @@ fn acceptGeneratorDeclaration(self: *Self) AcceptError!ast.GeneratorDeclaration 
         self.core.tokenizer.source[start_offset..end_offset],
     );
     return .{
-        .identifier = identifier,
+        .identifier = binding_identifier,
         .formal_parameters = formal_parameters,
         .function_body = function_body,
         .source_text = source_text,
@@ -2460,7 +2540,8 @@ pub fn acceptGeneratorExpression(self: *Self) AcceptError!ast.GeneratorExpressio
     // We need to do this after consuming the 'function' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     _ = try self.core.accept(RuleSet.is(.@"*"));
-    const identifier = self.acceptBindingIdentifier() catch null;
+    const binding_identifier_location = (try self.core.peek() orelse return error.UnexpectedToken).location;
+    const binding_identifier = self.acceptBindingIdentifier() catch null;
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -2468,6 +2549,9 @@ pub fn acceptGeneratorExpression(self: *Self) AcceptError!ast.GeneratorExpressio
     const function_body = try self.acceptFunctionBody(.generator);
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
+        if (binding_identifier != null) {
+            try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier.?, binding_identifier_location);
+        }
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
@@ -2480,7 +2564,7 @@ pub fn acceptGeneratorExpression(self: *Self) AcceptError!ast.GeneratorExpressio
         self.core.tokenizer.source[start_offset..end_offset],
     );
     return .{
-        .identifier = identifier,
+        .identifier = binding_identifier,
         .formal_parameters = formal_parameters,
         .function_body = function_body,
         .source_text = source_text,
@@ -2497,7 +2581,8 @@ fn acceptAsyncGeneratorDeclaration(self: *Self) AcceptError!ast.AsyncGeneratorDe
     try self.noLineTerminatorHere();
     _ = try self.core.accept(RuleSet.is(.function));
     _ = try self.core.accept(RuleSet.is(.@"*"));
-    const identifier = self.acceptBindingIdentifier() catch |err| {
+    const binding_identifier_location = (try self.core.peek() orelse return error.UnexpectedToken).location;
+    const binding_identifier = self.acceptBindingIdentifier() catch |err| {
         try self.emitError("Async generator declaration must have a binding identifier", .{});
         return err;
     };
@@ -2508,6 +2593,7 @@ fn acceptAsyncGeneratorDeclaration(self: *Self) AcceptError!ast.AsyncGeneratorDe
     const function_body = try self.acceptFunctionBody(.async_generator);
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
+        try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier, binding_identifier_location);
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
@@ -2520,7 +2606,7 @@ fn acceptAsyncGeneratorDeclaration(self: *Self) AcceptError!ast.AsyncGeneratorDe
         self.core.tokenizer.source[start_offset..end_offset],
     );
     return .{
-        .identifier = identifier,
+        .identifier = binding_identifier,
         .formal_parameters = formal_parameters,
         .function_body = function_body,
         .source_text = source_text,
@@ -2537,7 +2623,8 @@ pub fn acceptAsyncGeneratorExpression(self: *Self) AcceptError!ast.AsyncGenerato
     try self.noLineTerminatorHere();
     _ = try self.core.accept(RuleSet.is(.function));
     _ = try self.core.accept(RuleSet.is(.@"*"));
-    const identifier = self.acceptBindingIdentifier() catch null;
+    const binding_identifier_location = (try self.core.peek() orelse return error.UnexpectedToken).location;
+    const binding_identifier = self.acceptBindingIdentifier() catch null;
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -2545,6 +2632,9 @@ pub fn acceptAsyncGeneratorExpression(self: *Self) AcceptError!ast.AsyncGenerato
     const function_body = try self.acceptFunctionBody(.async_generator);
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
+        if (binding_identifier != null) {
+            try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier.?, binding_identifier_location);
+        }
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
@@ -2557,7 +2647,7 @@ pub fn acceptAsyncGeneratorExpression(self: *Self) AcceptError!ast.AsyncGenerato
         self.core.tokenizer.source[start_offset..end_offset],
     );
     return .{
-        .identifier = identifier,
+        .identifier = binding_identifier,
         .formal_parameters = formal_parameters,
         .function_body = function_body,
         .source_text = source_text,
@@ -2575,10 +2665,12 @@ fn acceptClassDeclaration(self: *Self) AcceptError!ast.ClassDeclaration {
     _ = try self.core.accept(RuleSet.is(.class));
     // We need to do this after consuming the 'class' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "class".len);
-    const identifier = self.acceptBindingIdentifier() catch |err| {
+    const binding_identifier_location = (try self.core.peek() orelse return error.UnexpectedToken).location;
+    const binding_identifier = self.acceptBindingIdentifier() catch |err| {
         try self.emitError("Class declaration must have a binding identifier", .{});
         return err;
     };
+    try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier, binding_identifier_location);
     const class_tail = try self.acceptClassTail();
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
@@ -2586,7 +2678,7 @@ fn acceptClassDeclaration(self: *Self) AcceptError!ast.ClassDeclaration {
         self.core.tokenizer.source[start_offset..end_offset],
     );
     return .{
-        .identifier = identifier,
+        .identifier = binding_identifier,
         .class_tail = class_tail,
         .source_text = source_text,
     };
@@ -2603,7 +2695,11 @@ fn acceptClassExpression(self: *Self) AcceptError!ast.ClassExpression {
     _ = try self.core.accept(RuleSet.is(.class));
     // We need to do this after consuming the 'class' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "class".len);
-    const identifier = self.acceptBindingIdentifier() catch null;
+    const binding_identifier_location = (try self.core.peek() orelse return error.UnexpectedToken).location;
+    const binding_identifier = self.acceptBindingIdentifier() catch null;
+    if (binding_identifier != null) {
+        try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier.?, binding_identifier_location);
+    }
     const class_tail = try self.acceptClassTail();
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
@@ -2611,7 +2707,7 @@ fn acceptClassExpression(self: *Self) AcceptError!ast.ClassExpression {
         self.core.tokenizer.source[start_offset..end_offset],
     );
     return .{
-        .identifier = identifier,
+        .identifier = binding_identifier,
         .class_tail = class_tail,
         .source_text = source_text,
     };
@@ -2778,7 +2874,8 @@ fn acceptAsyncFunctionDeclaration(self: *Self) AcceptError!ast.AsyncFunctionDecl
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
     try self.noLineTerminatorHere();
     _ = try self.core.accept(RuleSet.is(.function));
-    const identifier = self.acceptBindingIdentifier() catch |err| {
+    const binding_identifier_location = (try self.core.peek() orelse return error.UnexpectedToken).location;
+    const binding_identifier = self.acceptBindingIdentifier() catch |err| {
         if (self.core.peek() catch null) |next_token| if (next_token.type == .@"(") {
             try self.emitError("Async function declaration must have a binding identifier", .{});
         };
@@ -2791,6 +2888,7 @@ fn acceptAsyncFunctionDeclaration(self: *Self) AcceptError!ast.AsyncFunctionDecl
     const function_body = try self.acceptFunctionBody(.@"async");
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
+        try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier, binding_identifier_location);
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
@@ -2803,7 +2901,7 @@ fn acceptAsyncFunctionDeclaration(self: *Self) AcceptError!ast.AsyncFunctionDecl
         self.core.tokenizer.source[start_offset..end_offset],
     );
     return .{
-        .identifier = identifier,
+        .identifier = binding_identifier,
         .formal_parameters = formal_parameters,
         .function_body = function_body,
         .source_text = source_text,
@@ -2819,7 +2917,8 @@ pub fn acceptAsyncFunctionExpression(self: *Self) AcceptError!ast.AsyncFunctionE
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
     try self.noLineTerminatorHere();
     _ = try self.core.accept(RuleSet.is(.function));
-    const identifier = self.acceptBindingIdentifier() catch null;
+    const binding_identifier_location = (try self.core.peek() orelse return error.UnexpectedToken).location;
+    const binding_identifier = self.acceptBindingIdentifier() catch null;
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -2827,6 +2926,9 @@ pub fn acceptAsyncFunctionExpression(self: *Self) AcceptError!ast.AsyncFunctionE
     const function_body = try self.acceptFunctionBody(.@"async");
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
+        if (binding_identifier != null) {
+            try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier.?, binding_identifier_location);
+        }
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
@@ -2839,7 +2941,7 @@ pub fn acceptAsyncFunctionExpression(self: *Self) AcceptError!ast.AsyncFunctionE
         self.core.tokenizer.source[start_offset..end_offset],
     );
     return .{
-        .identifier = identifier,
+        .identifier = binding_identifier,
         .formal_parameters = formal_parameters,
         .function_body = function_body,
         .source_text = source_text,
