@@ -7,7 +7,7 @@ pub const language = @import("language.zig");
 pub const types = @import("types.zig");
 pub const utils = @import("utils.zig");
 
-pub const version_string = build_options.version_string;
+pub const version = build_options.version;
 
 test {
     _ = builtins;

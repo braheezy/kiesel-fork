@@ -79,9 +79,9 @@ pub fn main() std.os.uefi.Status {
     const stdout = agent.platform.stdout;
     const stderr = agent.platform.stderr;
 
-    stdout.print("Kiesel {[kiesel]s} [Zig {[zig]s}] on uefi\r\n", .{
-        .kiesel = kiesel.version_string,
-        .zig = builtin.zig_version_string,
+    stdout.print("Kiesel {[kiesel]} [Zig {[zig]}] on uefi\r\n", .{
+        .kiesel = kiesel.version,
+        .zig = builtin.zig_version,
     }) catch unreachable;
     stdout.print("{[vendor]s}, 0x{[revision]x}\r\n", .{
         .vendor = std.unicode.fmtUtf16Le(std.mem.span(std.os.uefi.system_table.firmware_vendor)),

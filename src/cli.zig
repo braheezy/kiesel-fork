@@ -65,24 +65,24 @@ var module_cache: std.HashMap(
 ) = undefined;
 
 const version = std.fmt.comptimePrint(
-    \\kiesel {[kiesel]s}
-    \\libgc {[libgc]s}
-    \\zig {[zig]s}
+    \\kiesel {[kiesel]}
+    \\libgc {[libgc]}
+    \\zig {[zig]}
     \\
 , .{
-    .kiesel = kiesel.version_string,
-    .libgc = kiesel.gc.libgc_version_string,
-    .zig = builtin.zig_version_string,
+    .kiesel = kiesel.version,
+    .libgc = kiesel.gc.libgc_version,
+    .zig = builtin.zig_version,
 });
 
 // Python REPL my beloved 🐍
 const repl_preamble = std.fmt.comptimePrint(
-    \\Kiesel {[kiesel]s} [Zig {[zig]s}] on {[os]s}
+    \\Kiesel {[kiesel]} [Zig {[zig]}] on {[os]s}
     \\Use {[eof]s} to exit.
     \\
 , .{
-    .kiesel = kiesel.version_string,
-    .zig = builtin.zig_version_string,
+    .kiesel = kiesel.version,
+    .zig = builtin.zig_version,
     .os = @tagName(builtin.os.tag),
     .eof = if (builtin.os.tag == .windows) "Ctrl+Z followed by Enter" else "Ctrl+D",
 });

@@ -41,21 +41,15 @@ pub fn build(b: *std.Build) void {
         "Enable building with libregexp (uses stubs otherwise)",
     ) orelse true;
 
-    const run_result = std.process.Child.run(.{
-        .allocator = b.allocator,
-        .argv = &.{ "git", "rev-parse", "HEAD" },
-        .cwd_dir = b.build_root.handle,
-    }) catch null;
-
-    var version_string: []const u8 = "0.1.0-dev";
-    if (run_result != null and run_result.?.stdout.len != 0) {
-        const git_rev = run_result.?.stdout[0..9];
-        version_string = std.fmt.allocPrint(
-            b.allocator,
-            "{s}+{s}",
-            .{ version_string, git_rev },
-        ) catch @panic("OOM");
-    }
+    var version = std.SemanticVersion.parse("0.1.0-dev") catch unreachable;
+    var code: u8 = undefined;
+    if (b.runAllowFail(
+        &.{ "git", "rev-parse", "HEAD" },
+        &code,
+        .Ignore,
+    )) |output| {
+        version.build = output[0..9];
+    } else |_| {}
 
     const options = b.addOptions();
     options.addOption(bool, "enable_annex_b", enable_annex_b);
@@ -63,7 +57,7 @@ pub fn build(b: *std.Build) void {
     options.addOption(bool, "enable_legacy", enable_legacy);
     options.addOption(bool, "enable_libgc", enable_libgc);
     options.addOption(bool, "enable_libregexp", enable_libregexp);
-    options.addOption([]const u8, "version_string", version_string);
+    options.addOption(std.SemanticVersion, "version", version);
 
     const any_pointer = b.dependency("any_pointer", .{});
     const libgc = b.dependency("libgc", .{

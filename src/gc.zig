@@ -4,11 +4,11 @@ const Allocator = std.mem.Allocator;
 
 const libgc = @import("./c/libgc.zig").libgc;
 
-pub const libgc_version_string = std.fmt.comptimePrint("{}.{}.{}", .{
-    libgc.GC_VERSION_MAJOR,
-    libgc.GC_VERSION_MINOR,
-    libgc.GC_VERSION_MICRO,
-});
+pub const libgc_version: std.SemanticVersion = .{
+    .major = libgc.GC_VERSION_MAJOR,
+    .minor = libgc.GC_VERSION_MINOR,
+    .patch = libgc.GC_VERSION_MICRO,
+};
 
 pub const GcAllocator = @import("gc/GcAllocator.zig");
 
