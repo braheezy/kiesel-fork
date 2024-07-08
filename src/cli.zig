@@ -44,26 +44,7 @@ const ModuleCacheKey = struct {
     referrer: ImportedModuleReferrer,
 };
 
-var module_cache: std.HashMap(
-    ModuleCacheKey,
-    Module,
-    struct {
-        pub fn hash(_: anytype, key: ModuleCacheKey) u64 {
-            var hasher = std.hash.Wyhash.init(0);
-            hasher.update(key.normalized_specifier);
-            switch (key.referrer) {
-                inline else => |ptr| hasher.update(std.mem.asBytes(&ptr)),
-            }
-            return hasher.final();
-        }
-
-        pub fn eql(_: anytype, a: ModuleCacheKey, b: ModuleCacheKey) bool {
-            return std.mem.eql(u8, a.normalized_specifier, b.normalized_specifier) and
-                std.meta.eql(a.referrer, b.referrer);
-        }
-    },
-    std.hash_map.default_max_load_percentage,
-) = undefined;
+var module_cache: std.StringHashMap(Module) = undefined;
 
 const version = std.fmt.comptimePrint(
     \\kiesel {[kiesel]}
@@ -451,11 +432,7 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
                     try String.fromUtf8(agent.gc_allocator, path),
                 ) catch |err| break :blk err,
             };
-            const module_cache_key: ModuleCacheKey = .{
-                .normalized_specifier = module_path,
-                .referrer = .{ .module = module },
-            };
-            try module_cache.putNoClobber(module_cache_key, .{ .source_text_module = module });
+            try module_cache.putNoClobber(module_path, .{ .source_text_module = module });
             const promise = module.loadRequestedModules(agent, null) catch |err| break :blk err;
             std.debug.assert(agent.queued_jobs.items.len == 0);
             switch (promise.fields.promise_state) {
@@ -811,7 +788,7 @@ pub fn main() !u8 {
     tracked_promise_rejections = @TypeOf(tracked_promise_rejections).init(agent.gc_allocator);
     defer tracked_promise_rejections.deinit();
 
-    module_cache = @TypeOf(module_cache).init(agent.gc_allocator);
+    module_cache = std.StringHashMap(Module).init(agent.gc_allocator);
     defer module_cache.deinit();
 
     agent.host_hooks.hostLoadImportedModule = struct {
@@ -828,14 +805,20 @@ pub fn main() !u8 {
                     .module => |module| resolveModulePath(agent_, .{ .module = module }, specifier),
                     .realm => unreachable,
                 } catch |err| break :blk err;
-                const module_cache_key: ModuleCacheKey = .{
-                    .normalized_specifier = module_path,
-                    .referrer = referrer,
-                };
-                if (module_cache.get(module_cache_key)) |module| break :blk module;
+                // NOTE: The spec says that the same (referrer, specifier) pair must resolve to the
+                // same cached module, but also that the actual mapping is host-defined.
+                // When a module is loaded via dynamic import the referrer is a script, which then
+                // doesn't have a cache hit if the module imports itself (referrer is a module) and
+                // causes infinite recursion.
+                // I haven't checked any of the major engines but at least Boa, LibJS, and QuickJS
+                // all use only the module name/path:
+                // - https://github.com/boa-dev/boa/blob/fc2a6e09969772feba98eaa89aaf89ca4797e925/core/engine/src/module/loader.rs#L248C5-L248C15
+                // - https://github.com/SerenityOS/serenity/blob/648b36f3c53bf3fd83a8dbf5fc788046abe10e29/Userland/Libraries/LibJS/Runtime/VM.cpp#L481-L487
+                // - https://github.com/bellard/quickjs/blob/36911f0d3ab1a4c190a4d5cbe7c2db225a455389/quickjs.c#L27590-L27596
+                if (module_cache.get(module_path)) |module| break :blk module;
                 break :blk if (parseSourceTextModule(agent_, module_path)) |source_text_module| {
                     const module: Module = .{ .source_text_module = source_text_module };
-                    try module_cache.putNoClobber(module_cache_key, module);
+                    try module_cache.putNoClobber(module_path, module);
                     break :blk module;
                 } else |err| switch (err) {
                     error.OutOfMemory, error.ExceptionThrown => @as(Agent.Error, @errorCast(err)),
