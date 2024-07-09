@@ -433,7 +433,7 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
                 ) catch |err| break :blk err,
             };
             try module_cache.putNoClobber(module_path, .{ .source_text_module = module });
-            const promise = module.loadRequestedModules(agent, null) catch |err| break :blk err;
+            var promise = module.loadRequestedModules(agent, null) catch |err| break :blk err;
             std.debug.assert(agent.queued_jobs.items.len == 0);
             switch (promise.fields.promise_state) {
                 .pending => unreachable,
@@ -444,8 +444,18 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
                 },
                 .fulfilled => {
                     module.link(agent) catch |err| break :blk err;
-                    _ = module.evaluate(agent) catch |err| break :blk err;
-                    break :blk @as(Value, .undefined);
+                    promise = module.evaluate(agent) catch |err| break :blk err;
+                    switch (promise.fields.promise_state) {
+                        .pending => unreachable,
+                        .rejected => {
+                            tracked_promise_rejections.clearAndFree();
+                            agent.exception = promise.fields.promise_result;
+                            break :blk error.ExceptionThrown;
+                        },
+                        .fulfilled => {
+                            break :blk @as(Value, .undefined);
+                        },
+                    }
                 },
             }
         },
