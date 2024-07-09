@@ -429,7 +429,7 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
                 .path => |path| resolveModulePath(
                     agent,
                     script_or_module,
-                    try String.fromUtf8(agent.gc_allocator, path),
+                    try String.fromUtf8(agent.gc_allocator, std.fs.path.basename(path)),
                 ) catch |err| break :blk err,
             };
             try module_cache.putNoClobber(module_path, .{ .source_text_module = module });
