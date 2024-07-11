@@ -56,7 +56,7 @@ pub const Intl = struct {
 
         try defineBuiltinFunction(object, "getCanonicalLocales", getCanonicalLocales, 1, realm);
 
-        // 8.1.1 Intl[ %Symbol.toStringTag% ]
+        // 8.1.1 Intl [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl-toStringTag
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
             .value = Value.from("Intl"),
