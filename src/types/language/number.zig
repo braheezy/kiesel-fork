@@ -198,8 +198,8 @@ pub const Number = union(enum) {
         // 1. If x is NaN, return NaN.
         if (self.isNan()) return self;
 
-        // 2. Return the result of negating x; that is, compute a Number with the same magnitude
-        //    but opposite sign.
+        // 2. Return the negation of x; that is, compute a Number with the same magnitude but
+        //    opposite sign.
         return if (self.isZero())
             .{ .f64 = -self.asFloat() }
         else switch (self) {
@@ -214,8 +214,8 @@ pub const Number = union(enum) {
         // 1. Let oldValue be ! ToInt32(x).
         const old_value = self.toInt32();
 
-        // 2. Return the result of applying bitwise complement to oldValue. The mathematical value
-        //    of the result is exactly representable as a 32-bit two's complement bit string.
+        // 2. Return the bitwise complement of oldValue. The mathematical value of the result is
+        //    exactly representable as a 32-bit two's complement bit string.
         return .{ .i32 = ~old_value };
     }
 

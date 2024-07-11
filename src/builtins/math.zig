@@ -177,8 +177,8 @@ pub const Math = struct {
 
         // 2. If n is NaN, n > 1𝔽, or n < -1𝔽, return NaN.
         // 3. If n is 1𝔽, return +0𝔽.
-        // 4. Return an implementation-approximated Number value representing the result of the
-        //    inverse cosine of ℝ(n).
+        // 4. Return an implementation-approximated Number value representing the inverse cosine of
+        //    ℝ(n).
         return Value.from(std.math.acos(n.asFloat()));
     }
 
@@ -193,8 +193,8 @@ pub const Math = struct {
         // 2. If n is either NaN or +∞𝔽, return n.
         // 3. If n is 1𝔽, return +0𝔽.
         // 4. If n < 1𝔽, return NaN.
-        // 5. Return an implementation-approximated Number value representing the result of the
-        //    inverse hyperbolic cosine of ℝ(n).
+        // 5. Return an implementation-approximated Number value representing the inverse
+        //    hyperbolic cosine of ℝ(n).
         return Value.from(std.math.acosh(n.asFloat()));
     }
 
@@ -208,8 +208,8 @@ pub const Math = struct {
 
         // 2. If n is one of NaN, +0𝔽, or -0𝔽, return n.
         // 3. If n > 1𝔽 or n < -1𝔽, return NaN.
-        // 4. Return an implementation-approximated Number value representing the result of the
-        //    inverse sine of ℝ(n).
+        // 4. Return an implementation-approximated Number value representing the inverse sine of
+        //    ℝ(n).
         return Value.from(std.math.asin(n.asFloat()));
     }
 
@@ -223,8 +223,8 @@ pub const Math = struct {
 
         // 2. If n is one of NaN, +0𝔽, or -0𝔽, return n.
         // 3. If n > 1𝔽 or n < -1𝔽, return NaN.
-        // 4. Return an implementation-approximated Number value representing the result of the
-        //    inverse sine of ℝ(n).
+        // 4. Return an implementation-approximated Number value representing the inverse sine of
+        //    ℝ(n).
         return Value.from(std.math.asinh(n.asFloat()));
     }
 
@@ -239,8 +239,8 @@ pub const Math = struct {
         // 2. If n is one of NaN, +0𝔽, or -0𝔽, return n.
         // 3. If n is +∞𝔽, return an implementation-approximated Number value representing π / 2.
         // 4. If n is -∞𝔽, return an implementation-approximated Number value representing -π / 2.
-        // 5. Return an implementation-approximated Number value representing the result of the
-        //    inverse tangent of ℝ(n).
+        // 5. Return an implementation-approximated Number value representing the inverse tangent
+        //    of ℝ(n).
         return Value.from(std.math.atan(n.asFloat()));
     }
 
@@ -256,8 +256,8 @@ pub const Math = struct {
         // 3. If n > 1𝔽 or n < -1𝔽, return NaN.
         // 4. If n is 1𝔽, return +∞𝔽.
         // 5. If n is -1𝔽, return -∞𝔽.
-        // 6. Return an implementation-approximated Number value representing the result of the
-        //    inverse hyperbolic tangent of ℝ(n).
+        // 6. Return an implementation-approximated Number value representing the inverse
+        //    hyperbolic tangent of ℝ(n).
         return Value.from(std.math.atanh(n.asFloat()));
     }
 
@@ -319,8 +319,8 @@ pub const Math = struct {
         const n = try x.toNumber(agent);
 
         // 2. If n is not finite or n is either +0𝔽 or -0𝔽, return n.
-        // 3. Return an implementation-approximated Number value representing the result of the
-        //    cube root of ℝ(n).
+        // 3. Return an implementation-approximated Number value representing the cube root of
+        //    ℝ(n).
         return Value.from(std.math.cbrt(n.asFloat()));
     }
 
@@ -364,8 +364,7 @@ pub const Math = struct {
 
         // 2. If n is not finite, return NaN.
         // 3. If n is either +0𝔽 or -0𝔽, return 1𝔽.
-        // 4. Return an implementation-approximated Number value representing the result of the
-        //    cosine of ℝ(n).
+        // 4. Return an implementation-approximated Number value representing the cosine of ℝ(n).
         return Value.from(@cos(n.asFloat()));
     }
 
@@ -380,8 +379,8 @@ pub const Math = struct {
         // 2. If n is NaN, return NaN.
         // 3. If n is either +∞𝔽 or -∞𝔽, return +∞𝔽.
         // 4. If n is either +0𝔽 or -0𝔽, return 1𝔽.
-        // 5. Return an implementation-approximated Number value representing the result of the
-        //    hyperbolic cosine of ℝ(n).
+        // 5. Return an implementation-approximated Number value representing the hyperbolic cosine
+        //    of ℝ(n).
         return Value.from(std.math.cosh(n.asFloat()));
     }
 
@@ -396,8 +395,8 @@ pub const Math = struct {
         // 2. If n is either NaN or +∞𝔽, return n.
         // 3. If n is either +0𝔽 or -0𝔽, return 1𝔽.
         // 4. If n is -∞𝔽, return +0𝔽.
-        // 5. Return an implementation-approximated Number value representing the result of the
-        //    exponential function of ℝ(n).
+        // 5. Return an implementation-approximated Number value representing the exponential
+        //    function of ℝ(n).
         return Value.from(@exp(n.asFloat()));
     }
 
@@ -411,8 +410,8 @@ pub const Math = struct {
 
         // 2. If n is one of NaN, +0𝔽, -0𝔽, or +∞𝔽, return n.
         // 3. If n is -∞𝔽, return -1𝔽.
-        // 4. Return an implementation-approximated Number value representing the result of
-        //    subtracting 1 from the exponential function of ℝ(n).
+        // 4. Let exp be the exponential function of ℝ(n).
+        // 5. Return an implementation-approximated Number value representing exp - 1.
         if (n.isNegativeZero()) return Value.from(n);
         return Value.from(@exp(n.asFloat()) - 1);
     }
@@ -427,7 +426,8 @@ pub const Math = struct {
 
         // 2. If n is NaN, return NaN.
         // 3. If n is one of +0𝔽, -0𝔽, +∞𝔽, or -∞𝔽, return n.
-        // 4. Let n16 be the result of converting n to IEEE 754-2019 binary16 format using roundTiesToEven mode.
+        // 4. Let n16 be the result of converting n to IEEE 754-2019 binary16 format using
+        //    roundTiesToEven mode.
         const n_16 = n.toFloat16();
 
         // 5. Let n64 be the result of converting n16 to IEEE 754-2019 binary64 format.
@@ -551,8 +551,8 @@ pub const Math = struct {
         // 3. If n is 1𝔽, return +0𝔽.
         // 4. If n is either +0𝔽 or -0𝔽, return -∞𝔽.
         // 5. If n < -0𝔽, return NaN.
-        // 6. Return an implementation-approximated Number value representing the result of the
-        //    natural logarithm of ℝ(n).
+        // 6. Return an implementation-approximated Number value representing the natural logarithm
+        //    of ℝ(n).
         return Value.from(@log(n.asFloat()));
     }
 
@@ -567,8 +567,8 @@ pub const Math = struct {
         // 2. If n is one of NaN, +0𝔽, -0𝔽, or +∞𝔽, return n.
         // 3. If n is -1𝔽, return -∞𝔽.
         // 4. If n < -1𝔽, return NaN.
-        // 5. Return an implementation-approximated Number value representing the result of the
-        //    natural logarithm of 1 + ℝ(n).
+        // 5. Return an implementation-approximated Number value representing the natural logarithm
+        //    of 1 + ℝ(n).
         if (n.isNegativeZero()) return Value.from(n);
         return Value.from(@log(1 + n.asFloat()));
     }
@@ -585,8 +585,8 @@ pub const Math = struct {
         // 3. If n is 1𝔽, return +0𝔽.
         // 4. If n is either +0𝔽 or -0𝔽, return -∞𝔽.
         // 5. If n < -0𝔽, return NaN.
-        // 6. Return an implementation-approximated Number value representing the result of the
-        //    base 10 logarithm of ℝ(n).
+        // 6. Return an implementation-approximated Number value representing the base 10 logarithm
+        //    of ℝ(n).
         return Value.from(@log10(n.asFloat()));
     }
 
@@ -602,8 +602,7 @@ pub const Math = struct {
         // 3. If n is 1𝔽, return +0𝔽.
         // 4. If n is either +0𝔽 or -0𝔽, return -∞𝔽.
         // 5. If n < -0𝔽, return NaN.
-        // 6. Return an implementation-approximated Number value representing the result of the
-        //    base 2 logarithm of ℝ(n).
+        // 6. Return an implementation-approximated Number value representing the base 2 logarithm of ℝ(n).
         return Value.from(@log2(n.asFloat()));
     }
 
@@ -752,8 +751,7 @@ pub const Math = struct {
 
         // 2. If n is one of NaN, +0𝔽, or -0𝔽, return n.
         // 3. If n is either +∞𝔽 or -∞𝔽, return NaN.
-        // 4. Return an implementation-approximated Number value representing the result of the
-        //    sine of ℝ(n).
+        // 4. Return an implementation-approximated Number value representing the sine of ℝ(n).
         return Value.from(@sin(n.asFloat()));
     }
 
@@ -766,8 +764,8 @@ pub const Math = struct {
         const n = try x.toNumber(agent);
 
         // 2. If n is not finite or n is either +0𝔽 or -0𝔽, return n.
-        // 3. Return an implementation-approximated Number value representing the result of the
-        //    hyperbolic sine of ℝ(n).
+        // 3. Return an implementation-approximated Number value representing the hyperbolic sine
+        //    of ℝ(n).
         return Value.from(std.math.sinh(n.asFloat()));
     }
 
@@ -781,8 +779,8 @@ pub const Math = struct {
 
         // 2. If n is one of NaN, +0𝔽, -0𝔽, or +∞𝔽, return n.
         // 3. If n < -0𝔽, return NaN.
-        // 4. Return an implementation-approximated Number value representing the result of the
-        //    square root of ℝ(n).
+        // 4. Return an implementation-approximated Number value representing the square root of
+        //    ℝ(n).
         return Value.from(@sqrt(n.asFloat()));
     }
 
@@ -1017,8 +1015,7 @@ pub const Math = struct {
 
         // 2. If n is one of NaN, +0𝔽, or -0𝔽, return n.
         // 3. If n is either +∞𝔽 or -∞𝔽, return NaN.
-        // 4. Return an implementation-approximated Number value representing the result of the
-        //    tangent of ℝ(n).
+        // 4. Return an implementation-approximated Number value representing the tangent of ℝ(n).
         return Value.from(@tan(n.asFloat()));
     }
 
@@ -1033,8 +1030,8 @@ pub const Math = struct {
         // 2. If n is one of NaN, +0𝔽, or -0𝔽, return n.
         // 3. If n is +∞𝔽, return 1𝔽.
         // 4. If n is -∞𝔽, return -1𝔽.
-        // 5. Return an implementation-approximated Number value representing the result of the
-        //    hyperbolic tangent of ℝ(n).
+        // 5. Return an implementation-approximated Number value representing the hyperbolic
+        //    tangent of ℝ(n).
         return Value.from(std.math.tanh(n.asFloat()));
     }
 

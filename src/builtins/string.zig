@@ -1985,7 +1985,7 @@ pub const StringPrototype = struct {
         const string = try object.toString(agent);
 
         // 3. Let sText be StringToCodePoints(S).
-        // 4. Let lowerText be the result of toLowercase(sText), according to the Unicode Default
+        // 4. Let lowerText be toLowercase(sText), according to the Unicode Default
         //    Case Conversion algorithm.
         // 5. Let L be CodePointsToString(lowerText).
         const lower = try string.toLowerCase(agent.gc_allocator);
@@ -2013,7 +2013,7 @@ pub const StringPrototype = struct {
         const string = try object.toString(agent);
 
         // 3. Let sText be StringToCodePoints(S).
-        // 4. Let upperText be the result of toUppercase(sText), according to the Unicode Default
+        // 4. Let upperText be toUppercase(sText), according to the Unicode Default
         //    Case Conversion algorithm.
         // 5. Let U be CodePointsToString(upperText).
         const upper = try string.toUpperCase(agent.gc_allocator);
