@@ -718,9 +718,10 @@ fn prettyPrintObject(object: Object, writer: anytype) PrettyPrintError(@TypeOf(w
     try tty_config.setColor(writer, .white);
     try writer.writeAll("{");
     try tty_config.setColor(writer, .reset);
-    if (length != 0) try writer.writeAll(" ");
     for (property_keys.items, 0..) |property_key, i| {
         const property_descriptor = property_storage.get(property_key).?;
+        if (!property_descriptor.enumerable.?) continue;
+        try writer.writeAll(" ");
         switch (property_key) {
             .string => |string| {
                 try writer.writeAll("\"");
@@ -752,9 +753,12 @@ fn prettyPrintObject(object: Object, writer: anytype) PrettyPrintError(@TypeOf(w
             try writer.writeAll("<accessor>");
             try tty_config.setColor(writer, .reset);
         }
-        if (i + 1 < length) try writer.writeAll(", ");
+        if (i + 1 < length) {
+            try writer.writeAll(",");
+        } else {
+            try writer.writeAll(" ");
+        }
     }
-    if (length != 0) try writer.writeAll(" ");
     try tty_config.setColor(writer, .white);
     try writer.writeAll("}");
     try tty_config.setColor(writer, .reset);
