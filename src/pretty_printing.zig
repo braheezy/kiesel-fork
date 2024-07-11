@@ -712,16 +712,21 @@ fn prettyPrintFunction(object: Object, writer: anytype) PrettyPrintError(@TypeOf
 fn prettyPrintObject(object: Object, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
     const property_storage = object.data.property_storage;
     const property_keys = ordinaryOwnPropertyKeys(object) catch return;
-    const length = property_keys.items.len;
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("{");
     try tty_config.setColor(writer, .reset);
-    for (property_keys.items, 0..) |property_key, i| {
+
+    var printed_properties: usize = 0;
+    for (property_keys.items) |property_key| {
         const property_descriptor = property_storage.get(property_key).?;
         if (!property_descriptor.enumerable.?) continue;
+
+        if (printed_properties > 0) try writer.writeAll(",");
+        printed_properties += 1;
         try writer.writeAll(" ");
+
         switch (property_key) {
             .string => |string| {
                 try writer.writeAll("\"");
@@ -746,6 +751,7 @@ fn prettyPrintObject(object: Object, writer: anytype) PrettyPrintError(@TypeOf(w
             },
         }
         try writer.writeAll(": ");
+
         if (property_descriptor.value) |value| {
             try writer.print("{pretty}", .{value});
         } else {
@@ -753,12 +759,9 @@ fn prettyPrintObject(object: Object, writer: anytype) PrettyPrintError(@TypeOf(w
             try writer.writeAll("<accessor>");
             try tty_config.setColor(writer, .reset);
         }
-        if (i + 1 < length) {
-            try writer.writeAll(",");
-        } else {
-            try writer.writeAll(" ");
-        }
     }
+    if (printed_properties > 0) try writer.writeAll(" ");
+
     try tty_config.setColor(writer, .white);
     try writer.writeAll("}");
     try tty_config.setColor(writer, .reset);
