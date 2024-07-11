@@ -428,6 +428,7 @@ pub const Atomics = struct {
         try defineBuiltinFunction(object, "load", load, 2, realm);
         try defineBuiltinFunction(object, "notify", notify, 3, realm);
         try defineBuiltinFunction(object, "or", @"or", 3, realm);
+        try defineBuiltinFunction(object, "pause", pause, 0, realm);
         try defineBuiltinFunction(object, "store", store, 3, realm);
         try defineBuiltinFunction(object, "sub", sub, 3, realm);
         try defineBuiltinFunction(object, "wait", wait, 4, realm);
@@ -739,6 +740,49 @@ pub const Atomics = struct {
         //     a. Return ByteListBitwiseOp(|, xBytes, yBytes).
         // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, or).
         return atomicReadModifyWrite(agent, typed_array, index, value, .Or);
+    }
+
+    /// 1 Atomics.pause ([ iterationNumber ])
+    /// https://tc39.es/proposal-atomics-microwait/#Atomics.pause
+    fn pause(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        const iteration_number = arguments.get(0);
+        // 1. If iterationNumber is not undefined, then
+        if (iteration_number != .undefined) {
+            // a. If iterationNumber is not an integral Number, throw a TypeError exception.
+            if (iteration_number != .number or !iteration_number.number.isIntegral()) {
+                return agent.throwException(
+                    .type_error,
+                    "{} is not an integral number",
+                    .{iteration_number},
+                );
+            }
+
+            // b. If ℝ(iterationNumber) < 0, throw a RangeError exception.
+            if (iteration_number.number.asFloat() < 0) {
+                return agent.throwException(
+                    .range_error,
+                    "{} is not a positive number",
+                    .{iteration_number},
+                );
+            }
+        }
+
+        // 2. If the execution environment of the ECMAScript implementation supports a signal that
+        // the current executing code is in a spin-wait loop, send that signal. An ECMAScript
+        // implementation may send that signal multiple times, determined by iterationNumber when
+        // not undefined. The number of times the signal is sent for an integral Number N is at
+        // most the number of times it is sent for N + 1.
+        const iterations = if (iteration_number != .undefined)
+            // Use u16 here to avoid freezing for large numbers (like MAX_SAFE_INTEGER).
+            std.math.lossyCast(u16, iteration_number.number.asFloat())
+        else
+            1;
+        for (0..iterations) |_| {
+            std.atomic.spinLoopHint();
+        }
+
+        // 3. Return undefined.
+        return .undefined;
     }
 
     /// 25.4.11 Atomics.store ( typedArray, index, value )
