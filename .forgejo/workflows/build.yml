@@ -16,6 +16,10 @@ jobs:
         with:
           components: "rust-src"
       - uses: https://github.com/Swatinem/rust-cache@v2
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install binutils-mingw-w64
       - name: Build kiesel.wasm
         run: |
           # Building with Intl almost doubles the size, let's try to keep the final blob
@@ -57,17 +61,16 @@ jobs:
           mv zig-out/bin/kiesel zig-out/bin/kiesel-macos-aarch64
       - name: Build kiesel-windows-aarch64.exe
         run: |
-          # TODO: Enable Intl on Windows once possible
-          #       See https://github.com/ziglang/zig/issues/15107#issuecomment-1817993587
+          # NOTE: Rust only has `aarch64-pc-windows-gnullvm`, not `aarch64-pc-windows-gnu` so we still skip Intl here.
           zig build -Dtarget=aarch64-windows-gnu -Doptimize=ReleaseSafe -Denable-intl=false
           mv zig-out/bin/kiesel.exe zig-out/bin/kiesel-windows-aarch64.exe
       - name: Build kiesel-windows-x86.exe
         run: |
-          zig build -Dtarget=x86-windows-gnu -Doptimize=ReleaseSafe -Denable-intl=false
+          zig build -Dtarget=x86-windows-gnu -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel.exe zig-out/bin/kiesel-windows-x86.exe
       - name: Build kiesel-windows-x86_64.exe
         run: |
-          zig build -Dtarget=x86_64-windows-gnu -Doptimize=ReleaseSafe -Denable-intl=false
+          zig build -Dtarget=x86_64-windows-gnu -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel.exe zig-out/bin/kiesel-windows-x86_64.exe
       - name: Build for UEFI
         run: |
