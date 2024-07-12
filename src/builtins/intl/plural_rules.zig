@@ -118,18 +118,17 @@ pub const PluralRulesConstructor = struct {
         // TODO: 7. Set opt.[[localeMatcher]] to matcher.
         _ = matcher;
 
-        // 8. Let localeData be %Intl.PluralRules%.[[LocaleData]].
-        // TODO: 9. Let r be ResolveLocale(%Intl.PluralRules%.[[AvailableLocales]], requestedLocales,
-        //          opt, %Intl.PluralRules%.[[RelevantExtensionKeys]], localeData).
+        // TODO: 8. Let r be ResolveLocale(%Intl.PluralRules%.[[AvailableLocales]], requestedLocales,
+        //          opt, %Intl.PluralRules%.[[RelevantExtensionKeys]], %Intl.PluralRules%.[[LocaleData]]).
         const resolved_locale = if (requested_locales.items.len != 0)
             requested_locales.items[0]
         else
             agent.platform.default_locale;
 
-        // 10. Set pluralRules.[[Locale]] to r.[[locale]].
+        // 9. Set pluralRules.[[Locale]] to r.[[Locale]].
         plural_rules.as(PluralRules).fields.locale = resolved_locale;
 
-        // 11. Let t be ? GetOption(options, "type", string, « "cardinal", "ordinal" », "cardinal").
+        // 10. Let t be ? GetOption(options, "type", string, « "cardinal", "ordinal" », "cardinal").
         const type_ = try getOption(
             options,
             "type",
@@ -138,7 +137,7 @@ pub const PluralRulesConstructor = struct {
             String.fromLiteral("cardinal"),
         );
 
-        // 12. Set pluralRules.[[Type]] to t.
+        // 11. Set pluralRules.[[Type]] to t.
         const type_map = std.StaticStringMap(
             PluralRules.Fields.Type,
         ).initComptime(&.{
@@ -147,9 +146,9 @@ pub const PluralRulesConstructor = struct {
         });
         plural_rules.as(PluralRules).fields.type = type_map.get(type_.ascii).?;
 
-        // TODO: 13. Perform ? SetNumberFormatDigitOptions(pluralRules, options, 0, 3, "standard").
+        // TODO: 12. Perform ? SetNumberFormatDigitOptions(pluralRules, options, 0, 3, "standard").
 
-        // 14. Return pluralRules.
+        // 13. Return pluralRules.
         return Value.from(plural_rules);
     }
 };
