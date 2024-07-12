@@ -59,6 +59,10 @@ jobs:
         run: |
           zig build -Dtarget=aarch64-macos-none -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-macos-aarch64
+      - name: Build kiesel-macos-x86_64
+        run: |
+          zig build -Dtarget=x86_64-macos-none -Doptimize=ReleaseSafe
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-macos-x86_64
       - name: Build kiesel-windows-aarch64.exe
         run: |
           # NOTE: Rust only has `aarch64-pc-windows-gnullvm`, not `aarch64-pc-windows-gnu` so we still skip Intl here.
