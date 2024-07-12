@@ -482,7 +482,7 @@ fn readFile(allocator: Allocator, base_dir: std.fs.Dir, sub_path: []const u8) Re
 const GetHistoryPathError =
     Allocator.Error ||
     std.fs.GetAppDataDirError ||
-    std.posix.MakeDirError ||
+    std.fs.Dir.MakeError ||
     std.fs.File.OpenError;
 
 fn getHistoryPath(allocator: Allocator) GetHistoryPathError![]const u8 {
@@ -492,7 +492,7 @@ fn getHistoryPath(allocator: Allocator) GetHistoryPathError![]const u8 {
     const history_path = try std.fs.path.join(allocator, &.{ app_data_dir, "history" });
     errdefer allocator.free(history_path);
 
-    std.fs.makeDirAbsolute(app_data_dir) catch |err| switch (err) {
+    std.fs.cwd().makePath(app_data_dir) catch |err| switch (err) {
         error.PathAlreadyExists => {},
         else => return err,
     };
