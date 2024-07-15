@@ -3595,14 +3595,23 @@ pub const Module = struct {
             },
             .export_declaration => |export_declaration| switch (export_declaration) {
                 // ExportDeclaration : export ExportFromClause FromClause ;
-                .export_from => {
-                    // TODO: 1. Let module be the sole element of the ModuleRequests of FromClause.
-                    // TODO: 2. Return ExportEntriesForModule of ExportFromClause with argument module.
+                .export_from => |export_from| {
+                    // 1. Let module be the sole element of the ModuleRequests of FromClause.
+                    const module = export_from.module_specifier;
+
+                    // 2. Return ExportEntriesForModule of ExportFromClause with argument module.
+                    try export_entries.appendSlice(
+                        try export_from.export_from_clause.exportEntriesForModule(
+                            allocator,
+                            try (try module.stringValue(allocator)).toUtf8(allocator),
+                        ),
+                    );
                 },
 
                 // ExportDeclaration : export NamedExports ;
-                .named_exports => {
-                    // TODO: 1. Return ExportEntriesForModule of NamedExports with argument null.
+                .named_exports => |named_exports| {
+                    // 1. Return ExportEntriesForModule of NamedExports with argument null.
+                    try export_entries.appendSlice(try named_exports.exportEntriesForModule(allocator, null));
                 },
 
                 // ExportDeclaration : export VariableStatement
@@ -3975,14 +3984,162 @@ pub const ExportDeclaration = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-ExportFromClause
 pub const ExportFromClause = union(enum) {
+    const Self = @This();
+
     star,
     star_as: ModuleExportName,
     named_exports: NamedExports,
+
+    /// 16.2.3.5 Static Semantics: ExportEntriesForModule
+    /// https://tc39.es/ecma262/#sec-static-semantics-exportentriesformodule
+    pub fn exportEntriesForModule(
+        self: Self,
+        allocator: Allocator,
+        module: ?[]const u8,
+    ) Allocator.Error![]const ExportEntry {
+        switch (self) {
+            // ExportFromClause : *
+            .star => {
+                // 1. Let entry be the ExportEntry Record {
+                //      [[ModuleRequest]]: module, [[ImportName]]: all-but-default,
+                //      [[LocalName]]: null, [[ExportName]]: null
+                //    }.
+                const entry: ExportEntry = .{
+                    .module_request = module,
+                    .import_name = .all_but_default,
+                    .local_name = null,
+                    .export_name = null,
+                };
+
+                // 2. Return « entry ».
+                var export_entries = try std.ArrayList(ExportEntry).initCapacity(allocator, 1);
+                export_entries.appendAssumeCapacity(entry);
+                return export_entries.toOwnedSlice();
+            },
+            // ExportFromClause : * as ModuleExportName
+            .star_as => |module_export_name| {
+                // 1. Let exportName be the StringValue of ModuleExportName.
+                const export_name = switch (module_export_name) {
+                    .identifier => |identifier| identifier,
+                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toUtf8(allocator),
+                };
+
+                // 2. Let entry be the ExportEntry Record {
+                //      [[ModuleRequest]]: module, [[ImportName]]: all, [[LocalName]]: null,
+                //      [[ExportName]]: exportName
+                //    }.
+                const entry: ExportEntry = .{
+                    .module_request = module,
+                    .import_name = .all,
+                    .local_name = null,
+                    .export_name = export_name,
+                };
+
+                // 3. Return « entry ».
+                var export_entries = try std.ArrayList(ExportEntry).initCapacity(allocator, 1);
+                export_entries.appendAssumeCapacity(entry);
+                return export_entries.toOwnedSlice();
+            },
+            .named_exports => |named_exports| return named_exports.exportEntriesForModule(allocator, module),
+        }
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-NamedExports
 pub const NamedExports = struct {
+    const Self = @This();
+
     exports_list: ExportsList,
+
+    /// 16.2.3.5 Static Semantics: ExportEntriesForModule
+    /// https://tc39.es/ecma262/#sec-static-semantics-exportentriesformodule
+    pub fn exportEntriesForModule(
+        self: Self,
+        allocator: Allocator,
+        module: ?[]const u8,
+    ) Allocator.Error![]const ExportEntry {
+        // ExportsList : ExportsList , ExportSpecifier
+        // 1. Let specs1 be the ExportEntriesForModule of ExportsList with argument module.
+        // 2. Let specs2 be the ExportEntriesForModule of ExportSpecifier with argument module.
+        // 3. Return the list-concatenation of specs1 and specs2.
+        var export_entries = try std.ArrayList(ExportEntry).initCapacity(
+            allocator,
+            self.exports_list.items.len,
+        );
+        for (self.exports_list.items) |export_specifier| {
+            // ExportSpecifier : ModuleExportName
+            if (export_specifier.alias == null) {
+                // 1. Let sourceName be the StringValue of ModuleExportName.
+                const source_name = switch (export_specifier.name) {
+                    .identifier => |identifier| identifier,
+                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toUtf8(allocator),
+                };
+
+                // 2. If module is null, then
+                const local_name: ?[]const u8, const import_name: ?[]const u8 = if (module == null) blk: {
+                    // a. Let localName be sourceName.
+                    // b. Let importName be null.
+                    break :blk .{ source_name, null };
+                }
+                // 3. Else,
+                else blk: {
+                    // a. Let localName be null.
+                    // b. Let importName be sourceName.
+                    break :blk .{ null, source_name };
+                };
+
+                // 4. Return a List whose sole element is a new ExportEntry Record {
+                //      [[ModuleRequest]]: module, [[ImportName]]: importName,
+                //      [[LocalName]]: localName, [[ExportName]]: sourceName
+                //    }.
+                export_entries.appendAssumeCapacity(.{
+                    .module_request = module,
+                    .import_name = if (import_name) |string| .{ .string = string } else null,
+                    .local_name = local_name,
+                    .export_name = source_name,
+                });
+            }
+            // ExportSpecifier : ModuleExportName as ModuleExportName
+            else {
+                // 1. Let sourceName be the StringValue of the first ModuleExportName.
+                const source_name = switch (export_specifier.name) {
+                    .identifier => |identifier| identifier,
+                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toUtf8(allocator),
+                };
+
+                // 2. Let exportName be the StringValue of the second ModuleExportName.
+                const export_name = switch (export_specifier.alias.?) {
+                    .identifier => |identifier| identifier,
+                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toUtf8(allocator),
+                };
+
+                // 3. If module is null, then
+                const local_name: ?[]const u8, const import_name: ?[]const u8 = if (module == null) blk: {
+                    // a. Let localName be sourceName.
+                    // b. Let importName be null.
+                    break :blk .{ source_name, null };
+                }
+                // 4. Else,
+                else blk: {
+                    // a. Let localName be null.
+                    // b. Let importName be sourceName.
+                    break :blk .{ null, source_name };
+                };
+
+                // 5. Return a List whose sole element is a new ExportEntry Record {
+                //      [[ModuleRequest]]: module, [[ImportName]]: importName,
+                //      [[LocalName]]: localName, [[ExportName]]: exportName
+                //    }.
+                export_entries.appendAssumeCapacity(.{
+                    .module_request = module,
+                    .import_name = if (import_name) |string| .{ .string = string } else null,
+                    .local_name = local_name,
+                    .export_name = export_name,
+                });
+            }
+        }
+        return export_entries.toOwnedSlice();
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-ExportsList
