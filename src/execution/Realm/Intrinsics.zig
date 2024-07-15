@@ -85,6 +85,8 @@ lazy_intrinsics: struct {
     @"%Intl%": Object = null_intrinsic,
     @"%Intl.Collator%": Object = null_intrinsic,
     @"%Intl.Collator.prototype%": Object = null_intrinsic,
+    @"%Intl.DisplayNames%": Object = null_intrinsic,
+    @"%Intl.DisplayNames.prototype%": Object = null_intrinsic,
     @"%Intl.ListFormat%": Object = null_intrinsic,
     @"%Intl.ListFormat.prototype%": Object = null_intrinsic,
     @"%Intl.Locale%": Object = null_intrinsic,
@@ -373,6 +375,12 @@ pub fn @"%Intl.Collator%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%Intl.Collator.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Intl.Collator.prototype%", builtins.Intl.CollatorPrototype);
+}
+pub fn @"%Intl.DisplayNames%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Intl.DisplayNames%", builtins.Intl.DisplayNamesConstructor);
+}
+pub fn @"%Intl.DisplayNames.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Intl.DisplayNames.prototype%", builtins.Intl.DisplayNamesPrototype);
 }
 pub fn @"%Intl.ListFormat%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Intl.ListFormat%", builtins.Intl.ListFormatConstructor);

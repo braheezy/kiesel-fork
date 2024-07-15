@@ -34,6 +34,9 @@ pub const Intl = struct {
     pub const Collator = @import("./intl/collator.zig").Collator;
     pub const CollatorConstructor = @import("./intl/collator.zig").CollatorConstructor;
     pub const CollatorPrototype = @import("./intl/collator.zig").CollatorPrototype;
+    pub const DisplayNames = @import("./intl/display_names.zig").DisplayNames;
+    pub const DisplayNamesConstructor = @import("./intl/display_names.zig").DisplayNamesConstructor;
+    pub const DisplayNamesPrototype = @import("./intl/display_names.zig").DisplayNamesPrototype;
     pub const ListFormat = @import("./intl/list_format.zig").ListFormat;
     pub const ListFormatConstructor = @import("./intl/list_format.zig").ListFormatConstructor;
     pub const ListFormatPrototype = @import("./intl/list_format.zig").ListFormatPrototype;
@@ -69,6 +72,15 @@ pub const Intl = struct {
         // https://tc39.es/ecma402/#sec-intl.collator-intro
         try defineBuiltinProperty(object, "Collator", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.Collator%"()),
+            .writable = true,
+            .enumerable = false,
+            .configurable = true,
+        });
+
+        // 8.2.3 Intl.DisplayNames ( . . . )
+        // https://tc39.es/ecma402/#sec-intl.displaynames-intro
+        try defineBuiltinProperty(object, "DisplayNames", PropertyDescriptor{
+            .value = Value.from(try realm.intrinsics.@"%Intl.DisplayNames%"()),
             .writable = true,
             .enumerable = false,
             .configurable = true,

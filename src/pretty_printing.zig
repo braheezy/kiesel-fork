@@ -567,6 +567,40 @@ fn prettyPrintIntlCollator(
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintIntlDisplayNames(
+    intl_display_names: *const builtins.Intl.DisplayNames,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    const agent = intl_display_names.data.agent;
+    const locale = intl_display_names.fields.locale;
+    const tty_config = state.tty_config;
+
+    const resolved_options = intl_display_names.fields.resolvedOptions();
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Intl.DisplayNames(");
+    try tty_config.setColor(writer, .reset);
+    if (intl_display_names.fields.type == .language) {
+        try writer.print("{pretty}, style: {pretty}, type: {pretty}, fallback: {pretty}, languageDisplay: {pretty}", .{
+            Value.from(String.fromAscii(locale.toString(agent.gc_allocator) catch return)),
+            Value.from(resolved_options.style),
+            Value.from(resolved_options.type),
+            Value.from(resolved_options.fallback),
+            Value.from(resolved_options.language_display),
+        });
+    } else {
+        try writer.print("{pretty}, style: {pretty}, type: {pretty}, fallback: {pretty}", .{
+            Value.from(String.fromAscii(locale.toString(agent.gc_allocator) catch return)),
+            Value.from(resolved_options.style),
+            Value.from(resolved_options.type),
+            Value.from(resolved_options.fallback),
+        });
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintIntlListFormat(
     intl_list_format: *const builtins.Intl.ListFormat,
     writer: anytype,
@@ -815,6 +849,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.TypedArray, prettyPrintTypedArray },
         } ++ if (build_options.enable_intl) .{
             .{ builtins.Intl.Collator, prettyPrintIntlCollator },
+            .{ builtins.Intl.DisplayNames, prettyPrintIntlDisplayNames },
             .{ builtins.Intl.ListFormat, prettyPrintIntlListFormat },
             .{ builtins.Intl.Locale, prettyPrintIntlLocale },
             .{ builtins.Intl.PluralRules, prettyPrintIntlPluralRules },
