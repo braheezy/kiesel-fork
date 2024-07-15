@@ -2141,6 +2141,18 @@ pub fn codegenDoWhileStatement(
     ctx: *Context,
 ) Executable.Error!void {
     // DoWhileStatement : do Statement while ( Expression ) ;
+
+    const break_jumps = try ctx.break_jumps.toOwnedSlice();
+    defer ctx.break_jumps = std.ArrayList(Executable.JumpIndex).fromOwnedSlice(
+        ctx.break_jumps.allocator,
+        break_jumps,
+    );
+    const continue_jumps = try ctx.continue_jumps.toOwnedSlice();
+    defer ctx.continue_jumps = std.ArrayList(Executable.JumpIndex).fromOwnedSlice(
+        ctx.continue_jumps.allocator,
+        continue_jumps,
+    );
+
     // 1. Let V be undefined.
     try executable.addInstructionWithConstant(.load_constant, .undefined);
 
@@ -2189,6 +2201,18 @@ pub fn codegenWhileStatement(
     ctx: *Context,
 ) Executable.Error!void {
     // WhileStatement : while ( Expression ) Statement
+
+    const break_jumps = try ctx.break_jumps.toOwnedSlice();
+    defer ctx.break_jumps = std.ArrayList(Executable.JumpIndex).fromOwnedSlice(
+        ctx.break_jumps.allocator,
+        break_jumps,
+    );
+    const continue_jumps = try ctx.continue_jumps.toOwnedSlice();
+    defer ctx.continue_jumps = std.ArrayList(Executable.JumpIndex).fromOwnedSlice(
+        ctx.continue_jumps.allocator,
+        continue_jumps,
+    );
+
     // 1. Let V be undefined.
     try executable.addInstructionWithConstant(.load_constant, .undefined);
 
@@ -2241,6 +2265,17 @@ pub fn codegenForStatement(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
+    const break_jumps = try ctx.break_jumps.toOwnedSlice();
+    defer ctx.break_jumps = std.ArrayList(Executable.JumpIndex).fromOwnedSlice(
+        ctx.break_jumps.allocator,
+        break_jumps,
+    );
+    const continue_jumps = try ctx.continue_jumps.toOwnedSlice();
+    defer ctx.continue_jumps = std.ArrayList(Executable.JumpIndex).fromOwnedSlice(
+        ctx.continue_jumps.allocator,
+        continue_jumps,
+    );
+
     if (node.initializer) |initializer| switch (initializer) {
         // ForStatement : for ( Expression[opt] ; Expression[opt] ; Expression[opt] ) Statement
         .expression => |expression| {
@@ -2489,6 +2524,18 @@ fn forInOfBodyEvaluation(
     iterator_kind: IteratorKind,
 ) Executable.Error!void {
     _ = iteration_kind;
+
+    const break_jumps = try ctx.break_jumps.toOwnedSlice();
+    defer ctx.break_jumps = std.ArrayList(Executable.JumpIndex).fromOwnedSlice(
+        ctx.break_jumps.allocator,
+        break_jumps,
+    );
+    const continue_jumps = try ctx.continue_jumps.toOwnedSlice();
+    defer ctx.continue_jumps = std.ArrayList(Executable.JumpIndex).fromOwnedSlice(
+        ctx.continue_jumps.allocator,
+        continue_jumps,
+    );
+
     // NOTE: The iterator is created by forInOfHeadEvaluation() and needs to be pushed onto the
     //       stack. If this isn't applicable a break completion jump to the end of this function
     //       is emitted.
@@ -2967,6 +3014,12 @@ pub fn codegenSwitchStatement(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
+    const break_jumps = try ctx.break_jumps.toOwnedSlice();
+    defer ctx.break_jumps = std.ArrayList(Executable.JumpIndex).fromOwnedSlice(
+        ctx.break_jumps.allocator,
+        break_jumps,
+    );
+
     // 1. Let exprRef be ? Evaluation of Expression.
     try codegenExpression(node.expression, executable, ctx);
 
