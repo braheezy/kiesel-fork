@@ -3062,7 +3062,13 @@ pub fn codegenLabelledStatement(
 
     // 14.13.4 Runtime Semantics: LabelledEvaluation
     // https://tc39.es/ecma262/#sec-runtime-semantics-labelledevaluation
-    // TODO: Implement labelled break and continue
+    // TODO: Implement labelled break and continue - for now we simply break to the end of the
+    //       statement, which is completely wrong but at least prevents infinite loops.
+    const break_jumps = try ctx.break_jumps.toOwnedSlice();
+    defer ctx.break_jumps = std.ArrayList(Executable.JumpIndex).fromOwnedSlice(
+        ctx.break_jumps.allocator,
+        break_jumps,
+    );
 
     switch (node.labelled_item) {
         // LabelledItem : FunctionDeclaration
@@ -3076,6 +3082,10 @@ pub fn codegenLabelledStatement(
             // 1. Return ? Evaluation of Statement.
             try codegenStatement(statement.*, executable, ctx);
         },
+    }
+
+    while (ctx.break_jumps.popOrNull()) |jump_index| {
+        try jump_index.setTargetHere();
     }
 }
 
