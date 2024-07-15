@@ -23,6 +23,7 @@ const String = types.String;
 const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getOption = types.getOption;
 const getOptionsObject = abstract_operations.getOptionsObject;
@@ -257,6 +258,8 @@ pub const DisplayNamesPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinFunction(object, "of", of, 1, realm);
+
         // 12.3.2 Intl.DisplayNames.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.displaynames.prototype-%symbol.tostringtag%
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
@@ -267,6 +270,67 @@ pub const DisplayNamesPrototype = struct {
         });
 
         return object;
+    }
+
+    /// 12.3.3 Intl.DisplayNames.prototype.of ( code )
+    /// https://tc39.es/ecma402/#sec-Intl.DisplayNames.prototype.of
+    fn of(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const code_value = arguments.get(0);
+
+        // 1. Let displayNames be this value.
+        // 2. Perform ? RequireInternalSlot(displayNames, [[InitializedDisplayNames]]).
+        const display_names = try this_value.requireInternalSlot(agent, DisplayNames);
+
+        // 3. Let code be ? ToString(code).
+        const code = try code_value.toString(agent);
+
+        // 4. Set code to ? CanonicalCodeForDisplayNames(displayNames.[[Type]], code).
+        // 5. Let fields be displayNames.[[Fields]].
+        // 6. If fields has a field [[<code>]], return fields.[[<code>]].
+        // 7. If displayNames.[[Fallback]] is "code", return code.
+        // 8. Return undefined.
+        const code_utf8 = try code.toUtf8(agent.gc_allocator);
+        defer agent.gc_allocator.free(code_utf8);
+        const data_provider = icu4zig.DataProvider.init();
+        defer data_provider.deinit();
+        const value = switch (display_names.fields.type) {
+            .language => blk: {
+                const locale_display_names_formatter = icu4zig.LocaleDisplayNamesFormatter.init(
+                    data_provider,
+                    display_names.fields.locale,
+                    display_names.fields.options,
+                );
+                defer locale_display_names_formatter.deinit();
+                const locale = icu4zig.Locale.init(code_utf8) catch return agent.throwException(
+                    .range_error,
+                    "Invalid language '{}'",
+                    .{code},
+                );
+                break :blk try locale_display_names_formatter.of(agent.gc_allocator, locale);
+            },
+            .region => blk: {
+                const region_display_names = icu4zig.RegionDisplayNames.init(
+                    data_provider,
+                    display_names.fields.locale,
+                );
+                defer region_display_names.deinit();
+                break :blk region_display_names.of(agent.gc_allocator, code_utf8) catch |err| switch (err) {
+                    error.OutOfMemory => return error.OutOfMemory,
+                    error.LocaleParserSubtagError => return agent.throwException(
+                        .range_error,
+                        "Invalid region '{}'",
+                        .{code},
+                    ),
+                };
+            },
+            else => return agent.throwException(
+                .internal_error,
+                "Unsupported Intl.DisplayNames type '{s}'",
+                .{@tagName(display_names.fields.type)},
+            ),
+        };
+        if (value.len == 0) return .undefined;
+        return Value.from(try String.fromUtf8(agent.gc_allocator, value));
     }
 };
 
