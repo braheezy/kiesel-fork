@@ -257,6 +257,15 @@ pub const DisplayNamesPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        // 12.3.2 Intl.DisplayNames.prototype [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma402/#sec-intl.displaynames.prototype-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+            .value = Value.from("Intl.DisplayNames"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
         return object;
     }
 };
