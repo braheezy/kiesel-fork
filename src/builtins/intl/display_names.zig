@@ -18,6 +18,7 @@ const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
@@ -27,7 +28,9 @@ const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getOption = types.getOption;
 const getOptionsObject = abstract_operations.getOptionsObject;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 12.2 Properties of the Intl.DisplayNames Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-displaynames-constructor
@@ -259,6 +262,7 @@ pub const DisplayNamesPrototype = struct {
         });
 
         try defineBuiltinFunction(object, "of", of, 1, realm);
+        try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
         // 12.3.2 Intl.DisplayNames.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.displaynames.prototype-%symbol.tostringtag%
@@ -331,6 +335,54 @@ pub const DisplayNamesPrototype = struct {
         };
         if (value.len == 0) return .undefined;
         return Value.from(try String.fromUtf8(agent.gc_allocator, value));
+    }
+
+    /// 12.3.4 Intl.DisplayNames.prototype.resolvedOptions ( )
+    /// https://tc39.es/ecma402/#sec-Intl.DisplayNames.prototype.resolvedOptions
+    fn resolvedOptions(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        const realm = agent.currentRealm();
+
+        // 1. Let displayNames be this value.
+        // 2. Perform ? RequireInternalSlot(displayNames, [[InitializedDisplayNames]]).
+        const display_names = try this_value.requireInternalSlot(agent, DisplayNames);
+
+        // 3. Let options be OrdinaryObjectCreate(%Object.prototype%).
+        const options = try ordinaryObjectCreate(
+            agent,
+            try realm.intrinsics.@"%Object.prototype%"(),
+        );
+
+        // 4. For each row of Table 18, except the header row, in table order, do
+        //     a. Let p be the Property value of the current row.
+        //     b. Let v be the value of displayNames's internal slot whose name is the Internal Slot value of the current row.
+        //     c. Assert: v is not undefined.
+        //     d. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        const resolved_options = display_names.fields.resolvedOptions();
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("locale"),
+            Value.from(String.fromAscii(try display_names.fields.locale.toString(agent.gc_allocator))),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("style"),
+            Value.from(resolved_options.style),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("type"),
+            Value.from(resolved_options.type),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("fallback"),
+            Value.from(resolved_options.fallback),
+        ) catch |err| try noexcept(err);
+        if (display_names.fields.type == .language) {
+            options.createDataPropertyOrThrow(
+                PropertyKey.from("languageDisplay"),
+                Value.from(resolved_options.language_display),
+            ) catch |err| try noexcept(err);
+        }
+
+        // 5. Return options.
+        return Value.from(options);
     }
 };
 
