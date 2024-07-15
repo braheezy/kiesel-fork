@@ -30,6 +30,7 @@ state: struct {
     in_class_constructor: bool = false,
     in_function_body: bool = false,
     in_iteration_statement: bool = false,
+    in_labelled_statement: bool = false,
     in_method_definition: bool = false,
     in_module: bool = false,
     in_strict_mode: bool = false,
@@ -1754,6 +1755,9 @@ pub fn acceptLabelledStatement(self: *Self) AcceptError!ast.LabelledStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const tmp = temporaryChange(&self.state.in_labelled_statement, true);
+    defer tmp.restore();
+
     const label_identifier = try self.acceptLabelIdentifier();
     _ = try self.core.accept(RuleSet.is(.@":"));
     const location = (try self.core.peek() orelse return error.UnexpectedToken).location;
@@ -1989,6 +1993,16 @@ pub fn acceptContinueStatement(self: *Self) AcceptError!ast.ContinueStatement {
     if (self.noLineTerminatorHere()) |_| {
         if (self.acceptLabelIdentifier()) |label| {
             try self.acceptOrInsertSemicolon();
+
+            if (!self.state.in_labelled_statement) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Labelled 'continue' statement is only allowed in labelled statement",
+                    .{},
+                );
+                return error.UnexpectedToken;
+            }
+
             return .{ .label = label };
         } else |_| {}
     } else |err| switch (err) {
@@ -2006,6 +2020,28 @@ pub fn acceptBreakStatement(self: *Self) AcceptError!ast.BreakStatement {
 
     const token = try self.core.accept(RuleSet.is(.@"break"));
 
+    if (self.noLineTerminatorHere()) |_| {
+        if (self.acceptLabelIdentifier()) |label| {
+            try self.acceptOrInsertSemicolon();
+
+            if (!self.state.in_labelled_statement) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Labelled 'break' statement is only allowed in labelled statement",
+                    .{},
+                );
+                return error.UnexpectedToken;
+            }
+
+            return .{ .label = label };
+        } else |_| {}
+    } else |err| switch (err) {
+        // Drop emitted 'unexpected newline' error
+        error.UnexpectedToken => _ = self.diagnostics.errors.pop(),
+        else => {},
+    }
+    try self.acceptOrInsertSemicolon();
+
     if (!self.state.in_breakable_statement) {
         try self.emitErrorAt(
             token.location,
@@ -2015,17 +2051,6 @@ pub fn acceptBreakStatement(self: *Self) AcceptError!ast.BreakStatement {
         return error.UnexpectedToken;
     }
 
-    if (self.noLineTerminatorHere()) |_| {
-        if (self.acceptLabelIdentifier()) |label| {
-            try self.acceptOrInsertSemicolon();
-            return .{ .label = label };
-        } else |_| {}
-    } else |err| switch (err) {
-        // Drop emitted 'unexpected newline' error
-        error.UnexpectedToken => _ = self.diagnostics.errors.pop(),
-        else => {},
-    }
-    try self.acceptOrInsertSemicolon();
     return .{ .label = null };
 }
 
