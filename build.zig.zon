@@ -23,8 +23,8 @@
             .hash = "1220166b9b8c5093f9931dac58950dba248ba333b1e5819fe0a58b4599c88e585cd6",
         },
         .libregexp = .{
-            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/f9aa9a5994753a08202cb5f632bd398c85528a39.tar.gz",
-            .hash = "122094331f06915a6f90999f8cb95c8a241603dd894f9911d1ec5cb8b2f1aa6df7eb",
+            .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/a0240bda2da27aa32ea6f175017fcea79c82daef.tar.gz",
+            .hash = "122029564fc6fd50dedfcc01a5f894cbda40fc1ad3efda1ed4c5fbcf1dd7d7be3b57",
         },
         // Needed for mach-o/getsect.h when building libgc for macOS
         .macos_sdk = .{
