@@ -11,8 +11,7 @@ jobs:
       image: ghcr.io/catthehacker/ubuntu:act-22.04
     steps:
       - uses: actions/checkout@v4
-      # Pinned to https://github.com/mlugg/setup-zig/pull/7
-      - uses: https://github.com/mlugg/setup-zig@2fb886036ef83cf152b35c8278550048c7d09e35
+      - uses: https://github.com/mlugg/setup-zig@v1
         with:
           version: master
       - uses: https://github.com/dtolnay/rust-toolchain@nightly
