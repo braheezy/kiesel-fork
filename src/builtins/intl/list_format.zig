@@ -315,7 +315,7 @@ fn formatList(
         },
     );
     defer list_formatter.deinit();
-    return String.fromUtf8(allocator, try list_formatter.format(allocator, list));
+    return String.fromUtf8(allocator, try list_formatter.format(allocator, .{ .utf8 = list }));
 }
 
 /// 13.5.5 StringListFromIterable ( iterable )

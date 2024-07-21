@@ -239,11 +239,12 @@ pub const LocaleConstructor = struct {
         if (tag_string.indexOf(String.fromLiteral("_"), 0) != null) {
             return agent.throwException(.range_error, "Invalid locale identifier '{}'", .{tag_string});
         }
-        var tag = icu4zig.Locale.init(try tag_string.toUtf8(agent.gc_allocator)) catch |err| switch (err) {
-            error.LocaleParserLanguageError,
-            error.LocaleParserSubtagError,
-            error.LocaleParserExtensionError,
-            => return agent.throwException(.range_error, "Invalid locale identifier '{}'", .{tag_string}),
+        var tag = icu4zig.Locale.init(try tag_string.toUtf8(agent.gc_allocator)) catch {
+            return agent.throwException(
+                .range_error,
+                "Invalid locale identifier '{}'",
+                .{tag_string},
+            );
         };
 
         // 13. Set tag to ? UpdateLanguageId(tag, options).
@@ -504,7 +505,6 @@ pub const LocalePrototype = struct {
                     "ca",
                 ) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
-                    error.LocaleParserExtensionError => unreachable,
                 } orelse return .undefined,
             ),
         );
@@ -525,7 +525,6 @@ pub const LocalePrototype = struct {
                     "kf",
                 ) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
-                    error.LocaleParserExtensionError => unreachable,
                 } orelse return .undefined,
             ),
         );
@@ -546,7 +545,6 @@ pub const LocalePrototype = struct {
                     "co",
                 ) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
-                    error.LocaleParserExtensionError => unreachable,
                 } orelse return .undefined,
             ),
         );
@@ -567,7 +565,6 @@ pub const LocalePrototype = struct {
                     "hc",
                 ) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
-                    error.LocaleParserExtensionError => unreachable,
                 } orelse return .undefined,
             ),
         );
@@ -586,7 +583,6 @@ pub const LocalePrototype = struct {
             "kn",
         ) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
-            error.LocaleParserExtensionError => unreachable,
         } orelse return Value.from(false);
         return Value.from(value.len == 0 or std.mem.eql(u8, value, "true"));
     }
@@ -606,7 +602,6 @@ pub const LocalePrototype = struct {
                     "nu",
                 ) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
-                    error.LocaleParserExtensionError => unreachable,
                 } orelse return .undefined,
             ),
         );

@@ -96,15 +96,12 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
                     .{tag},
                 );
             }
-            const canonicalized_tag = icu4zig.Locale.init(try tag.toUtf8(agent.gc_allocator)) catch |err| switch (err) {
-                error.LocaleParserLanguageError,
-                error.LocaleParserSubtagError,
-                error.LocaleParserExtensionError,
-                => return agent.throwException(
+            const canonicalized_tag = icu4zig.Locale.init(try tag.toUtf8(agent.gc_allocator)) catch {
+                return agent.throwException(
                     .range_error,
                     "Invalid locale identifier '{}'",
                     .{tag},
-                ),
+                );
             };
 
             // vii. If seen does not contain canonicalizedTag, append canonicalizedTag to seen.

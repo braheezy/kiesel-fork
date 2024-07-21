@@ -320,7 +320,7 @@ pub const DisplayNamesPrototype = struct {
                 defer region_display_names.deinit();
                 break :blk region_display_names.of(agent.gc_allocator, code_utf8) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
-                    error.LocaleParserSubtagError => return agent.throwException(
+                    error.Subtag => return agent.throwException(
                         .range_error,
                         "Invalid region '{}'",
                         .{code},

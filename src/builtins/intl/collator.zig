@@ -408,7 +408,7 @@ pub fn compareStrings(allocator: Allocator, collator_object: *const Collator, x:
         data_provider,
         collator_object.fields.locale,
         collator_object.fields.options,
-    ) catch unreachable;
+    );
     defer collator.deinit();
 
     const order = if (x == .ascii and y == .ascii) blk: {
@@ -464,11 +464,7 @@ pub const Collator = MakeObject(.{
         pub fn resolvedOptions(self: @This()) ResolvedOptions {
             const data_provider = icu4zig.DataProvider.init();
             defer data_provider.deinit();
-            const collator = icu4zig.Collator.init(
-                data_provider,
-                self.locale,
-                self.options,
-            ) catch unreachable;
+            const collator = icu4zig.Collator.init(data_provider, self.locale, self.options);
             defer collator.deinit();
             const resolved_options = collator.resolvedOptions();
 
