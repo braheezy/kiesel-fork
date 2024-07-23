@@ -20,11 +20,13 @@ const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
+const SafePointer = types.SafePointer;
 const String = types.String;
 const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const coerceOptionsToObject = abstract_operations.coerceOptionsToObject;
 const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getNumberOption = abstract_operations.getNumberOption;
 const getOption = types.getOption;
@@ -531,6 +533,8 @@ pub const DateTimeFormatPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        try defineBuiltinAccessor(object, "format", format, null, realm);
+
         // 11.3.2 Intl.DateTimeFormat.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype-%symbol.tostringtag%
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
@@ -541,6 +545,70 @@ pub const DateTimeFormatPrototype = struct {
         });
 
         return object;
+    }
+
+    /// 11.3.3 get Intl.DateTimeFormat.prototype.format
+    /// https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype.format
+    fn format(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let dtf be the this value.
+        // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1, then
+        //     a. Set dtf to ? UnwrapDateTimeFormat(dtf).
+        // 3. Perform ? RequireInternalSlot(dtf, [[InitializedDateTimeFormat]]).
+        const date_time_format = try this_value.requireInternalSlot(agent, DateTimeFormat);
+
+        // 4. If dtf.[[BoundFormat]] is undefined, then
+        if (date_time_format.fields.bound_format == null) {
+            // a. Let F be a new built-in function object as defined in DateTime Format Functions (11.5.4).
+            // b. Set F.[[DateTimeFormat]] to dtf.
+            const Captures = struct {
+                date_time_format: *DateTimeFormat,
+            };
+            const captures = try agent.gc_allocator.create(Captures);
+            captures.* = .{ .date_time_format = date_time_format };
+
+            const dateTimeFormatFunction = struct {
+                /// 11.5.4 DateTime Format Functions
+                /// https://tc39.es/ecma402/#sec-datetime-format-functions
+                fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+                    const function = agent_.activeFunctionObject();
+                    const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+                    const date = arguments.get(0);
+
+                    // 1. Let dtf be F.[[DateTimeFormat]].
+                    // 2. Assert: dtf is an Object and dtf has an [[InitializedDateTimeFormat]]
+                    //    internal slot.
+                    const date_time_format_ = captures_.date_time_format;
+
+                    // 3. If date is not provided or is undefined, then
+                    const x = if (date == .undefined) blk: {
+                        // a. Let x be ! Call(%Date.now%, undefined).
+                        break :blk @as(f64, @floatFromInt(std.time.milliTimestamp()));
+                    }
+                    // 4. Else,
+                    else blk: {
+                        // a. Let x be ? ToNumber(date).
+                        break :blk (try date.toNumber(agent_)).asFloat();
+                    };
+
+                    // 5. Return ? FormatDateTime(dtf, x).
+                    return formatDateTime(agent_, date_time_format_, x);
+                }
+            }.func;
+
+            const bound_format = try createBuiltinFunction(agent, .{
+                .function = dateTimeFormatFunction,
+            }, .{
+                .length = 1,
+                .name = "",
+                .additional_fields = SafePointer.make(*Captures, captures),
+            });
+
+            // c. Set dtf.[[BoundFormat]] to F.
+            date_time_format.fields.bound_format = bound_format;
+        }
+
+        // 5. Return dtf.[[BoundFormat]].
+        return Value.from(date_time_format.fields.bound_format.?);
     }
 };
 
@@ -620,3 +688,72 @@ pub const DateTimeFormat = MakeObject(.{
     },
     .tag = .intl_date_time_format,
 });
+
+/// 11.5.7 FormatDateTime ( dateTimeFormat, x )
+/// https://tc39.es/ecma402/#sec-formatdatetime
+pub fn formatDateTime(agent: *Agent, date_time_format: *const DateTimeFormat, x_: f64) Agent.Error!Value {
+    const date = @import("../date.zig");
+    const x = date.timeClip(x_);
+    if (std.math.isNan(x)) return agent.throwException(.range_error, "Invalid time value", .{});
+    const result = formatDateTimeImpl(
+        agent.gc_allocator,
+        date_time_format,
+        x,
+    ) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        else => return agent.throwException(
+            .internal_error,
+            "Unhandled ICU4X error: {s}",
+            .{@errorName(err)},
+        ),
+    };
+    return Value.from(try String.fromUtf8(agent.gc_allocator, result));
+}
+
+fn formatDateTimeImpl(
+    allocator: Allocator,
+    date_time_format: *const DateTimeFormat,
+    x: f64,
+) (Allocator.Error || icu4zig.Error || icu4zig.CalendarError)![]const u8 {
+    const date = @import("../date.zig");
+
+    const data_provider = icu4zig.DataProvider.init();
+    defer data_provider.deinit();
+
+    const calendar = icu4zig.Calendar.init(data_provider, date_time_format.fields.calendar);
+    defer calendar.deinit();
+
+    const date_time = try icu4zig.DateTime.init(
+        date.yearFromTime(x),
+        date.monthFromTime(x) + 1,
+        date.dateFromTime(x),
+        date.hourFromTime(x),
+        date.minFromTime(x),
+        date.secFromTime(x),
+        @as(u32, @intCast(date.msFromTime(x))) * 1_000_000,
+        calendar,
+    );
+    defer date_time.deinit();
+
+    const time_zone = icu4zig.CustomTimeZone.fromIanaId(
+        data_provider,
+        date_time_format.fields.time_zone,
+    ) catch icu4zig.CustomTimeZone.fromOffset(
+        date_time_format.fields.time_zone,
+    ) catch unreachable;
+    defer time_zone.deinit();
+
+    const zoned_date_time_formatter = try icu4zig.ZonedDateTimeFormatter.init(
+        data_provider,
+        date_time_format.fields.locale,
+        date_time_format.fields.date_style orelse .short,
+        date_time_format.fields.time_style orelse .short,
+    );
+    const result = try zoned_date_time_formatter.format(
+        allocator,
+        date_time,
+        time_zone,
+    );
+
+    return result;
+}
