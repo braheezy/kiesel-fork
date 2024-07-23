@@ -531,6 +531,15 @@ pub const DateTimeFormatPrototype = struct {
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
 
+        // 11.3.2 Intl.DateTimeFormat.prototype [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+            .value = Value.from("Intl.DateTimeFormat"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+
         return object;
     }
 };
