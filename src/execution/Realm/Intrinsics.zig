@@ -85,6 +85,8 @@ lazy_intrinsics: struct {
     @"%Intl%": Object = null_intrinsic,
     @"%Intl.Collator%": Object = null_intrinsic,
     @"%Intl.Collator.prototype%": Object = null_intrinsic,
+    @"%Intl.DateTimeFormat%": Object = null_intrinsic,
+    @"%Intl.DateTimeFormat.prototype%": Object = null_intrinsic,
     @"%Intl.DisplayNames%": Object = null_intrinsic,
     @"%Intl.DisplayNames.prototype%": Object = null_intrinsic,
     @"%Intl.ListFormat%": Object = null_intrinsic,
@@ -375,6 +377,12 @@ pub fn @"%Intl.Collator%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%Intl.Collator.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Intl.Collator.prototype%", builtins.Intl.CollatorPrototype);
+}
+pub fn @"%Intl.DateTimeFormat%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Intl.DateTimeFormat%", builtins.Intl.DateTimeFormatConstructor);
+}
+pub fn @"%Intl.DateTimeFormat.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%Intl.DateTimeFormat.prototype%", builtins.Intl.DateTimeFormatPrototype);
 }
 pub fn @"%Intl.DisplayNames%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%Intl.DisplayNames%", builtins.Intl.DisplayNamesConstructor);

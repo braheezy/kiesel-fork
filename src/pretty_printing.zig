@@ -566,6 +566,35 @@ fn prettyPrintIntlCollator(
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
 }
+fn prettyPrintIntlDateTimeFormat(
+    intl_date_time_format: *const builtins.Intl.DateTimeFormat,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    const agent = intl_date_time_format.data.agent;
+    const locale = intl_date_time_format.fields.locale;
+    const tty_config = state.tty_config;
+
+    const resolved_options = intl_date_time_format.fields.resolvedOptions();
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Intl.DisplayNames(");
+    try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}, calendar: {pretty}, numberingSystem: {pretty}, timeZone: {pretty}", .{
+        Value.from(String.fromAscii(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(resolved_options.calendar),
+        Value.from(resolved_options.numbering_system),
+        Value.from(resolved_options.time_zone),
+    });
+    if (resolved_options.date_style) |date_style| {
+        try writer.print(", dateStyle: {pretty}", .{Value.from(date_style)});
+    }
+    if (resolved_options.time_style) |time_style| {
+        try writer.print(", timeStyle: {pretty}", .{Value.from(time_style)});
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
 
 fn prettyPrintIntlDisplayNames(
     intl_display_names: *const builtins.Intl.DisplayNames,
@@ -849,6 +878,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.TypedArray, prettyPrintTypedArray },
         } ++ if (build_options.enable_intl) .{
             .{ builtins.Intl.Collator, prettyPrintIntlCollator },
+            .{ builtins.Intl.DateTimeFormat, prettyPrintIntlDateTimeFormat },
             .{ builtins.Intl.DisplayNames, prettyPrintIntlDisplayNames },
             .{ builtins.Intl.ListFormat, prettyPrintIntlListFormat },
             .{ builtins.Intl.Locale, prettyPrintIntlLocale },

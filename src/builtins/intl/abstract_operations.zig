@@ -19,6 +19,19 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 const LocaleList = std.ArrayList(icu4zig.Locale);
 
+/// https://unicode.org/reports/tr35/#Unicode_locale_identifier
+/// type = alphanum{3,8} (sep alphanum{3,8})*
+pub fn matchUnicodeLocaleIdentifierType(str: []const u8) bool {
+    var it = std.mem.splitScalar(u8, str, '-');
+    while (it.next()) |part| {
+        if (part.len < 3 or part.len > 8) return false;
+        for (part) |c| {
+            if (!std.ascii.isAlphanumeric(c)) return false;
+        }
+    }
+    return true;
+}
+
 /// 9.2.1 CanonicalizeLocaleList ( locales )
 /// https://tc39.es/ecma402/#sec-canonicalizelocalelist
 pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleList {
@@ -153,4 +166,54 @@ pub fn coerceOptionsToObject(agent: *Agent, options: Value) Agent.Error!Object {
 
     // 2. Return ? ToObject(options).
     return options.toObject(agent);
+}
+
+/// 9.2.13 DefaultNumberOption ( value, minimum, maximum, fallback )
+/// https://tc39.es/ecma402/#sec-defaultnumberoption
+pub fn defaultNumberOption(
+    agent: *Agent,
+    value: Value,
+    property: []const u8,
+    minimum: i32,
+    maximum: i32,
+    fallback: ?i32,
+) Agent.Error!?i32 {
+    // 1. If value is undefined, return fallback.
+    if (value == .undefined) return fallback;
+
+    // 2. Set value to ? ToNumber(value).
+    const number = try value.toNumber(agent);
+
+    // 3. If value is not finite or ℝ(value) < minimum or ℝ(value) > maximum, throw a RangeError
+    //    exception.
+    if (!number.isFinite() or
+        number.asFloat() < @as(f64, @floatFromInt(minimum)) or
+        number.asFloat() > @as(f64, @floatFromInt(maximum)))
+    {
+        return agent.throwException(
+            .range_error,
+            "Number option '{s}' must be in range {}-{}",
+            .{ property, minimum, maximum },
+        );
+    }
+
+    // 4. Return floor(ℝ(value)).
+    return @intFromFloat(@floor(number.asFloat()));
+}
+
+/// 9.2.14 GetNumberOption ( options, property, minimum, maximum, fallback )
+/// https://tc39.es/ecma402/#sec-getnumberoption
+pub fn getNumberOption(
+    agent: *Agent,
+    options: Object,
+    comptime property: []const u8,
+    minimum: i32,
+    maximum: i32,
+    fallback: ?i32,
+) Agent.Error!?i32 {
+    // 1. Let value be ? Get(options, property).
+    const value = try options.get(PropertyKey.from(property));
+
+    // 2. Return ? DefaultNumberOption(value, minimum, maximum, fallback).
+    return defaultNumberOption(agent, value, property, minimum, maximum, fallback);
 }

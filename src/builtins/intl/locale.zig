@@ -7,6 +7,7 @@ const Allocator = std.mem.Allocator;
 
 const icu4zig = @import("icu4zig");
 
+const abstract_operations = @import("abstract_operations.zig");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
@@ -26,6 +27,7 @@ const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getOption = types.getOption;
+const matchUnicodeLocaleIdentifierType = abstract_operations.matchUnicodeLocaleIdentifierType;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
@@ -37,19 +39,6 @@ const UnicodeExtensions = struct {
     kn: ?String = null,
     nu: ?String = null,
 };
-
-/// https://unicode.org/reports/tr35/#Unicode_locale_identifier
-/// type = alphanum{3,8} (sep alphanum{3,8})*
-fn matchUnicodeLocaleIdentifierType(str: []const u8) bool {
-    var it = std.mem.splitScalar(u8, str, '-');
-    while (it.next()) |part| {
-        if (part.len < 3 or part.len > 8) return false;
-        for (part) |c| {
-            if (!std.ascii.isAlphanumeric(c)) return false;
-        }
-    }
-    return true;
-}
 
 /// 14.1.2 UpdateLanguageId ( tag, options )
 /// https://tc39.es/ecma402/#sec-updatelanguageid

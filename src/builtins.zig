@@ -285,6 +285,7 @@ pub const setFunctionName = ecmascript_function.setFunctionName;
 pub const setValueInBuffer = array_buffer.setValueInBuffer;
 pub const sortIndexedProperties = array.sortIndexedProperties;
 pub const stringCreate = string.stringCreate;
+pub const systemTimeZoneIdentifier = date.systemTimeZoneIdentifier;
 pub const triggerPromiseReactions = promise.triggerPromiseReactions;
 pub const typedArrayElementSize = typed_array.typedArrayElementSize;
 pub const typedArrayLength = typed_array.typedArrayLength;

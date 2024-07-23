@@ -34,6 +34,9 @@ pub const Intl = struct {
     pub const Collator = @import("./intl/collator.zig").Collator;
     pub const CollatorConstructor = @import("./intl/collator.zig").CollatorConstructor;
     pub const CollatorPrototype = @import("./intl/collator.zig").CollatorPrototype;
+    pub const DateTimeFormat = @import("./intl/date_time_format.zig").DateTimeFormat;
+    pub const DateTimeFormatConstructor = @import("./intl/date_time_format.zig").DateTimeFormatConstructor;
+    pub const DateTimeFormatPrototype = @import("./intl/date_time_format.zig").DateTimeFormatPrototype;
     pub const DisplayNames = @import("./intl/display_names.zig").DisplayNames;
     pub const DisplayNamesConstructor = @import("./intl/display_names.zig").DisplayNamesConstructor;
     pub const DisplayNamesPrototype = @import("./intl/display_names.zig").DisplayNamesPrototype;
@@ -72,6 +75,15 @@ pub const Intl = struct {
         // https://tc39.es/ecma402/#sec-intl.collator-intro
         try defineBuiltinProperty(object, "Collator", PropertyDescriptor{
             .value = Value.from(try realm.intrinsics.@"%Intl.Collator%"()),
+            .writable = true,
+            .enumerable = false,
+            .configurable = true,
+        });
+
+        // 8.2.2 Intl.DateTimeFormat ( . . . )
+        // https://tc39.es/ecma402/#sec-intl.datetimeformat-intro
+        try defineBuiltinProperty(object, "DateTimeFormat", PropertyDescriptor{
+            .value = Value.from(try realm.intrinsics.@"%Intl.DateTimeFormat%"()),
             .writable = true,
             .enumerable = false,
             .configurable = true,
