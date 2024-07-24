@@ -7,8 +7,8 @@
             .hash = "122068e632c479fa771ed988bf36c10db5bd0b2918b92569b2fa440785e4013055a8",
         },
         .icu4zig = .{
-            .url = "https://codeberg.org/linusg/icu4zig/archive/37904aa786ebcede6918e28cfa1c1f960c8c67d2.tar.gz",
-            .hash = "122040eb756fbbab8fdc9eb789e16c79aa6f7e11ba40c86a8471ae2a0f68d0b763e4",
+            .url = "https://codeberg.org/linusg/icu4zig/archive/f51683c38d668459c9c5d00d67d2e2915a43352f.tar.gz",
+            .hash = "1220fd1a5e790893161fe8fe6b2e2dd6e2881e078257668aa1ef61a4e535095b309d",
             .lazy = true,
         },
         .kiesel_runtime = .{
