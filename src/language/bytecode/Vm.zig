@@ -2239,6 +2239,41 @@ fn instantiateAsyncArrowFunctionExpression(
     return closure;
 }
 
+fn getArgumentSpreadIndices(self: *Self) Allocator.Error![]const usize {
+    const value = self.stack.pop();
+    if (value == .undefined) return &.{};
+    const array = value.object;
+    const len = getArrayLength(array);
+    var argument_spread_indices = try std.ArrayList(usize).initCapacity(self.agent.gc_allocator, len);
+    for (0..len) |i| {
+        const argument_spread_index = array.propertyStorage().get(
+            PropertyKey.from(@as(u53, @intCast(i))),
+        ).?.value.?.number.i32;
+        argument_spread_indices.appendAssumeCapacity(@intCast(argument_spread_index));
+    }
+    return argument_spread_indices.toOwnedSlice();
+}
+
+fn getArguments(self: *Self, argument_count: usize) Agent.Error![]const Value {
+    self.function_arguments.clearRetainingCapacity();
+    try self.function_arguments.ensureTotalCapacity(argument_count); // May still resize when spreading
+    const argument_spread_indices = try self.getArgumentSpreadIndices();
+    defer self.agent.gc_allocator.free(argument_spread_indices);
+    for (0..argument_count) |i| {
+        const argument = self.stack.pop();
+        if (std.mem.indexOfScalar(usize, argument_spread_indices, argument_count - i - 1) == null) {
+            try self.function_arguments.insert(0, argument);
+        } else {
+            var iterator = try getIterator(self.agent, argument, .sync);
+            var n: usize = 0;
+            while (try iterator.stepValue()) |value| : (n += 1) {
+                try self.function_arguments.insert(n, value);
+            }
+        }
+    }
+    return self.function_arguments.items;
+}
+
 pub fn executeInstruction(
     self: *Self,
     executable: Executable,
@@ -2496,14 +2531,7 @@ pub fn executeInstruction(
             const maybe_reference = self.reference_stack.getLastOrNull() orelse null;
             const argument_count = self.fetchIndex(executable);
             const strict = self.fetchIndex(executable) == 1;
-            self.function_arguments.clearRetainingCapacity();
-            try self.function_arguments.ensureTotalCapacity(argument_count);
-            for (0..argument_count) |_| {
-                const argument = self.stack.pop();
-                self.function_arguments.appendAssumeCapacity(argument);
-            }
-            std.mem.reverse(Value, self.function_arguments.items);
-            const arguments = self.function_arguments.items;
+            const arguments = try self.getArguments(argument_count);
             const this_value = self.stack.pop();
             const function = self.stack.pop();
 
@@ -2577,14 +2605,7 @@ pub fn executeInstruction(
         },
         .evaluate_new => {
             const argument_count = self.fetchIndex(executable);
-            self.function_arguments.clearRetainingCapacity();
-            try self.function_arguments.ensureTotalCapacity(argument_count);
-            for (0..argument_count) |_| {
-                const argument = self.stack.pop();
-                self.function_arguments.appendAssumeCapacity(argument);
-            }
-            std.mem.reverse(Value, self.function_arguments.items);
-            const arguments = self.function_arguments.items;
+            const arguments = try self.getArguments(argument_count);
             const constructor = self.stack.pop();
             self.result = try evaluateNew(self.agent, constructor, arguments);
         },
@@ -2654,14 +2675,7 @@ pub fn executeInstruction(
             const function = try getSuperConstructor(self.agent);
 
             // 4. Let argList be ? ArgumentListEvaluation of Arguments.
-            self.function_arguments.clearRetainingCapacity();
-            try self.function_arguments.ensureTotalCapacity(argument_count);
-            for (0..argument_count) |_| {
-                const argument = self.stack.pop();
-                self.function_arguments.appendAssumeCapacity(argument);
-            }
-            std.mem.reverse(Value, self.function_arguments.items);
-            const arguments = self.function_arguments.items;
+            const arguments = try self.getArguments(argument_count);
 
             // 5. If IsConstructor(func) is false, throw a TypeError exception.
             if (!function.isConstructor()) {

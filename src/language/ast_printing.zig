@@ -80,9 +80,7 @@ pub fn printNewExpression(node: ast.NewExpression, writer: anytype, indentation:
     try print("expression:", writer, indentation + 1);
     try printExpression(node.expression.*, writer, indentation + 2);
     try print("arguments:", writer, indentation + 1);
-    for (node.arguments) |argument| {
-        try printExpression(argument, writer, indentation + 2);
-    }
+    try printArguments(node.arguments, writer, indentation + 2);
 }
 
 pub fn printCallExpression(node: ast.CallExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
@@ -90,21 +88,27 @@ pub fn printCallExpression(node: ast.CallExpression, writer: anytype, indentatio
     try print("expression:", writer, indentation + 1);
     try printExpression(node.expression.*, writer, indentation + 2);
     try print("arguments:", writer, indentation + 1);
-    for (node.arguments) |argument| {
-        try printExpression(argument, writer, indentation + 2);
-    }
+    try printArguments(node.arguments, writer, indentation + 2);
 }
 
 pub fn printSuperCall(node: ast.SuperCall, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("SuperCall", writer, indentation);
-    for (node.arguments) |argument| {
-        try printExpression(argument, writer, indentation + 1);
-    }
+    try printArguments(node.arguments, writer, indentation + 1);
 }
 
 pub fn printImportCall(node: ast.ImportCall, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("ImportCall", writer, indentation);
     try printExpression(node.expression.*, writer, indentation + 1);
+}
+
+pub fn printArguments(node: ast.Arguments, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    for (node) |argument| switch (argument) {
+        .expression => |expression| try printExpression(expression, writer, indentation),
+        .spread => |expression| {
+            try print("...", writer, indentation);
+            try printExpression(expression, writer, indentation);
+        },
+    };
 }
 
 pub fn printOptionalExpression(node: ast.OptionalExpression, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
@@ -118,9 +122,7 @@ pub fn printOptionalExpression(node: ast.OptionalExpression, writer: anytype, in
         .private_identifier => |private_identifier| try printPrivateIdentifier(private_identifier, writer, indentation + 2),
         .arguments => |arguments| {
             try print("arguments:", writer, indentation + 2);
-            for (arguments) |argument| {
-                try printExpression(argument, writer, indentation + 3);
-            }
+            try printArguments(arguments, writer, indentation + 3);
         },
     }
 }

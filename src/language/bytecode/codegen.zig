@@ -598,11 +598,7 @@ pub fn codegenNewExpression(
     if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
     try executable.addInstruction(.load);
 
-    for (node.arguments) |argument| {
-        try codegenExpression(argument, executable, ctx);
-        if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
-    }
+    try codegenArguments(node.arguments, executable, ctx);
 
     try executable.addInstruction(.evaluate_new);
     try executable.addIndex(node.arguments.len);
@@ -630,11 +626,7 @@ pub fn codegenCallExpression(
 
     try executable.addInstruction(.load_this_value_for_evaluate_call);
 
-    for (node.arguments) |argument| {
-        try codegenExpression(argument, executable, ctx);
-        if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
-    }
+    try codegenArguments(node.arguments, executable, ctx);
 
     const strict = ctx.contained_in_strict_mode_code;
 
@@ -710,13 +702,77 @@ pub fn codegenSuperCall(
     ctx: *Context,
 ) Executable.Error!void {
     // SuperCall : super Arguments
-    for (node.arguments) |argument| {
-        try codegenExpression(argument, executable, ctx);
-        if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        try executable.addInstruction(.load);
-    }
+    try codegenArguments(node.arguments, executable, ctx);
     try executable.addInstruction(.evaluate_super_call);
     try executable.addIndex(node.arguments.len);
+}
+
+/// 13.3.8.1 Runtime Semantics: ArgumentListEvaluation
+/// https://tc39.es/ecma262/#sec-runtime-semantics-argumentlistevaluation
+pub fn codegenArguments(
+    node: ast.Arguments,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    // Arguments : ( )
+    // 1. Return a new empty List.
+    var spread_indices = std.ArrayList(usize).init(executable.allocator);
+    defer spread_indices.deinit();
+    for (node, 0..) |argument, i| switch (argument) {
+        // ArgumentList : AssignmentExpression
+        // 1. Let ref be ? Evaluation of AssignmentExpression.
+        // 2. Let arg be ? GetValue(ref).
+        // 3. Return « arg ».
+        // ArgumentList : ArgumentList , AssignmentExpression
+        // 1. Let precedingArgs be ? ArgumentListEvaluation of ArgumentList.
+        // 2. Let ref be ? Evaluation of AssignmentExpression.
+        // 3. Let arg be ? GetValue(ref).
+        // 4. Return the list-concatenation of precedingArgs and « arg ».
+        .expression => |expression| {
+            try codegenExpression(expression, executable, ctx);
+            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
+        },
+
+        // ArgumentList : ... AssignmentExpression
+        // 1. Let list be a new empty List.
+        // 2. Let spreadRef be ? Evaluation of AssignmentExpression.
+        // 3. Let spreadObj be ? GetValue(spreadRef).
+        // 4. Let iteratorRecord be ? GetIterator(spreadObj, sync).
+        // 5. Repeat,
+        //     a. Let next be ? IteratorStepValue(iteratorRecord).
+        //     b. If next is done, return list.
+        //     c. Append next to list.
+        // ArgumentList : ArgumentList , ... AssignmentExpression
+        // 1. Let precedingArgs be ? ArgumentListEvaluation of ArgumentList.
+        // 2. Let spreadRef be ? Evaluation of AssignmentExpression.
+        // 3. Let iteratorRecord be ? GetIterator(? GetValue(spreadRef), sync).
+        // 4. Repeat,
+        //     a. Let next be ? IteratorStepValue(iteratorRecord).
+        //     b. If next is done, return precedingArgs.
+        //     c. Append next to precedingArgs.
+        .spread => |expression| {
+            try codegenExpression(expression, executable, ctx);
+            if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            try executable.addInstruction(.load);
+            try spread_indices.append(i);
+        },
+    };
+
+    if (spread_indices.items.len == 0) {
+        try executable.addInstructionWithConstant(.load_constant, .undefined);
+    } else {
+        try executable.addInstruction(.array_create);
+        try executable.addInstruction(.load);
+        for (spread_indices.items) |spread_index| {
+            try executable.addInstructionWithConstant(
+                .load_constant,
+                Value.from(@as(u53, @intCast(spread_index))),
+            );
+            try executable.addInstruction(.array_push_value);
+            try executable.addInstruction(.load);
+        }
+    }
 }
 
 /// 13.3.9.1 Runtime Semantics: Evaluation
@@ -761,11 +817,7 @@ pub fn codegenOptionalExpression(
         .arguments => |arguments| {
             try executable.addInstruction(.load_this_value_for_evaluate_call);
 
-            for (arguments) |argument| {
-                try codegenExpression(argument, executable, ctx);
-                if (argument.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.load);
-            }
+            try codegenArguments(arguments, executable, ctx);
 
             // TODO: 1. Let thisChain be this OptionalChain.
             // TODO: 2. Let tailCall be IsInTailPosition(thisChain).
@@ -908,6 +960,7 @@ pub fn codegenTaggedTemplate(
     }
 
     // 5. Return ? EvaluateCall(tagFunc, tagRef, TemplateLiteral, tailCall).
+    try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
     try executable.addInstruction(.evaluate_call);
     try executable.addIndex(@divFloor(node.template_literal.spans.len, 2) + 1);
     const strict = ctx.contained_in_strict_mode_code;
@@ -2567,6 +2620,7 @@ fn forInOfBodyEvaluation(
 
     // a. Let nextResult be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
     try executable.addInstruction(.load_iterator_next_args);
+    try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
     try executable.addInstruction(.evaluate_call);
     try executable.addIndex(0); // No arguments
     try executable.addIndex(0); // Strictness doesn't matter here

@@ -746,7 +746,7 @@ pub fn acceptNewExpression(self: *Self) AcceptError!ast.NewExpression {
         try self.emitErrorAt(token.location, "'new' expression cannot be used with 'super()'", .{});
         return error.UnexpectedToken;
     }
-    const arguments = self.acceptArguments() catch &[_]ast.Expression{};
+    const arguments = self.acceptArguments() catch &[_]ast.Argument{};
     return .{ .expression = expression, .arguments = arguments };
 }
 
@@ -801,14 +801,19 @@ pub fn acceptArguments(self: *Self) AcceptError!ast.Arguments {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var arguments = std.ArrayList(ast.Expression).init(self.allocator);
+    var arguments = std.ArrayList(ast.Argument).init(self.allocator);
     errdefer arguments.deinit();
     _ = try self.core.accept(RuleSet.is(.@"("));
     const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
-    while (self.acceptExpression(ctx)) |argument| {
-        try arguments.append(argument);
+    while (true) {
+        if (self.acceptExpression(ctx)) |expression| {
+            try arguments.append(.{ .expression = expression });
+        } else |_| if (self.core.accept(RuleSet.is(.@"..."))) |_| {
+            const expression = try self.acceptExpression(ctx);
+            try arguments.append(.{ .spread = expression });
+        } else |_| break;
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
-    } else |_| {}
+    }
     _ = try self.core.accept(RuleSet.is(.@")"));
     return arguments.toOwnedSlice();
 }

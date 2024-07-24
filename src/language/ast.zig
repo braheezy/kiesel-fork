@@ -189,7 +189,11 @@ pub const ImportCall = struct {
 };
 
 /// https://tc39.es/ecma262/#prod-Arguments
-pub const Arguments = []const Expression;
+pub const Arguments = []const Argument;
+pub const Argument = union(enum) {
+    expression: Expression,
+    spread: Expression,
+};
 
 /// https://tc39.es/ecma262/#prod-OptionalExpression
 pub const OptionalExpression = struct {
