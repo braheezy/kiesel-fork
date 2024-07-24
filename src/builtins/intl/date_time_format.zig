@@ -27,11 +27,14 @@ const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const coerceOptionsToObject = abstract_operations.coerceOptionsToObject;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getNumberOption = abstract_operations.getNumberOption;
 const getOption = types.getOption;
 const matchUnicodeLocaleIdentifierType = abstract_operations.matchUnicodeLocaleIdentifierType;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const noexcept = utils.noexcept;
+const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const systemTimeZoneIdentifier = builtins.systemTimeZoneIdentifier;
 
 /// 11.1.2 CreateDateTimeFormat ( newTarget, locales, options, required, defaults )
@@ -534,6 +537,7 @@ pub const DateTimeFormatPrototype = struct {
         });
 
         try defineBuiltinAccessor(object, "format", format, null, realm);
+        try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
         // 11.3.2 Intl.DateTimeFormat.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype-%symbol.tostringtag%
@@ -609,6 +613,78 @@ pub const DateTimeFormatPrototype = struct {
 
         // 5. Return dtf.[[BoundFormat]].
         return Value.from(date_time_format.fields.bound_format.?);
+    }
+
+    /// 11.3.7 Intl.DateTimeFormat.prototype.resolvedOptions ( )
+    /// https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype.resolvedoptions
+    fn resolvedOptions(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        const realm = agent.currentRealm();
+
+        // 1. Let lf be the this value.
+        // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1, then
+        //     a. Set dtf to ? UnwrapDateTimeFormat(dtf).
+        // 3. Perform ? RequireInternalSlot(dtf, [[InitializedDateTimeFormat]]).
+        const date_time_format = try this_value.requireInternalSlot(agent, DateTimeFormat);
+
+        // 4. Let options be OrdinaryObjectCreate(%Object.prototype%).
+        const options = try ordinaryObjectCreate(
+            agent,
+            try realm.intrinsics.@"%Object.prototype%"(),
+        );
+
+        // 5. For each row of Table 15, except the header row, in table order, do
+        //     a. Let p be the Property value of the current row.
+        //     b. If there is an Internal Slot value in the current row, then
+        //         i. Let v be the value of dtf's internal slot whose name is the Internal Slot value of the current row.
+        //     c. Else,
+        //         i. Let format be dtf.[[DateTimeFormat]].
+        //         ii. If format has a field [[<p>]] and dtf.[[DateStyle]] is undefined and dtf.[[TimeStyle]] is undefined, then
+        //             1. Let v be format.[[<p>]].
+        //         iii. Else,
+        //             1. Let v be undefined.
+        //     d. If v is not undefined, then
+        //         i. If there is a Conversion value in the current row, then
+        //             1. Let conversion be the Conversion value of the current row.
+        //             2. If conversion is hour12, then
+        //                 a. If v is "h11" or "h12", set v to true. Otherwise, set v to false.
+        //             3. Else,
+        //                 a. Assert: conversion is number.
+        //                 b. Set v to 𝔽(v).
+        //         ii. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        const resolved_options = date_time_format.fields.resolvedOptions();
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("locale"),
+            Value.from(String.fromAscii(try date_time_format.fields.locale.toString(agent.gc_allocator))),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("calendar"),
+            Value.from(resolved_options.calendar),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("numberingSystem"),
+            Value.from(resolved_options.numbering_system),
+        ) catch |err| try noexcept(err);
+        options.createDataPropertyOrThrow(
+            PropertyKey.from("timeZone"),
+            Value.from(resolved_options.time_zone),
+        ) catch |err| try noexcept(err);
+        if (resolved_options.date_style) |date_style| {
+            options.createDataPropertyOrThrow(
+                PropertyKey.from("dateStyle"),
+                Value.from(date_style),
+            ) catch |err| try noexcept(err);
+        }
+        if (resolved_options.time_style) |time_style| {
+            options.createDataPropertyOrThrow(
+                PropertyKey.from("timeStyle"),
+                Value.from(time_style),
+            ) catch |err| try noexcept(err);
+        }
+        // TODO: hourCycle, hour12, weekday, era, year, month, day, dayPeriod, hour, minute,
+        //       second, fractionalSecondDigits, timeZoneName
+
+        // 6. Return options.
+        return Value.from(options);
     }
 };
 
