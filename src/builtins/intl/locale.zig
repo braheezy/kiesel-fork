@@ -95,39 +95,43 @@ fn makeLocaleRecord(agent: *Agent, tag: icu4zig.Locale, options: UnicodeExtensio
     // 1-8.
     // This code ain't nice, I know.
     const str = try tag.toString(agent.gc_allocator);
-    var unicode_extensions = str;
-    const end = if (std.mem.indexOf(u8, str, "-x-")) |end| blk: {
-        unicode_extensions = unicode_extensions[0..end];
-        break :blk end;
-    } else null;
-    const start = if (std.mem.indexOf(u8, str, "-u-")) |start| blk: {
-        unicode_extensions = unicode_extensions[start + 3 ..];
-        break :blk start;
-    } else return tag.clone();
     var parts = std.ArrayList([]const u8).init(agent.gc_allocator);
     defer parts.deinit();
-    try parts.append(str[0 .. start + 2]);
-    var it = std.mem.splitScalar(u8, unicode_extensions, '-');
-    outer: while (it.next()) |key| {
-        const value: ?[]const u8 = blk: {
-            var value_parts = std.ArrayList([]const u8).init(agent.gc_allocator);
-            defer value_parts.deinit();
-            while (it.peek()) |next| {
-                if (next.len == 2) break;
-                try value_parts.append(it.next().?);
+    const end = std.mem.indexOf(u8, str, "-x-");
+    if (std.mem.indexOf(u8, str, "-u-")) |start| {
+        try parts.append(str[0 .. start + 2]);
+        const unicode_extensions = str[start + 3 .. end orelse str.len];
+        var it = std.mem.splitScalar(u8, unicode_extensions, '-');
+        outer: while (it.next()) |key| {
+            if (key.len == 0) break;
+            const value: ?[]const u8 = blk: {
+                var value_parts = std.ArrayList([]const u8).init(agent.gc_allocator);
+                defer value_parts.deinit();
+                while (it.peek()) |next| {
+                    if (next.len == 2) break;
+                    try value_parts.append(it.next().?);
+                }
+                break :blk if (value_parts.items.len > 0)
+                    try std.mem.join(agent.gc_allocator, "-", value_parts.items)
+                else
+                    null;
+            };
+            inline for (comptime std.meta.fieldNames(UnicodeExtensions)) |field_name| {
+                if (std.mem.eql(u8, key, field_name)) {
+                    if (@field(options, field_name) != null) continue :outer;
+                }
             }
-            break :blk if (value_parts.items.len > 0)
-                try std.mem.join(agent.gc_allocator, "-", value_parts.items)
-            else
-                null;
-        };
+            try parts.append(key);
+            if (value != null) try parts.append(value.?);
+        }
+    } else {
+        try parts.append(str[0 .. end orelse str.len]);
         inline for (comptime std.meta.fieldNames(UnicodeExtensions)) |field_name| {
-            if (std.mem.eql(u8, key, field_name)) {
-                if (@field(options, field_name) != null) continue :outer;
+            if (@field(options, field_name) != null) {
+                try parts.append("u");
+                break;
             }
         }
-        try parts.append(key);
-        if (value != null) try parts.append(value.?);
     }
     inline for (comptime std.meta.fieldNames(UnicodeExtensions)) |field_name| {
         if (@field(options, field_name)) |new_value| {
