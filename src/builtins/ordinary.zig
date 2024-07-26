@@ -314,17 +314,19 @@ fn validateAndApplyPropertyDescriptor(
         if (current.isAccessorDescriptor()) {
             // i. If Desc has a [[Get]] field and SameValue(Desc.[[Get]], current.[[Get]]) is false,
             //    return false.
-            if (descriptor.get != null and
-                ((descriptor.get.? == null and current.get.? != null) or
-                (descriptor.get.? != null and current.get.? == null) or
-                !descriptor.get.?.?.sameValue(current.get.?.?))) return false;
+            if (descriptor.get != null and !(blk: {
+                if (descriptor.get.? == null and current.get.? == null) break :blk true;
+                if (descriptor.get.?) |a| if (current.get.?) |b| break :blk a.sameValue(b);
+                break :blk false;
+            })) return false;
 
             // ii. If Desc has a [[Set]] field and SameValue(Desc.[[Set]], current.[[Set]]) is
             //     false, return false.
-            if (descriptor.set != null and
-                ((descriptor.set.? == null and current.set.? != null) or
-                (descriptor.set.? != null and current.set.? == null) or
-                !descriptor.set.?.?.sameValue(current.set.?.?))) return false;
+            if (descriptor.set != null and !(blk: {
+                if (descriptor.set.? == null and current.set.? == null) break :blk true;
+                if (descriptor.set.?) |a| if (current.set.?) |b| break :blk a.sameValue(b);
+                break :blk false;
+            })) return false;
         }
         // e. Else if current.[[Writable]] is false, then
         else if (!current.writable.?) {
