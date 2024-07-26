@@ -241,13 +241,15 @@ pub const String = union(enum) {
         if (search_value.isEmpty() and from_index <= len) return from_index;
         if (from_index >= len or search_len > len) return null;
         if (self == .ascii and search_value == .ascii) {
-            return if (std.mem.lastIndexOf(u8, self.ascii[0..from_index], search_value.ascii)) |index|
+            const end = std.math.clamp(from_index + search_len, 0, self.ascii.len);
+            return if (std.mem.lastIndexOf(u8, self.ascii[0..end], search_value.ascii)) |index|
                 index
             else
                 null;
         }
         if (self == .utf16 and search_value == .utf16) {
-            return if (std.mem.lastIndexOf(u16, self.utf16[0..from_index], search_value.utf16)) |index|
+            const end = std.math.clamp(from_index + search_len, 0, self.utf16.len);
+            return if (std.mem.lastIndexOf(u16, self.utf16[0..end], search_value.utf16)) |index|
                 index
             else
                 null;
