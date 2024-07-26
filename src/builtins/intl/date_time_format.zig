@@ -23,6 +23,7 @@ const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
 const String = types.String;
 const Value = types.Value;
+const calendarToBcp47 = abstract_operations.calendarToBcp47;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const coerceOptionsToObject = abstract_operations.coerceOptionsToObject;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -724,27 +725,7 @@ pub const DateTimeFormat = MakeObject(.{
         bound_format: ?Object,
 
         pub fn resolvedOptions(self: @This()) ResolvedOptions {
-            // See: https://www.unicode.org/repos/cldr/tags/latest/common/bcp47/calendar.xml
-            const calendar = switch (self.calendar) {
-                .buddhist => String.fromLiteral("buddhist"),
-                .chinese => String.fromLiteral("chinese"),
-                .coptic => String.fromLiteral("coptic"),
-                .dangi => String.fromLiteral("dangi"),
-                .ethiopian => String.fromLiteral("ethiopic"),
-                .ethiopian_amete_alem => String.fromLiteral("ethioaa"),
-                .gregorian => String.fromLiteral("gregory"),
-                .hebrew => String.fromLiteral("hebrew"),
-                .indian => String.fromLiteral("indian"),
-                .islamic_civil => String.fromLiteral("islamic-civil"),
-                .islamic_observational => String.fromLiteral("islamic"),
-                .islamic_tabular => String.fromLiteral("islamic-tbla"),
-                .islamic_umm_al_qura => String.fromLiteral("islamic-umalqura"),
-                .iso => String.fromLiteral("iso8601"),
-                .japanese => String.fromLiteral("japanese"),
-                .japanese_extended => unreachable, // Not listed?
-                .persian => String.fromLiteral("persian"),
-                .roc => String.fromLiteral("roc"),
-            };
+            const calendar = String.fromAscii(calendarToBcp47(self.calendar));
             const numbering_system = String.fromAscii(self.numbering_system);
             const time_zone = String.fromAscii(self.time_zone);
             return .{

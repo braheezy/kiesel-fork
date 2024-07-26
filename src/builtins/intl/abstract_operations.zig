@@ -32,6 +32,30 @@ pub fn matchUnicodeLocaleIdentifierType(str: []const u8) bool {
     return true;
 }
 
+pub fn calendarToBcp47(calendar_kind: icu4zig.Calendar.Kind) []const u8 {
+    // See: https://www.unicode.org/repos/cldr/tags/latest/common/bcp47/calendar.xml
+    return switch (calendar_kind) {
+        .buddhist => "buddhist",
+        .chinese => "chinese",
+        .coptic => "coptic",
+        .dangi => "dangi",
+        .ethiopian => "ethiopic",
+        .ethiopian_amete_alem => "ethioaa",
+        .gregorian => "gregory",
+        .hebrew => "hebrew",
+        .indian => "indian",
+        .islamic_civil => "islamic-civil",
+        .islamic_observational => "islamic",
+        .islamic_tabular => "islamic-tbla",
+        .islamic_umm_al_qura => "islamic-umalqura",
+        .iso => "iso8601",
+        .japanese => "japanese",
+        .japanese_extended => unreachable, // Not listed?
+        .persian => "persian",
+        .roc => "roc",
+    };
+}
+
 /// 9.2.1 CanonicalizeLocaleList ( locales )
 /// https://tc39.es/ecma402/#sec-canonicalizelocalelist
 pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleList {
