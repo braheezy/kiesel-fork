@@ -56,6 +56,72 @@ pub fn calendarToBcp47(calendar_kind: icu4zig.Calendar.Kind) []const u8 {
     };
 }
 
+/// 6.9.1 AvailableCalendars ( )
+/// https://tc39.es/ecma402/#sec-availablecalendars
+pub inline fn availableCalendars() []const []const u8 {
+    // The implementation-defined abstract operation AvailableCalendars takes no arguments and
+    // returns a List of Strings. The returned List is sorted according to lexicographic code unit
+    // order, and contains unique calendar types in canonical form (6.9) identifying the calendars
+    // for which the implementation provides the functionality of Intl.DateTimeFormat objects,
+    // including their aliases (e.g., either both or neither of "islamicc" and "islamic-civil").
+    // The List must include "iso8601".
+    // NOTE: For now we only include the canonical BCP 47 language tags, so this isn't spec compliant.
+    comptime {
+        const calendar_kinds = std.enums.values(icu4zig.Calendar.Kind);
+        var result: [calendar_kinds.len - 1][]const u8 = undefined;
+        var i = 0;
+        for (calendar_kinds) |calendar_kind| {
+            if (calendar_kind == .japanese_extended) continue;
+            result[i] = calendarToBcp47(calendar_kind);
+            i += 1;
+        }
+        const final = result; // Load bearing const assignment
+        return &final;
+    }
+}
+
+/// 6.6.3 AvailableCanonicalUnits ( )
+/// https://tc39.es/ecma402/#sec-availablecanonicalunits
+pub fn availableCanonicalUnits() []const []const u8 {
+    // The abstract operation AvailableCanonicalUnits takes no arguments and returns a List of
+    // Strings. The returned List is sorted according to lexicographic code unit order, and
+    // consists of the unique values of simple unit identifiers listed in every row of Table 2,
+    // except the header row.
+    return comptime &.{
+        "acre",        "bit",      "byte",              "celsius",     "centimeter",
+        "day",         "degree",   "fahrenheit",        "fluid-ounce", "foot",
+        "gallon",      "gigabit",  "gigabyte",          "gram",        "hectare",
+        "hour",        "inch",     "kilobit",           "kilobyte",    "kilogram",
+        "kilometer",   "liter",    "megabit",           "megabyte",    "meter",
+        "microsecond", "mile",     "mile-scandinavian", "milliliter",  "millimeter",
+        "millisecond", "minute",   "month",             "nanosecond",  "ounce",
+        "percent",     "petabyte", "pound",             "second",      "stone",
+        "terabit",     "terabyte", "week",              "yard",        "year",
+    };
+}
+
+/// 6.7.1 AvailableCanonicalNumberingSystems ( )
+/// https://tc39.es/ecma402/#sec-availablecanonicalnumberingsystems
+pub fn availableCanonicalNumberingSystems() []const []const u8 {
+    // The implementation-defined abstract operation AvailableCanonicalNumberingSystems takes no
+    // arguments and returns a List of Strings. The returned List is sorted according to
+    // lexicographic code unit order, and contains unique canonical numbering systems identifiers
+    // identifying the numbering systems for which the implementation provides the functionality of
+    // Intl.DateTimeFormat, Intl.NumberFormat, and Intl.RelativeTimeFormat objects. The List must
+    // include the Numbering System value of every row of Table 23, except the header row.
+    return comptime &.{
+        "adlm",    "ahom",     "arab",     "arabext",  "bali",     "beng", "bhks", "brah",
+        "cakm",    "cham",     "deva",     "diak",     "fullwide", "gong", "gonm", "gujr",
+        "guru",    "hanidec",  "hmng",     "hmnp",     "java",     "kali", "kawi", "khmr",
+        "knda",    "lana",     "lanatham", "laoo",     "latn",     "lepc", "limb", "mathbold",
+        "mathdbl", "mathmono", "mathsanb", "mathsans", "mlym",     "modi", "mong", "mroo",
+        "mtei",    "mymr",     "mymrshan", "mymrtlng", "nagm",     "newa", "nkoo", "olck",
+        "orya",    "osma",     "rohg",     "saur",     "segment",  "shrd", "sind", "sinh",
+        "sora",    "sund",     "takr",     "talu",     "tamldec",  "telu", "thai", "tibt",
+        "tirh",    "tnsa",     "vaii",     "wara",     "wcho",
+    };
+}
+
 /// 9.2.1 CanonicalizeLocaleList ( locales )
 /// https://tc39.es/ecma402/#sec-canonicalizelocalelist
 pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleList {

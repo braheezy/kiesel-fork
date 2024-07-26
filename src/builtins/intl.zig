@@ -20,6 +20,9 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
+const availableCalendars = abstract_operations.availableCalendars;
+const availableCanonicalNumberingSystems = abstract_operations.availableCanonicalNumberingSystems;
+const availableCanonicalUnits = abstract_operations.availableCanonicalUnits;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createArrayFromListMapToValue = types.createArrayFromListMapToValue;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
@@ -61,6 +64,7 @@ pub const Intl = struct {
         });
 
         try defineBuiltinFunction(object, "getCanonicalLocales", getCanonicalLocales, 1, realm);
+        try defineBuiltinFunction(object, "supportedValuesOf", supportedValuesOf, 1, realm);
 
         // 8.1.1 Intl [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl-toStringTag
@@ -137,6 +141,8 @@ pub const Intl = struct {
         return object;
     }
 
+    /// 8.3.1 Intl.getCanonicalLocales ( locales )
+    /// https://tc39.es/ecma402/#sec-intl.getcanonicallocales
     fn getCanonicalLocales(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const locales = arguments.get(0);
 
@@ -149,6 +155,69 @@ pub const Intl = struct {
             try createArrayFromListMapToValue(agent, icu4zig.Locale, locale_list.items, struct {
                 fn mapFn(agent_: *Agent, locale: icu4zig.Locale) Allocator.Error!Value {
                     return Value.from(String.fromAscii(try locale.toString(agent_.gc_allocator)));
+                }
+            }.mapFn),
+        );
+    }
+
+    /// 8.3.2 Intl.supportedValuesOf ( key )
+    /// https://tc39.es/ecma402/#sec-intl.supportedvaluesof
+    fn supportedValuesOf(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+        // 1. Let key be ? ToString(key).
+        const key = try arguments.get(0).toString(agent);
+
+        var list = std.ArrayList(String).init(agent.gc_allocator);
+        defer list.deinit();
+
+        // 2. If key is "calendar", then
+        if (key.eql(String.fromLiteral("calendar"))) {
+            // a. Let list be a new empty List.
+            // b. For each element identifier of AvailableCalendars(), do
+            //     i. Let canonical be CanonicalizeUValue("ca", identifier).
+            //     ii. If identifier is canonical, then
+            //         1. Append identifier to list.
+            for (availableCalendars()) |s| try list.append(String.fromAscii(s));
+        }
+        // 3. Else if key is "collation", then
+        else if (key.eql(String.fromLiteral("collation"))) {
+            // TODO: a. Let list be AvailableCanonicalCollations( ).
+        }
+        // 4. Else if key is "currency", then
+        else if (key.eql(String.fromLiteral("currency"))) {
+            // TODO: a. Let list be AvailableCanonicalCurrencies( ).
+        }
+        // 5. Else if key is "numberingSystem", then
+        else if (key.eql(String.fromLiteral("numberingSystem"))) {
+            // a. Let list be AvailableCanonicalNumberingSystems( ).
+            for (availableCanonicalNumberingSystems()) |s| try list.append(String.fromAscii(s));
+        }
+        // 6. Else if key is "timeZone", then
+        else if (key.eql(String.fromLiteral("timeZone"))) {
+            // TODO: a. Let list be AvailablePrimaryTimeZoneIdentifiers( ).
+            // See https://github.com/unicode-org/icu4x/issues/3970
+        }
+        // 7. Else if key is "unit", then
+        else if (key.eql(String.fromLiteral("unit"))) {
+            // a. Let list be AvailableCanonicalUnits( ).
+            for (availableCanonicalUnits()) |s| try list.append(String.fromAscii(s));
+        }
+        // 8. Else,
+        else {
+            // a. Throw a RangeError exception.
+            return agent.throwException(.range_error, "Invalid key '{}'", .{key});
+        }
+
+        std.mem.sortUnstable(String, list.items, {}, struct {
+            fn lessThanFn(_: void, lhs: String, rhs: String) bool {
+                return std.mem.lessThan(u8, lhs.ascii, rhs.ascii);
+            }
+        }.lessThanFn);
+
+        // 9. Return CreateArrayFromList( list ).
+        return Value.from(
+            try createArrayFromListMapToValue(agent, String, list.items, struct {
+                fn mapFn(_: *Agent, string: String) Allocator.Error!Value {
+                    return Value.from(string);
                 }
             }.mapFn),
         );
