@@ -736,7 +736,7 @@ pub const DateConstructor = struct {
         // 1. If NewTarget is undefined, then
         if (new_target == null) {
             // a. Let now be the time value (UTC) identifying the current time.
-            const now_: f64 = @floatFromInt(std.time.milliTimestamp());
+            const now_: f64 = @floatFromInt(agent.platform.currentTime());
 
             // b. Return ToDateString(now).
             return Value.from(String.fromAscii(try toDateString(agent.gc_allocator, now_)));
@@ -748,7 +748,7 @@ pub const DateConstructor = struct {
         // 3. If numberOfArgs = 0, then
         const date_value = if (number_of_args == 0) blk: {
             // a. Let dv be the time value (UTC) identifying the current time.
-            break :blk @as(f64, @floatFromInt(std.time.milliTimestamp()));
+            break :blk @as(f64, @floatFromInt(agent.platform.currentTime()));
         }
         // 4. Else if numberOfArgs = 1, then
         else if (number_of_args == 1) blk: {
@@ -840,10 +840,10 @@ pub const DateConstructor = struct {
 
     /// 21.4.3.1 Date.now ( )
     /// https://tc39.es/ecma262/#sec-date.now
-    fn now(_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
+    fn now(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         // This function returns the time value designating the UTC date and time of the occurrence
         // of the call to it.
-        const timestamp = std.time.milliTimestamp();
+        const timestamp = agent.platform.currentTime();
         return Value.from(@as(f64, @floatFromInt(timestamp)));
     }
 

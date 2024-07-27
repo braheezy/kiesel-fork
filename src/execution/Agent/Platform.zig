@@ -12,6 +12,7 @@ stderr: std.io.AnyWriter,
 tty_config: std.io.tty.Config,
 stack_info: ?stackinfo.StackInfo,
 default_locale: if (build_options.enable_intl) icu4zig.Locale else void,
+currentTime: *const fn () i64,
 
 // `any()` captures a pointer to the writer, so these have to stick around.
 const has_fd_t = @hasDecl(std.posix.system, "fd_t");
@@ -30,6 +31,7 @@ pub fn default() Self {
         .default_locale = if (build_options.enable_intl)
             icu4zig.Locale.init(null) catch unreachable
         else {},
+        .currentTime = std.time.milliTimestamp,
     };
 }
 

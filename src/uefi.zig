@@ -64,6 +64,7 @@ pub fn main() std.os.uefi.Status {
             .tty_config = .no_color,
             .stack_info = null,
             .default_locale = {},
+            .currentTime = std.time.milliTimestamp,
         },
     }) catch |err| switch (err) {
         error.OutOfMemory => return .OutOfResources,

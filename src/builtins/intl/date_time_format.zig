@@ -587,7 +587,7 @@ pub const DateTimeFormatPrototype = struct {
                     // 3. If date is not provided or is undefined, then
                     const x = if (date == .undefined) blk: {
                         // a. Let x be ! Call(%Date.now%, undefined).
-                        break :blk @as(f64, @floatFromInt(std.time.milliTimestamp()));
+                        break :blk @as(f64, @floatFromInt(agent_.platform.currentTime()));
                     }
                     // 4. Else,
                     else blk: {
