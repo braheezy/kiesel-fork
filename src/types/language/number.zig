@@ -613,16 +613,21 @@ pub const Number = union(enum) {
         if (self.isPositiveInf()) return String.fromLiteral("Infinity");
 
         // TODO: Implement steps 5-12 according to spec!
-        return String.fromAscii(try switch (self) {
-            .f64 => |x| if (x > @as(f64, 1e-7) and x < @as(f64, 1e21))
-                std.fmt.allocPrint(allocator, "{d}", .{x})
-            else
-                std.fmt.allocPrint(allocator, "{e}", .{x}),
+        return String.fromAscii(switch (self) {
+            .f64 => |x| if (x > 1e-7 and x < 1e21)
+                try std.fmt.allocPrint(allocator, "{d}", .{x})
+            else if (x < 0)
+                try std.fmt.allocPrint(allocator, "{e}", .{x})
+            else blk: {
+                const tmp = try std.fmt.allocPrint(allocator, "{e}", .{x});
+                defer allocator.free(tmp);
+                break :blk try std.mem.replaceOwned(u8, allocator, tmp, "e", "e+");
+            },
             .i32 => |x| switch (radix) {
-                2 => std.fmt.allocPrint(allocator, "{b}", .{x}),
-                8 => std.fmt.allocPrint(allocator, "{o}", .{x}),
-                16 => std.fmt.allocPrint(allocator, "{x}", .{x}),
-                else => std.fmt.allocPrint(allocator, "{d}", .{x}),
+                2 => try std.fmt.allocPrint(allocator, "{b}", .{x}),
+                8 => try std.fmt.allocPrint(allocator, "{o}", .{x}),
+                16 => try std.fmt.allocPrint(allocator, "{x}", .{x}),
+                else => try std.fmt.allocPrint(allocator, "{d}", .{x}),
             },
         });
     }
