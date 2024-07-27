@@ -66,7 +66,10 @@ pub const QueuedJob = struct {
 };
 
 pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
-    const platform = options.platform orelse Platform.default();
+    const platform = options.platform orelse if (@TypeOf(Platform.default) != void)
+        Platform.default()
+    else
+        @panic("No default implementation exists for this platform");
     pretty_printing.state.tty_config = platform.tty_config;
     var self: Self = .{
         .gc_allocator = gc_allocator,

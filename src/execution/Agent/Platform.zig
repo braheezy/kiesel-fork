@@ -14,13 +14,17 @@ stack_info: ?stackinfo.StackInfo,
 default_locale: if (build_options.enable_intl) icu4zig.Locale else void,
 currentTime: *const fn () i64,
 
-// `any()` captures a pointer to the writer, so these have to stick around.
 const has_fd_t = @hasDecl(std.posix.system, "fd_t");
+const has_clockid_t = @hasDecl(std.posix.system, "clockid_t") and
+    std.posix.system.clockid_t != void;
+
+// `any()` captures a pointer to the writer, so these have to stick around.
 var stdout_writer: if (has_fd_t) std.fs.File.Writer else void = undefined;
 var stderr_writer: if (has_fd_t) std.fs.File.Writer else void = undefined;
 
-pub fn default() Self {
-    if (!has_fd_t) @panic("Platform.default() not usable on this target");
+pub const default = if (has_clockid_t and has_fd_t) defaultImpl else {};
+
+fn defaultImpl() Self {
     stdout_writer = std.io.getStdOut().writer();
     stderr_writer = std.io.getStdErr().writer();
     return .{
