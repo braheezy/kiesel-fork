@@ -7,8 +7,8 @@
             .hash = "122068e632c479fa771ed988bf36c10db5bd0b2918b92569b2fa440785e4013055a8",
         },
         .icu4zig = .{
-            .url = "https://codeberg.org/linusg/icu4zig/archive/f51683c38d668459c9c5d00d67d2e2915a43352f.tar.gz",
-            .hash = "1220fd1a5e790893161fe8fe6b2e2dd6e2881e078257668aa1ef61a4e535095b309d",
+            .url = "https://codeberg.org/linusg/icu4zig/archive/25cdcb8475f41aacf33fd229b0a1048c53a6e162.tar.gz",
+            .hash = "12204c37c787eebb20e577edd78acfca4f47668526ef6199503456300ca2eb12949a",
             .lazy = true,
         },
         .kiesel_runtime = .{
@@ -19,8 +19,8 @@
             .lazy = true,
         },
         .libgc = .{
-            .url = "https://github.com/ivmai/bdwgc/archive/6992ccfd01fc3d04a6ad891b5fc7ac54fe3c66f4.tar.gz",
-            .hash = "1220166b9b8c5093f9931dac58950dba248ba333b1e5819fe0a58b4599c88e585cd6",
+            .url = "https://github.com/ivmai/bdwgc/archive/0a23b211b558137de7ee654c5527a54113142517.tar.gz",
+            .hash = "12200ce6e143367577284f796ac2a9f6d84b4dc3a79d20773720d5eba594ad82edf8",
         },
         .libregexp = .{
             .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/a0240bda2da27aa32ea6f175017fcea79c82daef.tar.gz",
@@ -33,8 +33,8 @@
             .lazy = true,
         },
         .parser_toolkit = .{
-            .url = "https://github.com/ikskuh/parser-toolkit/archive/9349d087a3216ebea27cc99b5b4bd8affe234816.tar.gz",
-            .hash = "12206f0ade18be8db985f6a688ca7ec9ffdbb95f033c8db91760b0d13cfe27618b61",
+            .url = "https://github.com/ikskuh/parser-toolkit/archive/0f3e2179346fa9948556595cbbb1c7ca575877d7.tar.gz",
+            .hash = "1220989ea38c6e870da7cf5012b552813d2867f010b4964ef7cbd137b1c534d5b0be",
         },
         .zig_args = .{
             .url = "https://github.com/ikskuh/zig-args/archive/03af1b6c5bfda9646a562c861055024daed5b238.tar.gz",
@@ -45,8 +45,7 @@
             .hash = "12207b3a0abfdf208a6f456d31f3f03054dda60db0d8e88065aee202a3195f8b00e0",
         },
         .zigline = .{
-            // FIXME: This points to https://github.com/alimpfard/zigline/pull/19, update once merged
-            .url = "https://github.com/alimpfard/zigline/archive/c0511aa7c647e6cc713aae972a41ef5b58a3ad40.tar.gz",
+            .url = "https://github.com/alimpfard/zigline/archive/fb6efc78edbb6cc4247a06e127cf67a58df7f263.tar.gz",
             .hash = "1220028df99a6973ec7b807a721f263ce91a1e110ebee1dd5b0dfcb6aa826c0ade5c",
         },
     },
