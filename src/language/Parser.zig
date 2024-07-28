@@ -1403,12 +1403,13 @@ pub fn acceptExpression(self: *Self, ctx: AcceptContext) AcceptError!ast.Express
             return error.UnexpectedToken,
     };
 
-    while (true) {
-        while (self.acceptTaggedTemplate(expression)) |tagged_template| {
-            expression = .{ .tagged_template = tagged_template };
-        } else |_| {}
-
+    outer: while (true) {
         next_token = try self.core.peek() orelse break;
+        while (next_token.type == .template or next_token.type == .template_head) {
+            expression = .{ .tagged_template = try self.acceptTaggedTemplate(expression) };
+            next_token = try self.core.peek() orelse break :outer;
+        }
+
         const new_ctx: AcceptContext = .{
             .precedence = getPrecedence(next_token.type),
             .associativity = getAssociativity(next_token.type),
