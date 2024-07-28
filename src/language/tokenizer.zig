@@ -401,6 +401,7 @@ fn numericMatcher(str: []const u8) ?usize {
 }
 
 fn stringMatcher(str: []const u8) ?usize {
+    if (str.len == 0 or (str[0] != '"' and str[0] != '\'')) return null;
     if (parseStringLiteral(str, .partial)) |string_literal|
         return string_literal.text.len
     else |err| switch (err) {
@@ -418,6 +419,7 @@ fn regularExpressionMatcher(str: []const u8) ?usize {
 }
 
 fn templateMatcher(str: []const u8) ?usize {
+    if (str.len == 0 or str[0] != '`') return null;
     if (parseTemplateLiteralSpan(str, .no_substitution)) |span|
         return span.text.len
     else |err| switch (err) {
@@ -426,6 +428,7 @@ fn templateMatcher(str: []const u8) ?usize {
 }
 
 fn templateHeadMatcher(str: []const u8) ?usize {
+    if (str.len == 0 or str[0] != '`') return null;
     if (parseTemplateLiteralSpan(str, .head)) |span| {
         return span.text.len;
     } else |err| switch (err) {
