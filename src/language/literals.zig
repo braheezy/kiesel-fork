@@ -340,19 +340,19 @@ pub fn parseRegularExpressionLiteral(
             .backslash => state = .pattern_character,
             else => return error.InvalidRegularExpressionLiteral,
         },
-        else => {
-            if (startsWithLineTerminator(str[i..])) return error.InvalidRegularExpressionLiteral;
-            switch (state) {
-                .opening_slash, .pattern_character, .backslash => state = .pattern_character,
-                .closing_slash, .flag_character => switch (consume) {
-                    .partial => return .{
-                        .pattern = str[1..closing_slash_index],
-                        .flags = str[closing_slash_index + 1 .. i],
-                    },
-                    .complete => return error.InvalidRegularExpressionLiteral,
+        else => switch (state) {
+            .opening_slash, .pattern_character, .backslash => {
+                if (startsWithLineTerminator(str[i..])) return error.InvalidRegularExpressionLiteral;
+                state = .pattern_character;
+            },
+            .closing_slash, .flag_character => switch (consume) {
+                .partial => return .{
+                    .pattern = str[1..closing_slash_index],
+                    .flags = str[closing_slash_index + 1 .. i],
                 },
-                else => return error.InvalidRegularExpressionLiteral,
-            }
+                .complete => return error.InvalidRegularExpressionLiteral,
+            },
+            else => return error.InvalidRegularExpressionLiteral,
         },
     };
 
