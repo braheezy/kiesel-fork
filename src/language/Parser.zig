@@ -553,38 +553,46 @@ pub fn acceptPrimaryExpression(self: *Self) AcceptError!ast.PrimaryExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    if (self.core.accept(RuleSet.is(.this))) |_|
-        return .this
-    else |_| if (self.acceptIdentifierReference()) |identifier_reference|
-        return .{ .identifier_reference = identifier_reference }
-    else |_| if (self.acceptLiteral()) |literal|
-        return .{ .literal = literal }
-    else |_| if (self.acceptArrayLiteral()) |array_literal|
-        return .{ .array_literal = array_literal }
-    else |_| if (self.acceptObjectLiteral()) |object_literal|
-        return .{ .object_literal = object_literal }
-    else |_| if (self.acceptFunctionExpression()) |function_expression|
-        return .{ .function_expression = function_expression }
-    else |_| if (self.acceptClassExpression()) |class_expression|
-        return .{ .class_expression = class_expression }
-    else |_| if (self.acceptGeneratorExpression()) |generator_expression|
-        return .{ .generator_expression = generator_expression }
-    else |_| if (self.acceptAsyncFunctionExpression()) |async_function_expression|
-        return .{ .async_function_expression = async_function_expression }
-    else |_| if (self.acceptAsyncGeneratorExpression()) |async_generator_expression|
-        return .{ .async_generator_expression = async_generator_expression }
-    else |_| if (self.acceptRegularExpressionLiteral()) |regular_expression_literal|
-        return .{ .regular_expression_literal = regular_expression_literal }
-    else |_| if (self.acceptTemplateLiteral()) |template_literal|
-        return .{ .template_literal = template_literal }
-    else |_| if (self.acceptArrowFunction()) |arrow_function|
-        return .{ .arrow_function = arrow_function }
-    else |_| if (self.acceptAsyncArrowFunction()) |async_arrow_function|
-        return .{ .async_arrow_function = async_arrow_function }
-    else |_| if (self.acceptParenthesizedExpression()) |parenthesized_expression|
-        return .{ .parenthesized_expression = parenthesized_expression }
-    else |_|
-        return error.UnexpectedToken;
+    const next_token = try self.core.peek() orelse return error.UnexpectedToken;
+    return switch (next_token.type) {
+        .this => blk: {
+            _ = self.core.accept(RuleSet.is(.this)) catch unreachable;
+            break :blk .this;
+        },
+        .identifier, .yield, .@"await" => if (self.acceptIdentifierReference()) |identifier_reference|
+            .{ .identifier_reference = identifier_reference }
+        else |_| if (self.acceptArrowFunction()) |arrow_function|
+            .{ .arrow_function = arrow_function }
+        else |_| if (self.acceptAsyncFunctionExpression()) |async_function_expression|
+            .{ .async_function_expression = async_function_expression }
+        else |_| if (self.acceptAsyncGeneratorExpression()) |async_generator_expression|
+            .{ .async_generator_expression = async_generator_expression }
+        else |_| if (self.acceptAsyncArrowFunction()) |async_arrow_function|
+            .{ .async_arrow_function = async_arrow_function }
+        else |_|
+            error.UnexpectedToken,
+        .@"(" => if (self.acceptArrowFunction()) |arrow_function|
+            .{ .arrow_function = arrow_function }
+        else |_| if (self.acceptParenthesizedExpression()) |parenthesized_expression|
+            .{ .parenthesized_expression = parenthesized_expression }
+        else |_|
+            error.UnexpectedToken,
+        .function => if (self.acceptFunctionExpression()) |function_expression|
+            .{ .function_expression = function_expression }
+        else |_| if (self.acceptGeneratorExpression()) |generator_expression|
+            .{ .generator_expression = generator_expression }
+        else |_|
+            error.UnexpectedToken,
+        .class => .{ .class_expression = try self.acceptClassExpression() },
+        .@"[" => .{ .array_literal = try self.acceptArrayLiteral() },
+        .@"{" => .{ .object_literal = try self.acceptObjectLiteral() },
+        .numeric, .string, .null, .true, .false => .{ .literal = try self.acceptLiteral() },
+        // NOTE: .regular_expression is only emitted when tokenizer.state.parsing_regular_expression
+        //       is true, so here we check for .@"/"
+        .@"/" => .{ .regular_expression_literal = try self.acceptRegularExpressionLiteral() },
+        .template, .template_head => .{ .template_literal = try self.acceptTemplateLiteral() },
+        else => error.UnexpectedToken,
+    };
 }
 
 pub fn acceptSecondaryExpression(
@@ -592,30 +600,24 @@ pub fn acceptSecondaryExpression(
     primary_expression: ast.Expression,
     ctx: AcceptContext,
 ) AcceptError!ast.Expression {
-    if (self.acceptMemberExpression(primary_expression)) |member_expression|
-        return .{ .member_expression = member_expression }
-    else |_| if (self.acceptCallExpression(primary_expression)) |call_expression|
-        return .{ .call_expression = call_expression }
-    else |_| if (self.acceptOptionalExpression(primary_expression)) |optional_expression|
-        return .{ .optional_expression = optional_expression }
-    else |_| if (self.acceptUpdateExpression(primary_expression)) |update_expression|
-        return .{ .update_expression = update_expression }
-    else |_| if (self.acceptBinaryExpression(primary_expression, ctx)) |binary_expression|
-        return .{ .binary_expression = binary_expression }
-    else |_| if (self.acceptRelationalExpression(.{ .expression = primary_expression }, ctx)) |relational_expression|
-        return .{ .relational_expression = relational_expression }
-    else |_| if (self.acceptEqualityExpression(primary_expression, ctx)) |equality_expression|
-        return .{ .equality_expression = equality_expression }
-    else |_| if (self.acceptLogicalExpression(primary_expression, ctx)) |logical_expression|
-        return .{ .logical_expression = logical_expression }
-    else |_| if (self.acceptConditionalExpression(primary_expression, ctx)) |conditional_expression|
-        return .{ .conditional_expression = conditional_expression }
-    else |_| if (self.acceptAssignmentExpression(primary_expression, ctx)) |assignment_expression|
-        return .{ .assignment_expression = assignment_expression }
-    else |_| if (self.acceptSequenceExpression(primary_expression)) |sequence_expression|
-        return .{ .sequence_expression = sequence_expression }
-    else |_|
-        return error.UnexpectedToken;
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const next_token = try self.core.peek() orelse return error.UnexpectedToken;
+    return switch (next_token.type) {
+        .@"[", .@"." => .{ .member_expression = try self.acceptMemberExpression(primary_expression) },
+        .@"(" => .{ .call_expression = try self.acceptCallExpression(primary_expression) },
+        .@"?." => .{ .optional_expression = try self.acceptOptionalExpression(primary_expression) },
+        .@"++", .@"--" => .{ .update_expression = try self.acceptUpdateExpression(primary_expression) },
+        .@"**", .@"*", .@"/", .@"%", .@"+", .@"-", .@"<<", .@">>", .@">>>", .@"&", .@"^", .@"|" => .{ .binary_expression = try self.acceptBinaryExpression(primary_expression, ctx) },
+        .@">", .@"<", .@">=", .@"<=", .instanceof, .in => .{ .relational_expression = try self.acceptRelationalExpression(.{ .expression = primary_expression }, ctx) },
+        .@"==", .@"!=", .@"===", .@"!==" => .{ .equality_expression = try self.acceptEqualityExpression(primary_expression, ctx) },
+        .@"&&", .@"||", .@"??" => .{ .logical_expression = try self.acceptLogicalExpression(primary_expression, ctx) },
+        .@"?" => .{ .conditional_expression = try self.acceptConditionalExpression(primary_expression, ctx) },
+        .@"=", .@"*=", .@"/=", .@"%=", .@"+=", .@"-=", .@"<<=", .@">>=", .@">>>=", .@"&=", .@"^=", .@"|=", .@"**=", .@"&&=", .@"||=", .@"??=" => .{ .assignment_expression = try self.acceptAssignmentExpression(primary_expression, ctx) },
+        .@"," => .{ .sequence_expression = try self.acceptSequenceExpression(primary_expression) },
+        else => error.UnexpectedToken,
+    };
 }
 
 pub fn acceptMemberExpression(
@@ -1361,41 +1363,52 @@ pub fn acceptExpression(self: *Self, ctx: AcceptContext) AcceptError!ast.Express
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    var expression: ast.Expression = if (self.acceptUnaryExpression()) |unary_expression|
-        .{ .unary_expression = unary_expression }
-    else |_| if (self.acceptUpdateExpression(null)) |update_expression|
-        .{ .update_expression = update_expression }
-    else |_| if (self.acceptSuperProperty()) |super_property|
-        .{ .super_property = super_property }
-    else |_| if (self.acceptMetaProperty()) |meta_property|
-        .{ .meta_property = meta_property }
-    else |_| if (self.acceptNewExpression()) |new_expression|
-        .{ .new_expression = new_expression }
-    else |_| if (self.acceptSuperCall()) |super_call|
-        .{ .super_call = super_call }
-    else |_| if (self.acceptImportCall()) |import_call|
-        .{ .import_call = import_call }
-    else |_| if (self.acceptAwaitExpression()) |await_expression|
-        .{ .await_expression = await_expression }
-    else |_| if (self.acceptPrimaryExpression()) |primary_expression|
-        .{ .primary_expression = primary_expression }
-    else |_| if (self.acceptPrivateIdentifier()) |private_identifier|
-        .{
-            .relational_expression = try acceptRelationalExpression(
-                self,
-                .{ .private_identifier = private_identifier },
-                ctx,
-            ),
-        }
-    else |_|
-        return error.UnexpectedToken;
+    var next_token = try self.core.peek() orelse return error.UnexpectedToken;
+    var expression: ast.Expression = switch (next_token.type) {
+        .delete, .void, .typeof, .@"+", .@"-", .@"~", .@"!" => .{ .unary_expression = try self.acceptUnaryExpression() },
+        .@"++", .@"--" => .{ .update_expression = try self.acceptUpdateExpression(null) },
+        .new => if (self.acceptNewExpression()) |new_expression|
+            .{ .new_expression = new_expression }
+        else |_| if (self.acceptMetaProperty()) |meta_property|
+            .{ .meta_property = meta_property }
+        else |_|
+            return error.UnexpectedToken,
+        .super => if (self.acceptSuperCall()) |super_call|
+            .{ .super_call = super_call }
+        else |_| if (self.acceptSuperProperty()) |super_property|
+            .{ .super_property = super_property }
+        else |_|
+            return error.UnexpectedToken,
+        .import => if (self.acceptImportCall()) |import_call|
+            .{ .import_call = import_call }
+        else |_| if (self.acceptMetaProperty()) |meta_property|
+            .{ .meta_property = meta_property }
+        else |_|
+            return error.UnexpectedToken,
+        .@"#" => blk: {
+            const private_identifier = try self.acceptPrivateIdentifier();
+            break :blk .{
+                .relational_expression = try acceptRelationalExpression(
+                    self,
+                    .{ .private_identifier = private_identifier },
+                    ctx,
+                ),
+            };
+        },
+        else => if (self.acceptAwaitExpression()) |await_expression|
+            .{ .await_expression = await_expression }
+        else |_| if (self.acceptPrimaryExpression()) |primary_expression|
+            .{ .primary_expression = primary_expression }
+        else |_|
+            return error.UnexpectedToken,
+    };
 
     while (true) {
         while (self.acceptTaggedTemplate(expression)) |tagged_template| {
             expression = .{ .tagged_template = tagged_template };
         } else |_| {}
 
-        const next_token = try self.core.peek() orelse break;
+        next_token = try self.core.peek() orelse break;
         const new_ctx: AcceptContext = .{
             .precedence = getPrecedence(next_token.type),
             .associativity = getAssociativity(next_token.type),
@@ -1421,36 +1434,31 @@ pub fn acceptStatement(self: *Self) AcceptError!*ast.Statement {
 
     const statement = try self.allocator.create(ast.Statement);
 
-    if (self.acceptBlockStatement()) |block_statement|
-        statement.* = .{ .block_statement = block_statement }
-    else |_| if (self.acceptVariableStatement(false)) |variable_statement|
-        statement.* = .{ .variable_statement = variable_statement }
-    else |_| if (self.core.accept(RuleSet.is(.@";"))) |_|
-        statement.* = .empty_statement
-    else |_| if (self.acceptLabelledStatement()) |labelled_statement|
-        statement.* = .{ .labelled_statement = labelled_statement }
-    else |_| if (self.acceptExpressionStatement()) |expression_statement|
-        statement.* = .{ .expression_statement = expression_statement }
-    else |_| if (self.acceptIfStatement()) |if_statement|
-        statement.* = .{ .if_statement = if_statement }
-    else |_| if (self.acceptBreakableStatement()) |breakable_statement|
-        statement.* = .{ .breakable_statement = breakable_statement }
-    else |_| if (self.acceptContinueStatement()) |continue_statement|
-        statement.* = .{ .continue_statement = continue_statement }
-    else |_| if (self.acceptBreakStatement()) |break_statement|
-        statement.* = .{ .break_statement = break_statement }
-    else |_| if (self.acceptReturnStatement()) |return_statement|
-        statement.* = .{ .return_statement = return_statement }
-    else |_| if (self.acceptWithStatement()) |with_statement|
-        statement.* = .{ .with_statement = with_statement }
-    else |_| if (self.acceptThrowStatement()) |throw_statement|
-        statement.* = .{ .throw_statement = throw_statement }
-    else |_| if (self.acceptTryStatement()) |try_statement|
-        statement.* = .{ .try_statement = try_statement }
-    else |_| if (self.acceptDebuggerStatement()) |_|
-        statement.* = .debugger_statement
-    else |_|
-        return error.UnexpectedToken;
+    const next_token = try self.core.peek() orelse return error.UnexpectedToken;
+    statement.* = switch (next_token.type) {
+        .@"{" => .{ .block_statement = try self.acceptBlockStatement() },
+        .@"var" => .{ .variable_statement = try self.acceptVariableStatement(false) },
+        .@"if" => .{ .if_statement = try self.acceptIfStatement() },
+        .do, .@"while", .@"for", .@"switch" => .{ .breakable_statement = try self.acceptBreakableStatement() },
+        .@"continue" => .{ .continue_statement = try self.acceptContinueStatement() },
+        .@"break" => .{ .break_statement = try self.acceptBreakStatement() },
+        .@"return" => .{ .return_statement = try self.acceptReturnStatement() },
+        .with => .{ .with_statement = try self.acceptWithStatement() },
+        .throw => .{ .throw_statement = try self.acceptThrowStatement() },
+        .@"try" => .{ .try_statement = try self.acceptTryStatement() },
+        .debugger => .{ .debugger_statement = try self.acceptDebuggerStatement() },
+        .@";" => blk: {
+            _ = self.core.accept(RuleSet.is(.@";")) catch unreachable;
+            break :blk .empty_statement;
+        },
+        else => if (self.acceptLabelledStatement()) |labelled_statement|
+            .{ .labelled_statement = labelled_statement }
+        else |_| if (self.acceptExpressionStatement()) |expression_statement|
+            .{ .expression_statement = expression_statement }
+        else |_|
+            return error.UnexpectedToken,
+    };
+
     return statement;
 }
 
@@ -1547,16 +1555,13 @@ pub fn acceptStatementListItem(self: *Self) AcceptError!ast.StatementListItem {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const statement_list_item: ast.StatementListItem = blk: {
-        // NOTE: Declarations need to be tried first since function declarations could also be expressions
-        if (self.acceptDeclaration()) |declaration|
-            break :blk .{ .declaration = declaration }
-        else |_| if (self.acceptStatement()) |statement|
-            break :blk .{ .statement = statement }
-        else |_|
-            return error.UnexpectedToken;
-    };
-    return statement_list_item;
+    // NOTE: Declarations need to be tried first since function declarations could also be expressions
+    if (self.acceptDeclaration()) |declaration|
+        return .{ .declaration = declaration }
+    else |_| if (self.acceptStatement()) |statement|
+        return .{ .statement = statement }
+    else |_|
+        return error.UnexpectedToken;
 }
 
 pub fn acceptLexicalDeclaration(
