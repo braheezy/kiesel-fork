@@ -311,14 +311,13 @@ fn ensureSimpleParameterList(
     self: *Self,
     formal_parameters: ast.FormalParameters,
     location: ptk.Location,
-) AcceptError!void {
+) Allocator.Error!void {
     if (!formal_parameters.isSimpleParameterList()) {
         try self.emitErrorAt(
             location,
             "Function with 'use strict' directive must have a simple parameter list",
             .{},
         );
-        return error.UnexpectedToken;
     }
 }
 
@@ -327,7 +326,7 @@ fn ensureUniqueParameterNames(
     kind: enum { strict, arrow, method },
     formal_parameters: ast.FormalParameters,
     location: ptk.Location,
-) AcceptError!void {
+) Allocator.Error!void {
     var seen_bound_names = std.StringHashMap(void).init(self.allocator);
     defer seen_bound_names.deinit();
     const bound_names = try formal_parameters.boundNames(self.allocator);
@@ -351,7 +350,6 @@ fn ensureUniqueParameterNames(
                     .{},
                 ),
             }
-            return error.UnexpectedToken;
         }
     }
 }
@@ -373,7 +371,7 @@ fn ensureAllowedIdentifier(
     kind: enum { binding_identifier, identifier_reference, function_parameter },
     value: []const u8,
     location: ptk.Location,
-) AcceptError!void {
+) Allocator.Error!void {
     if (std.mem.eql(u8, value, "eval") or
         std.mem.eql(u8, value, "arguments"))
     {
@@ -394,7 +392,6 @@ fn ensureAllowedIdentifier(
                 .{value},
             ),
         }
-        return error.UnexpectedToken;
     }
 }
 
@@ -573,10 +570,12 @@ pub fn acceptPrimaryExpression(self: *Self) AcceptError!ast.PrimaryExpression {
             error.UnexpectedToken,
         .@"(" => if (self.acceptArrowFunction()) |arrow_function|
             .{ .arrow_function = arrow_function }
-        else |_| if (self.acceptParenthesizedExpression()) |parenthesized_expression|
-            .{ .parenthesized_expression = parenthesized_expression }
-        else |_|
-            error.UnexpectedToken,
+        else |_| if (self.acceptParenthesizedExpression()) |parenthesized_expression| blk: {
+            // If parsing the arrow function failed and this succeeded, we may have emitted an
+            // 'invalid binding identifier' error, e.g. for `"use strict"; (eval)`
+            _ = self.diagnostics.errors.popOrNull();
+            break :blk .{ .parenthesized_expression = parenthesized_expression };
+        } else |_| error.UnexpectedToken,
         .function => if (self.acceptFunctionExpression()) |function_expression|
             .{ .function_expression = function_expression }
         else |_| if (self.acceptGeneratorExpression()) |generator_expression|
