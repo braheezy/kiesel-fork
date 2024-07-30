@@ -587,8 +587,8 @@ pub fn acceptPrimaryExpression(self: *Self) AcceptError!ast.PrimaryExpression {
         .@"{" => .{ .object_literal = try self.acceptObjectLiteral() },
         .numeric, .string, .null, .true, .false => .{ .literal = try self.acceptLiteral() },
         // NOTE: .regular_expression is only emitted when tokenizer.state.parsing_regular_expression
-        //       is true, so here we check for .@"/"
-        .@"/" => .{ .regular_expression_literal = try self.acceptRegularExpressionLiteral() },
+        //       is true, so here we check for .@"/" and .@"/="
+        .@"/", .@"/=" => .{ .regular_expression_literal = try self.acceptRegularExpressionLiteral() },
         .template, .template_head => .{ .template_literal = try self.acceptTemplateLiteral() },
         else => error.UnexpectedToken,
     };
