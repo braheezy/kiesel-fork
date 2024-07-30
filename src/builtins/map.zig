@@ -85,13 +85,15 @@ pub fn addEntriesFromIterable(
 /// https://tc39.es/ecma262/#sec-properties-of-the-map-constructor
 pub const MapConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "Map",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "groupBy", groupBy, 2, realm);
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
@@ -103,16 +105,6 @@ pub const MapConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 24.1.3.2 Map.prototype.constructor
-        // https://tc39.es/ecma262/#sec-map.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Map.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 24.1.1.1 Map ( [ iterable ] )
@@ -192,10 +184,12 @@ pub const MapConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-map-prototype-object
 pub const MapPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "clear", clear, 0, realm);
         try defineBuiltinFunction(object, "delete", delete, 1, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
@@ -206,6 +200,14 @@ pub const MapPrototype = struct {
         try defineBuiltinFunction(object, "set", set, 2, realm);
         try defineBuiltinAccessor(object, "size", size, null, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
+
+        // 24.1.3.2 Map.prototype.constructor
+        // https://tc39.es/ecma262/#sec-map.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Map%"()),
+        );
 
         // 24.1.3.12 Map.prototype [ %Symbol.iterator% ] ( )
         // https://tc39.es/ecma262/#sec-map.prototype-%symbol.iterator%
@@ -220,8 +222,6 @@ pub const MapPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 24.1.3.1 Map.prototype.clear ( )

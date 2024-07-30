@@ -619,13 +619,15 @@ pub fn getModifySetValueInBuffer(
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-constructor
 pub const ArrayBufferConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "ArrayBuffer",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "isView", isView, 1, realm);
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
@@ -637,16 +639,6 @@ pub const ArrayBufferConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 25.1.6.2 ArrayBuffer.prototype.constructor
-        // https://tc39.es/ecma262/#sec-arraybuffer.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%ArrayBuffer.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 25.1.4.1 ArrayBuffer ( length [ , options ] )
@@ -706,10 +698,12 @@ pub const ArrayBufferConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-prototype-object
 pub const ArrayBufferPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinAccessor(object, "detached", detached, null, realm);
         try defineBuiltinAccessor(object, "maxByteLength", maxByteLength, null, realm);
@@ -719,6 +713,14 @@ pub const ArrayBufferPrototype = struct {
         try defineBuiltinFunction(object, "transfer", transfer, 0, realm);
         try defineBuiltinFunction(object, "transferToFixedLength", transferToFixedLength, 0, realm);
 
+        // 25.1.6.2 ArrayBuffer.prototype.constructor
+        // https://tc39.es/ecma262/#sec-arraybuffer.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%ArrayBuffer%"()),
+        );
+
         // 25.1.6.7 ArrayBuffer.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-arraybuffer.prototype-%symbol.tostringtag%
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
@@ -727,8 +729,6 @@ pub const ArrayBufferPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 25.1.6.1 get ArrayBuffer.prototype.byteLength

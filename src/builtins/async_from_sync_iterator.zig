@@ -66,15 +66,15 @@ pub fn createAsyncFromSyncIterator(
 /// https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%-object
 pub const AsyncFromSyncIteratorPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%AsyncIteratorPrototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 0, realm);
         try defineBuiltinFunction(object, "return", @"return", 0, realm);
         try defineBuiltinFunction(object, "throw", throw, 0, realm);
-
-        return object;
     }
 
     /// 27.1.4.2.1 %AsyncFromSyncIteratorPrototype%.next ( [ value ] )

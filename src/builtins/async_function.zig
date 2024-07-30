@@ -30,13 +30,15 @@ const promiseResolve = builtins.promiseResolve;
 /// https://tc39.es/ecma262/#sec-async-function-constructor-properties
 pub const AsyncFunctionConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "AsyncFunction",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 27.7.2.1 AsyncFunction.prototype
         // https://tc39.es/ecma262/#sec-async-function-constructor-prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -45,8 +47,6 @@ pub const AsyncFunctionConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        return object;
     }
 
     /// 27.7.1.1 AsyncFunction ( ...parameterArgs, bodyArg )
@@ -77,12 +77,6 @@ pub const AsyncFunctionConstructor = struct {
 /// https://tc39.es/ecma262/#sec-async-function-prototype-properties
 pub const AsyncFunctionPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createNoinit(realm);
-        init(realm, object);
-        return object;
-    }
-
-    pub fn createNoinit(realm: *Realm) Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });

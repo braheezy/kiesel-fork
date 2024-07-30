@@ -176,16 +176,31 @@ fn setDefaultGlobalBindings(self: *Self) Agent.Error!void {
     // 2. For each property of the Global Object specified in clause 19, do
     for (try globalObjectProperties(self)) |property| {
         // a. Let name be the String value of the property name.
-        const name = PropertyKey.from(String.fromAscii(property[0]));
+        const name = property[0];
+        const property_key = PropertyKey.from(String.fromAscii(name));
 
         // b. Let desc be the fully populated data Property Descriptor for the property, containing
         //    the specified attributes for the property. For properties listed in 19.2, 19.3, or
         //    19.4 the value of the [[Value]] attribute is the corresponding intrinsic object from
         //    realmRec.
-        const descriptor = property[1];
-
-        // c. Perform ? DefinePropertyOrThrow(global, name, desc).
-        try global.definePropertyOrThrow(name, descriptor);
+        switch (property[1]) {
+            .property_descriptor => |property_descriptor| {
+                // c. Perform ? DefinePropertyOrThrow(global, name, desc).
+                try global.definePropertyOrThrow(property_key, property_descriptor);
+            },
+            .lazy_intrinsic => |lazyIntrinsicFn| {
+                try global.definePropertyOrThrow(property_key, .{
+                    .value = undefined,
+                    .writable = true,
+                    .enumerable = false,
+                    .configurable = true,
+                });
+                try global.propertyStorage().lazy_intrinsics.putNoClobber(name, .{
+                    .realm = self,
+                    .lazyIntrinsicFn = lazyIntrinsicFn,
+                });
+            },
+        }
     }
 
     // 3. Return unused.

@@ -37,13 +37,15 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-constructor
 pub const ListFormatConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "ListFormat",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 13.2.1 Intl.ListFormat.prototype
         // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -52,16 +54,6 @@ pub const ListFormatConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 13.3.1 Intl.ListFormat.prototype.constructor
-        // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Intl.ListFormat.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 13.1.1 Intl.ListFormat ( [ locales [ , options ] ] )
@@ -184,12 +176,22 @@ pub const ListFormatConstructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-prototype-object
 pub const ListFormatPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "format", format, 1, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
+
+        // 13.3.1 Intl.ListFormat.prototype.constructor
+        // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Intl.ListFormat%"()),
+        );
 
         // 13.3.2 Intl.ListFormat.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype-toStringTag
@@ -199,8 +201,6 @@ pub const ListFormatPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 13.3.3 Intl.ListFormat.prototype.format ( list )

@@ -49,10 +49,12 @@ pub fn createSetIterator(
 /// https://tc39.es/ecma262/#sec-%setiteratorprototype%-object
 pub const SetIteratorPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 0, realm);
 
         // 24.2.5.2.2 %SetIteratorPrototype% [ %Symbol.toStringTag% ]
@@ -63,8 +65,6 @@ pub const SetIteratorPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 24.2.5.2.1 %SetIteratorPrototype%.next ( )

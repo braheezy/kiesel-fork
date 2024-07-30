@@ -23,10 +23,12 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 pub const Reflect = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "apply", apply, 3, realm);
         try defineBuiltinFunction(object, "construct", construct, 2, realm);
         try defineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm);
@@ -49,8 +51,6 @@ pub const Reflect = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 28.1.1 Reflect.apply ( target, thisArgument, argumentsList )

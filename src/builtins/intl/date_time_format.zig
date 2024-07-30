@@ -473,13 +473,15 @@ pub fn createDateTimeFormat(
 /// https://tc39.es/ecma402/#sec-properties-of-intl-datetimeformat-constructor
 pub const DateTimeFormatConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "DateTimeFormat",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 11.2.1 Intl.DateTimeFormat.prototype
         // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -488,16 +490,6 @@ pub const DateTimeFormatConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 11.3.1 Intl.DateTimeFormat.prototype.constructor
-        // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Intl.DateTimeFormat.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 11.1.1 Intl.DateTimeFormat ( [ locales [ , options ] ] )
@@ -533,12 +525,22 @@ pub const DateTimeFormatConstructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-datetimeformat-prototype-object
 pub const DateTimeFormatPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinAccessor(object, "format", format, null, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
+
+        // 11.3.1 Intl.DateTimeFormat.prototype.constructor
+        // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Intl.DateTimeFormat%"()),
+        );
 
         // 11.3.2 Intl.DateTimeFormat.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype-%symbol.tostringtag%
@@ -548,8 +550,6 @@ pub const DateTimeFormatPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 11.3.3 get Intl.DateTimeFormat.prototype.format

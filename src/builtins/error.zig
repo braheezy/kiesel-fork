@@ -33,13 +33,15 @@ const Self = @This();
 /// https://tc39.es/ecma262/#sec-properties-of-the-error-constructor
 pub const ErrorConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Error",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 20.5.2.1 Error.prototype
         // https://tc39.es/ecma262/#sec-error.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -48,16 +50,6 @@ pub const ErrorConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 20.5.3.1 Error.prototype.constructor
-        // https://tc39.es/ecma262/#sec-error.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Error.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 20.5.1.1 Error ( message [ , options ] )
@@ -131,9 +123,19 @@ fn internalSet(
 /// https://tc39.es/ecma262/#sec-properties-of-the-error-prototype-object
 pub const ErrorPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
+
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+        // 20.5.3.1 Error.prototype.constructor
+        // https://tc39.es/ecma262/#sec-error.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Error%"()),
+        );
 
         // 20.5.3.2 Error.prototype.message
         // https://tc39.es/ecma262/#sec-error.prototype.message
@@ -152,8 +154,6 @@ pub const ErrorPrototype = struct {
         );
 
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
-
-        return object;
     }
 
     /// 20.5.3.4 Error.prototype.toString ( )
@@ -250,13 +250,15 @@ pub const URIErrorPrototype = MakeNativeErrorPrototype("URIError");
 fn MakeNativeErrorConstructor(comptime name: []const u8) type {
     return struct {
         pub fn create(realm: *Realm) Allocator.Error!Object {
-            const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+            return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
                 .length = 1,
                 .name = name,
                 .realm = realm,
                 .prototype = try realm.intrinsics.@"%Error%"(),
             });
+        }
 
+        pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
             const prototypeFn = @field(Realm.Intrinsics, "%" ++ name ++ ".prototype%");
 
             // 20.5.6.2.1 NativeError.prototype
@@ -267,16 +269,6 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
                 .enumerable = false,
                 .configurable = false,
             });
-
-            // 20.5.6.3.1 NativeError.prototype.constructor
-            // https://tc39.es/ecma262/#sec-nativeerror.prototype.constructor
-            try defineBuiltinProperty(
-                prototypeFn(&realm.intrinsics) catch unreachable,
-                "constructor",
-                Value.from(object),
-            );
-
-            return object;
         }
 
         /// 20.5.6.1.1 NativeError ( message [ , options ] )
@@ -336,9 +328,21 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
 fn MakeNativeErrorPrototype(comptime name: []const u8) type {
     return struct {
         pub fn create(realm: *Realm) Allocator.Error!Object {
-            const object = try builtins.Object.create(realm.agent, .{
+            return builtins.Object.create(realm.agent, .{
                 .prototype = try realm.intrinsics.@"%Error.prototype%"(),
             });
+        }
+
+        pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+            const constructorFn = @field(Realm.Intrinsics, "%" ++ name ++ "%");
+
+            // 20.5.6.3.1 NativeError.prototype.constructor
+            // https://tc39.es/ecma262/#sec-nativeerror.prototype.constructor
+            try defineBuiltinProperty(
+                object,
+                "constructor",
+                Value.from(try constructorFn(&realm.intrinsics)),
+            );
 
             // 20.5.6.3.2 NativeError.prototype.message
             // https://tc39.es/ecma262/#sec-nativeerror.prototype.message
@@ -355,8 +359,6 @@ fn MakeNativeErrorPrototype(comptime name: []const u8) type {
                 "name",
                 Value.from(name),
             );
-
-            return object;
         }
     };
 }
@@ -377,13 +379,15 @@ fn MakeNativeError() type {
 /// https://tc39.es/ecma262/#sec-aggregate-error-constructor
 pub const AggregateErrorConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 2,
             .name = "AggregateError",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Error%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 20.5.7.2.1 AggregateError.prototype
         // https://tc39.es/ecma262/#sec-aggregate-error.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -392,16 +396,6 @@ pub const AggregateErrorConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 20.5.7.3.1 AggregateError.prototype.constructor
-        // https://tc39.es/ecma262/#sec-aggregate-error.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%AggregateError.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 20.5.7.1.1 AggregateError ( errors, message [ , options ] )
@@ -475,9 +469,19 @@ pub const AggregateErrorConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-aggregate-error-prototype-objects
 pub const AggregateErrorPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Error.prototype%"(),
         });
+    }
+
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+        // 20.5.7.3.1 AggregateError.prototype.constructor
+        // https://tc39.es/ecma262/#sec-aggregate-error.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%AggregateError%"()),
+        );
 
         // 20.5.7.3.2 AggregateError.prototype.message
         // https://tc39.es/ecma262/#sec-aggregate-error.prototype.message
@@ -494,8 +498,6 @@ pub const AggregateErrorPrototype = struct {
             "name",
             Value.from("AggregateError"),
         );
-
-        return object;
     }
 };
 

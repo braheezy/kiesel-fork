@@ -1506,13 +1506,15 @@ pub fn performPromiseThen(
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-constructor
 pub const PromiseConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Promise",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "all", all, 1, realm);
         try defineBuiltinFunction(object, "allSettled", allSettled, 1, realm);
         try defineBuiltinFunction(object, "any", any, 1, realm);
@@ -1531,15 +1533,6 @@ pub const PromiseConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 27.2.5.2 Promise.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Promise.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 27.2.3.1 Promise ( executor )
@@ -1931,13 +1924,23 @@ pub const PromiseConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-prototype-object
 pub const PromisePrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "catch", @"catch", 1, realm);
         try defineBuiltinFunction(object, "finally", finally, 1, realm);
         try defineBuiltinFunction(object, "then", then, 2, realm);
+
+        // 27.2.5.2 Promise.prototype.constructor
+        // https://tc39.es/ecma262/#sec-promise.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Promise%"()),
+        );
 
         // 27.2.5.5 Promise.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-promise.prototype-%symbol.tostringtag%
@@ -1947,8 +1950,6 @@ pub const PromisePrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 27.2.5.1 Promise.prototype.catch ( onRejected )

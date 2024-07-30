@@ -38,7 +38,7 @@ const sameValueZero = types.sameValueZero;
 
 // Non-standard helper to get the length property of an array
 pub fn getArrayLength(array: Object) u32 {
-    const property_descriptor = array.data.property_storage.get(PropertyKey.from("length")).?;
+    const property_descriptor = array.propertyStorage().get(PropertyKey.from("length")).?;
     const value = property_descriptor.value.?;
     return @intFromFloat(value.number.asFloat());
 }
@@ -60,7 +60,7 @@ fn defineOwnProperty(
     // 2. Else if P is an array index, then
     else if (property_key.isArrayIndex()) {
         // a. Let lengthDesc be OrdinaryGetOwnProperty(A, "length").
-        var length_descriptor = ordinaryGetOwnProperty(array, PropertyKey.from("length")).?;
+        var length_descriptor = (ordinaryGetOwnProperty(array, PropertyKey.from("length")) catch unreachable).?;
 
         // b. Assert: IsDataDescriptor(lengthDesc) is true.
         std.debug.assert(length_descriptor.isDataDescriptor());
@@ -243,7 +243,7 @@ pub fn arraySetLength(
     new_len_desc.value = Value.from(new_len);
 
     // 7. Let oldLenDesc be OrdinaryGetOwnProperty(A, "length").
-    const old_len_desc = ordinaryGetOwnProperty(array, PropertyKey.from("length")).?;
+    const old_len_desc = (ordinaryGetOwnProperty(array, PropertyKey.from("length")) catch unreachable).?;
 
     // 8. Assert: IsDataDescriptor(oldLenDesc) is true.
     std.debug.assert(old_len_desc.isDataDescriptor());
@@ -356,13 +356,15 @@ pub fn arraySetLength(
 /// https://tc39.es/ecma262/#sec-properties-of-the-array-constructor
 pub const ArrayConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Array",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "from", from, 1, realm);
         try defineBuiltinFunction(object, "isArray", isArray, 1, realm);
         try defineBuiltinFunction(object, "of", of, 0, realm);
@@ -376,20 +378,6 @@ pub const ArrayConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 23.1.3.3 Array.prototype.constructor
-        // https://tc39.es/ecma262/#sec-array.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Array.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        // Ensure prototype function intrinsics
-        _ = try realm.intrinsics.@"%Array.prototype.toString%"();
-        _ = try realm.intrinsics.@"%Array.prototype.values%"();
-
-        return object;
     }
 
     /// 23.1.1.1 Array ( ...values )
@@ -706,12 +694,14 @@ pub const ArrayConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-array-prototype-object
 pub const ArrayPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = arrayCreate(
+        return arrayCreate(
             realm.agent,
             0,
             try realm.intrinsics.@"%Object.prototype%"(),
         ) catch |err| try noexcept(err);
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinFunction(object, "concat", concat, 1, realm);
         try defineBuiltinFunction(object, "copyWithin", copyWithin, 2, realm);
@@ -750,6 +740,14 @@ pub const ArrayPrototype = struct {
         try defineBuiltinFunction(object, "unshift", unshift, 1, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
         try defineBuiltinFunction(object, "with", with, 2, realm);
+
+        // 23.1.3.3 Array.prototype.constructor
+        // https://tc39.es/ecma262/#sec-array.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Array%"()),
+        );
 
         // 23.1.3.40 Array.prototype [ %Symbol.iterator% ] ( )
         // https://tc39.es/ecma262/#sec-array.prototype-%symbol.iterator%
@@ -800,7 +798,9 @@ pub const ArrayPrototype = struct {
             .configurable = true,
         });
 
-        return object;
+        // Ensure prototype function intrinsics
+        _ = try realm.intrinsics.@"%Array.prototype.toString%"();
+        _ = try realm.intrinsics.@"%Array.prototype.values%"();
     }
 
     /// 23.1.3.1 Array.prototype.at ( index )

@@ -662,13 +662,15 @@ fn makeMatchIndicesIndexPairArray(
 /// https://tc39.es/ecma262/#sec-properties-of-the-regexp-constructor
 pub const RegExpConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 2,
             .name = "RegExp",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 22.2.5.1 RegExp.prototype
@@ -679,16 +681,6 @@ pub const RegExpConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 22.2.6.1 RegExp.prototype.constructor
-        // https://tc39.es/ecma262/#sec-regexp.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%RegExp.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 22.2.4.1 RegExp ( pattern, flags )
@@ -783,10 +775,12 @@ pub const RegExpConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-regexp-prototype-object
 pub const RegExpPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinAccessor(object, "dotAll", dotAll, null, realm);
         try defineBuiltinFunction(object, "exec", exec, 1, realm);
         try defineBuiltinAccessor(object, "flags", flags, null, realm);
@@ -806,11 +800,17 @@ pub const RegExpPrototype = struct {
         try defineBuiltinAccessor(object, "unicode", unicode, null, realm);
         try defineBuiltinAccessor(object, "unicodeSets", unicodeSets, null, realm);
 
+        // 22.2.6.1 RegExp.prototype.constructor
+        // https://tc39.es/ecma262/#sec-regexp.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%RegExp%"()),
+        );
+
         if (build_options.enable_annex_b) {
             try defineBuiltinFunction(object, "compile", compile, 2, realm);
         }
-
-        return object;
     }
 
     /// 22.2.6.2 RegExp.prototype.exec ( string )

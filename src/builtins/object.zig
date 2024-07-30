@@ -34,19 +34,19 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const sameValue = types.sameValue;
 
-/// 20.1.1 The Object Constructor
-/// https://tc39.es/ecma262/#sec-object-constructor
+/// 20.1.2 Properties of the Object Constructor
+/// https://tc39.es/ecma262/#sec-properties-of-the-object-constructor
 pub const ObjectConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object_ {
-        // 20.1.2 Properties of the Object Constructor
-        // https://tc39.es/ecma262/#sec-properties-of-the-object-constructor
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Object",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object_) Allocator.Error!void {
         try defineBuiltinFunction(object, "assign", assign, 2, realm);
         try defineBuiltinFunction(object, "create", create_, 2, realm);
         try defineBuiltinFunction(object, "defineProperties", defineProperties, 2, realm);
@@ -79,19 +79,6 @@ pub const ObjectConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 20.1.3.1 Object.prototype.constructor
-        // https://tc39.es/ecma262/#sec-object.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Object.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        // Ensure prototype function intrinsics
-        _ = try realm.intrinsics.@"%Object.prototype.toString%"();
-
-        return object;
     }
 
     /// 20.1.1.1 Object ( [ value ] )
@@ -702,7 +689,7 @@ pub const ObjectConstructor = struct {
 /// 20.1.3 Properties of the Object Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-object-prototype-object
 pub const ObjectPrototype = struct {
-    pub fn createNoinit(realm: *Realm) Allocator.Error!Object_ {
+    pub fn create(realm: *Realm) Allocator.Error!Object_ {
         return Object.create(realm.agent, .{
             .prototype = null,
             .internal_methods = .{
@@ -719,6 +706,14 @@ pub const ObjectPrototype = struct {
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
 
+        // 20.1.3.1 Object.prototype.constructor
+        // https://tc39.es/ecma262/#sec-object.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Object%"()),
+        );
+
         if (build_options.enable_legacy) {
             try defineBuiltinAccessor(object, "__proto__", @"get __proto__", @"set __proto__", realm);
             try defineBuiltinFunction(object, "__defineGetter__", __defineGetter__, 2, realm);
@@ -726,6 +721,9 @@ pub const ObjectPrototype = struct {
             try defineBuiltinFunction(object, "__lookupGetter__", __lookupGetter__, 1, realm);
             try defineBuiltinFunction(object, "__lookupSetter__", __lookupSetter__, 1, realm);
         }
+
+        // Ensure prototype function intrinsics
+        _ = try realm.intrinsics.@"%Object.prototype.toString%"();
     }
 
     /// 20.1.3.2 Object.prototype.hasOwnProperty ( V )

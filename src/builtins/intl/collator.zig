@@ -38,13 +38,15 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// https://tc39.es/ecma402/#sec-properties-of-the-intl-collator-constructor
 pub const CollatorConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "Collator",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 10.2.1 Intl.Collator.prototype
         // https://tc39.es/ecma402/#sec-intl.collator.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -53,16 +55,6 @@ pub const CollatorConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 10.3.1 Intl.Collator.prototype.constructor
-        // https://tc39.es/ecma402/#sec-intl.collator.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Intl.Collator.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 10.1.1 Intl.Collator ( [ locales [ , options ] ] )
@@ -264,12 +256,22 @@ pub const CollatorConstructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-the-intl-collator-prototype-object
 pub const CollatorPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinAccessor(object, "compare", compare, null, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
+
+        // 10.3.1 Intl.Collator.prototype.constructor
+        // https://tc39.es/ecma402/#sec-intl.collator.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Intl.Collator%"()),
+        );
 
         // 10.3.2 Intl.Collator.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.collator.prototype-%symbol.tostringtag%
@@ -279,8 +281,6 @@ pub const CollatorPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 10.3.3 get Intl.Collator.prototype.compare

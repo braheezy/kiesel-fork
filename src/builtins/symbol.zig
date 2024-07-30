@@ -29,13 +29,16 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// https://tc39.es/ecma262/#sec-properties-of-the-symbol-constructor
 pub const SymbolConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const agent = realm.agent;
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "Symbol",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
+
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+        const agent = realm.agent;
 
         // 20.4.2.1 Symbol.asyncIterator
         // https://tc39.es/ecma262/#sec-symbol.asynciterator
@@ -166,16 +169,6 @@ pub const SymbolConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 20.4.3.1 Symbol.prototype.constructor
-        // https://tc39.es/ecma262/#sec-symbol.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Symbol.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 20.4.1.1 Symbol ( [ description ] )
@@ -256,10 +249,12 @@ pub const SymbolConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-symbol-prototype-object
 pub const SymbolPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinAccessor(object, "description", description, null, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
@@ -269,6 +264,14 @@ pub const SymbolPrototype = struct {
             .configurable = true,
         });
 
+        // 20.4.3.1 Symbol.prototype.constructor
+        // https://tc39.es/ecma262/#sec-symbol.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Symbol%"()),
+        );
+
         // 20.4.3.6 Symbol.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-symbol.prototype-%symbol.tostringtag%
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
@@ -277,8 +280,6 @@ pub const SymbolPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 20.4.3.4.1 ThisSymbolValue ( value )

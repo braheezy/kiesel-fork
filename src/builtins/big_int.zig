@@ -26,13 +26,15 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 /// https://tc39.es/ecma262/#sec-properties-of-the-bigint-constructor
 pub const BigIntConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "BigInt",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "asIntN", asIntN, 2, realm);
         try defineBuiltinFunction(object, "asUintN", asUintN, 2, realm);
 
@@ -44,16 +46,6 @@ pub const BigIntConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 21.2.3.1 BigInt.prototype.constructor
-        // https://tc39.es/ecma262/#sec-bigint.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%BigInt.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 21.2.1.1 BigInt ( value )
@@ -140,13 +132,23 @@ fn numberToBigInt(agent: *Agent, number: Number) Agent.Error!types.BigInt {
 /// https://tc39.es/ecma262/#sec-properties-of-the-bigint-prototype-object
 pub const BigIntPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
+
+        // 21.2.3.1 BigInt.prototype.constructor
+        // https://tc39.es/ecma262/#sec-bigint.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%BigInt%"()),
+        );
 
         // 21.2.3.5 BigInt.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-bigint.prototype-%symbol.tostringtag%
@@ -156,8 +158,6 @@ pub const BigIntPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 21.2.3.4.1 ThisBigIntValue ( value )

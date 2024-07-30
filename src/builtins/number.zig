@@ -28,13 +28,15 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// https://tc39.es/ecma262/#sec-properties-of-the-number-constructor
 pub const NumberConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Number",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 21.1.2.1 Number.EPSILON
         // https://tc39.es/ecma262/#sec-number.epsilon
         try defineBuiltinProperty(object, "EPSILON", PropertyDescriptor{
@@ -132,16 +134,6 @@ pub const NumberConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 21.1.3.1 Number.prototype.constructor
-        // https://tc39.es/ecma262/#sec-number.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Number.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 21.1.1.1 Number ( value )
@@ -253,13 +245,15 @@ pub const NumberConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-number-prototype-object
 pub const NumberPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try Number.create(realm.agent, .{
+        return Number.create(realm.agent, .{
             .fields = .{
                 .number_data = types.Number.from(0),
             },
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "toExponential", toExponential, 1, realm);
         try defineBuiltinFunction(object, "toFixed", toFixed, 1, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
@@ -267,7 +261,13 @@ pub const NumberPrototype = struct {
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
 
-        return object;
+        // 21.1.3.1 Number.prototype.constructor
+        // https://tc39.es/ecma262/#sec-number.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Number%"()),
+        );
     }
 
     /// 21.1.3.7.1 ThisNumberValue ( value )

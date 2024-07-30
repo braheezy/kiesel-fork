@@ -50,13 +50,15 @@ fn GrammarSymbol(comptime T: type) type {
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-constructor
 pub const FunctionConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Function",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 20.2.2.1 Function.prototype
         // https://tc39.es/ecma262/#sec-function.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -65,16 +67,6 @@ pub const FunctionConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 20.2.3.4 Function.prototype.constructor
-        // https://tc39.es/ecma262/#sec-function.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Function.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 20.2.1.1 Function ( ...parameterArgs, bodyArg )
@@ -462,7 +454,7 @@ pub fn createDynamicFunction(
 /// 20.2.3 Properties of the Function Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-prototype-object
 pub const FunctionPrototype = struct {
-    pub fn createNoinit(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .function = function }, .{
             .length = 0,
             .name = "",
@@ -481,6 +473,14 @@ pub const FunctionPrototype = struct {
             .enumerable = false,
             .configurable = false,
         });
+
+        // 20.2.3.4 Function.prototype.constructor
+        // https://tc39.es/ecma262/#sec-function.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Function%"()),
+        );
     }
 
     fn function(_: *Agent, _: Value, _: Arguments) Agent.Error!Value {

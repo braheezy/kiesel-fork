@@ -89,13 +89,15 @@ const AnySegmenter = union(enum) {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-segmenter-constructor
 pub const SegmenterConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "Segmenter",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 18.2.1 Intl.Segmenter.prototype
         // https://tc39.es/ecma402/#sec-intl.segmenter.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -104,16 +106,6 @@ pub const SegmenterConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 18.3.1 Intl.Segmenter.prototype.constructor
-        // https://tc39.es/ecma402/#sec-intl.segmenter.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Intl.Segmenter.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 18.1.1 Intl.Segmenter ( [ locales [ , options ] ] )
@@ -203,12 +195,22 @@ pub const SegmenterConstructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-segmenter-prototype-object
 pub const SegmenterPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "segment", segment, 1, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
+
+        // 18.3.1 Intl.Segmenter.prototype.constructor
+        // https://tc39.es/ecma402/#sec-intl.segmenter.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Intl.Segmenter%"()),
+        );
 
         // 18.3.2 Intl.Segmenter.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.segmenter.prototype-%symbol.tostringtag%
@@ -218,8 +220,6 @@ pub const SegmenterPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 18.3.3 Intl.Segmenter.prototype.segment ( string )
@@ -323,14 +323,14 @@ fn createSegmentsObject(
 /// https://tc39.es/ecma402/#sec-%intlsegmentsprototype%-object
 pub const IntlSegmentsPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "containing", containing, 1, realm);
         try defineBuiltinFunction(object, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
-
-        return object;
     }
 
     /// 18.5.2.1 %IntlSegmentsPrototype%.containing ( index )
@@ -443,10 +443,12 @@ pub fn createSegmentIterator(
 /// https://tc39.es/ecma402/#sec-%intlsegmentiteratorprototype%-object
 pub const IntlSegmentIteratorPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 0, realm);
 
         // 18.6.2.2 %IntlSegmentIteratorPrototype% [ %Symbol.toStringTag% ]
@@ -457,8 +459,6 @@ pub const IntlSegmentIteratorPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 18.6.2.1 %IntlSegmentIteratorPrototype%.next ( )

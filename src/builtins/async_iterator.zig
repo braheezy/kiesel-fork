@@ -18,13 +18,13 @@ const defineBuiltinFunction = utils.defineBuiltinFunction;
 /// https://tc39.es/ecma262/#sec-asynciteratorprototype
 pub const AsyncIteratorPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "%Symbol.asyncIterator%", @"%Symbol.asyncIterator%", 0, realm);
-
-        return object;
     }
 
     /// 27.1.3.1 %AsyncIteratorPrototype% [ %Symbol.asyncIterator% ] ( )

@@ -58,10 +58,12 @@ pub fn createRegExpStringIterator(
 /// https://tc39.es/ecma262/#sec-%regexpstringiteratorprototype%-object
 pub const RegExpStringIteratorPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 0, realm);
 
         // 22.2.9.2.2 %RegExpStringIteratorPrototype% [ %Symbol.toStringTag% ]
@@ -72,8 +74,6 @@ pub const RegExpStringIteratorPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 22.2.9.2.1 %RegExpStringIteratorPrototype%.next ( )

@@ -747,7 +747,7 @@ fn prettyPrintPrimitiveWrapper(
 }
 
 fn prettyPrintFunction(object: Object, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
-    const name = object.data.property_storage.get(PropertyKey.from("name")).?.value.?.string;
+    const name = object.propertyStorage().get(PropertyKey.from("name")).?.value.?.string;
     const tty_config = state.tty_config;
 
     if (object.is(builtins.ECMAScriptFunction)) {
@@ -773,7 +773,6 @@ fn prettyPrintFunction(object: Object, writer: anytype) PrettyPrintError(@TypeOf
 }
 
 fn prettyPrintObject(object: Object, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
-    const property_storage = object.data.property_storage;
     const property_keys = ordinaryOwnPropertyKeys(object) catch return;
     const tty_config = state.tty_config;
 
@@ -783,7 +782,7 @@ fn prettyPrintObject(object: Object, writer: anytype) PrettyPrintError(@TypeOf(w
 
     var printed_properties: usize = 0;
     for (property_keys.items) |property_key| {
-        const property_descriptor = property_storage.get(property_key).?;
+        const property_descriptor = (object.propertyStorage().getCreateIntrinsicIfNeeded(property_key) catch return).?;
         if (!property_descriptor.enumerable.?) continue;
 
         if (printed_properties > 0) try writer.writeAll(",");

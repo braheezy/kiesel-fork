@@ -54,13 +54,13 @@ pub fn createForInIterator(agent: *Agent, object: Object) Allocator.Error!Object
 /// https://tc39.es/ecma262/#sec-%foriniteratorprototype%-object
 pub const ForInIteratorPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 0, realm);
-
-        return object;
     }
 
     /// 14.7.5.10.2.1 %ForInIteratorPrototype%.next ( )

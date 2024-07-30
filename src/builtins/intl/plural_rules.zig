@@ -38,13 +38,15 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-constructor
 pub const PluralRulesConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "PluralRules",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 16.2.1 Intl.PluralRules.prototype
         // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -53,16 +55,6 @@ pub const PluralRulesConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 16.3.1 Intl.PluralRules.prototype.constructor
-        // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Intl.PluralRules.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 16.1.1 Intl.PluralRules ( [ locales [ , options ] ] )
@@ -157,12 +149,22 @@ pub const PluralRulesConstructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-prototype-object
 pub const PluralRulesPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "select", select, 1, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
+
+        // 16.3.1 Intl.PluralRules.prototype.constructor
+        // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Intl.PluralRules%"()),
+        );
 
         // 16.3.2 Intl.PluralRules.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype-tostringtag
@@ -172,8 +174,6 @@ pub const PluralRulesPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 16.3.3 Intl.PluralRules.prototype.select ( value )

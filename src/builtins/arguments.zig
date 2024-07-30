@@ -34,7 +34,7 @@ const sameValue = types.sameValue;
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-getownproperty-p
 fn getOwnProperty(object: Object, property_key: PropertyKey) Allocator.Error!?PropertyDescriptor {
     // 1. Let desc be OrdinaryGetOwnProperty(args, P).
-    var descriptor = ordinaryGetOwnProperty(object, property_key);
+    var descriptor = ordinaryGetOwnProperty(object, property_key) catch unreachable;
 
     // 2. If desc is undefined, return undefined.
     if (descriptor == null) return null;

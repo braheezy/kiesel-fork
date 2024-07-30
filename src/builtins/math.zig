@@ -25,10 +25,12 @@ const getIterator = types.getIterator;
 /// https://tc39.es/ecma262/#sec-value-properties-of-the-math-object
 pub const Math = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 21.3.1.1 Math.E
         // https://tc39.es/ecma262/#sec-math.e
         try defineBuiltinProperty(object, "E", PropertyDescriptor{
@@ -147,8 +149,6 @@ pub const Math = struct {
         try defineBuiltinFunction(object, "tan", tan, 1, realm);
         try defineBuiltinFunction(object, "tanh", tanh, 1, realm);
         try defineBuiltinFunction(object, "trunc", trunc, 1, realm);
-
-        return object;
     }
 
     /// 21.3.2.1 Math.abs ( x )

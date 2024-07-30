@@ -24,13 +24,15 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgeneratorfunction
 pub const AsyncGeneratorFunctionConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "AsyncGeneratorFunction",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 27.4.2.1 AsyncGeneratorFunction.prototype
         // https://tc39.es/ecma262/#sec-asyncgeneratorfunction-prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -39,8 +41,6 @@ pub const AsyncGeneratorFunctionConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        return object;
     }
 
     /// 27.4.1.1 AsyncGeneratorFunction ( ...parameterArgs, bodyArg )
@@ -71,12 +71,6 @@ pub const AsyncGeneratorFunctionConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgeneratorfunction-prototype
 pub const AsyncGeneratorFunctionPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createNoinit(realm);
-        init(realm, object);
-        return object;
-    }
-
-    pub fn createNoinit(realm: *Realm) Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });

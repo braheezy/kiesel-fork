@@ -416,10 +416,12 @@ fn atomicReadModifyWrite(
 
 pub const Atomics = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "add", add, 3, realm);
         try defineBuiltinFunction(object, "and", @"and", 3, realm);
         try defineBuiltinFunction(object, "compareExchange", compareExchange, 4, realm);
@@ -443,8 +445,6 @@ pub const Atomics = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 25.4.4 Atomics.add ( typedArray, index, value )

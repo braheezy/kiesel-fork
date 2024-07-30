@@ -59,10 +59,12 @@ pub const Intl = struct {
     pub const IntlSegmentIteratorPrototype = @import("./intl/segmenter.zig").IntlSegmentIteratorPrototype;
 
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "getCanonicalLocales", getCanonicalLocales, 1, realm);
         try defineBuiltinFunction(object, "supportedValuesOf", supportedValuesOf, 1, realm);
 
@@ -137,8 +139,6 @@ pub const Intl = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 8.3.1 Intl.getCanonicalLocales ( locales )

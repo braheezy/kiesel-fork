@@ -596,10 +596,12 @@ fn serializeJSONArray(
 
 pub const JSON = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 25.5.3 JSON [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-json-%symbol.tostringtag%
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
@@ -611,8 +613,6 @@ pub const JSON = struct {
 
         try defineBuiltinFunction(object, "parse", parse, 2, realm);
         try defineBuiltinFunction(object, "stringify", stringify, 3, realm);
-
-        return object;
     }
 
     /// 25.5.1 JSON.parse ( text [ , reviver ] )

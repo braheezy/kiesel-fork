@@ -1086,16 +1086,16 @@ fn proxyCreate(agent: *Agent, target: Value, handler: Value) Agent.Error!Object 
 /// https://tc39.es/ecma262/#sec-properties-of-the-proxy-constructor
 pub const ProxyConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 2,
             .name = "Proxy",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "revocable", revocable, 2, realm);
-
-        return object;
     }
 
     /// 28.2.1.1 Proxy ( target, handler )

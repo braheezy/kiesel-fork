@@ -21,12 +21,14 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 pub const ThrowTypeError = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .function = function }, .{
+        return createBuiltinFunction(realm.agent, .{ .function = function }, .{
             .length = 0,
             .name = "",
             .realm = realm,
         });
+    }
 
+    pub fn init(_: *Realm, object: Object) Allocator.Error!void {
         // The value of the [[Extensible]] internal slot of this function is false.
         object.data.extensible = false;
 
@@ -49,8 +51,6 @@ pub const ThrowTypeError = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        return object;
     }
 
     fn function(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {

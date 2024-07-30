@@ -294,13 +294,15 @@ fn setViewValue(
 /// https://tc39.es/ecma262/#sec-properties-of-the-dataview-constructor
 pub const DataViewConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "DataView",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 25.3.3.1 DataView.prototype
         // https://tc39.es/ecma262/#sec-dataview.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -309,16 +311,6 @@ pub const DataViewConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 25.3.4.4 DataView.prototype.constructor
-        // https://tc39.es/ecma262/#sec-dataview.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%DataView.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 25.3.2.1 DataView ( buffer [ , byteOffset [ , byteLength ] ] )
@@ -471,10 +463,12 @@ pub const DataViewConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-dataview-prototype-object
 pub const DataViewPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinAccessor(object, "buffer", buffer, null, realm);
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinAccessor(object, "byteOffset", byteOffset, null, realm);
@@ -501,6 +495,14 @@ pub const DataViewPrototype = struct {
         try defineBuiltinFunction(object, "setUint16", setUint16, 2, realm);
         try defineBuiltinFunction(object, "setUint32", setUint32, 2, realm);
 
+        // 25.3.4.4 DataView.prototype.constructor
+        // https://tc39.es/ecma262/#sec-dataview.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%DataView%"()),
+        );
+
         // 25.3.4.25 DataView.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-dataview.prototype-%symbol.tostringtag%
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
@@ -509,8 +511,6 @@ pub const DataViewPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 25.3.4.1 get DataView.prototype.buffer

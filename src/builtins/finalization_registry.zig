@@ -28,13 +28,15 @@ const sameValue = types.sameValue;
 /// https://tc39.es/ecma262/#sec-finalization-registry-constructor
 pub const FinalizationRegistryConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "FinalizationRegistry",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 26.2.2.1 FinalizationRegistry.prototype
         // https://tc39.es/ecma262/#sec-finalization-registry.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -43,16 +45,6 @@ pub const FinalizationRegistryConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 26.2.3.1 FinalizationRegistry.prototype.constructor
-        // https://tc39.es/ecma262/#sec-finalization-registry.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%FinalizationRegistry.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 26.2.1.1 FinalizationRegistry ( cleanupCallback )
@@ -104,12 +96,22 @@ pub const FinalizationRegistryConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-finalization-registry-prototype-object
 pub const FinalizationRegistryPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "register", register, 2, realm);
         try defineBuiltinFunction(object, "unregister", unregister, 1, realm);
+
+        // 26.2.3.1 FinalizationRegistry.prototype.constructor
+        // https://tc39.es/ecma262/#sec-finalization-registry.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%FinalizationRegistry%"()),
+        );
 
         // 26.2.3.4 FinalizationRegistry.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-finalization-registry.prototype-%symbol.tostringtag%
@@ -119,8 +121,6 @@ pub const FinalizationRegistryPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 26.2.3.2 FinalizationRegistry.prototype.register ( target, heldValue [ , unregisterToken ] )

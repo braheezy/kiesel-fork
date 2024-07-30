@@ -36,13 +36,15 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// https://tc39.es/ecma402/#sec-properties-of-intl-displaynames-constructor
 pub const DisplayNamesConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 2,
             .name = "DisplayNames",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 12.2.1 Intl.DisplayNames.prototype
         // https://tc39.es/ecma402/#sec-Intl.DisplayNames.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -51,16 +53,6 @@ pub const DisplayNamesConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 12.3.1 Intl.DisplayNames.prototype.constructor
-        // https://tc39.es/ecma402/#sec-Intl.DisplayNames.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Intl.DisplayNames.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 12.1.1 Intl.DisplayNames ( locales, options )
@@ -257,12 +249,22 @@ pub const DisplayNamesConstructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-displaynames-prototype-object
 pub const DisplayNamesPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "of", of, 1, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
+
+        // 12.3.1 Intl.DisplayNames.prototype.constructor
+        // https://tc39.es/ecma402/#sec-Intl.DisplayNames.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Intl.DisplayNames%"()),
+        );
 
         // 12.3.2 Intl.DisplayNames.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.displaynames.prototype-%symbol.tostringtag%
@@ -272,8 +274,6 @@ pub const DisplayNamesPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 12.3.3 Intl.DisplayNames.prototype.of ( code )

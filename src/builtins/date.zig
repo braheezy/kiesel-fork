@@ -699,13 +699,15 @@ pub fn toDateString(allocator: Allocator, time_value: f64) Allocator.Error![]con
 /// https://tc39.es/ecma262/#sec-properties-of-the-date-constructor
 pub const DateConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 7,
             .name = "Date",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "now", now, 0, realm);
         try defineBuiltinFunction(object, "parse", parse, 1, realm);
         try defineBuiltinFunction(object, "UTC", UTC, 7, realm);
@@ -718,16 +720,6 @@ pub const DateConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 21.4.4.1 Date.prototype.constructor
-        // https://tc39.es/ecma262/#sec-date.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Date.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 21.4.2.1 Date ( ...values )
@@ -893,10 +885,12 @@ pub const DateConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-date-prototype-object
 pub const DatePrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "getDate", getDate, 0, realm);
         try defineBuiltinFunction(object, "getDay", getDay, 0, realm);
         try defineBuiltinFunction(object, "getFullYear", getFullYear, 0, realm);
@@ -946,6 +940,14 @@ pub const DatePrototype = struct {
             .configurable = true,
         });
 
+        // 21.4.4.1 Date.prototype.constructor
+        // https://tc39.es/ecma262/#sec-date.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Date%"()),
+        );
+
         if (build_options.enable_annex_b) {
             try defineBuiltinFunction(object, "getYear", getYear, 0, realm);
             try defineBuiltinFunction(object, "setYear", setYear, 1, realm);
@@ -955,8 +957,6 @@ pub const DatePrototype = struct {
             const @"%Date.prototype.toUTCString%" = object.propertyStorage().get(PropertyKey.from("toUTCString")).?;
             try defineBuiltinProperty(object, "toGMTString", @"%Date.prototype.toUTCString%");
         }
-
-        return object;
     }
 
     /// 21.4.4.2 Date.prototype.getDate ( )

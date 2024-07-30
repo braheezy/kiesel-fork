@@ -148,13 +148,15 @@ fn makeLocaleRecord(agent: *Agent, tag: icu4zig.Locale, options: UnicodeExtensio
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-constructor
 pub const LocaleConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Locale",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 14.2.1 Intl.Locale.prototype
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -163,16 +165,6 @@ pub const LocaleConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 14.3.1 Intl.Locale.prototype.constructor
-        // https://tc39.es/ecma402/#sec-Intl.Locale.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Intl.Locale.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 14.1.1 Intl.Locale ( tag [ , options ] )
@@ -368,10 +360,12 @@ pub const LocaleConstructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-prototype-object
 pub const LocalePrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "maximize", maximize, 0, realm);
         try defineBuiltinFunction(object, "minimize", minimize, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
@@ -386,6 +380,14 @@ pub const LocalePrototype = struct {
         try defineBuiltinAccessor(object, "script", script, null, realm);
         try defineBuiltinAccessor(object, "region", region, null, realm);
 
+        // 14.3.1 Intl.Locale.prototype.constructor
+        // https://tc39.es/ecma402/#sec-Intl.Locale.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Intl.Locale%"()),
+        );
+
         // 14.3.2 Intl.Locale.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype-%symbol.tostringtag%
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
@@ -394,8 +396,6 @@ pub const LocalePrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 14.3.3 Intl.Locale.prototype.maximize ( )

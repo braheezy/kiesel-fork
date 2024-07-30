@@ -26,10 +26,12 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 /// https://tc39.es/ecma262/#sec-%stringiteratorprototype%-object
 pub const StringIteratorPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 0, realm);
 
         // 22.1.5.1.2 %StringIteratorPrototype% [ %Symbol.toStringTag% ]
@@ -40,8 +42,6 @@ pub const StringIteratorPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 22.1.5.1.1 %StringIteratorPrototype%.next ( )

@@ -24,13 +24,15 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 /// https://tc39.es/ecma262/#sec-generatorfunction-constructor
 pub const GeneratorFunctionConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "GeneratorFunction",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 27.3.2.1 GeneratorFunction.prototype
         // https://tc39.es/ecma262/#sec-generatorfunction.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -39,8 +41,6 @@ pub const GeneratorFunctionConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        return object;
     }
 
     /// 27.3.1.1 GeneratorFunction ( ...parameterArgs, bodyArg )
@@ -71,12 +71,6 @@ pub const GeneratorFunctionConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-generatorfunction-prototype-object
 pub const GeneratorFunctionPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createNoinit(realm);
-        init(realm, object);
-        return object;
-    }
-
-    pub fn createNoinit(realm: *Realm) Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });

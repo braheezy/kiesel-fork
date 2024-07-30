@@ -623,13 +623,15 @@ fn typedArraySetElement(agent: *Agent, typed_array: *const TypedArray, index: f6
 /// https://tc39.es/ecma262/#sec-properties-of-the-%typedarray%-intrinsic-object
 pub const TypedArrayConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "TypedArray",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "from", from, 1, realm);
         try defineBuiltinFunction(object, "of", of, 0, realm);
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
@@ -642,16 +644,6 @@ pub const TypedArrayConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 23.2.3.5 %TypedArray%.prototype.constructor
-        // https://tc39.es/ecma262/#sec-%typedarray%.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%TypedArray.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 23.2.1.1 %TypedArray% ( )
@@ -856,10 +848,12 @@ pub const TypedArrayConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-%typedarrayprototype%-object
 pub const TypedArrayPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinAccessor(object, "buffer", buffer, null, realm);
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
@@ -896,6 +890,14 @@ pub const TypedArrayPrototype = struct {
         try defineBuiltinFunction(object, "with", with, 2, realm);
         try defineBuiltinAccessor(object, "%Symbol.toStringTag%", @"%Symbol.toStringTag%", null, realm);
 
+        // 23.2.3.5 %TypedArray%.prototype.constructor
+        // https://tc39.es/ecma262/#sec-%typedarray%.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%TypedArray%"()),
+        );
+
         // 23.2.3.34 %TypedArray%.prototype.toString ( )
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype.tostring
         try defineBuiltinProperty(object, "toString", Value.from(try realm.intrinsics.@"%Array.prototype.toString%"()));
@@ -904,8 +906,6 @@ pub const TypedArrayPrototype = struct {
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype-%symbol.iterator%
         const @"%TypedArray.prototype.values%" = object.propertyStorage().get(PropertyKey.from("values")).?;
         try defineBuiltinProperty(object, "%Symbol.iterator%", @"%TypedArray.prototype.values%");
-
-        return object;
     }
 
     /// 23.2.3.1 %TypedArray%.prototype.at ( index )
@@ -3703,13 +3703,15 @@ fn allocateTypedArrayBuffer(
 fn MakeTypedArrayConstructor(comptime name: []const u8) type {
     return struct {
         pub fn create(realm: *Realm) Allocator.Error!Object {
-            const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+            return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
                 .length = 3,
                 .name = name,
                 .realm = realm,
                 .prototype = try realm.intrinsics.@"%TypedArray%"(),
             });
+        }
 
+        pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
             const prototypeFn = @field(Realm.Intrinsics, "%" ++ name ++ ".prototype%");
 
             // 23.2.6.1 TypedArray.BYTES_PER_ELEMENT
@@ -3732,16 +3734,6 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
                 .enumerable = false,
                 .configurable = false,
             });
-
-            // 23.2.7.2 TypedArray.prototype.constructor
-            // https://tc39.es/ecma262/#sec-typedarray.prototype.constructor
-            try defineBuiltinProperty(
-                prototypeFn(&realm.intrinsics) catch unreachable,
-                "constructor",
-                Value.from(object),
-            );
-
-            return object;
         }
 
         /// 23.2.5.1 TypedArray ( ...args )
@@ -3902,10 +3894,12 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
 fn MakeTypedArrayPrototype(comptime name: []const u8) type {
     return struct {
         pub fn create(realm: *Realm) Allocator.Error!Object {
-            const object = try builtins.Object.create(realm.agent, .{
+            return builtins.Object.create(realm.agent, .{
                 .prototype = try realm.intrinsics.@"%TypedArray.prototype%"(),
             });
+        }
 
+        pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
             // 23.2.7.1 TypedArray.prototype.BYTES_PER_ELEMENT
             // https://tc39.es/ecma262/#sec-typedarray.prototype.bytes_per_element
             try defineBuiltinProperty(object, "BYTES_PER_ELEMENT", PropertyDescriptor{
@@ -3918,7 +3912,15 @@ fn MakeTypedArrayPrototype(comptime name: []const u8) type {
                 .configurable = false,
             });
 
-            return object;
+            const constructorFn = @field(Realm.Intrinsics, "%" ++ name ++ "%");
+
+            // 23.2.7.2 TypedArray.prototype.constructor
+            // https://tc39.es/ecma262/#sec-typedarray.prototype.constructor
+            try defineBuiltinProperty(
+                object,
+                "constructor",
+                Value.from(try constructorFn(&realm.intrinsics)),
+            );
         }
     };
 }

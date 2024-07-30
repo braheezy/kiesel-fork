@@ -140,17 +140,17 @@ pub fn ordinaryPreventExtensions(object: Object) bool {
 
 /// 10.1.5 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-getownproperty-p
-fn getOwnProperty(object: Object, property_key: PropertyKey) error{}!?PropertyDescriptor {
+fn getOwnProperty(object: Object, property_key: PropertyKey) Allocator.Error!?PropertyDescriptor {
     // 1. Return OrdinaryGetOwnProperty(O, P).
     return ordinaryGetOwnProperty(object, property_key);
 }
 
 /// 10.1.5.1 OrdinaryGetOwnProperty ( O, P )
 /// https://tc39.es/ecma262/#sec-ordinarygetownproperty
-pub fn ordinaryGetOwnProperty(object: Object, property_key: PropertyKey) ?PropertyDescriptor {
+pub fn ordinaryGetOwnProperty(object: Object, property_key: PropertyKey) Allocator.Error!?PropertyDescriptor {
     // 1. If O does not have an own property with key P, return undefined.
     // 3. Let X be O's own property whose key is P.
-    const x = object.propertyStorage().get(property_key) orelse return null;
+    const x = (try object.propertyStorage().getCreateIntrinsicIfNeeded(property_key)) orelse return null;
 
     // 2. Let D be a newly created Property Descriptor with no fields.
     var descriptor: PropertyDescriptor = .{};

@@ -34,10 +34,12 @@ const promiseResolve = builtins.promiseResolve;
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgenerator-prototype
 pub const AsyncGeneratorPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%AsyncIteratorPrototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 1, realm);
         try defineBuiltinFunction(object, "return", @"return", 1, realm);
         try defineBuiltinFunction(object, "throw", throw, 1, realm);
@@ -59,8 +61,6 @@ pub const AsyncGeneratorPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 27.6.1.2 %AsyncGeneratorPrototype%.next ( value )

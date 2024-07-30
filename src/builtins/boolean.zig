@@ -26,13 +26,15 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// https://tc39.es/ecma262/#sec-properties-of-the-boolean-constructor
 pub const BooleanConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Boolean",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         // 20.3.2.1 Boolean.prototype
         // https://tc39.es/ecma262/#sec-boolean.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -41,16 +43,6 @@ pub const BooleanConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 20.3.3.1 Boolean.prototype.constructor
-        // https://tc39.es/ecma262/#sec-boolean.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Boolean.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 20.3.1.1 Boolean ( value )
@@ -85,17 +77,25 @@ pub const BooleanConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-boolean-prototype-object
 pub const BooleanPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try Boolean.create(realm.agent, .{
+        return Boolean.create(realm.agent, .{
             .fields = .{
                 .boolean_data = false,
             },
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
 
-        return object;
+        // 20.3.3.1 Boolean.prototype.constructor
+        // https://tc39.es/ecma262/#sec-boolean.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Boolean%"()),
+        );
     }
 
     /// 20.3.3.3.1 ThisBooleanValue ( value )

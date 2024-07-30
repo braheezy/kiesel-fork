@@ -111,13 +111,15 @@ pub fn allocateSharedArrayBuffer(
 /// https://tc39.es/ecma262/#sec-sharedarraybuffer-constructor
 pub const SharedArrayBufferConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "SharedArrayBuffer",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 25.2.4.1 SharedArrayBuffer.prototype
@@ -128,16 +130,6 @@ pub const SharedArrayBufferConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 25.2.5.2 SharedArrayBuffer.prototype.constructor
-        // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%SharedArrayBuffer.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 25.2.3.1 SharedArrayBuffer ( length [ , options ] )
@@ -184,15 +176,25 @@ pub const SharedArrayBufferConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-sharedarraybuffer-prototype-object
 pub const SharedArrayBufferPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinFunction(object, "grow", grow, 1, realm);
         try defineBuiltinAccessor(object, "growable", growable, null, realm);
         try defineBuiltinAccessor(object, "maxByteLength", maxByteLength, null, realm);
         try defineBuiltinFunction(object, "slice", slice, 2, realm);
+
+        // 25.2.5.2 SharedArrayBuffer.prototype.constructor
+        // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%SharedArrayBuffer%"()),
+        );
 
         // 25.2.5.7 SharedArrayBuffer.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype-%symbol.tostringtag%
@@ -202,8 +204,6 @@ pub const SharedArrayBufferPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 25.2.5.1 get SharedArrayBuffer.prototype.byteLength

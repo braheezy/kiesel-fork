@@ -159,13 +159,15 @@ fn setDataSize(set_data: SetData) usize {
 /// https://tc39.es/ecma262/#sec-properties-of-the-set-constructor
 pub const SetConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "Set",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 24.2.3.1 Set.prototype
@@ -176,16 +178,6 @@ pub const SetConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 24.2.4.3 Set.prototype.constructor
-        // https://tc39.es/ecma262/#sec-set.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%Set.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 24.2.2.1 Set ( [ iterable ] )
@@ -250,10 +242,12 @@ pub const SetConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-set-prototype-object
 pub const SetPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "add", add, 1, realm);
         try defineBuiltinFunction(object, "clear", clear, 0, realm);
         try defineBuiltinFunction(object, "delete", delete, 1, realm);
@@ -269,6 +263,14 @@ pub const SetPrototype = struct {
         try defineBuiltinFunction(object, "symmetricDifference", symmetricDifference, 1, realm);
         try defineBuiltinFunction(object, "union", @"union", 1, realm);
         try defineBuiltinFunction(object, "values", values, 0, realm);
+
+        // 24.2.4.3 Set.prototype.constructor
+        // https://tc39.es/ecma262/#sec-set.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%Set%"()),
+        );
 
         // 24.2.4.13 Set.prototype.keys ( )
         // https://tc39.es/ecma262/#sec-set.prototype.keys
@@ -287,8 +289,6 @@ pub const SetPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 24.2.4.1 Set.prototype.add ( value )

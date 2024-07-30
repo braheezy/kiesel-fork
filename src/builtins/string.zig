@@ -315,7 +315,7 @@ pub fn getSubstitution(
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-getownproperty-p
 fn getOwnProperty(object: Object, property_key: PropertyKey) Allocator.Error!?PropertyDescriptor {
     // 1. Let desc be OrdinaryGetOwnProperty(S, P).
-    const property_descriptor = ordinaryGetOwnProperty(object, property_key);
+    const property_descriptor = ordinaryGetOwnProperty(object, property_key) catch unreachable;
 
     // 2. If desc is not undefined, return desc.
     if (property_descriptor != null) return property_descriptor;
@@ -500,13 +500,15 @@ fn stringGetOwnProperty(
 /// https://tc39.es/ecma262/#sec-properties-of-the-string-constructor
 pub const StringConstructor = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "String",
             .realm = realm,
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "fromCharCode", fromCharCode, 1, realm);
         try defineBuiltinFunction(object, "fromCodePoint", fromCodePoint, 1, realm);
         try defineBuiltinFunction(object, "raw", raw, 1, realm);
@@ -519,16 +521,6 @@ pub const StringConstructor = struct {
             .enumerable = false,
             .configurable = false,
         });
-
-        // 22.1.3.6 String.prototype.constructor
-        // https://tc39.es/ecma262/#sec-string.prototype.constructor
-        try defineBuiltinProperty(
-            realm.intrinsics.@"%String.prototype%"() catch unreachable,
-            "constructor",
-            Value.from(object),
-        );
-
-        return object;
     }
 
     /// 22.1.1.1 String ( value )
@@ -688,13 +680,15 @@ pub const StringConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-string-prototype-object
 pub const StringPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try String.create(realm.agent, .{
+        return String.create(realm.agent, .{
             .fields = .{
                 .string_data = types.String.empty,
             },
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinFunction(object, "charAt", charAt, 1, realm);
         try defineBuiltinFunction(object, "charCodeAt", charCodeAt, 1, realm);
@@ -730,6 +724,14 @@ pub const StringPrototype = struct {
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
         try defineBuiltinFunction(object, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
 
+        // 22.1.3.6 String.prototype.constructor
+        // https://tc39.es/ecma262/#sec-string.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%String%"()),
+        );
+
         if (build_options.enable_annex_b) {
             try defineBuiltinFunction(object, "substr", substr, 2, realm);
             try defineBuiltinFunction(object, "anchor", anchor, 1, realm);
@@ -756,8 +758,6 @@ pub const StringPrototype = struct {
             const @"%String.prototype.trimEnd%" = object.propertyStorage().get(PropertyKey.from("trimEnd")).?;
             try defineBuiltinProperty(object, "trimRight", @"%String.prototype.trimEnd%");
         }
-
-        return object;
     }
 
     /// 22.1.3.35.1 ThisStringValue ( value )

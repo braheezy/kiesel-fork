@@ -49,10 +49,12 @@ pub fn createMapIterator(
 /// https://tc39.es/ecma262/#sec-%mapiteratorprototype%-object
 pub const MapIteratorPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object {
-        const object = try builtins.Object.create(realm.agent, .{
+        return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),
         });
+    }
 
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 0, realm);
 
         // 23.1.5.2.2 %ArrayIteratorPrototype% [ %Symbol.toStringTag% ]
@@ -63,8 +65,6 @@ pub const MapIteratorPrototype = struct {
             .enumerable = false,
             .configurable = true,
         });
-
-        return object;
     }
 
     /// 24.1.5.2.1 %MapIteratorPrototype%.next ( )
