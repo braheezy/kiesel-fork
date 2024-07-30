@@ -79,7 +79,7 @@ pub const BigUint64ArrayConstructor = MakeTypedArrayConstructor("BigUint64Array"
 pub const BigUint64ArrayPrototype = MakeTypedArrayPrototype("BigUint64Array");
 
 pub const Float16ArrayConstructor = MakeTypedArrayConstructor("Float16Array");
-pub const Float16ArrayPrototype = MakeTypedArrayPrototype("Float32Array");
+pub const Float16ArrayPrototype = MakeTypedArrayPrototype("Float16Array");
 
 pub const Float32ArrayConstructor = MakeTypedArrayConstructor("Float32Array");
 pub const Float32ArrayPrototype = MakeTypedArrayPrototype("Float32Array");
