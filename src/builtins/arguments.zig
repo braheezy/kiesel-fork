@@ -315,11 +315,12 @@ pub fn createMappedArgumentsObject(
     object.as(Arguments).fields.parameter_map = map;
 
     // 12. Let parameterNames be the BoundNames of formals.
-    const parameter_names = try formals.boundNames(agent.gc_allocator);
-    defer agent.gc_allocator.free(parameter_names);
+    var parameter_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
+    defer parameter_names.deinit();
+    try formals.collectBoundNames(&parameter_names);
 
     // 13. Let numberOfParameters be the number of elements in parameterNames.
-    const number_of_parameters = parameter_names.len;
+    const number_of_parameters = parameter_names.items.len;
 
     // 14. Let index be 0.
     // 15. Repeat, while index < len,
@@ -354,7 +355,7 @@ pub fn createMappedArgumentsObject(
     // 19. Repeat, while index ≥ 0,
     while (index != null) : (index = (std.math.sub(u53, index.?, 1) catch null)) {
         // a. Let name be parameterNames[index].
-        const name = parameter_names[@intCast(index.?)];
+        const name = parameter_names.items[@intCast(index.?)];
 
         // b. If mappedNames does not contain name, then
         if (!mapped_names.contains(name)) {

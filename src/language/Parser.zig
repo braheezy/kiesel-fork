@@ -327,11 +327,13 @@ fn ensureUniqueParameterNames(
     formal_parameters: ast.FormalParameters,
     location: ptk.Location,
 ) Allocator.Error!void {
+    var bound_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    defer bound_names.deinit();
+    try formal_parameters.collectBoundNames(&bound_names);
     var seen_bound_names = std.StringHashMap(void).init(self.allocator);
     defer seen_bound_names.deinit();
-    const bound_names = try formal_parameters.boundNames(self.allocator);
-    defer self.allocator.free(bound_names);
-    for (bound_names) |bound_name| {
+    try seen_bound_names.ensureTotalCapacity(@intCast(bound_names.items.len));
+    for (bound_names.items) |bound_name| {
         if (try seen_bound_names.fetchPut(bound_name, {})) |_| {
             switch (kind) {
                 .strict => try self.emitErrorAt(
@@ -359,9 +361,10 @@ fn ensureAllowedParameterNames(
     formal_parameters: ast.FormalParameters,
     location: ptk.Location,
 ) AcceptError!void {
-    const bound_names = try formal_parameters.boundNames(self.allocator);
-    defer self.allocator.free(bound_names);
-    for (bound_names) |bound_name| {
+    var bound_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    defer bound_names.deinit();
+    try formal_parameters.collectBoundNames(&bound_names);
+    for (bound_names.items) |bound_name| {
         try self.ensureAllowedIdentifier(.function_parameter, bound_name, location);
     }
 }

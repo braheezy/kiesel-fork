@@ -928,17 +928,18 @@ fn functionDeclarationInstantiation(
     const formals = function.fields.formal_parameters;
 
     // 5. Let parameterNames be the BoundNames of formals.
-    const parameter_names = try formals.boundNames(agent.gc_allocator);
-    defer agent.gc_allocator.free(parameter_names);
+    var parameter_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
+    defer parameter_names.deinit();
+    try formals.collectBoundNames(&parameter_names);
 
     // 6. If parameterNames has any duplicate entries, let hasDuplicates be true. Otherwise, let
     //    hasDuplicates be false.
     const has_duplicates = blk: {
         var unique_names = std.StringHashMap(void).init(agent.gc_allocator);
         defer unique_names.deinit();
-        if (parameter_names.len > std.math.maxInt(u32)) return error.OutOfMemory;
-        try unique_names.ensureTotalCapacity(@intCast(parameter_names.len));
-        for (parameter_names) |parameter_name| {
+        if (parameter_names.items.len > std.math.maxInt(u32)) return error.OutOfMemory;
+        try unique_names.ensureTotalCapacity(@intCast(parameter_names.items.len));
+        for (parameter_names.items) |parameter_name| {
             if (unique_names.contains(parameter_name)) break :blk true;
             unique_names.putAssumeCapacityNoClobber(parameter_name, {});
         }
@@ -952,12 +953,14 @@ fn functionDeclarationInstantiation(
     const has_parameter_expressions = formals.containsExpression();
 
     // 9. Let varNames be the VarDeclaredNames of code.
-    const var_names = try code.varDeclaredNames(agent.gc_allocator);
-    defer agent.gc_allocator.free(var_names);
+    var var_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
+    defer var_names.deinit();
+    try code.collectVarDeclaredNames(&var_names);
 
     // 10. Let varDeclarations be the VarScopedDeclarations of code.
-    const var_declarations = try code.varScopedDeclarations(agent.gc_allocator);
-    defer agent.gc_allocator.free(var_declarations);
+    var var_declarations = std.ArrayList(ast.VarScopedDeclaration).init(agent.gc_allocator);
+    defer var_declarations.deinit();
+    try code.collectVarScopedDeclarations(&var_declarations);
 
     // TODO: 11. Let lexicalNames be the LexicallyDeclaredNames of code.
     const lexical_names = &[_][]const u8{};
@@ -971,7 +974,7 @@ fn functionDeclarationInstantiation(
     defer functions_to_initialize.deinit();
 
     // 14. For each element d of varDeclarations, in reverse List order, do
-    var it = std.mem.reverseIterator(var_declarations);
+    var it = std.mem.reverseIterator(var_declarations.items);
     while (it.next()) |var_declaration| {
         // a. If d is neither a VariableDeclaration nor a ForBinding nor a BindingIdentifier, then
         if (var_declaration == .hoistable_declaration) {
@@ -1008,7 +1011,7 @@ fn functionDeclarationInstantiation(
         arguments_object_needed = false;
     }
     // 17. Else if parameterNames contains "arguments", then
-    else if (containsSlice(parameter_names, "arguments")) {
+    else if (containsSlice(parameter_names.items, "arguments")) {
         // a. Set argumentsObjectNeeded to false.
         arguments_object_needed = false;
     }
@@ -1059,7 +1062,7 @@ fn functionDeclarationInstantiation(
     };
 
     // 21. For each String paramName of parameterNames, do
-    for (parameter_names) |parameter_name| {
+    for (parameter_names.items) |parameter_name| {
         // a. Let alreadyDeclared be ! env.HasBinding(paramName).
         const already_declared = env.hasBinding(parameter_name) catch |err| try noexcept(err);
 
@@ -1128,20 +1131,16 @@ fn functionDeclarationInstantiation(
         ) catch |err| try noexcept(err);
 
         // f. Let parameterBindings be the list-concatenation of parameterNames and « "arguments" ».
-        var parameter_bindings = try std.ArrayList([]const u8).initCapacity(
-            agent.gc_allocator,
-            parameter_names.len + 1,
-        );
-        parameter_bindings.appendSliceAssumeCapacity(parameter_names);
-        parameter_bindings.appendAssumeCapacity("arguments");
-        break :blk try parameter_bindings.toOwnedSlice();
+        var parameter_bindings = try parameter_names.clone();
+        try parameter_bindings.append("arguments");
+        break :blk parameter_bindings;
     }
     // 23. Else,
     else blk: {
         // a. Let parameterBindings be parameterNames.
         break :blk parameter_names;
     };
-    defer if (arguments_object_needed) agent.gc_allocator.free(parameter_bindings);
+    defer if (arguments_object_needed) parameter_bindings.deinit();
 
     // TODO: 24-26.
     // NOTE: Ad-hoc implementation of IteratorBindingInitialization for SingleNameBinding and BindingRestElement
@@ -1206,14 +1205,14 @@ fn functionDeclarationInstantiation(
         var instantiated_var_names = std.StringHashMap(void).init(agent.gc_allocator);
         defer instantiated_var_names.deinit();
 
-        if (parameter_bindings.len > std.math.maxInt(u32)) return error.OutOfMemory;
-        try instantiated_var_names.ensureTotalCapacity(@intCast(parameter_bindings.len));
-        for (parameter_bindings) |parameter_binding| {
+        if (parameter_bindings.items.len > std.math.maxInt(u32)) return error.OutOfMemory;
+        try instantiated_var_names.ensureTotalCapacity(@intCast(parameter_bindings.items.len));
+        for (parameter_bindings.items) |parameter_binding| {
             instantiated_var_names.putAssumeCapacity(parameter_binding, {});
         }
 
         // c. For each element n of varNames, do
-        for (var_names) |var_name| {
+        for (var_names.items) |var_name| {
             // i. If instantiatedVarNames does not contain n, then
             if (!instantiated_var_names.contains(var_name)) {
                 // 1. Append n to instantiatedVarNames.
@@ -1249,7 +1248,7 @@ fn functionDeclarationInstantiation(
         defer instantiated_var_names.deinit();
 
         // e. For each element n of varNames, do
-        for (var_names) |var_name| {
+        for (var_names.items) |var_name| {
             // i. If instantiatedVarNames does not contain n, then
             if (!instantiated_var_names.contains(var_name)) {
                 // 1. Append n to instantiatedVarNames.
@@ -1262,7 +1261,7 @@ fn functionDeclarationInstantiation(
                 //     a. Let initialValue be undefined.
                 // 4. Else,
                 //     a. Let initialValue be ! env.GetBindingValue(n, false).
-                const initial_value = if (!containsSlice(parameter_names, var_name) or
+                const initial_value = if (!containsSlice(parameter_bindings.items, var_name) or
                     function_names.contains(var_name))
                     .undefined
                 else
@@ -1306,20 +1305,24 @@ fn functionDeclarationInstantiation(
     callee_context.ecmascript_code.?.lexical_environment = lex_env;
 
     // 33. Let lexDeclarations be the LexicallyScopedDeclarations of code.
-    const lex_declarations = try code.lexicallyScopedDeclarations(agent.gc_allocator);
-    defer agent.gc_allocator.free(lex_declarations);
+    var lex_declarations = std.ArrayList(ast.LexicallyScopedDeclaration).init(agent.gc_allocator);
+    defer lex_declarations.deinit();
+    try code.collectLexicallyScopedDeclarations(&lex_declarations);
+
+    var bound_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
+    defer bound_names.deinit();
 
     // 34. For each element d of lexDeclarations, do
-    for (lex_declarations) |declaration| {
+    for (lex_declarations.items) |declaration| {
         // a. NOTE: A lexically declared name cannot be the same as a function/generator
         //    declaration, formal parameter, or a var name. Lexically declared names are only
         //    instantiated here but not initialized.
 
-        const bound_names = try declaration.boundNames(agent.gc_allocator);
-        defer agent.gc_allocator.free(bound_names);
+        bound_names.clearRetainingCapacity();
+        try declaration.collectBoundNames(&bound_names);
 
         // b. For each element dn of the BoundNames of d, do
-        for (bound_names) |name| {
+        for (bound_names.items) |name| {
             // i. If IsConstantDeclaration of d is true, then
             if (declaration.isConstantDeclaration()) {
                 // 1. Perform ! lexEnv.CreateImmutableBinding(dn, true).

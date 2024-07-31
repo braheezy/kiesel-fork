@@ -192,19 +192,21 @@ fn evalDeclarationInstantiation(
     strict: bool,
 ) Agent.Error!void {
     // 1. Let varNames be the VarDeclaredNames of body.
-    const var_names = try body.varDeclaredNames(agent.gc_allocator);
-    defer agent.gc_allocator.free(var_names);
+    var var_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
+    defer var_names.deinit();
+    try body.collectVarDeclaredNames(&var_names);
 
     // 2. Let varDeclarations be the VarScopedDeclarations of body.
-    const var_declarations = try body.varScopedDeclarations(agent.gc_allocator);
-    defer agent.gc_allocator.free(var_declarations);
+    var var_declarations = std.ArrayList(ast.VarScopedDeclaration).init(agent.gc_allocator);
+    defer var_declarations.deinit();
+    try body.collectVarScopedDeclarations(&var_declarations);
 
     // 3. If strict is false, then
     if (!strict) {
         // a. If varEnv is a Global Environment Record, then
         if (var_env == .global_environment) {
             // i. For each element name of varNames, do
-            for (var_names) |name| {
+            for (var_names.items) |name| {
                 // 1. If varEnv.HasLexicalDeclaration(name) is true, throw a SyntaxError exception.
                 if (var_env.global_environment.hasLexicalDeclaration(name)) {
                     return agent.throwException(
@@ -231,7 +233,7 @@ fn evalDeclarationInstantiation(
                 //    declaration so it doesn't need to be checked for var/let hoisting conflicts.
 
                 // 2. For each element name of varNames, do
-                for (var_names) |name| {
+                for (var_names.items) |name| {
                     // a. If ! thisEnv.HasBinding(name) is true, then
                     if (this_env.hasBinding(name) catch |err| try noexcept(err)) {
                         // i. Throw a SyntaxError exception.
@@ -261,7 +263,7 @@ fn evalDeclarationInstantiation(
     defer declared_function_names.deinit();
 
     // 10. For each element d of varDeclarations, in reverse List order, do
-    var it = std.mem.reverseIterator(var_declarations);
+    var it = std.mem.reverseIterator(var_declarations.items);
     while (it.next()) |var_declaration| {
         // a. If d is not either a VariableDeclaration, a ForBinding, or a BindingIdentifier, then
         if (var_declaration == .hoistable_declaration) {
@@ -309,7 +311,7 @@ fn evalDeclarationInstantiation(
     defer declared_var_names.deinit();
 
     // 12. For each element d of varDeclarations, do
-    for (var_declarations) |var_declaration| {
+    for (var_declarations.items) |var_declaration| {
         // a. If d is either a VariableDeclaration, a ForBinding, or a BindingIdentifier, then
         if (var_declaration == .variable_declaration) {
             // TODO: Update this when binding patterns are supported.
@@ -351,18 +353,22 @@ fn evalDeclarationInstantiation(
     //     Environment Record and the global object is a Proxy exotic object.
 
     // 15. Let lexDeclarations be the LexicallyScopedDeclarations of body.
-    const lex_declarations = try body.lexicallyScopedDeclarations(agent.gc_allocator);
-    defer agent.gc_allocator.free(lex_declarations);
+    var lex_declarations = std.ArrayList(ast.LexicallyScopedDeclaration).init(agent.gc_allocator);
+    defer lex_declarations.deinit();
+    try body.collectLexicallyScopedDeclarations(&lex_declarations);
+
+    var bound_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
+    defer bound_names.deinit();
 
     // 16. For each element d of lexDeclarations, do
-    for (lex_declarations) |declaration| {
+    for (lex_declarations.items) |declaration| {
         // a. NOTE: Lexically declared names are only instantiated here but not initialized.
 
-        const bound_names = try declaration.boundNames(agent.gc_allocator);
-        defer agent.gc_allocator.free(bound_names);
+        bound_names.clearRetainingCapacity();
+        try declaration.collectBoundNames(&bound_names);
 
         // b. For each element dn of the BoundNames of d, do
-        for (bound_names) |name| {
+        for (bound_names.items) |name| {
             // i. If IsConstantDeclaration of d is true, then
             if (declaration.isConstantDeclaration()) {
                 // 1. Perform ? lexEnv.CreateImmutableBinding(dn, true).

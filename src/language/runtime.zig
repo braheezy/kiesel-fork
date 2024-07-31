@@ -419,22 +419,26 @@ pub fn blockDeclarationInstantiation(
     std.debug.assert(env == .declarative_environment);
 
     // 1. let declarations be the LexicallyScopedDeclarations of code.
-    const declarations = switch (code) {
-        .statement_list => |node| try node.lexicallyScopedDeclarations(agent.gc_allocator),
-        .case_block => |node| try node.lexicallyScopedDeclarations(agent.gc_allocator),
-    };
-    defer agent.gc_allocator.free(declarations);
+    var declarations = std.ArrayList(ast.LexicallyScopedDeclaration).init(agent.gc_allocator);
+    defer declarations.deinit();
+    switch (code) {
+        .statement_list => |node| try node.collectLexicallyScopedDeclarations(&declarations),
+        .case_block => |node| try node.collectLexicallyScopedDeclarations(&declarations),
+    }
 
     // 2. Let privateEnv be the running execution context's PrivateEnvironment.
     const private_env = agent.runningExecutionContext().ecmascript_code.?.private_environment;
 
+    var bound_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
+    defer bound_names.deinit();
+
     // 3. For each element d of declarations, do
-    for (declarations) |declaration| {
-        const bound_names = try declaration.boundNames(agent.gc_allocator);
-        defer agent.gc_allocator.free(bound_names);
+    for (declarations.items) |declaration| {
+        bound_names.clearRetainingCapacity();
+        try declaration.collectBoundNames(&bound_names);
 
         // a. For each element dn of the BoundNames of d, do
-        for (bound_names) |name| {
+        for (bound_names.items) |name| {
             // i. If IsConstantDeclaration of d is true, then
             if (declaration.isConstantDeclaration()) {
                 // 1. Perform ! env.CreateImmutableBinding(dn, true).

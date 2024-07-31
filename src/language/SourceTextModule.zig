@@ -480,11 +480,7 @@ pub fn parse(
 
     // 4. Let importEntries be the ImportEntries of body.
     var import_entries = std.ArrayList(ImportEntry).init(agent.gc_allocator);
-    {
-        const tmp = try body.importEntries(agent.gc_allocator);
-        defer agent.gc_allocator.free(tmp);
-        try import_entries.appendSlice(tmp);
-    }
+    try body.collectImportEntries(&import_entries);
 
     // 5. Let importedBoundNames be ImportedLocalNames(importEntries).
     // NOTE: This is lazily done with a for loop below.
@@ -498,11 +494,12 @@ pub fn parse(
     // TODO: 8-9.
 
     // 9. Let exportEntries be the ExportEntries of body.
-    const export_entries = try body.exportEntries(agent.gc_allocator);
-    defer agent.gc_allocator.free(export_entries);
+    var export_entries = std.ArrayList(ExportEntry).init(agent.gc_allocator);
+    defer export_entries.deinit();
+    try body.collectExportEntries(&export_entries);
 
     // 10. For each ExportEntry Record ee of exportEntries, do
-    for (export_entries) |export_entry| {
+    for (export_entries.items) |export_entry| {
         // a. If ee.[[ModuleRequest]] is null, then
         if (export_entry.module_request == null) {
             const import_entry_with_bound_name: ?ImportEntry = for (import_entries.items) |import_entry| {
@@ -1120,15 +1117,16 @@ pub fn initializeEnvironment(self: *Self) Agent.Error!void {
     const code = self.ecmascript_code;
 
     // 19. Let varDeclarations be the VarScopedDeclarations of code.
-    const var_declarations = try code.varScopedDeclarations(agent.gc_allocator);
-    defer agent.gc_allocator.free(var_declarations);
+    var var_declarations = std.ArrayList(ast.VarScopedDeclaration).init(agent.gc_allocator);
+    defer var_declarations.deinit();
+    try code.collectVarScopedDeclarations(&var_declarations);
 
     // 20. Let declaredVarNames be a new empty List.
     var declared_var_names = std.StringHashMap(void).init(agent.gc_allocator);
     defer declared_var_names.deinit();
 
     // 21. For each element d of varDeclarations, do
-    for (var_declarations) |var_declaration| {
+    for (var_declarations.items) |var_declaration| {
         const bound_name = switch (var_declaration) {
             .variable_declaration => |variable_declaration| variable_declaration.binding_identifier,
             .hoistable_declaration => |hoistable_declaration| switch (hoistable_declaration) {
@@ -1153,19 +1151,23 @@ pub fn initializeEnvironment(self: *Self) Agent.Error!void {
     }
 
     // 22. Let lexDeclarations be the LexicallyScopedDeclarations of code.
-    const lex_declarations = try code.lexicallyScopedDeclarations(agent.gc_allocator);
-    defer agent.gc_allocator.free(lex_declarations);
+    var lex_declarations = std.ArrayList(ast.LexicallyScopedDeclaration).init(agent.gc_allocator);
+    defer lex_declarations.deinit();
+    try code.collectLexicallyScopedDeclarations(&lex_declarations);
 
     // 23. Let privateEnv be null.
     const private_env = null;
 
+    var bound_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
+    defer bound_names.deinit();
+
     // 24. For each element d of lexDeclarations, do
-    for (lex_declarations) |declaration| {
-        const bound_names = try declaration.boundNames(agent.gc_allocator);
-        defer agent.gc_allocator.free(bound_names);
+    for (lex_declarations.items) |declaration| {
+        bound_names.clearRetainingCapacity();
+        try declaration.collectBoundNames(&bound_names);
 
         // a. For each element dn of the BoundNames of d, do
-        for (bound_names) |name| {
+        for (bound_names.items) |name| {
             // i. If IsConstantDeclaration of d is true, then
             if (declaration.isConstantDeclaration()) {
                 // 1. Perform ! env.CreateImmutableBinding(dn, true).

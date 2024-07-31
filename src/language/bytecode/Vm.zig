@@ -614,11 +614,12 @@ pub fn executeInstruction(
 
             // 14.7.5.4 Runtime Semantics: ForDeclarationBindingInstantiation
             // https://tc39.es/ecma262/#sec-runtime-semantics-fordeclarationbindinginstantiation
-            const bound_names = try lexical_declaration.boundNames(self.agent.gc_allocator);
-            defer self.agent.gc_allocator.free(bound_names);
+            var bound_names = std.ArrayList(ast.Identifier).init(self.agent.gc_allocator);
+            defer bound_names.deinit();
+            try lexical_declaration.collectBoundNames(&bound_names);
 
             // 1. For each element name of the BoundNames of ForBinding, do
-            for (bound_names) |name| {
+            for (bound_names.items) |name| {
                 // a. If IsConstantDeclaration of LetOrConst is true, then
                 if (lexical_declaration.isConstantDeclaration()) {
                     // i. Perform ! environment.CreateImmutableBinding(name, true).

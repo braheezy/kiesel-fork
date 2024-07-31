@@ -139,13 +139,14 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     // TODO: 1. Let lexNames be the LexicallyDeclaredNames of script.
 
     // 2. Let varNames be the VarDeclaredNames of script.
-    const var_names = try script.varDeclaredNames(agent.gc_allocator);
-    defer agent.gc_allocator.free(var_names);
+    var var_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
+    defer var_names.deinit();
+    try script.collectVarDeclaredNames(&var_names);
 
     // TODO: 3. For each element name of lexNames, do
 
     // 4. For each element name of varNames, do
-    for (var_names) |name| {
+    for (var_names.items) |name| {
         // a. If env.HasLexicalDeclaration(name) is true, throw a SyntaxError exception.
         if (env.hasLexicalDeclaration(name)) {
             return agent.throwException(
@@ -157,8 +158,9 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     }
 
     // 5. Let varDeclarations be the VarScopedDeclarations of script.
-    const var_declarations = try script.varScopedDeclarations(agent.gc_allocator);
-    defer agent.gc_allocator.free(var_declarations);
+    var var_declarations = std.ArrayList(ast.VarScopedDeclaration).init(agent.gc_allocator);
+    defer var_declarations.deinit();
+    try script.collectVarScopedDeclarations(&var_declarations);
 
     // 6. Let functionsToInitialize be a new empty List.
     var functions_to_initialize = std.ArrayList(ast.HoistableDeclaration).init(agent.gc_allocator);
@@ -169,7 +171,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     defer declared_function_names.deinit();
 
     // 8. For each element d of varDeclarations, in reverse List order, do
-    var it = std.mem.reverseIterator(var_declarations);
+    var it = std.mem.reverseIterator(var_declarations.items);
     while (it.next()) |var_declaration| {
         // a. If d is not either a VariableDeclaration, a ForBinding, or a BindingIdentifier, then
         if (var_declaration == .hoistable_declaration) {
@@ -214,7 +216,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     defer declared_var_names.deinit();
 
     // 10. For each element d of varDeclarations, do
-    for (var_declarations) |var_declaration| {
+    for (var_declarations.items) |var_declaration| {
         // a. If d is either a VariableDeclaration, a ForBinding, or a BindingIdentifier, then
         if (var_declaration == .variable_declaration) {
             // TODO: Update this when binding patterns are supported.
@@ -255,21 +257,25 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     // 12. NOTE: Annex B.3.2.2 adds additional steps at this point.
 
     // 13. Let lexDeclarations be the LexicallyScopedDeclarations of script.
-    const lex_declarations = try script.lexicallyScopedDeclarations(agent.gc_allocator);
-    defer agent.gc_allocator.free(lex_declarations);
+    var lex_declarations = std.ArrayList(ast.LexicallyScopedDeclaration).init(agent.gc_allocator);
+    defer lex_declarations.deinit();
+    try script.collectLexicallyScopedDeclarations(&lex_declarations);
 
     // 14. Let privateEnv be null.
     const private_env = null;
 
+    var bound_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
+    defer bound_names.deinit();
+
     // 15. For each element d of lexDeclarations, do
-    for (lex_declarations) |declaration| {
+    for (lex_declarations.items) |declaration| {
         // a. NOTE: Lexically declared names are only instantiated here but not initialized.
 
-        const bound_names = try declaration.boundNames(agent.gc_allocator);
-        defer agent.gc_allocator.free(bound_names);
+        bound_names.clearRetainingCapacity();
+        try declaration.collectBoundNames(&bound_names);
 
         // b. For each element dn of the BoundNames of d, do
-        for (bound_names) |name| {
+        for (bound_names.items) |name| {
             // i. If IsConstantDeclaration of d is true, then
             if (declaration.isConstantDeclaration()) {
                 // 1. Perform ? env.CreateImmutableBinding(dn, true).
