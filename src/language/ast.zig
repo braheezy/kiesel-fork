@@ -1056,11 +1056,14 @@ pub const StatementList = struct {
                 // 1. If Statement is Statement : LabelledStatement , return the
                 //    TopLevelVarDeclaredNames of Statement.
                 if (statement.* == .labelled_statement) {
-                    return statement.labelled_statement.topLevelVarDeclaredNames(allocator);
+                    try var_declared_names.appendSlice(
+                        try statement.labelled_statement.topLevelVarDeclaredNames(allocator),
+                    );
                 }
-
                 // 2. Return the VarDeclaredNames of Statement.
-                try var_declared_names.appendSlice(try statement.varDeclaredNames(allocator));
+                else {
+                    try var_declared_names.appendSlice(try statement.varDeclaredNames(allocator));
+                }
             },
             // StatementListItem : Declaration
             .declaration => |declaration| {
@@ -1096,11 +1099,14 @@ pub const StatementList = struct {
                 // 1. If Statement is Statement : LabelledStatement , return the
                 //    TopLevelVarScopedDeclarations of Statement.
                 if (statement.* == .labelled_statement) {
-                    return statement.labelled_statement.topLevelVarScopedDeclarations(allocator);
+                    try variable_declarations.appendSlice(
+                        try statement.labelled_statement.topLevelVarScopedDeclarations(allocator),
+                    );
                 }
-
                 // 2. Return the VarScopedDeclarations of Statement.
-                try variable_declarations.appendSlice(try statement.varScopedDeclarations(allocator));
+                else {
+                    try variable_declarations.appendSlice(try statement.varScopedDeclarations(allocator));
+                }
             },
             // StatementListItem : Declaration
             .declaration => |declaration| {
