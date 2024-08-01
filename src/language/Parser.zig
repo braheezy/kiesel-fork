@@ -464,6 +464,7 @@ pub fn acceptParenthesizedExpression(self: *Self) AcceptError!ast.ParenthesizedE
 
     _ = try self.core.accept(RuleSet.is(.@"("));
     const expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(expression);
     expression.* = try self.acceptExpression(.{});
     _ = try self.core.accept(RuleSet.is(.@")"));
     return .{ .expression = expression };
@@ -633,6 +634,7 @@ pub fn acceptMemberExpression(
     const property: ast.MemberExpression.Property = switch (token.type) {
         .@"[" => blk: {
             const property_expression = try self.allocator.create(ast.Expression);
+            errdefer self.allocator.destroy(property_expression);
             property_expression.* = try self.acceptExpression(.{});
             _ = try self.core.accept(RuleSet.is(.@"]"));
             break :blk .{ .expression = property_expression };
@@ -672,6 +674,7 @@ pub fn acceptSuperProperty(self: *Self) AcceptError!ast.SuperProperty {
     return switch (token.type) {
         .@"[" => blk: {
             const expression = try self.allocator.create(ast.Expression);
+            errdefer self.allocator.destroy(expression);
             expression.* = try self.acceptExpression(.{});
             _ = try self.core.accept(RuleSet.is(.@"]"));
             break :blk .{ .expression = expression };
@@ -739,6 +742,7 @@ pub fn acceptNewExpression(self: *Self) AcceptError!ast.NewExpression {
 
         const ctx: AcceptContext = .{ .precedence = getPrecedence(.new) };
         const expression = try self.allocator.create(ast.Expression);
+        errdefer self.allocator.destroy(expression);
         expression.* = try self.acceptExpression(ctx);
         break :blk expression;
     };
@@ -796,6 +800,7 @@ pub fn acceptImportCall(self: *Self) AcceptError!ast.ImportCall {
     _ = try self.core.accept(RuleSet.is(.import));
     _ = try self.core.accept(RuleSet.is(.@"("));
     const expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(expression);
     expression.* = try self.acceptExpression(.{});
     _ = try self.core.accept(RuleSet.is(.@")"));
     return .{ .expression = expression };
@@ -834,6 +839,7 @@ pub fn acceptOptionalExpression(
         .{ .arguments = arguments }
     else |_| if (self.core.accept(RuleSet.is(.@"["))) |_| blk: {
         const property_expression = try self.allocator.create(ast.Expression);
+        errdefer self.allocator.destroy(property_expression);
         property_expression.* = try self.acceptExpression(.{});
         _ = try self.core.accept(RuleSet.is(.@"]"));
         break :blk .{ .expression = property_expression };
@@ -867,6 +873,7 @@ pub fn acceptUpdateExpression(
 
     // Defer heap allocation of expression until we know this is an UpdateExpression
     const expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(expression);
     if (primary_expression == null) {
         const ctx: AcceptContext = switch (operator_token.type) {
             .@"++" => .{ .precedence = getPrecedenceAlt(.prefix_increment), .associativity = getAssociativityAlt(.prefix_increment) },
@@ -1070,6 +1077,7 @@ pub fn acceptUnaryExpression(self: *Self) AcceptError!ast.UnaryExpression {
         else => .{ .precedence = getPrecedence(operator_token.type), .associativity = getAssociativity(operator_token.type) },
     };
     const expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(expression);
     expression.* = try self.acceptExpression(ctx);
     return .{ .operator = operator, .expression = expression };
 }
@@ -1113,8 +1121,10 @@ pub fn acceptBinaryExpression(
     };
     // Defer heap allocation of expression until we know this is a BinaryExpression
     const lhs_expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(lhs_expression);
     lhs_expression.* = primary_expression;
     const rhs_expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(rhs_expression);
     rhs_expression.* = try self.acceptExpression(ctx);
     return .{
         .operator = operator,
@@ -1152,6 +1162,7 @@ pub fn acceptRelationalExpression(
         .expression => |expression| .{
             .expression = blk: {
                 const lhs_expression = try self.allocator.create(ast.Expression);
+                errdefer self.allocator.destroy(lhs_expression);
                 lhs_expression.* = expression;
                 break :blk lhs_expression;
             },
@@ -1159,6 +1170,7 @@ pub fn acceptRelationalExpression(
         .private_identifier => |private_identifier| .{ .private_identifier = private_identifier },
     };
     const rhs_expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(rhs_expression);
     rhs_expression.* = try self.acceptExpression(ctx);
     return .{
         .operator = operator,
@@ -1185,8 +1197,10 @@ pub fn acceptEqualityExpression(
     };
     // Defer heap allocation of expression until we know this is an EqualityExpression
     const lhs_expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(lhs_expression);
     lhs_expression.* = primary_expression;
     const rhs_expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(rhs_expression);
     rhs_expression.* = try self.acceptExpression(ctx);
     return .{
         .operator = operator,
@@ -1212,8 +1226,10 @@ pub fn acceptLogicalExpression(
     };
     // Defer heap allocation of expression until we know this is a LogicalExpression
     const lhs_expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(lhs_expression);
     lhs_expression.* = primary_expression;
     const rhs_expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(rhs_expression);
     rhs_expression.* = try self.acceptExpression(ctx);
     return .{
         .operator = operator,
@@ -1233,11 +1249,14 @@ pub fn acceptConditionalExpression(
     _ = try self.core.accept(RuleSet.is(.@"?"));
     // Defer heap allocation of expression until we know this is a ConditionalExpression
     const test_expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(test_expression);
     test_expression.* = primary_expression;
     const consequent_expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(consequent_expression);
     consequent_expression.* = try self.acceptExpression(ctx);
     _ = try self.core.accept(RuleSet.is(.@":"));
     const alternate_expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(alternate_expression);
     alternate_expression.* = try self.acceptExpression(ctx);
     return .{
         .test_expression = test_expression,
@@ -1319,8 +1338,10 @@ pub fn acceptAssignmentExpression(
 
     // Defer heap allocation of expression until we know this is an AssignmentExpression
     const lhs_expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(lhs_expression);
     lhs_expression.* = primary_expression;
     const rhs_expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(rhs_expression);
     rhs_expression.* = try self.acceptExpression(ctx);
     return .{
         .operator = operator,
@@ -1436,6 +1457,7 @@ pub fn acceptStatement(self: *Self) AcceptError!*ast.Statement {
     errdefer self.core.restoreState(state);
 
     const statement = try self.allocator.create(ast.Statement);
+    errdefer self.allocator.destroy(statement);
 
     const next_token = try self.core.peek() orelse return error.UnexpectedToken;
     statement.* = switch (next_token.type) {
@@ -1470,6 +1492,7 @@ pub fn acceptDeclaration(self: *Self) AcceptError!*ast.Declaration {
     errdefer self.core.restoreState(state);
 
     const declaration = try self.allocator.create(ast.Declaration);
+    errdefer self.allocator.destroy(declaration);
 
     if (self.acceptHoistableDeclaration()) |hoistable_declaration|
         declaration.* = .{ .hoistable_declaration = hoistable_declaration }
@@ -2400,8 +2423,10 @@ pub fn acceptArrowFunction(self: *Self) AcceptError!ast.ArrowFunction {
         const expression_body = try self.acceptExpression(ctx);
         // Synthesize a FunctionBody with return statement
         const statement = try self.allocator.create(ast.Statement);
+        errdefer self.allocator.destroy(statement);
         statement.* = .{ .return_statement = .{ .expression = expression_body } };
         const items = try self.allocator.alloc(ast.StatementListItem, 1);
+        errdefer self.allocator.free(items);
         items[0] = .{ .statement = statement };
         const statement_list: ast.StatementList = .{ .items = items };
         break :blk .{
@@ -2757,6 +2782,7 @@ fn acceptClassTail(self: *Self) AcceptError!ast.ClassTail {
 
     const class_heritage = if (self.core.accept(RuleSet.is(.extends))) |_| blk: {
         const expression = try self.allocator.create(ast.Expression);
+        errdefer self.allocator.destroy(expression);
         expression.* = try self.acceptExpression(.{});
         break :blk expression;
     } else |_| null;
@@ -2994,6 +3020,7 @@ pub fn acceptAwaitExpression(self: *Self) AcceptError!ast.AwaitExpression {
 
     _ = try self.core.accept(RuleSet.is(.@"await"));
     const expression = try self.allocator.create(ast.Expression);
+    errdefer self.allocator.destroy(expression);
     expression.* = try self.acceptExpression(.{});
     return .{ .expression = expression };
 }
@@ -3040,8 +3067,10 @@ pub fn acceptAsyncArrowFunction(self: *Self) AcceptError!ast.AsyncArrowFunction 
         const expression_body = try self.acceptExpression(ctx);
         // Synthesize a FunctionBody with return statement
         const statement = try self.allocator.create(ast.Statement);
+        errdefer self.allocator.destroy(statement);
         statement.* = .{ .return_statement = .{ .expression = expression_body } };
         const items = try self.allocator.alloc(ast.StatementListItem, 1);
+        errdefer self.allocator.free(items);
         items[0] = .{ .statement = statement };
         const statement_list: ast.StatementList = .{ .items = items };
         break :blk .{
