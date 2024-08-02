@@ -358,10 +358,16 @@ fn parseFloat(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     if (std.mem.startsWith(u8, trimmed_string, "Infinity")) return Value.infinity();
     // Don't pass other strings starting with "inf" to `std.fmt.parseFloat()`
     if (std.ascii.startsWithIgnoreCase(trimmed_string, "inf")) return Value.nan();
-    // FIXME: This is very much not correct :)
-    // Slice at a few chars that parseFloat() would accept but which are not part of StrDecimalLiteral
-    const string = trimmed_string[0 .. std.mem.indexOfAny(u8, trimmed_string, "_x") orelse trimmed_string.len];
-    return Value.from(std.fmt.parseFloat(f64, string) catch std.math.nan(f64));
+    // Limit to characters valid for StrDecimalLiteral before brute forcing
+    var len = for (trimmed_string, 0..) |c, i| {
+        if (!std.ascii.isDigit(c) and std.mem.indexOfScalar(u8, "+-.eE", c) == null) break i;
+    } else trimmed_string.len;
+    while (len != 0) : (len -= 1) {
+        if (std.fmt.parseFloat(f64, trimmed_string[0..len])) |result|
+            return Value.from(result)
+        else |_| {}
+    }
+    return Value.nan();
 }
 
 /// 19.2.5 parseInt ( string, radix )
