@@ -338,6 +338,13 @@ pub fn parseRegularExpressionLiteral(
                 in_character_class = false;
             },
             .backslash => state = .pattern_character,
+            .closing_slash, .flag_character => switch (consume) {
+                .partial => return .{
+                    .pattern = str[1..closing_slash_index],
+                    .flags = str[closing_slash_index + 1 .. i],
+                },
+                .complete => return error.InvalidRegularExpressionLiteral,
+            },
             else => return error.InvalidRegularExpressionLiteral,
         },
         else => switch (state) {
