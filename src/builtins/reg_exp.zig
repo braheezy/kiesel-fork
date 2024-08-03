@@ -310,9 +310,9 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
 
     // 8-13.
     const shift = string == .utf16;
-    const buf = switch (string) {
-        .ascii => |ascii| ascii,
-        .utf16 => |utf16| std.mem.sliceAsBytes(utf16),
+    const buf, const buf_len = switch (string) {
+        .ascii => |ascii| .{ ascii, ascii.len },
+        .utf16 => |utf16| .{ std.mem.sliceAsBytes(utf16), utf16.len },
     };
     var @"opaque": LreOpaque = .{ .allocator = agent.gc_allocator };
     const result = if (last_index >= length) 0 else libregexp.lre_exec(
@@ -320,11 +320,11 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
         @ptrCast(re_bytecode),
         buf.ptr,
         @intCast(last_index),
-        @intCast(buf.len),
-        // 0 = 8 bit chars, 1 = 16 bit chars, 2 = 16 bit chars, UTF-16
+        @intCast(buf_len),
+        // 0 = 8 bit chars, 1 = 16 bit chars, 2 = 16 bit chars, UTF-16 (set internally via the u flag)
         switch (string) {
             .ascii => 0,
-            .utf16 => 2,
+            .utf16 => 1,
         },
         &@"opaque",
     );
