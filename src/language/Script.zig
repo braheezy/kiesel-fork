@@ -21,6 +21,10 @@ const SafePointer = types.SafePointer;
 const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
+const instantiateAsyncFunctionObject = language.instantiateAsyncFunctionObject;
+const instantiateAsyncGeneratorFunctionObject = language.instantiateAsyncGeneratorFunctionObject;
+const instantiateGeneratorFunctionObject = language.instantiateGeneratorFunctionObject;
+const instantiateOrdinaryFunctionObject = language.instantiateOrdinaryFunctionObject;
 
 const Self = @This();
 
@@ -298,10 +302,10 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
 
         // b. Let fo be InstantiateFunctionObject of f with arguments env and privateEnv.
         const function_object = try switch (hoistable_declaration) {
-            .function_declaration => |function_declaration| function_declaration.instantiateOrdinaryFunctionObject(agent, .{ .global_environment = env }, private_env),
-            .generator_declaration => |generator_declaration| generator_declaration.instantiateGeneratorFunctionObject(agent, .{ .global_environment = env }, private_env),
-            .async_function_declaration => |async_function_declaration| async_function_declaration.instantiateAsyncFunctionObject(agent, .{ .global_environment = env }, private_env),
-            .async_generator_declaration => |async_generator_declaration| async_generator_declaration.instantiateAsyncGeneratorFunctionObject(agent, .{ .global_environment = env }, private_env),
+            .function_declaration => |function_declaration| instantiateOrdinaryFunctionObject(agent, function_declaration, .{ .global_environment = env }, private_env),
+            .generator_declaration => |generator_declaration| instantiateGeneratorFunctionObject(agent, generator_declaration, .{ .global_environment = env }, private_env),
+            .async_function_declaration => |async_function_declaration| instantiateAsyncFunctionObject(agent, async_function_declaration, .{ .global_environment = env }, private_env),
+            .async_generator_declaration => |async_generator_declaration| instantiateAsyncGeneratorFunctionObject(agent, async_generator_declaration, .{ .global_environment = env }, private_env),
         };
 
         // c. Perform ? env.CreateGlobalFunctionBinding(fn, fo, false).

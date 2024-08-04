@@ -1,4 +1,5 @@
 const module = @import("language/module.zig");
+const runtime = @import("language/runtime.zig");
 
 pub const Diagnostics = @import("ptk").Diagnostics;
 pub const ExportEntry = SourceTextModule.ExportEntry;
@@ -15,6 +16,10 @@ pub const continueModuleLoading = SourceTextModule.continueModuleLoading;
 pub const finishLoadingImportedModule = module.finishLoadingImportedModule;
 pub const getImportedModule = module.getImportedModule;
 pub const getModuleNamespace = module.getModuleNamespace;
+pub const instantiateAsyncFunctionObject = runtime.instantiateAsyncFunctionObject;
+pub const instantiateAsyncGeneratorFunctionObject = runtime.instantiateAsyncGeneratorFunctionObject;
+pub const instantiateGeneratorFunctionObject = runtime.instantiateGeneratorFunctionObject;
+pub const instantiateOrdinaryFunctionObject = runtime.instantiateOrdinaryFunctionObject;
 pub const tokenizer = @import("language/tokenizer.zig");
 
 test {

@@ -4,32 +4,19 @@ const Allocator = std.mem.Allocator;
 
 const libregexp = @import("../c/libregexp.zig").libregexp;
 
-const builtins = @import("../builtins.zig");
-const execution = @import("../execution.zig");
 const language = @import("../language.zig");
 const reg_exp = @import("../builtins/reg_exp.zig");
 const tokenizer = @import("tokenizer.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 const line_terminators = tokenizer.line_terminators;
 
-const Agent = execution.Agent;
 const BigInt = types.BigInt;
-const Environment = execution.Environment;
 const ExportEntry = language.ExportEntry;
 const ImportEntry = language.ImportEntry;
-const Object = types.Object;
-const PrivateEnvironment = execution.PrivateEnvironment;
-const PropertyKey = types.PropertyKey;
 const String = types.String;
 const StringArrayHashMap = types.StringArrayHashMap;
 const Value = types.Value;
 const escapeSequenceMatcher = tokenizer.escapeSequenceMatcher;
-const makeConstructor = builtins.makeConstructor;
-const noexcept = utils.noexcept;
-const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
-const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
-const setFunctionName = builtins.setFunctionName;
 
 const AnalyzeQuery = enum {
     is_reference,
@@ -2471,81 +2458,6 @@ pub const FunctionDeclaration = struct {
         // 1. Return false.
         return false;
     }
-
-    /// 15.2.4 Runtime Semantics: InstantiateOrdinaryFunctionObject
-    /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateordinaryfunctionobject
-    pub fn instantiateOrdinaryFunctionObject(
-        self: Self,
-        agent: *Agent,
-        env: Environment,
-        private_env: ?*PrivateEnvironment,
-    ) Allocator.Error!Object {
-        const realm = agent.currentRealm();
-
-        // FunctionDeclaration : function BindingIdentifier ( FormalParameters ) { FunctionBody }
-        if (self.identifier) |identifier| {
-            // 1. Let name be the StringValue of BindingIdentifier.
-            const name = identifier;
-
-            // 2. Let sourceText be the source text matched by FunctionDeclaration.
-            const source_text = self.source_text;
-
-            // 3. Let F be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
-            //    FormalParameters, FunctionBody, non-lexical-this, env, privateEnv).
-            const function = try ordinaryFunctionCreate(
-                agent,
-                try realm.intrinsics.@"%Function.prototype%"(),
-                source_text,
-                self.formal_parameters,
-                self.function_body,
-                .non_lexical_this,
-                env,
-                private_env,
-            );
-
-            // 4. Perform SetFunctionName(F, name).
-            try setFunctionName(
-                function,
-                PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-                null,
-            );
-
-            // 5. Perform MakeConstructor(F).
-            try makeConstructor(function, .{});
-
-            // 6. Return F.
-            return function;
-        }
-        // FunctionDeclaration : function ( FormalParameters ) { FunctionBody }
-        // NOTE: An anonymous FunctionDeclaration can only occur as part of an export default
-        // declaration, and its function code is therefore always strict mode code.
-        else {
-            // 1. Let sourceText be the source text matched by FunctionDeclaration.
-            const source_text = self.source_text;
-
-            // 2. Let F be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
-            //    FormalParameters, FunctionBody, non-lexical-this, env, privateEnv).
-            const function = try ordinaryFunctionCreate(
-                agent,
-                try realm.intrinsics.@"%Function.prototype%"(),
-                source_text,
-                self.formal_parameters,
-                self.function_body,
-                .non_lexical_this,
-                env,
-                private_env,
-            );
-
-            // 3. Perform SetFunctionName(F, "default").
-            try setFunctionName(function, PropertyKey.from("default"), null);
-
-            // 4. Perform MakeConstructor(F).
-            try makeConstructor(function, .{});
-
-            // 5. Return F.
-            return function;
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-FunctionExpression
@@ -2681,107 +2593,6 @@ pub const GeneratorDeclaration = struct {
         // 1. Return false.
         return false;
     }
-
-    /// 15.5.3 Runtime Semantics: InstantiateGeneratorFunctionObject
-    /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiategeneratorfunctionobject
-    pub fn instantiateGeneratorFunctionObject(
-        self: Self,
-        agent: *Agent,
-        env: Environment,
-        private_env: ?*PrivateEnvironment,
-    ) Allocator.Error!Object {
-        const realm = agent.currentRealm();
-
-        // GeneratorDeclaration : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
-        if (self.identifier) |identifier| {
-            // 1. Let name be the StringValue of BindingIdentifier.
-            const name = identifier;
-
-            // 2. Let sourceText be the source text matched by GeneratorDeclaration.
-            const source_text = self.source_text;
-
-            // 3. Let F be OrdinaryFunctionCreate(%GeneratorFunction.prototype%, sourceText,
-            //    FormalParameters, GeneratorBody, non-lexical-this, env, privateEnv).
-            const function = try ordinaryFunctionCreate(
-                agent,
-                try realm.intrinsics.@"%GeneratorFunction.prototype%"(),
-                source_text,
-                self.formal_parameters,
-                self.function_body,
-                .non_lexical_this,
-                env,
-                private_env,
-            );
-
-            // 4. Perform SetFunctionName(F, name).
-            try setFunctionName(
-                function,
-                PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-                null,
-            );
-
-            // 5. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
-            const prototype = try ordinaryObjectCreate(
-                agent,
-                try realm.intrinsics.@"%GeneratorPrototype%"(),
-            );
-
-            // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
-            //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
-            //    }).
-            function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
-                .value = Value.from(prototype),
-                .writable = true,
-                .enumerable = false,
-                .configurable = false,
-            }) catch |err| try noexcept(err);
-
-            // 7. Return F.
-            return function;
-        }
-        // GeneratorDeclaration : function * ( FormalParameters ) { GeneratorBody }
-        // NOTE: An anonymous GeneratorDeclaration can only occur as part of an export default
-        // declaration, and its function code is therefore always strict mode code.
-        else {
-            // 1. Let sourceText be the source text matched by GeneratorDeclaration.
-            const source_text = self.source_text;
-
-            // 2. Let F be OrdinaryFunctionCreate(%GeneratorFunction.prototype%, sourceText,
-            //    FormalParameters, GeneratorBody, non-lexical-this, env, privateEnv).
-            const function = try ordinaryFunctionCreate(
-                agent,
-                try realm.intrinsics.@"%GeneratorFunction.prototype%"(),
-                source_text,
-                self.formal_parameters,
-                self.function_body,
-                .non_lexical_this,
-                env,
-                private_env,
-            );
-
-            // 3. Perform SetFunctionName(F, "default").
-            try setFunctionName(function, PropertyKey.from("default"), null);
-
-            // 4. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
-            const prototype = try ordinaryObjectCreate(
-                agent,
-                try realm.intrinsics.@"%GeneratorPrototype%"(),
-            );
-
-            // 5. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
-            //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
-            //    }).
-            function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
-                .value = Value.from(prototype),
-                .writable = true,
-                .enumerable = false,
-                .configurable = false,
-            }) catch |err| try noexcept(err);
-
-            // 6. Return F.
-            return function;
-        }
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-GeneratorExpression
@@ -2822,106 +2633,6 @@ pub const AsyncGeneratorDeclaration = struct {
         //     async function * ( FormalParameters ) { AsyncGeneratorBody }
         // 1. Return false.
         return false;
-    }
-
-    /// 15.6.3 Runtime Semantics: InstantiateAsyncGeneratorFunctionObject
-    /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncgeneratorfunctionobject
-    pub fn instantiateAsyncGeneratorFunctionObject(
-        self: Self,
-        agent: *Agent,
-        env: Environment,
-        private_env: ?*PrivateEnvironment,
-    ) Allocator.Error!Object {
-        const realm = agent.currentRealm();
-
-        // AsyncGeneratorDeclaration : async function * BindingIdentifier ( FormalParameters ) { AsyncGeneratorBody }
-        if (self.identifier) |identifier| {
-            // 1. Let name be the StringValue of BindingIdentifier.
-            const name = identifier;
-
-            // 2. Let sourceText be the source text matched by AsyncGeneratorDeclaration.
-            const source_text = self.source_text;
-
-            // 3. Let F be OrdinaryFunctionCreate(%AsyncGeneratorFunction.prototype%, sourceText,
-            //    FormalParameters, AsyncGeneratorBody, non-lexical-this, env, privateEnv).
-            const function = try ordinaryFunctionCreate(
-                agent,
-                try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"(),
-                source_text,
-                self.formal_parameters,
-                self.function_body,
-                .non_lexical_this,
-                env,
-                private_env,
-            );
-
-            // 4. Perform SetFunctionName(F, name).
-            try setFunctionName(
-                function,
-                PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-                null,
-            );
-
-            // 5. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
-            const prototype = try ordinaryObjectCreate(
-                agent,
-                try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
-            );
-
-            // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
-            //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
-            //    }).
-            function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
-                .value = Value.from(prototype),
-                .writable = true,
-                .enumerable = false,
-                .configurable = false,
-            }) catch |err| try noexcept(err);
-
-            // 7. Return F.
-            return function;
-        }
-        // AsyncGeneratorDeclaration : async function * ( FormalParameters ) { AsyncGeneratorBody }
-        // NOTE: An anonymous AsyncGeneratorDeclaration can only occur as part of an `export default` declaration.
-        else {
-            // 1. Let sourceText be the source text matched by AsyncGeneratorDeclaration.
-            const source_text = self.source_text;
-
-            // 2. Let F be OrdinaryFunctionCreate(%AsyncGeneratorFunction.prototype%, sourceText,
-            //    FormalParameters, AsyncGeneratorBody, non-lexical-this, env, privateEnv).
-            const function = try ordinaryFunctionCreate(
-                agent,
-                try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"(),
-                source_text,
-                self.formal_parameters,
-                self.function_body,
-                .non_lexical_this,
-                env,
-                private_env,
-            );
-
-            // 3. Perform SetFunctionName(F, "default").
-            try setFunctionName(function, PropertyKey.from("default"), null);
-
-            // 4. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
-            const prototype = try ordinaryObjectCreate(
-                agent,
-                try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
-            );
-
-            // 5. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
-            //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
-            //    }).
-            function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
-                .value = Value.from(prototype),
-                .writable = true,
-                .enumerable = false,
-                .configurable = false,
-            }) catch |err| try noexcept(err);
-
-            // 6. Return F.
-            return function;
-        }
     }
 };
 
@@ -3235,73 +2946,6 @@ pub const AsyncFunctionDeclaration = struct {
         //     async function ( FormalParameters ) { AsyncFunctionBody }
         // 1. Return false.
         return false;
-    }
-
-    /// 15.8.2 Runtime Semantics: InstantiateAsyncFunctionObject
-    /// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncfunctionobject
-    pub fn instantiateAsyncFunctionObject(
-        self: Self,
-        agent: *Agent,
-        env: Environment,
-        private_env: ?*PrivateEnvironment,
-    ) Allocator.Error!Object {
-        const realm = agent.currentRealm();
-
-        // AsyncFunctionDeclaration : async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
-        if (self.identifier) |identifier| {
-            // 1. Let name be the StringValue of BindingIdentifier.
-            const name = identifier;
-
-            // 2. Let sourceText be the source text matched by AsyncFunctionDeclaration.
-            const source_text = self.source_text;
-
-            // 3. Let F be OrdinaryFunctionCreate(%AsyncFunction.prototype%, sourceText,
-            //    FormalParameters, AsyncFunctionBody, non-lexical-this, env, privateEnv).
-            const function = try ordinaryFunctionCreate(
-                agent,
-                try realm.intrinsics.@"%AsyncFunction.prototype%"(),
-                source_text,
-                self.formal_parameters,
-                self.function_body,
-                .non_lexical_this,
-                env,
-                private_env,
-            );
-
-            // 4. Perform SetFunctionName(F, name).
-            try setFunctionName(
-                function,
-                PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-                null,
-            );
-
-            // 5. Return F.
-            return function;
-        }
-        // AsyncFunctionDeclaration : async function ( FormalParameters ) { AsyncFunctionBody }
-        else {
-            // 1. Let sourceText be the source text matched by AsyncFunctionDeclaration.
-            const source_text = self.source_text;
-
-            // 2. Let F be OrdinaryFunctionCreate(%AsyncFunction.prototype%, sourceText,
-            //    FormalParameters, AsyncFunctionBody, non-lexical-this, env, privateEnv).
-            const function = try ordinaryFunctionCreate(
-                agent,
-                try realm.intrinsics.@"%AsyncFunction.prototype%"(),
-                source_text,
-                self.formal_parameters,
-                self.function_body,
-                .non_lexical_this,
-                env,
-                private_env,
-            );
-
-            // 3. Perform SetFunctionName(F, "default").
-            try setFunctionName(function, PropertyKey.from("default"), null);
-
-            // 4. Return F.
-            return function;
-        }
     }
 };
 

@@ -10,6 +10,7 @@ const builtin_function = @import("./builtin_function.zig");
 const builtins = @import("../builtins.zig");
 const bytecode = @import("../language/bytecode.zig");
 const execution = @import("../execution.zig");
+const language = @import("../language.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
@@ -46,6 +47,10 @@ const createUnmappedArgumentsObject = builtins.createUnmappedArgumentsObject;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const generateBytecode = bytecode.generateBytecode;
 const generatorStart = builtins.generatorStart;
+const instantiateAsyncFunctionObject = language.instantiateAsyncFunctionObject;
+const instantiateAsyncGeneratorFunctionObject = language.instantiateAsyncGeneratorFunctionObject;
+const instantiateGeneratorFunctionObject = language.instantiateGeneratorFunctionObject;
+const instantiateOrdinaryFunctionObject = language.instantiateOrdinaryFunctionObject;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const newFunctionEnvironment = execution.newFunctionEnvironment;
 const newPromiseCapability = builtins.newPromiseCapability;
@@ -1348,10 +1353,10 @@ fn functionDeclarationInstantiation(
 
         // b. Let fo be InstantiateFunctionObject of f with arguments lexEnv and privateEnv.
         const function_object = try switch (hoistable_declaration) {
-            .function_declaration => |function_declaration| function_declaration.instantiateOrdinaryFunctionObject(agent, lex_env, private_env),
-            .generator_declaration => |generator_declaration| generator_declaration.instantiateGeneratorFunctionObject(agent, lex_env, private_env),
-            .async_function_declaration => |async_function_declaration| async_function_declaration.instantiateAsyncFunctionObject(agent, lex_env, private_env),
-            .async_generator_declaration => |async_generator_declaration| async_generator_declaration.instantiateAsyncGeneratorFunctionObject(agent, lex_env, private_env),
+            .function_declaration => |function_declaration| instantiateOrdinaryFunctionObject(agent, function_declaration, lex_env, private_env),
+            .generator_declaration => |generator_declaration| instantiateGeneratorFunctionObject(agent, generator_declaration, lex_env, private_env),
+            .async_function_declaration => |async_function_declaration| instantiateAsyncFunctionObject(agent, async_function_declaration, lex_env, private_env),
+            .async_generator_declaration => |async_generator_declaration| instantiateAsyncGeneratorFunctionObject(agent, async_generator_declaration, lex_env, private_env),
         };
 
         // c. Perform ! varEnv.SetMutableBinding(fn, fo, false).

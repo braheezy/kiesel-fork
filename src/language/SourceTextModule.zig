@@ -31,6 +31,10 @@ const Value = types.Value;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const getImportedModule = language.getImportedModule;
 const getModuleNamespace = language.getModuleNamespace;
+const instantiateAsyncFunctionObject = language.instantiateAsyncFunctionObject;
+const instantiateAsyncGeneratorFunctionObject = language.instantiateAsyncGeneratorFunctionObject;
+const instantiateGeneratorFunctionObject = language.instantiateGeneratorFunctionObject;
+const instantiateOrdinaryFunctionObject = language.instantiateOrdinaryFunctionObject;
 const newModuleEnvironment = execution.newModuleEnvironment;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
@@ -1186,10 +1190,10 @@ pub fn initializeEnvironment(self: *Self) Agent.Error!void {
 
                 // 1. Let fo be InstantiateFunctionObject of d with arguments env and privateEnv.
                 const function_object = try switch (hoistable_declaration) {
-                    .function_declaration => |function_declaration| function_declaration.instantiateOrdinaryFunctionObject(agent, env, private_env),
-                    .generator_declaration => |generator_declaration| generator_declaration.instantiateGeneratorFunctionObject(agent, env, private_env),
-                    .async_function_declaration => |async_function_declaration| async_function_declaration.instantiateAsyncFunctionObject(agent, env, private_env),
-                    .async_generator_declaration => |async_generator_declaration| async_generator_declaration.instantiateAsyncGeneratorFunctionObject(agent, env, private_env),
+                    .function_declaration => |function_declaration| instantiateOrdinaryFunctionObject(agent, function_declaration, env, private_env),
+                    .generator_declaration => |generator_declaration| instantiateGeneratorFunctionObject(agent, generator_declaration, env, private_env),
+                    .async_function_declaration => |async_function_declaration| instantiateAsyncFunctionObject(agent, async_function_declaration, env, private_env),
+                    .async_generator_declaration => |async_generator_declaration| instantiateAsyncGeneratorFunctionObject(agent, async_generator_declaration, env, private_env),
                 };
 
                 // 2. Perform ! env.InitializeBinding(dn, fo).
