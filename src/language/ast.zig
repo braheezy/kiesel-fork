@@ -2411,10 +2411,22 @@ pub const FormalParameters = struct {
     /// 15.1.5 Static Semantics: ExpectedArgumentCount
     /// https://tc39.es/ecma262/#sec-static-semantics-expectedargumentcount
     pub fn expectedArgumentCount(self: Self) usize {
-        if (self.items.len != 0 and self.items[self.items.len - 1] == .function_rest_parameter)
-            return self.items.len - 1
-        else
-            return self.items.len;
+        var count: usize = 0;
+        for (self.items) |item| switch (item) {
+            .formal_parameter => |formal_parameter| switch (formal_parameter.binding_element) {
+                .single_name_binding => |single_name_binding| {
+                    if (single_name_binding.initializer != null) break;
+                    count += 1;
+                },
+                .binding_pattern => |binding_pattern| {
+                    if (binding_pattern.initializer != null) break;
+                    count += 1;
+                },
+            },
+            .function_rest_parameter => break,
+        };
+
+        return count;
     }
 };
 
