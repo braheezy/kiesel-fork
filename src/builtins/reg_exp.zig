@@ -315,7 +315,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
         .utf16 => |utf16| .{ std.mem.sliceAsBytes(utf16), utf16.len },
     };
     var @"opaque": LreOpaque = .{ .allocator = agent.gc_allocator };
-    const result = if (last_index >= length) 0 else libregexp.lre_exec(
+    const result = if (last_index > length) 0 else libregexp.lre_exec(
         captures_list,
         @ptrCast(re_bytecode),
         buf.ptr,
@@ -331,7 +331,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
 
     if (result < 0) return error.OutOfMemory;
     if (result == 0) {
-        if (last_index >= length or (re_flags & (libregexp.LRE_FLAG_GLOBAL | libregexp.LRE_FLAG_STICKY)) != 0) {
+        if (last_index > length or (re_flags & (libregexp.LRE_FLAG_GLOBAL | libregexp.LRE_FLAG_STICKY)) != 0) {
             try reg_exp.object().set(
                 PropertyKey.from("lastIndex"),
                 Value.from(0),
