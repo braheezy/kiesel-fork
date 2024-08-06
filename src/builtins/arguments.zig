@@ -19,6 +19,7 @@ const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const SafePointer = types.SafePointer;
+const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const noexcept = utils.noexcept;
@@ -365,10 +366,18 @@ pub fn createMappedArgumentsObject(
             // ii. If index < len, then
             if (index.? < len) {
                 // 1. Let g be MakeArgGetter(name, env).
-                const getter = try makeArgGetter(agent, name, env);
+                const getter = try makeArgGetter(
+                    agent,
+                    try String.fromUtf8(agent.gc_allocator, name),
+                    env,
+                );
 
                 // 2. Let p be MakeArgSetter(name, env).
-                const setter = try makeArgSetter(agent, name, env);
+                const setter = try makeArgSetter(
+                    agent,
+                    try String.fromUtf8(agent.gc_allocator, name),
+                    env,
+                );
 
                 // 3. Perform ! map.[[DefineOwnProperty]](! ToString(𝔽(index)), PropertyDescriptor {
                 //      [[Set]]: p, [[Get]]: g, [[Enumerable]]: false, [[Configurable]]: true
@@ -411,13 +420,13 @@ pub fn createMappedArgumentsObject(
 
 /// 10.4.4.7.1 MakeArgGetter ( name, env )
 /// https://tc39.es/ecma262/#sec-makearggetter
-fn makeArgGetter(agent: *Agent, name: []const u8, env: Environment) Allocator.Error!Object {
+fn makeArgGetter(agent: *Agent, name: String, env: Environment) Allocator.Error!Object {
     const Captures = struct {
-        name: []const u8,
+        name: String,
         env: Environment,
     };
     const captures = try agent.gc_allocator.create(Captures);
-    captures.* = .{ .name = try agent.gc_allocator.dupe(u8, name), .env = env };
+    captures.* = .{ .name = name, .env = env };
 
     // 1. Let getterClosure be a new Abstract Closure with no parameters that captures name and env
     //    and performs the following steps when called:
@@ -447,13 +456,13 @@ fn makeArgGetter(agent: *Agent, name: []const u8, env: Environment) Allocator.Er
 
 /// 10.4.4.7.2 MakeArgSetter ( name, env )
 /// https://tc39.es/ecma262/#sec-makeargsetter
-fn makeArgSetter(agent: *Agent, name: []const u8, env: Environment) Allocator.Error!Object {
+fn makeArgSetter(agent: *Agent, name: String, env: Environment) Allocator.Error!Object {
     const Captures = struct {
-        name: []const u8,
+        name: String,
         env: Environment,
     };
     const captures = try agent.gc_allocator.create(Captures);
-    captures.* = .{ .name = try agent.gc_allocator.dupe(u8, name), .env = env };
+    captures.* = .{ .name = name, .env = env };
 
     // 1. Let setterClosure be a new Abstract Closure with parameters (value) that captures name
     //    and env and performs the following steps when called:

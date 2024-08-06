@@ -17,6 +17,7 @@ const PrivateName = types.PrivateName;
 const Reference = types.Reference;
 const SourceTextModule = language.SourceTextModule;
 const String = types.String;
+const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 
 pub const DeclarativeEnvironment = @import("environments/DeclarativeEnvironment.zig");
@@ -50,7 +51,7 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn hasBinding(self: Self, name: []const u8) Agent.Error!bool {
+    pub fn hasBinding(self: Self, name: String) Agent.Error!bool {
         return switch (self) {
             .function_environment => |env| env.declarative_environment.hasBinding(name),
             inline else => |env| env.hasBinding(name),
@@ -60,7 +61,7 @@ pub const Environment = union(enum) {
     pub fn createMutableBinding(
         self: Self,
         agent: *Agent,
-        name: []const u8,
+        name: String,
         deletable: bool,
     ) Agent.Error!void {
         return switch (self) {
@@ -74,7 +75,7 @@ pub const Environment = union(enum) {
     pub fn createImmutableBinding(
         self: Self,
         agent: *Agent,
-        name: []const u8,
+        name: String,
         strict: bool,
     ) Agent.Error!void {
         return switch (self) {
@@ -88,7 +89,7 @@ pub const Environment = union(enum) {
     pub fn initializeBinding(
         self: Self,
         agent: *Agent,
-        name: []const u8,
+        name: String,
         value: Value,
     ) Agent.Error!void {
         return switch (self) {
@@ -102,7 +103,7 @@ pub const Environment = union(enum) {
     pub fn setMutableBinding(
         self: Self,
         agent: *Agent,
-        name: []const u8,
+        name: String,
         value: Value,
         strict: bool,
     ) Agent.Error!void {
@@ -117,7 +118,7 @@ pub const Environment = union(enum) {
     pub fn getBindingValue(
         self: Self,
         agent: *Agent,
-        name: []const u8,
+        name: String,
         strict: bool,
     ) Agent.Error!Value {
         return switch (self) {
@@ -126,7 +127,7 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn deleteBinding(self: Self, name: []const u8) Agent.Error!bool {
+    pub fn deleteBinding(self: Self, name: String) Agent.Error!bool {
         return switch (self) {
             .function_environment => |env| env.declarative_environment.deleteBinding(name),
             inline else => |env| env.deleteBinding(name),
@@ -181,9 +182,9 @@ pub const Environment = union(enum) {
 
     pub fn createImportBinding(
         self: Self,
-        name: []const u8,
+        name: String,
         module: *SourceTextModule,
-        binding_name: []const u8,
+        binding_name: String,
     ) Allocator.Error!void {
         return switch (self) {
             .module_environment => |env| env.createImportBinding(name, module, binding_name),
@@ -196,7 +197,7 @@ pub const Environment = union(enum) {
 /// https://tc39.es/ecma262/#sec-getidentifierreference
 pub fn getIdentifierReference(
     start_env: Environment,
-    name: []const u8,
+    name: String,
     strict: bool,
     maybe_lookup_cache_entry: ?*?Environment.LookupCacheEntry,
 ) Agent.Error!Reference {
@@ -211,8 +212,7 @@ pub fn getIdentifierReference(
                     .{ .environment = environment }
                 else
                     .unresolvable,
-                // FIXME: This may be any UTF-8 string! We need an allocator or pass it in as a string.
-                .referenced_name = .{ .value = Value.from(String.fromAscii(name)) },
+                .referenced_name = .{ .value = Value.from(name) },
                 .strict = strict,
                 .this_value = null,
             };
@@ -231,8 +231,7 @@ pub fn getIdentifierReference(
             //    }.
             return .{
                 .base = .{ .environment = env.? },
-                // FIXME: This may be any UTF-8 string! We need an allocator or pass it in as a string.
-                .referenced_name = .{ .value = Value.from(String.fromAscii(name)) },
+                .referenced_name = .{ .value = Value.from(name) },
                 .strict = strict,
                 .this_value = null,
             };
@@ -253,8 +252,7 @@ pub fn getIdentifierReference(
                 //    }.
                 return .{
                     .base = .unresolvable,
-                    // FIXME: This may be any UTF-8 string! We need an allocator or pass it in as a string.
-                    .referenced_name = .{ .value = Value.from(String.fromAscii(name)) },
+                    .referenced_name = .{ .value = Value.from(name) },
                     .strict = strict,
                     .this_value = null,
                 };
@@ -278,7 +276,7 @@ pub fn newDeclarativeEnvironment(
         // 2. Set env.[[OuterEnv]] to E.
         .outer_env = outer_env,
 
-        .bindings = std.StringArrayHashMap(DeclarativeEnvironment.Binding).init(allocator),
+        .bindings = StringHashMap(DeclarativeEnvironment.Binding).init(allocator),
     };
 
     // 3. Return env.
@@ -372,7 +370,7 @@ pub fn newGlobalEnvironment(
         .declarative_record = declarative_record,
 
         // 7. Set env.[[VarNames]] to a new empty List.
-        .var_names = std.StringHashMap(void).init(allocator),
+        .var_names = StringHashMap(void).init(allocator),
 
         // 8. Set env.[[OuterEnv]] to null.
         .outer_env = null,
@@ -395,7 +393,7 @@ pub fn newModuleEnvironment(
         // 2. Set env.[[OuterEnv]] to E.
         .declarative_environment = try newDeclarativeEnvironment(allocator, outer_env),
 
-        .indirect_bindings = std.StringArrayHashMap(ModuleEnvironment.IndirectBinding).init(allocator),
+        .indirect_bindings = StringHashMap(ModuleEnvironment.IndirectBinding).init(allocator),
     };
 
     // 3. Return env.

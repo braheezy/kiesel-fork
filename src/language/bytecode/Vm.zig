@@ -117,7 +117,7 @@ fn fetchConstant(self: *Self, executable: Executable) Value {
     return executable.constants.unmanaged.entries.get(index).key;
 }
 
-fn fetchIdentifier(self: *Self, executable: Executable) []const u8 {
+fn fetchIdentifier(self: *Self, executable: Executable) String {
     const index = self.fetchIndex(executable);
     return executable.identifiers.unmanaged.entries.get(index).key;
 }
@@ -263,7 +263,7 @@ pub fn executeInstruction(
             // ClassExpression : class BindingIdentifier ClassTail
             if (class_expression.identifier) |identifier| {
                 // 1. Let className be the StringValue of BindingIdentifier.
-                const class_name = identifier;
+                const class_name = try String.fromUtf8(self.agent.gc_allocator, identifier);
 
                 // 2. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments className and className.
                 const value = try classDefinitionEvaluation(
@@ -291,7 +291,7 @@ pub fn executeInstruction(
                     self.agent,
                     class_expression.class_tail,
                     null,
-                    "",
+                    String.empty,
                 );
 
                 // 2. Set value.[[SourceText]] to the source text matched by ClassExpression.
@@ -421,8 +421,7 @@ pub fn executeInstruction(
                 const base = reference.base.environment;
 
                 // c. Return ? base.DeleteBinding(ref.[[ReferencedName]]).
-                const referenced_name = try reference.referenced_name.value.string.toUtf8(self.agent.gc_allocator);
-                self.result = Value.from(try base.deleteBinding(referenced_name));
+                self.result = Value.from(try base.deleteBinding(reference.referenced_name.value.string));
             }
         },
         .evaluate_call => {
@@ -552,9 +551,7 @@ pub fn executeInstruction(
             self.reference = .{
                 .base = .{ .value = base_value },
                 .referenced_name = .{
-                    .value = Value.from(
-                        try String.fromUtf8(self.agent.gc_allocator, property_name_string),
-                    ),
+                    .value = Value.from(property_name_string),
                 },
                 .strict = strict,
                 .this_value = null,
@@ -619,7 +616,9 @@ pub fn executeInstruction(
             try lexical_declaration.collectBoundNames(&bound_names);
 
             // 1. For each element name of the BoundNames of ForBinding, do
-            for (bound_names.items) |name| {
+            for (bound_names.items) |name_utf8| {
+                const name = try String.fromUtf8(self.agent.gc_allocator, name_utf8);
+
                 // a. If IsConstantDeclaration of LetOrConst is true, then
                 if (lexical_declaration.isConstantDeclaration()) {
                     // i. Perform ! environment.CreateImmutableBinding(name, true).
@@ -743,7 +742,9 @@ pub fn executeInstruction(
             const private_environment = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
 
             // 6. Let privateName be ResolvePrivateIdentifier(privateEnv, privateIdentifier).
-            const private_name = private_environment.resolvePrivateIdentifier(private_identifier);
+            const private_name = private_environment.resolvePrivateIdentifier(
+                try private_identifier.toUtf8(self.agent.gc_allocator),
+            );
 
             // 7. If PrivateElementFind(rval, privateName) is not empty, return true.
             // 8. Return false.
@@ -786,7 +787,7 @@ pub fn executeInstruction(
             // 4. Perform ? InitializeBoundName("*default*", value, env).
             try initializeBoundName(
                 self.agent,
-                "*default*",
+                String.fromLiteral("*default*"),
                 value,
                 .{ .environment = environment },
             );
@@ -941,7 +942,9 @@ pub fn executeInstruction(
             const private_environment = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
 
             // 3. Let privateName be ResolvePrivateIdentifier(privEnv, privateIdentifier).
-            const private_name = private_environment.resolvePrivateIdentifier(private_identifier);
+            const private_name = private_environment.resolvePrivateIdentifier(
+                try private_identifier.toUtf8(self.agent.gc_allocator),
+            );
 
             // 4. Return the Reference Record {
             //      [[Base]]: baseValue, [[ReferencedName]]: privateName, [[Strict]]: true, [[ThisValue]]: empty
@@ -1074,7 +1077,9 @@ pub fn executeInstruction(
             // 4. Assert: Exactly one element of names is a Private Name whose [[Description]] is privateIdentifier.
             // 5. Let privateName be the Private Name in names whose [[Description]] is privateIdentifier.
             // 6. Return privateName.
-            const private_name = private_environment.names.get(private_identifier).?;
+            const private_name = private_environment.names.get(
+                try private_identifier.toUtf8(self.agent.gc_allocator),
+            ).?;
             std.debug.assert(private_name.symbol.private);
             self.result = Value.from(private_name.symbol);
         },

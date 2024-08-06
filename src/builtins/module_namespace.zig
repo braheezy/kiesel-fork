@@ -196,7 +196,8 @@ fn get(object: Object, property_key: PropertyKey, receiver: Value) Agent.Error!V
     };
 
     // 12. Return ? targetEnv.GetBindingValue(binding.[[BindingName]], true).
-    return target_env.getBindingValue(agent, binding.binding_name.string, true);
+    const binding_name = try String.fromUtf8(agent.gc_allocator, binding.binding_name.string);
+    return target_env.getBindingValue(agent, binding_name, true);
 }
 
 /// 10.4.6.9 [[Set]] ( P, V, Receiver )

@@ -251,7 +251,7 @@ pub fn getActiveScriptOrModule(self: Self) ?ExecutionContext.ScriptOrModule {
 /// https://tc39.es/ecma262/#sec-resolvebinding
 pub fn resolveBinding(
     self: *Self,
-    name: []const u8,
+    name: String,
     maybe_env: ?Environment,
     strict: bool,
     maybe_lookup_cache_entry: ?*?Environment.LookupCacheEntry,

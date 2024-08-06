@@ -14,21 +14,23 @@ const types = @import("../../types.zig");
 const Agent = execution.Agent;
 const DeclarativeEnvironment = environments.DeclarativeEnvironment;
 const SourceTextModule = language.SourceTextModule;
+const String = types.String;
+const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 
 const Self = @This();
 
-indirect_bindings: std.StringArrayHashMap(IndirectBinding),
+indirect_bindings: StringHashMap(IndirectBinding),
 
 // NOTE: This is how we implement the spec's inheritance of module environments.
 declarative_environment: *DeclarativeEnvironment,
 
 pub const IndirectBinding = struct {
     module: *SourceTextModule,
-    binding_name: []const u8,
+    binding_name: String,
 };
 
-pub fn hasBinding(self: Self, name: []const u8) bool {
+pub fn hasBinding(self: Self, name: String) bool {
     // Handled via DeclarativeEnvironment in the spec but with a vague "has a binding", so we need
     // to override the implementation and check the indirect bindings as well.
     return self.indirect_bindings.contains(name) or self.declarative_environment.bindings.contains(name);
@@ -39,7 +41,7 @@ pub fn hasBinding(self: Self, name: []const u8) bool {
 pub fn getBindingValue(
     self: Self,
     agent: *Agent,
-    name: []const u8,
+    name: String,
     strict: bool,
 ) error{ ExceptionThrown, OutOfMemory }!Value {
     // 1. Assert: S is true.
@@ -76,14 +78,14 @@ pub fn getBindingValue(
     const binding = self.declarative_environment.bindings.get(name).?;
     return binding.value orelse agent.throwException(
         .reference_error,
-        "Binding for '{s}' is not initialized",
+        "Binding for '{}' is not initialized",
         .{name},
     );
 }
 
 /// 9.1.1.5.2 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-module-environment-records-deletebinding-n
-pub fn deleteBinding(_: *Self, _: []const u8) bool {
+pub fn deleteBinding(_: *Self, _: String) bool {
     // The DeleteBinding concrete method of a Module Environment Record is never used within this
     // specification.
     unreachable;
@@ -107,9 +109,9 @@ pub fn getThisBinding(_: Self) Value {
 /// https://tc39.es/ecma262/#sec-createimportbinding
 pub fn createImportBinding(
     self: *Self,
-    name: []const u8,
+    name: String,
     module: *SourceTextModule,
-    binding_name: []const u8,
+    binding_name: String,
 ) Allocator.Error!void {
     // 1. Assert: envRec does not already have a binding for N.
     // 2. Assert: When M.[[Environment]] is instantiated, it will have a direct binding for N2.

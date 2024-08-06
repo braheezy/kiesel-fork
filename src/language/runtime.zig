@@ -47,7 +47,7 @@ const setFunctionName = builtins.setFunctionName;
 /// https://tc39.es/ecma262/#sec-initializeboundname
 pub fn initializeBoundName(
     agent: *Agent,
-    name: []const u8,
+    name: String,
     value: Value,
     environment_or_strict: union(enum) {
         environment: Environment,
@@ -439,7 +439,9 @@ pub fn blockDeclarationInstantiation(
         try declaration.collectBoundNames(&bound_names);
 
         // a. For each element dn of the BoundNames of d, do
-        for (bound_names.items) |name| {
+        for (bound_names.items) |name_utf8| {
+            const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
+
             // i. If IsConstantDeclaration of d is true, then
             if (declaration.isConstantDeclaration()) {
                 // 1. Perform ! env.CreateImmutableBinding(dn, true).
@@ -459,8 +461,8 @@ pub fn blockDeclarationInstantiation(
 
             // i. Let fn be the sole element of the BoundNames of d.
             const function_name = switch (hoistable_declaration) {
-                inline else => |function_declaration| function_declaration.identifier,
-            }.?;
+                inline else => |function_declaration| try String.fromUtf8(agent.gc_allocator, function_declaration.identifier.?),
+            };
 
             // ii. Let fo be InstantiateFunctionObject of d with arguments env and privateEnv.
             const function_object = try switch (hoistable_declaration) {
@@ -572,7 +574,7 @@ pub fn instantiateOrdinaryFunctionExpression(
         std.debug.assert(default_name == null);
 
         // 2. Set name to the StringValue of BindingIdentifier.
-        const name = identifier;
+        const name = try String.fromUtf8(agent.gc_allocator, identifier);
 
         // 3. Let outerEnv be the running execution context's LexicalEnvironment.
         const outer_env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -603,11 +605,7 @@ pub fn instantiateOrdinaryFunctionExpression(
         );
 
         // 9. Perform SetFunctionName(closure, name).
-        try setFunctionName(
-            closure,
-            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-            null,
-        );
+        try setFunctionName(closure, PropertyKey.from(name), null);
 
         // 10. Perform MakeConstructor(closure).
         try makeConstructor(closure, .{});
@@ -621,7 +619,10 @@ pub fn instantiateOrdinaryFunctionExpression(
     // FunctionExpression : function ( FormalParameters ) { FunctionBody }
     else {
         // 1. If name is not present, set name to "".
-        const name = default_name orelse "";
+        const name = if (default_name) |name|
+            try String.fromUtf8(agent.gc_allocator, name)
+        else
+            String.empty;
 
         // 2. Let env be the LexicalEnvironment of the running execution context.
         const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -646,11 +647,7 @@ pub fn instantiateOrdinaryFunctionExpression(
         );
 
         // 6. Perform SetFunctionName(closure, name).
-        try setFunctionName(
-            closure,
-            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-            null,
-        );
+        try setFunctionName(closure, PropertyKey.from(name), null);
 
         // 7. Perform MakeConstructor(closure).
         try makeConstructor(closure, .{});
@@ -670,7 +667,10 @@ pub fn instantiateArrowFunctionExpression(
     const realm = agent.currentRealm();
 
     // 1. If name is not present, set name to "".
-    const name = default_name orelse "";
+    const name = if (default_name) |name|
+        try String.fromUtf8(agent.gc_allocator, name)
+    else
+        String.empty;
 
     // 2. Let env be the LexicalEnvironment of the running execution context.
     const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -695,11 +695,7 @@ pub fn instantiateArrowFunctionExpression(
     );
 
     // 6. Perform SetFunctionName(closure, name).
-    try setFunctionName(
-        closure,
-        PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-        null,
-    );
+    try setFunctionName(closure, PropertyKey.from(name), null);
 
     // 7. Return closure.
     return closure;
@@ -1101,7 +1097,7 @@ pub fn instantiateGeneratorFunctionObject(
     // GeneratorDeclaration : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
     if (generator_declaration.identifier) |identifier| {
         // 1. Let name be the StringValue of BindingIdentifier.
-        const name = identifier;
+        const name = try String.fromUtf8(agent.gc_allocator, identifier);
 
         // 2. Let sourceText be the source text matched by GeneratorDeclaration.
         const source_text = generator_declaration.source_text;
@@ -1120,11 +1116,7 @@ pub fn instantiateGeneratorFunctionObject(
         );
 
         // 4. Perform SetFunctionName(F, name).
-        try setFunctionName(
-            function,
-            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-            null,
-        );
+        try setFunctionName(function, PropertyKey.from(name), null);
 
         // 5. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1204,7 +1196,7 @@ pub fn instantiateGeneratorFunctionExpression(
         std.debug.assert(default_name == null);
 
         // 2. Set name to the StringValue of BindingIdentifier.
-        const name = identifier;
+        const name = try String.fromUtf8(agent.gc_allocator, identifier);
 
         // 3. Let outerEnv be the running execution context's LexicalEnvironment.
         const outer_env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -1235,11 +1227,7 @@ pub fn instantiateGeneratorFunctionExpression(
         );
 
         // 9. Perform SetFunctionName(closure, name).
-        try setFunctionName(
-            closure,
-            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-            null,
-        );
+        try setFunctionName(closure, PropertyKey.from(name), null);
 
         // 10. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1266,7 +1254,10 @@ pub fn instantiateGeneratorFunctionExpression(
     // GeneratorExpression : function * ( FormalParameters ) { GeneratorBody }
     else {
         // 1. If name is not present, set name to "".
-        const name = default_name orelse "";
+        const name = if (default_name) |name|
+            try String.fromUtf8(agent.gc_allocator, name)
+        else
+            String.empty;
 
         // 2. Let env be the LexicalEnvironment of the running execution context.
         const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -1291,11 +1282,7 @@ pub fn instantiateGeneratorFunctionExpression(
         );
 
         // 6. Perform SetFunctionName(closure, name).
-        try setFunctionName(
-            closure,
-            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-            null,
-        );
+        try setFunctionName(closure, PropertyKey.from(name), null);
 
         // 7. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1331,7 +1318,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
     // AsyncGeneratorDeclaration : async function * BindingIdentifier ( FormalParameters ) { AsyncGeneratorBody }
     if (async_generator_declaration.identifier) |identifier| {
         // 1. Let name be the StringValue of BindingIdentifier.
-        const name = identifier;
+        const name = try String.fromUtf8(agent.gc_allocator, identifier);
 
         // 2. Let sourceText be the source text matched by AsyncGeneratorDeclaration.
         const source_text = async_generator_declaration.source_text;
@@ -1350,11 +1337,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         );
 
         // 4. Perform SetFunctionName(F, name).
-        try setFunctionName(
-            function,
-            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-            null,
-        );
+        try setFunctionName(function, PropertyKey.from(name), null);
 
         // 5. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1433,7 +1416,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         std.debug.assert(default_name == null);
 
         // 2. Set name to the StringValue of BindingIdentifier.
-        const name = identifier;
+        const name = try String.fromUtf8(agent.gc_allocator, identifier);
 
         // 3. Let outerEnv be the running execution context's LexicalEnvironment.
         const outer_env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -1464,11 +1447,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         );
 
         // 9. Perform SetFunctionName(closure, name).
-        try setFunctionName(
-            closure,
-            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-            null,
-        );
+        try setFunctionName(closure, PropertyKey.from(name), null);
 
         // 10. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1495,7 +1474,10 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
     // AsyncGeneratorExpression : async function * ( FormalParameters ) { AsyncGeneratorBody }
     else {
         // 1. If name is not present, set name to "".
-        const name = default_name orelse "";
+        const name = if (default_name) |name|
+            try String.fromUtf8(agent.gc_allocator, name)
+        else
+            String.empty;
 
         // 2. Let env be the LexicalEnvironment of the running execution context.
         const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -1520,11 +1502,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         );
 
         // 6. Perform SetFunctionName(closure, name).
-        try setFunctionName(
-            closure,
-            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-            null,
-        );
+        try setFunctionName(closure, PropertyKey.from(name), null);
 
         // 7. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
         const prototype = try ordinaryObjectCreate(
@@ -1756,8 +1734,8 @@ fn classElementEvaluation(
 pub fn classDefinitionEvaluation(
     agent: *Agent,
     class_tail: ast.ClassTail,
-    class_binding: ?[]const u8,
-    class_name: []const u8,
+    class_binding: ?String,
+    class_name: String,
 ) Agent.Error!Object {
     const realm = agent.currentRealm();
 
@@ -1974,7 +1952,7 @@ pub fn classDefinitionEvaluation(
         const class_constructor_fields = try agent.gc_allocator.create(ClassConstructorFields);
         break :blk try createBuiltinFunction(agent, .{ .constructor = default_constructor }, .{
             .length = 0,
-            .name = class_name,
+            .name = try class_name.toUtf8(agent.gc_allocator),
             .realm = agent.currentRealm(),
             .prototype = constructor_parent,
             .additional_fields = SafePointer.make(*ClassConstructorFields, class_constructor_fields),
@@ -2001,7 +1979,7 @@ pub fn classDefinitionEvaluation(
         // d. Perform SetFunctionName(F, className).
         try setFunctionName(
             function,
-            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, class_name)),
+            PropertyKey.from(class_name),
             null,
         );
 
@@ -2235,7 +2213,7 @@ pub fn bindingClassDeclarationEvaluation(
     // ClassDeclaration : class BindingIdentifier ClassTail
     if (class_declaration.identifier) |identifier| {
         // 1. Let className be the StringValue of BindingIdentifier.
-        const class_name = identifier;
+        const class_name = try String.fromUtf8(agent.gc_allocator, identifier);
 
         // 2. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments className and className.
         const value = try classDefinitionEvaluation(
@@ -2270,7 +2248,7 @@ pub fn bindingClassDeclarationEvaluation(
             agent,
             class_declaration.class_tail,
             null,
-            "default",
+            String.fromLiteral("default"),
         );
 
         // 2. Set value.[[SourceText]] to the source text matched by ClassDeclaration.
@@ -2299,7 +2277,7 @@ pub fn instantiateAsyncFunctionObject(
     // AsyncFunctionDeclaration : async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
     if (async_function_declaration.identifier) |identifier| {
         // 1. Let name be the StringValue of BindingIdentifier.
-        const name = identifier;
+        const name = try String.fromUtf8(agent.gc_allocator, identifier);
 
         // 2. Let sourceText be the source text matched by AsyncFunctionDeclaration.
         const source_text = async_function_declaration.source_text;
@@ -2318,11 +2296,7 @@ pub fn instantiateAsyncFunctionObject(
         );
 
         // 4. Perform SetFunctionName(F, name).
-        try setFunctionName(
-            function,
-            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-            null,
-        );
+        try setFunctionName(function, PropertyKey.from(name), null);
 
         // 5. Return F.
         return function;
@@ -2368,7 +2342,7 @@ pub fn instantiateAsyncFunctionExpression(
         std.debug.assert(default_name == null);
 
         // 2. Set name to the StringValue of BindingIdentifier.
-        const name = identifier;
+        const name = try String.fromUtf8(agent.gc_allocator, identifier);
 
         // 3. Let outerEnv be the running execution context's LexicalEnvironment.
         const outer_env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -2399,11 +2373,7 @@ pub fn instantiateAsyncFunctionExpression(
         );
 
         // 9. Perform SetFunctionName(closure, name).
-        try setFunctionName(
-            closure,
-            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-            null,
-        );
+        try setFunctionName(closure, PropertyKey.from(name), null);
 
         // 10. Perform ! funcEnv.InitializeBinding(name, closure).
         func_env.initializeBinding(agent, name, Value.from(closure));
@@ -2414,7 +2384,10 @@ pub fn instantiateAsyncFunctionExpression(
     // AsyncFunctionExpression : async function ( FormalParameters ) { AsyncFunctionBody }
     else {
         // 1. If name is not present, set name to "".
-        const name = default_name orelse "";
+        const name = if (default_name) |name|
+            try String.fromUtf8(agent.gc_allocator, name)
+        else
+            String.empty;
 
         // 2. Let env be the LexicalEnvironment of the running execution context.
         const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -2439,11 +2412,7 @@ pub fn instantiateAsyncFunctionExpression(
         );
 
         // 6. Perform SetFunctionName(closure, name).
-        try setFunctionName(
-            closure,
-            PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-            null,
-        );
+        try setFunctionName(closure, PropertyKey.from(name), null);
 
         // 7. Return closure.
         return closure;
@@ -2460,7 +2429,10 @@ pub fn instantiateAsyncArrowFunctionExpression(
     const realm = agent.currentRealm();
 
     // 1. If name is not present, set name to "".
-    const name = default_name orelse "";
+    const name = if (default_name) |name|
+        try String.fromUtf8(agent.gc_allocator, name)
+    else
+        String.empty;
 
     // 2. Let env be the LexicalEnvironment of the running execution context.
     const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -2489,11 +2461,7 @@ pub fn instantiateAsyncArrowFunctionExpression(
     );
 
     // 8. Perform SetFunctionName(closure, name).
-    try setFunctionName(
-        closure,
-        PropertyKey.from(try String.fromUtf8(agent.gc_allocator, name)),
-        null,
-    );
+    try setFunctionName(closure, PropertyKey.from(name), null);
 
     // 9. Return closure.
     return closure;

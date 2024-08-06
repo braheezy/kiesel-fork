@@ -12,6 +12,8 @@ const types = @import("../../types.zig");
 const Agent = execution.Agent;
 const Environment = environments.Environment;
 const Object = types.Object;
+const String = types.String;
+const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 
 const Self = @This();
@@ -19,7 +21,7 @@ const Self = @This();
 /// [[OuterEnv]]
 outer_env: ?Environment,
 
-bindings: std.StringArrayHashMap(Binding),
+bindings: StringHashMap(Binding),
 
 pub const Binding = struct {
     value: ?Value,
@@ -30,7 +32,7 @@ pub const Binding = struct {
 
 /// 9.1.1.1.1 HasBinding ( N )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-hasbinding-n
-pub fn hasBinding(self: Self, name: []const u8) bool {
+pub fn hasBinding(self: Self, name: String) bool {
     // 1. If envRec has a binding for N, return true.
     // 2. Return false.
     return self.bindings.contains(name);
@@ -41,7 +43,7 @@ pub fn hasBinding(self: Self, name: []const u8) bool {
 pub fn createMutableBinding(
     self: *Self,
     _: *Agent,
-    name: []const u8,
+    name: String,
     deletable: bool,
 ) Allocator.Error!void {
     // 1. Assert: envRec does not already have a binding for N.
@@ -63,7 +65,7 @@ pub fn createMutableBinding(
 pub fn createImmutableBinding(
     self: *Self,
     _: *Agent,
-    name: []const u8,
+    name: String,
     strict: bool,
 ) Allocator.Error!void {
     // 1. Assert: envRec does not already have a binding for N.
@@ -81,7 +83,7 @@ pub fn createImmutableBinding(
 
 /// 9.1.1.1.4 InitializeBinding ( N, V )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-initializebinding-n-v
-pub fn initializeBinding(self: Self, _: *Agent, name: []const u8, value: Value) void {
+pub fn initializeBinding(self: Self, _: *Agent, name: String, value: Value) void {
     var binding = self.bindings.getPtr(name).?;
 
     // 1. Assert: envRec must have an uninitialized binding for N.
@@ -99,7 +101,7 @@ pub fn initializeBinding(self: Self, _: *Agent, name: []const u8, value: Value) 
 pub fn setMutableBinding(
     self: *Self,
     agent: *Agent,
-    name: []const u8,
+    name: String,
     value: Value,
     strict: bool,
 ) Agent.Error!void {
@@ -109,7 +111,7 @@ pub fn setMutableBinding(
     if (maybe_binding == null) {
         // a. If S is true, throw a ReferenceError exception.
         if (strict) {
-            return agent.throwException(.reference_error, "'{s}' is not defined", .{name});
+            return agent.throwException(.reference_error, "'{}' is not defined", .{name});
         }
 
         // b. Perform ! envRec.CreateMutableBinding(N, true).
@@ -132,7 +134,7 @@ pub fn setMutableBinding(
         // a. Throw a ReferenceError exception.
         return agent.throwException(
             .reference_error,
-            "Binding for '{s}' is not initialized",
+            "Binding for '{}' is not initialized",
             .{name},
         );
     }
@@ -149,7 +151,7 @@ pub fn setMutableBinding(
         if (final_strict) {
             return agent.throwException(
                 .reference_error,
-                "Binding for '{s}' is immutable",
+                "Binding for '{}' is immutable",
                 .{name},
             );
         }
@@ -163,7 +165,7 @@ pub fn setMutableBinding(
 pub fn getBindingValue(
     self: Self,
     agent: *Agent,
-    name: []const u8,
+    name: String,
     _: bool,
 ) error{ExceptionThrown}!Value {
     // 1. Assert: envRec has a binding for N.
@@ -173,23 +175,22 @@ pub fn getBindingValue(
     // 3. Return the value currently bound to N in envRec.
     return binding.value orelse agent.throwException(
         .reference_error,
-        "Binding for '{s}' is not initialized",
+        "Binding for '{}' is not initialized",
         .{name},
     );
 }
 
 /// 9.1.1.1.7 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-deletebinding-n
-pub fn deleteBinding(self: *Self, name: []const u8) bool {
+pub fn deleteBinding(self: *Self, name: String) bool {
     // 1. Assert: envRec has a binding for N.
-    const binding_index = self.bindings.getIndex(name).?;
-    const binding = self.bindings.values()[binding_index];
+    const binding = self.bindings.get(name).?;
 
     // 2. If the binding for N in envRec cannot be deleted, return false.
     if (!binding.deletable) return false;
 
     // 3. Remove the binding for N from envRec.
-    self.bindings.orderedRemoveAt(binding_index);
+    _ = self.bindings.remove(name);
 
     // 4. Return true.
     return true;

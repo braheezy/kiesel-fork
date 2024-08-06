@@ -9,6 +9,8 @@ const types = @import("../../types.zig");
 const Instruction = instructions_.Instruction;
 const InstructionIterator = instructions_.InstructionIterator;
 const IteratorKind = types.IteratorKind;
+const String = types.String;
+const StringArrayHashMap = types.StringArrayHashMap;
 const Value = types.Value;
 const ValueArrayHashMap = types.ValueArrayHashMap;
 const sameValue = types.sameValue;
@@ -18,7 +20,7 @@ const Self = @This();
 allocator: Allocator,
 instructions: std.ArrayList(Instruction),
 constants: ValueArrayHashMap(void, sameValue),
-identifiers: std.StringArrayHashMap(void),
+identifiers: StringArrayHashMap(void),
 ast_nodes: std.ArrayList(AstNode),
 environment_lookup_cache_size: usize = 0,
 
@@ -46,7 +48,7 @@ pub fn init(allocator: Allocator) Self {
         .allocator = allocator,
         .instructions = std.ArrayList(Instruction).init(allocator),
         .constants = ValueArrayHashMap(void, sameValue).init(allocator),
-        .identifiers = std.StringArrayHashMap(void).init(allocator),
+        .identifiers = StringArrayHashMap(void).init(allocator),
         .ast_nodes = std.ArrayList(AstNode).init(allocator),
     };
 }
@@ -68,7 +70,8 @@ pub fn addConstant(self: *Self, constant: Value) Allocator.Error!usize {
 }
 
 pub fn addIdentifier(self: *Self, identifier: ast.Identifier) Allocator.Error!usize {
-    const result = try self.identifiers.getOrPut(identifier);
+    const string = try String.fromUtf8(self.allocator, identifier);
+    const result = try self.identifiers.getOrPut(string);
     return result.index;
 }
 

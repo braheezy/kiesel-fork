@@ -130,8 +130,7 @@ pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
         const base = self.base.environment;
 
         // c. Return ? base.GetBindingValue(V.[[ReferencedName]], V.[[Strict]]) (see 9.1).
-        const referenced_name = try self.referenced_name.value.string.toUtf8(agent.gc_allocator);
-        return base.getBindingValue(agent, referenced_name, self.strict);
+        return base.getBindingValue(agent, self.referenced_name.value.string, self.strict);
     }
 }
 
@@ -204,8 +203,7 @@ pub fn putValue(self: Self, agent: *Agent, value: Value) Agent.Error!void {
     const base = self.base.environment;
 
     // c. Return ? base.SetMutableBinding(V.[[ReferencedName]], W, V.[[Strict]]) (see 9.1).
-    const referenced_name = try self.referenced_name.value.string.toUtf8(agent.gc_allocator);
-    return base.setMutableBinding(agent, referenced_name, value, self.strict);
+    return base.setMutableBinding(agent, self.referenced_name.value.string, value, self.strict);
 }
 
 /// 6.2.5.7 GetThisValue ( V )
@@ -229,6 +227,5 @@ pub fn initializeReferencedBinding(self: Self, agent: *Agent, value: Value) Agen
     const base = self.base.environment;
 
     // 4. Return ? base.InitializeBinding(V.[[ReferencedName]], W).
-    const referenced_name = try self.referenced_name.value.string.toUtf8(agent.gc_allocator);
-    return base.initializeBinding(agent, referenced_name, value);
+    return base.initializeBinding(agent, self.referenced_name.value.string, value);
 }

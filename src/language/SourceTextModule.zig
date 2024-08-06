@@ -1019,6 +1019,7 @@ pub fn initializeEnvironment(self: *Self) Agent.Error!void {
         );
 
         const import_name = import_entry.import_name.?;
+        const local_name = try String.fromUtf8(agent.gc_allocator, import_entry.local_name);
 
         // b. If in.[[ImportName]] is namespace-object, then
         if (import_name == .namespace_object) {
@@ -1028,14 +1029,14 @@ pub fn initializeEnvironment(self: *Self) Agent.Error!void {
             // ii. Perform ! env.CreateImmutableBinding(in.[[LocalName]], true).
             env.createImmutableBinding(
                 agent,
-                import_entry.local_name,
+                local_name,
                 true,
             ) catch |err| try noexcept(err);
 
             // iii. Perform ! env.InitializeBinding(in.[[LocalName]], namespace).
             env.initializeBinding(
                 agent,
-                import_entry.local_name,
+                local_name,
                 Value.from(namespace),
             ) catch |err| try noexcept(err);
         }
@@ -1062,14 +1063,14 @@ pub fn initializeEnvironment(self: *Self) Agent.Error!void {
                 // 2. Perform ! env.CreateImmutableBinding(in.[[LocalName]], true).
                 env.createImmutableBinding(
                     agent,
-                    import_entry.local_name,
+                    local_name,
                     true,
                 ) catch |err| try noexcept(err);
 
                 // 3. Perform ! env.InitializeBinding(in.[[LocalName]], namespace).
                 env.initializeBinding(
                     agent,
-                    import_entry.local_name,
+                    local_name,
                     Value.from(namespace),
                 ) catch |err| try noexcept(err);
             }
@@ -1078,9 +1079,9 @@ pub fn initializeEnvironment(self: *Self) Agent.Error!void {
                 // 1. Perform env.CreateImportBinding(in.[[LocalName]], resolution.[[Module]],
                 //    resolution.[[BindingName]]).
                 try env.createImportBinding(
-                    import_entry.local_name,
+                    local_name,
                     resolution.module.source_text_module,
-                    resolution.binding_name.string,
+                    try String.fromUtf8(agent.gc_allocator, resolution.binding_name.string),
                 );
             }
         }
@@ -1126,7 +1127,7 @@ pub fn initializeEnvironment(self: *Self) Agent.Error!void {
     try code.collectVarScopedDeclarations(&var_declarations);
 
     // 20. Let declaredVarNames be a new empty List.
-    var declared_var_names = std.StringHashMap(void).init(agent.gc_allocator);
+    var declared_var_names = StringHashMap(void).init(agent.gc_allocator);
     defer declared_var_names.deinit();
 
     // 21. For each element d of varDeclarations, do
@@ -1139,7 +1140,9 @@ pub fn initializeEnvironment(self: *Self) Agent.Error!void {
         }.?;
 
         // TODO: a. For each element dn of the BoundNames of d, do
-        for ([_]ast.Identifier{bound_name}) |var_name| {
+        for ([_]ast.Identifier{bound_name}) |var_name_utf8| {
+            const var_name = try String.fromUtf8(agent.gc_allocator, var_name_utf8);
+
             // i. If declaredVarNames does not contain dn, then
             if (!declared_var_names.contains(var_name)) {
                 // 1. Perform ! env.CreateMutableBinding(dn, false).
@@ -1171,7 +1174,9 @@ pub fn initializeEnvironment(self: *Self) Agent.Error!void {
         try declaration.collectBoundNames(&bound_names);
 
         // a. For each element dn of the BoundNames of d, do
-        for (bound_names.items) |name| {
+        for (bound_names.items) |name_utf8| {
+            const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
+
             // i. If IsConstantDeclaration of d is true, then
             if (declaration.isConstantDeclaration()) {
                 // 1. Perform ! env.CreateImmutableBinding(dn, true).

@@ -35,6 +35,7 @@ const PropertyKeyOrPrivateName = types.PropertyKeyOrPrivateName;
 const Realm = execution.Realm;
 const ScriptOrModule = execution.ScriptOrModule;
 const String = types.String;
+const StringHashMap = types.StringHashMap;
 const Symbol = types.Symbol;
 const Value = types.Value;
 const Vm = bytecode.Vm;
@@ -971,7 +972,7 @@ fn functionDeclarationInstantiation(
     const lexical_names = &[_][]const u8{};
 
     // 12. Let functionNames be a new empty List.
-    var function_names = std.StringHashMap(void).init(agent.gc_allocator);
+    var function_names = StringHashMap(void).init(agent.gc_allocator);
     defer function_names.deinit();
 
     // 13. Let functionsToInitialize be a new empty List.
@@ -989,8 +990,8 @@ fn functionDeclarationInstantiation(
 
             // ii. Let fn be the sole element of the BoundNames of d.
             const function_name = switch (hoistable_declaration) {
-                inline else => |function_declaration| function_declaration.identifier,
-            }.?;
+                inline else => |function_declaration| try String.fromUtf8(agent.gc_allocator, function_declaration.identifier.?),
+            };
 
             // iii. If functionNames does not contain fn, then
             if (!function_names.contains(function_name)) {
@@ -1023,7 +1024,9 @@ fn functionDeclarationInstantiation(
     // 18. Else if hasParameterExpressions is false, then
     else if (!has_parameter_expressions) {
         // a. If functionNames contains "arguments" or lexicalNames contains "arguments", then
-        if (function_names.contains("arguments") or containsSlice(lexical_names, "arguments")) {
+        if (function_names.contains(String.fromLiteral("arguments")) or
+            containsSlice(lexical_names, "arguments"))
+        {
             // i. Set argumentsObjectNeeded to false.
             arguments_object_needed = false;
         }
@@ -1067,7 +1070,9 @@ fn functionDeclarationInstantiation(
     };
 
     // 21. For each String paramName of parameterNames, do
-    for (parameter_names.items) |parameter_name| {
+    for (parameter_names.items) |parameter_name_utf8| {
+        const parameter_name = try String.fromUtf8(agent.gc_allocator, parameter_name_utf8);
+
         // a. Let alreadyDeclared be ! env.HasBinding(paramName).
         const already_declared = env.hasBinding(parameter_name) catch |err| try noexcept(err);
 
@@ -1117,7 +1122,11 @@ fn functionDeclarationInstantiation(
         // c. If strict is true, then
         if (strict) {
             // i. Perform ! env.CreateImmutableBinding("arguments", false).
-            env.createImmutableBinding(agent, "arguments", false) catch |err| try noexcept(err);
+            env.createImmutableBinding(
+                agent,
+                String.fromLiteral("arguments"),
+                false,
+            ) catch |err| try noexcept(err);
 
             // ii. NOTE: In strict mode code early errors prevent attempting to assign to this
             //     binding, so its mutability is not observable.
@@ -1125,13 +1134,17 @@ fn functionDeclarationInstantiation(
         // d. Else,
         else {
             // i. Perform ! env.CreateMutableBinding("arguments", false).
-            env.createMutableBinding(agent, "arguments", false) catch |err| try noexcept(err);
+            env.createMutableBinding(
+                agent,
+                String.fromLiteral("arguments"),
+                false,
+            ) catch |err| try noexcept(err);
         }
 
         // e. Perform ! env.InitializeBinding("arguments", ao).
         env.initializeBinding(
             agent,
-            "arguments",
+            String.fromLiteral("arguments"),
             Value.from(arguments_object),
         ) catch |err| try noexcept(err);
 
@@ -1154,7 +1167,7 @@ fn functionDeclarationInstantiation(
         switch (item) {
             .formal_parameter => |formal_parameter| {
                 const name = switch (formal_parameter.binding_element) {
-                    .single_name_binding => |single_name_binding| single_name_binding.binding_identifier,
+                    .single_name_binding => |single_name_binding| try String.fromUtf8(agent.gc_allocator, single_name_binding.binding_identifier),
                     .binding_pattern => return agent.throwException(
                         .internal_error,
                         "Binding patterns in function parameters are not supported yet",
@@ -1178,7 +1191,7 @@ fn functionDeclarationInstantiation(
             },
             .function_rest_parameter => |function_rest_parameter| {
                 const name = switch (function_rest_parameter.binding_rest_element) {
-                    .binding_identifier => |binding_identifier| binding_identifier,
+                    .binding_identifier => |binding_identifier| try String.fromUtf8(agent.gc_allocator, binding_identifier),
                     .binding_pattern => return agent.throwException(
                         .internal_error,
                         "Binding patterns in function parameters are not supported yet",
@@ -1207,17 +1220,22 @@ fn functionDeclarationInstantiation(
         // a. NOTE: Only a single Environment Record is needed for the parameters and top-level vars.
 
         // b. Let instantiatedVarNames be a copy of the List parameterBindings.
-        var instantiated_var_names = std.StringHashMap(void).init(agent.gc_allocator);
+        var instantiated_var_names = StringHashMap(void).init(agent.gc_allocator);
         defer instantiated_var_names.deinit();
 
         if (parameter_bindings.items.len > std.math.maxInt(u32)) return error.OutOfMemory;
         try instantiated_var_names.ensureTotalCapacity(@intCast(parameter_bindings.items.len));
         for (parameter_bindings.items) |parameter_binding| {
-            instantiated_var_names.putAssumeCapacity(parameter_binding, {});
+            instantiated_var_names.putAssumeCapacity(
+                try String.fromUtf8(agent.gc_allocator, parameter_binding),
+                {},
+            );
         }
 
         // c. For each element n of varNames, do
-        for (var_names.items) |var_name| {
+        for (var_names.items) |var_name_utf8| {
+            const var_name = try String.fromUtf8(agent.gc_allocator, var_name_utf8);
+
             // i. If instantiatedVarNames does not contain n, then
             if (!instantiated_var_names.contains(var_name)) {
                 // 1. Append n to instantiatedVarNames.
@@ -1249,11 +1267,13 @@ fn functionDeclarationInstantiation(
         callee_context.ecmascript_code.?.variable_environment = var_env;
 
         // d. Let instantiatedVarNames be a new empty List.
-        var instantiated_var_names = std.StringHashMap(void).init(agent.gc_allocator);
+        var instantiated_var_names = StringHashMap(void).init(agent.gc_allocator);
         defer instantiated_var_names.deinit();
 
         // e. For each element n of varNames, do
-        for (var_names.items) |var_name| {
+        for (var_names.items) |var_name_utf8| {
+            const var_name = try String.fromUtf8(agent.gc_allocator, var_name_utf8);
+
             // i. If instantiatedVarNames does not contain n, then
             if (!instantiated_var_names.contains(var_name)) {
                 // 1. Append n to instantiatedVarNames.
@@ -1266,7 +1286,7 @@ fn functionDeclarationInstantiation(
                 //     a. Let initialValue be undefined.
                 // 4. Else,
                 //     a. Let initialValue be ! env.GetBindingValue(n, false).
-                const initial_value = if (!containsSlice(parameter_bindings.items, var_name) or
+                const initial_value = if (!containsSlice(parameter_bindings.items, try var_name.toUtf8(agent.gc_allocator)) or
                     function_names.contains(var_name))
                     .undefined
                 else
@@ -1327,7 +1347,9 @@ fn functionDeclarationInstantiation(
         try declaration.collectBoundNames(&bound_names);
 
         // b. For each element dn of the BoundNames of d, do
-        for (bound_names.items) |name| {
+        for (bound_names.items) |name_utf8| {
+            const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
+
             // i. If IsConstantDeclaration of d is true, then
             if (declaration.isConstantDeclaration()) {
                 // 1. Perform ! lexEnv.CreateImmutableBinding(dn, true).
@@ -1348,8 +1370,8 @@ fn functionDeclarationInstantiation(
     for (functions_to_initialize.items) |hoistable_declaration| {
         // a. Let fn be the sole element of the BoundNames of f.
         const function_name = switch (hoistable_declaration) {
-            inline else => |function_declaration| function_declaration.identifier,
-        }.?;
+            inline else => |function_declaration| try String.fromUtf8(agent.gc_allocator, function_declaration.identifier.?),
+        };
 
         // b. Let fo be InstantiateFunctionObject of f with arguments lexEnv and privateEnv.
         const function_object = try switch (hoistable_declaration) {

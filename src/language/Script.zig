@@ -18,6 +18,7 @@ const Module = language.Module;
 const Parser = @import("Parser.zig");
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
+const String = types.String;
 const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
@@ -150,12 +151,14 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     // TODO: 3. For each element name of lexNames, do
 
     // 4. For each element name of varNames, do
-    for (var_names.items) |name| {
+    for (var_names.items) |name_utf8| {
+        const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
+
         // a. If env.HasLexicalDeclaration(name) is true, throw a SyntaxError exception.
         if (env.hasLexicalDeclaration(name)) {
             return agent.throwException(
                 .syntax_error,
-                "Global environment already has a lexical declaration '{s}'",
+                "Global environment already has a lexical declaration '{}'",
                 .{name},
             );
         }
@@ -171,7 +174,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     defer functions_to_initialize.deinit();
 
     // 7. Let declaredFunctionNames be a new empty List.
-    var declared_function_names = std.StringHashMap(void).init(agent.gc_allocator);
+    var declared_function_names = StringHashMap(void).init(agent.gc_allocator);
     defer declared_function_names.deinit();
 
     // 8. For each element d of varDeclarations, in reverse List order, do
@@ -188,8 +191,8 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
 
             // iii. Let fn be the sole element of the BoundNames of d.
             const function_name = switch (hoistable_declaration) {
-                inline else => |function_declaration| function_declaration.identifier,
-            }.?;
+                inline else => |function_declaration| try String.fromUtf8(agent.gc_allocator, function_declaration.identifier.?),
+            };
 
             // iv. If declaredFunctionNames does not contain fn, then
             if (!declared_function_names.contains(function_name)) {
@@ -200,7 +203,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
                 if (!function_definable) {
                     return agent.throwException(
                         .type_error,
-                        "Cannot declare '{s}' in global environment",
+                        "Cannot declare '{}' in global environment",
                         .{function_name},
                     );
                 }
@@ -216,7 +219,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     }
 
     // 9. Let declaredVarNames be a new empty List.
-    var declared_var_names = std.StringHashMap(void).init(agent.gc_allocator);
+    var declared_var_names = StringHashMap(void).init(agent.gc_allocator);
     defer declared_var_names.deinit();
 
     // 10. For each element d of varDeclarations, do
@@ -229,7 +232,9 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
             };
 
             // i. For each String vn of the BoundNames of d, do
-            for (bound_names) |var_name| {
+            for (bound_names) |var_name_utf8| {
+                const var_name = try String.fromUtf8(agent.gc_allocator, var_name_utf8);
+
                 // 1. If declaredFunctionNames does not contain vn, then
                 if (!declared_function_names.contains(var_name)) {
                     // a. Let vnDefinable be ? env.CanDeclareGlobalVar(vn).
@@ -239,7 +244,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
                     if (!var_name_definable) {
                         return agent.throwException(
                             .type_error,
-                            "Cannot declare '{s}' in global environment",
+                            "Cannot declare '{}' in global environment",
                             .{var_name},
                         );
                     }
@@ -279,7 +284,9 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
         try declaration.collectBoundNames(&bound_names);
 
         // b. For each element dn of the BoundNames of d, do
-        for (bound_names.items) |name| {
+        for (bound_names.items) |name_utf8| {
+            const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
+
             // i. If IsConstantDeclaration of d is true, then
             if (declaration.isConstantDeclaration()) {
                 // 1. Perform ? env.CreateImmutableBinding(dn, true).
@@ -297,8 +304,8 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     for (functions_to_initialize.items) |hoistable_declaration| {
         // a. Let fn be the sole element of the BoundNames of f.
         const function_name = switch (hoistable_declaration) {
-            inline else => |function_declaration| function_declaration.identifier,
-        }.?;
+            inline else => |function_declaration| try String.fromUtf8(agent.gc_allocator, function_declaration.identifier.?),
+        };
 
         // b. Let fo be InstantiateFunctionObject of f with arguments env and privateEnv.
         const function_object = try switch (hoistable_declaration) {
