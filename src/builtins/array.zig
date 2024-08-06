@@ -297,26 +297,43 @@ pub fn arraySetLength(
 
     // 17. For each own property key P of A such that P is an array index and ! ToUint32(P) ≥ newLen,
     //     in descending numeric index order, do
-    // NOTE: Deletion invalidates the ArrayHashMap.keys() array, so we have to make a copy
-    var indices = std.ArrayList(u32).init(agent.gc_allocator);
-    defer indices.deinit();
-    for (array.propertyStorage().hash_map.keys()) |property_key| {
-        if (property_key.isArrayIndex() and property_key.integer_index >= new_len) {
-            try indices.append(@as(u32, @intCast(property_key.integer_index)));
+    // NOTE: After a certain length looping through all indices becomes very slow, and chances are
+    //       most values are array holes. In that case we collect a list of known property keys,
+    //       otherwise we loop through indices in reverse order and bail out if no property exists.
+    var maybe_indices = if (old_len >= 1_000_000) blk: {
+        var indices = std.ArrayList(u32).init(agent.gc_allocator);
+        for (array.propertyStorage().hash_map.keys()) |property_key| {
+            if (property_key.isArrayIndex() and property_key.integer_index >= new_len) {
+                try indices.append(@as(u32, @intCast(property_key.integer_index)));
+            }
         }
-    }
-    std.sort.insertion(u32, indices.items, {}, std.sort.desc(u32));
-    for (indices.items) |index| {
+        std.sort.insertion(u32, indices.items, {}, std.sort.desc(u32));
+        break :blk indices;
+    } else null;
+    defer if (maybe_indices) |*indices| indices.deinit();
+    var index = if (maybe_indices) |*indices|
+        indices.popOrNull()
+    else
+        std.math.sub(u32, old_len, 1) catch null;
+    while (index != null and index.? >= new_len) : ({
+        index = if (maybe_indices) |*indices|
+            indices.popOrNull()
+        else
+            std.math.sub(u32, index.?, 1) catch null;
+    }) {
+        const property_key = PropertyKey.from(@as(u53, index.?));
+        if (maybe_indices == null and !array.propertyStorage().has(property_key)) continue;
+
         // a. Let deleteSucceeded be ! A.[[Delete]](P).
         const delete_succeeded = array.internalMethods().delete(
             array,
-            PropertyKey.from(@as(u53, index)),
+            property_key,
         ) catch |err| try noexcept(err);
 
         // b. If deleteSucceeded is false, then
         if (!delete_succeeded) {
             // i. Set newLenDesc.[[Value]] to ! ToUint32(P) + 1𝔽.
-            new_len_desc.value = Value.from(@as(f64, @floatFromInt(index)) + 1);
+            new_len_desc.value = Value.from(@as(f64, @floatFromInt(index.?)) + 1);
 
             // ii. If newWritable is false, set newLenDesc.[[Writable]] to false.
             if (!new_writable) new_len_desc.writable = false;
