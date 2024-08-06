@@ -736,6 +736,19 @@ pub const Value = union(enum) {
             return PropertyKey.from(key.symbol);
         }
 
+        // OPTIMIZATION: If we have a number that fits into an `PropertyKey.IntegerIndex` there's
+        //               no need to do a string conversion and back.
+        if (key == .number and key.number.isIntegral()) {
+            switch (key.number) {
+                .i32 => |value| if (value >= 0) {
+                    return PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(value)));
+                },
+                .f64 => |value| if (value >= 0 and value <= std.math.maxInt(PropertyKey.IntegerIndex)) {
+                    return PropertyKey.from(@as(PropertyKey.IntegerIndex, @intFromFloat(value)));
+                },
+            }
+        }
+
         // 3. Return ! ToString(key).
         const string = key.toString(agent) catch |err| try noexcept(err);
         return PropertyKey.from(string);
