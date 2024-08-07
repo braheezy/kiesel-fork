@@ -16,6 +16,7 @@ const libgc_stub = struct {
     pub const GC_warn_proc = ?*const fn ([*c]u8, GC_word) callconv(.C) void;
 
     pub fn GC_init() void {}
+    pub fn GC_is_init_called() c_int {}
     pub fn GC_disable() void {}
     pub fn GC_gcollect() void {}
     pub fn GC_malloc(_: usize) ?*anyopaque {
@@ -26,4 +27,5 @@ const libgc_stub = struct {
         return 0;
     }
     pub fn GC_set_warn_proc(_: GC_warn_proc) void {}
+    pub fn GC_start_mark_threads() void {}
 };

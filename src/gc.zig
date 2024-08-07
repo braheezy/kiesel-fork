@@ -13,7 +13,10 @@ pub const libgc_version: std.SemanticVersion = .{
 pub const GcAllocator = @import("gc/GcAllocator.zig");
 
 pub fn allocator() Allocator {
-    libgc.GC_init();
+    if (libgc.GC_is_init_called() == 0) {
+        libgc.GC_init();
+        libgc.GC_start_mark_threads();
+    }
     return .{
         .ptr = undefined,
         .vtable = &GcAllocator.vtable,
