@@ -266,8 +266,10 @@ pub fn createNonEnumerableDataPropertyOrThrow(
 ) Agent.Error!void {
     // 1. Assert: O is an ordinary, extensible object with no non-configurable properties.
     std.debug.assert(self.extensible().* and blk: {
-        for (self.propertyStorage().hash_map.values()) |descriptor| {
-            if (descriptor.configurable.? == false) break :blk false;
+        for (self.propertyStorage().hash_map.values()) |entry| {
+            switch (entry) {
+                inline else => |x| if (!x.attributes.configurable) break :blk false,
+            }
         }
         break :blk true;
     });
