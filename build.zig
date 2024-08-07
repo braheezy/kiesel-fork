@@ -65,6 +65,7 @@ pub fn build(b: *std.Build) void {
         .BUILD_SHARED_LIBS = false,
         .enable_gcj_support = false,
         .enable_java_finalization = false,
+        .enable_large_config = true,
         .disable_gc_debug = true,
     });
     const libregexp = b.dependency("libregexp", .{
