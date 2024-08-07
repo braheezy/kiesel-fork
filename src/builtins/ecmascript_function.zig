@@ -1008,7 +1008,9 @@ fn functionDeclarationInstantiation(
     }
 
     // 15. Let argumentsObjectNeeded be true.
-    var arguments_object_needed = true;
+    // OPTIMIZATION: If nothing accesses the arguments object we don't need to create one. This is
+    //               determined during parsing, with a deopt when using eval.
+    var arguments_object_needed = formals.arguments_object_needed or code.arguments_object_needed;
 
     // 16. If func.[[ThisMode]] is lexical, then
     if (function.fields.this_mode == .lexical) {

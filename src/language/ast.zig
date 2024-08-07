@@ -2321,6 +2321,7 @@ pub const FormalParameters = struct {
     };
 
     items: []const Item,
+    arguments_object_needed: bool,
 
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
@@ -2482,6 +2483,7 @@ pub const FunctionBody = struct {
     type: Type,
     statement_list: StatementList,
     strict: bool,
+    arguments_object_needed: bool,
 
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations

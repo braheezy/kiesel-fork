@@ -28,6 +28,7 @@ state: struct {
     in_breakable_statement: bool = false,
     in_class_body: bool = false,
     in_class_constructor: bool = false,
+    in_formal_parameters: bool = false,
     in_function_body: bool = false,
     in_iteration_statement: bool = false,
     in_labelled_statement: bool = false,
@@ -35,6 +36,7 @@ state: struct {
     in_module: bool = false,
     in_strict_mode: bool = false,
     call_expression_forbidden: bool = false,
+    arguments_object_needed: bool = false,
 } = .{},
 
 const RuleSet = ptk.RuleSet(Tokenizer.TokenType);
@@ -1426,6 +1428,15 @@ pub fn acceptExpression(self: *Self, ctx: AcceptContext) AcceptError!ast.Express
             return error.UnexpectedToken,
     };
 
+    if ((self.state.in_formal_parameters or self.state.in_function_body) and
+        expression == .primary_expression and
+        expression.primary_expression == .identifier_reference and
+        (std.mem.eql(u8, expression.primary_expression.identifier_reference, "arguments") or
+        std.mem.eql(u8, expression.primary_expression.identifier_reference, "eval")))
+    {
+        self.state.arguments_object_needed = true;
+    }
+
     outer: while (true) {
         next_token = try self.core.peek() orelse break;
         while (next_token.type == .template or next_token.type == .template_head) {
@@ -2255,6 +2266,12 @@ pub fn acceptFormalParameters(self: *Self) AcceptError!ast.FormalParameters {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const tmp1 = temporaryChange(&self.state.in_formal_parameters, true);
+    defer tmp1.restore();
+
+    const tmp2 = temporaryChange(&self.state.arguments_object_needed, false);
+    defer tmp2.restore();
+
     var formal_parameters_items = std.ArrayList(ast.FormalParameters.Item).init(self.allocator);
     errdefer formal_parameters_items.deinit();
     while (true) {
@@ -2273,7 +2290,10 @@ pub fn acceptFormalParameters(self: *Self) AcceptError!ast.FormalParameters {
             _ = self.core.accept(RuleSet.is(.@",")) catch break;
         } else |_| break;
     }
-    return .{ .items = try formal_parameters_items.toOwnedSlice() };
+    return .{
+        .items = try formal_parameters_items.toOwnedSlice(),
+        .arguments_object_needed = self.state.arguments_object_needed,
+    };
 }
 
 pub fn acceptFunctionDeclaration(self: *Self) AcceptError!ast.FunctionDeclaration {
@@ -2371,12 +2391,16 @@ pub fn acceptFunctionBody(
     });
     defer tmp2.restore();
 
+    const tmp3 = temporaryChange(&self.state.arguments_object_needed, false);
+    defer tmp3.restore();
+
     const statement_list = try self.acceptStatementList(.{ .update_strict_mode = true });
     const strict = self.state.in_strict_mode or statement_list.containsDirective("use strict");
     return .{
         .type = @"type",
         .statement_list = statement_list,
         .strict = strict,
+        .arguments_object_needed = self.state.arguments_object_needed,
     };
 }
 
@@ -2404,7 +2428,10 @@ pub fn acceptArrowFunction(self: *Self) AcceptError!ast.ArrowFunction {
                 },
             },
         });
-        formal_parameters = .{ .items = try formal_parameters_items.toOwnedSlice() };
+        formal_parameters = .{
+            .items = try formal_parameters_items.toOwnedSlice(),
+            .arguments_object_needed = false,
+        };
     } else |_| {
         _ = try self.core.accept(RuleSet.is(.@"("));
         // We need to do this after consuming the '(' token to skip preceeding whitespace.
@@ -2433,6 +2460,7 @@ pub fn acceptArrowFunction(self: *Self) AcceptError!ast.ArrowFunction {
             .type = .normal,
             .statement_list = statement_list,
             .strict = self.state.in_strict_mode,
+            .arguments_object_needed = false,
         };
     };
     try self.ensureUniqueParameterNames(.arrow, formal_parameters, location);
@@ -3050,7 +3078,10 @@ pub fn acceptAsyncArrowFunction(self: *Self) AcceptError!ast.AsyncArrowFunction 
                 },
             },
         });
-        formal_parameters = .{ .items = try formal_parameters_items.toOwnedSlice() };
+        formal_parameters = .{
+            .items = try formal_parameters_items.toOwnedSlice(),
+            .arguments_object_needed = false,
+        };
     } else |_| {
         _ = try self.core.accept(RuleSet.is(.@"("));
         formal_parameters = try self.acceptFormalParameters();
@@ -3077,6 +3108,7 @@ pub fn acceptAsyncArrowFunction(self: *Self) AcceptError!ast.AsyncArrowFunction 
             .type = .@"async",
             .statement_list = statement_list,
             .strict = self.state.in_strict_mode,
+            .arguments_object_needed = false,
         };
     };
     try self.ensureUniqueParameterNames(.arrow, formal_parameters, location);

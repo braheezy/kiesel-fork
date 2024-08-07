@@ -807,7 +807,10 @@ pub fn methodDefinitionEvaluation(
             const source_text = function_expression.source_text;
 
             // 5. Let formalParameterList be an instance of the production FormalParameters : [empty] .
-            const formal_parameter_list: ast.FormalParameters = .{ .items = &.{} };
+            const formal_parameter_list: ast.FormalParameters = .{
+                .items = &.{},
+                .arguments_object_needed = false,
+            };
 
             // 6. Let closure be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
             //    formalParameterList, FunctionBody, non-lexical-this, env, privateEnv).
@@ -1551,7 +1554,10 @@ fn classFieldDefinitionEvaluation(
     // 2. If Initializer is present, then
     const initializer = if (field_definition.initializer) |initializer| blk: {
         // a. Let formalParameterList be an instance of the production FormalParameters : [empty] .
-        const formal_parameter_list: ast.FormalParameters = .{ .items = &.{} };
+        const formal_parameter_list: ast.FormalParameters = .{
+            .items = &.{},
+            .arguments_object_needed = false,
+        };
 
         // b. Let env be the LexicalEnvironment of the running execution context.
         const env = agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
@@ -1574,6 +1580,7 @@ fn classFieldDefinitionEvaluation(
                 .type = .normal,
                 .statement_list = statement_list,
                 .strict = true,
+                .arguments_object_needed = false,
             };
         };
         const initializer_function = try ordinaryFunctionCreate(
@@ -1627,7 +1634,10 @@ fn classStaticBlockDefinitionEvaluation(
     const source_text = "";
 
     // 4. Let formalParameters be an instance of the production FormalParameters : [empty] .
-    const formal_parameter_list: ast.FormalParameters = .{ .items = &.{} };
+    const formal_parameter_list: ast.FormalParameters = .{
+        .items = &.{},
+        .arguments_object_needed = false,
+    };
 
     // 5. Let bodyFunction be OrdinaryFunctionCreate(%Function.prototype%, sourceText,
     //    formalParameters, ClassStaticBlockBody, non-lexical-this, lex, privateEnv).
@@ -1638,6 +1648,7 @@ fn classStaticBlockDefinitionEvaluation(
             .type = .normal,
             .statement_list = class_static_block.statement_list,
             .strict = true,
+            .arguments_object_needed = false,
         };
     };
     const body_function = try ordinaryFunctionCreate(
