@@ -68,6 +68,11 @@ jobs:
         run: |
           zig build -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-x86_64
+      - name: Build kiesel-linux-x86_64 (ReleaseFast)
+        run: |
+          # This is being used for https://boajs.dev/benchmarks, ReleaseSafe is noticeably slower
+          zig build -Dtarget=x86_64-linux-musl -Doptimize=ReleaseFast
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-x86_64-releasefast
       - name: Build kiesel-macos-aarch64
         run: |
           zig build -Dtarget=aarch64-macos-none -Doptimize=ReleaseSafe
