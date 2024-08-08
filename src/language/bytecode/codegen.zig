@@ -23,6 +23,40 @@ pub const Context = struct {
     break_jumps: std.ArrayList(Executable.JumpIndex),
 };
 
+/// Due to the lack of basic blocks we have to perform a bit of trickery to make `break` and
+/// `continue` jumps not bypass necessary cleanup (popping references and environments from their
+/// stack, for instance). This doesn't work for return statements, but given the short-lived nature
+/// of bytecode VMs that's probably good enough.
+fn interceptContinueAndBreakJumps(
+    executable: *Executable,
+    ctx: *Context,
+    codegenFn: anytype,
+    args: anytype,
+) Executable.Error!void {
+    try @call(.always_inline, codegenFn, args);
+    try executable.addInstruction(.jump);
+    const skip_jump = try executable.addJumpIndex();
+    if (ctx.continue_jumps.items.len != 0) {
+        while (ctx.continue_jumps.popOrNull()) |jump_index| {
+            try jump_index.setTargetHere();
+        }
+        try @call(.always_inline, codegenFn, args);
+        try executable.addInstruction(.jump);
+        const jump_index = try executable.addJumpIndex();
+        try ctx.continue_jumps.append(jump_index);
+    }
+    if (ctx.break_jumps.items.len != 0) {
+        while (ctx.break_jumps.popOrNull()) |jump_index| {
+            try jump_index.setTargetHere();
+        }
+        try @call(.always_inline, codegenFn, args);
+        try executable.addInstruction(.jump);
+        const jump_index = try executable.addJumpIndex();
+        try ctx.break_jumps.append(jump_index);
+    }
+    try skip_jump.setTargetHere();
+}
+
 pub fn codegenParenthesizedExpression(
     node: ast.ParenthesizedExpression,
     executable: *Executable,
@@ -1876,8 +1910,17 @@ pub fn codegenBlock(
 
     // 6. Set the running execution context's LexicalEnvironment to oldEnv.
     if (has_lexically_scoped_declarations) {
-        try executable.addInstruction(.restore_lexical_environment);
-        try executable.addInstruction(.pop_lexical_environment);
+        try interceptContinueAndBreakJumps(
+            executable,
+            ctx,
+            struct {
+                fn codegen(executable_: *Executable) Executable.Error!void {
+                    try executable_.addInstruction(.restore_lexical_environment);
+                    try executable_.addInstruction(.pop_lexical_environment);
+                }
+            }.codegen,
+            .{executable},
+        );
     }
 
     // 7. Return ? blockValue.
@@ -2919,8 +2962,17 @@ pub fn codegenWithStatement(
     try codegenStatement(node.statement.*, executable, ctx);
 
     // 7. Set the running execution context's LexicalEnvironment to oldEnv.
-    try executable.addInstruction(.restore_lexical_environment);
-    try executable.addInstruction(.pop_lexical_environment);
+    try interceptContinueAndBreakJumps(
+        executable,
+        ctx,
+        struct {
+            fn codegen(executable_: *Executable) Executable.Error!void {
+                try executable_.addInstruction(.restore_lexical_environment);
+                try executable_.addInstruction(.pop_lexical_environment);
+            }
+        }.codegen,
+        .{executable},
+    );
 
     // 8. Return ? UpdateEmpty(C, undefined).
 }
@@ -3099,8 +3151,17 @@ pub fn codegenSwitchStatement(
     }
 
     // 8. Set the running execution context's LexicalEnvironment to oldEnv.
-    try executable.addInstruction(.restore_lexical_environment);
-    try executable.addInstruction(.pop_lexical_environment);
+    try interceptContinueAndBreakJumps(
+        executable,
+        ctx,
+        struct {
+            fn codegen(executable_: *Executable) Executable.Error!void {
+                try executable_.addInstruction(.restore_lexical_environment);
+                try executable_.addInstruction(.pop_lexical_environment);
+            }
+        }.codegen,
+        .{executable},
+    );
 
     // 9. Return R.
 }
