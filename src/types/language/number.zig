@@ -614,7 +614,7 @@ pub const Number = union(enum) {
 
         // TODO: Implement steps 5-12 according to spec!
         return String.fromAscii(switch (self) {
-            .f64 => |x| if (@abs(x) > 1e-7 and @abs(x) < 1e21)
+            .f64 => |x| if (@abs(x) >= 1e-6 and @abs(x) < 1e21)
                 try std.fmt.allocPrint(allocator, "{d}", .{x})
             else if (@abs(x) < 1)
                 try std.fmt.allocPrint(allocator, "{e}", .{x})
