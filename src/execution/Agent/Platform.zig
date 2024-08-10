@@ -16,7 +16,7 @@ default_locale: if (build_options.enable_intl) icu4zig.Locale else void,
 currentTime: *const fn () i64,
 
 /// Whether `fd_t` is defined
-const has_fd_t = @hasDecl(std.posix.system, "fd_t");
+const has_fd_t = std.posix.system.fd_t != void;
 
 /// Whether `clockid_t` is defined
 const has_clockid_t = @hasDecl(std.posix.system, "clockid_t") and
