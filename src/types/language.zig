@@ -10,7 +10,6 @@ pub const StringHashMap = string.StringHashMap;
 pub const Symbol = @import("language/Symbol.zig");
 pub const Value = @import("language/Value.zig");
 pub const ValueArrayHashMap = Value.ValueArrayHashMap;
-pub const coerceOptionsToObject = Value.coerceOptionsToObject;
 pub const createArrayFromList = Value.createArrayFromList;
 pub const createArrayFromListMapToValue = Value.createArrayFromListMapToValue;
 pub const getOption = Value.getOption;

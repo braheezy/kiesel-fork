@@ -21,7 +21,6 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
-const coerceOptionsToObject = types.coerceOptionsToObject;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
@@ -216,7 +215,7 @@ pub const LocaleConstructor = struct {
         };
 
         // 10. Set options to ? CoerceOptionsToObject(options).
-        const options = try coerceOptionsToObject(agent, options_value);
+        const options = try options_value.coerceOptionsToObject(agent);
 
         // 11. If IsStructurallyValidLanguageTag(tag) is false, throw a RangeError exception.
         // 12. Set tag to CanonicalizeUnicodeLocaleId(tag).

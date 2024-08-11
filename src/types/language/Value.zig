@@ -1818,15 +1818,15 @@ pub fn createArrayFromListMapToValue(
 
 /// 9.2.12 CoerceOptionsToObject ( options )
 /// https://tc39.es/ecma402/#sec-coerceoptionstoobject
-pub fn coerceOptionsToObject(agent: *Agent, options: Self) Agent.Error!Object {
+pub fn coerceOptionsToObject(self: Self, agent: *Agent) Agent.Error!Object {
     // 1. If options is undefined, then
-    if (options.isUndefined()) {
+    if (self.isUndefined()) {
         // a. Return OrdinaryObjectCreate(null).
         return ordinaryObjectCreate(agent, null);
     }
 
     // 2. Return ? ToObject(options).
-    return options.toObject(agent);
+    return self.toObject(agent);
 }
 
 /// 9.2.13 GetOption ( options, property, type, values, default )

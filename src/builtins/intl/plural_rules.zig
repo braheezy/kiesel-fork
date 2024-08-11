@@ -24,7 +24,6 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
-const coerceOptionsToObject = abstract_operations.coerceOptionsToObject;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
@@ -93,7 +92,7 @@ pub const PluralRulesConstructor = struct {
         const requested_locales = try canonicalizeLocaleList(agent, locales);
 
         // 4. Set options to ? CoerceOptionsToObject(options).
-        const options = try coerceOptionsToObject(agent, options_value);
+        const options = try options_value.coerceOptionsToObject(agent);
 
         // 5. Let opt be a new Record.
 

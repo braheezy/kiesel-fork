@@ -25,7 +25,6 @@ const ScriptOrModule = kiesel.execution.ScriptOrModule;
 const SourceTextModule = kiesel.language.SourceTextModule;
 const String = kiesel.types.String;
 const Value = kiesel.types.Value;
-const coerceOptionsToObject = kiesel.types.coerceOptionsToObject;
 const defineBuiltinFunction = kiesel.utils.defineBuiltinFunction;
 const defineBuiltinProperty = kiesel.utils.defineBuiltinProperty;
 const finishLoadingImportedModule = kiesel.language.finishLoadingImportedModule;
@@ -224,7 +223,7 @@ const Kiesel = struct {
     fn print(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const stdout = agent.platform.stdout;
         const value = arguments.get(0);
-        const options = try coerceOptionsToObject(agent, arguments.get(1));
+        const options = try arguments.get(1).coerceOptionsToObject(agent);
         const newline = try getOption(options, "newline", .boolean, null, true);
         const pretty = try getOption(options, "pretty", .boolean, null, false);
         const end = if (newline) "\n" else "";

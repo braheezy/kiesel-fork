@@ -25,7 +25,6 @@ const String = types.String;
 const Value = types.Value;
 const calendarToBcp47 = abstract_operations.calendarToBcp47;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
-const coerceOptionsToObject = abstract_operations.coerceOptionsToObject;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
@@ -77,7 +76,7 @@ pub fn createDateTimeFormat(
     const requested_locales = try canonicalizeLocaleList(agent, locales);
 
     // 3. Set options to ? CoerceOptionsToObject(options).
-    const options = try coerceOptionsToObject(agent, options_value);
+    const options = try options_value.coerceOptionsToObject(agent);
 
     // 4. Let opt be a new Record.
 

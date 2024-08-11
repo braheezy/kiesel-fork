@@ -24,7 +24,6 @@ const SafePointer = types.SafePointer;
 const String = types.String;
 const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
-const coerceOptionsToObject = abstract_operations.coerceOptionsToObject;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
@@ -92,7 +91,7 @@ pub const CollatorConstructor = struct {
         const requested_locales = try canonicalizeLocaleList(agent, locales);
 
         // 7. Set options to ? CoerceOptionsToObject(options).
-        const options = try coerceOptionsToObject(agent, options_value);
+        const options = try options_value.coerceOptionsToObject(agent);
 
         // 8. Let usage be ? GetOption(options, "usage", string, « "sort", "search" », "sort").
         const usage = try getOption(

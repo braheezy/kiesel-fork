@@ -27,7 +27,6 @@ pub const StringHashMap = language.StringHashMap;
 pub const Symbol = language.Symbol;
 pub const Value = language.Value;
 pub const ValueArrayHashMap = language.ValueArrayHashMap;
-pub const coerceOptionsToObject = language.coerceOptionsToObject;
 pub const copyDataBlockBytes = spec.copyDataBlockBytes;
 pub const createArrayFromList = language.createArrayFromList;
 pub const createArrayFromListMapToValue = language.createArrayFromListMapToValue;
