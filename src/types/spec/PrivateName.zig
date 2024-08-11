@@ -9,8 +9,6 @@ const Symbol = types.Symbol;
 
 const Self = @This();
 
-pub const Id = usize;
-
 /// As symbols already have uniqueness via an internal ID, as well as a description string, private
 /// names can easily be implemented using symbols.
 /// This should be considered an implementation detail and not relied upon for anything else.
@@ -34,7 +32,7 @@ pub fn eql(a: Self, b: Self) bool {
 pub fn PrivateNameArrayHashMap(comptime V: type) type {
     return std.ArrayHashMap(Self, V, struct {
         pub fn hash(_: @This(), key: Self) u32 {
-            return std.array_hash_map.getAutoHashFn(Id, void)({}, key.symbol.id);
+            return std.array_hash_map.getAutoHashFn(Symbol.Id, void)({}, key.symbol.id);
         }
 
         pub fn eql(_: @This(), a: Self, b: Self, _: usize) bool {

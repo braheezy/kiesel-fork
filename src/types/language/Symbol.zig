@@ -14,15 +14,13 @@ const String = types.String;
 const Self = @This();
 
 pub const Id = usize;
+pub const private_bitmask = 1 << (@bitSizeOf(Id) - 1);
 
 /// Internal ID used for equality checks
 id: Id,
 
 /// [[Description]]
 description: ?String,
-
-/// Flag to mark this symbol as a private name.
-private: bool = false,
 
 pub fn format(
     self: Self,
@@ -37,6 +35,11 @@ pub fn format(
         try writer.print("\"{}\"", .{description});
     }
     try writer.writeAll(")");
+}
+
+/// Symbols are marked as private names if the ID's MSB is set.
+pub fn isPrivate(self: Self) bool {
+    return (self.id & private_bitmask) != 0;
 }
 
 /// Shortcut for the SameValue AO applied on two symbols (i.e. id equality)

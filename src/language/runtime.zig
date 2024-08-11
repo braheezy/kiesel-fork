@@ -26,6 +26,7 @@ const PropertyKeyOrPrivateName = types.PropertyKeyOrPrivateName;
 const Reference = types.Reference;
 const SafePointer = types.SafePointer;
 const String = types.String;
+const Symbol = types.Symbol;
 const Value = types.Value;
 const arrayCreate = builtins.arrayCreate;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -1796,7 +1797,7 @@ pub fn classDefinitionEvaluation(
                         .{},
                     ),
                 };
-                symbol.private = true;
+                symbol.id |= Symbol.private_bitmask;
 
                 // 1. Let name be a new Private Name whose [[Description]] is dn.
                 const name: PrivateName = .{ .symbol = symbol };

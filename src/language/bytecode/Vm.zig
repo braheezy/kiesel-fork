@@ -1080,7 +1080,7 @@ pub fn executeInstruction(
             const private_name = private_environment.names.get(
                 try private_identifier.toUtf8(self.agent.gc_allocator),
             ).?;
-            std.debug.assert(private_name.symbol.private);
+            std.debug.assert(private_name.symbol.isPrivate());
             self.result = Value.from(private_name.symbol);
         },
         .resolve_this_binding => self.result = try self.agent.resolveThisBinding(),

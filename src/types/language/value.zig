@@ -1291,7 +1291,7 @@ pub const Value = union(enum) {
 
     /// Non-standard helper to turn a symbol value into a private name.
     pub fn toPrivateName(self: Self) ?PrivateName {
-        if (self != .symbol or !self.symbol.private) return null;
+        if (self != .symbol or !self.symbol.isPrivate()) return null;
         return .{ .symbol = self.symbol };
     }
 };

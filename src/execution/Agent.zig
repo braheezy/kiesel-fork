@@ -37,7 +37,7 @@ pre_allocated: struct {
     one: BigInt,
 },
 exception: ?Value = null,
-symbol_id: usize = 0,
+symbol_id: Symbol.Id = 0,
 well_known_symbols: WellKnownSymbols,
 global_symbol_registry: StringHashMap(Symbol),
 host_hooks: HostHooks,
@@ -126,7 +126,8 @@ pub fn checkStackOverflow(self: *Self) error{ExceptionThrown}!void {
 
 pub fn createSymbol(self: *Self, description: ?String) error{Overflow}!Symbol {
     const id = blk: {
-        const next_symbol_id = try std.math.add(usize, self.symbol_id, 1);
+        const next_symbol_id = try std.math.add(Symbol.Id, self.symbol_id, 1);
+        if ((next_symbol_id & Symbol.private_bitmask) != 0) return error.Overflow;
         defer self.symbol_id = next_symbol_id;
         break :blk self.symbol_id;
     };
