@@ -60,7 +60,7 @@ fn getPrototypeOf(object: Object) Agent.Error!?Object {
     );
 
     // 8. If handlerProto is not an Object and handlerProto is not null, throw a TypeError exception.
-    if (handler_prototype != .object and handler_prototype != .null) {
+    if (!handler_prototype.isObject() and !handler_prototype.isNull()) {
         return agent.throwException(
             .type_error,
             "{} is not an Object or null",
@@ -73,7 +73,7 @@ fn getPrototypeOf(object: Object) Agent.Error!?Object {
 
     // 10. If extensibleTarget is true, return handlerProto.
     if (extensible_target) {
-        return if (handler_prototype == .object) handler_prototype.object else null;
+        return if (handler_prototype.isObject()) handler_prototype.asObject() else null;
     }
 
     // 11. Let targetProto be ? target.[[GetPrototypeOf]]().
@@ -82,7 +82,7 @@ fn getPrototypeOf(object: Object) Agent.Error!?Object {
     // 12. If SameValue(handlerProto, targetProto) is false, throw a TypeError exception.
     if (!sameValue(
         handler_prototype,
-        if (target_prototype != null) Value.from(target_prototype.?) else .null,
+        if (target_prototype != null) Value.from(target_prototype.?) else Value.null,
     )) {
         return agent.throwException(
             .type_error,
@@ -92,7 +92,7 @@ fn getPrototypeOf(object: Object) Agent.Error!?Object {
     }
 
     // 13. Return handlerProto.
-    return if (handler_prototype == .object) handler_prototype.object else null;
+    return if (handler_prototype.isObject()) handler_prototype.asObject() else null;
 }
 
 /// 10.5.2 [[SetPrototypeOf]] ( V )
@@ -123,7 +123,7 @@ fn setPrototypeOf(object: Object, prototype: ?Object) Agent.Error!bool {
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, V »)).
     const boolean_trap_result = (try Value.from(trap.?).callAssumeCallable(
         Value.from(handler),
-        &.{ Value.from(target), if (prototype != null) Value.from(prototype.?) else .null },
+        &.{ Value.from(target), if (prototype != null) Value.from(prototype.?) else Value.null },
     )).toBoolean();
 
     // 8. If booleanTrapResult is false, return false.
@@ -140,8 +140,8 @@ fn setPrototypeOf(object: Object, prototype: ?Object) Agent.Error!bool {
 
     // 12. If SameValue(V, targetProto) is false, throw a TypeError exception.
     if (!sameValue(
-        if (prototype != null) Value.from(prototype.?) else .null,
-        if (target_prototype != null) Value.from(target_prototype.?) else .null,
+        if (prototype != null) Value.from(prototype.?) else Value.null,
+        if (target_prototype != null) Value.from(target_prototype.?) else Value.null,
     )) {
         return agent.throwException(
             .type_error,
@@ -283,7 +283,7 @@ fn getOwnProperty(object: Object, property_key: PropertyKey) Agent.Error!?Proper
     );
 
     // 8. If trapResultObj is not an Object and trapResultObj is not undefined, throw a TypeError exception.
-    if (trap_result_obj != .object and trap_result_obj != .undefined) {
+    if (!trap_result_obj.isObject() and !trap_result_obj.isUndefined()) {
         return agent.throwException(
             .type_error,
             "Proxy 'getOwnPropertyDescriptor' trap must return an object or undefined",
@@ -295,7 +295,7 @@ fn getOwnProperty(object: Object, property_key: PropertyKey) Agent.Error!?Proper
     const target_descriptor = try target.internalMethods().getOwnProperty(target, property_key);
 
     // 10. If trapResultObj is undefined, then
-    if (trap_result_obj == .undefined) {
+    if (trap_result_obj.isUndefined()) {
         // a. If targetDesc is undefined, return undefined.
         if (target_descriptor == null) return null;
 
@@ -617,7 +617,7 @@ fn get(object: Object, property_key: PropertyKey, receiver: Value) Agent.Error!V
         // b. If IsAccessorDescriptor(targetDesc) is true and targetDesc.[[Get]] is undefined, then
         if (target_descriptor.?.isAccessorDescriptor() and target_descriptor.?.get.? == null) {
             // i. If trapResult is not undefined, throw a TypeError exception.
-            if (trap_result != .undefined) {
+            if (!trap_result.isUndefined()) {
                 return agent.throwException(
                     .type_error,
                     "Proxy 'get' trap must return undefined for non-configurable accessor property with no getter on target",
@@ -817,9 +817,9 @@ fn ownPropertyKeys(object: Object) Agent.Error!std.ArrayList(PropertyKey) {
     try unique_property_keys.ensureTotalCapacity(@intCast(elements.len));
 
     for (elements) |element| {
-        const property_key = switch (element) {
-            .string => |string| PropertyKey.from(string),
-            .symbol => |symbol| PropertyKey.from(symbol),
+        const property_key = switch (element.type()) {
+            .string => PropertyKey.from(element.asString()),
+            .symbol => PropertyKey.from(element.asSymbol()),
             else => unreachable,
         };
         trap_result.appendAssumeCapacity(property_key);
@@ -997,7 +997,7 @@ fn construct(object: Object, arguments_list: Arguments, new_target: Object) Agen
     );
 
     // 10. If newObj is not an Object, throw a TypeError exception.
-    if (new_obj != .object) {
+    if (!new_obj.isObject()) {
         return agent.throwException(
             .type_error,
             "Proxy 'construct' trap must return an object",
@@ -1006,7 +1006,7 @@ fn construct(object: Object, arguments_list: Arguments, new_target: Object) Agen
     }
 
     // 11. Return newObj.
-    return new_obj.object;
+    return new_obj.asObject();
 }
 
 /// 10.5.14 ValidateNonRevokedProxy ( proxy )
@@ -1029,12 +1029,12 @@ pub fn validateNonRevokedProxy(proxy: *Proxy) error{ExceptionThrown}!void {
 /// https://tc39.es/ecma262/#sec-proxycreate
 fn proxyCreate(agent: *Agent, target: Value, handler: Value) Agent.Error!Object {
     // 1. If target is not an Object, throw a TypeError exception.
-    if (target != .object) {
+    if (!target.isObject()) {
         return agent.throwException(.type_error, "{} is not an Object", .{target});
     }
 
     // 2. If handler is not an Object, throw a TypeError exception.
-    if (handler != .object) {
+    if (!handler.isObject()) {
         return agent.throwException(.type_error, "{} is not an Object", .{handler});
     }
 
@@ -1044,10 +1044,10 @@ fn proxyCreate(agent: *Agent, target: Value, handler: Value) Agent.Error!Object 
 
         .fields = .{
             // 6. Set P.[[ProxyTarget]] to target.
-            .proxy_target = target.object,
+            .proxy_target = target.asObject(),
 
             // 7. Set P.[[ProxyHandler]] to handler.
-            .proxy_handler = handler.object,
+            .proxy_handler = handler.asObject(),
         },
 
         // 4. Set P's essential internal methods, except for [[Call]] and [[Construct]], to the definitions specified in 10.5.
@@ -1139,7 +1139,7 @@ pub const ProxyConstructor = struct {
                 const revocable_proxy = additional_fields.revocable_proxy;
 
                 // c. If p is null, return undefined.
-                if (revocable_proxy == null) return .undefined;
+                if (revocable_proxy == null) return Value.undefined;
 
                 // d. Set F.[[RevocableProxy]] to null.
                 additional_fields.revocable_proxy = null;
@@ -1152,7 +1152,7 @@ pub const ProxyConstructor = struct {
                 revocable_proxy.?.as(Proxy).fields.proxy_handler = null;
 
                 // h. Return undefined.
-                return .undefined;
+                return Value.undefined;
             }
         }.func;
 

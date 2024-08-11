@@ -183,7 +183,7 @@ pub const SymbolConstructor = struct {
 
         const description_string = blk: {
             // 2. If description is undefined, let descString be undefined.
-            if (description == .undefined) break :blk null;
+            if (description.isUndefined()) break :blk null;
 
             // 3. Else, let descString be ? ToString(description).
             break :blk try description.toString(agent);
@@ -236,12 +236,12 @@ pub const SymbolConstructor = struct {
         const symbol = arguments.get(0);
 
         // 1. If sym is not a Symbol, throw a TypeError exception.
-        if (symbol != .symbol) {
+        if (!symbol.isSymbol()) {
             return agent.throwException(.type_error, "{} is not a Symbol", .{symbol});
         }
 
         // 2. Return KeyForSymbol(sym).
-        return Value.from(keyForSymbol(agent, symbol.symbol) orelse return .undefined);
+        return Value.from(keyForSymbol(agent, symbol.asSymbol()) orelse return Value.undefined);
     }
 };
 
@@ -285,21 +285,17 @@ pub const SymbolPrototype = struct {
     /// 20.4.3.4.1 ThisSymbolValue ( value )
     /// https://tc39.es/ecma262/#sec-thissymbolvalue
     fn thisSymbolValue(agent: *Agent, value: Value) error{ExceptionThrown}!types.Symbol {
-        switch (value) {
-            // 1. If value is a Symbol, return value.
-            .symbol => |symbol| return symbol,
+        // 1. If value is a Symbol, return value.
+        if (value.isSymbol()) return value.asSymbol();
 
-            // 2. If value is an Object and value has a [[SymbolData]] internal slot, then
-            .object => |object| if (object.is(Symbol)) {
-                // a. Let s be value.[[SymbolData]].
-                // b. Assert: s is a Symbol.
-                const s = object.as(Symbol).fields.symbol_data;
+        // 2. If value is an Object and value has a [[SymbolData]] internal slot, then
+        if (value.isObject() and value.asObject().is(Symbol)) {
+            // a. Let s be value.[[SymbolData]].
+            // b. Assert: s is a Symbol.
+            const s = value.asObject().as(Symbol).fields.symbol_data;
 
-                // c. Return s.
-                return s;
-            },
-
-            else => {},
+            // c. Return s.
+            return s;
         }
 
         // 3. Throw a TypeError exception.
@@ -318,7 +314,7 @@ pub const SymbolPrototype = struct {
         const symbol = try thisSymbolValue(agent, this_value);
 
         // 3. Return sym.[[Description]].
-        return Value.from(symbol.description orelse return .undefined);
+        return Value.from(symbol.description orelse return Value.undefined);
     }
 
     /// 20.4.3.3 Symbol.prototype.toString ( )

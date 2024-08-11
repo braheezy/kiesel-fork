@@ -190,7 +190,7 @@ pub fn @"%Array.prototype.toString%"(self: *Self) Allocator.Error!Object {
     if (intrinsic.ptr.isNull()) {
         const array_prototype = try @"%Array.prototype%"(self);
         const property_descriptor = array_prototype.propertyStorage().get(PropertyKey.from("toString"));
-        intrinsic.* = property_descriptor.?.value.?.object;
+        intrinsic.* = property_descriptor.?.value.?.asObject();
     }
     return intrinsic.*;
 }
@@ -199,7 +199,7 @@ pub fn @"%Array.prototype.values%"(self: *Self) Allocator.Error!Object {
     if (intrinsic.ptr.isNull()) {
         const array_prototype = try @"%Array.prototype%"(self);
         const property_descriptor = array_prototype.propertyStorage().get(PropertyKey.from("values"));
-        intrinsic.* = property_descriptor.?.value.?.object;
+        intrinsic.* = property_descriptor.?.value.?.asObject();
     }
     return intrinsic.*;
 }
@@ -454,7 +454,7 @@ pub fn @"%Object.prototype.toString%"(self: *Self) Allocator.Error!Object {
     if (intrinsic.ptr.isNull()) {
         const object_prototype = try @"%Object.prototype%"(self);
         const property_descriptor = object_prototype.propertyStorage().get(PropertyKey.from("toString"));
-        intrinsic.* = property_descriptor.?.value.?.object;
+        intrinsic.* = property_descriptor.?.value.?.asObject();
     }
     return intrinsic.*;
 }

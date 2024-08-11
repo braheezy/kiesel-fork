@@ -179,7 +179,7 @@ pub fn ordinaryToPrimitive(self: Self, hint: PreferredType) Agent.Error!Value {
             const result = try method.callAssumeCallableNoArgs(Value.from(self));
 
             // ii. If result is not an Object, return result.
-            if (result != .object) return result;
+            if (!result.isObject()) return result;
         }
     }
 
@@ -479,23 +479,23 @@ pub fn speciesConstructor(self: Self, default_constructor: Self) Agent.Error!Sel
     const constructor = try self.get(PropertyKey.from("constructor"));
 
     // 2. If C is undefined, return defaultConstructor.
-    if (constructor == .undefined) return default_constructor;
+    if (constructor.isUndefined()) return default_constructor;
 
     // 3. If C is not an Object, throw a TypeError exception.
-    if (constructor != .object) {
+    if (!constructor.isObject()) {
         return self.agent().throwException(.type_error, "{} is not an Object", .{constructor});
     }
 
     // 4. Let S be ? Get(C, %Symbol.species%).
-    const species = try constructor.object.get(
+    const species = try constructor.asObject().get(
         PropertyKey.from(self.agent().well_known_symbols.@"%Symbol.species%"),
     );
 
     // 5. If S is either undefined or null, return defaultConstructor.
-    if (species == .undefined or species == .null) return default_constructor;
+    if (species.isUndefined() or species.isNull()) return default_constructor;
 
     // 6. If IsConstructor(S) is true, return S.
-    if (species.isConstructor()) return species.object;
+    if (species.isConstructor()) return species.asObject();
 
     // 7. Throw a TypeError exception.
     return self.agent().throwException(
@@ -613,7 +613,7 @@ pub fn copyDataProperties(
     excluded_items: []const PropertyKey,
 ) Agent.Error!void {
     // 1. If source is either undefined or null, return unused.
-    if (source == .undefined or source == .null) return;
+    if (source.isUndefined() or source.isNull()) return;
 
     // 2. Let from be ! ToObject(source).
     const from = source.toObject(self.agent()) catch |err| try noexcept(err);
@@ -824,7 +824,7 @@ pub fn defineField(self: *Self, field: ClassFieldDefinition) Agent.Error!void {
     // 4. Else,
     else blk: {
         // a. Let initValue be undefined.
-        break :blk .undefined;
+        break :blk Value.undefined;
     };
 
     switch (field.name) {

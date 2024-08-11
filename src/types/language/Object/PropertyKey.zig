@@ -8,7 +8,7 @@ const utils = @import("../../../utils.zig");
 const Agent = execution.Agent;
 const String = @import("../string.zig").String;
 const Symbol = @import("../Symbol.zig");
-const Value = @import("../value.zig").Value;
+const Value = @import("../Value.zig");
 const isZigString = utils.isZigString;
 
 /// A property key is either a String or a Symbol. All Strings and Symbols, including the empty

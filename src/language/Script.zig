@@ -120,7 +120,7 @@ pub fn evaluate(self: *Self) Agent.Error!Value {
         // b. If result is a normal completion and result.[[Value]] is empty, then
         if (generateAndRunBytecode(agent, script, .{})) |completion|
             // i. Set result to NormalCompletion(undefined).
-            break :blk completion.value orelse .undefined
+            break :blk completion.value orelse Value.undefined
         else |err|
             break :blk err;
     } else |err| err;

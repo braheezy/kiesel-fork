@@ -62,7 +62,7 @@ pub const BigIntConstructor = struct {
         const primitive = try value.toPrimitive(agent, .number);
 
         // 3. If prim is a Number, return ? NumberToBigInt(prim).
-        if (primitive == .number) return Value.from(try numberToBigInt(agent, primitive.number));
+        if (primitive.isNumber()) return Value.from(try numberToBigInt(agent, primitive.asNumber()));
 
         // 4. Otherwise, return ? ToBigInt(prim).
         return Value.from(try primitive.toBigInt(agent));
@@ -167,18 +167,14 @@ pub const BigIntPrototype = struct {
     /// 21.2.3.4.1 ThisBigIntValue ( value )
     /// https://tc39.es/ecma262/#sec-thisbigintvalue
     fn thisBigIntValue(agent: *Agent, value: Value) error{ExceptionThrown}!types.BigInt {
-        switch (value) {
-            // 1. If value is a BigInt, return value.
-            .big_int => |big_int| return big_int,
+        // 1. If value is a BigInt, return value.
+        if (value.isBigInt()) return value.asBigInt();
 
-            // 2. If value is an Object and value has a [[BigIntData]] internal slot, then
-            .object => |object| if (object.is(BigInt)) {
-                // a. Assert: value.[[BigIntData]] is a BigInt.
-                // b. Return value.[[BigIntData]].
-                return object.as(BigInt).fields.big_int_data;
-            },
-
-            else => {},
+        // 2. If value is an Object and value has a [[BigIntData]] internal slot, then
+        if (value.isObject() and value.asObject().is(BigInt)) {
+            // a. Assert: value.[[BigIntData]] is a BigInt.
+            // b. Return value.[[BigIntData]].
+            return value.asObject().as(BigInt).fields.big_int_data;
         }
 
         // 3. Throw a TypeError exception.
@@ -206,7 +202,7 @@ pub const BigIntPrototype = struct {
 
         // 2. If radix is undefined, let radixMV be 10.
         // 3. Else, let radixMV be ? ToIntegerOrInfinity(radix).
-        const radix_mv = if (radix == .undefined) 10 else try radix.toIntegerOrInfinity(agent);
+        const radix_mv = if (radix.isUndefined()) 10 else try radix.toIntegerOrInfinity(agent);
 
         // 4. If radixMV is not in the inclusive interval from 2 to 36, throw a RangeError exception.
         if (radix_mv < 2 or radix_mv > 36) {

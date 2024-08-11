@@ -59,7 +59,7 @@ pub const Iterator = struct {
         };
 
         // 5. If result is not an Object, then
-        if (result != .object) {
+        if (!result.isObject()) {
             // a. Set iteratorRecord.[[Done]] to true.
             self.done = true;
 
@@ -68,7 +68,7 @@ pub const Iterator = struct {
         }
 
         // 6. Return result.
-        return result.object;
+        return result.asObject();
     }
 
     /// 7.4.5 IteratorComplete ( iterResult )
@@ -177,7 +177,7 @@ pub const Iterator = struct {
         const inner_result_value = inner_result catch |err| return err;
 
         // 7. If innerResult.[[Value]] is not an Object, throw a TypeError exception.
-        if (inner_result_value != .object) {
+        if (!inner_result_value.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{inner_result_value});
         }
 
@@ -214,7 +214,7 @@ pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: Object) Agent
     const iterator = try Value.from(method).callNoArgs(agent, object);
 
     // 2. If iterator is not an Object, throw a TypeError exception.
-    if (iterator != .object) {
+    if (!iterator.isObject()) {
         return agent.throwException(.type_error, "{} is not an Object", .{iterator});
     }
 
@@ -225,7 +225,7 @@ pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: Object) Agent
     //      [[Iterator]]: iterator, [[NextMethod]]: nextMethod, [[Done]]: false
     //    }.
     const iterator_record: Iterator = .{
-        .iterator = iterator.object,
+        .iterator = iterator.asObject(),
         .next_method = next_method,
         .done = false,
     };

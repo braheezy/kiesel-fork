@@ -160,7 +160,7 @@ pub fn arrayBufferCopyAndDetach(
         0;
 
     // 3. If newLength is undefined, then
-    const new_byte_length = if (new_length == .undefined) blk: {
+    const new_byte_length = if (new_length.isUndefined()) blk: {
         // a. Let newByteLength be arrayBuffer.[[ArrayBufferByteLength]].
         break :blk array_buffer_byte_length;
     }
@@ -190,7 +190,7 @@ pub fn arrayBufferCopyAndDetach(
     };
 
     // 8. If arrayBuffer.[[ArrayBufferDetachKey]] is not undefined, throw a TypeError exception.
-    if (array_buffer.fields.array_buffer_detach_key != .undefined) {
+    if (!array_buffer.fields.array_buffer_detach_key.isUndefined()) {
         return agent.throwException(.type_error, "ArrayBuffer detach key does not match", .{});
     }
 
@@ -251,7 +251,7 @@ pub fn detachArrayBuffer(
     // 1. Assert: IsSharedArrayBuffer(arrayBuffer) is false.
 
     // 2. If key is not present, set key to undefined.
-    const key = maybe_key orelse .undefined;
+    const key = maybe_key orelse Value.undefined;
 
     // 3. If arrayBuffer.[[ArrayBufferDetachKey]] is not key, throw a TypeError exception.
     if (!sameValue(array_buffer.fields.array_buffer_detach_key, key)) {
@@ -306,13 +306,13 @@ pub fn cloneArrayBuffer(
 /// https://tc39.es/ecma262/#sec-getarraybuffermaxbytelengthoption
 pub fn getArrayBufferMaxByteLengthOption(agent: *Agent, options: Value) Agent.Error!?u53 {
     // 1. If options is not an Object, return empty.
-    if (options != .object) return null;
+    if (!options.isObject()) return null;
 
     // 2. Let maxByteLength be ? Get(options, "maxByteLength").
-    const max_byte_length = try options.object.get(PropertyKey.from("maxByteLength"));
+    const max_byte_length = try options.asObject().get(PropertyKey.from("maxByteLength"));
 
     // 3. If maxByteLength is undefined, return empty.
-    if (max_byte_length == .undefined) return null;
+    if (max_byte_length.isUndefined()) return null;
 
     // 4. Return ? ToIndex(maxByteLength).
     return try max_byte_length.toIndex(agent);
@@ -439,10 +439,10 @@ pub fn numericToRawBytes(
         //    implementation must always choose the same encoding for each implementation
         //    distinguishable NaN value.
         break :blk std.mem.toBytes(
-            if (value.number.isNan())
+            if (value.asNumber().isNan())
                 std.math.nan(f16)
             else
-                value.number.toFloat16(),
+                value.asNumber().toFloat16(),
         );
     }
     // 2. If type is float32, then
@@ -454,10 +454,10 @@ pub fn numericToRawBytes(
         //    implementation must always choose the same encoding for each implementation
         //    distinguishable NaN value.
         break :blk std.mem.toBytes(
-            if (value.number.isNan())
+            if (value.asNumber().isNan())
                 std.math.nan(f32)
             else
-                @as(f32, @floatCast(value.number.asFloat())),
+                @as(f32, @floatCast(value.asNumber().asFloat())),
         );
     }
     // 3. Else if type is float64, then
@@ -468,10 +468,10 @@ pub fn numericToRawBytes(
         //    format Not-a-Number encoding. An implementation must always choose the same encoding
         //    for each implementation distinguishable NaN value.
         break :blk std.mem.toBytes(
-            if (value.number.isNan())
+            if (value.asNumber().isNan())
                 std.math.nan(f64)
             else
-                value.number.asFloat(),
+                value.asNumber().asFloat(),
         );
     }
     // 4. Else,
@@ -522,7 +522,7 @@ pub fn setValueInBuffer(
 
     // 3. Assert: value is a BigInt if IsBigIntElementType(type) is true; otherwise, value is a
     //    Number.
-    std.debug.assert(value == if (@"type".isBigIntElementType()) .big_int else .number);
+    std.debug.assert(if (@"type".isBigIntElementType()) value.isBigInt() else value.isNumber());
 
     // 4. Let block be arrayBuffer.[[ArrayBufferData]].
     const block = array_buffer.arrayBufferData().?;
@@ -571,7 +571,7 @@ pub fn getModifySetValueInBuffer(
 
     // 3. Assert: value is a BigInt if IsBigIntElementType(type) is true; otherwise, value is a
     //    Number.
-    std.debug.assert(value == if (@"type".isBigIntElementType()) .big_int else .number);
+    std.debug.assert(if (@"type".isBigIntElementType()) value.isBigInt() else value.isNumber());
 
     // 4. Let block be arrayBuffer.[[ArrayBufferData]].
     const block = array_buffer.arrayBufferData().?;
@@ -679,11 +679,11 @@ pub const ArrayBufferConstructor = struct {
         const arg = arguments.get(0);
 
         // 1. If arg is not an Object, return false.
-        if (arg != .object) return Value.from(false);
+        if (!arg.isObject()) return Value.from(false);
 
         // 2. If arg has a [[ViewedArrayBuffer]] internal slot, return true.
         // 3. Return false.
-        return Value.from(arg.object.is(builtins.DataView) or arg.object.is(builtins.TypedArray));
+        return Value.from(arg.asObject().is(builtins.DataView) or arg.asObject().is(builtins.TypedArray));
     }
 
     /// 25.1.5.3 get ArrayBuffer [ %Symbol.species% ]
@@ -829,7 +829,7 @@ pub const ArrayBufferPrototype = struct {
         const host_handled = try agent.host_hooks.hostResizeArrayBuffer(object, new_byte_length);
 
         // 8. If hostHandled is handled, return undefined.
-        if (host_handled == .handled) return .undefined;
+        if (host_handled == .handled) return Value.undefined;
 
         // 9. Let oldBlock be O.[[ArrayBufferData]].
         // 10. Let newBlock be ? CreateByteDataBlock(newByteLength).
@@ -854,7 +854,7 @@ pub const ArrayBufferPrototype = struct {
         }
 
         // 16. Return undefined.
-        return .undefined;
+        return Value.undefined;
     }
 
     /// 25.1.6.7 ArrayBuffer.prototype.slice ( start, end )
@@ -897,7 +897,7 @@ pub const ArrayBufferPrototype = struct {
 
         // 10. If end is undefined, let relativeEnd be len; else let relativeEnd be
         //     ? ToIntegerOrInfinity(end).
-        const relative_end = if (end == .undefined)
+        const relative_end = if (end.isUndefined())
             len_f64
         else
             try end.toIntegerOrInfinity(agent);
@@ -1009,7 +1009,7 @@ pub const ArrayBuffer = MakeObject(.{
         array_buffer_data: ?DataBlock,
 
         /// [[ArrayBufferDetachKey]]
-        array_buffer_detach_key: Value = .undefined,
+        array_buffer_detach_key: Value = Value.undefined,
 
         /// [[ArrayBufferMaxByteLength]]
         array_buffer_max_byte_length: ?u53 = null,

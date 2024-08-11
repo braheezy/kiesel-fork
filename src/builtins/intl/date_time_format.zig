@@ -207,7 +207,7 @@ pub fn createDateTimeFormat(
     const time_zone_value = try options.get(PropertyKey.from("timeZone"));
 
     // 27. If timeZone is undefined, then
-    var time_zone_string = if (time_zone_value == .undefined) blk: {
+    var time_zone_string = if (time_zone_value.isUndefined()) blk: {
         // a. Set timeZone to SystemTimeZoneIdentifier().
         break :blk systemTimeZoneIdentifier();
     }
@@ -585,7 +585,7 @@ pub const DateTimeFormatPrototype = struct {
                     const date_time_format_ = captures_.date_time_format;
 
                     // 3. If date is not provided or is undefined, then
-                    const x = if (date == .undefined) blk: {
+                    const x = if (date.isUndefined()) blk: {
                         // a. Let x be ! Call(%Date.now%, undefined).
                         break :blk @as(f64, @floatFromInt(agent_.platform.currentTime()));
                     }

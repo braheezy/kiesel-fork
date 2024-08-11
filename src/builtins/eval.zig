@@ -32,7 +32,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     if (!direct) std.debug.assert(!strict_caller);
 
     // 2. If x is not a String, return x.
-    if (x != .string) return x;
+    if (!x.isString()) return x;
 
     // 3. Let evalRealm be the current Realm Record.
     // 4. NOTE: In the case of a direct eval, evalRealm is the realm of both the caller of eval and
@@ -40,7 +40,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     const eval_realm = agent.currentRealm();
 
     // 5. Perform ? HostEnsureCanCompileStrings(evalRealm, « », x, direct).
-    try agent.host_hooks.hostEnsureCanCompileStrings(eval_realm, &.{}, x.string, direct);
+    try agent.host_hooks.hostEnsureCanCompileStrings(eval_realm, &.{}, x.asString(), direct);
 
     // TODO: 6-10.
 
@@ -51,7 +51,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     defer diagnostics.deinit();
 
     // a. Let script be ParseText(x, Script).
-    const script = Parser.parse(ast.Script, agent.gc_allocator, try x.string.toUtf8(agent.gc_allocator), .{
+    const script = Parser.parse(ast.Script, agent.gc_allocator, try x.asString().toUtf8(agent.gc_allocator), .{
         .diagnostics = &diagnostics,
         .file_name = "eval",
     }) catch |err| switch (err) {
@@ -68,7 +68,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     };
 
     // c. If script Contains ScriptBody is false, return undefined.
-    if (script.statement_list.items.len == 0) return .undefined;
+    if (script.statement_list.items.len == 0) return Value.undefined;
 
     // d. Let body be the ScriptBody of script.
     const body = script;
@@ -172,7 +172,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
             .contained_in_strict_mode_code = strict_eval,
         })) |completion|
             // a. Set result to NormalCompletion(undefined).
-            break :blk completion.value orelse .undefined
+            break :blk completion.value orelse Value.undefined
         else |err|
             break :blk err;
     } else |err| err;
@@ -480,7 +480,7 @@ fn evalDeclarationInstantiation(
                 var_env.createMutableBinding(agent, var_name, true) catch |err| try noexcept(err);
 
                 // 3. Perform ! varEnv.InitializeBinding(vn, undefined).
-                var_env.initializeBinding(agent, var_name, .undefined) catch |err| try noexcept(err);
+                var_env.initializeBinding(agent, var_name, Value.undefined) catch |err| try noexcept(err);
             }
         }
     }

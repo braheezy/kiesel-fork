@@ -200,7 +200,7 @@ fn doWait(
     // 4. Let i be ? ValidateAtomicAccess(taRecord, index).
     const i = try validateAtomicAccess(agent, ta, index);
 
-    const typed_array = typed_array_value.object.as(builtins.TypedArray);
+    const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
     // 5. Let arrayTypeName be typedArray.[[TypedArrayName]].
     const array_type_name = typed_array.fields.typed_array_name;
@@ -369,7 +369,7 @@ fn atomicReadModifyWrite(
         index,
         null,
     );
-    const typed_array = typed_array_value.object.as(builtins.TypedArray);
+    const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
     // 2. If typedArray.[[ContentType]] is bigint, let v be ? ToBigInt(value).
     // 3. Otherwise, let v be 𝔽(? ToIntegerOrInfinity(value)).
@@ -494,7 +494,7 @@ pub const Atomics = struct {
             index,
             null,
         );
-        const typed_array = typed_array_value.object.as(builtins.TypedArray);
+        const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
         // 2. Let buffer be typedArray.[[ViewedArrayBuffer]].
         const buffer = typed_array.fields.viewed_array_buffer;
@@ -645,7 +645,7 @@ pub const Atomics = struct {
             index,
             null,
         );
-        const typed_array = typed_array_value.object.as(builtins.TypedArray);
+        const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
         // 2. Perform ? RevalidateAtomicAccess(typedArray, byteIndexInBuffer).
         try revalidateAtomicAccess(agent, typed_array, byte_index_in_buffer);
@@ -690,10 +690,10 @@ pub const Atomics = struct {
             index,
             true,
         );
-        const typed_array = typed_array_value.object.as(builtins.TypedArray);
+        const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
         // 2. If count is undefined, then
-        const count = if (count_value == .undefined) blk: {
+        const count = if (count_value.isUndefined()) blk: {
             // a. Let c be +∞.
             break :blk std.math.inf(f64);
         }
@@ -747,9 +747,9 @@ pub const Atomics = struct {
     fn pause(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const iteration_number = arguments.get(0);
         // 1. If iterationNumber is not undefined, then
-        if (iteration_number != .undefined) {
+        if (!iteration_number.isUndefined()) {
             // a. If iterationNumber is not an integral Number, throw a TypeError exception.
-            if (iteration_number != .number or !iteration_number.number.isIntegral()) {
+            if (!iteration_number.isNumber() or !iteration_number.asNumber().isIntegral()) {
                 return agent.throwException(
                     .type_error,
                     "{} is not an integral number",
@@ -758,7 +758,7 @@ pub const Atomics = struct {
             }
 
             // b. If ℝ(iterationNumber) < 0, throw a RangeError exception.
-            if (iteration_number.number.asFloat() < 0) {
+            if (iteration_number.asNumber().asFloat() < 0) {
                 return agent.throwException(
                     .range_error,
                     "{} is not a positive number",
@@ -772,9 +772,9 @@ pub const Atomics = struct {
         // implementation may send that signal multiple times, determined by iterationNumber when
         // not undefined. The number of times the signal is sent for an integral Number N is at
         // most the number of times it is sent for N + 1.
-        const iterations = if (iteration_number != .undefined)
+        const iterations = if (!iteration_number.isUndefined())
             // Use u16 here to avoid freezing for large numbers (like MAX_SAFE_INTEGER).
-            std.math.lossyCast(u16, iteration_number.number.asFloat())
+            std.math.lossyCast(u16, iteration_number.asNumber().asFloat())
         else
             1;
         for (0..iterations) |_| {
@@ -782,7 +782,7 @@ pub const Atomics = struct {
         }
 
         // 3. Return undefined.
-        return .undefined;
+        return Value.undefined;
     }
 
     /// 25.4.11 Atomics.store ( typedArray, index, value )
@@ -799,7 +799,7 @@ pub const Atomics = struct {
             index,
             null,
         );
-        const typed_array = typed_array_value.object.as(builtins.TypedArray);
+        const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
         // 2. If typedArray.[[ContentType]] is bigint, let v be ? ToBigInt(value).
         // 3. Otherwise, let v be 𝔽(? ToIntegerOrInfinity(value)).

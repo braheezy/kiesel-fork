@@ -1,5 +1,4 @@
 const string = @import("language/string.zig");
-const value = @import("language/value.zig");
 
 pub const BigInt = @import("language/BigInt.zig");
 pub const MakeObject = @import("language/Object/make_object.zig").MakeObject;
@@ -9,17 +8,17 @@ pub const String = string.String;
 pub const StringArrayHashMap = string.StringArrayHashMap;
 pub const StringHashMap = string.StringHashMap;
 pub const Symbol = @import("language/Symbol.zig");
-pub const Value = value.Value;
-pub const ValueArrayHashMap = value.ValueArrayHashMap;
-pub const coerceOptionsToObject = value.coerceOptionsToObject;
-pub const createArrayFromList = value.createArrayFromList;
-pub const createArrayFromListMapToValue = value.createArrayFromListMapToValue;
-pub const getOption = value.getOption;
-pub const isLessThan = value.isLessThan;
-pub const isLooselyEqual = value.isLooselyEqual;
-pub const isStrictlyEqual = value.isStrictlyEqual;
-pub const sameValue = value.sameValue;
-pub const sameValueZero = value.sameValueZero;
+pub const Value = @import("language/Value.zig");
+pub const ValueArrayHashMap = Value.ValueArrayHashMap;
+pub const coerceOptionsToObject = Value.coerceOptionsToObject;
+pub const createArrayFromList = Value.createArrayFromList;
+pub const createArrayFromListMapToValue = Value.createArrayFromListMapToValue;
+pub const getOption = Value.getOption;
+pub const isLessThan = Value.isLessThan;
+pub const isLooselyEqual = Value.isLooselyEqual;
+pub const isStrictlyEqual = Value.isStrictlyEqual;
+pub const sameValue = Value.sameValue;
+pub const sameValueZero = Value.sameValueZero;
 
 test {
     _ = BigInt;

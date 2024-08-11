@@ -47,9 +47,9 @@ pub fn hasBinding(self: Self, name: String) Agent.Error!bool {
     );
 
     // 6. If unscopables is an Object, then
-    if (unscopables == .object) {
+    if (unscopables.isObject()) {
         // a. Let blocked be ToBoolean(? Get(unscopables, N)).
-        const blocked = (try unscopables.object.get(property_key)).toBoolean();
+        const blocked = (try unscopables.asObject().get(property_key)).toBoolean();
 
         // b. If blocked is true, return false.
         if (blocked) return false;
@@ -74,7 +74,7 @@ pub fn createMutableBinding(
     //      [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: D
     //    }).
     try self.binding_object.definePropertyOrThrow(property_key, .{
-        .value = .undefined,
+        .value = Value.undefined,
         .writable = true,
         .enumerable = true,
         .configurable = deletable,
@@ -148,7 +148,7 @@ pub fn getBindingValue(
     // 3. If value is false, then
     if (!value) {
         // a. If S is false, return undefined; otherwise throw a ReferenceError exception.
-        if (!strict) return .undefined;
+        if (!strict) return Value.undefined;
         return agent.throwException(.reference_error, "'{}' is not defined", .{name});
     }
 

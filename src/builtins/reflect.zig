@@ -99,7 +99,7 @@ pub const Reflect = struct {
         const args = try arguments_list.createListFromArrayLike(agent, .{});
 
         // 5. Return ? Construct(target, args, newTarget).
-        return Value.from(try target.object.construct(args, new_target.object));
+        return Value.from(try target.asObject().construct(args, new_target.asObject()));
     }
 
     /// 28.1.3 Reflect.defineProperty ( target, propertyKey, attributes )
@@ -110,7 +110,7 @@ pub const Reflect = struct {
         const attributes = arguments.get(2);
 
         // 1. If target is not an Object, throw a TypeError exception.
-        if (target != .object) {
+        if (!target.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{target});
         }
 
@@ -122,7 +122,7 @@ pub const Reflect = struct {
 
         // 4. Return ? target.[[DefineOwnProperty]](key, desc).
         return Value.from(
-            try target.object.internalMethods().defineOwnProperty(target.object, key, descriptor),
+            try target.asObject().internalMethods().defineOwnProperty(target.asObject(), key, descriptor),
         );
     }
 
@@ -133,7 +133,7 @@ pub const Reflect = struct {
         const property_key = arguments.get(1);
 
         // 1. If target is not an Object, throw a TypeError exception.
-        if (target != .object) {
+        if (!target.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{target});
         }
 
@@ -141,7 +141,7 @@ pub const Reflect = struct {
         const key = try property_key.toPropertyKey(agent);
 
         // 3. Return ? target.[[Delete]](key).
-        return Value.from(try target.object.internalMethods().delete(target.object, key));
+        return Value.from(try target.asObject().internalMethods().delete(target.asObject(), key));
     }
 
     /// 28.1.5 Reflect.get ( target, propertyKey [ , receiver ] )
@@ -151,7 +151,7 @@ pub const Reflect = struct {
         const property_key = arguments.get(1);
 
         // 1. If target is not an Object, throw a TypeError exception.
-        if (target != .object) {
+        if (!target.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{target});
         }
 
@@ -163,7 +163,7 @@ pub const Reflect = struct {
         const receiver = arguments.getOrNull(2) orelse target;
 
         // 4. Return ? target.[[Get]](key, receiver).
-        return try target.object.internalMethods().get(target.object, key, receiver);
+        return try target.asObject().internalMethods().get(target.asObject(), key, receiver);
     }
 
     /// 28.1.6 Reflect.getOwnPropertyDescriptor ( target, propertyKey )
@@ -173,7 +173,7 @@ pub const Reflect = struct {
         const property_key = arguments.get(1);
 
         // 1. If target is not an Object, throw a TypeError exception.
-        if (target != .object) {
+        if (!target.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{target});
         }
 
@@ -181,13 +181,13 @@ pub const Reflect = struct {
         const key = try property_key.toPropertyKey(agent);
 
         // 3. Let desc be ? target.[[GetOwnProperty]](key).
-        const maybe_descriptor = try target.object.internalMethods().getOwnProperty(target.object, key);
+        const maybe_descriptor = try target.asObject().internalMethods().getOwnProperty(target.asObject(), key);
 
         // 4. Return FromPropertyDescriptor(desc).
         if (maybe_descriptor) |descriptor|
             return Value.from(try descriptor.fromPropertyDescriptor(agent))
         else
-            return .undefined;
+            return Value.undefined;
     }
 
     /// 28.1.7 Reflect.getPrototypeOf ( target )
@@ -196,13 +196,13 @@ pub const Reflect = struct {
         const target = arguments.get(0);
 
         // 1. If target is not an Object, throw a TypeError exception.
-        if (target != .object) {
+        if (!target.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{target});
         }
 
         // 2. Return ? target.[[GetPrototypeOf]]().
         return Value.from(
-            try target.object.internalMethods().getPrototypeOf(target.object) orelse return .null,
+            try target.asObject().internalMethods().getPrototypeOf(target.asObject()) orelse return Value.null,
         );
     }
 
@@ -213,7 +213,7 @@ pub const Reflect = struct {
         const property_key = arguments.get(1);
 
         // 1. If target is not an Object, throw a TypeError exception.
-        if (target != .object) {
+        if (!target.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{target});
         }
 
@@ -221,7 +221,7 @@ pub const Reflect = struct {
         const key = try property_key.toPropertyKey(agent);
 
         // 3. Return ? target.[[HasProperty]](key).
-        return Value.from(try target.object.internalMethods().hasProperty(target.object, key));
+        return Value.from(try target.asObject().internalMethods().hasProperty(target.asObject(), key));
     }
 
     /// 28.1.9 Reflect.isExtensible ( target )
@@ -230,12 +230,12 @@ pub const Reflect = struct {
         const target = arguments.get(0);
 
         // 1. If target is not an Object, throw a TypeError exception.
-        if (target != .object) {
+        if (!target.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{target});
         }
 
         // 2. Return ? target.[[IsExtensible]]().
-        return Value.from(try target.object.internalMethods().isExtensible(target.object));
+        return Value.from(try target.asObject().internalMethods().isExtensible(target.asObject()));
     }
 
     /// 28.1.10 Reflect.ownKeys ( target )
@@ -244,12 +244,12 @@ pub const Reflect = struct {
         const target = arguments.get(0);
 
         // 1. If target is not an Object, throw a TypeError exception.
-        if (target != .object) {
+        if (!target.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{target});
         }
 
         // 2. Let keys be ? target.[[OwnPropertyKeys]]().
-        const keys = try target.object.internalMethods().ownPropertyKeys(target.object);
+        const keys = try target.asObject().internalMethods().ownPropertyKeys(target.asObject());
         defer keys.deinit();
 
         // 3. Return CreateArrayFromList(keys).
@@ -268,12 +268,12 @@ pub const Reflect = struct {
         const target = arguments.get(0);
 
         // 1. If target is not an Object, throw a TypeError exception.
-        if (target != .object) {
+        if (!target.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{target});
         }
 
         // 2. Return ? target.[[PreventExtensions]]().
-        return Value.from(try target.object.internalMethods().preventExtensions(target.object));
+        return Value.from(try target.asObject().internalMethods().preventExtensions(target.asObject()));
     }
 
     /// 28.1.12 Reflect.set ( target, propertyKey, V [ , receiver ] )
@@ -284,7 +284,7 @@ pub const Reflect = struct {
         const value = arguments.get(2);
 
         // 1. If target is not an Object, throw a TypeError exception.
-        if (target != .object) {
+        if (!target.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{target});
         }
 
@@ -297,7 +297,7 @@ pub const Reflect = struct {
 
         // 4. Return ? target.[[Set]](key, V, receiver).
         return Value.from(
-            try target.object.internalMethods().set(target.object, key, value, receiver),
+            try target.asObject().internalMethods().set(target.asObject(), key, value, receiver),
         );
     }
 
@@ -308,20 +308,20 @@ pub const Reflect = struct {
         const prototype = arguments.get(1);
 
         // 1. If target is not an Object, throw a TypeError exception.
-        if (target != .object) {
+        if (!target.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{target});
         }
 
         // 2. If proto is not an Object and proto is not null, throw a TypeError exception.
-        if (prototype != .object and prototype != .null) {
+        if (!prototype.isObject() and !prototype.isNull()) {
             return agent.throwException(.type_error, "{} is not an Object or null", .{prototype});
         }
 
         // 3. Return ? target.[[SetPrototypeOf]](proto).
         return Value.from(
-            try target.object.internalMethods().setPrototypeOf(
-                target.object,
-                if (prototype == .object) prototype.object else null,
+            try target.asObject().internalMethods().setPrototypeOf(
+                target.asObject(),
+                if (prototype.isObject()) prototype.asObject() else null,
             ),
         );
     }

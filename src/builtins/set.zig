@@ -52,13 +52,13 @@ const SetRecord = struct {
 /// https://tc39.es/ecma262/#sec-getsetrecord
 fn getSetRecord(agent: *Agent, object_value: Value) Agent.Error!SetRecord {
     // 1. If obj is not an Object, throw a TypeError exception.
-    const object = if (object_value != .object) {
+    const object = if (!object_value.isObject()) {
         return agent.throwException(
             .type_error,
             "{} is not an Object",
             .{object_value},
         );
-    } else object_value.object;
+    } else object_value.asObject();
 
     // 2. Let rawSize be ? Get(obj, "size").
     const raw_size = try object.get(PropertyKey.from("size"));
@@ -117,8 +117,8 @@ fn getSetRecord(agent: *Agent, object_value: Value) Agent.Error!SetRecord {
     return .{
         .set = object,
         .size = @intFromFloat(int_size),
-        .has = has.object,
-        .keys = keys.object,
+        .has = has.asObject(),
+        .keys = keys.asObject(),
     };
 }
 
@@ -203,7 +203,7 @@ pub const SetConstructor = struct {
         );
 
         // 4. If iterable is either undefined or null, return set.
-        if (iterable == .undefined or iterable == .null) return Value.from(set);
+        if (iterable.isUndefined() or iterable.isNull()) return Value.from(set);
 
         // 5. Let adder be ? Get(set, "add").
         const adder = try set.get(PropertyKey.from("add"));
@@ -335,7 +335,7 @@ pub const SetPrototype = struct {
         }
 
         // 4. Return undefined.
-        return .undefined;
+        return Value.undefined;
     }
 
     /// 24.2.4.4 Set.prototype.delete ( value )
@@ -515,7 +515,7 @@ pub const SetPrototype = struct {
         }
 
         // 8. Return undefined.
-        return .undefined;
+        return Value.undefined;
     }
 
     /// 24.2.4.8 Set.prototype.has ( value )

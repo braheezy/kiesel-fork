@@ -89,7 +89,7 @@ pub fn construct(
     const function = object.as(BuiltinFunction);
 
     // 1. Return ? BuiltinCallOrConstruct(F, uninitialized, argumentsList, newTarget).
-    return (try builtinCallOrConstruct(agent, function, null, arguments_list, new_target)).object;
+    return (try builtinCallOrConstruct(agent, function, null, arguments_list, new_target)).asObject();
 }
 
 /// 10.3.3 BuiltinCallOrConstruct ( F, thisArgument, argumentsList, newTarget )

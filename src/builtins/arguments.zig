@@ -476,7 +476,7 @@ fn makeArgSetter(agent: *Agent, name: String, env: Environment) Allocator.Error!
 
             // a. Return ! env.SetMutableBinding(name, value, false).
             env_.setMutableBinding(agent_, name_, value, false) catch |err| try noexcept(err);
-            return .undefined;
+            return Value.undefined;
         }
     }.func;
 

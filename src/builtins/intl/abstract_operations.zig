@@ -126,7 +126,7 @@ pub fn availableCanonicalNumberingSystems() []const []const u8 {
 /// https://tc39.es/ecma402/#sec-canonicalizelocalelist
 pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleList {
     // 1. If locales is undefined, then
-    if (locales == .undefined) {
+    if (locales.isUndefined()) {
         // a. Return a new empty List.
         return LocaleList.init(agent.gc_allocator);
     }
@@ -136,8 +136,8 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
 
     // 3. If Type(locales) is String or Type(locales) is Object and locales has an
     //    [[InitializedLocale]] internal slot, then
-    const object = if (locales == .string or
-        locales == .object and locales.object.is(builtins.Intl.Locale))
+    const object = if (locales.isString() or
+        (locales.isObject() and locales.asObject().is(builtins.Intl.Locale)))
     blk: {
         // a. Let O be CreateArrayFromList(« locales »).
         break :blk try createArrayFromList(agent, &.{locales});
@@ -168,7 +168,7 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
             const k_value = try object.get(property_key);
 
             // ii. If Type(kValue) is not String or Object, throw a TypeError exception.
-            if (k_value != .string and k_value != .object) {
+            if (!k_value.isString() and !k_value.isObject()) {
                 return agent.throwException(
                     .type_error,
                     "Locale list items must be strings or objects",
@@ -177,10 +177,10 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
             }
 
             // iii. If Type(kValue) is Object and kValue has an [[InitializedLocale]] internal slot, then
-            const tag = if (k_value == .object and k_value.object.is(builtins.Intl.Locale)) blk: {
+            const tag = if (k_value.isObject() and k_value.asObject().is(builtins.Intl.Locale)) blk: {
                 // 1. Let tag be kValue.[[Locale]].
                 break :blk String.fromAscii(
-                    try k_value.object.as(builtins.Intl.Locale).fields.locale.toString(agent.gc_allocator),
+                    try k_value.asObject().as(builtins.Intl.Locale).fields.locale.toString(agent.gc_allocator),
                 );
             }
             // iv. Else,
@@ -226,15 +226,15 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
 /// https://tc39.es/ecma402/#sec-getoptionsobject
 pub fn getOptionsObject(agent: *Agent, options: Value) Agent.Error!Object {
     // 1. If options is undefined, then
-    if (options == .undefined) {
+    if (options.isUndefined()) {
         // a. Return OrdinaryObjectCreate(null).
         return ordinaryObjectCreate(agent, null);
     }
 
     // 2. If options is an Object, then
-    if (options == .object) {
+    if (options.isObject()) {
         // a. Return options.
-        return options.object;
+        return options.asObject();
     }
 
     // 3. Throw a TypeError exception.
@@ -249,7 +249,7 @@ pub fn getOptionsObject(agent: *Agent, options: Value) Agent.Error!Object {
 /// https://tc39.es/ecma402/#sec-coerceoptionstoobject
 pub fn coerceOptionsToObject(agent: *Agent, options: Value) Agent.Error!Object {
     // 1. If options is undefined, then
-    if (options == .undefined) {
+    if (options.isUndefined()) {
         // a. Return OrdinaryObjectCreate(null).
         return ordinaryObjectCreate(agent, null);
     }
@@ -269,7 +269,7 @@ pub fn defaultNumberOption(
     fallback: ?i32,
 ) Agent.Error!?i32 {
     // 1. If value is undefined, return fallback.
-    if (value == .undefined) return fallback;
+    if (value.isUndefined()) return fallback;
 
     // 2. Set value to ? ToNumber(value).
     const number = try value.toNumber(agent);

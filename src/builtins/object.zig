@@ -100,7 +100,7 @@ pub const ObjectConstructor = struct {
         }
 
         // 2. If value is either undefined or null, return OrdinaryObjectCreate(%Object.prototype%).
-        if (value == .undefined or value == .null) {
+        if (value.isUndefined() or value.isNull()) {
             return Value.from(try ordinaryObjectCreate(
                 agent,
                 try realm.intrinsics.@"%Object.prototype%"(),
@@ -126,7 +126,7 @@ pub const ObjectConstructor = struct {
         // 3. For each element nextSource of sources, do
         for (sources) |next_source| {
             // a. If nextSource is neither undefined nor null, then
-            if (next_source != .undefined and next_source != .null) {
+            if (!next_source.isUndefined() and !next_source.isNull()) {
                 // i. Let from be ! ToObject(nextSource).
                 const from = next_source.toObject(agent) catch |err| try noexcept(err);
 
@@ -162,15 +162,18 @@ pub const ObjectConstructor = struct {
         const properties = arguments.get(1);
 
         // 1. If O is not an Object and O is not null, throw a TypeError exception.
-        if (object != .object and object != .null) {
+        if (!object.isObject() and !object.isNull()) {
             return agent.throwException(.type_error, "{} is not an Object or null", .{object});
         }
 
         // 2. Let obj be OrdinaryObjectCreate(O).
-        const obj = try ordinaryObjectCreate(agent, if (object == .object) object.object else null);
+        const obj = try ordinaryObjectCreate(
+            agent,
+            if (object.isObject()) object.asObject() else null,
+        );
 
         // 3. If Properties is not undefined, then
-        if (properties != .undefined) {
+        if (!properties.isUndefined()) {
             // a. Return ? ObjectDefineProperties(obj, Properties).
             return Value.from(try objectDefineProperties(agent, obj, properties));
         }
@@ -186,12 +189,12 @@ pub const ObjectConstructor = struct {
         const properties = arguments.get(1);
 
         // 1. If O is not an Object, throw a TypeError exception.
-        if (object != .object) {
+        if (!object.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{object});
         }
 
         // 2. Return ? ObjectDefineProperties(O, Properties).
-        return Value.from(try objectDefineProperties(agent, object.object, properties));
+        return Value.from(try objectDefineProperties(agent, object.asObject(), properties));
     }
 
     /// 20.1.2.3.1 ObjectDefineProperties ( O, Properties )
@@ -253,7 +256,7 @@ pub const ObjectConstructor = struct {
         const attributes = arguments.get(2);
 
         // 1. If O is not an Object, throw a TypeError exception.
-        if (object != .object) {
+        if (!object.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{object});
         }
 
@@ -264,7 +267,7 @@ pub const ObjectConstructor = struct {
         const property_descriptor = try attributes.toPropertyDescriptor(agent);
 
         // 4. Perform ? DefinePropertyOrThrow(O, key, desc).
-        try object.object.definePropertyOrThrow(property_key, property_descriptor);
+        try object.asObject().definePropertyOrThrow(property_key, property_descriptor);
 
         // 5. Return O.
         return object;
@@ -292,10 +295,10 @@ pub const ObjectConstructor = struct {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return O.
-        if (object != .object) return object;
+        if (!object.isObject()) return object;
 
         // 2. Let status be ? SetIntegrityLevel(O, frozen).
-        const status = try object.object.setIntegrityLevel(.frozen);
+        const status = try object.asObject().setIntegrityLevel(.frozen);
 
         // 3. If status is false, throw a TypeError exception.
         if (!status) return agent.throwException(.type_error, "Could not freeze object", .{});
@@ -343,7 +346,7 @@ pub const ObjectConstructor = struct {
                 object_.createDataPropertyOrThrow(property_key, value) catch |err| try noexcept(err);
 
                 // c. Return undefined.
-                return .undefined;
+                return Value.undefined;
             }
         }.func;
 
@@ -377,7 +380,7 @@ pub const ObjectConstructor = struct {
         if (maybe_descriptor) |descriptor|
             return Value.from(try descriptor.fromPropertyDescriptor(agent))
         else
-            return .undefined;
+            return Value.undefined;
     }
 
     /// 20.1.2.9 Object.getOwnPropertyDescriptors ( O )
@@ -493,7 +496,7 @@ pub const ObjectConstructor = struct {
         const obj = try object.toObject(agent);
 
         // 2. Return ? obj.[[GetPrototypeOf]]().
-        return Value.from(try obj.internalMethods().getPrototypeOf(obj) orelse return .null);
+        return Value.from(try obj.internalMethods().getPrototypeOf(obj) orelse return Value.null);
     }
 
     /// 20.1.2.13 Object.groupBy ( items, callbackfn )
@@ -557,10 +560,10 @@ pub const ObjectConstructor = struct {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return true.
-        if (object != .object) return Value.from(true);
+        if (!object.isObject()) return Value.from(true);
 
         // 2. Return ? IsExtensible(O).
-        return Value.from(try object.object.isExtensible());
+        return Value.from(try object.asObject().isExtensible());
     }
 
     /// 20.1.2.17 Object.isFrozen ( O )
@@ -569,10 +572,10 @@ pub const ObjectConstructor = struct {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return true.
-        if (object != .object) return Value.from(true);
+        if (!object.isObject()) return Value.from(true);
 
         // 2. Return ? TestIntegrityLevel(O, frozen).
-        return Value.from(try object.object.testIntegrityLevel(.frozen));
+        return Value.from(try object.asObject().testIntegrityLevel(.frozen));
     }
 
     /// 20.1.2.18 Object.isSealed ( O )
@@ -581,10 +584,10 @@ pub const ObjectConstructor = struct {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return true.
-        if (object != .object) return Value.from(true);
+        if (!object.isObject()) return Value.from(true);
 
         // 2. Return ? TestIntegrityLevel(O, sealed).
-        return Value.from(try object.object.testIntegrityLevel(.sealed));
+        return Value.from(try object.asObject().testIntegrityLevel(.sealed));
     }
 
     /// 20.1.2.19 Object.keys ( O )
@@ -609,10 +612,10 @@ pub const ObjectConstructor = struct {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return O.
-        if (object != .object) return object;
+        if (!object.isObject()) return object;
 
         // 2. Let status be ? O.[[PreventExtensions]]().
-        const status = try object.object.internalMethods().preventExtensions(object.object);
+        const status = try object.asObject().internalMethods().preventExtensions(object.asObject());
 
         // 3. If status is false, throw a TypeError exception.
         if (!status) return agent.throwException(.type_error, "Could not prevent extensions", .{});
@@ -627,10 +630,10 @@ pub const ObjectConstructor = struct {
         const object = arguments.get(0);
 
         // 1. If O is not an Object, return O.
-        if (object != .object) return Value.from(true);
+        if (!object.isObject()) return Value.from(true);
 
         // 2. Let status be ? SetIntegrityLevel(O, sealed).
-        const status = try object.object.setIntegrityLevel(.sealed);
+        const status = try object.asObject().setIntegrityLevel(.sealed);
 
         // 3. If status is false, throw a TypeError exception.
         if (!status) return agent.throwException(.type_error, "Could not seal object", .{});
@@ -649,17 +652,17 @@ pub const ObjectConstructor = struct {
         _ = try object.requireObjectCoercible(agent);
 
         // 2. If proto is not an Object and proto is not null, throw a TypeError exception.
-        if (prototype != .object and prototype != .null) {
+        if (!prototype.isObject() and !prototype.isNull()) {
             return agent.throwException(.type_error, "{} is not an Object or null", .{prototype});
         }
 
         // 3. If O is not an Object, return O.
-        if (object != .object) return object;
+        if (!object.isObject()) return object;
 
         // 4. Let status be ? O.[[SetPrototypeOf]](proto).
-        const status = try object.object.internalMethods().setPrototypeOf(
-            object.object,
-            if (prototype == .object) prototype.object else null,
+        const status = try object.asObject().internalMethods().setPrototypeOf(
+            object.asObject(),
+            if (prototype.isObject()) prototype.asObject() else null,
         );
 
         // 5. If status is false, throw a TypeError exception.
@@ -747,12 +750,12 @@ pub const ObjectPrototype = struct {
         const value = arguments.get(0);
 
         // 1. If V is not an Object, return false.
-        if (value != .object) return Value.from(false);
+        if (!value.isObject()) return Value.from(false);
 
         // 2. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
 
-        var prototype: ?Object_ = value.object;
+        var prototype: ?Object_ = value.asObject();
 
         // 3. Repeat,
         while (true) {
@@ -806,10 +809,10 @@ pub const ObjectPrototype = struct {
     /// https://tc39.es/ecma262/#sec-object.prototype.tostring
     fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. If the this value is undefined, return "[object Undefined]".
-        if (this_value == .undefined) return Value.from("[object Undefined]");
+        if (this_value.isUndefined()) return Value.from("[object Undefined]");
 
         // 2. If the this value is null, return "[object Null]".
-        if (this_value == .null) return Value.from("[object Null]");
+        if (this_value.isNull()) return Value.from("[object Null]");
 
         // 3. Let O be ! ToObject(this value).
         const object = this_value.toObject(agent) catch |err| try noexcept(err);
@@ -854,10 +857,7 @@ pub const ObjectPrototype = struct {
         const tag_value = try object.get(PropertyKey.from(agent.well_known_symbols.@"%Symbol.toStringTag%"));
 
         // 16. If tag is not a String, set tag to builtinTag.
-        const tag = switch (tag_value) {
-            .string => |string| string,
-            else => builtin_tag,
-        };
+        const tag = if (tag_value.isString()) tag_value.asString() else builtin_tag;
 
         // 17. Return the string-concatenation of "[object ", tag, and "]".
         return Value.from(
@@ -882,7 +882,7 @@ pub const ObjectPrototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Return ? O.[[GetPrototypeOf]]().
-        return Value.from(try object.internalMethods().getPrototypeOf(object) orelse return .null);
+        return Value.from(try object.internalMethods().getPrototypeOf(object) orelse return Value.null);
     }
 
     /// 20.1.3.8.2 set Object.prototype.__proto__
@@ -894,15 +894,15 @@ pub const ObjectPrototype = struct {
         const object = try this_value.requireObjectCoercible(agent);
 
         // 2. If proto is not an Object and proto is not null, return undefined.
-        if (prototype != .object and prototype != .null) return .undefined;
+        if (!prototype.isObject() and !prototype.isNull()) return Value.undefined;
 
         // 3. If O is not an Object, return undefined.
-        if (object != .object) return .undefined;
+        if (!object.isObject()) return Value.undefined;
 
         // 4. Let status be ? O.[[SetPrototypeOf]](proto).
-        const status = try object.object.internalMethods().setPrototypeOf(
-            object.object,
-            if (prototype == .object) prototype.object else null,
+        const status = try object.asObject().internalMethods().setPrototypeOf(
+            object.asObject(),
+            if (prototype.isObject()) prototype.asObject() else null,
         );
 
         // 5. If status is false, throw a TypeError exception.
@@ -911,7 +911,7 @@ pub const ObjectPrototype = struct {
         }
 
         // 6. Return undefined.
-        return .undefined;
+        return Value.undefined;
     }
 
     /// 20.1.3.9.1 Object.prototype.__defineGetter__ ( P, getter )
@@ -932,7 +932,7 @@ pub const ObjectPrototype = struct {
         //      [[Get]]: getter, [[Enumerable]]: true, [[Configurable]]: true
         //    }.
         const property_descriptor: PropertyDescriptor = .{
-            .get = getter.object,
+            .get = getter.asObject(),
             .enumerable = true,
             .configurable = true,
         };
@@ -944,7 +944,7 @@ pub const ObjectPrototype = struct {
         try object.definePropertyOrThrow(property_key, property_descriptor);
 
         // 6. Return undefined.
-        return .undefined;
+        return Value.undefined;
     }
 
     /// 20.1.3.9.2 Object.prototype.__defineSetter__ ( P, setter )
@@ -965,7 +965,7 @@ pub const ObjectPrototype = struct {
         //      [[Set]]: setter, [[Enumerable]]: true, [[Configurable]]: true
         //    }.
         const property_descriptor: PropertyDescriptor = .{
-            .set = setter.object,
+            .set = setter.asObject(),
             .enumerable = true,
             .configurable = true,
         };
@@ -977,7 +977,7 @@ pub const ObjectPrototype = struct {
         try object.definePropertyOrThrow(property_key, property_descriptor);
 
         // 6. Return undefined.
-        return .undefined;
+        return Value.undefined;
     }
 
     /// 20.1.3.9.3 Object.prototype.__lookupGetter__ ( P )
@@ -1001,17 +1001,17 @@ pub const ObjectPrototype = struct {
             )) |property_descriptor| {
                 // i. If IsAccessorDescriptor(desc) is true, return desc.[[Get]].
                 if (property_descriptor.isAccessorDescriptor()) {
-                    return Value.from(property_descriptor.get.? orelse return .undefined);
+                    return Value.from(property_descriptor.get.? orelse return Value.undefined);
                 }
 
                 // ii. Return undefined.
-                return .undefined;
+                return Value.undefined;
             }
 
             // c. Set O to ? O.[[GetPrototypeOf]]().
             object = try object.internalMethods().getPrototypeOf(object) orelse {
                 // d. If O is null, return undefined.
-                return .undefined;
+                return Value.undefined;
             };
         }
     }
@@ -1037,17 +1037,17 @@ pub const ObjectPrototype = struct {
             )) |property_descriptor| {
                 // i. If IsAccessorDescriptor(desc) is true, return desc.[[Set]].
                 if (property_descriptor.isAccessorDescriptor()) {
-                    return Value.from(property_descriptor.set.? orelse return .undefined);
+                    return Value.from(property_descriptor.set.? orelse return Value.undefined);
                 }
 
                 // ii. Return undefined.
-                return .undefined;
+                return Value.undefined;
             }
 
             // c. Set O to ? O.[[GetPrototypeOf]]().
             object = try object.internalMethods().getPrototypeOf(object) orelse {
                 // d. If O is null, return undefined.
-                return .undefined;
+                return Value.undefined;
             };
         }
     }

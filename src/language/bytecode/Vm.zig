@@ -135,14 +135,14 @@ fn fetchIndex(self: *Self, executable: Executable) Executable.IndexType {
 
 fn getArgumentSpreadIndices(self: *Self) Allocator.Error![]const usize {
     const value = self.stack.pop();
-    if (value == .undefined) return &.{};
-    const array = value.object;
+    if (value.isUndefined()) return &.{};
+    const array = value.asObject();
     const len = getArrayLength(array);
     var argument_spread_indices = try std.ArrayList(usize).initCapacity(self.agent.gc_allocator, len);
     for (0..len) |i| {
         const argument_spread_index = array.propertyStorage().get(
             PropertyKey.from(@as(u53, @intCast(i))),
-        ).?.value.?.number.i32;
+        ).?.value.?.asNumber().i32;
         argument_spread_indices.appendAssumeCapacity(@intCast(argument_spread_index));
     }
     return argument_spread_indices.toOwnedSlice();
@@ -184,7 +184,7 @@ pub fn executeInstruction(
         .array_create => self.result = Value.from(try arrayCreate(self.agent, 0, null)),
         .array_push_value => {
             const init_value = self.stack.pop();
-            const array = self.stack.pop().object;
+            const array = self.stack.pop().asObject();
             const index = getArrayLength(array);
             // From ArrayAccumulation:
             // 4. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), initValue).
@@ -196,14 +196,14 @@ pub fn executeInstruction(
         },
         .array_set_length => {
             const length = self.fetchIndex(executable);
-            const array = self.result.?.object;
+            const array = self.result.?.asObject();
             // From ArrayAccumulation:
             // 2. Perform ? Set(array, "length", 𝔽(len), true).
             try array.set(PropertyKey.from("length"), Value.from(length), .throw);
         },
         .array_spread_value => {
             const spread_obj = self.stack.pop();
-            const array = self.stack.pop().object;
+            const array = self.stack.pop().asObject();
             var next_index: u53 = @intCast(getArrayLength(array));
 
             // From ArrayAccumulation:
@@ -234,9 +234,9 @@ pub fn executeInstruction(
         },
         .bitwise_not => {
             const value = self.result.?;
-            self.result = switch (value) {
-                .number => |number| Value.from(number.bitwiseNOT()),
-                .big_int => |big_int| Value.from(try big_int.bitwiseNOT(self.agent)),
+            self.result = switch (value.type()) {
+                .number => Value.from(value.asNumber().bitwiseNOT()),
+                .big_int => Value.from(try value.asBigInt().bitwiseNOT(self.agent)),
                 else => unreachable,
             };
         },
@@ -342,7 +342,7 @@ pub fn executeInstruction(
             self.iterator = .{ .iterator = iterator, .next_method = next_method, .done = false };
         },
         .create_with_environment => {
-            const object = self.result.?.object;
+            const object = self.result.?.asObject();
             const old_env = self.lexical_environment_stack.getLast();
             const new_env: Environment = .{
                 .object_environment = try newObjectEnvironment(
@@ -356,10 +356,10 @@ pub fn executeInstruction(
         },
         .decrement => {
             const value = self.result.?;
-            self.result = switch (value) {
-                .number => |number| Value.from(number.subtract(.{ .i32 = 1 })),
-                .big_int => |big_int| Value.from(
-                    try big_int.subtract(self.agent, self.agent.pre_allocated.one),
+            self.result = switch (value.type()) {
+                .number => Value.from(value.asNumber().subtract(.{ .i32 = 1 })),
+                .big_int => Value.from(
+                    try value.asBigInt().subtract(self.agent, self.agent.pre_allocated.one),
                 ),
                 else => @panic("decrement instruction must only be used with numeric value"),
             };
@@ -396,9 +396,9 @@ pub fn executeInstruction(
                 const base_obj = try reference.base.value.toObject(self.agent);
 
                 // d. If ref.[[ReferencedName]] is not a property key, then
-                const property_key = switch (reference.referenced_name.value) {
-                    .string => |string| PropertyKey.from(string),
-                    .symbol => |symbol| PropertyKey.from(symbol),
+                const property_key = switch (reference.referenced_name.value.type()) {
+                    .string => PropertyKey.from(reference.referenced_name.value.asString()),
+                    .symbol => PropertyKey.from(reference.referenced_name.value.asSymbol()),
                     // i. Set ref.[[ReferencedName]] to ? ToPropertyKey(ref.[[ReferencedName]]).
                     else => try reference.referenced_name.value.toPropertyKey(self.agent),
                 };
@@ -421,7 +421,7 @@ pub fn executeInstruction(
                 const base = reference.base.environment;
 
                 // c. Return ? base.DeleteBinding(ref.[[ReferencedName]]).
-                self.result = Value.from(try base.deleteBinding(reference.referenced_name.value.string));
+                self.result = Value.from(try base.deleteBinding(reference.referenced_name.value.asString()));
             }
         },
         .evaluate_call => {
@@ -440,11 +440,11 @@ pub fn executeInstruction(
             if (maybe_reference) |reference| {
                 if (!reference.isPropertyReference() and
                     reference.referenced_name == .value and
-                    reference.referenced_name.value == .string and
-                    reference.referenced_name.value.string.eql(String.fromLiteral("eval")) and
+                    reference.referenced_name.value.isString() and
+                    reference.referenced_name.value.asString().eql(String.fromLiteral("eval")) and
 
                     // a. If SameValue(func, %eval%) is true, then
-                    function.object.sameValue(eval))
+                    function.asObject().sameValue(eval))
                 {
                     self.result = try directEval(self.agent, arguments, strict);
                     return;
@@ -582,7 +582,7 @@ pub fn executeInstruction(
             }
 
             // 6. Let result be ? Construct(func, argList, newTarget).
-            var result = try function.object.construct(arguments, new_target);
+            var result = try function.asObject().construct(arguments, new_target);
 
             // 7. Let thisER be GetThisEnvironment().
             const this_environment = self.agent.getThisEnvironment();
@@ -654,7 +654,7 @@ pub fn executeInstruction(
             self.result = if (self.agent.getNewTarget()) |new_target|
                 Value.from(new_target)
             else
-                .undefined;
+                Value.undefined;
         },
         .get_or_create_import_meta => {
             // 1. Let module be GetActiveScriptOrModule().
@@ -730,7 +730,7 @@ pub fn executeInstruction(
             const rval = self.stack.pop();
 
             // 4. If rval is not an Object, throw a TypeError exception.
-            if (rval != .object) {
+            if (!rval.isObject()) {
                 return self.agent.throwException(
                     .type_error,
                     "Right-hand side of 'in' operator must be an object",
@@ -748,14 +748,14 @@ pub fn executeInstruction(
 
             // 7. If PrivateElementFind(rval, privateName) is not empty, return true.
             // 8. Return false.
-            self.result = Value.from(rval.object.privateElementFind(private_name) != null);
+            self.result = Value.from(rval.asObject().privateElementFind(private_name) != null);
         },
         .has_property => {
             const rval = self.stack.pop();
             const lval = self.stack.pop();
 
             // 5. If rval is not an Object, throw a TypeError exception.
-            if (rval != .object) {
+            if (!rval.isObject()) {
                 return self.agent.throwException(
                     .type_error,
                     "Right-hand side of 'in' operator must be an object",
@@ -765,17 +765,17 @@ pub fn executeInstruction(
 
             // 6. Return ? HasProperty(rval, ? ToPropertyKey(lval)).
             self.result = Value.from(
-                try rval.object.hasProperty(try lval.toPropertyKey(self.agent)),
+                try rval.asObject().hasProperty(try lval.toPropertyKey(self.agent)),
             );
         },
         .increment => {
             const value = self.result.?;
-            self.result = switch (value) {
-                .number => |number| Value.from(number.add(.{ .i32 = 1 })),
-                .big_int => |big_int| Value.from(
-                    try big_int.add(self.agent, self.agent.pre_allocated.one),
+            self.result = switch (value.type()) {
+                .number => Value.from(value.asNumber().add(.{ .i32 = 1 })),
+                .big_int => Value.from(
+                    try value.asBigInt().add(self.agent, self.agent.pre_allocated.one),
                 ),
-                else => @panic("increment instruction must only be used with numeric value"),
+                else => unreachable,
             };
         },
         .initialize_default_export => {
@@ -1005,7 +1005,7 @@ pub fn executeInstruction(
                 ),
             };
             const property_name = self.stack.pop();
-            const object = self.stack.pop().object;
+            const object = self.stack.pop().asObject();
             _ = try methodDefinitionEvaluation(
                 self.agent,
                 .{ .property_name = property_name, .method = method },
@@ -1017,7 +1017,7 @@ pub fn executeInstruction(
         .object_set_property => {
             const property_value = self.stack.pop();
             const property_name = try self.stack.pop().toPropertyKey(self.agent);
-            const object = self.stack.pop().object;
+            const object = self.stack.pop().asObject();
             // From PropertyDefinitionEvaluation:
             // 5. Perform ! CreateDataPropertyOrThrow(object, propName, propValue).
             object.createDataPropertyOrThrow(property_name, property_value) catch |err| try noexcept(err);
@@ -1025,7 +1025,7 @@ pub fn executeInstruction(
         },
         .object_spread_value => {
             const from_value = self.stack.pop();
-            var object = self.stack.pop().object;
+            var object = self.stack.pop().asObject();
             const excluded_names: []const PropertyKey = &.{};
             // From PropertyDefinitionEvaluation:
             // 4. Perform ? CopyDataProperties(object, fromValue, excludedNames).
@@ -1145,7 +1145,7 @@ pub fn executeInstruction(
             else
                 self.result.?;
 
-            self.result = switch (value) {
+            self.result = switch (value.type()) {
                 // 4. If val is undefined, return "undefined".
                 .undefined => Value.from("undefined"),
 
@@ -1168,18 +1168,18 @@ pub fn executeInstruction(
                 .big_int => Value.from("bigint"),
 
                 // 11. Assert: val is an Object.
-                .object => |object| blk: {
+                .object => blk: {
                     // B.3.6.3 Changes to the typeof Operator
                     // https://tc39.es/ecma262/#sec-IsHTMLDDA-internal-slot-typeof
                     if (build_options.enable_annex_b) {
                         // 12. If val has an [[IsHTMLDDA]] internal slot, return "undefined".
-                        if (object.isHTMLDDA()) break :blk Value.from("undefined");
+                        if (value.asObject().isHTMLDDA()) break :blk Value.from("undefined");
                     } else {
                         // 12. NOTE: This step is replaced in section B.3.6.3.
                     }
 
                     // 13. If val has a [[Call]] internal slot, return "function".
-                    if (object.internalMethods().call) |_| break :blk Value.from("function");
+                    if (value.asObject().internalMethods().call) |_| break :blk Value.from("function");
 
                     // 14. Return "object".
                     break :blk Value.from("object");
@@ -1188,9 +1188,9 @@ pub fn executeInstruction(
         },
         .unary_minus => {
             const value = self.result.?;
-            self.result = switch (value) {
-                .number => |number| Value.from(number.unaryMinus()),
-                .big_int => |big_int| Value.from(try big_int.unaryMinus()),
+            self.result = switch (value.type()) {
+                .number => Value.from(value.asNumber().unaryMinus()),
+                .big_int => Value.from(try value.asBigInt().unaryMinus()),
                 else => unreachable,
             };
         },

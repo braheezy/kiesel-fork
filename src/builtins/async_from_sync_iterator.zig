@@ -85,7 +85,7 @@ pub const AsyncFromSyncIteratorPrototype = struct {
 
         // 1. Let O be the this value.
         // 2. Assert: O is an Object that has a [[SyncIteratorRecord]] internal slot.
-        const async_from_sync_iterator = this_value.object.as(AsyncFromSyncIterator);
+        const async_from_sync_iterator = this_value.asObject().as(AsyncFromSyncIterator);
 
         // 3. Let promiseCapability be ! NewPromiseCapability(%Promise%).
         const promise_capability = newPromiseCapability(
@@ -124,7 +124,7 @@ pub const AsyncFromSyncIteratorPrototype = struct {
 
         // 1. Let O be the this value.
         // 2. Assert: O is an Object that has a [[SyncIteratorRecord]] internal slot.
-        const async_from_sync_iterator = this_value.object.as(AsyncFromSyncIterator);
+        const async_from_sync_iterator = this_value.asObject().as(AsyncFromSyncIterator);
 
         // 3. Let promiseCapability be ! NewPromiseCapability(%Promise%).
         const promise_capability = newPromiseCapability(
@@ -146,13 +146,13 @@ pub const AsyncFromSyncIteratorPrototype = struct {
             // a. Let iterResult be CreateIterResultObject(value, true).
             const iter_result = try createIterResultObject(
                 agent,
-                maybe_value orelse .undefined,
+                maybe_value orelse Value.undefined,
                 true,
             );
 
             // b. Perform ! Call(promiseCapability.[[Resolve]], undefined, « iterResult »).
             _ = Value.from(promise_capability.resolve).callAssumeCallable(
-                .undefined,
+                Value.undefined,
                 &.{Value.from(iter_result)},
             ) catch |err| try noexcept(err);
 
@@ -178,7 +178,7 @@ pub const AsyncFromSyncIteratorPrototype = struct {
         };
 
         // 11. If result is not an Object, then
-        if (result != .object) {
+        if (!result.isObject()) {
             const type_error = try agent.createException(
                 .type_error,
                 "Return value of iterator 'return' function must be object",
@@ -188,7 +188,7 @@ pub const AsyncFromSyncIteratorPrototype = struct {
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
             //    TypeError object »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
-                .undefined,
+                Value.undefined,
                 &.{Value.from(type_error)},
             ) catch |err| try noexcept(err);
 
@@ -198,7 +198,7 @@ pub const AsyncFromSyncIteratorPrototype = struct {
 
         // 12. Return AsyncFromSyncIteratorContinuation(result, promiseCapability).
         return Value.from(
-            try asyncFromSyncIteratorContinuation(agent, result.object, promise_capability),
+            try asyncFromSyncIteratorContinuation(agent, result.asObject(), promise_capability),
         );
     }
 
@@ -210,7 +210,7 @@ pub const AsyncFromSyncIteratorPrototype = struct {
 
         // 1. Let O be the this value.
         // 2. Assert: O is an Object that has a [[SyncIteratorRecord]] internal slot.
-        const async_from_sync_iterator = this_value.object.as(AsyncFromSyncIterator);
+        const async_from_sync_iterator = this_value.asObject().as(AsyncFromSyncIterator);
 
         // 3. Let promiseCapability be ! NewPromiseCapability(%Promise%).
         const promise_capability = newPromiseCapability(
@@ -231,8 +231,8 @@ pub const AsyncFromSyncIteratorPrototype = struct {
         if (throw_ == null) {
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « value »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
-                .undefined,
-                &.{maybe_value orelse .undefined},
+                Value.undefined,
+                &.{maybe_value orelse Value.undefined},
             ) catch |err| try noexcept(err);
 
             // b. Return promiseCapability.[[Promise]].
@@ -257,7 +257,7 @@ pub const AsyncFromSyncIteratorPrototype = struct {
         };
 
         // 11. If result is not an Object, then
-        if (result != .object) {
+        if (!result.isObject()) {
             const type_error = try agent.createException(
                 .type_error,
                 "Return value of iterator 'throw' function must be object",
@@ -267,7 +267,7 @@ pub const AsyncFromSyncIteratorPrototype = struct {
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
             //    TypeError object »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
-                .undefined,
+                Value.undefined,
                 &.{Value.from(type_error)},
             ) catch |err| try noexcept(err);
 
@@ -277,7 +277,7 @@ pub const AsyncFromSyncIteratorPrototype = struct {
 
         // 12. Return AsyncFromSyncIteratorContinuation(result, promiseCapability).
         return Value.from(
-            try asyncFromSyncIteratorContinuation(agent, result.object, promise_capability),
+            try asyncFromSyncIteratorContinuation(agent, result.asObject(), promise_capability),
         );
     }
 };
@@ -356,7 +356,7 @@ fn asyncFromSyncIteratorContinuation(agent: *Agent, result: Object, promise_capa
         agent,
         value_wrapper.as(builtins.Promise),
         on_fulfilled,
-        .undefined,
+        Value.undefined,
         promise_capability,
     );
 

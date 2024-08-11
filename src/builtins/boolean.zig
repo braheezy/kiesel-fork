@@ -101,21 +101,17 @@ pub const BooleanPrototype = struct {
     /// 20.3.3.3.1 ThisBooleanValue ( value )
     /// https://tc39.es/ecma262/#sec-thisbooleanvalue
     fn thisBooleanValue(agent: *Agent, value: Value) error{ExceptionThrown}!bool {
-        switch (value) {
-            // 1. If value is a Boolean, return value.
-            .boolean => |boolean| return boolean,
+        // 1. If value is a Boolean, return value.
+        if (value.isBoolean()) return value.asBoolean();
 
-            // 2. If value is an Object and value has a [[BooleanData]] internal slot, then
-            .object => |object| if (object.is(Boolean)) {
-                // a. Let b be value.[[BooleanData]].
-                // b. Assert: b is a Boolean.
-                const b = object.as(Boolean).fields.boolean_data;
+        // 2. If value is an Object and value has a [[BooleanData]] internal slot, then
+        if (value.isObject() and value.asObject().is(Boolean)) {
+            // a. Let b be value.[[BooleanData]].
+            // b. Assert: b is a Boolean.
+            const b = value.asObject().as(Boolean).fields.boolean_data;
 
-                // c. Return b.
-                return b;
-            },
-
-            else => {},
+            // c. Return b.
+            return b;
         }
 
         // 3. Throw a TypeError exception.

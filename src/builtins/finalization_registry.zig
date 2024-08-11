@@ -81,7 +81,7 @@ pub const FinalizationRegistryConstructor = struct {
                 .realm = function.as(builtins.BuiltinFunction).fields.realm,
 
                 // 6. Set finalizationRegistry.[[CleanupCallback]] to HostMakeJobCallback(cleanupCallback).
-                .cleanup_callback = agent.host_hooks.hostMakeJobCallback(cleanup_callback.object),
+                .cleanup_callback = agent.host_hooks.hostMakeJobCallback(cleanup_callback.asObject()),
 
                 // 7. Set finalizationRegistry.[[Cells]] to a new empty List.
             },
@@ -156,7 +156,7 @@ pub const FinalizationRegistryPrototype = struct {
         // 5. If CanBeHeldWeakly(unregisterToken) is false, then
         if (!unregister_token.canBeHeldWeakly(agent)) {
             // a. If unregisterToken is not undefined, throw a TypeError exception.
-            if (unregister_token != .undefined) {
+            if (!unregister_token.isUndefined()) {
                 return agent.throwException(
                     .type_error,
                     "Value {} cannot be held weakly",
@@ -172,7 +172,7 @@ pub const FinalizationRegistryPrototype = struct {
         _ = finalization_registry;
 
         // 8. Return undefined.
-        return .undefined;
+        return Value.undefined;
     }
 
     /// 26.2.3.3 FinalizationRegistry.prototype.unregister ( unregisterToken )

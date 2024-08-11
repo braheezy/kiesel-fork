@@ -40,7 +40,7 @@ const sameValueZero = types.sameValueZero;
 pub fn getArrayLength(array: Object) u32 {
     const property_descriptor = array.propertyStorage().get(PropertyKey.from("length")).?;
     const value = property_descriptor.value.?;
-    return @intFromFloat(value.number.asFloat());
+    return @intFromFloat(value.asNumber().asFloat());
 }
 
 /// 10.4.2.1 [[DefineOwnProperty]] ( P, Desc )
@@ -72,7 +72,7 @@ fn defineOwnProperty(
         const length_value = length_descriptor.value.?;
 
         // e. Assert: length is a non-negative integral Number.
-        const length = length_value.number.asFloat();
+        const length = length_value.asNumber().asFloat();
         std.debug.assert(std.math.isFinite(length) and std.math.trunc(length) == length);
 
         // f. Let index be ! ToUint32(P).
@@ -173,19 +173,19 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: u64) Ag
         const this_realm = agent.currentRealm();
 
         // b. Let realmC be ? GetFunctionRealm(C).
-        const constructor_realm = try constructor.object.getFunctionRealm();
+        const constructor_realm = try constructor.asObject().getFunctionRealm();
 
         // c. If thisRealm and realmC are not the same Realm Record, then
         if (this_realm != constructor_realm) {
             // i. If SameValue(C, realmC.[[Intrinsics]].[[%Array%]]) is true, set C to undefined.
-            if (constructor.object.sameValue(try constructor_realm.intrinsics.@"%Array%"())) {
-                constructor = .undefined;
+            if (constructor.asObject().sameValue(try constructor_realm.intrinsics.@"%Array%"())) {
+                constructor = Value.undefined;
             }
         }
     }
 
     // 5. If C is an Object, then
-    if (constructor == .object) {
+    if (constructor.isObject()) {
         // a. Set C to ? Get(C, %Symbol.species%).
         constructor = try constructor.get(
             agent,
@@ -193,11 +193,11 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: u64) Ag
         );
 
         // b. If C is null, set C to undefined.
-        if (constructor == .null) constructor = .undefined;
+        if (constructor.isNull()) constructor = Value.undefined;
     }
 
     // 6. If C is undefined, return ? ArrayCreate(length).
-    if (constructor == .undefined) return arrayCreate(agent, length, null);
+    if (constructor.isUndefined()) return arrayCreate(agent, length, null);
 
     // 7. If IsConstructor(C) is false, throw a TypeError exception.
     if (!constructor.isConstructor()) {
@@ -205,7 +205,7 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: u64) Ag
     }
 
     // 8. Return ? Construct(C, « 𝔽(length) »).
-    return constructor.object.construct(&.{Value.from(@as(u32, @intCast(length)))}, null);
+    return constructor.asObject().construct(&.{Value.from(@as(u32, @intCast(length)))}, null);
 }
 
 /// 10.4.2.4 ArraySetLength ( A, Desc )
@@ -252,7 +252,7 @@ pub fn arraySetLength(
     std.debug.assert(old_len_desc.configurable == false);
 
     // 10. Let oldLen be oldLenDesc.[[Value]].
-    const old_len: u32 = @intFromFloat(old_len_desc.value.?.number.asFloat());
+    const old_len: u32 = @intFromFloat(old_len_desc.value.?.asNumber().asFloat());
 
     // 11. If newLen ≥ oldLen, then
     if (new_len >= old_len) {
@@ -425,7 +425,7 @@ pub const ArrayConstructor = struct {
             var int_len: u32 = undefined;
 
             // c. If len is not a Number, then
-            if (len != .number) {
+            if (!len.isNumber()) {
                 // i. Perform ! CreateDataPropertyOrThrow(array, "0", len).
                 array.createDataPropertyOrThrow(
                     PropertyKey.from(0),
@@ -441,7 +441,7 @@ pub const ArrayConstructor = struct {
                 int_len = len.toUint32(agent) catch unreachable;
 
                 // ii. If SameValueZero(intLen, len) is false, throw a RangeError exception.
-                if (@as(f64, @floatFromInt(int_len)) != len.number.asFloat()) {
+                if (@as(f64, @floatFromInt(int_len)) != len.asNumber().asFloat()) {
                     return agent.throwException(.range_error, "Invalid array length", .{});
                 }
             }
@@ -496,7 +496,7 @@ pub const ArrayConstructor = struct {
         const constructor_ = this_value;
 
         // 2. If mapfn is undefined, then
-        const mapping = if (map_fn == .undefined) blk: {
+        const mapping = if (map_fn.isUndefined()) blk: {
             // a. Let mapping be false.
             break :blk false;
         }
@@ -522,7 +522,7 @@ pub const ArrayConstructor = struct {
             // a. If IsConstructor(C) is true, then
             const array = if (constructor_.isConstructor()) blk: {
                 // i. Let A be ? Construct(C).
-                break :blk try constructor_.object.constructNoArgs();
+                break :blk try constructor_.asObject().constructNoArgs();
             }
             // b. Else,
             else blk: {
@@ -601,7 +601,7 @@ pub const ArrayConstructor = struct {
         // 9. If IsConstructor(C) is true, then
         const array = if (constructor_.isConstructor()) blk: {
             // a. Let A be ? Construct(C, « 𝔽(len) »).
-            break :blk try constructor_.object.construct(&.{Value.from(len)}, null);
+            break :blk try constructor_.asObject().construct(&.{Value.from(len)}, null);
         }
         // 10. Else,
         else blk: {
@@ -669,7 +669,7 @@ pub const ArrayConstructor = struct {
         const array = blk: {
             if (constructor_.isConstructor()) {
                 // a. Let A be ? Construct(C, « lenNumber »).
-                break :blk try constructor_.object.construct(&.{len_number}, null);
+                break :blk try constructor_.asObject().construct(&.{len_number}, null);
             }
             // 5. Else,
             else {
@@ -843,7 +843,7 @@ pub const ArrayPrototype = struct {
             @as(f64, @floatFromInt(len)) + relative_index;
 
         // 6. If k < 0 or k ≥ len, return undefined.
-        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return .undefined;
+        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return Value.undefined;
         const k: u53 = @intFromFloat(k_f64);
 
         // 7. Return ? Get(O, ! ToString(𝔽(k))).
@@ -878,7 +878,7 @@ pub const ArrayPrototype = struct {
             // b. If spreadable is true, then
             if (spreadable) {
                 // i. Let len be ? LengthOfArrayLike(E).
-                const len = try element.object.lengthOfArrayLike();
+                const len = try element.asObject().lengthOfArrayLike();
 
                 // ii. If n + len > 2**53 - 1, throw a TypeError exception.
                 if (std.meta.isError(std.math.add(u53, n, len))) {
@@ -897,12 +897,12 @@ pub const ArrayPrototype = struct {
                     const property_key = PropertyKey.from(k);
 
                     // 2. Let exists be ? HasProperty(E, Pk).
-                    const exists = try element.object.hasProperty(property_key);
+                    const exists = try element.asObject().hasProperty(property_key);
 
                     // 3. If exists is true, then
                     if (exists) {
                         // a. Let subElement be ? Get(E, Pk).
-                        const sub_element = try element.object.get(property_key);
+                        const sub_element = try element.asObject().get(property_key);
 
                         // b. Perform ? CreateDataPropertyOrThrow(A, ! ToString(𝔽(n)), subElement).
                         try array.createDataPropertyOrThrow(PropertyKey.from(n), sub_element);
@@ -940,15 +940,15 @@ pub const ArrayPrototype = struct {
     /// https://tc39.es/ecma262/#sec-isconcatspreadable
     fn isConcatSpreadable(agent: *Agent, value: Value) Agent.Error!bool {
         // 1. If O is not an Object, return false.
-        if (value != .object) return false;
+        if (!value.isObject()) return false;
 
         // 2. Let spreadable be ? Get(O, %Symbol.isConcatSpreadable%).
-        const spreadable = try value.object.get(
+        const spreadable = try value.asObject().get(
             PropertyKey.from(agent.well_known_symbols.@"%Symbol.isConcatSpreadable%"),
         );
 
         // 3. If spreadable is not undefined, return ToBoolean(spreadable).
-        if (spreadable != .undefined) return spreadable.toBoolean();
+        if (!spreadable.isUndefined()) return spreadable.toBoolean();
 
         // 4. Return ? IsArray(O).
         return value.isArray();
@@ -1004,7 +1004,7 @@ pub const ArrayPrototype = struct {
 
         // 11. If end is undefined, let relativeEnd be len; else let relativeEnd be
         //     ? ToIntegerOrInfinity(end).
-        const relative_end = if (end == .undefined)
+        const relative_end = if (end.isUndefined())
             len_f64
         else
             try end.toIntegerOrInfinity(agent);
@@ -1177,7 +1177,7 @@ pub const ArrayPrototype = struct {
 
         // 7. If end is undefined, let relativeEnd be len; else let relativeEnd be
         //    ? ToIntegerOrInfinity(end).
-        const relative_end = if (end == .undefined)
+        const relative_end = if (end.isUndefined())
             len_f64
         else
             try end.toIntegerOrInfinity(agent);
@@ -1363,7 +1363,7 @@ pub const ArrayPrototype = struct {
         var depth_num: f64 = 1;
 
         // 4. If depth is not undefined, then
-        if (depth != .undefined) {
+        if (!depth.isUndefined()) {
             // a. Set depthNum to ? ToIntegerOrInfinity(depth).
             depth_num = try depth.toIntegerOrInfinity(agent);
 
@@ -1448,14 +1448,14 @@ pub const ArrayPrototype = struct {
                         depth - 1;
 
                     // 3. Let elementLen be ? LengthOfArrayLike(element).
-                    const element_len = try element.object.lengthOfArrayLike();
+                    const element_len = try element.asObject().lengthOfArrayLike();
 
                     // 4. Set targetIndex to ? FlattenIntoArray(target, element, elementLen,
                     //    targetIndex, newDepth).
                     target_index = try flattenIntoArray(
                         agent,
                         target,
-                        element.object,
+                        element.asObject(),
                         element_len,
                         target_index,
                         new_depth,
@@ -1516,7 +1516,7 @@ pub const ArrayPrototype = struct {
             source_len,
             0,
             1,
-            mapper_function.object,
+            mapper_function.asObject(),
             this_arg,
         );
 
@@ -1568,7 +1568,7 @@ pub const ArrayPrototype = struct {
         }
 
         // 6. Return undefined.
-        return .undefined;
+        return Value.undefined;
     }
 
     /// 23.1.3.16 Array.prototype.includes ( searchElement [ , fromIndex ] )
@@ -1590,7 +1590,7 @@ pub const ArrayPrototype = struct {
         var n = try from_index.toIntegerOrInfinity(agent);
 
         // 5. Assert: If fromIndex is undefined, then n is 0.
-        if (from_index == .undefined) std.debug.assert(n == 0);
+        if (from_index.isUndefined()) std.debug.assert(n == 0);
 
         // 6. If n = +∞, return false.
         if (std.math.isPositiveInf(n)) return Value.from(false);
@@ -1641,7 +1641,7 @@ pub const ArrayPrototype = struct {
         var n = try from_index.toIntegerOrInfinity(agent);
 
         // 5. Assert: If fromIndex is undefined, then n is 0.
-        if (from_index == .undefined) std.debug.assert(n == 0);
+        if (from_index.isUndefined()) std.debug.assert(n == 0);
 
         // 6. If n = +∞, return -1𝔽.
         if (std.math.isPositiveInf(n)) return Value.from(-1);
@@ -1695,7 +1695,7 @@ pub const ArrayPrototype = struct {
 
         // 3. If separator is undefined, let sep be ",".
         // 4. Else, let sep be ? ToString(separator).
-        const sep: String.Builder.Segment = if (separator == .undefined)
+        const sep: String.Builder.Segment = if (separator.isUndefined())
             .{ .char = ',' }
         else
             .{ .string = try separator.toString(agent) };
@@ -1718,7 +1718,7 @@ pub const ArrayPrototype = struct {
             const element = try object.get(PropertyKey.from(k));
 
             // c. If element is neither undefined nor null, then
-            if (element != .undefined and element != .null) {
+            if (!element.isUndefined() and !element.isNull()) {
                 // i. Let S be ? ToString(element).
                 const string = try element.toString(agent);
 
@@ -1871,7 +1871,7 @@ pub const ArrayPrototype = struct {
             try object.set(PropertyKey.from("length"), Value.from(0), .throw);
 
             // b. Return undefined.
-            return .undefined;
+            return Value.undefined;
         }
         // 4. Else,
         else {
@@ -2015,7 +2015,7 @@ pub const ArrayPrototype = struct {
 
                 // ii. Set accumulator to ? Call(callbackfn, undefined, « accumulator, kValue, 𝔽(k), O »).
                 accumulator = try callback_fn.callAssumeCallable(
-                    .undefined,
+                    Value.undefined,
                     &.{ accumulator, k_value, Value.from(k), Value.from(object) },
                 );
             }
@@ -2111,7 +2111,7 @@ pub const ArrayPrototype = struct {
 
                 // ii. Set accumulator to ? Call(callbackfn, undefined, « accumulator, kValue, 𝔽(k), O »).
                 accumulator = try callback_fn.callAssumeCallable(
-                    .undefined,
+                    Value.undefined,
                     &.{ accumulator, k_value, Value.from(k.?), Value.from(object) },
                 );
             }
@@ -2221,7 +2221,7 @@ pub const ArrayPrototype = struct {
             try object.set(PropertyKey.from("length"), Value.from(0), .throw);
 
             // b. Return undefined.
-            return .undefined;
+            return Value.undefined;
         }
 
         // 4. Let first be ? Get(O, "0").
@@ -2303,7 +2303,7 @@ pub const ArrayPrototype = struct {
 
         // 7. If end is undefined, let relativeEnd be len; else let relativeEnd be
         //    ? ToIntegerOrInfinity(end).
-        const relative_end = if (end == .undefined)
+        const relative_end = if (end.isUndefined())
             len_f64
         else
             try end.toIntegerOrInfinity(agent);
@@ -2419,7 +2419,7 @@ pub const ArrayPrototype = struct {
 
         // 1. If comparefn is not undefined and IsCallable(comparefn) is false, throw a TypeError
         //    exception.
-        if (compare_fn != .undefined and !compare_fn.isCallable()) {
+        if (!compare_fn.isUndefined() and !compare_fn.isCallable()) {
             return agent.throwException(.type_error, "{} is not callable", .{compare_fn});
         }
 
@@ -2445,7 +2445,7 @@ pub const ArrayPrototype = struct {
             len,
             .{
                 .impl = sortCompare,
-                .compare_fn = if (compare_fn != .undefined) compare_fn.object else null,
+                .compare_fn = if (!compare_fn.isUndefined()) compare_fn.asObject() else null,
             },
             .skip_holes,
         );
@@ -2692,7 +2692,7 @@ pub const ArrayPrototype = struct {
             const element = try array.get(PropertyKey.from(k));
 
             // c. If element is neither undefined nor null, then
-            if (element != .undefined and element != .null) {
+            if (!element.isUndefined() and !element.isNull()) {
                 // i. Let S be ? ToString(? Invoke(element, "toLocaleString")).
                 const string = try (try element.invokeNoArgs(
                     agent,
@@ -2753,7 +2753,7 @@ pub const ArrayPrototype = struct {
 
         // 1. If comparefn is not undefined and IsCallable(comparefn) is false, throw a TypeError
         //    exception.
-        if (compare_fn != .undefined and !compare_fn.isCallable()) {
+        if (!compare_fn.isUndefined() and !compare_fn.isCallable()) {
             return agent.throwException(.type_error, "{} is not callable", .{compare_fn});
         }
 
@@ -2782,7 +2782,7 @@ pub const ArrayPrototype = struct {
             len,
             .{
                 .impl = sortCompare,
-                .compare_fn = if (compare_fn != .undefined) compare_fn.object else null,
+                .compare_fn = if (!compare_fn.isUndefined()) compare_fn.asObject() else null,
             },
             .read_through_holes,
         );
@@ -3134,7 +3134,7 @@ pub fn findViaPredicate(
     }
 
     // 5. Return the Record { [[Index]]: -1𝔽, [[Value]]: undefined }.
-    return .{ .index = Value.from(-1), .value = .undefined };
+    return .{ .index = Value.from(-1), .value = Value.undefined };
 }
 
 const SortCompare = struct {
@@ -3229,19 +3229,19 @@ pub fn compareArrayElements(
     maybe_compare_fn: ?Object,
 ) Agent.Error!std.math.Order {
     // 1. If x and y are both undefined, return +0𝔽.
-    if (x == .undefined and y == .undefined) return .eq;
+    if (x.isUndefined() and y.isUndefined()) return .eq;
 
     // 2. If x is undefined, return 1𝔽.
-    if (x == .undefined) return .gt;
+    if (x.isUndefined()) return .gt;
 
     // 3. If y is undefined, return -1𝔽.
-    if (y == .undefined) return .lt;
+    if (y.isUndefined()) return .lt;
 
     // 4. If comparefn is not undefined, then
     if (maybe_compare_fn) |compare_fn| {
         // a. Let v be ? ToNumber(? Call(comparefn, undefined, « x, y »)).
         const value = try (try Value.from(compare_fn).callAssumeCallable(
-            .undefined,
+            Value.undefined,
             &.{ x, y },
         )).toNumber(agent);
 

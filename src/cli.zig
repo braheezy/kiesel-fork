@@ -117,7 +117,7 @@ const Kiesel = struct {
 
     fn collect(_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         kiesel.gc.collect();
-        return .undefined;
+        return Value.undefined;
     }
 
     fn createIsHTMLDDA(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
@@ -148,7 +148,7 @@ const Kiesel = struct {
                         ///
                         /// We pick the most common one :^)
                         fn call(_: Object, _: Value, _: Arguments) Agent.Error!Value {
-                            return .null;
+                            return Value.null;
                         }
                     }.call,
                 },
@@ -167,15 +167,15 @@ const Kiesel = struct {
 
     fn detachArrayBuffer(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const array_buffer = arguments.get(0);
-        if (array_buffer != .object or !array_buffer.object.is(kiesel.builtins.ArrayBuffer)) {
+        if (!array_buffer.isObject() or !array_buffer.asObject().is(kiesel.builtins.ArrayBuffer)) {
             return agent.throwException(.type_error, "Argument must be an ArrayBuffer", .{});
         }
         try kiesel.builtins.detachArrayBuffer(
             agent,
-            array_buffer.object.as(kiesel.builtins.ArrayBuffer),
+            array_buffer.asObject().as(kiesel.builtins.ArrayBuffer),
             null,
         );
-        return .undefined;
+        return Value.undefined;
     }
 
     /// Algorithm from https://github.com/tc39/test262/blob/main/INTERPRETING.md
@@ -232,7 +232,7 @@ const Kiesel = struct {
             stdout.print("{pretty}{s}", .{ value, end }) catch {}
         else
             stdout.print("{}{s}", .{ try value.toString(agent), end }) catch {};
-        return .undefined;
+        return Value.undefined;
     }
 
     fn readFile_(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
@@ -303,7 +303,7 @@ const Kiesel = struct {
         }
         const nanoseconds = std.math.lossyCast(u64, milliseconds.asFloat() * 1_000_000);
         std.time.sleep(nanoseconds);
-        return .undefined;
+        return Value.undefined;
     }
 
     fn writeFile(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
@@ -328,7 +328,7 @@ const Kiesel = struct {
                 .{@errorName(err)},
             );
         };
-        return .undefined;
+        return Value.undefined;
     }
 };
 
@@ -453,7 +453,7 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
                             break :blk error.ExceptionThrown;
                         },
                         .fulfilled => {
-                            break :blk @as(Value, .undefined);
+                            break :blk Value.undefined;
                         },
                     }
                 },
@@ -510,10 +510,10 @@ fn printValueDebugInfo(
 ) @TypeOf(writer).Error!void {
     // Porffor REPL my beloved 💜
     try tty_config.setColor(writer, .blue);
-    switch (value) {
-        .number => |number| try writer.print(" (type: {s})", .{@tagName(number)}),
-        .string => |string| try writer.print(" (type: {s})", .{@tagName(string)}),
-        .symbol => |symbol| try writer.print(" (id: {})", .{symbol.id}),
+    switch (value.type()) {
+        .number => try writer.print(" (type: {s})", .{@tagName(value.asNumber())}),
+        .string => try writer.print(" (type: {s})", .{@tagName(value.asString())}),
+        .symbol => try writer.print(" (id: {})", .{value.asSymbol().id}),
         else => {},
     }
     try tty_config.setColor(writer, .reset);

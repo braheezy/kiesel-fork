@@ -162,11 +162,11 @@ pub fn regExpInitialize(
 ) Agent.Error!Object {
     // 1. If pattern is undefined, let P be the empty String.
     // 2. Else, let P be ? ToString(pattern).
-    const p = if (pattern == .undefined) String.empty else try pattern.toString(agent);
+    const p = if (pattern.isUndefined()) String.empty else try pattern.toString(agent);
 
     // 3. If flags is undefined, let F be the empty String.
     // 4. Else, let F be ? ToString(flags).
-    const f = if (flags == .undefined) String.empty else try flags.toString(agent);
+    const f = if (flags.isUndefined()) String.empty else try flags.toString(agent);
 
     // 5. If F contains any code unit other than "d", "g", "i", "m", "s", "u", "v", or "y", or if F
     //    contains any code unit more than once, throw a SyntaxError exception.
@@ -242,7 +242,7 @@ pub fn regExpExec(agent: *Agent, reg_exp: Object, string: String) Agent.Error!?O
         const result = try exec.callAssumeCallable(Value.from(reg_exp), &.{Value.from(string)});
 
         // b. If result is not an Object and result is not null, throw a TypeError exception.
-        if (result != .object and result != .null) {
+        if (!result.isObject() and !result.isNull()) {
             return agent.throwException(
                 .type_error,
                 "RegExp exec function must return object or null",
@@ -251,7 +251,7 @@ pub fn regExpExec(agent: *Agent, reg_exp: Object, string: String) Agent.Error!?O
         }
 
         // c. Return result.
-        return if (result == .object) result.object else null;
+        return if (result.isObject()) result.asObject() else null;
     }
 
     // 3. Perform ? RequireInternalSlot(R, [[RegExpMatcher]]).
@@ -416,7 +416,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
     // 31. Else,
     else blk: {
         // a. Let groups be undefined.
-        break :blk .undefined;
+        break :blk Value.undefined;
 
         // b. Let hasGroups be false.
     };
@@ -438,7 +438,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
         // b. If captureI is undefined, then
         if (capture_i == null) {
             // i. Let capturedValue be undefined.
-            captured_value = .undefined;
+            captured_value = Value.undefined;
 
             // ii. Append undefined to indices.
             try indices.append(null);
@@ -476,7 +476,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
             const property_key = PropertyKey.from(
                 try String.fromUtf8(agent.gc_allocator, group_name),
             );
-            groups.object.createDataPropertyOrThrow(
+            groups.asObject().createDataPropertyOrThrow(
                 property_key,
                 captured_value,
             ) catch |err| try noexcept(err);
@@ -603,7 +603,7 @@ fn makeMatchIndicesIndexPairArray(
     // 7. Else,
     else blk: {
         // a. Let groups be undefined.
-        break :blk .undefined;
+        break :blk Value.undefined;
     };
 
     // 8. Perform ! CreateDataPropertyOrThrow(A, "groups", groups).
@@ -626,7 +626,7 @@ fn makeMatchIndicesIndexPairArray(
         // c. Else,
         else blk: {
             // i. Let matchIndexPair be undefined.
-            break :blk .undefined;
+            break :blk Value.undefined;
         };
 
         // d. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(i)), matchIndexPair).
@@ -638,7 +638,7 @@ fn makeMatchIndicesIndexPairArray(
         // e. If i > 0 and groupNames[i - 1] is not undefined, then
         if (i > 0 and group_names[i - 1] != null) {
             // i. Assert: groups is not undefined.
-            std.debug.assert(groups != .undefined);
+            std.debug.assert(!groups.isUndefined());
 
             // ii. Perform ! CreateDataPropertyOrThrow(groups, groupNames[i - 1], matchIndexPair).
             const property_key = PropertyKey.from(
@@ -647,7 +647,7 @@ fn makeMatchIndicesIndexPairArray(
                     try agent.gc_allocator.dupe(u8, group_names[i - 1].?),
                 ),
             );
-            groups.object.createDataPropertyOrThrow(
+            groups.asObject().createDataPropertyOrThrow(
                 property_key,
                 match_index_pair,
             ) catch |err| try noexcept(err);
@@ -700,9 +700,9 @@ pub const RegExpConstructor = struct {
             constructor_ = agent.activeFunctionObject();
 
             // b. If patternIsRegExp is true and flags is undefined, then
-            if (pattern_is_regexp and flags == .undefined) {
+            if (pattern_is_regexp and flags.isUndefined()) {
                 // i. Let patternConstructor be ? Get(pattern, "constructor").
-                const pattern_constructor = try pattern.object.get(PropertyKey.from("constructor"));
+                const pattern_constructor = try pattern.asObject().get(PropertyKey.from("constructor"));
 
                 // ii. If SameValue(newTarget, patternConstructor) is true, return pattern.
                 if (sameValue(Value.from(constructor_), pattern_constructor)) return pattern;
@@ -718,13 +718,13 @@ pub const RegExpConstructor = struct {
         var f: Value = undefined;
 
         // 4. If pattern is an Object and pattern has a [[RegExpMatcher]] internal slot, then
-        if (pattern == .object and pattern.object.is(RegExp)) {
+        if (pattern.isObject() and pattern.asObject().is(RegExp)) {
             // a. Let P be pattern.[[OriginalSource]].
-            p = Value.from(pattern.object.as(RegExp).fields.original_source);
+            p = Value.from(pattern.asObject().as(RegExp).fields.original_source);
 
             // b. If flags is undefined, let F be pattern.[[OriginalFlags]].
-            if (flags == .undefined) {
-                f = Value.from(pattern.object.as(RegExp).fields.original_flags);
+            if (flags.isUndefined()) {
+                f = Value.from(pattern.asObject().as(RegExp).fields.original_flags);
             }
             // c. Else, let F be flags.
             else {
@@ -734,12 +734,12 @@ pub const RegExpConstructor = struct {
         // 5. Else if patternIsRegExp is true, then
         else if (pattern_is_regexp) {
             // a. Let P be ? Get(pattern, "source").
-            p = try pattern.object.get(PropertyKey.from("source"));
+            p = try pattern.asObject().get(PropertyKey.from("source"));
 
             // b. If flags is undefined, then
-            if (flags == .undefined) {
+            if (flags.isUndefined()) {
                 // i. Let F be ? Get(pattern, "flags").
-                f = try pattern.object.get(PropertyKey.from("flags"));
+                f = try pattern.asObject().get(PropertyKey.from("flags"));
             }
             // c. Else,
             else {
@@ -827,7 +827,7 @@ pub const RegExpPrototype = struct {
         return if (try regExpBuiltinExec(agent, reg_exp, string)) |object|
             Value.from(object)
         else
-            .null;
+            Value.null;
     }
 
     /// 22.2.6.3 get RegExp.prototype.dotAll
@@ -844,10 +844,10 @@ pub const RegExpPrototype = struct {
     fn flags(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let R be the this value.
         // 2. If R is not an Object, throw a TypeError exception.
-        if (this_value != .object) {
+        if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.object;
+        const reg_exp = this_value.asObject();
 
         // 3. Let codeUnits be a new empty List.
         var code_units = try std.ArrayList(u8).initCapacity(agent.gc_allocator, 8);
@@ -909,10 +909,10 @@ pub const RegExpPrototype = struct {
     /// https://tc39.es/ecma262/#sec-regexphasflag
     fn regExpHasFlag(agent: *Agent, reg_exp_value: Value, flag: c_int) Agent.Error!Value {
         // 1. If R is not an Object, throw a TypeError exception.
-        if (reg_exp_value != .object) {
+        if (!reg_exp_value.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{reg_exp_value});
         }
-        const reg_exp = reg_exp_value.object;
+        const reg_exp = reg_exp_value.asObject();
 
         // 2. If R does not have an [[OriginalFlags]] internal slot, then
         if (!reg_exp.is(RegExp)) {
@@ -920,7 +920,7 @@ pub const RegExpPrototype = struct {
 
             // a. If SameValue(R, %RegExp.prototype%) is true, return undefined.
             if (reg_exp.sameValue(try realm.intrinsics.@"%RegExp.prototype%"())) {
-                return .undefined;
+                return Value.undefined;
             }
 
             // b. Otherwise, throw a TypeError exception.
@@ -970,10 +970,10 @@ pub const RegExpPrototype = struct {
 
         // 1. Let rx be the this value.
         // 2. If rx is not an Object, throw a TypeError exception.
-        if (this_value != .object) {
+        if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.object;
+        const reg_exp = this_value.asObject();
 
         // 3. Let S be ? ToString(string).
         const string = try string_value.toString(agent);
@@ -987,7 +987,7 @@ pub const RegExpPrototype = struct {
             return if (try regExpExec(agent, reg_exp, string)) |object|
                 Value.from(object)
             else
-                .null;
+                Value.null;
         }
         // 6. Else,
         else {
@@ -1013,7 +1013,7 @@ pub const RegExpPrototype = struct {
                 // ii. If result is null, then
                 if (result == null) {
                     // 1. If n = 0, return null.
-                    if (n == 0) return .null;
+                    if (n == 0) return Value.null;
 
                     // 2. Return A.
                     return Value.from(array);
@@ -1057,10 +1057,10 @@ pub const RegExpPrototype = struct {
 
         // 1. Let R be the this value.
         // 2. If R is not an Object, throw a TypeError exception.
-        if (this_value != .object) {
+        if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.object;
+        const reg_exp = this_value.asObject();
 
         // 3. Let S be ? ToString(string).
         const string = try string_value.toString(agent);
@@ -1112,10 +1112,10 @@ pub const RegExpPrototype = struct {
 
         // 1. Let rx be the this value.
         // 2. If rx is not an Object, throw a TypeError exception.
-        if (this_value != .object) {
+        if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.object;
+        const reg_exp = this_value.asObject();
 
         // 3. Let S be ? ToString(string).
         const string = try string_value.toString(agent);
@@ -1243,7 +1243,7 @@ pub const RegExpPrototype = struct {
                 var capture_n = try result.get(PropertyKey.from(n));
 
                 // ii. If capN is not undefined, then
-                if (capture_n != .undefined) {
+                if (!capture_n.isUndefined()) {
                     // 1. Set capN to ? ToString(capN).
                     capture_n_string = try capture_n.toString(agent);
                 }
@@ -1267,24 +1267,24 @@ pub const RegExpPrototype = struct {
                 //    « 𝔽(position), S ».
                 var replacer_args = try std.ArrayList(Value).initCapacity(
                     agent.gc_allocator,
-                    captures.items.len + 3 + @intFromBool(named_captures != .undefined),
+                    captures.items.len + 3 + @intFromBool(!named_captures.isUndefined()),
                 );
                 replacer_args.appendAssumeCapacity(Value.from(matched));
                 for (captures.items) |capture| replacer_args.appendAssumeCapacity(
-                    if (capture) |s| Value.from(s) else .null,
+                    if (capture) |s| Value.from(s) else Value.null,
                 );
                 replacer_args.appendAssumeCapacity(Value.from(@as(u53, @intCast(position))));
                 replacer_args.appendAssumeCapacity(Value.from(string));
 
                 // ii. If namedCaptures is not undefined, then
-                if (named_captures != .undefined) {
+                if (!named_captures.isUndefined()) {
                     // 1. Append namedCaptures to replacerArgs.
                     replacer_args.appendAssumeCapacity(named_captures);
                 }
 
                 // iii. Let replValue be ? Call(replaceValue, undefined, replacerArgs).
                 const replacement_value = try replace_value.callAssumeCallable(
-                    .undefined,
+                    Value.undefined,
                     replacer_args.items,
                 );
 
@@ -1294,7 +1294,7 @@ pub const RegExpPrototype = struct {
             // l. Else,
             else blk: {
                 // i. If namedCaptures is not undefined, then
-                const named_captures_object: ?Object = if (named_captures != .undefined) blk_obj: {
+                const named_captures_object: ?Object = if (!named_captures.isUndefined()) blk_obj: {
                     // 1. Set namedCaptures to ? ToObject(namedCaptures).
                     break :blk_obj try named_captures.toObject(agent);
                 } else null;
@@ -1308,7 +1308,7 @@ pub const RegExpPrototype = struct {
                     position,
                     captures.items,
                     named_captures_object,
-                    replace_value.string,
+                    replace_value.asString(),
                 );
             };
 
@@ -1353,10 +1353,10 @@ pub const RegExpPrototype = struct {
 
         // 1. Let rx be the this value.
         // 2. If rx is not an Object, throw a TypeError exception.
-        if (this_value != .object) {
+        if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.object;
+        const reg_exp = this_value.asObject();
 
         // 3. Let S be ? ToString(string).
         const string = try string_value.toString(agent);
@@ -1394,10 +1394,10 @@ pub const RegExpPrototype = struct {
     fn source(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // Let R be the this value.
         // 2. If R is not an Object, throw a TypeError exception.
-        if (this_value != .object) {
+        if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.object;
+        const reg_exp = this_value.asObject();
 
         // 3. If R does not have an [[OriginalSource]] internal slot, then
         if (!reg_exp.is(RegExp)) {
@@ -1453,10 +1453,10 @@ pub const RegExpPrototype = struct {
 
         // 1. Let rx be the this value.
         // 2. If rx is not an Object, throw a TypeError exception.
-        if (this_value != .object) {
+        if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.object;
+        const reg_exp = this_value.asObject();
 
         // 3. Let S be ? ToString(string).
         const string = try string_value.toString(agent);
@@ -1492,7 +1492,7 @@ pub const RegExpPrototype = struct {
         var length_array: u32 = 0;
 
         // 13. If limit is undefined, let lim be 2**32 - 1; else let lim be ℝ(? ToUint32(limit)).
-        const limit = if (limit_value == .undefined)
+        const limit = if (limit_value.isUndefined())
             std.math.maxInt(u32)
         else
             try limit_value.toUint32(agent);
@@ -1639,10 +1639,10 @@ pub const RegExpPrototype = struct {
     fn @"test"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let R be the this value.
         // 2. If R is not an Object, throw a TypeError exception.
-        if (this_value != .object) {
+        if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.object;
+        const reg_exp = this_value.asObject();
 
         // 3. Let string be ? ToString(S).
         const string = try arguments.get(0).toString(agent);
@@ -1659,10 +1659,10 @@ pub const RegExpPrototype = struct {
     fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let R be the this value.
         // 2. If R is not an Object, throw a TypeError exception.
-        if (this_value != .object) {
+        if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.object;
+        const reg_exp = this_value.asObject();
 
         // 3. Let pattern be ? ToString(? Get(R, "source")).
         const pattern = try (try reg_exp.get(PropertyKey.from("source"))).toString(agent);
@@ -1714,9 +1714,9 @@ pub const RegExpPrototype = struct {
         var f: Value = undefined;
 
         // 3. If pattern is an Object and pattern has a [[RegExpMatcher]] internal slot, then
-        if (pattern == .object and pattern.object.is(RegExp)) {
+        if (pattern.isObject() and pattern.asObject().is(RegExp)) {
             // a. If flags is not undefined, throw a TypeError exception.
-            if (flags_ != .undefined) {
+            if (!flags_.isUndefined()) {
                 return agent.throwException(
                     .type_error,
                     "Flags must be undefined when pattern is a RegExp object, got {}",
@@ -1725,10 +1725,10 @@ pub const RegExpPrototype = struct {
             }
 
             // b. Let P be pattern.[[OriginalSource]].
-            p = Value.from(pattern.object.as(RegExp).fields.original_source);
+            p = Value.from(pattern.asObject().as(RegExp).fields.original_source);
 
             // c. Let F be pattern.[[OriginalFlags]].
-            f = Value.from(pattern.object.as(RegExp).fields.original_flags);
+            f = Value.from(pattern.asObject().as(RegExp).fields.original_flags);
         }
         // 4. Else,
         else {

@@ -747,7 +747,7 @@ fn prettyPrintPrimitiveWrapper(
 }
 
 fn prettyPrintFunction(object: Object, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
-    const name = object.propertyStorage().get(PropertyKey.from("name")).?.value.?.string;
+    const name = object.propertyStorage().get(PropertyKey.from("name")).?.value.?.asString();
     const tty_config = state.tty_config;
 
     if (object.is(builtins.ECMAScriptFunction)) {
@@ -839,8 +839,8 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
 
     const tty_config = state.tty_config;
 
-    if (value == .object) {
-        const object = value.object;
+    if (value.isObject()) {
+        const object = value.asObject();
         if (state.seen_objects.get(object.ptr)) |i| {
             try tty_config.setColor(writer, .dim);
             try writer.print("<ref #{}>", .{i});
@@ -904,7 +904,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
         return prettyPrintObject(object, writer);
     }
 
-    const color = switch (value) {
+    const color = switch (value.type()) {
         .undefined => Color.bright_black,
         .null => Color.yellow,
         .boolean => Color.blue,

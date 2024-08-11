@@ -162,14 +162,14 @@ pub fn asyncBlockStart(
 
             if (result) |completion| {
                 std.debug.assert(completion.type == .normal or completion.type == .@"return");
-                const value = completion.value orelse .undefined;
+                const value = completion.value orelse Value.undefined;
 
                 // e. If result is a normal completion, then
                 //     i. Perform ! Call(promiseCapability.[[Resolve]], undefined, « undefined »).
                 // f. Else if result is a return completion, then
                 //     i. Perform ! Call(promiseCapability.[[Resolve]], undefined, « result.[[Value]] »).
                 _ = Value.from(promise_capability_.resolve).callAssumeCallable(
-                    .undefined,
+                    Value.undefined,
                     &.{value},
                 ) catch |err| try noexcept(err);
             }
@@ -183,7 +183,7 @@ pub fn asyncBlockStart(
 
                     // ii. Perform ! Call(promiseCapability.[[Reject]], undefined, « result.[[Value]] »).
                     _ = Value.from(promise_capability_.reject).callAssumeCallable(
-                        .undefined,
+                        Value.undefined,
                         &.{exception},
                     ) catch |err_| try noexcept(err_);
                 },
@@ -249,7 +249,7 @@ pub fn @"await"(agent: *Agent, value: Value) Agent.Error!Value {
             _ = previous_context;
 
             // f. Return undefined.
-            return .undefined;
+            return Value.undefined;
         }
     }.func;
 
@@ -280,7 +280,7 @@ pub fn @"await"(agent: *Agent, value: Value) Agent.Error!Value {
             _ = previous_context;
 
             // f. Return undefined.
-            return .undefined;
+            return Value.undefined;
         }
     }.func;
 

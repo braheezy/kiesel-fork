@@ -140,7 +140,7 @@ fn codegenSingleNameBinding(
         try executable.addInstruction(.load); // Save RHS
 
         try executable.addInstruction(.load);
-        try executable.addInstructionWithConstant(.load_constant, .undefined);
+        try executable.addInstructionWithConstant(.load_constant, Value.undefined);
         try executable.addInstruction(.is_strictly_equal);
 
         try executable.addInstruction(.jump_conditional);
@@ -225,7 +225,7 @@ pub fn codegenLiteral(
         // Literal : NullLiteral
         .null => {
             // 1. Return null.
-            try executable.addInstructionWithConstant(.store_constant, .null);
+            try executable.addInstructionWithConstant(.store_constant, Value.null);
         },
 
         // Literal : BooleanLiteral
@@ -794,7 +794,7 @@ pub fn codegenArguments(
     };
 
     if (spread_indices.items.len == 0) {
-        try executable.addInstructionWithConstant(.load_constant, .undefined);
+        try executable.addInstructionWithConstant(.load_constant, Value.undefined);
     } else {
         try executable.addInstruction(.array_create);
         try executable.addInstruction(.load);
@@ -829,7 +829,7 @@ pub fn codegenOptionalExpression(
 
     // 3. If baseValue is either undefined or null, then
     try executable.addInstruction(.load);
-    try executable.addInstructionWithConstant(.load_constant, .undefined);
+    try executable.addInstructionWithConstant(.load_constant, Value.undefined);
     try executable.addInstruction(.is_loosely_equal);
 
     try executable.addInstruction(.jump_conditional);
@@ -839,7 +839,7 @@ pub fn codegenOptionalExpression(
     // a. Return undefined.
     try consequent_jump.setTargetHere();
     try executable.addInstruction(.store); // Drop baseValue from the stack
-    try executable.addInstructionWithConstant(.store_constant, .undefined);
+    try executable.addInstructionWithConstant(.store_constant, Value.undefined);
     try executable.addInstruction(.jump);
     const end_jump = try executable.addJumpIndex();
 
@@ -994,7 +994,7 @@ pub fn codegenTaggedTemplate(
     }
 
     // 5. Return ? EvaluateCall(tagFunc, tagRef, TemplateLiteral, tailCall).
-    try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
+    try executable.addInstructionWithConstant(.load_constant, Value.undefined); // No spread args
     try executable.addInstruction(.evaluate_call);
     try executable.addIndex(@divFloor(node.template_literal.spans.len, 2) + 1);
     const strict = ctx.contained_in_strict_mode_code;
@@ -1181,7 +1181,7 @@ pub fn codegenUnaryExpression(
             if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
             // 3. Return undefined.
-            try executable.addInstructionWithConstant(.store_constant, .undefined);
+            try executable.addInstructionWithConstant(.store_constant, Value.undefined);
         },
 
         // UnaryExpression : typeof UnaryExpression
@@ -1430,7 +1430,7 @@ pub fn codegenLogicalExpression(
             try executable.addInstruction(.load);
 
             try executable.addInstruction(.load);
-            try executable.addInstructionWithConstant(.load_constant, .undefined);
+            try executable.addInstructionWithConstant(.load_constant, Value.undefined);
             try executable.addInstruction(.is_loosely_equal);
 
             try executable.addInstruction(.jump_conditional);
@@ -1682,7 +1682,7 @@ pub fn codegenAssignmentExpression(
 
         // 3. If lval is neither undefined nor null, return lval.
         try executable.addInstruction(.load);
-        try executable.addInstructionWithConstant(.load_constant, .undefined);
+        try executable.addInstructionWithConstant(.load_constant, Value.undefined);
         try executable.addInstruction(.is_loosely_equal);
 
         try executable.addInstruction(.jump_conditional);
@@ -2041,7 +2041,7 @@ pub fn codegenLexicalBinding(
                 try executable.addInstruction(.push_reference);
 
                 // 2. Perform ! InitializeReferencedBinding(lhs, undefined).
-                try executable.addInstructionWithConstant(.store_constant, .undefined);
+                try executable.addInstructionWithConstant(.store_constant, Value.undefined);
                 try executable.addInstruction(.initialize_referenced_binding);
                 try executable.addInstruction(.pop_reference);
 
@@ -2173,7 +2173,7 @@ pub fn codegenIfStatement(
 
     // 3. If exprValue is true, then
     try consequent_jump.setTargetHere();
-    try executable.addInstructionWithConstant(.store_constant, .undefined);
+    try executable.addInstructionWithConstant(.store_constant, Value.undefined);
 
     // a. Let stmtCompletion be Completion(Evaluation of the first Statement).
     try codegenStatement(node.consequent_statement.*, executable, ctx);
@@ -2182,7 +2182,7 @@ pub fn codegenIfStatement(
 
     // 4. Else,
     try alternate_jump.setTargetHere();
-    try executable.addInstructionWithConstant(.store_constant, .undefined);
+    try executable.addInstructionWithConstant(.store_constant, Value.undefined);
 
     if (node.alternate_statement) |alternate_statement| {
         // a. Let stmtCompletion be Completion(Evaluation of the second Statement).
@@ -2250,7 +2250,7 @@ pub fn codegenDoWhileStatement(
     );
 
     // 1. Let V be undefined.
-    try executable.addInstructionWithConstant(.load_constant, .undefined);
+    try executable.addInstructionWithConstant(.load_constant, Value.undefined);
 
     // 2. Repeat,
     const start_index = executable.instructions.items.len;
@@ -2310,7 +2310,7 @@ pub fn codegenWhileStatement(
     );
 
     // 1. Let V be undefined.
-    try executable.addInstructionWithConstant(.load_constant, .undefined);
+    try executable.addInstructionWithConstant(.load_constant, Value.undefined);
 
     // 2. Repeat,
     const start_index = executable.instructions.items.len;
@@ -2438,7 +2438,7 @@ pub fn codegenForStatement(
     };
 
     // 1. Let V be undefined.
-    try executable.addInstructionWithConstant(.load_constant, .undefined);
+    try executable.addInstructionWithConstant(.load_constant, Value.undefined);
 
     // TODO: 2. Perform ? CreatePerIterationEnvironment(perIterationBindings).
 
@@ -2570,7 +2570,7 @@ fn forInOfHeadEvaluation(
         // a. If exprValue is either undefined or null, then
         //     i. Return Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: empty }.
         try executable.addInstruction(.load);
-        try executable.addInstructionWithConstant(.load_constant, .undefined);
+        try executable.addInstructionWithConstant(.load_constant, Value.undefined);
         try executable.addInstruction(.is_loosely_equal);
         try executable.addInstruction(.jump_conditional);
         const consequent_jump = try executable.addJumpIndex();
@@ -2644,7 +2644,7 @@ fn forInOfBodyEvaluation(
     try executable.addInstruction(.push_lexical_environment);
 
     // 3. Let V be undefined.
-    try executable.addInstructionWithConstant(.load_constant, .undefined);
+    try executable.addInstructionWithConstant(.load_constant, Value.undefined);
 
     // 4. Let destructuring be IsDestructuring of lhs.
     const destructuring = switch (lhs) {
@@ -2663,7 +2663,7 @@ fn forInOfBodyEvaluation(
 
     // a. Let nextResult be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
     try executable.addInstruction(.load_iterator_next_args);
-    try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
+    try executable.addInstructionWithConstant(.load_constant, Value.undefined); // No spread args
     try executable.addInstruction(.evaluate_call);
     try executable.addIndex(0); // No arguments
     try executable.addIndex(0); // Strictness doesn't matter here
@@ -2853,7 +2853,7 @@ fn forInOfBodyEvaluation(
         // value that was created for the jump_conditional instruction.
         try jump_index.setTargetHere();
         try executable.addInstruction(.store); // Pop RHS object
-        try executable.addInstructionWithConstant(.store_constant, .undefined);
+        try executable.addInstructionWithConstant(.store_constant, Value.undefined);
 
         try skip_break_jump.setTargetHere();
     }
@@ -2932,7 +2932,7 @@ pub fn codegenReturnStatement(
     // ReturnStatement : return ;
     else {
         // 1. Return Completion Record { [[Type]]: return, [[Value]]: undefined, [[Target]]: empty }.
-        try executable.addInstructionWithConstant(.store_constant, .undefined);
+        try executable.addInstructionWithConstant(.store_constant, Value.undefined);
         try executable.addInstruction(.@"return");
     }
 }
@@ -2983,7 +2983,7 @@ fn caseBlockEvaluation(executable: *Executable, ctx: *Context, case_block: ast.C
     // CaseBlock : { }
     if (case_block.items.len == 0) {
         // 1. Return undefined.
-        try executable.addInstructionWithConstant(.store_constant, .undefined);
+        try executable.addInstructionWithConstant(.store_constant, Value.undefined);
         return;
     }
 
@@ -3069,7 +3069,7 @@ fn caseBlockEvaluation(executable: *Executable, ctx: *Context, case_block: ast.C
                 const skip_jump = try executable.addJumpIndex();
                 try consequent_jumps.items[i].setTargetHere();
                 try executable.addInstruction(.store); // Pop input value
-                try executable.addInstructionWithConstant(.store_constant, .undefined);
+                try executable.addInstructionWithConstant(.store_constant, Value.undefined);
                 try skip_jump.setTargetHere();
                 try codegenStatementList(case_clause.statement_list, executable, ctx);
                 i += 1;
@@ -3079,7 +3079,7 @@ fn caseBlockEvaluation(executable: *Executable, ctx: *Context, case_block: ast.C
                 const skip_jump = try executable.addJumpIndex();
                 try default_or_end_jump.setTargetHere();
                 try executable.addInstruction(.store); // Pop input value
-                try executable.addInstructionWithConstant(.store_constant, .undefined);
+                try executable.addInstructionWithConstant(.store_constant, Value.undefined);
                 try skip_jump.setTargetHere();
                 try codegenStatementList(default_clause.statement_list, executable, ctx);
             },
@@ -3090,7 +3090,7 @@ fn caseBlockEvaluation(executable: *Executable, ctx: *Context, case_block: ast.C
         const skip_jump = try executable.addJumpIndex();
         try default_or_end_jump.setTargetHere();
         try executable.addInstruction(.store); // Pop input value
-        try executable.addInstructionWithConstant(.store_constant, .undefined);
+        try executable.addInstructionWithConstant(.store_constant, Value.undefined);
         try skip_jump.setTargetHere();
     }
 }
@@ -3235,7 +3235,7 @@ pub fn codegenTryStatement(
         const exception_jump_to_catch = try executable.addJumpIndex();
 
         // 1. Let B be Completion(Evaluation of Block).
-        try executable.addInstructionWithConstant(.store_constant, .undefined);
+        try executable.addInstructionWithConstant(.store_constant, Value.undefined);
         try codegenBlock(node.try_block, executable, ctx);
         try executable.addInstruction(.pop_exception_jump_target);
         try executable.addInstruction(.jump);
@@ -3250,7 +3250,7 @@ pub fn codegenTryStatement(
             .create_catch_binding,
             catch_parameter,
         );
-        try executable.addInstructionWithConstant(.store_constant, .undefined);
+        try executable.addInstructionWithConstant(.store_constant, Value.undefined);
         try codegenBlock(node.catch_block.?, executable, ctx);
 
         // 3. Else, let C be B.
@@ -3263,13 +3263,13 @@ pub fn codegenTryStatement(
         const exception_jump_to_finally = try executable.addJumpIndex();
 
         // 1. Let B be Completion(Evaluation of Block).
-        try executable.addInstructionWithConstant(.store_constant, .undefined);
+        try executable.addInstructionWithConstant(.store_constant, Value.undefined);
         try codegenBlock(node.try_block, executable, ctx);
 
         // 2. Let F be Completion(Evaluation of Finally).
         try exception_jump_to_finally.setTargetHere();
         try executable.addInstruction(.pop_exception_jump_target);
-        try executable.addInstructionWithConstant(.store_constant, .undefined);
+        try executable.addInstructionWithConstant(.store_constant, Value.undefined);
         try codegenBlock(node.finally_block.?, executable, ctx);
         try executable.addInstruction(.rethrow_exception_if_any);
 
@@ -3282,7 +3282,7 @@ pub fn codegenTryStatement(
         const exception_jump_to_catch = try executable.addJumpIndex();
 
         // 1. Let B be Completion(Evaluation of Block).
-        try executable.addInstructionWithConstant(.store_constant, .undefined);
+        try executable.addInstructionWithConstant(.store_constant, Value.undefined);
         try codegenBlock(node.try_block, executable, ctx);
         try executable.addInstruction(.jump);
         const finally_jump = try executable.addJumpIndex();
@@ -3298,14 +3298,14 @@ pub fn codegenTryStatement(
             .create_catch_binding,
             catch_parameter,
         );
-        try executable.addInstructionWithConstant(.store_constant, .undefined);
+        try executable.addInstructionWithConstant(.store_constant, Value.undefined);
         try codegenBlock(node.catch_block.?, executable, ctx);
 
         // 4. Let F be Completion(Evaluation of Finally).
         try finally_jump.setTargetHere();
         try exception_jump_to_finally.setTargetHere();
         try executable.addInstruction(.pop_exception_jump_target);
-        try executable.addInstructionWithConstant(.store_constant, .undefined);
+        try executable.addInstructionWithConstant(.store_constant, Value.undefined);
         try codegenBlock(node.finally_block.?, executable, ctx);
         try executable.addInstruction(.rethrow_exception_if_any);
 

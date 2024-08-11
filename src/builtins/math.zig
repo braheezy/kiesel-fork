@@ -493,7 +493,7 @@ pub const Math = struct {
         // 3. For each element number of coerced, do
         for (coerced.items) |number| {
             // a. If number is either +∞𝔽 or -∞𝔽, return +∞𝔽.
-            if (number.isPositiveInf() or number.isNegativeInf()) return Value.infinity();
+            if (number.isPositiveInf() or number.isNegativeInf()) return Value.infinity;
         }
 
         // 4. Let onlyZero be true.
@@ -502,7 +502,7 @@ pub const Math = struct {
         // 5. For each element number of coerced, do
         for (coerced.items) |number| {
             // a. If number is NaN, return NaN.
-            if (number.isNan()) return Value.nan();
+            if (number.isNan()) return Value.nan;
 
             // b. If number is neither +0𝔽 nor -0𝔽, set onlyZero to false.
             if (!number.isZero()) only_zero = false;
@@ -628,7 +628,7 @@ pub const Math = struct {
         // 4. For each element number of coerced, do
         for (coerced.items) |number| {
             // a. If number is NaN, return NaN.
-            if (number.isNan()) return Value.nan();
+            if (number.isNan()) return Value.nan;
 
             // b. If number is +0𝔽 and highest is -0𝔽, set highest to +0𝔽.
             if (number.isPositiveZero() and highest.isNegativeZero()) {
@@ -666,7 +666,7 @@ pub const Math = struct {
         // 4. For each element number of coerced, do
         for (coerced.items) |number| {
             // a. If number is NaN, return NaN.
-            if (number.isNan()) return Value.nan();
+            if (number.isNan()) return Value.nan;
 
             // b. If number is -0𝔽 and lowest is +0𝔽, set lowest to -0𝔽.
             if (number.isNegativeZero() and lowest.isPositiveZero()) {
@@ -856,7 +856,7 @@ pub const Math = struct {
             //            without violating this specification.
 
             // iv. If next is not a Number, then
-            if (next != .number) {
+            if (!next.isNumber()) {
                 // 1. Let error be ThrowCompletion(a newly created TypeError object).
                 const @"error" = agent.throwException(
                     .type_error,
@@ -869,7 +869,7 @@ pub const Math = struct {
             }
 
             // v. Let n be next.
-            const n = next.number;
+            const n = next.asNumber();
 
             // vi. If state is not NOT-A-NUMBER, then
             if (state != .not_a_number) {
@@ -930,11 +930,11 @@ pub const Math = struct {
 
         switch (state) {
             // 8. If state is NOT-A-NUMBER, return NaN.
-            .not_a_number => return Value.nan(),
+            .not_a_number => return Value.nan,
             // 9. If state is PLUS-INFINITY, return +∞𝔽.
-            .plus_infinity => return Value.infinity(),
+            .plus_infinity => return Value.infinity,
             // 10. If state is MINUS-INFINITY, return -∞𝔽.
-            .minus_infinity => return Value.negativeInfinity(),
+            .minus_infinity => return Value.negative_infinity,
             // 11. If state is MINUS-ZERO, return -0𝔽.
             .minus_zero => return Value.from(-0.0),
             // 12. Return 𝔽(sum).
@@ -955,7 +955,7 @@ pub const Math = struct {
                     } else 0.0;
 
                     if (@abs(overflow) > 1.0 or std.math.sign(overflow) == std.math.sign(next)) {
-                        return if (overflow > 0.0) Value.infinity() else Value.negativeInfinity();
+                        return if (overflow > 0.0) Value.infinity else Value.negative_infinity;
                     }
 
                     hi, lo = twoSum(overflow * @"2^1023", next / 2.0);
@@ -966,11 +966,11 @@ pub const Math = struct {
                             if (hi == @"2^1023" and lo == -(max_ulp / 2) and n > 0 and partials.items[n - 1] < 0.0) {
                                 return Value.from(max_f64);
                             }
-                            return Value.infinity();
+                            return Value.infinity;
                         } else if (hi == -@"2^1023" and lo == max_ulp / 2 and n > 0 and partials.items[n - 1] > 0.0) {
                             return Value.from(-max_f64);
                         }
-                        return Value.negativeInfinity();
+                        return Value.negative_infinity;
                     }
 
                     if (lo != 0.0) {

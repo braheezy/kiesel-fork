@@ -28,7 +28,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// Recursively convert a `std.json.Value` to a JS `Value`.
 fn convertJsonValue(agent: *Agent, value: std.json.Value) Allocator.Error!Value {
     return switch (value) {
-        .null => .null,
+        .null => Value.null,
         .bool => |x| Value.from(x),
         .float => |x| Value.from(x),
         .integer => |x| Value.from(@as(f64, @floatFromInt(x))),
@@ -81,14 +81,14 @@ fn internalizeJSONProperty(
     const value = try holder.get(name);
 
     // 2. If val is an Object, then
-    if (value == .object) {
+    if (value.isObject()) {
         // a. Let isArray be ? IsArray(val).
         const is_array = try value.isArray();
 
         // b. If isArray is true, then
         if (is_array) {
             // i. Let len be ? LengthOfArrayLike(val).
-            const len = try value.object.lengthOfArrayLike();
+            const len = try value.asObject().lengthOfArrayLike();
 
             // ii. Let I be 0.
             var i: u53 = 0;
@@ -101,20 +101,20 @@ fn internalizeJSONProperty(
                 // 2. Let newElement be ? InternalizeJSONProperty(val, prop, reviver).
                 const new_element = try internalizeJSONProperty(
                     agent,
-                    value.object,
+                    value.asObject(),
                     property_key,
                     reviver,
                 );
 
                 // 3. If newElement is undefined, then
-                if (new_element == .undefined) {
+                if (new_element.isUndefined()) {
                     // a. Perform ? val.[[Delete]](prop).
-                    _ = try value.object.internalMethods().delete(value.object, property_key);
+                    _ = try value.asObject().internalMethods().delete(value.asObject(), property_key);
                 }
                 // 4. Else,
                 else {
                     // a. Perform ? CreateDataProperty(val, prop, newElement).
-                    _ = try value.object.createDataProperty(property_key, new_element);
+                    _ = try value.asObject().createDataProperty(property_key, new_element);
                 }
 
                 // 5. Set I to I + 1.
@@ -123,7 +123,7 @@ fn internalizeJSONProperty(
         // c. Else,
         else {
             // i. Let keys be ? EnumerableOwnProperties(val, key).
-            const keys = try value.object.enumerableOwnProperties(.key);
+            const keys = try value.asObject().enumerableOwnProperties(.key);
             defer keys.deinit();
 
             // ii. For each String P of keys, do
@@ -133,20 +133,20 @@ fn internalizeJSONProperty(
                 // 1. Let newElement be ? InternalizeJSONProperty(val, P, reviver).
                 const new_element = try internalizeJSONProperty(
                     agent,
-                    value.object,
+                    value.asObject(),
                     property_key,
                     reviver,
                 );
 
                 // 2. If newElement is undefined, then
-                if (new_element == .undefined) {
+                if (new_element.isUndefined()) {
                     // a. Perform ? val.[[Delete]](P).
-                    _ = try value.object.internalMethods().delete(value.object, property_key);
+                    _ = try value.asObject().internalMethods().delete(value.asObject(), property_key);
                 }
                 // 3. Else,
                 else {
                     // a. Perform ? CreateDataProperty(val, P, newElement).
-                    _ = try value.object.createDataProperty(property_key, new_element);
+                    _ = try value.asObject().createDataProperty(property_key, new_element);
                 }
             }
         }
@@ -192,7 +192,7 @@ fn serializeJSONProperty(
     var value = try holder.get(key);
 
     // 2. If value is an Object or value is a BigInt, then
-    if (value == .object or value == .big_int) {
+    if (value.isObject() or value.isBigInt()) {
         // a. Let toJSON be ? GetV(value, "toJSON").
         const to_json = try value.get(agent, PropertyKey.from("toJSON"));
 
@@ -213,67 +213,65 @@ fn serializeJSONProperty(
     }
 
     // 4. If value is an Object, then
-    if (value == .object) {
+    if (value.isObject()) {
         // a. If value has a [[NumberData]] internal slot, then
-        if (value.object.is(builtins.Number)) {
+        if (value.asObject().is(builtins.Number)) {
             // i. Set value to ? ToNumber(value).
             value = Value.from(try value.toNumber(agent));
         }
         // b. Else if value has a [[StringData]] internal slot, then
-        else if (value.object.is(builtins.String)) {
+        else if (value.asObject().is(builtins.String)) {
             // i. Set value to ? ToString(value).
             value = Value.from(try value.toString(agent));
         }
         // c. Else if value has a [[BooleanData]] internal slot, then
-        else if (value.object.is(builtins.Boolean)) {
+        else if (value.asObject().is(builtins.Boolean)) {
             // i. Set value to value.[[BooleanData]].
-            value = Value.from(value.object.as(builtins.Boolean).fields.boolean_data);
+            value = Value.from(value.asObject().as(builtins.Boolean).fields.boolean_data);
         }
         // d. Else if value has a [[BigIntData]] internal slot, then
-        else if (value.object.is(builtins.BigInt)) {
+        else if (value.asObject().is(builtins.BigInt)) {
             // i. Set value to value.[[BigIntData]].
-            value = Value.from(value.object.as(builtins.BigInt).fields.big_int_data);
+            value = Value.from(value.asObject().as(builtins.BigInt).fields.big_int_data);
         }
     }
 
-    switch (value) {
+    switch (value.type()) {
         // 5. If value is null, return "null".
         .null => return String.fromLiteral("null"),
 
         // 6. If value is true, return "true".
         // 7. If value is false, return "false".
-        .boolean => |boolean| return if (boolean) String.fromLiteral("true") else String.fromLiteral("false"),
+        .boolean => return if (value.asBoolean()) String.fromLiteral("true") else String.fromLiteral("false"),
 
         // 8. If value is a String, return QuoteJSONString(value).
-        .string => |string| return try quoteJSONString(agent, string),
+        .string => return try quoteJSONString(agent, value.asString()),
 
         // 9. If value is a Number, then
-        .number => |number| {
+        .number => {
             // a. If value is finite, return ! ToString(value).
-            if (number.isFinite()) return try number.toString(agent.gc_allocator, 10);
+            if (value.asNumber().isFinite()) return try value.asNumber().toString(agent.gc_allocator, 10);
 
             // b. Return "null".
             return String.fromLiteral("null");
         },
 
+        // 10. If value is a BigInt, throw a TypeError exception.
+        .big_int => return agent.throwException(.type_error, "Cannot serialize BigInt to JSON", .{}),
+
+        // 11. If value is an Object and IsCallable(value) is false, then
+        .object => if (!value.isCallable()) {
+            // a. Let isArray be ? IsArray(value).
+            const is_array = try value.isArray();
+
+            // b. If isArray is true, return ? SerializeJSONArray(state, value).
+            if (is_array) return try serializeJSONArray(agent, state, value.asObject());
+
+            // c. Return ? SerializeJSONObject(state, value).
+            return try serializeJSONObject(agent, state, value.asObject());
+        },
+
         else => {},
-    }
-
-    // 10. If value is a BigInt, throw a TypeError exception.
-    if (value == .big_int) {
-        return agent.throwException(.type_error, "Cannot serialize BigInt to JSON", .{});
-    }
-
-    // 11. If value is an Object and IsCallable(value) is false, then
-    if (value == .object and !value.isCallable()) {
-        // a. Let isArray be ? IsArray(value).
-        const is_array = try value.isArray();
-
-        // b. If isArray is true, return ? SerializeJSONArray(state, value).
-        if (is_array) return try serializeJSONArray(agent, state, value.object);
-
-        // c. Return ? SerializeJSONObject(state, value).
-        return try serializeJSONObject(agent, state, value.object);
     }
 
     // 12. Return undefined.
@@ -670,7 +668,7 @@ pub const JSON = struct {
             ) catch |err| try noexcept(err);
 
             // d. Return ? InternalizeJSONProperty(root, rootName, reviver).
-            return internalizeJSONProperty(agent, root, root_name, reviver.object);
+            return internalizeJSONProperty(agent, root, root_name, reviver.asObject());
         }
         // 12. Else,
         else {
@@ -702,11 +700,11 @@ pub const JSON = struct {
         var replacer_function: ?Object = null;
 
         // 5. If replacer is an Object, then
-        if (replacer == .object) {
+        if (replacer.isObject()) {
             // a. If IsCallable(replacer) is true, then
             if (replacer.isCallable()) {
                 // i. Set ReplacerFunction to replacer.
-                replacer_function = replacer.object;
+                replacer_function = replacer.asObject();
             }
             // b. Else,
             else {
@@ -719,7 +717,7 @@ pub const JSON = struct {
                     property_list = PropertyKeyArrayHashMap(void).init(agent.gc_allocator);
 
                     // 2. Let len be ? LengthOfArrayLike(replacer).
-                    const len = try replacer.object.lengthOfArrayLike();
+                    const len = try replacer.asObject().lengthOfArrayLike();
 
                     // 3. Let k be 0.
                     var k: u53 = 0;
@@ -730,36 +728,30 @@ pub const JSON = struct {
                         const property_key = PropertyKey.from(k);
 
                         // b. Let v be ? Get(replacer, prop).
-                        const k_value = try replacer.object.get(property_key);
+                        const k_value = try replacer.asObject().get(property_key);
 
                         // c. Let item be undefined.
                         var item: ?PropertyKey = null;
 
-                        switch (k_value) {
-                            // d. If v is a String, then
-                            .string => |string| {
-                                // i. Set item to v.
-                                item = PropertyKey.from(string);
-                            },
-
-                            // e. Else if v is a Number, then
-                            .number => |number| {
-                                // i. Set item to ! ToString(v).
-                                item = PropertyKey.from(
-                                    try number.toString(agent.gc_allocator, 10),
-                                );
-                            },
-
-                            // f. Else if v is an Object, then
-                            .object => |object| {
-                                // i. If v has a [[StringData]] or [[NumberData]] internal slot,
-                                //    set item to ? ToString(v).
-                                if (object.is(builtins.String) or object.is(builtins.Number)) {
-                                    item = PropertyKey.from(try k_value.toString(agent));
-                                }
-                            },
-
-                            else => {},
+                        // d. If v is a String, then
+                        if (k_value.isString()) {
+                            // i. Set item to v.
+                            item = PropertyKey.from(k_value.asString());
+                        }
+                        // e. Else if v is a Number, then
+                        else if (k_value.isNumber()) {
+                            // i. Set item to ! ToString(v).
+                            item = PropertyKey.from(
+                                try k_value.asNumber().toString(agent.gc_allocator, 10),
+                            );
+                        }
+                        // f. Else if v is an Object, then
+                        else if (k_value.isObject()) {
+                            // i. If v has a [[StringData]] or [[NumberData]] internal slot,
+                            //    set item to ? ToString(v).
+                            if (k_value.asObject().is(builtins.String) or k_value.asObject().is(builtins.Number)) {
+                                item = PropertyKey.from(try k_value.toString(agent));
+                            }
                         }
 
                         // g. If item is not undefined and PropertyList does not contain item, then
@@ -775,52 +767,48 @@ pub const JSON = struct {
         }
 
         // 6. If space is an Object, then
-        if (space == .object) {
+        if (space.isObject()) {
             // a. If space has a [[NumberData]] internal slot, then
-            if (space.object.is(builtins.Number)) {
+            if (space.asObject().is(builtins.Number)) {
                 // i. Set space to ? ToNumber(space).
                 space = Value.from(try space.toNumber(agent));
             }
             // b. Else if space has a [[StringData]] internal slot, then
-            else if (space.object.is(builtins.String)) {
+            else if (space.asObject().is(builtins.String)) {
                 // i. Set space to ? ToString(space).
                 space = Value.from(try space.toString(agent));
             }
         }
 
-        const gap = switch (space) {
-            // 7. If space is a Number, then
-            .number => blk: {
-                // a. Let spaceMV be ! ToIntegerOrInfinity(space).
-                // b. Set spaceMV to min(10, spaceMV).
-                const space_mv = @min(10, space.toIntegerOrInfinity(agent) catch unreachable);
+        // 7. If space is a Number, then
+        const gap = if (space.isNumber()) blk: {
+            // a. Let spaceMV be ! ToIntegerOrInfinity(space).
+            // b. Set spaceMV to min(10, spaceMV).
+            const space_mv = @min(10, space.toIntegerOrInfinity(agent) catch unreachable);
 
-                // c. If spaceMV < 1, let gap be the empty String; otherwise let gap be the String
-                //    value containing spaceMV occurrences of the code unit 0x0020 (SPACE).
-                if (space_mv < 1)
-                    break :blk String.empty
-                else {
-                    const s = try agent.gc_allocator.alloc(u8, @intFromFloat(space_mv));
-                    @memset(s, ' ');
-                    break :blk String.fromAscii(s);
-                }
-            },
-
-            // 8. Else if space is a String, then
-            .string => |string| blk: {
-                // a. If the length of space ≤ 10, let gap be space; otherwise let gap be the
-                //    substring of space from 0 to 10.
-                break :blk if (string.length() <= 10)
-                    string
-                else
-                    try string.substring(agent.gc_allocator, 0, 10);
-            },
-
-            // 9. Else,
-            else => blk: {
-                // a. Let gap be the empty String.
-                break :blk String.empty;
-            },
+            // c. If spaceMV < 1, let gap be the empty String; otherwise let gap be the String
+            //    value containing spaceMV occurrences of the code unit 0x0020 (SPACE).
+            if (space_mv < 1)
+                break :blk String.empty
+            else {
+                const s = try agent.gc_allocator.alloc(u8, @intFromFloat(space_mv));
+                @memset(s, ' ');
+                break :blk String.fromAscii(s);
+            }
+        }
+        // 8. Else if space is a String, then
+        else if (space.isString()) blk: {
+            // a. If the length of space ≤ 10, let gap be space; otherwise let gap be the
+            //    substring of space from 0 to 10.
+            break :blk if (space.asString().length() <= 10)
+                space.asString()
+            else
+                try space.asString().substring(agent.gc_allocator, 0, 10);
+        }
+        // 9. Else,
+        else blk: {
+            // a. Let gap be the empty String.
+            break :blk String.empty;
         };
 
         // 10. Let wrapper be OrdinaryObjectCreate(%Object.prototype%).
@@ -851,6 +839,6 @@ pub const JSON = struct {
         return if (try serializeJSONProperty(agent, &state, PropertyKey.from(""), wrapper)) |string|
             Value.from(string)
         else
-            .undefined;
+            Value.undefined;
     }
 };

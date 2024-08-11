@@ -76,14 +76,14 @@ pub const MapIteratorPrototype = struct {
         //       instance instead of as local variables. This should not be observable.
 
         // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
-        if (this_value != .object or !this_value.object.is(MapIterator)) {
+        if (!this_value.isObject() or !this_value.asObject().is(MapIterator)) {
             return agent.throwException(.type_error, "This value must be a Map Iterator", .{});
         }
-        const map_iterator = this_value.object.as(MapIterator);
+        const map_iterator = this_value.asObject().as(MapIterator);
 
         // 2. If state is completed, return CreateIterResultObject(undefined, true).
         if (map_iterator.fields == .completed) {
-            return Value.from(try createIterResultObject(agent, .undefined, true));
+            return Value.from(try createIterResultObject(agent, Value.undefined, true));
         }
 
         const map = map_iterator.fields.state.map;
@@ -116,7 +116,7 @@ pub const MapIteratorPrototype = struct {
         else {
             map_iterator.fields = .completed;
             map.fields.unregisterIterator();
-            return Value.from(try createIterResultObject(agent, .undefined, true));
+            return Value.from(try createIterResultObject(agent, Value.undefined, true));
         };
 
         map_iterator.fields.state.index = index;

@@ -748,9 +748,9 @@ pub const DateConstructor = struct {
             const value = arguments.get(0);
 
             // b. If value is an Object and value has a [[DateValue]] internal slot, then
-            const time_value = if (value == .object and value.object.is(Date)) blk_tv: {
+            const time_value = if (value.isObject() and value.asObject().is(Date)) blk_tv: {
                 // i. Let tv be value.[[DateValue]].
-                break :blk_tv value.object.as(Date).fields.date_value;
+                break :blk_tv value.asObject().as(Date).fields.date_value;
             }
             // c. Else,
             else blk_tv: {
@@ -758,12 +758,12 @@ pub const DateConstructor = struct {
                 const primitive_value = try value.toPrimitive(agent, null);
 
                 // ii. If v is a String, then
-                if (primitive_value == .string) {
+                if (primitive_value.isString()) {
                     // 1. Assert: The next step never returns an abrupt completion because v is a
                     //    String.
                     // 2. Let tv be the result of parsing v as a date, in exactly the same manner
                     //    as for the parse method (21.4.3.2).
-                    break :blk_tv parseDateTimeString(primitive_value.string);
+                    break :blk_tv parseDateTimeString(primitive_value.asString());
                 }
                 // iii. Else,
                 else {
@@ -970,7 +970,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return DateFromTime(LocalTime(t)).
         return Value.from(dateFromTime(localTime(time_value)));
@@ -987,7 +987,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return WeekDay(LocalTime(t)).
         return Value.from(weekDay(localTime(time_value)));
@@ -1004,7 +1004,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return YearFromTime(LocalTime(t)).
         return Value.from(yearFromTime(localTime(time_value)));
@@ -1021,7 +1021,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return HourFromTime(LocalTime(t)).
         return Value.from(hourFromTime(localTime(time_value)));
@@ -1038,7 +1038,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return msFromTime(LocalTime(t)).
         return Value.from(msFromTime(localTime(time_value)));
@@ -1055,7 +1055,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return MinFromTime(LocalTime(t)).
         return Value.from(minFromTime(localTime(time_value)));
@@ -1072,7 +1072,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return MonthFromTime(LocalTime(t)).
         return Value.from(monthFromTime(localTime(time_value)));
@@ -1089,7 +1089,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return SecFromTime(LocalTime(t)).
         return Value.from(secFromTime(localTime(time_value)));
@@ -1117,7 +1117,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return (t - LocalTime(t)) / msPerMinute.
         return Value.from((time_value - localTime(time_value)) / std.time.ms_per_min);
@@ -1134,7 +1134,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return DateFromTime(t).
         return Value.from(dateFromTime(time_value));
@@ -1151,7 +1151,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return WeekDay(t).
         return Value.from(weekDay(time_value));
@@ -1168,7 +1168,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return YearFromTime(t).
         return Value.from(yearFromTime(time_value));
@@ -1185,7 +1185,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return HourFromTime(t).
         return Value.from(hourFromTime(time_value));
@@ -1202,7 +1202,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return msFromTime(t).
         return Value.from(msFromTime(time_value));
@@ -1219,7 +1219,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return MinFromTime(t).
         return Value.from(minFromTime(time_value));
@@ -1236,7 +1236,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return MonthFromTime(t).
         return Value.from(monthFromTime(time_value));
@@ -1253,7 +1253,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return SecFromTime(t).
         return Value.from(secFromTime(time_value));
@@ -1275,7 +1275,7 @@ pub const DatePrototype = struct {
         const date = (try date_value.toNumber(agent)).asFloat();
 
         // 5. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 6. Set t to LocalTime(t).
         time_value = localTime(time_value);
@@ -1382,7 +1382,7 @@ pub const DatePrototype = struct {
             undefined;
 
         // 8. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 9. Set t to LocalTime(t).
         time_value = localTime(time_value);
@@ -1425,7 +1425,7 @@ pub const DatePrototype = struct {
         const millisecond = (try millisecond_value.toNumber(agent)).asFloat();
 
         // 5. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 6. Set t to LocalTime(t).
         time_value = localTime(time_value);
@@ -1478,7 +1478,7 @@ pub const DatePrototype = struct {
             undefined;
 
         // 7. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 8. Set t to LocalTime(t).
         time_value = localTime(time_value);
@@ -1528,7 +1528,7 @@ pub const DatePrototype = struct {
             undefined;
 
         // 6. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 7. Set t to LocalTime(t).
         time_value = localTime(time_value);
@@ -1575,7 +1575,7 @@ pub const DatePrototype = struct {
             undefined;
 
         // 6. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 7. Set t to LocalTime(t).
         time_value = localTime(time_value);
@@ -1642,7 +1642,7 @@ pub const DatePrototype = struct {
         const date = (try date_value.toNumber(agent)).asFloat();
 
         // 5. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 6. Let newDate be MakeDate(MakeDay(YearFromTime(t), MonthFromTime(t), dt), TimeWithinDay(t)).
         const new_date = makeDate(
@@ -1746,7 +1746,7 @@ pub const DatePrototype = struct {
             undefined;
 
         // 8. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 9. If min is not present, let m be MinFromTime(t).
         if (minute_value == null) minute = @floatFromInt(minFromTime(time_value));
@@ -1790,7 +1790,7 @@ pub const DatePrototype = struct {
         const millisecond = (try millisecond_value.toNumber(agent)).asFloat();
 
         // 5. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 6. Let time be MakeTime(HourFromTime(t), MinFromTime(t), SecFromTime(t), ms).
         const time = makeTime(
@@ -1840,7 +1840,7 @@ pub const DatePrototype = struct {
             undefined;
 
         // 7. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 8. If sec is not present, let s be SecFromTime(t).
         if (second_value == null) second = @floatFromInt(secFromTime(time_value));
@@ -1887,7 +1887,7 @@ pub const DatePrototype = struct {
             undefined;
 
         // 6. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 7. If date is not present, let dt be DateFromTime(t).
         if (date_value == null) date = @floatFromInt(dateFromTime(time_value));
@@ -1931,7 +1931,7 @@ pub const DatePrototype = struct {
             undefined;
 
         // 6. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 7. If ms is not present, let milli be msFromTime(t).
         if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(time_value));
@@ -2035,7 +2035,7 @@ pub const DatePrototype = struct {
         const time_value = try Value.from(object).toPrimitive(agent, .number);
 
         // 3. If tv is a Number and tv is not finite, return null.
-        if (time_value == .number and !time_value.number.isFinite()) return .null;
+        if (time_value.isNumber() and !time_value.asNumber().isFinite()) return Value.null;
 
         // 4. Return ? Invoke(O, "toISOString").
         return Value.from(object).invokeNoArgs(agent, PropertyKey.from("toISOString"));
@@ -2176,15 +2176,15 @@ pub const DatePrototype = struct {
 
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
-        if (this_value != .object) {
+        if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
-        const object = this_value.object;
+        const object = this_value.asObject();
 
-        if (hint_value != .string) {
+        if (!hint_value.isString()) {
             return agent.throwException(.type_error, "{} is not a string", .{hint_value});
         }
-        const hint = hint_value.string;
+        const hint = hint_value.asString();
 
         // 3. If hint is either "string" or "default", then
         const try_first: PreferredType = if (hint.eql(String.fromLiteral("string")) or hint.eql(String.fromLiteral("default"))) blk: {
@@ -2221,7 +2221,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return Value.nan();
+        if (std.math.isNan(time_value)) return Value.nan;
 
         // 5. Return YearFromTime(LocalTime(t)) - 1900𝔽.
         return Value.from(yearFromTime(localTime(time_value)) - 1900);

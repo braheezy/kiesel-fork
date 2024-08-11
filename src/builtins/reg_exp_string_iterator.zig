@@ -86,18 +86,18 @@ pub const RegExpStringIteratorPrototype = struct {
         //       observable.
 
         // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
-        if (this_value != .object or !this_value.object.is(RegExpStringIterator)) {
+        if (!this_value.isObject() or !this_value.asObject().is(RegExpStringIterator)) {
             return agent.throwException(
                 .type_error,
                 "This value must be a RegExp String Iterator",
                 .{},
             );
         }
-        const reg_exp_string_iterator = this_value.object.as(RegExpStringIterator);
+        const reg_exp_string_iterator = this_value.asObject().as(RegExpStringIterator);
 
         // 2. If state is completed, return CreateIterResultObject(undefined, true).
         if (reg_exp_string_iterator.fields == .completed) {
-            return Value.from(try createIterResultObject(agent, .undefined, true));
+            return Value.from(try createIterResultObject(agent, Value.undefined, true));
         }
 
         const reg_exp = reg_exp_string_iterator.fields.state.reg_exp;
@@ -111,7 +111,7 @@ pub const RegExpStringIteratorPrototype = struct {
         // ii. If match is null, return undefined.
         if (match == null) {
             reg_exp_string_iterator.fields = .completed;
-            return Value.from(try createIterResultObject(agent, .undefined, true));
+            return Value.from(try createIterResultObject(agent, Value.undefined, true));
         }
 
         // iii. If global is false, then

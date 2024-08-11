@@ -53,14 +53,14 @@ pub const StringIteratorPrototype = struct {
         //       instance instead of as local variables. This should not be observable.
 
         // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
-        if (this_value != .object or !this_value.object.is(StringIterator)) {
+        if (!this_value.isObject() or !this_value.asObject().is(StringIterator)) {
             return agent.throwException(.type_error, "This value must be an Array Iterator", .{});
         }
-        const string_iterator = this_value.object.as(StringIterator);
+        const string_iterator = this_value.asObject().as(StringIterator);
 
         // 2. If state is completed, return CreateIterResultObject(undefined, true).
         if (string_iterator.fields == .completed) {
-            return Value.from(try createIterResultObject(agent, .undefined, true));
+            return Value.from(try createIterResultObject(agent, Value.undefined, true));
         }
 
         const string = string_iterator.fields.state.string;
@@ -90,7 +90,7 @@ pub const StringIteratorPrototype = struct {
 
         // d. Return undefined.
         string_iterator.fields = .completed;
-        return Value.from(try createIterResultObject(agent, .undefined, true));
+        return Value.from(try createIterResultObject(agent, Value.undefined, true));
     }
 };
 

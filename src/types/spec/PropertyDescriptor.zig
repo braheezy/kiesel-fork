@@ -101,7 +101,7 @@ pub fn fromPropertyDescriptor(self: Self, agent: *Agent) Allocator.Error!Object 
         // a. Perform ! CreateDataPropertyOrThrow(obj, "get", Desc.[[Get]]).
         object.createDataPropertyOrThrow(
             PropertyKey.from("get"),
-            if (get) |o| Value.from(o) else .undefined,
+            if (get) |o| Value.from(o) else Value.undefined,
         ) catch |err| try noexcept(err);
     }
 
@@ -110,7 +110,7 @@ pub fn fromPropertyDescriptor(self: Self, agent: *Agent) Allocator.Error!Object 
         // a. Perform ! CreateDataPropertyOrThrow(obj, "set", Desc.[[Set]]).
         object.createDataPropertyOrThrow(
             PropertyKey.from("set"),
-            if (set) |o| Value.from(o) else .undefined,
+            if (set) |o| Value.from(o) else Value.undefined,
         ) catch |err| try noexcept(err);
     }
 
@@ -148,7 +148,7 @@ pub fn completePropertyDescriptor(self: *Self) void {
     //      [[Configurable]]: false
     //    }.
     const like: Self = .{
-        .value = .undefined,
+        .value = Value.undefined,
         .writable = false,
         .enumerable = false,
         .configurable = false,
@@ -207,12 +207,12 @@ test "isAccessorDescriptor" {
     try std.testing.expect((Self{ .get = getter }).isAccessorDescriptor());
     try std.testing.expect((Self{ .set = setter }).isAccessorDescriptor());
     try std.testing.expect((Self{ .get = getter, .set = setter }).isAccessorDescriptor());
-    try std.testing.expect(!(Self{ .value = .undefined }).isAccessorDescriptor());
+    try std.testing.expect(!(Self{ .value = Value.undefined }).isAccessorDescriptor());
     try std.testing.expect(!(Self{}).isAccessorDescriptor());
 }
 
 test "isDataDescriptor" {
-    try std.testing.expect((Self{ .value = .undefined }).isDataDescriptor());
+    try std.testing.expect((Self{ .value = Value.undefined }).isDataDescriptor());
     try std.testing.expect((Self{ .writable = true }).isDataDescriptor());
     try std.testing.expect(!(Self{ .writable = null }).isDataDescriptor());
     try std.testing.expect(!(Self{}).isDataDescriptor());

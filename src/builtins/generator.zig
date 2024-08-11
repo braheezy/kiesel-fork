@@ -183,7 +183,7 @@ pub fn generatorStart(
             //     i. Let resultValue be result.[[Value]].
             const result_value = if (result) |completion| blk: {
                 std.debug.assert(completion.type == .normal or completion.type == .@"return");
-                break :blk completion.value orelse .undefined;
+                break :blk completion.value orelse Value.undefined;
             }
             // k. Else,
             else |err| {
@@ -241,12 +241,12 @@ pub fn generatorResume(agent: *Agent, generator_value: Value, value: Value) Agen
     const state = try generatorValidate(agent, generator_value);
 
     // 2. If state is completed, return CreateIterResultObject(undefined, true).
-    if (state == .completed) return createIterResultObject(agent, .undefined, true);
+    if (state == .completed) return createIterResultObject(agent, Value.undefined, true);
 
     // 3. Assert: state is either suspended-start or suspended-yield.
     std.debug.assert(state == .suspended_start or state == .suspended_yield);
 
-    const generator = generator_value.object.as(Generator);
+    const generator = generator_value.asObject().as(Generator);
 
     // 4. Let genContext be generator.[[GeneratorContext]].
     const generator_context = generator.fields.generator_context;
@@ -290,7 +290,7 @@ pub fn generatorResumeAbrupt(
     // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
     var state = try generatorValidate(agent, generator_value);
 
-    const generator = generator_value.object.as(Generator);
+    const generator = generator_value.asObject().as(Generator);
 
     // 2. If state is suspended-start, then
     if (state == .suspended_start) {

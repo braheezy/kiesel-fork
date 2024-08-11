@@ -78,7 +78,7 @@ pub const ErrorConstructor = struct {
         object.data.internal_methods.set = internalSet;
 
         // 3. If message is not undefined, then
-        if (message != .undefined) {
+        if (!message.isUndefined()) {
             // a. Let msg be ? ToString(message).
             const msg = try message.toString(agent);
 
@@ -109,11 +109,11 @@ fn internalSet(
     value: Value,
     receiver: Value,
 ) Agent.Error!bool {
-    if (property_key == .string and value == .string) {
+    if (property_key == .string and value.isString()) {
         if (property_key.string.eql(String.fromLiteral("name"))) {
-            object.as(Error).fields.error_data.name = value.string;
+            object.as(Error).fields.error_data.name = value.asString();
         } else if (property_key.string.eql(String.fromLiteral("message"))) {
-            object.as(Error).fields.error_data.message = value.string;
+            object.as(Error).fields.error_data.message = value.asString();
         }
     }
     return builtins.ordinarySet(object, property_key, value, receiver);
@@ -161,22 +161,22 @@ pub const ErrorPrototype = struct {
     fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. If O is not an Object, throw a TypeError exception.
-        if (this_value != .object) {
+        if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{this_value});
         }
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let name be ? Get(O, "name").
         const name = try object.get(PropertyKey.from("name"));
 
         // 4. If name is undefined, set name to "Error"; otherwise set name to ? ToString(name).
-        const name_string = if (name == .undefined) String.fromLiteral("Error") else try name.toString(agent);
+        const name_string = if (name.isUndefined()) String.fromLiteral("Error") else try name.toString(agent);
 
         // 5. Let msg be ? Get(O, "message").
         const msg = try object.get(PropertyKey.from("message"));
 
         // 6. If msg is undefined, set msg to the empty String; otherwise set msg to ? ToString(msg).
-        const msg_string = if (msg == .undefined) String.empty else try msg.toString(agent);
+        const msg_string = if (msg.isUndefined()) String.empty else try msg.toString(agent);
 
         // 7. If name is the empty String, return msg.
         if (name_string.isEmpty()) return Value.from(msg_string);
@@ -301,7 +301,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
             object.data.internal_methods.set = internalSet;
 
             // 3. If message is not undefined, then
-            if (message != .undefined) {
+            if (!message.isUndefined()) {
                 // a. Let msg be ? ToString(message).
                 const msg = try message.toString(agent);
 
@@ -425,7 +425,7 @@ pub const AggregateErrorConstructor = struct {
         object.data.internal_methods.set = internalSet;
 
         // 3. If message is not undefined, then
-        if (message != .undefined) {
+        if (!message.isUndefined()) {
             // a. Let msg be ? ToString(message).
             const msg = try message.toString(agent);
 
@@ -515,7 +515,7 @@ pub const AggregateError = MakeObject(.{
 /// https://tc39.es/ecma262/#sec-installerrorcause
 fn installErrorCause(agent: *Agent, object: Object, options: Value) Agent.Error!void {
     // 1. If options is an Object and ? HasProperty(options, "cause") is true, then
-    if (options == .object and try options.object.hasProperty(PropertyKey.from("cause"))) {
+    if (options.isObject() and try options.asObject().hasProperty(PropertyKey.from("cause"))) {
         // a. Let cause be ? Get(options, "cause").
         const cause = try options.get(agent, PropertyKey.from("cause"));
 

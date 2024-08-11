@@ -136,7 +136,7 @@ fn continueDynamicImport(
 
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « moduleCompletion.[[Value]] »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
-                .undefined,
+                Value.undefined,
                 &.{exception},
             ) catch |err_| try noexcept(err_);
 
@@ -165,12 +165,12 @@ fn continueDynamicImport(
 
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « reason »).
             _ = Value.from(promise_capability_.reject).callAssumeCallable(
-                .undefined,
+                Value.undefined,
                 &.{reason},
             ) catch |err| try noexcept(err);
 
             // b. Return unused.
-            return .undefined;
+            return Value.undefined;
         }
     }.func;
 
@@ -215,12 +215,12 @@ fn continueDynamicImport(
 
                     // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « link.[[Value]] »).
                     _ = Value.from(promise_capability_.reject).callAssumeCallable(
-                        .undefined,
+                        Value.undefined,
                         &.{exception},
                     ) catch |err_| try noexcept(err_);
 
                     // ii. Return unused.
-                    return .undefined;
+                    return Value.undefined;
                 },
             };
 
@@ -250,12 +250,12 @@ fn continueDynamicImport(
 
                     // ii. Perform ! Call(promiseCapability.[[Resolve]], undefined, « namespace »).
                     _ = Value.from(promise_capability__.resolve).callAssumeCallable(
-                        .undefined,
+                        Value.undefined,
                         &.{Value.from(namespace)},
                     ) catch |err| try noexcept(err);
 
                     // iii. Return unused.
-                    return .undefined;
+                    return Value.undefined;
                 }
             }.func;
 
@@ -276,7 +276,7 @@ fn continueDynamicImport(
             );
 
             // g. Return unused.
-            return .undefined;
+            return Value.undefined;
         }
     }.func;
 

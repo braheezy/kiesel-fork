@@ -200,14 +200,14 @@ pub const LocaleConstructor = struct {
         );
 
         // 7. If tag is not a String and tag is not an Object, throw a TypeError exception.
-        if (tag_value != .string and tag_value != .object) {
+        if (!tag_value.isString() and !tag_value.isObject()) {
             return agent.throwException(.type_error, "Locale must be string or object", .{});
         }
 
         // 8. If tag an is Object and tag has an [[InitializedLocale]] internal slot, then
-        const tag_string = if (tag_value == .object and tag_value.object.is(Locale)) blk: {
+        const tag_string = if (tag_value.isObject() and tag_value.asObject().is(Locale)) blk: {
             // a. Let tag be tag.[[Locale]].
-            break :blk String.fromAscii(try tag_value.object.as(Locale).fields.locale.toString(agent.gc_allocator));
+            break :blk String.fromAscii(try tag_value.asObject().as(Locale).fields.locale.toString(agent.gc_allocator));
         }
         // 9. Else,
         else blk: {
@@ -498,7 +498,7 @@ pub const LocalePrototype = struct {
                     "ca",
                 ) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
-                } orelse return .undefined,
+                } orelse return Value.undefined,
             ),
         );
     }
@@ -518,7 +518,7 @@ pub const LocalePrototype = struct {
                     "kf",
                 ) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
-                } orelse return .undefined,
+                } orelse return Value.undefined,
             ),
         );
     }
@@ -538,7 +538,7 @@ pub const LocalePrototype = struct {
                     "co",
                 ) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
-                } orelse return .undefined,
+                } orelse return Value.undefined,
             ),
         );
     }
@@ -558,7 +558,7 @@ pub const LocalePrototype = struct {
                     "hc",
                 ) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
-                } orelse return .undefined,
+                } orelse return Value.undefined,
             ),
         );
     }
@@ -595,7 +595,7 @@ pub const LocalePrototype = struct {
                     "nu",
                 ) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
-                } orelse return .undefined,
+                } orelse return Value.undefined,
             ),
         );
     }
@@ -623,7 +623,7 @@ pub const LocalePrototype = struct {
         // 3. Return GetLocaleScript(loc.[[Locale]]).
         return Value.from(
             String.fromAscii(
-                try locale.fields.locale.script(agent.gc_allocator) orelse return .undefined,
+                try locale.fields.locale.script(agent.gc_allocator) orelse return Value.undefined,
             ),
         );
     }
@@ -638,7 +638,7 @@ pub const LocalePrototype = struct {
         // 3. Return GetLocaleRegion(loc.[[Locale]]).
         return Value.from(
             String.fromAscii(
-                try locale.fields.locale.region(agent.gc_allocator) orelse return .undefined,
+                try locale.fields.locale.region(agent.gc_allocator) orelse return Value.undefined,
             ),
         );
     }

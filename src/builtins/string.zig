@@ -274,7 +274,7 @@ pub fn getSubstitution(
                 //     a. Let refReplacement be the empty String.
                 // 6. Else,
                 //     a. Let refReplacement be ? ToString(capture).
-                const ref_replacement = if (capture == .undefined)
+                const ref_replacement = if (capture.isUndefined())
                     types.String.empty
                 else
                     try capture.toString(agent);
@@ -537,8 +537,8 @@ pub const StringConstructor = struct {
             // 2. Else,
             else {
                 // a. If NewTarget is undefined and value is a Symbol, return SymbolDescriptiveString(value).
-                if (new_target == null and value == .symbol) {
-                    return Value.from(try value.symbol.descriptiveString(agent));
+                if (new_target == null and value.isSymbol()) {
+                    return Value.from(try value.asSymbol().descriptiveString(agent));
                 }
 
                 // b. Let s be ? ToString(value).
@@ -763,21 +763,17 @@ pub const StringPrototype = struct {
     /// 22.1.3.35.1 ThisStringValue ( value )
     /// https://tc39.es/ecma262/#sec-thisstringvalue
     fn thisStringValue(agent: *Agent, value: Value) error{ExceptionThrown}!types.String {
-        switch (value) {
-            // 1. If value is a String, return value.
-            .string => |string| return string,
+        // 1. If value is a String, return value.
+        if (value.isString()) return value.asString();
 
-            // 2. If value is an Object and value has a [[StringData]] internal slot, then
-            .object => |object| if (object.is(String)) {
-                // a. Let s be value.[[StringData]].
-                // b. Assert: s is a String.
-                const s = object.as(String).fields.string_data;
+        // 2. If value is an Object and value has a [[StringData]] internal slot, then
+        if (value.isObject() and value.asObject().is(String)) {
+            // a. Let s be value.[[StringData]].
+            // b. Assert: s is a String.
+            const s = value.asObject().as(String).fields.string_data;
 
-                // c. Return s.
-                return s;
-            },
-
-            else => {},
+            // c. Return s.
+            return s;
         }
 
         // 3. Throw a TypeError exception.
@@ -815,7 +811,7 @@ pub const StringPrototype = struct {
             @as(f64, @floatFromInt(len)) + relative_index;
 
         // 7. If k < 0 or k ≥ len, return undefined.
-        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return .undefined;
+        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return Value.undefined;
         const k: usize = @intFromFloat(k_f64);
 
         // 8. Return the substring of S from k to k + 1.
@@ -865,7 +861,7 @@ pub const StringPrototype = struct {
         const size = string.length();
 
         // 5. If position < 0 or position ≥ size, return NaN.
-        if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return Value.nan();
+        if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return Value.nan;
         const position: usize = @intFromFloat(position_f64);
 
         // 6. Return the Number value for the numeric value of the code unit at index position
@@ -891,7 +887,7 @@ pub const StringPrototype = struct {
         const size = string.length();
 
         // 5. If position < 0 or position ≥ size, return undefined.
-        if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return .undefined;
+        if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return Value.undefined;
         const position: usize = @intFromFloat(position_f64);
 
         // 6. Let cp be CodePointAt(S, position).
@@ -959,7 +955,7 @@ pub const StringPrototype = struct {
         const len = string.length();
 
         // 7. If endPosition is undefined, let pos be len; else let pos be ? ToIntegerOrInfinity(endPosition).
-        const pos = if (end_position == .undefined)
+        const pos = if (end_position.isUndefined())
             @as(f64, @floatFromInt(len))
         else
             try end_position.toIntegerOrInfinity(agent);
@@ -1169,7 +1165,7 @@ pub const StringPrototype = struct {
         const object = try this_value.requireObjectCoercible(agent);
 
         // 2. If regexp is neither undefined nor null, then
-        if (regexp != .undefined and regexp != .null) {
+        if (!regexp.isUndefined() and !regexp.isNull()) {
             // a. Let matcher be ? GetMethod(regexp, %Symbol.match%).
             const matcher = try regexp.getMethod(
                 agent,
@@ -1187,7 +1183,7 @@ pub const StringPrototype = struct {
         const string = try object.toString(agent);
 
         // 4. Let rx be ? RegExpCreate(regexp, undefined).
-        const rx = try regExpCreate(agent, regexp, .undefined);
+        const rx = try regExpCreate(agent, regexp, Value.undefined);
 
         // 5. Return ? Invoke(rx, %Symbol.match%, « S »).
         return Value.from(rx).invoke(
@@ -1206,14 +1202,14 @@ pub const StringPrototype = struct {
         const object = try this_value.requireObjectCoercible(agent);
 
         // 2. If regexp is neither undefined nor null, then
-        if (regexp != .undefined and regexp != .null) {
+        if (!regexp.isUndefined() and !regexp.isNull()) {
             // a. Let isRegExp be ? IsRegExp(regexp).
             const is_reg_exp = try regexp.isRegExp();
 
             // b. If isRegExp is true, then
             if (is_reg_exp) {
                 // i. Let flags be ? Get(regexp, "flags").
-                const flags = try regexp.object.get(PropertyKey.from("flags"));
+                const flags = try regexp.asObject().get(PropertyKey.from("flags"));
 
                 // ii. Perform ? RequireObjectCoercible(flags).
                 _ = try flags.requireObjectCoercible(agent);
@@ -1309,7 +1305,7 @@ pub const StringPrototype = struct {
         // 5. If fillString is undefined, set fillString to the String value consisting solely of
         //    the code unit 0x0020 (SPACE).
         // 6. Else, set fillString to ? ToString(fillString).
-        const fill_string = if (fill_string_value == .undefined)
+        const fill_string = if (fill_string_value.isUndefined())
             types.String.fromLiteral(" ")
         else
             try fill_string_value.toString(agent);
@@ -1367,7 +1363,7 @@ pub const StringPrototype = struct {
         const object = try this_value.requireObjectCoercible(agent);
 
         // 2. If searchValue is neither undefined nor null, then
-        if (search_value != .undefined and search_value != .null) {
+        if (!search_value.isUndefined() and !search_value.isNull()) {
             // a. Let replacer be ? GetMethod(searchValue, %Symbol.replace%).
             const replacer = try search_value.getMethod(
                 agent,
@@ -1394,7 +1390,7 @@ pub const StringPrototype = struct {
         const functional_replace = replace_value.isCallable();
 
         // 6. If functionalReplace is false, then
-        if (!functional_replace and replace_value != .string) {
+        if (!functional_replace and !replace_value.isString()) {
             // a. Set replaceValue to ? ToString(replaceValue).
             replace_value = Value.from(try replace_value.toString(agent));
         }
@@ -1424,7 +1420,7 @@ pub const StringPrototype = struct {
             //    𝔽(position), string »)).
             break :blk try (try replace_value.call(
                 agent,
-                .undefined,
+                Value.undefined,
                 &.{
                     Value.from(search_string),
                     Value.from(@as(f64, @floatFromInt(position.?))),
@@ -1435,7 +1431,7 @@ pub const StringPrototype = struct {
         // 13. Else,
         else blk: {
             // a. Assert: replaceValue is a String.
-            std.debug.assert(replace_value == .string);
+            std.debug.assert(replace_value.isString());
 
             // b. Let captures be a new empty List.
             // c. Let replacement be ! GetSubstitution(searchString, string, position, captures,
@@ -1447,7 +1443,7 @@ pub const StringPrototype = struct {
                 position.?,
                 &.{},
                 null,
-                replace_value.string,
+                replace_value.asString(),
             ) catch |err| try noexcept(err);
         };
 
@@ -1467,7 +1463,7 @@ pub const StringPrototype = struct {
         const object = try this_value.requireObjectCoercible(agent);
 
         // 2. If searchValue is neither undefined nor null, then
-        if (search_value != .undefined and search_value != .null) {
+        if (!search_value.isUndefined() and !search_value.isNull()) {
             // a. Let isRegExp be ? IsRegExp(searchValue).
             const is_reg_exp = try search_value.isRegExp();
 
@@ -1515,7 +1511,7 @@ pub const StringPrototype = struct {
         const functional_replace = replace_value.isCallable();
 
         // 6. If functionalReplace is false, then
-        if (!functional_replace and replace_value != .string) {
+        if (!functional_replace and !replace_value.isString()) {
             // a. Set replaceValue to ? ToString(replaceValue).
             replace_value = Value.from(try replace_value.toString(agent));
         }
@@ -1558,7 +1554,7 @@ pub const StringPrototype = struct {
                 // i. Let replacement be ? ToString(? Call(replaceValue, undefined, « searchString,
                 //    𝔽(p), string »)).
                 break :blk try (try replace_value.callAssumeCallable(
-                    .undefined,
+                    Value.undefined,
                     &.{
                         Value.from(search_string),
                         Value.from(@as(f64, @floatFromInt(position))),
@@ -1569,7 +1565,7 @@ pub const StringPrototype = struct {
             // c. Else,
             else blk: {
                 // i. Assert: replaceValue is a String.
-                std.debug.assert(replace_value == .string);
+                std.debug.assert(replace_value.isString());
 
                 // ii. Let captures be a new empty List.
                 // iii. Let replacement be ! GetSubstitution(searchString, string, p, captures,
@@ -1581,7 +1577,7 @@ pub const StringPrototype = struct {
                     position,
                     &.{},
                     null,
-                    replace_value.string,
+                    replace_value.asString(),
                 ) catch |err| try noexcept(err);
             };
 
@@ -1622,7 +1618,7 @@ pub const StringPrototype = struct {
         const object = try this_value.requireObjectCoercible(agent);
 
         // 2. If regexp is neither undefined nor null, then
-        if (regexp != .undefined and regexp != .null) {
+        if (!regexp.isUndefined() and !regexp.isNull()) {
             // a. Let searcher be ? GetMethod(regexp, %Symbol.search%).
             const searcher = try regexp.getMethod(
                 agent,
@@ -1640,7 +1636,7 @@ pub const StringPrototype = struct {
         const string = try object.toString(agent);
 
         // 4. Let rx be ? RegExpCreate(regexp, undefined).
-        const rx = try regExpCreate(agent, regexp, .undefined);
+        const rx = try regExpCreate(agent, regexp, Value.undefined);
 
         // 5. Return ? Invoke(rx, %Symbol.search%, « string »).
         return Value.from(rx).invoke(
@@ -1684,7 +1680,7 @@ pub const StringPrototype = struct {
         const from: u53 = @intFromFloat(from_f64);
 
         // 8. If end is undefined, let intEnd be len; else let intEnd be ? ToIntegerOrInfinity(end).
-        const int_end = if (end == .undefined)
+        const int_end = if (end.isUndefined())
             len_f64
         else
             try end.toIntegerOrInfinity(agent);
@@ -1726,7 +1722,7 @@ pub const StringPrototype = struct {
         const object = try this_value.requireObjectCoercible(agent);
 
         // 2. If separator is neither undefined nor null, then
-        if (separator_value != .undefined and separator_value != .null) {
+        if (!separator_value.isUndefined() and !separator_value.isNull()) {
             // a. Let splitter be ? GetMethod(separator, %Symbol.split%).
             const splitter = try separator_value.getMethod(
                 agent,
@@ -1747,7 +1743,7 @@ pub const StringPrototype = struct {
         const string = try object.toString(agent);
 
         // 4. If limit is undefined, let lim be 2**32 - 1; else let lim be ℝ(? ToUint32(limit)).
-        const limit = if (limit_value == .undefined)
+        const limit = if (limit_value.isUndefined())
             std.math.maxInt(u32)
         else
             try limit_value.toUint32(agent);
@@ -1762,7 +1758,7 @@ pub const StringPrototype = struct {
         }
 
         // 7. If separator is undefined, then
-        if (separator_value == .undefined) {
+        if (separator_value.isUndefined()) {
             // a. Return CreateArrayFromList(« S »).
             return Value.from(try createArrayFromList(agent, &.{Value.from(string)}));
         }
@@ -1890,7 +1886,7 @@ pub const StringPrototype = struct {
         const len = string.length();
 
         // 7. If position is undefined, let pos be 0; else let pos be ? ToIntegerOrInfinity(position).
-        const pos = if (position == .undefined) 0 else try position.toIntegerOrInfinity(agent);
+        const pos = if (position.isUndefined()) 0 else try position.toIntegerOrInfinity(agent);
 
         // 8. Let start be the result of clamping pos between 0 and len.
         const start = std.math.clamp(std.math.lossyCast(usize, pos), 0, len);
@@ -1936,7 +1932,7 @@ pub const StringPrototype = struct {
         const int_start = try start.toIntegerOrInfinity(agent);
 
         // 5. If end is undefined, let intEnd be len; else let intEnd be ? ToIntegerOrInfinity(end).
-        const int_end = if (end == .undefined)
+        const int_end = if (end.isUndefined())
             @as(f64, @floatFromInt(len))
         else
             try end.toIntegerOrInfinity(agent);
@@ -2194,7 +2190,7 @@ pub const StringPrototype = struct {
         }
 
         // 8. If length is undefined, let intLength be size; otherwise let intLength be ? ToIntegerOrInfinity(length).
-        var int_length = if (length == .undefined)
+        var int_length = if (length.isUndefined())
             size
         else
             try length.toIntegerOrInfinity(agent);

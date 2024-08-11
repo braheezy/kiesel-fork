@@ -336,7 +336,7 @@ pub fn newFunctionEnvironment(
         // 6. Set env.[[OuterEnv]] to F.[[Environment]].
         .declarative_environment = try newDeclarativeEnvironment(allocator, function.fields.environment),
 
-        .this_value = .undefined,
+        .this_value = Value.undefined,
     };
 
     // 7. Return env.

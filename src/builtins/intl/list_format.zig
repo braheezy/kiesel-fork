@@ -322,7 +322,7 @@ fn formatList(
 /// https://tc39.es/ecma402/#sec-createstringlistfromiterable
 fn stringListFromIterable(agent: *Agent, iterable: Value) Agent.Error![]const []const u8 {
     // 1. If iterable is undefined, then
-    if (iterable == .undefined) {
+    if (iterable.isUndefined()) {
         // a. Return a new empty List.
         return &.{};
     }
@@ -339,7 +339,7 @@ fn stringListFromIterable(agent: *Agent, iterable: Value) Agent.Error![]const []
     //         i. Return list.
     while (try iterator.stepValue()) |next| {
         // c. If next is not a String, then
-        if (next != .string) {
+        if (!next.isString()) {
             // i. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
@@ -352,7 +352,7 @@ fn stringListFromIterable(agent: *Agent, iterable: Value) Agent.Error![]const []
         }
 
         // d. Append next to list.
-        try list.append(try next.string.toUtf8(agent.gc_allocator));
+        try list.append(try next.asString().toUtf8(agent.gc_allocator));
     }
     return list.toOwnedSlice();
 }

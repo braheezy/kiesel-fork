@@ -166,7 +166,7 @@ fn getOwnProperty(object: Object, property_key: PropertyKey) Allocator.Error!?Pr
         );
 
         // ii. If value is undefined, return undefined.
-        if (value == .undefined) return null;
+        if (value.isUndefined()) return null;
 
         // iii. Return the PropertyDescriptor {
         //        [[Value]]: value, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true
@@ -271,7 +271,7 @@ fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value)
         const numeric_index: f64 = @floatFromInt(property_key.integer_index);
 
         // i. If SameValue(O, Receiver) is true, then
-        if (receiver == .object and object.sameValue(receiver.object)) {
+        if (receiver.isObject() and object.sameValue(receiver.asObject())) {
             // 1. Perform ? TypedArraySetElement(O, numericIndex, V).
             try typedArraySetElement(agent, object.as(TypedArray), numeric_index, value);
 
@@ -540,7 +540,7 @@ fn isValidIntegerIndex(typed_array: *const TypedArray, index: f64) bool {
 /// https://tc39.es/ecma262/#sec-typedarraygetelement
 fn typedArrayGetElement(agent: *Agent, typed_array: *const TypedArray, index: u53) Allocator.Error!Value {
     // 1. If IsValidIntegerIndex(O, index) is false, return undefined.
-    if (!isValidIntegerIndex(typed_array, @floatFromInt(index))) return .undefined;
+    if (!isValidIntegerIndex(typed_array, @floatFromInt(index))) return Value.undefined;
 
     // 2. Let offset be O.[[ByteOffset]].
     const offset = typed_array.fields.byte_offset;
@@ -673,7 +673,7 @@ pub const TypedArrayConstructor = struct {
         }
 
         // 3. If mapfn is undefined, then
-        const mapping = if (map_fn == .undefined) blk: {
+        const mapping = if (map_fn.isUndefined()) blk: {
             // a. Let mapping be false.
             break :blk false;
         }
@@ -707,7 +707,7 @@ pub const TypedArrayConstructor = struct {
             // c. Let targetObj be ? TypedArrayCreateFromConstructor(C, « 𝔽(len) »).
             const target_object = try typedArrayCreateFromConstructor(
                 agent,
-                constructor_.object,
+                constructor_.asObject(),
                 &.{Value.from(@as(u53, @intCast(len)))},
             );
 
@@ -758,7 +758,7 @@ pub const TypedArrayConstructor = struct {
         // 10. Let targetObj be ? TypedArrayCreateFromConstructor(C, « 𝔽(len) »).
         const target_object = try typedArrayCreateFromConstructor(
             agent,
-            constructor_.object,
+            constructor_.asObject(),
             &.{Value.from(len)},
         );
 
@@ -814,7 +814,7 @@ pub const TypedArrayConstructor = struct {
         // 4. Let newObj be ? TypedArrayCreateFromConstructor(C, « 𝔽(len) »).
         const new_object = try typedArrayCreateFromConstructor(
             agent,
-            constructor_.object,
+            constructor_.asObject(),
             &.{Value.from(@as(u53, @intCast(len)))},
         );
 
@@ -916,7 +916,7 @@ pub const TypedArrayPrototype = struct {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -934,7 +934,7 @@ pub const TypedArrayPrototype = struct {
             @as(f64, @floatFromInt(len)) + relative_index;
 
         // 7. If k < 0 or k ≥ len, return undefined.
-        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return .undefined;
+        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return Value.undefined;
         const k: u53 = @intFromFloat(k_f64);
 
         // 8. Return ! Get(O, ! ToString(𝔽(k))).
@@ -1006,7 +1006,7 @@ pub const TypedArrayPrototype = struct {
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         var ta = try validateTypedArray(agent, this_value, .seq_cst);
         const typed_array = ta.object;
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         var len = typedArrayLength(ta);
@@ -1048,7 +1048,7 @@ pub const TypedArrayPrototype = struct {
 
         // 12. If end is undefined, let relativeEnd be len; else let relativeEnd be
         //     ? ToIntegerOrInfinity(end).
-        const relative_end = if (end == .undefined)
+        const relative_end = if (end.isUndefined())
             len_f64
         else
             try end.toIntegerOrInfinity(agent);
@@ -1197,7 +1197,7 @@ pub const TypedArrayPrototype = struct {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -1245,7 +1245,7 @@ pub const TypedArrayPrototype = struct {
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         var ta = try validateTypedArray(agent, this_value, .seq_cst);
         const typed_array = ta.object;
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         var len = typedArrayLength(ta);
@@ -1277,7 +1277,7 @@ pub const TypedArrayPrototype = struct {
 
         // 10. If end is undefined, let relativeEnd be len; else let relativeEnd be
         //     ? ToIntegerOrInfinity(end).
-        const relative_end = if (end == .undefined)
+        const relative_end = if (end.isUndefined())
             len_f64
         else
             try end.toIntegerOrInfinity(agent);
@@ -1337,7 +1337,7 @@ pub const TypedArrayPrototype = struct {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -1416,7 +1416,7 @@ pub const TypedArrayPrototype = struct {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -1437,7 +1437,7 @@ pub const TypedArrayPrototype = struct {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -1458,7 +1458,7 @@ pub const TypedArrayPrototype = struct {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -1479,7 +1479,7 @@ pub const TypedArrayPrototype = struct {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -1500,7 +1500,7 @@ pub const TypedArrayPrototype = struct {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -1531,7 +1531,7 @@ pub const TypedArrayPrototype = struct {
         }
 
         // 7. Return undefined.
-        return .undefined;
+        return Value.undefined;
     }
 
     /// 23.2.3.16 %TypedArray%.prototype.includes ( searchElement [ , fromIndex ] )
@@ -1543,7 +1543,7 @@ pub const TypedArrayPrototype = struct {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -1555,7 +1555,7 @@ pub const TypedArrayPrototype = struct {
         var n = try from_index.toIntegerOrInfinity(agent);
 
         // 6. Assert: If fromIndex is undefined, then n is 0.
-        if (from_index == .undefined) std.debug.assert(n == 0);
+        if (from_index.isUndefined()) std.debug.assert(n == 0);
 
         // 7. If n = +∞, return false.
         if (std.math.isPositiveInf(n)) return Value.from(false);
@@ -1596,7 +1596,7 @@ pub const TypedArrayPrototype = struct {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -1608,7 +1608,7 @@ pub const TypedArrayPrototype = struct {
         var n = try from_index.toIntegerOrInfinity(agent);
 
         // 6. Assert: If fromIndex is undefined, then n is 0.
-        if (from_index == .undefined) std.debug.assert(n == 0);
+        if (from_index.isUndefined()) std.debug.assert(n == 0);
 
         // 7. If n = +∞, return -1𝔽.
         if (std.math.isPositiveInf(n)) return Value.from(-1);
@@ -1654,14 +1654,14 @@ pub const TypedArrayPrototype = struct {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
 
         // 4. If separator is undefined, let sep be ",".
         // 5. Else, let sep be ? ToString(separator).
-        const sep: String.Builder.Segment = if (separator == .undefined)
+        const sep: String.Builder.Segment = if (separator.isUndefined())
             .{ .char = ',' }
         else
             .{ .string = try separator.toString(agent) };
@@ -1684,7 +1684,7 @@ pub const TypedArrayPrototype = struct {
             const element = object.get(PropertyKey.from(k)) catch |err| try noexcept(err);
 
             // c. If element is not undefined, then
-            if (element != .undefined) {
+            if (!element.isUndefined()) {
                 // i. Let S be ! ToString(element).
                 const string = element.toString(agent) catch |err| try noexcept(err);
 
@@ -1721,7 +1721,7 @@ pub const TypedArrayPrototype = struct {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -1801,7 +1801,7 @@ pub const TypedArrayPrototype = struct {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -1854,7 +1854,7 @@ pub const TypedArrayPrototype = struct {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -1906,7 +1906,7 @@ pub const TypedArrayPrototype = struct {
 
             // c. Set accumulator to ? Call(callbackfn, undefined, « accumulator, kValue, 𝔽(k), O »).
             accumulator = try callback_fn.callAssumeCallable(
-                .undefined,
+                Value.undefined,
                 &.{ accumulator, k_value, Value.from(k), Value.from(object) },
             );
 
@@ -1926,7 +1926,7 @@ pub const TypedArrayPrototype = struct {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -1978,7 +1978,7 @@ pub const TypedArrayPrototype = struct {
 
             // c. Set accumulator to ? Call(callbackfn, undefined, « accumulator, kValue, 𝔽(k), O »).
             accumulator = try callback_fn.callAssumeCallable(
-                .undefined,
+                Value.undefined,
                 &.{ accumulator, k_value, Value.from(k.?), Value.from(object) },
             );
 
@@ -1995,7 +1995,7 @@ pub const TypedArrayPrototype = struct {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -2057,9 +2057,9 @@ pub const TypedArrayPrototype = struct {
         }
 
         // 6. If source is an Object that has a [[TypedArrayName]] internal slot, then
-        if (source == .object and source.object.is(TypedArray)) {
+        if (source.isObject() and source.asObject().is(TypedArray)) {
             // a. Perform ? SetTypedArrayFromTypedArray(target, targetOffset, source).
-            try setTypedArrayFromTypedArray(agent, target, target_offset, source.object.as(TypedArray));
+            try setTypedArrayFromTypedArray(agent, target, target_offset, source.asObject().as(TypedArray));
         }
         // 7. Else,
         else {
@@ -2068,7 +2068,7 @@ pub const TypedArrayPrototype = struct {
         }
 
         // 8. Return undefined.
-        return .undefined;
+        return Value.undefined;
     }
 
     /// 23.2.3.26.1 SetTypedArrayFromTypedArray ( target, targetOffset, source )
@@ -2360,7 +2360,7 @@ pub const TypedArrayPrototype = struct {
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         var ta = try validateTypedArray(agent, this_value, .seq_cst);
         const typed_array = ta.object;
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let srcArrayLength be TypedArrayLength(taRecord).
         const src_array_length: f64 = @floatFromInt(typedArrayLength(ta));
@@ -2384,7 +2384,7 @@ pub const TypedArrayPrototype = struct {
 
         // 8. If end is undefined, let relativeEnd be srcArrayLength; else let relativeEnd be
         //    ? ToIntegerOrInfinity(end).
-        const relative_end = if (end == .undefined)
+        const relative_end = if (end.isUndefined())
             src_array_length
         else
             try end.toIntegerOrInfinity(agent);
@@ -2543,7 +2543,7 @@ pub const TypedArrayPrototype = struct {
         // 1. Let O be the this value.
         // 2. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -2587,14 +2587,14 @@ pub const TypedArrayPrototype = struct {
 
         // 1. If comparefn is not undefined and IsCallable(comparefn) is false, throw a TypeError
         //    exception.
-        if (compare_fn != .undefined and !compare_fn.isCallable()) {
+        if (!compare_fn.isUndefined() and !compare_fn.isCallable()) {
             return agent.throwException(.type_error, "{} is not callable", .{compare_fn});
         }
 
         // 2. Let obj be the this value.
         // 3. Let taRecord be ? ValidateTypedArray(obj, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 4. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -2617,7 +2617,7 @@ pub const TypedArrayPrototype = struct {
             len,
             .{
                 .impl = sortCompare,
-                .compare_fn = if (compare_fn != .undefined) compare_fn.object else null,
+                .compare_fn = if (!compare_fn.isUndefined()) compare_fn.asObject() else null,
             },
             .read_through_holes,
         );
@@ -2696,7 +2696,7 @@ pub const TypedArrayPrototype = struct {
         const begin_byte_offset = src_byte_offset + (start_index * element_size);
 
         // 15. If O.[[ArrayLength]] is auto and end is undefined, then
-        const arguments_list = if (typed_array.fields.array_length == .auto and end == .undefined) blk_args: {
+        const arguments_list = if (typed_array.fields.array_length == .auto and end.isUndefined()) blk_args: {
             // a. Let argumentsList be « buffer, 𝔽(beginByteOffset) ».
             break :blk_args &.{ Value.from(buffer_.object()), Value.from(begin_byte_offset) };
         }
@@ -2704,7 +2704,7 @@ pub const TypedArrayPrototype = struct {
         else blk_args: {
             // a. If end is undefined, let relativeEnd be srcLength; else let relativeEnd be
             //    ? ToIntegerOrInfinity(end).
-            const relative_end = if (end == .undefined)
+            const relative_end = if (end.isUndefined())
                 src_length
             else
                 try end.toIntegerOrInfinity(agent);
@@ -2742,7 +2742,7 @@ pub const TypedArrayPrototype = struct {
     fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let array be ? ToObject(this value).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
-        const array = this_value.object;
+        const array = this_value.asObject();
 
         // 2. Let len be ? LengthOfArrayLike(array).
         const len = typedArrayLength(ta);
@@ -2769,7 +2769,7 @@ pub const TypedArrayPrototype = struct {
             const element = array.get(PropertyKey.from(k)) catch |err| try noexcept(err);
 
             // c. If element is neither undefined nor null, then
-            if (element != .undefined and element != .null) {
+            if (!element.isUndefined() and !element.isNull()) {
                 // i. Let S be ? ToString(? Invoke(element, "toLocaleString")).
                 const string = try (try element.invokeNoArgs(
                     agent,
@@ -2836,7 +2836,7 @@ pub const TypedArrayPrototype = struct {
 
         // 1. If comparefn is not undefined and IsCallable(comparefn) is false, throw a TypeError
         //    exception.
-        if (compare_fn != .undefined and !compare_fn.isCallable()) {
+        if (!compare_fn.isUndefined() and !compare_fn.isCallable()) {
             return agent.throwException(.type_error, "{} is not callable", .{compare_fn});
         }
 
@@ -2844,7 +2844,7 @@ pub const TypedArrayPrototype = struct {
         // 3. Let taRecord be ? ValidateTypedArray(O, seq-cst).
         const ta = try validateTypedArray(agent, this_value, .seq_cst);
         const typed_array = ta.object;
-        const object = this_value.object;
+        const object = this_value.asObject();
 
         // 4. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
@@ -2874,7 +2874,7 @@ pub const TypedArrayPrototype = struct {
             len,
             .{
                 .impl = sortCompare,
-                .compare_fn = if (compare_fn != .undefined) compare_fn.object else null,
+                .compare_fn = if (!compare_fn.isUndefined()) compare_fn.asObject() else null,
             },
             .read_through_holes,
         );
@@ -2989,16 +2989,14 @@ pub const TypedArrayPrototype = struct {
     fn @"%Symbol.toStringTag%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. If O is not an Object, return undefined.
-        const object_ = switch (this_value) {
-            .object => |object_| object_,
-            else => return .undefined,
-        };
+        if (!this_value.isObject()) return Value.undefined;
+        const object = this_value.asObject();
 
         // 3. If O does not have a [[TypedArrayName]] internal slot, return undefined.
-        if (!object_.is(TypedArray)) return .undefined;
+        if (!object.is(TypedArray)) return Value.undefined;
 
         // 4. Let name be O.[[TypedArrayName]].
-        const name = object_.as(TypedArray).fields.typed_array_name;
+        const name = object.as(TypedArray).fields.typed_array_name;
 
         // 5. Assert: name is a String.
         // 6. Return name.
@@ -3060,7 +3058,7 @@ fn typedArrayCreateFromConstructor(
     const ta = try validateTypedArray(agent, Value.from(new_typed_array), .seq_cst);
 
     // 3. If the number of elements in argumentList is 1 and argumentList[0] is a Number, then
-    if (argument_list.len == 1 and argument_list[0] == .number) {
+    if (argument_list.len == 1 and argument_list[0].isNumber()) {
         // a. If IsTypedArrayOutOfBounds(taRecord) is true, throw a TypeError exception.
         if (isTypedArrayOutOfBounds(ta)) {
             return agent.throwException(.type_error, "Typed array is out of bounds", .{});
@@ -3070,7 +3068,7 @@ fn typedArrayCreateFromConstructor(
         const length = typedArrayLength(ta);
 
         // c. If length < ℝ(argumentList[0]), throw a TypeError exception.
-        if (@as(f64, @floatFromInt(length)) < argument_list[0].number.asFloat()) {
+        if (@as(f64, @floatFromInt(length)) < argument_list[0].asNumber().asFloat()) {
             return agent.throwException(
                 .type_error,
                 "Typed array must have at least length {}, got {}",
@@ -3168,13 +3166,13 @@ pub fn compareTypedArrayElements(
     maybe_compare_fn: ?Object,
 ) Agent.Error!std.math.Order {
     // 1. Assert: x is a Number and y is a Number, or x is a BigInt and y is a BigInt.
-    std.debug.assert((x == .number and y == .number) or (x == .big_int and y == .big_int));
+    std.debug.assert((x.isNumber() and y.isNumber()) or (x.isBigInt() and y.isBigInt()));
 
     // 2. If comparefn is not undefined, then
     if (maybe_compare_fn) |compare_fn| {
         // a. Let v be ? ToNumber(? Call(comparefn, undefined, « x, y »)).
         const value = try (try Value.from(compare_fn).callAssumeCallable(
-            .undefined,
+            Value.undefined,
             &.{ x, y },
         )).toNumber(agent);
 
@@ -3185,31 +3183,31 @@ pub fn compareTypedArrayElements(
         return if (value.isZero()) .eq else if (value.asFloat() < 0) .lt else .gt;
     }
 
-    if (x == .number and y == .number) {
+    if (x.isNumber() and y.isNumber()) {
         // 3. If x and y are both NaN, return +0𝔽.
-        if (x.number.isNan() and y.number.isNan()) return .eq;
+        if (x.asNumber().isNan() and y.asNumber().isNan()) return .eq;
 
         // 4. If x is NaN, return 1𝔽.
-        if (x.number.isNan()) return .gt;
+        if (x.asNumber().isNan()) return .gt;
 
         // 5. If y is NaN, return -1𝔽.
-        if (y.number.isNan()) return .lt;
+        if (y.asNumber().isNan()) return .lt;
 
         // 6. If x < y, return -1𝔽.
-        if (x.number.lessThan(y.number).?) return .lt;
+        if (x.asNumber().lessThan(y.asNumber()).?) return .lt;
 
         // 7. If x > y, return 1𝔽.
-        if (y.number.lessThan(x.number).?) return .gt;
+        if (y.asNumber().lessThan(x.asNumber()).?) return .gt;
 
         // 8. If x is -0𝔽 and y is +0𝔽, return -1𝔽.
-        if (x.number.isNegativeZero() and y.number.isPositiveZero()) return .lt;
+        if (x.asNumber().isNegativeZero() and y.asNumber().isPositiveZero()) return .lt;
 
         // 9. If x is +0𝔽 and y is -0𝔽, return 1𝔽.
-        if (x.number.isPositiveZero() and y.number.isNegativeZero()) return .gt;
+        if (x.asNumber().isPositiveZero() and y.asNumber().isNegativeZero()) return .gt;
     } else {
         // 6-7.
-        if (x.big_int.lessThan(y.big_int)) return .lt;
-        if (y.big_int.lessThan(x.big_int)) return .gt;
+        if (x.asBigInt().lessThan(y.asBigInt())) return .lt;
+        if (y.asBigInt().lessThan(x.asBigInt())) return .gt;
     }
 
     // 10. Return +0𝔽.
@@ -3488,7 +3486,7 @@ fn initializeTypedArrayFromArrayBuffer(
 
     // 5. If length is not undefined, then
     //     a. Let newLength be ? ToIndex(length).
-    const new_length: u53 = if (length != .undefined) try length.toIndex(agent) else undefined;
+    const new_length: u53 = if (!length.isUndefined()) try length.toIndex(agent) else undefined;
 
     // 6. If IsDetachedBuffer(buffer) is true, throw a TypeError exception.
     if (isDetachedBuffer(buffer)) {
@@ -3499,7 +3497,7 @@ fn initializeTypedArrayFromArrayBuffer(
     const buffer_byte_length = arrayBufferByteLength(buffer, .seq_cst);
 
     // 8. If length is undefined and bufferIsFixedLength is false, then
-    if (length == .undefined and !buffer_is_fixed_length) {
+    if (length.isUndefined() and !buffer_is_fixed_length) {
         // a. If offset > bufferByteLength, throw a RangeError exception.
         if (offset > buffer_byte_length) {
             return agent.throwException(
@@ -3518,7 +3516,7 @@ fn initializeTypedArrayFromArrayBuffer(
     // 9. Else,
     else {
         // a. If length is undefined, then
-        const new_byte_length = if (length == .undefined) blk: {
+        const new_byte_length = if (length.isUndefined()) blk: {
             // i. If bufferByteLength modulo elementSize ≠ 0, throw a RangeError exception.
             if (@mod(buffer_byte_length, element_size) != 0) {
                 return agent.throwException(
@@ -3775,7 +3773,7 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
                 const first_argument = arguments.get(0);
 
                 // b. If firstArgument is an Object, then
-                if (first_argument == .object) {
+                if (first_argument.isObject()) {
                     // i. Let O be ? AllocateTypedArray(constructorName, NewTarget, proto).
                     const object = try allocateTypedArray(
                         agent,
@@ -3786,17 +3784,17 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
                     );
 
                     // ii. If firstArgument has a [[TypedArrayName]] internal slot, then
-                    if (first_argument.object.is(TypedArray)) {
+                    if (first_argument.asObject().is(TypedArray)) {
                         // 1. Perform ? InitializeTypedArrayFromTypedArray(O, firstArgument).
                         try initializeTypedArrayFromTypedArray(
                             agent,
                             object.as(TypedArray),
-                            first_argument.object.as(TypedArray),
+                            first_argument.asObject().as(TypedArray),
                         );
                     }
                     // iii. Else if firstArgument has an [[ArrayBufferData]] internal slot, then
-                    else if (first_argument.object.is(builtins.ArrayBuffer) or
-                        first_argument.object.is(builtins.SharedArrayBuffer))
+                    else if (first_argument.asObject().is(builtins.ArrayBuffer) or
+                        first_argument.asObject().is(builtins.SharedArrayBuffer))
                     {
                         // 1. If numberOfArgs > 1, let byteOffset be args[1]; else let byteOffset
                         //    be undefined.
@@ -3811,10 +3809,10 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
                         try initializeTypedArrayFromArrayBuffer(
                             agent,
                             object.as(TypedArray),
-                            if (first_argument.object.is(builtins.ArrayBuffer))
-                                .{ .array_buffer = first_argument.object.as(builtins.ArrayBuffer) }
+                            if (first_argument.asObject().is(builtins.ArrayBuffer))
+                                .{ .array_buffer = first_argument.asObject().as(builtins.ArrayBuffer) }
                             else
-                                .{ .shared_array_buffer = first_argument.object.as(builtins.SharedArrayBuffer) },
+                                .{ .shared_array_buffer = first_argument.asObject().as(builtins.SharedArrayBuffer) },
                             byte_offset,
                             length,
                         );
@@ -3824,10 +3822,10 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
                         // 1. Assert: firstArgument is an Object and firstArgument does not have
                         //    either a [[TypedArrayName]] or an [[ArrayBufferData]] internal slot.
                         std.debug.assert(
-                            first_argument == .object and
-                                !first_argument.object.is(TypedArray) and
-                                !first_argument.object.is(builtins.ArrayBuffer) and
-                                !first_argument.object.is(builtins.SharedArrayBuffer),
+                            first_argument.isObject() and
+                                !first_argument.asObject().is(TypedArray) and
+                                !first_argument.asObject().is(builtins.ArrayBuffer) and
+                                !first_argument.asObject().is(builtins.SharedArrayBuffer),
                         );
 
                         // 2. Let usingIterator be ? GetMethod(firstArgument, %Symbol.iterator%).
@@ -3859,7 +3857,7 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
                             try initializeTypedArrayFromArrayLike(
                                 agent,
                                 object.as(TypedArray),
-                                first_argument.object,
+                                first_argument.asObject(),
                             );
                         }
                     }
@@ -3870,7 +3868,7 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
                 // c. Else,
                 else {
                     // i. Assert: firstArgument is not an Object.
-                    std.debug.assert(first_argument != .object);
+                    std.debug.assert(!first_argument.isObject());
 
                     // ii. Let elementLength be ? ToIndex(firstArgument).
                     const element_length = try first_argument.toIndex(agent);

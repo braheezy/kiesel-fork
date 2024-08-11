@@ -69,12 +69,12 @@ pub const ForInIteratorPrototype = struct {
         // 1. Let O be the this value.
         // 2. Assert: O is an Object.
         // 3. Assert: O has all of the internal slots of a For-In Iterator Instance (14.7.5.10.3).
-        std.debug.assert(this_value == .object);
-        std.debug.assert(this_value.object.is(ForInIterator));
-        const for_in_iterator = this_value.object.as(ForInIterator);
+        std.debug.assert(this_value.isObject());
+        std.debug.assert(this_value.asObject().is(ForInIterator));
+        const for_in_iterator = this_value.asObject().as(ForInIterator);
 
         if (for_in_iterator.fields == .completed) {
-            return Value.from(try createIterResultObject(agent, .undefined, true));
+            return Value.from(try createIterResultObject(agent, Value.undefined, true));
         }
 
         // 4. Let object be O.[[Object]].
@@ -135,7 +135,7 @@ pub const ForInIteratorPrototype = struct {
             object = (try object.internalMethods().getPrototypeOf(object)) orelse {
                 // f. If object is null, return CreateIterResultObject(undefined, true).
                 for_in_iterator.fields = .completed;
-                return Value.from(try createIterResultObject(agent, .undefined, true));
+                return Value.from(try createIterResultObject(agent, Value.undefined, true));
             };
 
             // d. Set O.[[Object]] to object.

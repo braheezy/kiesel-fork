@@ -265,8 +265,8 @@ fn innerModuleLoading(
 
         // c. Perform ! Call(state.[[PromiseCapability]].[[Resolve]], undefined, « undefined »).
         _ = Value.from(state.promise_capability.resolve).callAssumeCallable(
-            .undefined,
-            &.{.undefined},
+            Value.undefined,
+            &.{Value.undefined},
         ) catch |err| try noexcept(err);
     }
 
@@ -300,7 +300,7 @@ pub fn continueModuleLoading(
 
             // b. Perform ! Call(state.[[PromiseCapability]].[[Reject]], undefined, « moduleCompletion.[[Value]] »).
             _ = Value.from(state.promise_capability.reject).callAssumeCallable(
-                .undefined,
+                Value.undefined,
                 &.{exception},
             ) catch |err_| try noexcept(err_);
         },
@@ -676,7 +676,7 @@ pub fn evaluate(self: *Self, agent: *Agent) Allocator.Error!*builtins.Promise {
 
             // d. Perform ! Call(capability.[[Reject]], undefined, « result.[[Value]] »).
             _ = Value.from(capability.reject).callAssumeCallable(
-                .undefined,
+                Value.undefined,
                 &.{exception},
             ) catch |err_| try noexcept(err_);
         },
@@ -699,8 +699,8 @@ pub fn evaluate(self: *Self, agent: *Agent) Allocator.Error!*builtins.Promise {
 
             // ii. Perform ! Call(capability.[[Resolve]], undefined, « undefined »).
             _ = Value.from(capability.resolve).callAssumeCallable(
-                .undefined,
-                &.{.undefined},
+                Value.undefined,
+                &.{Value.undefined},
             ) catch |err| try noexcept(err);
         }
 
@@ -1149,7 +1149,7 @@ pub fn initializeEnvironment(self: *Self) Agent.Error!void {
                 env.createMutableBinding(agent, var_name, false) catch |err| try noexcept(err);
 
                 // 2. Perform ! env.InitializeBinding(dn, undefined).
-                env.initializeBinding(agent, var_name, .undefined) catch |err| try noexcept(err);
+                env.initializeBinding(agent, var_name, Value.undefined) catch |err| try noexcept(err);
 
                 // 3. Append dn to declaredVarNames.
                 try declared_var_names.putNoClobber(var_name, {});

@@ -78,14 +78,14 @@ pub const ArrayIteratorPrototype = struct {
         //       instance instead of as local variables. This should not be observable.
 
         // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
-        if (this_value != .object or !this_value.object.is(ArrayIterator)) {
+        if (!this_value.isObject() or !this_value.asObject().is(ArrayIterator)) {
             return agent.throwException(.type_error, "This value must be an Array Iterator", .{});
         }
-        const array_iterator = this_value.object.as(ArrayIterator);
+        const array_iterator = this_value.asObject().as(ArrayIterator);
 
         // 2. If state is completed, return CreateIterResultObject(undefined, true).
         if (array_iterator.fields == .completed) {
-            return Value.from(try createIterResultObject(agent, .undefined, true));
+            return Value.from(try createIterResultObject(agent, Value.undefined, true));
         }
 
         const array = array_iterator.fields.state.array;
@@ -117,7 +117,7 @@ pub const ArrayIteratorPrototype = struct {
         // iii. If index ≥ len, return NormalCompletion(undefined).
         if (index >= len) {
             array_iterator.fields = .completed;
-            return Value.from(try createIterResultObject(agent, .undefined, true));
+            return Value.from(try createIterResultObject(agent, Value.undefined, true));
         }
 
         // iv. Let indexNumber be 𝔽(index).

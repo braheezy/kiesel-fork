@@ -79,7 +79,7 @@ pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
         return agent.throwException(
             .reference_error,
             "'{}' is not defined",
-            .{self.referenced_name.value.string},
+            .{self.referenced_name.value.asString()},
         );
     }
 
@@ -89,12 +89,12 @@ pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
         // NOTE: For property lookups on primitives we can directly go to the prototype instead
         //       of creating a wrapper object, or return the value for `"string".length`.
         const base_object = blk: {
-            if (self.base.value != .string or self.referenced_name == .private_name) {
+            if (!self.base.value.isString() or self.referenced_name == .private_name) {
                 break :blk try self.base.value.synthesizePrototype(agent);
             }
-            switch (self.referenced_name.value) {
-                .string => |string| if (string.eql(String.fromLiteral("length")))
-                    return Value.from(@as(u53, @intCast(self.base.value.string.length())))
+            switch (self.referenced_name.value.type()) {
+                .string => if (self.referenced_name.value.asString().eql(String.fromLiteral("length")))
+                    return Value.from(@as(u53, @intCast(self.base.value.asString().length())))
                 else
                     break :blk try self.base.value.synthesizePrototype(agent),
                 .symbol => break :blk try self.base.value.synthesizePrototype(agent),
@@ -109,9 +109,9 @@ pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
         }
 
         // c. If V.[[ReferencedName]] is not a property key, then
-        const property_key = switch (self.referenced_name.value) {
-            .string => |string| PropertyKey.from(string),
-            .symbol => |symbol| PropertyKey.from(symbol),
+        const property_key = switch (self.referenced_name.value.type()) {
+            .string => PropertyKey.from(self.referenced_name.value.asString()),
+            .symbol => PropertyKey.from(self.referenced_name.value.asSymbol()),
             // i. Set V.[[ReferencedName]] to ? ToPropertyKey(V.[[ReferencedName]]).
             else => try self.referenced_name.value.toPropertyKey(agent),
         };
@@ -130,7 +130,7 @@ pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
         const base = self.base.environment;
 
         // c. Return ? base.GetBindingValue(V.[[ReferencedName]], V.[[Strict]]) (see 9.1).
-        return base.getBindingValue(agent, self.referenced_name.value.string, self.strict);
+        return base.getBindingValue(agent, self.referenced_name.value.asString(), self.strict);
     }
 }
 
@@ -147,7 +147,7 @@ pub fn putValue(self: Self, agent: *Agent, value: Value) Agent.Error!void {
             return agent.throwException(
                 .reference_error,
                 "'{}' is not defined",
-                .{self.referenced_name.value.string},
+                .{self.referenced_name.value.asString()},
             );
         }
 
@@ -155,7 +155,7 @@ pub fn putValue(self: Self, agent: *Agent, value: Value) Agent.Error!void {
         const global_obj = agent.getGlobalObject();
 
         // c. Perform ? Set(globalObj, V.[[ReferencedName]], W, false).
-        try global_obj.set(PropertyKey.from(self.referenced_name.value.string), value, .ignore);
+        try global_obj.set(PropertyKey.from(self.referenced_name.value.asString()), value, .ignore);
 
         // d. Return unused.
         return;
@@ -173,9 +173,9 @@ pub fn putValue(self: Self, agent: *Agent, value: Value) Agent.Error!void {
         }
 
         // c. If V.[[ReferencedName]] is not a property key, then
-        const property_key = switch (self.referenced_name.value) {
-            .string => |string| PropertyKey.from(string),
-            .symbol => |symbol| PropertyKey.from(symbol),
+        const property_key = switch (self.referenced_name.value.type()) {
+            .string => PropertyKey.from(self.referenced_name.value.asString()),
+            .symbol => PropertyKey.from(self.referenced_name.value.asSymbol()),
             // i. Set V.[[ReferencedName]] to ? ToPropertyKey(V.[[ReferencedName]]).
             else => try self.referenced_name.value.toPropertyKey(agent),
         };
@@ -203,7 +203,7 @@ pub fn putValue(self: Self, agent: *Agent, value: Value) Agent.Error!void {
     const base = self.base.environment;
 
     // c. Return ? base.SetMutableBinding(V.[[ReferencedName]], W, V.[[Strict]]) (see 9.1).
-    return base.setMutableBinding(agent, self.referenced_name.value.string, value, self.strict);
+    return base.setMutableBinding(agent, self.referenced_name.value.asString(), value, self.strict);
 }
 
 /// 6.2.5.7 GetThisValue ( V )
@@ -227,5 +227,5 @@ pub fn initializeReferencedBinding(self: Self, agent: *Agent, value: Value) Agen
     const base = self.base.environment;
 
     // 4. Return ? base.InitializeBinding(V.[[ReferencedName]], W).
-    return base.initializeBinding(agent, self.referenced_name.value.string, value);
+    return base.initializeBinding(agent, self.referenced_name.value.asString(), value);
 }

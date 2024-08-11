@@ -47,7 +47,7 @@ pub fn addEntriesFromIterable(
     //     b. If next is done, return target.
     while (try iterator.stepValue()) |next| {
         // c. If next is not an Object, then
-        if (next != .object) {
+        if (!next.isObject()) {
             // i. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
@@ -60,13 +60,13 @@ pub fn addEntriesFromIterable(
         }
 
         // d. Let k be Completion(Get(next, "0")).
-        const k = next.object.get(PropertyKey.from(0)) catch |err| {
+        const k = next.asObject().get(PropertyKey.from(0)) catch |err| {
             // e. IfAbruptCloseIterator(k, iteratorRecord).
             return iterator.close(@as(Agent.Error!Object, err));
         };
 
         // f. Let v be Completion(Get(next, "1")).
-        const v = next.object.get(PropertyKey.from(1)) catch |err| {
+        const v = next.asObject().get(PropertyKey.from(1)) catch |err| {
             // h. IfAbruptCloseIterator(v, iteratorRecord).
             return iterator.close(@as(Agent.Error!Object, err));
         };
@@ -130,7 +130,7 @@ pub const MapConstructor = struct {
         );
 
         // 4. If iterable is either undefined or null, return map.
-        if (iterable == .undefined or iterable == .null) return Value.from(map);
+        if (iterable.isUndefined() or iterable.isNull()) return Value.from(map);
 
         // 5. Let adder be ? Get(map, "set").
         const adder = try map.get(PropertyKey.from("set"));
@@ -141,7 +141,7 @@ pub const MapConstructor = struct {
         }
 
         // 7. Return ? AddEntriesFromIterable(map, iterable, adder).
-        return Value.from(try addEntriesFromIterable(agent, map, iterable, adder.object));
+        return Value.from(try addEntriesFromIterable(agent, map, iterable, adder.asObject()));
     }
 
     /// 24.1.2.1 Map.groupBy ( items, callbackfn )
@@ -240,7 +240,7 @@ pub const MapPrototype = struct {
         }
 
         // 4. Return undefined.
-        return .undefined;
+        return Value.undefined;
     }
 
     /// 24.1.3.3 Map.prototype.delete ( key )
@@ -331,7 +331,7 @@ pub const MapPrototype = struct {
         }
 
         // 8. Return undefined.
-        return .undefined;
+        return Value.undefined;
     }
 
     /// 24.1.3.6 Map.prototype.get ( key )
@@ -351,7 +351,7 @@ pub const MapPrototype = struct {
         if (map.fields.map_data.get(key)) |value| return value;
 
         // 5. Return undefined.
-        return .undefined;
+        return Value.undefined;
     }
 
     /// 24.1.3.7 Map.prototype.has ( key )

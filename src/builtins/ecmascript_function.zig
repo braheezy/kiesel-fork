@@ -182,7 +182,7 @@ fn call(object: Object, this_argument: Value, arguments_list: Arguments) Agent.E
     else |err| return err;
 
     // 10. Return undefined.
-    return .undefined;
+    return Value.undefined;
 }
 
 /// 10.2.1.1 PrepareForOrdinaryCall ( F, newTarget )
@@ -261,7 +261,7 @@ pub fn ordinaryCallBindThis(
         // 6. Else,
         else {
             // a. If thisArgument is either undefined or null, then
-            if (this_argument == .undefined or this_argument == .null) {
+            if (this_argument.isUndefined() or this_argument.isNull()) {
                 // i. Let globalEnv be calleeRealm.[[GlobalEnv]].
                 const global_env = callee_realm.global_env;
 
@@ -435,7 +435,7 @@ fn evaluateAsyncFunctionBody(
 
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « declResult.[[Value]] »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
-                .undefined,
+                Value.undefined,
                 &.{exception},
             ) catch |err_| try noexcept(err_);
         },
@@ -520,13 +520,13 @@ fn construct(
     if (result) |completion| {
         if (completion.type == .@"return") {
             // a. If result.[[Value]] is an Object, return result.[[Value]].
-            if (completion.value.? == .object) return completion.value.?.object;
+            if (completion.value.?.isObject()) return completion.value.?.asObject();
 
             // b. If kind is base, return thisArgument.
             if (kind == .base) return this_argument;
 
             // c. If result.[[Value]] is not undefined, throw a TypeError exception.
-            if (completion.value.? != .undefined) {
+            if (!completion.value.?.isUndefined()) {
                 return agent.throwException(
                     .type_error,
                     "Constructor must return an object or undefined",
@@ -545,10 +545,10 @@ fn construct(
     const this_binding = try constructor_env.getThisBinding();
 
     // 13. Assert: thisBinding is an Object.
-    std.debug.assert(this_binding == .object);
+    std.debug.assert(this_binding.isObject());
 
     // 14. Return thisBinding.
-    return this_binding.object;
+    return this_binding.asObject();
 }
 
 /// 10.2.3 OrdinaryFunctionCreate ( functionPrototype, sourceText, ParameterList, Body, thisMode, env, privateEnv )
@@ -1092,7 +1092,7 @@ fn functionDeclarationInstantiation(
                 env.initializeBinding(
                     agent,
                     parameter_name,
-                    .undefined,
+                    Value.undefined,
                 ) catch |err| try noexcept(err);
             }
         }
@@ -1179,7 +1179,7 @@ fn functionDeclarationInstantiation(
                 const initializer = formal_parameter.binding_element.single_name_binding.initializer;
                 var value = arguments_list.get(i);
                 const reference = try agent.resolveBinding(name, environment, strict, null);
-                if (initializer != null and value == .undefined) {
+                if (initializer != null and value.isUndefined()) {
                     value = (try generateAndRunBytecode(
                         agent,
                         ast.ExpressionStatement{ .expression = initializer.? },
@@ -1247,7 +1247,7 @@ fn functionDeclarationInstantiation(
                 env.createMutableBinding(agent, var_name, false) catch |err| try noexcept(err);
 
                 // 3. Perform ! env.InitializeBinding(n, undefined).
-                env.initializeBinding(agent, var_name, .undefined) catch |err| try noexcept(err);
+                env.initializeBinding(agent, var_name, Value.undefined) catch |err| try noexcept(err);
             }
         }
 
@@ -1290,7 +1290,7 @@ fn functionDeclarationInstantiation(
                 //     a. Let initialValue be ! env.GetBindingValue(n, false).
                 const initial_value = if (!containsSlice(parameter_bindings.items, try var_name.toUtf8(agent.gc_allocator)) or
                     function_names.contains(var_name))
-                    .undefined
+                    Value.undefined
                 else
                     env.getBindingValue(agent, var_name, false) catch |err| try noexcept(err);
 

@@ -287,7 +287,7 @@ fn setViewValue(
     );
 
     // 16. Return undefined.
-    return .undefined;
+    return Value.undefined;
 }
 
 /// 25.3.3 Properties of the DataView Constructor
@@ -330,16 +330,16 @@ pub const DataViewConstructor = struct {
         }
 
         // 2. Perform ? RequireInternalSlot(buffer, [[ArrayBufferData]]).
-        if (buffer_value != .object) {
+        if (!buffer_value.isObject()) {
             return agent.throwException(.type_error, "{} is not an Object", .{buffer_value});
         }
-        if (!buffer_value.object.is(builtins.ArrayBuffer) and !buffer_value.object.is(builtins.SharedArrayBuffer)) {
+        if (!buffer_value.asObject().is(builtins.ArrayBuffer) and !buffer_value.asObject().is(builtins.SharedArrayBuffer)) {
             return agent.throwException(.type_error, "{} is not an ArrayBuffer or SharedArrayBuffer object", .{buffer_value});
         }
-        const buffer: ArrayBufferLike = if (buffer_value.object.is(builtins.ArrayBuffer))
-            .{ .array_buffer = buffer_value.object.as(builtins.ArrayBuffer) }
+        const buffer: ArrayBufferLike = if (buffer_value.asObject().is(builtins.ArrayBuffer))
+            .{ .array_buffer = buffer_value.asObject().as(builtins.ArrayBuffer) }
         else
-            .{ .shared_array_buffer = buffer_value.object.as(builtins.SharedArrayBuffer) };
+            .{ .shared_array_buffer = buffer_value.asObject().as(builtins.SharedArrayBuffer) };
 
         // 3. Let offset be ? ToIndex(byteOffset).
         const offset = try byte_offset.toIndex(agent);
@@ -365,7 +365,7 @@ pub const DataViewConstructor = struct {
         const buffer_is_fixed_length = isFixedLengthArrayBuffer(buffer);
 
         // 8. If byteLength is undefined, then
-        const view_byte_length: DataView.Fields.ByteLength = if (byte_length == .undefined) blk: {
+        const view_byte_length: DataView.Fields.ByteLength = if (byte_length.isUndefined()) blk: {
             // a. If bufferIsFixedLength is true, then
             if (buffer_is_fixed_length) {
                 // i. Let viewByteLength be bufferByteLength - offset.
@@ -430,7 +430,7 @@ pub const DataViewConstructor = struct {
         }
 
         // 14. If byteLength is not undefined, then
-        if (byte_length != .undefined) {
+        if (!byte_length.isUndefined()) {
             // a. If offset + viewByteLength > bufferByteLength, throw a RangeError exception.
             if (if (std.math.add(u53, offset, view_byte_length.value)) |x|
                 x > buffer_byte_length

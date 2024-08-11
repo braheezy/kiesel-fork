@@ -244,7 +244,7 @@ pub const SharedArrayBufferPrototype = struct {
         const host_handled = try agent.host_hooks.hostGrowSharedArrayBuffer(object, new_byte_length);
 
         // 6. If hostHandled is handled, return undefined.
-        if (host_handled == .handled) return .undefined;
+        if (host_handled == .handled) return Value.undefined;
 
         // 7. Let isLittleEndian be the value of the [[LittleEndian]] field of the surrounding
         //    agent's Agent Record.
@@ -262,7 +262,7 @@ pub const SharedArrayBufferPrototype = struct {
         const current_byte_length = object.fields.array_buffer_data.items.len;
 
         // c. If newByteLength = currentByteLength, return undefined.
-        if (new_byte_length == current_byte_length) return .undefined;
+        if (new_byte_length == current_byte_length) return Value.undefined;
 
         // d. If newByteLength < currentByteLength or newByteLength > O.[[ArrayBufferMaxByteLength]],
         //    throw a RangeError exception.
@@ -295,7 +295,7 @@ pub const SharedArrayBufferPrototype = struct {
             .{new_byte_length},
         );
         @memset(object.fields.array_buffer_data.items[current_byte_length..], 0);
-        return .undefined;
+        return Value.undefined;
     }
 
     /// 25.2.5.4 get SharedArrayBuffer.prototype.growable
@@ -373,7 +373,7 @@ pub const SharedArrayBufferPrototype = struct {
 
         // 9. If end is undefined, let relativeEnd be len; else let relativeEnd be
         //    ? ToIntegerOrInfinity(end).
-        const relative_end = if (end == .undefined)
+        const relative_end = if (end.isUndefined())
             len_f64
         else
             try end.toIntegerOrInfinity(agent);

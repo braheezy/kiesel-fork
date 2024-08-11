@@ -355,7 +355,7 @@ pub const IntlSegmentsPrototype = struct {
         const n = try index.toIntegerOrInfinity(agent);
 
         // 7. If n < 0 or n ≥ len, return undefined.
-        if (n < 0 or n >= @as(f64, @floatFromInt(len))) return .undefined;
+        if (n < 0 or n >= @as(f64, @floatFromInt(len))) return Value.undefined;
 
         // 8. Let startIndex be FindBoundary(segmenter, string, n, before).
         const boundary_before = findBoundary(segmenter, string, @intFromFloat(n), .before);
@@ -483,7 +483,7 @@ pub const IntlSegmentIteratorPrototype = struct {
         // 7. If startIndex ≥ len, then
         if (start_index >= len) {
             // a. Return CreateIterResultObject(undefined, true).
-            return Value.from(try createIterResultObject(agent, .undefined, true));
+            return Value.from(try createIterResultObject(agent, Value.undefined, true));
         }
 
         // 8. Let endIndex be FindBoundary(segmenter, string, startIndex, after).

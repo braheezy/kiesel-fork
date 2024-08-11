@@ -85,7 +85,7 @@ pub const NumberConstructor = struct {
         // 21.1.2.10 Number.NaN
         // https://tc39.es/ecma262/#sec-number.nan
         try defineBuiltinProperty(object, "NaN", PropertyDescriptor{
-            .value = Value.nan(),
+            .value = Value.nan,
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -94,7 +94,7 @@ pub const NumberConstructor = struct {
         // 21.1.2.11 Number.NEGATIVE_INFINITY
         // https://tc39.es/ecma262/#sec-number.negative_infinity
         try defineBuiltinProperty(object, "NEGATIVE_INFINITY", PropertyDescriptor{
-            .value = Value.negativeInfinity(),
+            .value = Value.negative_infinity,
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -115,7 +115,7 @@ pub const NumberConstructor = struct {
         // 21.1.2.14 Number.POSITIVE_INFINITY
         // https://tc39.es/ecma262/#sec-number.positive_infinity
         try defineBuiltinProperty(object, "POSITIVE_INFINITY", PropertyDescriptor{
-            .value = Value.infinity(),
+            .value = Value.infinity,
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -187,10 +187,10 @@ pub const NumberConstructor = struct {
         const number = arguments.get(0);
 
         // 1. If number is not a Number, return false.
-        if (number != .number) return Value.from(false);
+        if (!number.isNumber()) return Value.from(false);
 
         // 2. If number is not finite, return false.
-        if (!number.number.isFinite()) return Value.from(false);
+        if (!number.asNumber().isFinite()) return Value.from(false);
 
         // 3. Otherwise, return true.
         return Value.from(true);
@@ -202,7 +202,7 @@ pub const NumberConstructor = struct {
         const number = arguments.get(0);
 
         // 1. If number is an integral Number, return true.
-        if (number == .number and number.number.isIntegral()) return Value.from(true);
+        if (number.isNumber() and number.asNumber().isIntegral()) return Value.from(true);
 
         // 2. Return false.
         return Value.from(false);
@@ -214,10 +214,10 @@ pub const NumberConstructor = struct {
         const number = arguments.get(0);
 
         // 1. If number is not a Number, return false.
-        if (number != .number) return Value.from(false);
+        if (!number.isNumber()) return Value.from(false);
 
         // 2. If number is NaN, return true.
-        if (number.number.isNan()) return Value.from(true);
+        if (number.asNumber().isNan()) return Value.from(true);
 
         // 3. Otherwise, return false.
         return Value.from(false);
@@ -229,9 +229,9 @@ pub const NumberConstructor = struct {
         const number = arguments.get(0);
 
         // 1. If number is an integral Number, then
-        if (number == .number and number.number.isIntegral()) {
+        if (number.isNumber() and number.asNumber().isIntegral()) {
             // a. If abs(ℝ(number)) ≤ 2**53 - 1, return true.
-            if (@abs(number.number.asFloat()) <= @as(f64, @floatFromInt(std.math.maxInt(u53)))) {
+            if (@abs(number.asNumber().asFloat()) <= @as(f64, @floatFromInt(std.math.maxInt(u53)))) {
                 return Value.from(true);
             }
         }
@@ -273,21 +273,17 @@ pub const NumberPrototype = struct {
     /// 21.1.3.7.1 ThisNumberValue ( value )
     /// https://tc39.es/ecma262/#sec-thisnumbervalue
     fn thisNumberValue(agent: *Agent, value: Value) error{ExceptionThrown}!types.Number {
-        switch (value) {
-            // 1. If value is a Number, return value.
-            .number => |number| return number,
+        // 1. If value is a Number, return value.
+        if (value.isNumber()) return value.asNumber();
 
-            // 2. If value is an Object and value has a [[NumberData]] internal slot, then
-            .object => |object| if (object.is(Number)) {
-                // a. Let n be value.[[NumberData]].
-                // b. Assert: n is a Number.
-                const n = object.as(Number).fields.number_data;
+        // 2. If value is an Object and value has a [[NumberData]] internal slot, then
+        if (value.isObject() and value.asObject().is(Number)) {
+            // a. Let n be value.[[NumberData]].
+            // b. Assert: n is a Number.
+            const n = value.asObject().as(Number).fields.number_data;
 
-                // c. Return n.
-                return n;
-            },
-
-            else => {},
+            // c. Return n.
+            return n;
         }
 
         // 3. Throw a TypeError exception.
@@ -341,7 +337,7 @@ pub const NumberPrototype = struct {
         }
 
         // 9-15.
-        var formatted = if (fraction_digits_value == .undefined)
+        var formatted = if (fraction_digits_value.isUndefined())
             try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "{s}{e}",
@@ -457,7 +453,7 @@ pub const NumberPrototype = struct {
         const x_number = try thisNumberValue(agent, this_value);
 
         // 2. If precision is undefined, return ! ToString(x).
-        if (precision_value == .undefined) {
+        if (precision_value.isUndefined()) {
             return Value.from(Value.from(x_number).toString(agent) catch |err| try noexcept(err));
         }
 
@@ -628,7 +624,7 @@ pub const NumberPrototype = struct {
 
         // 2. If radix is undefined, let radixMV be 10.
         // 3. Else, let radixMV be ? ToIntegerOrInfinity(radix).
-        const radix_mv = if (radix == .undefined) 10 else try radix.toIntegerOrInfinity(agent);
+        const radix_mv = if (radix.isUndefined()) 10 else try radix.toIntegerOrInfinity(agent);
 
         // 4. If radixMV is not in the inclusive interval from 2 to 36, throw a RangeError exception.
         if (radix_mv < 2 or radix_mv > 36) {

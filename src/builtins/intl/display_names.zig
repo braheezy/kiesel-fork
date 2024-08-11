@@ -93,7 +93,7 @@ pub const DisplayNamesConstructor = struct {
         const requested_locales = try canonicalizeLocaleList(agent, locales);
 
         // 4. If options is undefined, throw a TypeError exception.
-        if (options_value == .undefined) {
+        if (options_value.isUndefined()) {
             return agent.throwException(.type_error, "Options object must not be undefined", .{});
         }
 
@@ -333,7 +333,7 @@ pub const DisplayNamesPrototype = struct {
                 .{@tagName(display_names.fields.type)},
             ),
         };
-        if (value.len == 0) return .undefined;
+        if (value.len == 0) return Value.undefined;
         return Value.from(try String.fromUtf8(agent.gc_allocator, value));
     }
 

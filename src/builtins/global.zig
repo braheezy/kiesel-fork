@@ -44,15 +44,15 @@ pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]Glo
 
         // 19.1.2 Infinity
         // https://tc39.es/ecma262/#sec-value-properties-of-the-global-object-infinity
-        .{ "Infinity", .{ .property_descriptor = .{ .value = Value.infinity(), .writable = false, .enumerable = false, .configurable = false } } },
+        .{ "Infinity", .{ .property_descriptor = .{ .value = Value.infinity, .writable = false, .enumerable = false, .configurable = false } } },
 
         // 19.1.3 NaN
         // https://tc39.es/ecma262/#sec-value-properties-of-the-global-object-nan
-        .{ "NaN", .{ .property_descriptor = .{ .value = Value.nan(), .writable = false, .enumerable = false, .configurable = false } } },
+        .{ "NaN", .{ .property_descriptor = .{ .value = Value.nan, .writable = false, .enumerable = false, .configurable = false } } },
 
         // 19.1.4 undefined
         // https://tc39.es/ecma262/#sec-undefined
-        .{ "undefined", .{ .property_descriptor = .{ .value = .undefined, .writable = false, .enumerable = false, .configurable = false } } },
+        .{ "undefined", .{ .property_descriptor = .{ .value = Value.undefined, .writable = false, .enumerable = false, .configurable = false } } },
 
         // 19.2.1 eval ( x )
         // https://tc39.es/ecma262/#sec-eval-x
@@ -353,11 +353,11 @@ fn parseFloat(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     // 5. Let parsedNumber be ParseText(trimmedPrefix, StrDecimalLiteral).
     // 6. Assert: parsedNumber is a Parse Node.
     // 7. Return the StringNumericValue of parsedNumber.
-    if (std.mem.startsWith(u8, trimmed_string, "-Infinity")) return Value.negativeInfinity();
-    if (std.mem.startsWith(u8, trimmed_string, "+Infinity")) return Value.infinity();
-    if (std.mem.startsWith(u8, trimmed_string, "Infinity")) return Value.infinity();
+    if (std.mem.startsWith(u8, trimmed_string, "-Infinity")) return Value.negative_infinity;
+    if (std.mem.startsWith(u8, trimmed_string, "+Infinity")) return Value.infinity;
+    if (std.mem.startsWith(u8, trimmed_string, "Infinity")) return Value.infinity;
     // Don't pass other strings starting with "inf" to `std.fmt.parseFloat()`
-    if (std.ascii.startsWithIgnoreCase(trimmed_string, "inf")) return Value.nan();
+    if (std.ascii.startsWithIgnoreCase(trimmed_string, "inf")) return Value.nan;
     // Limit to characters valid for StrDecimalLiteral before brute forcing
     var len = for (trimmed_string, 0..) |c, i| {
         if (!std.ascii.isDigit(c) and std.mem.indexOfScalar(u8, "+-.eE", c) == null) break i;
@@ -367,7 +367,7 @@ fn parseFloat(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
             return Value.from(result)
         else |_| {}
     }
-    return Value.nan();
+    return Value.nan;
 }
 
 /// 19.2.5 parseInt ( string, radix )
@@ -407,7 +407,7 @@ fn parseInt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     // 8. If R ≠ 0, then
     if (radix != 0) {
         // a. If R < 2 or R > 36, return NaN.
-        if (radix < 2 or radix > 36) return Value.nan();
+        if (radix < 2 or radix > 36) return Value.nan;
 
         // b. If R ≠ 16, set stripPrefix to false.
         if (radix != 16) strip_prefix = false;
@@ -449,7 +449,7 @@ fn parseInt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         math_int.? += @floatFromInt(digit);
     }
 
-    if (math_int == null) return Value.nan();
+    if (math_int == null) return Value.nan;
 
     // 15. If mathInt = 0, then
     //     a. If sign = -1, return -0𝔽.

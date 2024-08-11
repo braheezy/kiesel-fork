@@ -484,7 +484,7 @@ pub const FunctionPrototype = struct {
     }
 
     fn function(_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
-        return .undefined;
+        return Value.undefined;
     }
 
     /// 20.2.3.1 Function.prototype.apply ( thisArg, argArray )
@@ -502,7 +502,7 @@ pub const FunctionPrototype = struct {
         }
 
         // 3. If argArray is either undefined or null, then
-        if (arg_array == .undefined or arg_array == .null) {
+        if (arg_array.isUndefined() or arg_array.isNull()) {
             // TODO: a. Perform PrepareForTailCall().
 
             // b. Return ? Call(func, thisArg).
@@ -533,28 +533,28 @@ pub const FunctionPrototype = struct {
         }
 
         // 3. Let F be ? BoundFunctionCreate(Target, thisArg, args).
-        const function_ = try boundFunctionCreate(agent, target.object, this_arg, args);
+        const function_ = try boundFunctionCreate(agent, target.asObject(), this_arg, args);
 
         // 4. Let L be 0.
         var length: f64 = 0;
 
         // 5. Let targetHasLength be ? HasOwnProperty(Target, "length").
-        const target_has_length = try target.object.hasOwnProperty(PropertyKey.from("length"));
+        const target_has_length = try target.asObject().hasOwnProperty(PropertyKey.from("length"));
 
         // 6. If targetHasLength is true, then
         if (target_has_length) {
             // a. Let targetLen be ? Get(Target, "length").
-            const target_length = try target.object.get(PropertyKey.from("length"));
+            const target_length = try target.asObject().get(PropertyKey.from("length"));
 
             // b. If targetLen is a Number, then
-            if (target_length == .number) {
+            if (target_length.isNumber()) {
                 // i. If targetLen is +∞𝔽, then
-                if (target_length.number.isPositiveInf()) {
+                if (target_length.asNumber().isPositiveInf()) {
                     // 1. Set L to +∞.
                     length = std.math.inf(f64);
                 }
                 // ii. Else if targetLen is -∞𝔽, then
-                else if (target_length.number.isNegativeInf()) {
+                else if (target_length.asNumber().isNegativeInf()) {
                     // 1. Set L to 0.
                     length = 0;
                 }
@@ -579,13 +579,13 @@ pub const FunctionPrototype = struct {
         try setFunctionLength(function_, length);
 
         // 8. Let targetName be ? Get(Target, "name").
-        var target_name = try target.object.get(PropertyKey.from("name"));
+        var target_name = try target.asObject().get(PropertyKey.from("name"));
 
         // 9. If targetName is not a String, set targetName to the empty String.
-        if (target_name != .string) target_name = Value.from("");
+        if (!target_name.isString()) target_name = Value.from("");
 
         // 10. Perform SetFunctionName(F, targetName, "bound").
-        try setFunctionName(function_, PropertyKey.from(target_name.string), "bound");
+        try setFunctionName(function_, PropertyKey.from(target_name.asString()), "bound");
 
         // 11. Return F.
         return Value.from(function_);
@@ -620,12 +620,12 @@ pub const FunctionPrototype = struct {
         // 2. If func is an Object, func has a [[SourceText]] internal slot, func.[[SourceText]] is
         //    a sequence of Unicode code points, and HostHasSourceTextAvailable(func) is true, then
         //     a. Return CodePointsToString(func.[[SourceText]]).
-        if (func == .object) {
-            if (func.object.is(ECMAScriptFunction)) {
-                const ecmascript_function = func.object.as(ECMAScriptFunction);
+        if (func.isObject()) {
+            if (func.asObject().is(ECMAScriptFunction)) {
+                const ecmascript_function = func.asObject().as(ECMAScriptFunction);
                 return Value.from(try String.fromUtf8(agent.gc_allocator, ecmascript_function.fields.source_text));
-            } else if (func.object.is(BuiltinFunction)) {
-                const builtin_function = func.object.as(BuiltinFunction);
+            } else if (func.asObject().is(BuiltinFunction)) {
+                const builtin_function = func.asObject().as(BuiltinFunction);
                 if (builtin_function.fields.additional_fields.tryCast(*ClassConstructorFields)) |class_constructor_fields| {
                     return Value.from(try String.fromUtf8(agent.gc_allocator, class_constructor_fields.source_text));
                 }
@@ -638,8 +638,8 @@ pub const FunctionPrototype = struct {
         //    func.[[InitialName]] is a String, the portion of the returned String that would be
         //    matched by NativeFunctionAccessoropt PropertyName must be the value of
         //    func.[[InitialName]].
-        if (func == .object and func.object.is(BuiltinFunction)) {
-            const builtin_function = func.object.as(BuiltinFunction);
+        if (func.isObject() and func.asObject().is(BuiltinFunction)) {
+            const builtin_function = func.asObject().as(BuiltinFunction);
             const name = builtin_function.fields.initial_name orelse String.empty;
             const source_text = try std.fmt.allocPrint(
                 agent.gc_allocator,
