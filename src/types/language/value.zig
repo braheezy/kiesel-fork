@@ -627,9 +627,11 @@ pub const Value = union(enum) {
 
         // 2. Let int64bit be ℝ(n) modulo 2**64.
         // 3. If int64bit ≥ 2**63, return ℤ(int64bit - 2**64); otherwise return ℤ(int64bit).
-        var int64bit = try BigInt.from(agent.gc_allocator, 0);
-        try int64bit.value.truncate(&n.value, .signed, 64);
-        return int64bit.value.to(i64) catch unreachable;
+        var n_managed = try n.value.toManaged(agent.gc_allocator);
+        defer n_managed.deinit();
+        var int64bit = try std.math.big.int.Managed.init(agent.gc_allocator);
+        try int64bit.truncate(&n_managed, .signed, 64);
+        return int64bit.to(i64) catch unreachable;
     }
 
     /// 7.1.16 ToBigUint64 ( argument )
@@ -640,9 +642,11 @@ pub const Value = union(enum) {
 
         // 2. Let int64bit be ℝ(n) modulo 2**64.
         // 3. Return ℤ(int64bit).
-        var int64bit = try BigInt.from(agent.gc_allocator, 0);
-        try int64bit.value.truncate(&n.value, .unsigned, 64);
-        return int64bit.value.to(u64) catch unreachable;
+        var n_managed = try n.value.toManaged(agent.gc_allocator);
+        defer n_managed.deinit();
+        var int64bit = try std.math.big.int.Managed.init(agent.gc_allocator);
+        try int64bit.truncate(&n_managed, .unsigned, 64);
+        return int64bit.to(u64) catch unreachable;
     }
 
     /// 7.1.17 ToString ( argument )
@@ -1322,9 +1326,8 @@ pub fn stringToBigInt(allocator: Allocator, string: String) Allocator.Error!?Big
     // 4. Assert: mv is an integer.
     // 5. Return ℤ(mv).
     // TODO: Implement the proper string parsing grammar!
-    var big_int = try types.BigInt.from(allocator, 0);
     var trimmed_string = try (try string.trim(allocator, .@"start+end")).toUtf8(allocator);
-    if (trimmed_string.len == 0) return big_int;
+    if (trimmed_string.len == 0) return try types.BigInt.from(allocator, 0);
     // Unlike std.fmt.parseFloat(), std.math.big.int.Managed.setString() doesn't like the prefix
     // so we have to cut it off manually.
     const base: u8 = if (std.ascii.startsWithIgnoreCase(trimmed_string, "0b")) blk: {
@@ -1342,7 +1345,8 @@ pub fn stringToBigInt(allocator: Allocator, string: String) Allocator.Error!?Big
     } else blk: {
         break :blk 10;
     };
-    big_int.value.setString(
+    var big_int = try std.math.big.int.Managed.init(allocator);
+    big_int.setString(
         base,
         trimmed_string,
     ) catch |err| switch (err) {
@@ -1350,7 +1354,7 @@ pub fn stringToBigInt(allocator: Allocator, string: String) Allocator.Error!?Big
         error.InvalidCharacter => return null,
         error.InvalidBase => unreachable,
     };
-    return big_int;
+    return types.BigInt.fromConst(big_int.toConst());
 }
 
 /// 7.2.10 SameValue ( x, y )
@@ -1855,6 +1859,8 @@ test "format" {
     const object = try builtins.Object.create(&agent, .{
         .prototype = null,
     });
+    var managed = try std.math.big.int.Managed.initSet(std.testing.allocator, 123);
+    defer managed.deinit();
     const test_cases = [_]struct { Value, []const u8 }{
         .{ .undefined, "undefined" },
         .{ .null, "null" },
@@ -1863,14 +1869,13 @@ test "format" {
         .{ Value.from("foo"), "\"foo\"" },
         .{ Value.from(Symbol{ .id = 0, .description = null }), "Symbol()" },
         .{ Value.from(Symbol{ .id = 0, .description = String.fromLiteral("foo") }), "Symbol(\"foo\")" },
-        .{ Value.from(BigInt{ .value = try BigInt.Value.initSet(std.testing.allocator, 123) }), "123n" },
+        .{ Value.from(BigInt.fromConst(managed.toConst())), "123n" },
         .{ Value.from(object), "[object Object]" },
     };
     for (test_cases) |test_case| {
         const value, const expected = test_case;
         const string = try std.fmt.allocPrint(std.testing.allocator, "{}", .{value});
         defer std.testing.allocator.free(string);
-        defer if (value == .big_int) @constCast(&value.big_int).value.deinit();
         try std.testing.expectEqualStrings(expected, string);
     }
 }

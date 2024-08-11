@@ -269,12 +269,12 @@ pub const NumericLiteral = struct {
                 return Value.from(number);
             },
             .big_int => {
-                var big_int = try BigInt.from(allocator, 0);
-                big_int.value.setString(base, str) catch |err| switch (err) {
+                var big_int = try std.math.big.int.Managed.init(allocator);
+                big_int.setString(base, str) catch |err| switch (err) {
                     error.InvalidBase, error.InvalidCharacter => unreachable,
                     error.OutOfMemory => return error.OutOfMemory,
                 };
-                return Value.from(big_int);
+                return Value.from(BigInt.fromConst(big_int.toConst()));
             },
         }
     }

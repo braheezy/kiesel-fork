@@ -82,9 +82,11 @@ pub const BigIntConstructor = struct {
 
         // 3. Let mod be ℝ(bigint) modulo 2**bits.
         // 4. If mod ≥ 2**(bits - 1), return ℤ(mod - 2**bits); otherwise, return ℤ(mod).
-        var result = try types.BigInt.from(agent.gc_allocator, 0);
-        try result.value.truncate(&big_int.value, .signed, @intCast(bits));
-        return Value.from(result);
+        var big_int_managed = try big_int.value.toManaged(agent.gc_allocator);
+        defer big_int_managed.deinit();
+        var result = try std.math.big.int.Managed.init(agent.gc_allocator);
+        try result.truncate(&big_int_managed, .signed, @intCast(bits));
+        return Value.from(types.BigInt.fromConst(result.toConst()));
     }
 
     /// 21.2.2.2 BigInt.asUintN ( bits, bigint )
@@ -100,9 +102,11 @@ pub const BigIntConstructor = struct {
         const big_int = try big_int_value.toBigInt(agent);
 
         // 3. Return ℤ(ℝ(bigint) modulo 2**bits).
-        var result = try types.BigInt.from(agent.gc_allocator, 0);
-        try result.value.truncate(&big_int.value, .unsigned, @intCast(bits));
-        return Value.from(result);
+        var big_int_managed = try big_int.value.toManaged(agent.gc_allocator);
+        defer big_int_managed.deinit();
+        var result = try std.math.big.int.Managed.init(agent.gc_allocator);
+        try result.truncate(&big_int_managed, .unsigned, @intCast(bits));
+        return Value.from(types.BigInt.fromConst(result.toConst()));
     }
 };
 
@@ -120,12 +124,12 @@ fn numberToBigInt(agent: *Agent, number: Number) Agent.Error!types.BigInt {
 
     // 2. Return ℤ(ℝ(number)).
     const string = try number.toString(agent.gc_allocator, 10);
-    var big_int = try types.BigInt.from(agent.gc_allocator, 0);
-    big_int.value.setString(10, string.ascii) catch |err| switch (err) {
+    var big_int = try std.math.big.int.Managed.init(agent.gc_allocator);
+    big_int.setString(10, string.ascii) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.InvalidBase, error.InvalidCharacter => unreachable,
     };
-    return big_int;
+    return types.BigInt.fromConst(big_int.toConst());
 }
 
 /// 21.2.3 Properties of the BigInt Prototype Object
