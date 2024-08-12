@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const AnyPointer = @import("any-pointer").AnyPointer;
-
 const build_options = @import("build-options");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
@@ -93,9 +91,8 @@ pub const PropertyKind = enum {
     @"key+value",
 };
 
-ptr: AnyPointer,
-data: *Data,
-tag: ?Tag,
+// Uses `allowzero` to store lazy intrinsics as `.{ .data = @ptrFromInt(0) }` initially
+data: *allowzero Data,
 
 pub fn format(
     self: Self,
@@ -112,12 +109,14 @@ pub fn format(
 
 pub inline fn is(self: Self, comptime T: type) bool {
     comptime std.debug.assert(T.tag != null);
-    if (self.tag == null) return false;
-    return T.tag.? == self.tag.?;
+    if (self.data.tag == null) return false;
+    return T.tag.? == self.data.tag.?;
 }
 
 pub inline fn as(self: Self, comptime T: type) *T {
-    return self.ptr.cast(*T);
+    std.debug.assert(self.data.tag.? == T.tag);
+    // Casting alignment is safe because we allocate objects as *T
+    return @alignCast(@fieldParentPtr("data", @as(*Data, @ptrCast(self.data))));
 }
 
 // Helper functions so we don't have to say 'data' all the time
@@ -153,7 +152,7 @@ pub inline fn propertyStorage(self: Self) *PropertyStorage {
 
 /// Shortcut for the SameValue AO applied on two objects (i.e. pointer equality)
 pub fn sameValue(self: Self, other: Self) bool {
-    return self.ptr.eql(other.ptr);
+    return self.data == other.data;
 }
 
 /// 7.1.1.1 OrdinaryToPrimitive ( O, hint )

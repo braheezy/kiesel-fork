@@ -5,8 +5,6 @@ const Color = std.io.tty.Color;
 
 const icu4zig = @import("icu4zig");
 
-const AnyPointer = @import("any-pointer").AnyPointer;
-
 const build_options = @import("build-options");
 const builtins = @import("builtins.zig");
 const types = @import("types.zig");
@@ -22,7 +20,7 @@ const ordinaryOwnPropertyKeys = builtins.ordinaryOwnPropertyKeys;
 const typedArrayElementSize = builtins.typedArrayElementSize;
 const typedArrayLength = builtins.typedArrayLength;
 
-const SeenObjects = std.AutoHashMap(AnyPointer, usize);
+const SeenObjects = std.AutoHashMap(*allowzero Object.Data, usize);
 const State = struct {
     seen_objects: SeenObjects,
     print_in_progress: bool,
@@ -841,13 +839,13 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
 
     if (value.isObject()) {
         const object = value.asObject();
-        if (state.seen_objects.get(object.ptr)) |i| {
+        if (state.seen_objects.get(object.data)) |i| {
             try tty_config.setColor(writer, .dim);
             try writer.print("<ref #{}>", .{i});
             try tty_config.setColor(writer, .reset);
             return;
         }
-        state.seen_objects.putNoClobber(object.ptr, state.seen_objects.count()) catch return;
+        state.seen_objects.putNoClobber(object.data, state.seen_objects.count()) catch return;
 
         inline for (.{
             .{ builtins.Array, prettyPrintArray },

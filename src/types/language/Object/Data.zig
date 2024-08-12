@@ -9,6 +9,8 @@ const PrivateElement = types.PrivateElement;
 const PrivateNameArrayHashMap = types.PrivateNameArrayHashMap;
 const PropertyStorage = @import("PropertyStorage.zig");
 
+tag: ?Object.Tag,
+
 /// [[Prototype]]
 prototype: ?Object,
 

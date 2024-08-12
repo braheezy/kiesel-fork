@@ -60,6 +60,7 @@ pub fn MakeObject(
             self.* = .{
                 .fields = if (has_fields) args.fields,
                 .data = .{
+                    .tag = options.tag,
                     .agent = agent,
                     .prototype = args.prototype,
                     .extensible = args.extensible,
@@ -74,9 +75,7 @@ pub fn MakeObject(
 
         pub fn object(self: *Self) Object {
             return .{
-                .ptr = AnyPointer.make(*Self, self),
                 .data = &self.data,
-                .tag = options.tag,
             };
         }
     };

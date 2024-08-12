@@ -16,12 +16,14 @@ const Realm = @import("../Realm.zig");
 
 const Self = @This();
 
+const null_object_data: *allowzero Object.Data = @ptrFromInt(0);
+
 realm: *Realm,
 
 // Not stored as top-level properties so we can have methods of the same names
 lazy_intrinsics: struct {
     // Using a null ptr allows us to avoid using extra memory for optionals.
-    const null_intrinsic: Object = .{ .data = undefined, .ptr = AnyPointer.null_pointer, .tag = undefined };
+    const null_intrinsic: Object = .{ .data = null_object_data };
 
     @"%AggregateError%": Object = null_intrinsic,
     @"%AggregateError.prototype%": Object = null_intrinsic,
@@ -161,12 +163,12 @@ inline fn lazyIntrinsic(
     comptime T: type,
 ) Allocator.Error!Object {
     const intrinsic = &@field(self.lazy_intrinsics, name);
-    if (intrinsic.ptr.isNull()) {
+    if (intrinsic.data == null_object_data) {
         const object = try T.create(self.realm);
         // Sanity check to ensure there is no dependency loop - creating the object must not
         // (indirectly) rely on itself. If something within `create()` assigned the intrinsic it
         // has been created twice and overwriting it would be a mistake.
-        std.debug.assert(intrinsic.ptr.isNull());
+        std.debug.assert(intrinsic.data == null_object_data);
         intrinsic.* = object;
         try T.init(self.realm, object);
     }
@@ -187,7 +189,7 @@ pub fn @"%Array.prototype%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%Array.prototype.toString%"(self: *Self) Allocator.Error!Object {
     const intrinsic = &self.lazy_intrinsics.@"%Array.prototype.toString%";
-    if (intrinsic.ptr.isNull()) {
+    if (intrinsic.data == null_object_data) {
         const array_prototype = try @"%Array.prototype%"(self);
         const property_descriptor = array_prototype.propertyStorage().get(PropertyKey.from("toString"));
         intrinsic.* = property_descriptor.?.value.?.asObject();
@@ -196,7 +198,7 @@ pub fn @"%Array.prototype.toString%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%Array.prototype.values%"(self: *Self) Allocator.Error!Object {
     const intrinsic = &self.lazy_intrinsics.@"%Array.prototype.values%";
-    if (intrinsic.ptr.isNull()) {
+    if (intrinsic.data == null_object_data) {
         const array_prototype = try @"%Array.prototype%"(self);
         const property_descriptor = array_prototype.propertyStorage().get(PropertyKey.from("values"));
         intrinsic.* = property_descriptor.?.value.?.asObject();
@@ -451,7 +453,7 @@ pub fn @"%Object.prototype%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%Object.prototype.toString%"(self: *Self) Allocator.Error!Object {
     const intrinsic = &self.lazy_intrinsics.@"%Object.prototype.toString%";
-    if (intrinsic.ptr.isNull()) {
+    if (intrinsic.data == null_object_data) {
         const object_prototype = try @"%Object.prototype%"(self);
         const property_descriptor = object_prototype.propertyStorage().get(PropertyKey.from("toString"));
         intrinsic.* = property_descriptor.?.value.?.asObject();

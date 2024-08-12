@@ -82,16 +82,11 @@ const Entry = union(enum) {
 };
 
 comptime {
-    // Let's make sure the size doesn't quietly change (yes, it's complicated)
+    // Let's make sure the size doesn't quietly change
     switch (builtin.target.ptrBitWidth()) {
-        32 => switch (builtin.mode) {
-            .Debug, .ReleaseSafe => std.debug.assert(@sizeOf(Entry) == 56),
-            .ReleaseFast, .ReleaseSmall => std.debug.assert(@sizeOf(Entry) == 48),
-        },
-        64 => switch (builtin.mode) {
-            .Debug, .ReleaseSafe => std.debug.assert(@sizeOf(Entry) == 96),
-            .ReleaseFast, .ReleaseSmall => std.debug.assert(@sizeOf(Entry) == 80),
-        },
+        // Only some 32-bit platforms have certain bitpacking optimizations applied
+        32 => std.debug.assert(@sizeOf(Entry) == 32 or @sizeOf(Entry) == 40),
+        64 => std.debug.assert(@sizeOf(Entry) == 64),
         else => unreachable,
     }
 }
