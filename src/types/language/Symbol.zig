@@ -23,10 +23,10 @@ pub const Data = struct {
 
 data: *Data,
 
-pub fn create(agent: *Agent, description: ?String) Allocator.Error!Self {
-    const data_ptr = try agent.gc_allocator.create(Data);
-    data_ptr.* = .{ .description = description };
-    return .{ .data = data_ptr };
+pub fn init(allocator: Allocator, description: ?String) Allocator.Error!Self {
+    const data = try allocator.create(Data);
+    data.* = .{ .description = description };
+    return .{ .data = data };
 }
 
 pub fn format(

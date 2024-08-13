@@ -85,7 +85,7 @@ pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
         .zero = try BigInt.from(self.gc_allocator, 0),
         .one = try BigInt.from(self.gc_allocator, 1),
     };
-    self.well_known_symbols = try WellKnownSymbols.init(&self);
+    self.well_known_symbols = try WellKnownSymbols.init(self.gc_allocator);
     self.global_symbol_registry = StringHashMap(Symbol).init(self.gc_allocator);
     self.execution_context_stack = std.ArrayList(ExecutionContext).init(self.gc_allocator);
     self.queued_jobs = std.ArrayList(QueuedJob).init(self.gc_allocator);

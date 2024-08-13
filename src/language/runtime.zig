@@ -1790,7 +1790,7 @@ pub fn classDefinitionEvaluation(
             // ii. Else,
             else {
                 const description = try String.fromUtf8(agent.gc_allocator, declared_name);
-                var symbol = try Symbol.create(agent, description);
+                var symbol = try Symbol.init(agent.gc_allocator, description);
                 symbol.data.is_private = true;
 
                 // 1. Let name be a new Private Name whose [[Description]] is dn.

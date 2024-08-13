@@ -190,7 +190,7 @@ pub const SymbolConstructor = struct {
         };
 
         // 4. Return a new Symbol whose [[Description]] is descString.
-        return Value.from(try types.Symbol.create(agent, description_string));
+        return Value.from(try types.Symbol.init(agent.gc_allocator, description_string));
     }
 
     /// 20.4.2.2 Symbol.for ( key )
@@ -209,7 +209,7 @@ pub const SymbolConstructor = struct {
         std.debug.assert(!agent.global_symbol_registry.contains(string_key));
 
         // 4. Let newSymbol be a new Symbol whose [[Description]] is stringKey.
-        const new_symbol = try types.Symbol.create(agent, string_key);
+        const new_symbol = try types.Symbol.init(agent.gc_allocator, string_key);
 
         // 5. Append the Record { [[Key]]: stringKey, [[Symbol]]: newSymbol } to the GlobalSymbolRegistry List.
         try agent.global_symbol_registry.putNoClobber(string_key, new_symbol);
