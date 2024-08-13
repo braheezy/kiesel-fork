@@ -43,3 +43,19 @@ pub fn init(allocator: Allocator) std.mem.Allocator.Error!Self {
         .@"%Symbol.unscopables%" = try Symbol.init(allocator, String.fromLiteral("Symbol.unscopables")),
     };
 }
+
+pub fn deinit(self: Self, allocator: Allocator) void {
+    self.@"%Symbol.asyncIterator%".deinit(allocator);
+    self.@"%Symbol.hasInstance%".deinit(allocator);
+    self.@"%Symbol.isConcatSpreadable%".deinit(allocator);
+    self.@"%Symbol.iterator%".deinit(allocator);
+    self.@"%Symbol.match%".deinit(allocator);
+    self.@"%Symbol.matchAll%".deinit(allocator);
+    self.@"%Symbol.replace%".deinit(allocator);
+    self.@"%Symbol.search%".deinit(allocator);
+    self.@"%Symbol.species%".deinit(allocator);
+    self.@"%Symbol.split%".deinit(allocator);
+    self.@"%Symbol.toPrimitive%".deinit(allocator);
+    self.@"%Symbol.toStringTag%".deinit(allocator);
+    self.@"%Symbol.unscopables%".deinit(allocator);
+}

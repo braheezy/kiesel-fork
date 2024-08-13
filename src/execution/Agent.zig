@@ -93,8 +93,9 @@ pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
 }
 
 pub fn deinit(self: *Self) void {
-    self.gc_allocator.free(self.pre_allocated.zero.managed.limbs);
-    self.gc_allocator.free(self.pre_allocated.one.managed.limbs);
+    self.pre_allocated.zero.deinit(self.gc_allocator);
+    self.pre_allocated.one.deinit(self.gc_allocator);
+    self.well_known_symbols.deinit(self.gc_allocator);
     self.global_symbol_registry.deinit();
     self.execution_context_stack.deinit();
     self.queued_jobs.deinit();
@@ -320,9 +321,14 @@ pub fn getGlobalObject(self: Self) Object {
     return current_realm.global_object;
 }
 
+test init {
+    // Ensure Agent teardown is leak-free
+    var agent = try init(std.testing.allocator, .{});
+    defer agent.deinit();
+}
+
 test "well_known_symbols" {
-    const gc = @import("../gc.zig");
-    var agent = try init(gc.allocator(), .{});
+    var agent = try init(std.testing.allocator, .{});
     defer agent.deinit();
     const unscopables = agent.well_known_symbols.@"%Symbol.unscopables%";
     try std.testing.expectEqualStrings(unscopables.data.description.?.ascii, "Symbol.unscopables");
