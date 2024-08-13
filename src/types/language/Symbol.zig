@@ -29,6 +29,12 @@ pub fn init(allocator: Allocator, description: ?String) Allocator.Error!Self {
     return .{ .data = data };
 }
 
+/// For tests not using the GC allocator.
+pub fn deinit(self: Self, allocator: Allocator) void {
+    // TODO: To deinit the description string we need to know if it was dynamically allocated.
+    allocator.destroy(self.data);
+}
+
 pub fn format(
     self: Self,
     comptime fmt: []const u8,

@@ -36,6 +36,12 @@ pub fn from(allocator: Allocator, value: anytype) Allocator.Error!Self {
     return .{ .managed = managed };
 }
 
+/// For tests not using the GC allocator.
+pub fn deinit(self: Self, allocator: Allocator) void {
+    self.managed.deinit();
+    allocator.destroy(self.managed);
+}
+
 pub fn asFloat(self: Self, agent: *Agent) Allocator.Error!f64 {
     // NOTE: We could also use to(i1024) here, which should cover the largest possible int for
     //       an f64, but that fails to codegen on the Zig side for at least aarch64-macos and
