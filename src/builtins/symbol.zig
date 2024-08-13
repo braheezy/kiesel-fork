@@ -190,13 +190,7 @@ pub const SymbolConstructor = struct {
         };
 
         // 4. Return a new Symbol whose [[Description]] is descString.
-        return Value.from(agent.createSymbol(description_string) catch |err| switch (err) {
-            error.Overflow => return agent.throwException(
-                .internal_error,
-                "Maximum number of symbols exceeded",
-                .{},
-            ),
-        });
+        return Value.from(try types.Symbol.create(agent, description_string));
     }
 
     /// 20.4.2.2 Symbol.for ( key )
@@ -215,13 +209,7 @@ pub const SymbolConstructor = struct {
         std.debug.assert(!agent.global_symbol_registry.contains(string_key));
 
         // 4. Let newSymbol be a new Symbol whose [[Description]] is stringKey.
-        const new_symbol = agent.createSymbol(string_key) catch |err| switch (err) {
-            error.Overflow => return agent.throwException(
-                .internal_error,
-                "Maximum number of symbols exceeded",
-                .{},
-            ),
-        };
+        const new_symbol = try types.Symbol.create(agent, string_key);
 
         // 5. Append the Record { [[Key]]: stringKey, [[Symbol]]: newSymbol } to the GlobalSymbolRegistry List.
         try agent.global_symbol_registry.putNoClobber(string_key, new_symbol);
@@ -314,7 +302,7 @@ pub const SymbolPrototype = struct {
         const symbol = try thisSymbolValue(agent, this_value);
 
         // 3. Return sym.[[Description]].
-        return Value.from(symbol.description orelse return Value.undefined);
+        return Value.from(symbol.data.description orelse return Value.undefined);
     }
 
     /// 20.4.3.3 Symbol.prototype.toString ( )
@@ -360,7 +348,7 @@ pub fn keyForSymbol(agent: *Agent, symbol: types.Symbol) ?String {
     var it = agent.global_symbol_registry.iterator();
     while (it.next()) |entry| {
         // a. If SameValue(e.[[Symbol]], sym) is true, return e.[[Key]].
-        if (entry.value_ptr.id == symbol.id) return entry.key_ptr.*;
+        if (entry.value_ptr.sameValue(symbol)) return entry.key_ptr.*;
     }
 
     // 2. Assert: GlobalSymbolRegistry does not currently contain an entry for sym.

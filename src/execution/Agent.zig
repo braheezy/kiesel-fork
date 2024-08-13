@@ -37,7 +37,6 @@ pre_allocated: struct {
     one: BigInt,
 },
 exception: ?Value = null,
-symbol_id: Symbol.Id = 0,
 well_known_symbols: WellKnownSymbols,
 global_symbol_registry: StringHashMap(Symbol),
 host_hooks: HostHooks,
@@ -86,7 +85,7 @@ pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
         .zero = try BigInt.from(self.gc_allocator, 0),
         .one = try BigInt.from(self.gc_allocator, 1),
     };
-    self.well_known_symbols = WellKnownSymbols.init(&self);
+    self.well_known_symbols = try WellKnownSymbols.init(&self);
     self.global_symbol_registry = StringHashMap(Symbol).init(self.gc_allocator);
     self.execution_context_stack = std.ArrayList(ExecutionContext).init(self.gc_allocator);
     self.queued_jobs = std.ArrayList(QueuedJob).init(self.gc_allocator);
@@ -122,16 +121,6 @@ pub fn checkStackOverflow(self: *Self) error{ExceptionThrown}!void {
             return self.throwException(.internal_error, "Stack overflow", .{});
         }
     }
-}
-
-pub fn createSymbol(self: *Self, description: ?String) error{Overflow}!Symbol {
-    const id = blk: {
-        const next_symbol_id = try std.math.add(Symbol.Id, self.symbol_id, 1);
-        if ((next_symbol_id & Symbol.private_bitmask) != 0) return error.Overflow;
-        defer self.symbol_id = next_symbol_id;
-        break :blk self.symbol_id;
-    };
-    return .{ .id = id, .description = description };
 }
 
 const ExceptionType = enum {
@@ -336,6 +325,5 @@ test "well_known_symbols" {
     var agent = try init(gc.allocator(), .{});
     defer agent.deinit();
     const unscopables = agent.well_known_symbols.@"%Symbol.unscopables%";
-    try std.testing.expectEqual(unscopables.id, 12);
-    try std.testing.expectEqualStrings(unscopables.description.?.ascii, "Symbol.unscopables");
+    try std.testing.expectEqualStrings(unscopables.data.description.?.ascii, "Symbol.unscopables");
 }

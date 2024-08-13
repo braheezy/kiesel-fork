@@ -85,8 +85,8 @@ comptime {
     // Let's make sure the size doesn't quietly change
     switch (builtin.target.ptrBitWidth()) {
         // Only some 32-bit platforms have certain bitpacking optimizations applied
-        32 => std.debug.assert(@sizeOf(Entry) == 32 or @sizeOf(Entry) == 40),
-        64 => std.debug.assert(@sizeOf(Entry) == 64),
+        32 => std.debug.assert(@sizeOf(Entry) == 24 or @sizeOf(Entry) == 32),
+        64 => std.debug.assert(@sizeOf(Entry) == 48),
         else => unreachable,
     }
 }
@@ -163,7 +163,7 @@ pub const PropertyKeyArrayHashMapContext = struct {
     pub fn hash(_: anytype, property_key: PropertyKey) u64 {
         return switch (property_key) {
             .string => |string| string.hash(),
-            .symbol => |symbol| std.hash_map.getAutoHashFn(Symbol.Id, void)({}, symbol.id),
+            .symbol => |symbol| std.hash_map.getAutoHashFn(*Symbol.Data, void)({}, symbol.data),
             .integer_index => |integer_index| std.hash_map.getAutoHashFn(PropertyKey.IntegerIndex, void)({}, integer_index),
         };
     }

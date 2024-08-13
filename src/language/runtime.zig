@@ -1790,14 +1790,8 @@ pub fn classDefinitionEvaluation(
             // ii. Else,
             else {
                 const description = try String.fromUtf8(agent.gc_allocator, declared_name);
-                var symbol = agent.createSymbol(description) catch |err| switch (err) {
-                    error.Overflow => return agent.throwException(
-                        .internal_error,
-                        "Maximum number of symbols exceeded",
-                        .{},
-                    ),
-                };
-                symbol.id |= Symbol.private_bitmask;
+                var symbol = try Symbol.create(agent, description);
+                symbol.data.is_private = true;
 
                 // 1. Let name be a new Private Name whose [[Description]] is dn.
                 const name: PrivateName = .{ .symbol = symbol };

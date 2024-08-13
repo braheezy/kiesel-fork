@@ -1,6 +1,8 @@
 //! 6.1.5.1 Well-Known Symbols
 //! https://tc39.es/ecma262/#sec-well-known-symbols
 
+const std = @import("std");
+
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
 
@@ -24,20 +26,20 @@ const Self = @This();
 @"%Symbol.toStringTag%": Symbol,
 @"%Symbol.unscopables%": Symbol,
 
-pub fn init(agent: *Agent) Self {
+pub fn init(agent: *Agent) std.mem.Allocator.Error!Self {
     return .{
-        .@"%Symbol.asyncIterator%" = agent.createSymbol(String.fromLiteral("Symbol.asyncIterator")) catch unreachable,
-        .@"%Symbol.hasInstance%" = agent.createSymbol(String.fromLiteral("Symbol.hasInstance")) catch unreachable,
-        .@"%Symbol.isConcatSpreadable%" = agent.createSymbol(String.fromLiteral("Symbol.isConcatSpreadable")) catch unreachable,
-        .@"%Symbol.iterator%" = agent.createSymbol(String.fromLiteral("Symbol.iterator")) catch unreachable,
-        .@"%Symbol.match%" = agent.createSymbol(String.fromLiteral("Symbol.match")) catch unreachable,
-        .@"%Symbol.matchAll%" = agent.createSymbol(String.fromLiteral("Symbol.matchAll")) catch unreachable,
-        .@"%Symbol.replace%" = agent.createSymbol(String.fromLiteral("Symbol.replace")) catch unreachable,
-        .@"%Symbol.search%" = agent.createSymbol(String.fromLiteral("Symbol.search")) catch unreachable,
-        .@"%Symbol.species%" = agent.createSymbol(String.fromLiteral("Symbol.species")) catch unreachable,
-        .@"%Symbol.split%" = agent.createSymbol(String.fromLiteral("Symbol.split")) catch unreachable,
-        .@"%Symbol.toPrimitive%" = agent.createSymbol(String.fromLiteral("Symbol.toPrimitive")) catch unreachable,
-        .@"%Symbol.toStringTag%" = agent.createSymbol(String.fromLiteral("Symbol.toStringTag")) catch unreachable,
-        .@"%Symbol.unscopables%" = agent.createSymbol(String.fromLiteral("Symbol.unscopables")) catch unreachable,
+        .@"%Symbol.asyncIterator%" = try Symbol.create(agent, String.fromLiteral("Symbol.asyncIterator")),
+        .@"%Symbol.hasInstance%" = try Symbol.create(agent, String.fromLiteral("Symbol.hasInstance")),
+        .@"%Symbol.isConcatSpreadable%" = try Symbol.create(agent, String.fromLiteral("Symbol.isConcatSpreadable")),
+        .@"%Symbol.iterator%" = try Symbol.create(agent, String.fromLiteral("Symbol.iterator")),
+        .@"%Symbol.match%" = try Symbol.create(agent, String.fromLiteral("Symbol.match")),
+        .@"%Symbol.matchAll%" = try Symbol.create(agent, String.fromLiteral("Symbol.matchAll")),
+        .@"%Symbol.replace%" = try Symbol.create(agent, String.fromLiteral("Symbol.replace")),
+        .@"%Symbol.search%" = try Symbol.create(agent, String.fromLiteral("Symbol.search")),
+        .@"%Symbol.species%" = try Symbol.create(agent, String.fromLiteral("Symbol.species")),
+        .@"%Symbol.split%" = try Symbol.create(agent, String.fromLiteral("Symbol.split")),
+        .@"%Symbol.toPrimitive%" = try Symbol.create(agent, String.fromLiteral("Symbol.toPrimitive")),
+        .@"%Symbol.toStringTag%" = try Symbol.create(agent, String.fromLiteral("Symbol.toStringTag")),
+        .@"%Symbol.unscopables%" = try Symbol.create(agent, String.fromLiteral("Symbol.unscopables")),
     };
 }

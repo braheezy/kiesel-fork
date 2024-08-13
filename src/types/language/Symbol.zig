@@ -13,14 +13,21 @@ const String = types.String;
 
 const Self = @This();
 
-pub const Id = usize;
-pub const private_bitmask = 1 << (@bitSizeOf(Id) - 1);
+pub const Data = struct {
+    /// Flag to mark this symbol as a private name.
+    is_private: bool = false,
 
-/// Internal ID used for equality checks
-id: Id,
+    /// [[Description]]
+    description: ?String,
+};
 
-/// [[Description]]
-description: ?String,
+data: *Data,
+
+pub fn create(agent: *Agent, description: ?String) Allocator.Error!Self {
+    const data_ptr = try agent.gc_allocator.create(Data);
+    data_ptr.* = .{ .description = description };
+    return .{ .data = data_ptr };
+}
 
 pub fn format(
     self: Self,
@@ -31,20 +38,15 @@ pub fn format(
     _ = fmt;
     _ = options;
     try writer.writeAll("Symbol(");
-    if (self.description) |description| {
+    if (self.data.description) |description| {
         try writer.print("\"{}\"", .{description});
     }
     try writer.writeAll(")");
 }
 
-/// Symbols are marked as private names if the ID's MSB is set.
-pub fn isPrivate(self: Self) bool {
-    return (self.id & private_bitmask) != 0;
-}
-
 /// Shortcut for the SameValue AO applied on two symbols (i.e. id equality)
 pub fn sameValue(self: Self, other: Self) bool {
-    return self.id == other.id;
+    return self.data == other.data;
 }
 
 /// 20.4.3.3.1 SymbolDescriptiveString ( sym )
@@ -53,7 +55,7 @@ pub fn descriptiveString(self: Self, agent: *Agent) Allocator.Error!String {
     // 1. Let desc be sym's [[Description]] value.
     // 2. If desc is undefined, set desc to the empty String.
     // 3. Assert: desc is a String.
-    const description = self.description orelse String.empty;
+    const description = self.data.description orelse String.empty;
 
     // 4. Return the string-concatenation of "Symbol(", desc, and ")".
     return String.concat(
@@ -63,15 +65,15 @@ pub fn descriptiveString(self: Self, agent: *Agent) Allocator.Error!String {
 }
 
 test "format" {
-    const test_cases = [_]struct { Self, []const u8 }{
-        .{ .{ .id = 0, .description = null }, "Symbol()" },
-        .{ .{ .id = 1, .description = String.empty }, "Symbol(\"\")" },
-        .{ .{ .id = 2, .description = String.fromLiteral("foo") }, "Symbol(\"foo\")" },
+    var test_cases = [_]struct { Self.Data, []const u8 }{
+        .{ .{ .description = null }, "Symbol()" },
+        .{ .{ .description = String.empty }, "Symbol(\"\")" },
+        .{ .{ .description = String.fromLiteral("foo") }, "Symbol(\"foo\")" },
     };
-    for (test_cases) |test_case| {
-        const symbol, const expected = test_case;
+    for (&test_cases) |*test_case| {
+        const symbol: Self = .{ .data = &test_case[0] };
         const string = try std.fmt.allocPrint(std.testing.allocator, "{}", .{symbol});
         defer std.testing.allocator.free(string);
-        try std.testing.expectEqualStrings(expected, string);
+        try std.testing.expectEqualStrings(test_case[1], string);
     }
 }

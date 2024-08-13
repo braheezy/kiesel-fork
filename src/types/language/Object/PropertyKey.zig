@@ -78,7 +78,7 @@ pub const PropertyKey = union(enum) {
             },
             .symbol => |a_symbol| switch (b) {
                 .string => false,
-                .symbol => |b_symbol| a_symbol.id == b_symbol.id,
+                .symbol => |b_symbol| a_symbol.data == b_symbol.data,
                 .integer_index => false,
             },
             .integer_index => |a_integer_index| switch (b) {

@@ -1396,7 +1396,7 @@ pub fn synthesizePrototype(self: Self, agent: *Agent) Allocator.Error!?Object {
 
 /// Non-standard helper to turn a symbol value into a private name.
 pub fn toPrivateName(self: Self) ?PrivateName {
-    if (!self.isSymbol() or !self.asSymbol().isPrivate()) return null;
+    if (!self.isSymbol() or !self.asSymbol().data.is_private) return null;
     return .{ .symbol = self.asSymbol() };
 }
 
@@ -1952,19 +1952,21 @@ test format {
     const gc = @import("../../gc.zig");
     var agent = try Agent.init(gc.allocator(), .{});
     defer agent.deinit();
+    var symbol_data_without_description: Symbol.Data = .{ .description = null };
+    var symbol_data_with_description: Symbol.Data = .{ .description = String.fromLiteral("foo") };
+    var managed = try std.math.big.int.Managed.initSet(std.testing.allocator, 123);
+    defer managed.deinit();
     const object = try builtins.Object.create(&agent, .{
         .prototype = null,
     });
-    var managed = try std.math.big.int.Managed.initSet(std.testing.allocator, 123);
-    defer managed.deinit();
     const test_cases = [_]struct { Self, []const u8 }{
         .{ @"undefined", "undefined" },
         .{ @"null", "null" },
         .{ from(true), "true" },
         .{ from(false), "false" },
         .{ from("foo"), "\"foo\"" },
-        .{ from(Symbol{ .id = 0, .description = null }), "Symbol()" },
-        .{ from(Symbol{ .id = 0, .description = String.fromLiteral("foo") }), "Symbol(\"foo\")" },
+        .{ from(Symbol{ .data = &symbol_data_without_description }), "Symbol()" },
+        .{ from(Symbol{ .data = &symbol_data_with_description }), "Symbol(\"foo\")" },
         .{ from(BigInt.fromConst(managed.toConst())), "123n" },
         .{ from(object), "[object Object]" },
     };

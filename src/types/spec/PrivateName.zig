@@ -9,7 +9,7 @@ const Symbol = types.Symbol;
 
 const Self = @This();
 
-/// As symbols already have uniqueness via an internal ID, as well as a description string, private
+/// As symbols already have uniqueness via pointers, as well as a description string, private
 /// names can easily be implemented using symbols.
 /// This should be considered an implementation detail and not relied upon for anything else.
 symbol: Symbol,
@@ -22,7 +22,7 @@ pub fn format(
 ) @TypeOf(writer).Error!void {
     _ = fmt;
     _ = options;
-    try writer.print("{}", .{self.symbol.description.?});
+    try writer.print("{}", .{self.symbol.data.description.?});
 }
 
 pub fn eql(a: Self, b: Self) bool {
@@ -32,7 +32,7 @@ pub fn eql(a: Self, b: Self) bool {
 pub fn PrivateNameArrayHashMap(comptime V: type) type {
     return std.ArrayHashMap(Self, V, struct {
         pub fn hash(_: @This(), key: Self) u32 {
-            return std.array_hash_map.getAutoHashFn(Symbol.Id, void)({}, key.symbol.id);
+            return std.array_hash_map.getAutoHashFn(*Symbol.Data, void)({}, key.symbol.data);
         }
 
         pub fn eql(_: @This(), a: Self, b: Self, _: usize) bool {

@@ -834,7 +834,7 @@ pub fn setFunctionName(
             // 2. If name is a Symbol, then
             .symbol => |symbol| blk: {
                 // a. Let description be name's [[Description]] value.
-                const description = symbol.description;
+                const description = symbol.data.description;
 
                 // b. If description is undefined, set name to the empty String.
                 if (description == null) break :blk String.empty;
@@ -849,7 +849,7 @@ pub fn setFunctionName(
         // 3. Else if name is a Private Name, then
         .private_name => |private_name| blk: {
             // a. Set name to name.[[Description]].
-            break :blk private_name.symbol.description.?;
+            break :blk private_name.symbol.data.description.?;
         },
     };
 
