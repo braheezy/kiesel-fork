@@ -93,8 +93,8 @@ pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
 }
 
 pub fn deinit(self: *Self) void {
-    self.gc_allocator.free(self.pre_allocated.zero.value.limbs);
-    self.gc_allocator.free(self.pre_allocated.one.value.limbs);
+    self.gc_allocator.free(self.pre_allocated.zero.managed.limbs);
+    self.gc_allocator.free(self.pre_allocated.one.managed.limbs);
     self.global_symbol_registry.deinit();
     self.execution_context_stack.deinit();
     self.queued_jobs.deinit();

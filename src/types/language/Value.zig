@@ -433,7 +433,7 @@ pub fn toBoolean(self: Self) bool {
         .number => if (self.asNumber().isZero() or self.asNumber().isNan()) {
             return false;
         },
-        .big_int => if (self.asBigInt().value.eqlZero()) {
+        .big_int => if (self.asBigInt().managed.eqlZero()) {
             return false;
         },
         .string => if (self.asString().isEmpty()) {
@@ -730,9 +730,8 @@ pub fn toBigInt64(self: Self, agent: *Agent) Agent.Error!i64 {
 
     // 2. Let int64bit be ℝ(n) modulo 2**64.
     // 3. If int64bit ≥ 2**63, return ℤ(int64bit - 2**64); otherwise return ℤ(int64bit).
-    const n_managed = try n.value.toManaged(agent.gc_allocator);
     var int64bit = try std.math.big.int.Managed.init(agent.gc_allocator);
-    try int64bit.truncate(&n_managed, .signed, 64);
+    try int64bit.truncate(n.managed, .signed, 64);
     return int64bit.to(i64) catch unreachable;
 }
 
@@ -744,9 +743,8 @@ pub fn toBigUint64(self: Self, agent: *Agent) Agent.Error!u64 {
 
     // 2. Let int64bit be ℝ(n) modulo 2**64.
     // 3. Return ℤ(int64bit).
-    const n_managed = try n.value.toManaged(agent.gc_allocator);
     var int64bit = try std.math.big.int.Managed.init(agent.gc_allocator);
-    try int64bit.truncate(&n_managed, .unsigned, 64);
+    try int64bit.truncate(n.managed, .unsigned, 64);
     return int64bit.to(u64) catch unreachable;
 }
 
@@ -1445,8 +1443,8 @@ pub fn stringToBigInt(allocator: Allocator, string: String) Allocator.Error!?Big
     } else blk: {
         break :blk 10;
     };
-    var big_int = try std.math.big.int.Managed.init(allocator);
-    big_int.setString(
+    const big_int = try BigInt.from(allocator, 0);
+    big_int.managed.setString(
         base,
         trimmed_string,
     ) catch |err| switch (err) {
@@ -1454,7 +1452,7 @@ pub fn stringToBigInt(allocator: Allocator, string: String) Allocator.Error!?Big
         error.InvalidCharacter => return null,
         error.InvalidBase => unreachable,
     };
-    return try types.BigInt.from(allocator, big_int.toConst());
+    return big_int;
 }
 
 /// 7.2.10 SameValue ( x, y )
@@ -1967,7 +1965,7 @@ test format {
         .{ from("foo"), "\"foo\"" },
         .{ from(Symbol{ .data = &symbol_data_without_description }), "Symbol()" },
         .{ from(Symbol{ .data = &symbol_data_with_description }), "Symbol(\"foo\")" },
-        .{ from(try BigInt.from(gc.allocator(), managed.toConst())), "123n" },
+        .{ from(try BigInt.from(gc.allocator(), managed)), "123n" },
         .{ from(object), "[object Object]" },
     };
     for (test_cases) |test_case| {
