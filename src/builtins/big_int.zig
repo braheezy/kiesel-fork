@@ -86,7 +86,7 @@ pub const BigIntConstructor = struct {
         defer big_int_managed.deinit();
         var result = try std.math.big.int.Managed.init(agent.gc_allocator);
         try result.truncate(&big_int_managed, .signed, @intCast(bits));
-        return Value.from(types.BigInt.fromConst(result.toConst()));
+        return Value.from(try types.BigInt.from(agent.gc_allocator, result.toConst()));
     }
 
     /// 21.2.2.2 BigInt.asUintN ( bits, bigint )
@@ -106,7 +106,7 @@ pub const BigIntConstructor = struct {
         defer big_int_managed.deinit();
         var result = try std.math.big.int.Managed.init(agent.gc_allocator);
         try result.truncate(&big_int_managed, .unsigned, @intCast(bits));
-        return Value.from(types.BigInt.fromConst(result.toConst()));
+        return Value.from(try types.BigInt.from(agent.gc_allocator, result.toConst()));
     }
 };
 
@@ -129,7 +129,7 @@ fn numberToBigInt(agent: *Agent, number: Number) Agent.Error!types.BigInt {
         error.OutOfMemory => return error.OutOfMemory,
         error.InvalidBase, error.InvalidCharacter => unreachable,
     };
-    return types.BigInt.fromConst(big_int.toConst());
+    return types.BigInt.from(agent.gc_allocator, big_int.toConst());
 }
 
 /// 21.2.3 Properties of the BigInt Prototype Object

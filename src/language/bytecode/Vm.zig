@@ -1190,7 +1190,7 @@ pub fn executeInstruction(
             const value = self.result.?;
             self.result = switch (value.type()) {
                 .number => Value.from(value.asNumber().unaryMinus()),
-                .big_int => Value.from(try value.asBigInt().unaryMinus()),
+                .big_int => Value.from(try value.asBigInt().unaryMinus(self.agent)),
                 else => unreachable,
             };
         },

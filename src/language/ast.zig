@@ -274,7 +274,7 @@ pub const NumericLiteral = struct {
                     error.InvalidBase, error.InvalidCharacter => unreachable,
                     error.OutOfMemory => return error.OutOfMemory,
                 };
-                return Value.from(BigInt.fromConst(big_int.toConst()));
+                return Value.from(try BigInt.from(allocator, big_int.toConst()));
             },
         }
     }

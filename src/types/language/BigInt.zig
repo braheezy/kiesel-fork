@@ -13,7 +13,7 @@ const String = types.String;
 
 const Self = @This();
 
-value: std.math.big.int.Const,
+value: *std.math.big.int.Const,
 
 pub fn format(
     self: Self,
@@ -28,15 +28,12 @@ pub fn format(
 }
 
 pub fn from(allocator: Allocator, value: anytype) Allocator.Error!Self {
-    const managed = if (@typeInfo(@TypeOf(value)) == .ComptimeInt and value == 0)
-        try std.math.big.int.Managed.init(allocator)
-    else
-        try std.math.big.int.Managed.initSet(allocator, value);
-    return fromConst(managed.toConst());
-}
-
-pub fn fromConst(value: std.math.big.int.Const) Self {
-    return .{ .value = value };
+    const value_ptr = try allocator.create(std.math.big.int.Const);
+    value_ptr.* = switch (@TypeOf(value)) {
+        std.math.big.int.Const => value,
+        else => (try std.math.big.int.Managed.initSet(allocator, value)).toConst(),
+    };
+    return .{ .value = value_ptr };
 }
 
 pub fn asFloat(self: Self, agent: *Agent) Allocator.Error!f64 {
@@ -52,12 +49,12 @@ pub fn asFloat(self: Self, agent: *Agent) Allocator.Error!f64 {
 
 /// 6.1.6.2.1 BigInt::unaryMinus ( x )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-unaryMinus
-pub fn unaryMinus(x: Self) Allocator.Error!Self {
+pub fn unaryMinus(x: Self, agent: *Agent) Allocator.Error!Self {
     // 1.If x = 0ℤ, return 0ℤ.
     if (x.value.eqlZero()) return x;
 
     // 2. Return -x.
-    return fromConst(x.value.negate());
+    return from(agent.gc_allocator, x.value.negate());
 }
 
 /// 6.1.6.2.2 BigInt::bitwiseNOT ( x )
@@ -71,7 +68,7 @@ pub fn bitwiseNOT(self: Self, agent: *Agent) Allocator.Error!Self {
     var result = try self.value.toManaged(agent.gc_allocator);
     result.negate();
     try result.sub(&result, &one_managed);
-    return fromConst(result.toConst());
+    return from(agent.gc_allocator, result.toConst());
 }
 
 /// 6.1.6.2.3 BigInt::exponentiate ( base, exponent )
@@ -101,7 +98,7 @@ pub fn exponentiate(base: Self, agent: *Agent, exponent: Self) Agent.Error!Self 
         try result.mul(&result, &base_managed);
         try exponent_managed.sub(&exponent_managed, &one_managed);
     }
-    return fromConst(result.toConst());
+    return from(agent.gc_allocator, result.toConst());
 }
 
 /// 6.1.6.2.4 BigInt::multiply ( x, y )
@@ -112,7 +109,7 @@ pub fn multiply(x: Self, agent: *Agent, y: Self) Allocator.Error!Self {
     const y_managed = try y.value.toManaged(agent.gc_allocator);
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.mul(&x_managed, &y_managed);
-    return fromConst(result.toConst());
+    return from(agent.gc_allocator, result.toConst());
 }
 
 /// 6.1.6.2.5 BigInt::divide ( x, y )
@@ -128,7 +125,7 @@ pub fn divide(x: Self, agent: *Agent, y: Self) Agent.Error!Self {
     var quotient = try std.math.big.int.Managed.init(agent.gc_allocator);
     var r = try std.math.big.int.Managed.init(agent.gc_allocator);
     try quotient.divTrunc(&r, &x_managed, &y_managed);
-    return fromConst(quotient.toConst());
+    return from(agent.gc_allocator, quotient.toConst());
 }
 
 /// 6.1.6.2.6 BigInt::remainder ( n, d )
@@ -148,7 +145,7 @@ pub fn remainder(n: Self, agent: *Agent, d: Self) Agent.Error!Self {
     var quotient = try std.math.big.int.Managed.init(agent.gc_allocator);
     var r = try std.math.big.int.Managed.init(agent.gc_allocator);
     try quotient.divTrunc(&r, &n_managed, &d_managed);
-    return fromConst(r.toConst());
+    return from(agent.gc_allocator, r.toConst());
 }
 
 /// 6.1.6.2.7 BigInt::add ( x, y )
@@ -159,7 +156,7 @@ pub fn add(x: Self, agent: *Agent, y: Self) Allocator.Error!Self {
     const y_managed = try y.value.toManaged(agent.gc_allocator);
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.add(&x_managed, &y_managed);
-    return fromConst(result.toConst());
+    return from(agent.gc_allocator, result.toConst());
 }
 
 /// 6.1.6.2.8 BigInt::subtract ( x, y )
@@ -170,7 +167,7 @@ pub fn subtract(x: Self, agent: *Agent, y: Self) Allocator.Error!Self {
     const y_managed = try y.value.toManaged(agent.gc_allocator);
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.sub(&x_managed, &y_managed);
-    return fromConst(result.toConst());
+    return from(agent.gc_allocator, result.toConst());
 }
 
 /// 6.1.6.2.9 BigInt::leftShift ( x, y )
@@ -189,7 +186,7 @@ pub fn leftShift(x: Self, agent: *Agent, y: Self) Agent.Error!Self {
             .{std.math.maxInt(usize)},
         ),
     );
-    return fromConst(result.toConst());
+    return from(agent.gc_allocator, result.toConst());
 }
 
 /// 6.1.6.2.10 BigInt::signedRightShift ( x, y )
@@ -206,7 +203,7 @@ pub fn signedRightShift(x: Self, agent: *Agent, y: Self) Agent.Error!Self {
             .{std.math.maxInt(usize)},
         ),
     );
-    return fromConst(result.toConst());
+    return from(agent.gc_allocator, result.toConst());
 }
 
 /// 6.1.6.2.11 BigInt::unsignedRightShift ( x, y )
@@ -224,14 +221,14 @@ pub fn unsignedRightShift(_: Self, agent: *Agent, _: Self) error{ExceptionThrown
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-lessThan
 pub fn lessThan(x: Self, y: Self) bool {
     // 1. If ℝ(x) < ℝ(y), return true; otherwise return false.
-    return x.value.order(y.value) == .lt;
+    return x.value.order(y.value.*) == .lt;
 }
 
 /// 6.1.6.2.13 BigInt::equal ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-equal
 pub fn equal(x: Self, y: Self) bool {
     // 1. If ℝ(x) = ℝ(y), return true; otherwise return false.
-    return x.value.eql(y.value);
+    return x.value.eql(y.value.*);
 }
 
 /// 6.1.6.2.18 BigInt::bitwiseAND ( x, y )
@@ -242,7 +239,7 @@ pub fn bitwiseAND(x: Self, agent: *Agent, y: Self) Allocator.Error!Self {
     const y_managed = try y.value.toManaged(agent.gc_allocator);
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.bitAnd(&x_managed, &y_managed);
-    return fromConst(result.toConst());
+    return from(agent.gc_allocator, result.toConst());
 }
 
 /// 6.1.6.2.19 BigInt::bitwiseXOR ( x, y )
@@ -253,7 +250,7 @@ pub fn bitwiseXOR(x: Self, agent: *Agent, y: Self) Allocator.Error!Self {
     const y_managed = try y.value.toManaged(agent.gc_allocator);
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.bitXor(&x_managed, &y_managed);
-    return fromConst(result.toConst());
+    return from(agent.gc_allocator, result.toConst());
 }
 
 /// 6.1.6.2.20 BigInt::bitwiseOR ( x, y )
@@ -264,7 +261,7 @@ pub fn bitwiseOR(x: Self, agent: *Agent, y: Self) Allocator.Error!Self {
     const y_managed = try y.value.toManaged(agent.gc_allocator);
     var result = try std.math.big.int.Managed.init(agent.gc_allocator);
     try result.bitOr(&x_managed, &y_managed);
-    return fromConst(result.toConst());
+    return from(agent.gc_allocator, result.toConst());
 }
 
 /// 6.1.6.2.21 BigInt::toString ( x, radix )
@@ -290,7 +287,8 @@ test format {
         const value, const expected = test_case;
         var managed = try std.math.big.int.Managed.initSet(std.testing.allocator, value);
         defer managed.deinit();
-        const big_int = fromConst(managed.toConst());
+        const big_int = try from(std.testing.allocator, managed.toConst());
+        defer std.testing.allocator.destroy(big_int.value);
         const string = try std.fmt.allocPrint(std.testing.allocator, "{}", .{big_int});
         defer std.testing.allocator.free(string);
         try std.testing.expectEqualStrings(expected, string);

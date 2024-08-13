@@ -1454,7 +1454,7 @@ pub fn stringToBigInt(allocator: Allocator, string: String) Allocator.Error!?Big
         error.InvalidCharacter => return null,
         error.InvalidBase => unreachable,
     };
-    return types.BigInt.fromConst(big_int.toConst());
+    return try types.BigInt.from(allocator, big_int.toConst());
 }
 
 /// 7.2.10 SameValue ( x, y )
@@ -1967,7 +1967,7 @@ test format {
         .{ from("foo"), "\"foo\"" },
         .{ from(Symbol{ .data = &symbol_data_without_description }), "Symbol()" },
         .{ from(Symbol{ .data = &symbol_data_with_description }), "Symbol(\"foo\")" },
-        .{ from(BigInt.fromConst(managed.toConst())), "123n" },
+        .{ from(try BigInt.from(gc.allocator(), managed.toConst())), "123n" },
         .{ from(object), "[object Object]" },
     };
     for (test_cases) |test_case| {
