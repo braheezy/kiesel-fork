@@ -35,7 +35,7 @@ const num_properties = 55 +
     (if (build_options.enable_annex_b) 2 else 0) +
     (if (build_options.enable_intl) 1 else 0);
 
-pub fn globalObjectProperties(realm: *Realm) Allocator.Error![num_properties]GlobalObjectProperty {
+pub fn globalObjectProperties(realm: *Realm) [num_properties]GlobalObjectProperty {
     // NOTE: For the sake of compactness we're breaking the line length recommendations here.
     return .{
         // 19.1.1 globalThis

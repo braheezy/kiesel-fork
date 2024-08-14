@@ -174,7 +174,7 @@ fn setDefaultGlobalBindings(self: *Self) Agent.Error!void {
     const global = self.global_object;
 
     // 2. For each property of the Global Object specified in clause 19, do
-    for (try globalObjectProperties(self)) |property| {
+    for (globalObjectProperties(self)) |property| {
         // a. Let name be the String value of the property name.
         const name = property[0];
         const property_key = PropertyKey.from(String.fromAscii(name));
