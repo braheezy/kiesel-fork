@@ -103,7 +103,6 @@ pub fn builtinCallOrConstruct(
 ) Agent.Error!Value {
     // 1. Let callerContext be the running execution context.
     const caller_context = agent.runningExecutionContext();
-    _ = caller_context;
 
     // TODO: 2. If callerContext is not already suspended, suspend callerContext.
     _ = caller_context;

@@ -206,7 +206,11 @@ pub fn asyncBlockStart(
 
     // 6. Assert: When we return here, asyncContext has already been removed from the execution
     //    context stack and runningContext is the currently running execution context.
-    std.debug.assert(running_context == agent.runningExecutionContext());
+    // TODO: This may not be valid, the pointer can change if the execution context stack is resized.
+    //       For this to work we need to either heap-allocate execution contexts so they have a
+    //       stable pointer or otherwise give them a unique ID.
+    // std.debug.assert(running_context == agent.runningExecutionContext());
+    _ = running_context;
 
     // 7. Assert: result is a normal completion with a value of unused. The possible sources of
     //    this value are Await or, if the async function doesn't await anything, step 3.h above.
