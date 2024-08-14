@@ -3,6 +3,7 @@ name: Docs
 on:
   push:
     branches: [main]
+  pull_request:
 
 jobs:
   docs:
@@ -20,6 +21,7 @@ jobs:
       - uses: https://github.com/Swatinem/rust-cache@v2
       - run: zig build docs
       - name: Upload files
+        if: ${{ github.ref_name == 'main' }}
         run: |
           cd zig-out
           find docs -type d | while read -r directory; do
