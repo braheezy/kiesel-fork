@@ -358,7 +358,7 @@ pub const NumberPrototype = struct {
                 .{ formatted[0..index], formatted[index + 1 ..] },
             );
         }
-        return Value.from(String.fromAscii(formatted));
+        return Value.from(try String.fromAscii(agent.gc_allocator, formatted));
     }
 
     /// 21.1.3.3 Number.prototype.toFixed ( fractionDigits )
@@ -427,7 +427,8 @@ pub const NumberPrototype = struct {
         //         v. Set m to the string-concatenation of a, ".", and b.
         // 12. Return the string-concatenation of s and m.
         return Value.from(
-            String.fromAscii(
+            try String.fromAscii(
+                agent.gc_allocator,
                 try std.fmt.allocPrint(
                     agent.gc_allocator,
                     "{s}{d:.[2]}",
@@ -564,7 +565,8 @@ pub const NumberPrototype = struct {
                 // vi. Return the string-concatenation of s, m, the code unit 0x0065 (LATIN SMALL
                 //     LETTER E), c, and d.
                 return Value.from(
-                    String.fromAscii(
+                    try String.fromAscii(
+                        agent.gc_allocator,
                         try std.fmt.allocPrint(
                             agent.gc_allocator,
                             "{s}{s}e{c}{d}",
@@ -578,7 +580,8 @@ pub const NumberPrototype = struct {
         // 11. If e = p - 1, return the string-concatenation of s and m.
         if (exponent == precision - 1) {
             return Value.from(
-                String.fromAscii(
+                try String.fromAscii(
+                    agent.gc_allocator,
                     try std.fmt.allocPrint(agent.gc_allocator, "{s}{s}", .{ sign, number_string }),
                 ),
             );
@@ -608,7 +611,8 @@ pub const NumberPrototype = struct {
 
         // 14. Return the string-concatenation of s and m.
         return Value.from(
-            String.fromAscii(
+            try String.fromAscii(
+                agent.gc_allocator,
                 try std.fmt.allocPrint(agent.gc_allocator, "{s}{s}", .{ sign, number_string }),
             ),
         );

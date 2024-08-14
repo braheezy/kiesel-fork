@@ -69,7 +69,7 @@ pub fn stringPad(
             @memcpy(dest, fill_string_code_units[0..dest.len]);
         }
 
-        break :blk types.String.fromUtf16(repeated_code_units);
+        break :blk try types.String.fromUtf16(agent.gc_allocator, repeated_code_units);
     };
 
     switch (placement) {
@@ -183,7 +183,7 @@ pub fn getSubstitution(
                 agent.gc_allocator,
                 1,
                 1 + digit_count,
-            )).ascii;
+            )).data.slice.ascii;
 
             // iii. Let index be ℝ(StringToNumber(digits)).
             var index = std.fmt.parseInt(usize, digits, 10) catch unreachable;
@@ -1136,18 +1136,18 @@ pub const StringPrototype = struct {
         // 3. Let thatValue be ? ToString(that).
         const that_value = try that.toString(agent);
 
-        const order = if (string == .ascii and that_value == .ascii) blk: {
-            break :blk std.mem.order(u8, string.ascii, that_value.ascii);
-        } else if (string == .utf16 and that_value == .utf16) blk: {
-            break :blk std.mem.order(u16, string.utf16, that_value.utf16);
-        } else if (string == .ascii and that_value == .utf16) blk: {
+        const order = if (string.data.slice == .ascii and that_value.data.slice == .ascii) blk: {
+            break :blk std.mem.order(u8, string.data.slice.ascii, that_value.data.slice.ascii);
+        } else if (string.data.slice == .utf16 and that_value.data.slice == .utf16) blk: {
+            break :blk std.mem.order(u16, string.data.slice.utf16, that_value.data.slice.utf16);
+        } else if (string.data.slice == .ascii and that_value.data.slice == .utf16) blk: {
             const string_utf16 = try string.toUtf16(agent.gc_allocator);
             defer agent.gc_allocator.free(string_utf16);
-            break :blk std.mem.order(u16, string_utf16, that_value.utf16);
-        } else if (string == .utf16 and that_value == .ascii) blk: {
+            break :blk std.mem.order(u16, string_utf16, that_value.data.slice.utf16);
+        } else if (string.data.slice == .utf16 and that_value.data.slice == .ascii) blk: {
             const that_value_utf16 = try that_value.toUtf16(agent.gc_allocator);
             defer agent.gc_allocator.free(that_value_utf16);
-            break :blk std.mem.order(u16, string.utf16, that_value_utf16);
+            break :blk std.mem.order(u16, string.data.slice.utf16, that_value_utf16);
         } else unreachable;
         return switch (order) {
             .lt => Value.from(-1),
@@ -1786,11 +1786,11 @@ pub const StringPrototype = struct {
                         const code_unit_string = if (code_unit > 0x7F) blk: {
                             var utf16 = try agent_.gc_allocator.alloc(u16, 1);
                             utf16[0] = code_unit;
-                            break :blk types.String.fromUtf16(utf16);
+                            break :blk try types.String.fromUtf16(agent_.gc_allocator, utf16);
                         } else blk: {
                             var ascii = try agent_.gc_allocator.alloc(u8, 1);
                             ascii[0] = @intCast(code_unit);
-                            break :blk types.String.fromAscii(ascii);
+                            break :blk try types.String.fromAscii(agent_.gc_allocator, ascii);
                         };
                         return Value.from(code_unit_string);
                     }

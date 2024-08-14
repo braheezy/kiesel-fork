@@ -865,7 +865,11 @@ pub fn setFunctionName(
         //    name.
         name = try String.concat(
             agent.gc_allocator,
-            &.{ String.fromAscii(prefix.?), String.fromLiteral(" "), name },
+            &.{
+                try String.fromAscii(agent.gc_allocator, prefix.?),
+                String.fromLiteral(" "),
+                name,
+            },
         );
 
         // b. If F has an [[InitialName]] internal slot, then

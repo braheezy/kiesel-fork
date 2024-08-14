@@ -511,7 +511,7 @@ fn printValueDebugInfo(
     try tty_config.setColor(writer, .blue);
     switch (value.type()) {
         .number => try writer.print(" (type: {s})", .{@tagName(value.asNumber())}),
-        .string => try writer.print(" (type: {s})", .{@tagName(value.asString())}),
+        .string => try writer.print(" (type: {s})", .{@tagName(value.asString().data.slice)}),
         .symbol => try writer.print(" (id: {x})", .{@intFromPtr(value.asSymbol().data)}),
         else => {},
     }

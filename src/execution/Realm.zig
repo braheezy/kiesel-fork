@@ -177,7 +177,7 @@ fn setDefaultGlobalBindings(self: *Self) Agent.Error!void {
     for (globalObjectProperties(self)) |property| {
         // a. Let name be the String value of the property name.
         const name = property[0];
-        const property_key = PropertyKey.from(String.fromAscii(name));
+        const property_key = PropertyKey.from(try String.fromAscii(self.agent.gc_allocator, name));
 
         // b. Let desc be the fully populated data Property Descriptor for the property, containing
         //    the specified attributes for the property. For properties listed in 19.2, 19.3, or

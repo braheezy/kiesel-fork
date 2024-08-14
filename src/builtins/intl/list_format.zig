@@ -137,7 +137,7 @@ pub const ListFormatConstructor = struct {
             .{ "disjunction", .disjunction },
             .{ "unit", .unit },
         });
-        list_format.as(ListFormat).fields.type = type_map.get(type_.ascii).?;
+        list_format.as(ListFormat).fields.type = type_map.get(type_.data.slice.ascii).?;
 
         // 12. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow" »,
         //     "long").
@@ -161,7 +161,7 @@ pub const ListFormatConstructor = struct {
             .{ "short", .short },
             .{ "narrow", .narrow },
         });
-        list_format.as(ListFormat).fields.style = style_map.get(style.ascii).?;
+        list_format.as(ListFormat).fields.style = style_map.get(style.data.slice.ascii).?;
 
         // TODO: 14. Let resolvedLocaleData be r.[[LocaleData]].
         // TODO: 15. Let dataLocaleTypes be resolvedLocaleData.[[<type>]].
@@ -243,17 +243,18 @@ pub const ListFormatPrototype = struct {
         //     b. Let v be the value of lf's internal slot whose name is the Internal Slot value of the current row.
         //     c. Assert: v is not undefined.
         //     d. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        const resolved_options = list_format.fields.resolvedOptions();
         options.createDataPropertyOrThrow(
             PropertyKey.from("locale"),
-            Value.from(String.fromAscii(try list_format.fields.locale.toString(agent.gc_allocator))),
+            Value.from(try String.fromAscii(agent.gc_allocator, try list_format.fields.locale.toString(agent.gc_allocator))),
         ) catch |err| try noexcept(err);
         options.createDataPropertyOrThrow(
             PropertyKey.from("type"),
-            Value.from(String.fromAscii(@tagName(list_format.fields.type))),
+            Value.from(resolved_options.type),
         ) catch |err| try noexcept(err);
         options.createDataPropertyOrThrow(
             PropertyKey.from("style"),
-            Value.from(String.fromAscii(@tagName(list_format.fields.style))),
+            Value.from(resolved_options.style),
         ) catch |err| try noexcept(err);
 
         // 5. Return options.
@@ -285,6 +286,28 @@ pub const ListFormat = MakeObject(.{
 
         /// [[Style]]
         style: Style,
+
+        pub const ResolvedOptions = struct {
+            type: String,
+            style: String,
+        };
+
+        pub fn resolvedOptions(self: @This()) ResolvedOptions {
+            const @"type" = switch (self.type) {
+                .conjunction => String.fromLiteral("conjunction"),
+                .disjunction => String.fromLiteral("disjunction"),
+                .unit => String.fromLiteral("unit"),
+            };
+            const style = switch (self.style) {
+                .long => String.fromLiteral("long"),
+                .short => String.fromLiteral("short"),
+                .narrow => String.fromLiteral("narrow"),
+            };
+            return .{
+                .type = @"type",
+                .style = style,
+            };
+        }
     },
     .tag = .intl_list_format,
 });

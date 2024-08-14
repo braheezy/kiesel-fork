@@ -646,7 +646,7 @@ pub const FunctionPrototype = struct {
                 "function {}() {{ [native code] }}",
                 .{name},
             );
-            return Value.from(String.fromAscii(source_text));
+            return Value.from(try String.fromAscii(agent.gc_allocator, source_text));
         }
 
         // 4. If func is an Object and IsCallable(func) is true, return an implementation-defined

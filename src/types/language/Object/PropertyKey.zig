@@ -3,12 +3,13 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const execution = @import("../../../execution.zig");
+const types = @import("../../../types.zig");
 const utils = @import("../../../utils.zig");
 
 const Agent = execution.Agent;
-const String = @import("../string.zig").String;
-const Symbol = @import("../Symbol.zig");
-const Value = @import("../Value.zig");
+const String = types.String;
+const Symbol = types.Symbol;
+const Value = types.Value;
 const isZigString = utils.isZigString;
 
 /// A property key is either a String or a Symbol. All Strings and Symbols, including the empty
@@ -40,8 +41,8 @@ pub const PropertyKey = union(enum) {
         } else if (T == String) {
             // FIXME: This should use CanonicalNumericIndexString to reject numeric strings that
             //        are not canonical.
-            if (value == .utf16) return .{ .string = value };
-            if (std.fmt.parseUnsigned(IntegerIndex, value.ascii, 10)) |integer_index| {
+            if (value.data.slice == .utf16) return .{ .string = value };
+            if (std.fmt.parseUnsigned(IntegerIndex, value.data.slice.ascii, 10)) |integer_index| {
                 return .{ .integer_index = integer_index };
             } else |_| {
                 return .{ .string = value };
@@ -64,8 +65,14 @@ pub const PropertyKey = union(enum) {
     fn eqlStringAndIntegerIndex(string: String, index: IntegerIndex) bool {
         const len = comptime std.fmt.count("{d}", .{std.math.maxInt(IntegerIndex)});
         var buf: [len]u8 = undefined;
-        const index_string = std.fmt.bufPrint(&buf, "{d}", .{index}) catch unreachable;
-        return string.eql(String.fromAscii(index_string));
+        const index_string: String = blk: {
+            const slice: String.Data.Slice = .{
+                .ascii = std.fmt.bufPrint(&buf, "{d}", .{index}) catch unreachable,
+            };
+            const data: *const String.Data = &.{ .slice = slice };
+            break :blk .{ .data = @constCast(data) };
+        };
+        return string.eql(index_string);
     }
 
     /// Non-standard helper to check `PropertyKey` equality without going through `sameValue()`.
@@ -96,7 +103,8 @@ pub const PropertyKey = union(enum) {
             .string => |string| Value.from(string),
             .symbol => |symbol| Value.from(symbol),
             .integer_index => |integer_index| Value.from(
-                String.fromAscii(
+                try String.fromAscii(
+                    agent.gc_allocator,
                     try std.fmt.allocPrint(
                         agent.gc_allocator,
                         "{}",
@@ -117,7 +125,8 @@ pub const PropertyKey = union(enum) {
             .string => |string| .{ .string = string },
             .symbol => |symbol| .{ .symbol = symbol },
             .integer_index => |integer_index| .{
-                .string = String.fromAscii(
+                .string = try String.fromAscii(
+                    agent.gc_allocator,
                     try std.fmt.allocPrint(agent.gc_allocator, "{}", .{integer_index}),
                 ),
             },

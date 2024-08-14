@@ -49,7 +49,7 @@ pub fn asFloat(self: Self, agent: *Agent) Allocator.Error!f64 {
     //       works for now.
     return std.fmt.parseFloat(
         f64,
-        (try self.toString(agent.gc_allocator, 10)).ascii,
+        (try self.toString(agent.gc_allocator, 10)).data.slice.ascii,
     ) catch unreachable;
 }
 
@@ -254,7 +254,7 @@ pub fn bitwiseOR(x: Self, agent: *Agent, y: Self) Allocator.Error!Self {
 pub fn toString(self: Self, allocator: Allocator, radix: u8) Allocator.Error!String {
     // 1. If x < 0ℤ, return the string-concatenation of "-" and BigInt::toString(-x, radix).
     // 2. Return the String value consisting of the representation of x using radix radix.
-    return String.fromAscii(self.managed.toString(allocator, radix, .lower) catch |err| switch (err) {
+    return String.fromAscii(allocator, self.managed.toString(allocator, radix, .lower) catch |err| switch (err) {
         // This is an internal API, the base should always be valid.
         error.InvalidBase => @panic("BigInt.toString() called with invalid base"),
         error.OutOfMemory => return error.OutOfMemory,

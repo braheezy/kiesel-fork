@@ -2,7 +2,7 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
-const String = @import("../string.zig").String;
+const String = @import("../String.zig");
 
 const Self = @This();
 
@@ -17,7 +17,7 @@ pub const Segment = union(enum) {
 
     pub fn isAscii(self: Segment) bool {
         return switch (self) {
-            .string => |string| string == .ascii,
+            .string => |string| string.data.slice == .ascii,
             .char => true,
             .code_unit => |code_unit| code_unit <= 0x7F,
             .code_point => |code_point| code_point <= 0x7F,
@@ -63,7 +63,7 @@ pub fn build(self: Self) Allocator.Error!String {
     if (is_ascii) {
         var result = std.ArrayList(u8).init(self.allocator);
         for (self.segments.items) |segment| switch (segment) {
-            .string => |string| switch (string) {
+            .string => |string| switch (string.data.slice) {
                 .ascii => |ascii| try result.appendSlice(ascii),
                 .utf16 => unreachable,
             },
@@ -71,11 +71,11 @@ pub fn build(self: Self) Allocator.Error!String {
             .code_unit => |code_unit| try result.append(@intCast(code_unit)),
             .code_point => |code_point| try result.append(@intCast(code_point)),
         };
-        return String.fromAscii(try result.toOwnedSlice());
+        return String.fromAscii(self.allocator, try result.toOwnedSlice());
     } else {
         var result = std.ArrayList(u16).init(self.allocator);
         for (self.segments.items) |segment| switch (segment) {
-            .string => |string| switch (string) {
+            .string => |string| switch (string.data.slice) {
                 .ascii => |ascii| for (ascii) |c| try result.append(c),
                 .utf16 => |utf16| try result.appendSlice(utf16),
             },
@@ -90,6 +90,6 @@ pub fn build(self: Self) Allocator.Error!String {
                 }
             },
         };
-        return String.fromUtf16(try result.toOwnedSlice());
+        return String.fromUtf16(self.allocator, try result.toOwnedSlice());
     }
 }

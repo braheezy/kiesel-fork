@@ -15,16 +15,16 @@ const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
-const BigInt = @import("BigInt.zig");
+const BigInt = types.BigInt;
 const Iterator = types.Iterator;
-const Number = @import("number.zig").Number;
-const Object = @import("Object.zig");
+const Number = types.Number;
+const Object = types.Object;
 const PrivateName = types.PrivateName;
-const PropertyDescriptor = @import("../spec/PropertyDescriptor.zig");
-const PropertyKey = Object.PropertyKey;
+const PropertyDescriptor = types.PropertyDescriptor;
+const PropertyKey = types.PropertyKey;
 const PropertyKeyArrayHashMap = Object.PropertyStorage.PropertyKeyArrayHashMap;
-const String = @import("string.zig").String;
-const Symbol = @import("Symbol.zig");
+const String = types.String;
+const Symbol = types.Symbol;
 const arrayCreate = builtins.arrayCreate;
 const getIterator = types.getIterator;
 const isZigString = utils.isZigString;
@@ -86,14 +86,23 @@ const TaggedUnionImpl = union(enum) {
     undefined,
     null,
     boolean: bool,
-    string_ascii: []const u8,
-    string_utf16: []const u16,
+    string: String,
     symbol: Symbol,
     number_i32: i32,
     number_f64: f64,
     big_int: BigInt,
     object: Object,
 };
+
+comptime {
+    // Let's make sure the size doesn't quietly change
+    switch (builtin.target.ptrBitWidth()) {
+        // Only some 32-bit platforms have certain bitpacking optimizations applied
+        32 => std.debug.assert(@sizeOf(TaggedUnionImpl) == 12 or @sizeOf(TaggedUnionImpl) == 16),
+        64 => std.debug.assert(@sizeOf(TaggedUnionImpl) == 16),
+        else => unreachable,
+    }
+}
 
 // TODO: Conditionally use a NaN-boxed impl on supported platforms
 impl: TaggedUnionImpl,
@@ -144,10 +153,7 @@ pub inline fn from(value: anytype) Self {
         return .{ .impl = .{ .boolean = value } };
     } else if (isZigString(T)) {
         const string = String.fromLiteral(value);
-        return switch (string) {
-            .ascii => |x| .{ .impl = .{ .string_ascii = x } },
-            .utf16 => |x| .{ .impl = .{ .string_utf16 = x } },
-        };
+        return .{ .impl = .{ .string = string } };
     } else if (is_number) {
         const number = Number.from(value);
         return switch (number) {
@@ -164,10 +170,7 @@ pub inline fn from(value: anytype) Self {
     } else if (T == Object) {
         return .{ .impl = .{ .object = value } };
     } else if (T == String) {
-        return switch (value) {
-            .ascii => |x| .{ .impl = .{ .string_ascii = x } },
-            .utf16 => |x| .{ .impl = .{ .string_utf16 = x } },
-        };
+        return .{ .impl = .{ .string = value } };
     } else if (T == Symbol) {
         return .{ .impl = .{ .symbol = value } };
     } else {
@@ -180,7 +183,7 @@ pub fn @"type"(self: Self) Type {
         .undefined => .undefined,
         .null => .null,
         .boolean => .boolean,
-        .string_ascii, .string_utf16 => .string,
+        .string => .string,
         .symbol => .symbol,
         .number_i32, .number_f64 => .number,
         .big_int => .big_int,
@@ -205,15 +208,11 @@ pub fn asBoolean(self: Self) bool {
 }
 
 pub fn isString(self: Self) bool {
-    return self.impl == .string_ascii or self.impl == .string_utf16;
+    return self.impl == .string;
 }
 
 pub fn asString(self: Self) String {
-    return switch (self.impl) {
-        .string_ascii => |x| .{ .ascii = x },
-        .string_utf16 => |x| .{ .utf16 = x },
-        else => unreachable,
-    };
+    return self.impl.string;
 }
 
 pub fn isSymbol(self: Self) bool {
@@ -1994,9 +1993,9 @@ test from {
     const inf = std.math.inf(f64);
     try std.testing.expectEqual(from(true).asBoolean(), true);
     try std.testing.expectEqual(from(false).asBoolean(), false);
-    try std.testing.expectEqual(from("").asString().ascii, "");
-    try std.testing.expectEqual(from("foo").asString().ascii, "foo");
-    try std.testing.expectEqual(from("123").asString().ascii, "123");
+    try std.testing.expectEqual(from("").asString().data.slice.ascii, "");
+    try std.testing.expectEqual(from("foo").asString().data.slice.ascii, "foo");
+    try std.testing.expectEqual(from("123").asString().data.slice.ascii, "123");
     try std.testing.expectEqual(from(0).asNumber().i32, 0);
     try std.testing.expectEqual(from(0.0).asNumber().i32, 0);
     try std.testing.expectEqual(from(123).asNumber().i32, 123);

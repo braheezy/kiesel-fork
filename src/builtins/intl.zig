@@ -154,7 +154,12 @@ pub const Intl = struct {
         return Value.from(
             try createArrayFromListMapToValue(agent, icu4zig.Locale, locale_list.items, struct {
                 fn mapFn(agent_: *Agent, locale: icu4zig.Locale) Allocator.Error!Value {
-                    return Value.from(String.fromAscii(try locale.toString(agent_.gc_allocator)));
+                    return Value.from(
+                        try String.fromAscii(
+                            agent_.gc_allocator,
+                            try locale.toString(agent_.gc_allocator),
+                        ),
+                    );
                 }
             }.mapFn),
         );
@@ -166,8 +171,7 @@ pub const Intl = struct {
         // 1. Let key be ? ToString(key).
         const key = try arguments.get(0).toString(agent);
 
-        var list = std.ArrayList(String).init(agent.gc_allocator);
-        defer list.deinit();
+        var list: []const String = &.{};
 
         // 2. If key is "calendar", then
         if (key.eql(String.fromLiteral("calendar"))) {
@@ -176,7 +180,7 @@ pub const Intl = struct {
             //     i. Let canonical be CanonicalizeUValue("ca", identifier).
             //     ii. If identifier is canonical, then
             //         1. Append identifier to list.
-            for (availableCalendars()) |s| try list.append(String.fromAscii(s));
+            list = availableCalendars();
         }
         // 3. Else if key is "collation", then
         else if (key.eql(String.fromLiteral("collation"))) {
@@ -189,7 +193,7 @@ pub const Intl = struct {
         // 5. Else if key is "numberingSystem", then
         else if (key.eql(String.fromLiteral("numberingSystem"))) {
             // a. Let list be AvailableCanonicalNumberingSystems( ).
-            for (availableCanonicalNumberingSystems()) |s| try list.append(String.fromAscii(s));
+            list = availableCanonicalNumberingSystems();
         }
         // 6. Else if key is "timeZone", then
         else if (key.eql(String.fromLiteral("timeZone"))) {
@@ -199,7 +203,7 @@ pub const Intl = struct {
         // 7. Else if key is "unit", then
         else if (key.eql(String.fromLiteral("unit"))) {
             // a. Let list be AvailableCanonicalUnits( ).
-            for (availableCanonicalUnits()) |s| try list.append(String.fromAscii(s));
+            list = availableCanonicalUnits();
         }
         // 8. Else,
         else {
@@ -207,15 +211,9 @@ pub const Intl = struct {
             return agent.throwException(.range_error, "Invalid key '{}'", .{key});
         }
 
-        std.mem.sortUnstable(String, list.items, {}, struct {
-            fn lessThanFn(_: void, lhs: String, rhs: String) bool {
-                return std.mem.lessThan(u8, lhs.ascii, rhs.ascii);
-            }
-        }.lessThanFn);
-
         // 9. Return CreateArrayFromList( list ).
         return Value.from(
-            try createArrayFromListMapToValue(agent, String, list.items, struct {
+            try createArrayFromListMapToValue(agent, String, list, struct {
                 fn mapFn(_: *Agent, string: String) Allocator.Error!Value {
                     return Value.from(string);
                 }

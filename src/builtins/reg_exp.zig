@@ -309,8 +309,8 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
     }
 
     // 8-13.
-    const shift = string == .utf16;
-    const buf, const buf_len = switch (string) {
+    const shift = string.data.slice == .utf16;
+    const buf, const buf_len = switch (string.data.slice) {
         .ascii => |ascii| .{ ascii, ascii.len },
         .utf16 => |utf16| .{ std.mem.sliceAsBytes(utf16), utf16.len },
     };
@@ -322,7 +322,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
         @intCast(last_index),
         @intCast(buf_len),
         // 0 = 8 bit chars, 1 = 16 bit chars, 2 = 16 bit chars, UTF-16 (set internally via the u flag)
-        switch (string) {
+        switch (string.data.slice) {
             .ascii => 0,
             .utf16 => 1,
         },
@@ -902,7 +902,7 @@ pub const RegExpPrototype = struct {
 
         // 20. Return the String value whose code units are the elements of the List codeUnits. If
         //     codeUnits has no elements, the empty String is returned.
-        return Value.from(String.fromAscii(try code_units.toOwnedSlice()));
+        return Value.from(try String.fromAscii(agent.gc_allocator, try code_units.toOwnedSlice()));
     }
 
     /// 22.2.6.4.1 RegExpHasFlag ( R, codeUnit )

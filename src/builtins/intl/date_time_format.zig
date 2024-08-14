@@ -163,10 +163,14 @@ pub fn createDateTimeFormat(
         agent.platform.default_locale;
     const resolved = .{
         .locale = resolved_locale,
-        .calendar = (try resolved_locale.getUnicodeExtension(agent.gc_allocator, "ca")) orelse
-            if (calendar != null and calendar.? == .ascii) calendar.?.ascii else "gregory",
-        .numbering_system = (try resolved_locale.getUnicodeExtension(agent.gc_allocator, "nu")) orelse
-            if (numbering_system != null and numbering_system.? == .ascii) numbering_system.?.ascii else "latn",
+        .calendar = if (try resolved_locale.getUnicodeExtension(agent.gc_allocator, "ca")) |ca|
+            try String.fromAscii(agent.gc_allocator, ca)
+        else
+            calendar orelse String.fromLiteral("gregory"),
+        .numbering_system = if (try resolved_locale.getUnicodeExtension(agent.gc_allocator, "nu")) |nu|
+            try String.fromAscii(agent.gc_allocator, nu)
+        else
+            numbering_system orelse String.fromLiteral("latn"),
     };
 
     // 18. Set dateTimeFormat.[[Locale]] to r.[[Locale]].
@@ -195,7 +199,7 @@ pub fn createDateTimeFormat(
         .{ "persian", .persian },
         .{ "roc", .roc },
     });
-    date_time_format.as(DateTimeFormat).fields.calendar = calendar_map.get(resolved.calendar) orelse .gregorian;
+    date_time_format.as(DateTimeFormat).fields.calendar = calendar_map.get(resolved.calendar.data.slice.ascii) orelse .gregorian;
 
     // 21. Set dateTimeFormat.[[NumberingSystem]] to r.[[nu]].
     date_time_format.as(DateTimeFormat).fields.numbering_system = resolved.numbering_system;
@@ -245,7 +249,7 @@ pub fn createDateTimeFormat(
     }
 
     // 31. Set dateTimeFormat.[[TimeZone]] to timeZone.
-    date_time_format.as(DateTimeFormat).fields.time_zone = time_zone_string;
+    date_time_format.as(DateTimeFormat).fields.time_zone = try String.fromAscii(agent.gc_allocator, time_zone_string);
 
     // TODO: 32. Let formatOptions be a new Record.
     // TODO: 33. Set formatOptions.[[hourCycle]] to hc.
@@ -377,7 +381,7 @@ pub fn createDateTimeFormat(
         .{ "short", .short },
     });
     date_time_format.as(DateTimeFormat).fields.date_style = if (date_style) |s|
-        date_style_map.get(s.ascii).?
+        date_style_map.get(s.data.slice.ascii).?
     else
         null;
 
@@ -406,7 +410,7 @@ pub fn createDateTimeFormat(
         .{ "short", .short },
     });
     date_time_format.as(DateTimeFormat).fields.time_style = if (time_style) |s|
-        time_style_map.get(s.ascii).?
+        time_style_map.get(s.data.slice.ascii).?
     else
         null;
 
@@ -654,7 +658,12 @@ pub const DateTimeFormatPrototype = struct {
         const resolved_options = date_time_format.fields.resolvedOptions();
         options.createDataPropertyOrThrow(
             PropertyKey.from("locale"),
-            Value.from(String.fromAscii(try date_time_format.fields.locale.toString(agent.gc_allocator))),
+            Value.from(
+                try String.fromAscii(
+                    agent.gc_allocator,
+                    try date_time_format.fields.locale.toString(agent.gc_allocator),
+                ),
+            ),
         ) catch |err| try noexcept(err);
         options.createDataPropertyOrThrow(
             PropertyKey.from("calendar"),
@@ -692,14 +701,6 @@ pub const DateTimeFormatPrototype = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-datetimeformat-instances
 pub const DateTimeFormat = MakeObject(.{
     .Fields = struct {
-        pub const ResolvedOptions = struct {
-            calendar: String,
-            numbering_system: String,
-            time_zone: String,
-            date_style: ?String,
-            time_style: ?String,
-        };
-
         /// [[Locale]]
         locale: icu4zig.Locale,
 
@@ -707,10 +708,10 @@ pub const DateTimeFormat = MakeObject(.{
         calendar: icu4zig.Calendar.Kind,
 
         /// [[NumberingSystem]]
-        numbering_system: []const u8,
+        numbering_system: String,
 
         /// [[TimeZone]]
-        time_zone: []const u8,
+        time_zone: String,
 
         // TODO: [[HourCycle]]
 
@@ -723,22 +724,31 @@ pub const DateTimeFormat = MakeObject(.{
         /// [[BoundFormat]]
         bound_format: ?Object,
 
+        pub const ResolvedOptions = struct {
+            calendar: String,
+            numbering_system: String,
+            time_zone: String,
+            date_style: ?String,
+            time_style: ?String,
+        };
+
         pub fn resolvedOptions(self: @This()) ResolvedOptions {
-            const calendar = String.fromAscii(calendarToBcp47(self.calendar));
-            const numbering_system = String.fromAscii(self.numbering_system);
-            const time_zone = String.fromAscii(self.time_zone);
             return .{
-                .calendar = calendar,
-                .numbering_system = numbering_system,
-                .time_zone = time_zone,
-                .date_style = if (self.date_style) |date_style|
-                    String.fromAscii(@tagName(date_style))
-                else
-                    null,
-                .time_style = if (self.time_style) |time_style|
-                    String.fromAscii(@tagName(time_style))
-                else
-                    null,
+                .calendar = calendarToBcp47(self.calendar),
+                .numbering_system = self.numbering_system,
+                .time_zone = self.time_zone,
+                .date_style = if (self.date_style) |date_style| switch (date_style) {
+                    .full => String.fromLiteral("full"),
+                    .long => String.fromLiteral("long"),
+                    .medium => String.fromLiteral("medium"),
+                    .short => String.fromLiteral("short"),
+                } else null,
+                .time_style = if (self.time_style) |time_style| switch (time_style) {
+                    .full => String.fromLiteral("full"),
+                    .long => String.fromLiteral("long"),
+                    .medium => String.fromLiteral("medium"),
+                    .short => String.fromLiteral("short"),
+                } else null,
             };
         }
     },
@@ -793,9 +803,9 @@ fn formatDateTimeImpl(
 
     const time_zone = icu4zig.CustomTimeZone.fromIanaId(
         data_provider,
-        date_time_format.fields.time_zone,
+        date_time_format.fields.time_zone.data.slice.ascii,
     ) catch icu4zig.CustomTimeZone.fromOffset(
-        date_time_format.fields.time_zone,
+        date_time_format.fields.time_zone.data.slice.ascii,
     ) catch unreachable;
     defer time_zone.deinit();
 

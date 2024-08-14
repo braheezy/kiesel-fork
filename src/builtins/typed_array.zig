@@ -2986,7 +2986,7 @@ pub const TypedArrayPrototype = struct {
 
     /// 23.2.3.38 get %TypedArray%.prototype [ %Symbol.toStringTag% ]
     /// https://tc39.es/ecma262/#sec-get-%typedarray%.prototype-%symbol.tostringtag%
-    fn @"%Symbol.toStringTag%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    fn @"%Symbol.toStringTag%"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. If O is not an Object, return undefined.
         if (!this_value.isObject()) return Value.undefined;
@@ -3000,7 +3000,7 @@ pub const TypedArrayPrototype = struct {
 
         // 5. Assert: name is a String.
         // 6. Return name.
-        return Value.from(String.fromAscii(name));
+        return Value.from(try String.fromAscii(agent.gc_allocator, name));
     }
 };
 

@@ -793,7 +793,7 @@ pub const JSON = struct {
             else {
                 const s = try agent.gc_allocator.alloc(u8, @intFromFloat(space_mv));
                 @memset(s, ' ');
-                break :blk String.fromAscii(s);
+                break :blk try String.fromAscii(agent.gc_allocator, s);
             }
         }
         // 8. Else if space is a String, then

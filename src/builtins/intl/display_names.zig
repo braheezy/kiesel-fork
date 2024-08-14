@@ -143,7 +143,7 @@ pub const DisplayNamesConstructor = struct {
             .{ "short", .short },
             .{ "long", .long },
         });
-        display_names.as(DisplayNames).fields.options.style = style_map.get(style.ascii).?;
+        display_names.as(DisplayNames).fields.options.style = style_map.get(style.data.slice.ascii).?;
 
         // 12. Let type be ? GetOption(options, "type", string, « "language", "region", "script",
         //     "currency", "calendar", "dateTimeField" », undefined).
@@ -178,7 +178,7 @@ pub const DisplayNamesConstructor = struct {
             .{ "calendar", .calendar },
             .{ "dateTimeField", .date_time_field },
         });
-        display_names.as(DisplayNames).fields.type = type_map.get(@"type".?.ascii).?;
+        display_names.as(DisplayNames).fields.type = type_map.get(@"type".?.data.slice.ascii).?;
 
         // 15. Let fallback be ? GetOption(options, "fallback", string, « "code", "none" », "code").
         const fallback = try getOption(
@@ -199,7 +199,7 @@ pub const DisplayNamesConstructor = struct {
             .{ "code", .code },
             .{ "none", .none },
         });
-        display_names.as(DisplayNames).fields.options.fallback = fallback_map.get(fallback.ascii).?;
+        display_names.as(DisplayNames).fields.options.fallback = fallback_map.get(fallback.data.slice.ascii).?;
 
         // 17. Set displayNames.[[Locale]] to r.[[Locale]].
         display_names.as(DisplayNames).fields.locale = resolved_locale;
@@ -234,7 +234,7 @@ pub const DisplayNamesConstructor = struct {
             .{ "dialect", .dialect },
             .{ "standard", .standard },
         });
-        display_names.as(DisplayNames).fields.options.language_display = language_display_map.get(language_display.ascii).?;
+        display_names.as(DisplayNames).fields.options.language_display = language_display_map.get(language_display.data.slice.ascii).?;
 
         // 25. Let styleFields be typeFields.[[<style>]].
         // 26. Assert: styleFields is a Record (see 12.2.3).
@@ -360,7 +360,12 @@ pub const DisplayNamesPrototype = struct {
         const resolved_options = display_names.fields.resolvedOptions();
         options.createDataPropertyOrThrow(
             PropertyKey.from("locale"),
-            Value.from(String.fromAscii(try display_names.fields.locale.toString(agent.gc_allocator))),
+            Value.from(
+                try String.fromAscii(
+                    agent.gc_allocator,
+                    try display_names.fields.locale.toString(agent.gc_allocator),
+                ),
+            ),
         ) catch |err| try noexcept(err);
         options.createDataPropertyOrThrow(
             PropertyKey.from("style"),
@@ -399,13 +404,6 @@ pub const DisplayNames = MakeObject(.{
             date_time_field,
         };
 
-        pub const ResolvedOptions = struct {
-            style: String,
-            type: String,
-            fallback: String,
-            language_display: String,
-        };
-
         /// [[Locale]]
         locale: icu4zig.Locale,
 
@@ -415,14 +413,37 @@ pub const DisplayNames = MakeObject(.{
         /// [[Style]], [[Fallback]], [[LanguageDisplay]]
         options: icu4zig.LocaleDisplayNamesFormatter.Options,
 
+        pub const ResolvedOptions = struct {
+            style: String,
+            type: String,
+            fallback: String,
+            language_display: String,
+        };
+
         pub fn resolvedOptions(self: @This()) ResolvedOptions {
             const @"type" = switch (self.type) {
+                .language => String.fromLiteral("language"),
+                .region => String.fromLiteral("region"),
+                .script => String.fromLiteral("script"),
+                .currency => String.fromLiteral("currency"),
+                .calendar => String.fromLiteral("calendar"),
                 .date_time_field => String.fromLiteral("dateTimeField"),
-                else => String.fromAscii(@tagName(self.type)),
             };
-            const style = String.fromAscii(@tagName(self.options.style));
-            const fallback = String.fromAscii(@tagName(self.options.fallback));
-            const language_display = String.fromAscii(@tagName(self.options.language_display));
+            const style = switch (self.options.style) {
+                .auto => String.fromLiteral("auto"),
+                .narrow => String.fromLiteral("narrow"),
+                .short => String.fromLiteral("short"),
+                .long => String.fromLiteral("long"),
+                .menu => String.fromLiteral("menu"),
+            };
+            const fallback = switch (self.options.fallback) {
+                .code => String.fromLiteral("code"),
+                .none => String.fromLiteral("none"),
+            };
+            const language_display = switch (self.options.language_display) {
+                .dialect => String.fromLiteral("dialect"),
+                .standard => String.fromLiteral("standard"),
+            };
             return .{
                 .style = style,
                 .type = @"type",

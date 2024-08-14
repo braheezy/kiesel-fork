@@ -135,7 +135,7 @@ fn makeLocaleRecord(agent: *Agent, tag: icu4zig.Locale, options: UnicodeExtensio
     inline for (comptime std.meta.fieldNames(UnicodeExtensions)) |field_name| {
         if (@field(options, field_name)) |new_value| {
             try parts.append(field_name);
-            try parts.append(new_value.ascii); // All extensions have been validated and should be ASCII at this point
+            try parts.append(new_value.data.slice.ascii); // All extensions have been validated and should be ASCII at this point
         }
     }
     if (end != null) try parts.append(str[end.? + 1 ..]);
@@ -206,7 +206,10 @@ pub const LocaleConstructor = struct {
         // 8. If tag an is Object and tag has an [[InitializedLocale]] internal slot, then
         const tag_string = if (tag_value.isObject() and tag_value.asObject().is(Locale)) blk: {
             // a. Let tag be tag.[[Locale]].
-            break :blk String.fromAscii(try tag_value.asObject().as(Locale).fields.locale.toString(agent.gc_allocator));
+            break :blk try String.fromAscii(
+                agent.gc_allocator,
+                try tag_value.asObject().as(Locale).fields.locale.toString(agent.gc_allocator),
+            );
         }
         // 9. Else,
         else blk: {
@@ -464,7 +467,10 @@ pub const LocalePrototype = struct {
 
         // 3. Return loc.[[Locale]].
         return Value.from(
-            String.fromAscii(try locale.fields.locale.toString(agent.gc_allocator)),
+            try String.fromAscii(
+                agent.gc_allocator,
+                try locale.fields.locale.toString(agent.gc_allocator),
+            ),
         );
     }
 
@@ -478,7 +484,10 @@ pub const LocalePrototype = struct {
         // 3. Let locale be loc.[[Locale]].
         // 4. Return the longest prefix of locale matched by the unicode_language_id Unicode locale nonterminal.
         return Value.from(
-            String.fromAscii(try locale.fields.locale.basename(agent.gc_allocator)),
+            try String.fromAscii(
+                agent.gc_allocator,
+                try locale.fields.locale.basename(agent.gc_allocator),
+            ),
         );
     }
 
@@ -491,7 +500,8 @@ pub const LocalePrototype = struct {
 
         // 3. Return loc.[[Calendar]].
         return Value.from(
-            String.fromAscii(
+            try String.fromAscii(
+                agent.gc_allocator,
                 locale.fields.locale.getUnicodeExtension(
                     agent.gc_allocator,
                     "ca",
@@ -511,7 +521,8 @@ pub const LocalePrototype = struct {
 
         // 3. Return loc.[[CaseFirst]].
         return Value.from(
-            String.fromAscii(
+            try String.fromAscii(
+                agent.gc_allocator,
                 locale.fields.locale.getUnicodeExtension(
                     agent.gc_allocator,
                     "kf",
@@ -531,7 +542,8 @@ pub const LocalePrototype = struct {
 
         // 3. Return loc.[[Collation]].
         return Value.from(
-            String.fromAscii(
+            try String.fromAscii(
+                agent.gc_allocator,
                 locale.fields.locale.getUnicodeExtension(
                     agent.gc_allocator,
                     "co",
@@ -551,7 +563,8 @@ pub const LocalePrototype = struct {
 
         // 3. Return loc.[[HourCycle]].
         return Value.from(
-            String.fromAscii(
+            try String.fromAscii(
+                agent.gc_allocator,
                 locale.fields.locale.getUnicodeExtension(
                     agent.gc_allocator,
                     "hc",
@@ -588,7 +601,8 @@ pub const LocalePrototype = struct {
 
         // 3. Return loc.[[NumberingSystem]].
         return Value.from(
-            String.fromAscii(
+            try String.fromAscii(
+                agent.gc_allocator,
                 locale.fields.locale.getUnicodeExtension(
                     agent.gc_allocator,
                     "nu",
@@ -608,7 +622,10 @@ pub const LocalePrototype = struct {
 
         // 3. Return GetLocaleLanguage(loc.[[Locale]]).
         return Value.from(
-            String.fromAscii(try locale.fields.locale.language(agent.gc_allocator)),
+            try String.fromAscii(
+                agent.gc_allocator,
+                try locale.fields.locale.language(agent.gc_allocator),
+            ),
         );
     }
 
@@ -621,7 +638,8 @@ pub const LocalePrototype = struct {
 
         // 3. Return GetLocaleScript(loc.[[Locale]]).
         return Value.from(
-            String.fromAscii(
+            try String.fromAscii(
+                agent.gc_allocator,
                 try locale.fields.locale.script(agent.gc_allocator) orelse return Value.undefined,
             ),
         );
@@ -636,7 +654,8 @@ pub const LocalePrototype = struct {
 
         // 3. Return GetLocaleRegion(loc.[[Locale]]).
         return Value.from(
-            String.fromAscii(
+            try String.fromAscii(
+                agent.gc_allocator,
                 try locale.fields.locale.region(agent.gc_allocator) orelse return Value.undefined,
             ),
         );

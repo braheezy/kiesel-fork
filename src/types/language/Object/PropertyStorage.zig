@@ -112,8 +112,8 @@ pub fn has(self: Self, property_key: PropertyKey) bool {
 }
 
 pub fn get(self: Self, property_key: PropertyKey) ?PropertyDescriptor {
-    if (property_key == .string and property_key.string == .ascii) {
-        const name = property_key.string.ascii;
+    if (property_key == .string and property_key.string.data.slice == .ascii) {
+        const name = property_key.string.data.slice.ascii;
         std.debug.assert(!self.lazy_intrinsics.contains(name));
     }
     if (self.hash_map.get(property_key)) |entry| {
@@ -124,8 +124,8 @@ pub fn get(self: Self, property_key: PropertyKey) ?PropertyDescriptor {
 
 pub fn getCreateIntrinsicIfNeeded(self: *Self, property_key: PropertyKey) Allocator.Error!?PropertyDescriptor {
     if (self.hash_map.getPtr(property_key)) |entry| {
-        if (property_key == .string and property_key.string == .ascii) {
-            const name = property_key.string.ascii;
+        if (property_key == .string and property_key.string.data.slice == .ascii) {
+            const name = property_key.string.data.slice.ascii;
             if (self.lazy_intrinsics.get(name)) |lazy_intrinsic| {
                 const object = try lazy_intrinsic.lazyIntrinsicFn(&lazy_intrinsic.realm.intrinsics);
                 entry.data.value = Value.from(object);
@@ -144,8 +144,8 @@ pub fn set(
 ) Allocator.Error!void {
     const entry = Entry.fromPropertyDescriptor(property_descriptor);
     try self.hash_map.put(property_key, entry);
-    if (property_key == .string and property_key.string == .ascii) {
-        const name = property_key.string.ascii;
+    if (property_key == .string and property_key.string.data.slice == .ascii) {
+        const name = property_key.string.data.slice.ascii;
         _ = self.lazy_intrinsics.remove(name);
     }
 }
@@ -153,8 +153,8 @@ pub fn set(
 pub fn remove(self: *Self, property_key: PropertyKey) void {
     const removed = self.hash_map.orderedRemove(property_key);
     std.debug.assert(removed);
-    if (property_key == .string and property_key.string == .ascii) {
-        const name = property_key.string.ascii;
+    if (property_key == .string and property_key.string.data.slice == .ascii) {
+        const name = property_key.string.data.slice.ascii;
         _ = self.lazy_intrinsics.remove(name);
     }
 }

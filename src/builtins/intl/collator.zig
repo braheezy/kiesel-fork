@@ -107,7 +107,7 @@ pub const CollatorConstructor = struct {
             .{ "sort", .sort },
             .{ "search", .search },
         });
-        collator.as(Collator).fields.usage = usage_map.get(usage.ascii).?;
+        collator.as(Collator).fields.usage = usage_map.get(usage.data.slice.ascii).?;
 
         // TODO: 10-11.
 
@@ -168,7 +168,7 @@ pub const CollatorConstructor = struct {
             .{ "false", .off },
         });
         if (maybe_case_first) |case_first| {
-            collator.as(Collator).fields.options.case_first = case_first_map.get(case_first.ascii).?;
+            collator.as(Collator).fields.options.case_first = case_first_map.get(case_first.data.slice.ascii).?;
         }
 
         // 23. Let relevantExtensionKeys be %Intl.Collator%.[[RelevantExtensionKeys]].
@@ -225,7 +225,7 @@ pub const CollatorConstructor = struct {
             .{ "variant", .{ .tertiary, .auto } },
         });
         if (maybe_sensitivity) |sensitivity| {
-            const strength, const case_level = sensitivity_map.get(sensitivity.ascii).?;
+            const strength, const case_level = sensitivity_map.get(sensitivity.data.slice.ascii).?;
             collator.as(Collator).fields.options.strength = strength;
             collator.as(Collator).fields.options.case_level = case_level;
         }
@@ -366,7 +366,12 @@ pub const CollatorPrototype = struct {
         const resolved_options = collator.fields.resolvedOptions();
         options.createDataPropertyOrThrow(
             PropertyKey.from("locale"),
-            Value.from(String.fromAscii(try collator.fields.locale.toString(agent.gc_allocator))),
+            Value.from(
+                try String.fromAscii(
+                    agent.gc_allocator,
+                    try collator.fields.locale.toString(agent.gc_allocator),
+                ),
+            ),
         ) catch |err| try noexcept(err);
         options.createDataPropertyOrThrow(
             PropertyKey.from("usage"),
@@ -410,18 +415,30 @@ pub fn compareStrings(allocator: Allocator, collator_object: *const Collator, x:
     );
     defer collator.deinit();
 
-    const order = if (x == .ascii and y == .ascii) blk: {
-        break :blk collator.compare(.{ .utf8 = x.ascii }, .{ .utf8 = y.ascii });
-    } else if (x == .utf16 and y == .utf16) blk: {
-        break :blk collator.compare(.{ .utf16 = x.utf16 }, .{ .utf16 = y.utf16 });
-    } else if (x == .ascii and y == .utf16) blk: {
+    const order = if (x.data.slice == .ascii and y.data.slice == .ascii) blk: {
+        break :blk collator.compare(
+            .{ .utf8 = x.data.slice.ascii },
+            .{ .utf8 = y.data.slice.ascii },
+        );
+    } else if (x.data.slice == .utf16 and y.data.slice == .utf16) blk: {
+        break :blk collator.compare(
+            .{ .utf16 = x.data.slice.utf16 },
+            .{ .utf16 = y.data.slice.utf16 },
+        );
+    } else if (x.data.slice == .ascii and y.data.slice == .utf16) blk: {
         const x_utf16 = try x.toUtf16(allocator);
         defer allocator.free(x_utf16);
-        break :blk collator.compare(.{ .utf16 = x_utf16 }, .{ .utf16 = y.utf16 });
-    } else if (x == .utf16 and y == .ascii) blk: {
+        break :blk collator.compare(
+            .{ .utf16 = x_utf16 },
+            .{ .utf16 = y.data.slice.utf16 },
+        );
+    } else if (x.data.slice == .utf16 and y.data.slice == .ascii) blk: {
         const y_utf16 = try y.toUtf16(allocator);
         defer allocator.free(y_utf16);
-        break :blk collator.compare(.{ .utf16 = x.utf16 }, .{ .utf16 = y_utf16 });
+        break :blk collator.compare(
+            .{ .utf16 = x.data.slice.utf16 },
+            .{ .utf16 = y_utf16 },
+        );
     } else unreachable;
     return switch (order) {
         .lt => Value.from(-1),
@@ -439,15 +456,6 @@ pub const Collator = MakeObject(.{
             search,
         };
 
-        pub const ResolvedOptions = struct {
-            usage: String,
-            sensitivity: String,
-            ignore_punctuation: bool,
-            collation: String,
-            numeric: bool,
-            case_first: String,
-        };
-
         /// [[Locale]]
         locale: icu4zig.Locale,
 
@@ -460,6 +468,15 @@ pub const Collator = MakeObject(.{
         /// [[BoundCompare]]
         bound_compare: ?Object,
 
+        pub const ResolvedOptions = struct {
+            usage: String,
+            sensitivity: String,
+            ignore_punctuation: bool,
+            collation: String,
+            numeric: bool,
+            case_first: String,
+        };
+
         pub fn resolvedOptions(self: @This()) ResolvedOptions {
             const data_provider = icu4zig.DataProvider.init();
             defer data_provider.deinit();
@@ -467,7 +484,10 @@ pub const Collator = MakeObject(.{
             defer collator.deinit();
             const resolved_options = collator.resolvedOptions();
 
-            const usage = String.fromAscii(@tagName(self.usage));
+            const usage = switch (self.usage) {
+                .sort => String.fromLiteral("sort"),
+                .search => String.fromLiteral("search"),
+            };
             const sensitivity = if (resolved_options.strength == .primary and resolved_options.case_level == .off)
                 String.fromLiteral("base")
             else if (resolved_options.strength == .primary and resolved_options.case_level == .on)

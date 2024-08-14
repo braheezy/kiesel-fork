@@ -29,11 +29,16 @@ const State = struct {
 
 var fba_buf: [64 * 1024]u8 = undefined;
 var fba = std.heap.FixedBufferAllocator.init(&fba_buf);
+var arena = std.heap.ArenaAllocator.init(fba.allocator());
 pub var state: State = .{
-    .seen_objects = SeenObjects.init(fba.allocator()),
+    .seen_objects = SeenObjects.init(arena.allocator()),
     .print_in_progress = false,
     .tty_config = undefined, // Set whenever an `Agent` is created
 };
+
+fn asciiString(ascii: []const u8) String {
+    return String.fromAscii(arena.allocator(), ascii) catch String.fromLiteral("<OOM>");
+}
 
 fn PrettyPrintError(comptime Writer: type) type {
     return Writer.Error || if (builtin.os.tag == .windows)
@@ -552,7 +557,7 @@ fn prettyPrintIntlCollator(
     try tty_config.setColor(writer, .reset);
     try writer.print("{pretty}, usage: {pretty}, sensitivity: {pretty}, ignorePunctuation: " ++
         "{pretty}, collation: {pretty}, numeric: {pretty}, caseFirst: {pretty}", .{
-        Value.from(String.fromAscii(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
         Value.from(resolved_options.usage),
         Value.from(resolved_options.sensitivity),
         Value.from(resolved_options.ignore_punctuation),
@@ -578,7 +583,7 @@ fn prettyPrintIntlDateTimeFormat(
     try writer.writeAll("Intl.DisplayNames(");
     try tty_config.setColor(writer, .reset);
     try writer.print("{pretty}, calendar: {pretty}, numberingSystem: {pretty}, timeZone: {pretty}", .{
-        Value.from(String.fromAscii(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
         Value.from(resolved_options.calendar),
         Value.from(resolved_options.numbering_system),
         Value.from(resolved_options.time_zone),
@@ -609,7 +614,7 @@ fn prettyPrintIntlDisplayNames(
     try tty_config.setColor(writer, .reset);
     if (intl_display_names.fields.type == .language) {
         try writer.print("{pretty}, style: {pretty}, type: {pretty}, fallback: {pretty}, languageDisplay: {pretty}", .{
-            Value.from(String.fromAscii(locale.toString(agent.gc_allocator) catch return)),
+            Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
             Value.from(resolved_options.style),
             Value.from(resolved_options.type),
             Value.from(resolved_options.fallback),
@@ -617,7 +622,7 @@ fn prettyPrintIntlDisplayNames(
         });
     } else {
         try writer.print("{pretty}, style: {pretty}, type: {pretty}, fallback: {pretty}", .{
-            Value.from(String.fromAscii(locale.toString(agent.gc_allocator) catch return)),
+            Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
             Value.from(resolved_options.style),
             Value.from(resolved_options.type),
             Value.from(resolved_options.fallback),
@@ -634,17 +639,17 @@ fn prettyPrintIntlListFormat(
 ) PrettyPrintError(@TypeOf(writer))!void {
     const agent = intl_list_format.data.agent;
     const locale = intl_list_format.fields.locale;
-    const type_ = intl_list_format.fields.type;
-    const style = intl_list_format.fields.style;
     const tty_config = state.tty_config;
+
+    const resolved_options = intl_list_format.fields.resolvedOptions();
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Intl.ListFormat(");
     try tty_config.setColor(writer, .reset);
     try writer.print("{pretty}, type: {pretty}, style: {pretty}", .{
-        Value.from(String.fromAscii(locale.toString(agent.gc_allocator) catch return)),
-        Value.from(String.fromAscii(@tagName(type_))),
-        Value.from(String.fromAscii(@tagName(style))),
+        Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(resolved_options.type),
+        Value.from(resolved_options.style),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -662,7 +667,9 @@ fn prettyPrintIntlLocale(
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Intl.Locale(");
     try tty_config.setColor(writer, .reset);
-    try writer.print("{pretty}", .{Value.from(String.fromAscii(locale.toString(agent.gc_allocator) catch return))});
+    try writer.print("{pretty}", .{
+        Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
+    });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
     try tty_config.setColor(writer, .reset);
@@ -674,15 +681,16 @@ fn prettyPrintIntlPluralRules(
 ) PrettyPrintError(@TypeOf(writer))!void {
     const agent = intl_plural_rules.data.agent;
     const locale = intl_plural_rules.fields.locale;
-    const type_ = intl_plural_rules.fields.type;
     const tty_config = state.tty_config;
+
+    const resolved_options = intl_plural_rules.fields.resolvedOptions();
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Intl.PluralRules(");
     try tty_config.setColor(writer, .reset);
     try writer.print("{pretty}, type: {pretty}", .{
-        Value.from(String.fromAscii(locale.toString(agent.gc_allocator) catch return)),
-        Value.from(String.fromAscii(@tagName(type_))),
+        Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(resolved_options.type),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");
@@ -695,15 +703,16 @@ fn prettyPrintIntlSegmenter(
 ) PrettyPrintError(@TypeOf(writer))!void {
     const agent = intl_segmenter.data.agent;
     const locale = intl_segmenter.fields.locale;
-    const segmenter_granularity = intl_segmenter.fields.segmenter_granularity;
     const tty_config = state.tty_config;
+
+    const resolved_options = intl_segmenter.fields.resolvedOptions();
 
     try tty_config.setColor(writer, .white);
     try writer.writeAll("Intl.Segmenter(");
     try tty_config.setColor(writer, .reset);
     try writer.print("{pretty}, granularity: {pretty}", .{
-        Value.from(String.fromAscii(locale.toString(agent.gc_allocator) catch return)),
-        Value.from(String.fromAscii(@tagName(segmenter_granularity))),
+        Value.from(asciiString(locale.toString(agent.gc_allocator) catch return)),
+        Value.from(resolved_options.granularity),
     });
     try tty_config.setColor(writer, .white);
     try writer.writeAll(")");

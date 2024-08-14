@@ -331,5 +331,5 @@ test "well_known_symbols" {
     var agent = try init(std.testing.allocator, .{});
     defer agent.deinit();
     const unscopables = agent.well_known_symbols.@"%Symbol.unscopables%";
-    try std.testing.expectEqualStrings(unscopables.data.description.?.ascii, "Symbol.unscopables");
+    try std.testing.expectEqualStrings(unscopables.data.description.?.data.slice.ascii, "Symbol.unscopables");
 }

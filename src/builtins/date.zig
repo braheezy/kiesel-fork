@@ -519,7 +519,7 @@ pub fn parseDateTimeString(string: String) f64 {
         }
     };
     var parser: std.fmt.Parser = .{
-        .buf = switch (string) {
+        .buf = switch (string.data.slice) {
             .ascii => |ascii| ascii,
             .utf16 => return invalid,
         },
@@ -731,7 +731,7 @@ pub const DateConstructor = struct {
             const now_: f64 = @floatFromInt(agent.platform.currentTime());
 
             // b. Return ToDateString(now).
-            return Value.from(String.fromAscii(try toDateString(agent.gc_allocator, now_)));
+            return Value.from(try String.fromAscii(agent.gc_allocator, try toDateString(agent.gc_allocator, now_)));
         }
 
         // 2. Let numberOfArgs be the number of elements in values.
@@ -1974,7 +1974,7 @@ pub const DatePrototype = struct {
         const t = localTime(time_value);
 
         // 6. Return DateString(t).
-        return Value.from(String.fromAscii(try dateString(agent.gc_allocator, t)));
+        return Value.from(try String.fromAscii(agent.gc_allocator, try dateString(agent.gc_allocator, t)));
     }
 
     /// 21.4.4.36 Date.prototype.toISOString ( )
@@ -2007,7 +2007,7 @@ pub const DatePrototype = struct {
             if (year >= 0 and year <= 9999) 4 else 6,
         );
 
-        return Value.from(String.fromAscii(try std.fmt.allocPrint(
+        return Value.from(try String.fromAscii(agent.gc_allocator, try std.fmt.allocPrint(
             agent.gc_allocator,
             "{s}{s}-{:0>2}-{:0>2}T{:0>2}:{:0>2}:{:0>2}.{:0>3}Z",
             .{
@@ -2082,7 +2082,7 @@ pub const DatePrototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. Return ToDateString(tv).
-        return Value.from(String.fromAscii(try toDateString(agent.gc_allocator, time_value)));
+        return Value.from(try String.fromAscii(agent.gc_allocator, try toDateString(agent.gc_allocator, time_value)));
     }
 
     /// 21.4.4.42 Date.prototype.toTimeString ( )
@@ -2102,7 +2102,7 @@ pub const DatePrototype = struct {
         const t = localTime(time_value);
 
         // 6. Return the string-concatenation of TimeString(t) and TimeZoneString(tv).
-        return Value.from(String.fromAscii(try std.mem.concat(agent.gc_allocator, u8, &.{
+        return Value.from(try String.fromAscii(agent.gc_allocator, try std.mem.concat(agent.gc_allocator, u8, &.{
             try timeString(agent.gc_allocator, t),
             try timeZoneString(agent.gc_allocator, time_value),
         })));
@@ -2144,7 +2144,7 @@ pub const DatePrototype = struct {
         // 11. Return the string-concatenation of weekday, ",", the code unit 0x0020 (SPACE), day,
         //     the code unit 0x0020 (SPACE), month, the code unit 0x0020 (SPACE), yearSign,
         //     paddedYear, the code unit 0x0020 (SPACE), and TimeString(tv).
-        return Value.from(String.fromAscii(try std.fmt.allocPrint(
+        return Value.from(try String.fromAscii(agent.gc_allocator, try std.fmt.allocPrint(
             agent.gc_allocator,
             "{s}, {:0>2} {s} {s}{s} {s}",
             .{

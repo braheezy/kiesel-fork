@@ -1,4 +1,4 @@
-const String = @import("../string.zig").String;
+const String = @import("../String.zig");
 
 const Self = @This();
 

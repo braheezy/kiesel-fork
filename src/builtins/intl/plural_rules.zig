@@ -135,7 +135,7 @@ pub const PluralRulesConstructor = struct {
             .{ "cardinal", .cardinal },
             .{ "ordinal", .ordinal },
         });
-        plural_rules.as(PluralRules).fields.type = type_map.get(type_.ascii).?;
+        plural_rules.as(PluralRules).fields.type = type_map.get(type_.data.slice.ascii).?;
 
         // TODO: 12. Perform ? SetNumberFormatDigitOptions(pluralRules, options, 0, 3, "standard").
 
@@ -189,7 +189,10 @@ pub const PluralRulesPrototype = struct {
 
         // 4. Return ResolvePlural(pr, n).[[PluralCategory]].
         return Value.from(
-            String.fromAscii(@tagName(resolvePlural(plural_rules, n).plural_category)),
+            try String.fromAscii(
+                agent.gc_allocator,
+                @tagName(resolvePlural(plural_rules, n).plural_category),
+            ),
         );
     }
 
@@ -245,13 +248,19 @@ pub const PluralRulesPrototype = struct {
         //             1. Assert: The Conversion value of the current row is number.
         //             2. Set v to 𝔽(v).
         //         ii. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        const resolved_options = plural_rules.fields.resolvedOptions();
         options.createDataPropertyOrThrow(
             PropertyKey.from("locale"),
-            Value.from(String.fromAscii(try plural_rules.fields.locale.toString(agent.gc_allocator))),
+            Value.from(
+                try String.fromAscii(
+                    agent.gc_allocator,
+                    try plural_rules.fields.locale.toString(agent.gc_allocator),
+                ),
+            ),
         ) catch |err| try noexcept(err);
         options.createDataPropertyOrThrow(
             PropertyKey.from("type"),
-            Value.from(String.fromAscii(@tagName(plural_rules.fields.type))),
+            Value.from(resolved_options.type),
         ) catch |err| try noexcept(err);
         options.createDataPropertyOrThrow(
             PropertyKey.from("pluralCategories"),
@@ -281,6 +290,18 @@ pub const PluralRules = MakeObject(.{
 
         /// [[Type]]
         type: Type,
+
+        pub const ResolvedOptions = struct {
+            type: String,
+        };
+
+        pub fn resolvedOptions(self: @This()) ResolvedOptions {
+            const @"type" = switch (self.type) {
+                .cardinal => String.fromLiteral("cardinal"),
+                .ordinal => String.fromLiteral("ordinal"),
+            };
+            return .{ .type = @"type" };
+        }
     },
     .tag = .intl_plural_rules,
 });

@@ -539,7 +539,7 @@ fn encode(
             return std.mem.indexOfScalar(u8, unescaped_set, c) != null;
         }
     }.isValidChar);
-    return String.fromAscii(try buffer.toOwnedSlice());
+    return String.fromAscii(agent.gc_allocator, try buffer.toOwnedSlice());
 }
 
 /// 19.2.6.6 Decode ( string, preserveEscapeSet )
@@ -593,7 +593,7 @@ fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u
                 // 2. If preserveEscapeSet contains asciiChar, set S to escape. Otherwise, set S to
                 //    asciiChar.
                 s = if (std.mem.indexOfScalar(u8, preserve_escape_set, byte) != null)
-                    .{ .string = String.fromUtf16(escape_) }
+                    .{ .string = try String.fromUtf16(agent.gc_allocator, escape_) }
                 else
                     .{ .code_unit = byte };
             }
@@ -721,7 +721,8 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                 //    hexadecimal number.
                 // 2. Let S be the string-concatenation of "%" and StringPad(hex, 2, "0", start).
                 break :blk .{
-                    .string = String.fromAscii(
+                    .string = try String.fromAscii(
+                        agent.gc_allocator,
                         try std.fmt.allocPrint(
                             agent.gc_allocator,
                             "%{}",
@@ -738,7 +739,8 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                 var bytes = std.mem.toBytes(c);
                 std.mem.reverse(u8, &bytes);
                 break :blk .{
-                    .string = String.fromAscii(
+                    .string = try String.fromAscii(
+                        agent.gc_allocator,
                         try std.fmt.allocPrint(
                             agent.gc_allocator,
                             "%u{}",

@@ -56,19 +56,19 @@ const AnySegmenter = union(enum) {
     fn segment(self: AnySegmenter, string: String) BreakIterator {
         return switch (self) {
             .grapheme => |segmenter| .{
-                .grapheme = segmenter.segment(switch (string) {
+                .grapheme = segmenter.segment(switch (string.data.slice) {
                     .ascii => |utf8| .{ .utf8 = utf8 },
                     .utf16 => |utf16| .{ .utf16 = utf16 },
                 }),
             },
             .word => |segmenter| .{
-                .word = segmenter.segment(switch (string) {
+                .word = segmenter.segment(switch (string.data.slice) {
                     .ascii => |utf8| .{ .utf8 = utf8 },
                     .utf16 => |utf16| .{ .utf16 = utf16 },
                 }),
             },
             .sentence => |segmenter| .{
-                .sentence = segmenter.segment(switch (string) {
+                .sentence = segmenter.segment(switch (string.data.slice) {
                     .ascii => |utf8| .{ .utf8 = utf8 },
                     .utf16 => |utf16| .{ .utf16 = utf16 },
                 }),
@@ -184,7 +184,7 @@ pub const SegmenterConstructor = struct {
             .{ "word", .word },
             .{ "sentence", .sentence },
         });
-        segmenter.as(Segmenter).fields.segmenter_granularity = granularity_map.get(granularity.ascii).?;
+        segmenter.as(Segmenter).fields.segmenter_granularity = granularity_map.get(granularity.data.slice.ascii).?;
 
         // 13. Return segmenter.
         return Value.from(segmenter);
@@ -258,13 +258,19 @@ pub const SegmenterPrototype = struct {
         //     b. Let v be the value of segmenter's internal slot whose name is the Internal Slot value of the current row.
         //     c. Assert: v is not undefined.
         //     d. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        const resolved_options = segmenter.fields.resolvedOptions();
         options.createDataPropertyOrThrow(
             PropertyKey.from("locale"),
-            Value.from(String.fromAscii(try segmenter.fields.locale.toString(agent.gc_allocator))),
+            Value.from(
+                try String.fromAscii(
+                    agent.gc_allocator,
+                    try segmenter.fields.locale.toString(agent.gc_allocator),
+                ),
+            ),
         ) catch |err| try noexcept(err);
         options.createDataPropertyOrThrow(
             PropertyKey.from("granularity"),
-            Value.from(String.fromAscii(@tagName(segmenter.fields.segmenter_granularity))),
+            Value.from(resolved_options.granularity),
         ) catch |err| try noexcept(err);
 
         // 5. Return options.
@@ -276,6 +282,10 @@ pub const SegmenterPrototype = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-segmenter-instances
 pub const Segmenter = MakeObject(.{
     .Fields = struct {
+        pub const ResolvedOptions = struct {
+            granularity: String,
+        };
+
         pub const SegmenterGranularity = enum {
             grapheme,
             word,
@@ -287,6 +297,15 @@ pub const Segmenter = MakeObject(.{
 
         /// [[SegmenterGranularity]]
         segmenter_granularity: SegmenterGranularity,
+
+        pub fn resolvedOptions(self: @This()) ResolvedOptions {
+            const granularity = switch (self.segmenter_granularity) {
+                .grapheme => String.fromLiteral("grapheme"),
+                .word => String.fromLiteral("word"),
+                .sentence => String.fromLiteral("sentence"),
+            };
+            return .{ .granularity = granularity };
+        }
     },
     .tag = .intl_segmenter,
 });

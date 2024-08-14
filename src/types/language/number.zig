@@ -603,6 +603,7 @@ pub const Number = union(enum) {
         // 3. If x < -0𝔽, return the string-concatenation of "-" and Number::toString(-x, radix).
         if (self.asFloat() < 0) {
             return String.fromAscii(
+                allocator,
                 try std.fmt.allocPrint(allocator, "-{}", .{
                     try self.unaryMinus().toString(allocator, radix),
                 }),
@@ -613,7 +614,7 @@ pub const Number = union(enum) {
         if (self.isPositiveInf()) return String.fromLiteral("Infinity");
 
         // TODO: Implement steps 5-12 according to spec!
-        return String.fromAscii(switch (self) {
+        return String.fromAscii(allocator, switch (self) {
             .f64 => |x| if (@abs(x) >= 1e-6 and @abs(x) < 1e21)
                 try std.fmt.allocPrint(allocator, "{d}", .{x})
             else if (@abs(x) < 1)
