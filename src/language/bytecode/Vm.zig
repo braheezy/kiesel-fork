@@ -168,1034 +168,1146 @@ fn getArguments(self: *Self, argument_count: usize) Agent.Error![]const Value {
     return self.function_arguments.items;
 }
 
-pub fn executeInstruction(
-    self: *Self,
-    executable: Executable,
-    instruction: Instruction,
-) Agent.Error!void {
-    switch (instruction) {
-        .apply_string_or_numeric_binary_operator => {
-            const operator_type = self.fetchIndex(executable);
-            const operator: ast.BinaryExpression.Operator = @enumFromInt(operator_type);
-            const rval = self.stack.pop();
-            const lval = self.stack.pop();
-            self.result = try applyStringOrNumericBinaryOperator(self.agent, lval, operator, rval);
-        },
-        .array_create => self.result = Value.from(try arrayCreate(self.agent, 0, null)),
-        .array_push_value => {
-            const init_value = self.stack.pop();
-            const array = self.stack.pop().asObject();
-            const index = getArrayLength(array);
-            // From ArrayAccumulation:
-            // 4. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), initValue).
-            array.createDataPropertyOrThrow(
-                PropertyKey.from(@as(PropertyKey.IntegerIndex, index)),
-                init_value,
-            ) catch |err| try noexcept(err);
-            self.result = Value.from(array);
-        },
-        .array_set_length => {
-            const length = self.fetchIndex(executable);
-            const array = self.result.?.asObject();
-            // From ArrayAccumulation:
-            // 2. Perform ? Set(array, "length", 𝔽(len), true).
-            try array.set(PropertyKey.from("length"), Value.from(length), .throw);
-        },
-        .array_spread_value => {
-            const spread_obj = self.stack.pop();
-            const array = self.stack.pop().asObject();
-            var next_index: u53 = @intCast(getArrayLength(array));
-
-            // From ArrayAccumulation:
-            // 3. Let iteratorRecord be ? GetIterator(spreadObj, sync).
-            var iterator = try getIterator(self.agent, spread_obj, .sync);
-
-            // 4. Repeat,
-            //     a. Let next be ? IteratorStepValue(iteratorRecord).
-            //     b. If next is done, return nextIndex.
-            while (try iterator.stepValue()) |next| : (next_index += 1) {
-                // c. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), next).
-                array.createDataPropertyOrThrow(
-                    PropertyKey.from(next_index),
-                    next,
-                ) catch |err| try noexcept(err);
-
-                // d. Set nextIndex to nextIndex + 1.
-            }
-            self.result = Value.from(array);
-        },
-        .@"await" => {
-            const value = self.result.?;
-            self.result = try @"await"(self.agent, value);
-        },
-        .binding_class_declaration_evaluation => {
-            const class_declaration = self.fetchAstNode(executable).class_declaration;
-            self.result = Value.from(try bindingClassDeclarationEvaluation(self.agent, class_declaration));
-        },
-        .bitwise_not => {
-            const value = self.result.?;
-            self.result = switch (value.type()) {
-                .number => Value.from(value.asNumber().bitwiseNOT()),
-                .big_int => Value.from(try value.asBigInt().bitwiseNOT(self.agent)),
-                else => unreachable,
-            };
-        },
-        .block_declaration_instantiation => {
-            const block = self.fetchAstNode(executable);
-            const old_env = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
-            const block_env = try newDeclarativeEnvironment(self.agent.gc_allocator, old_env);
-            try blockDeclarationInstantiation(
-                self.agent,
-                switch (block.*) {
-                    .statement_list => |statement_list| .{ .statement_list = statement_list },
-                    .case_block => |case_block| .{ .case_block = case_block },
-                    else => unreachable,
-                },
-                .{ .declarative_environment = block_env },
-            );
-            self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{
-                .declarative_environment = block_env,
-            };
-        },
-        .class_definition_evaluation => {
-            const class_expression = self.fetchAstNode(executable).class_expression;
-
-            // ClassExpression : class BindingIdentifier ClassTail
-            if (class_expression.identifier) |identifier| {
-                // 1. Let className be the StringValue of BindingIdentifier.
-                const class_name = try String.fromUtf8(self.agent.gc_allocator, identifier);
-
-                // 2. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments className and className.
-                const value = try classDefinitionEvaluation(
-                    self.agent,
-                    class_expression.class_tail,
-                    class_name,
-                    class_name,
-                );
-
-                // 3. Set value.[[SourceText]] to the source text matched by ClassExpression.
-                if (value.is(builtins.ECMAScriptFunction)) {
-                    value.as(builtins.ECMAScriptFunction).fields.source_text = class_expression.source_text;
-                } else if (value.is(builtins.BuiltinFunction)) {
-                    const class_constructor_fields = value.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
-                    class_constructor_fields.source_text = class_expression.source_text;
-                } else unreachable;
-
-                // 4. Return value.
-                self.result = Value.from(value);
-            }
-            // ClassExpression : class ClassTail
-            else {
-                // 1. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments undefined and "".
-                const value = try classDefinitionEvaluation(
-                    self.agent,
-                    class_expression.class_tail,
-                    null,
-                    String.empty,
-                );
-
-                // 2. Set value.[[SourceText]] to the source text matched by ClassExpression.
-                if (value.is(builtins.ECMAScriptFunction)) {
-                    value.as(builtins.ECMAScriptFunction).fields.source_text = class_expression.source_text;
-                } else if (value.is(builtins.BuiltinFunction)) {
-                    const class_constructor_fields = value.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
-                    class_constructor_fields.source_text = class_expression.source_text;
-                } else unreachable;
-
-                // 3. Return value.
-                self.result = Value.from(value);
-            }
-        },
-        .create_catch_binding => {
-            // TODO: This should create a new environment - for now we approximate this by creating
-            //       a new binding and ignoring the error if one already exists.
-            const name = self.fetchIdentifier(executable);
-            const thrown_value = self.exception.?;
-            self.exception = null;
-            const running_context = self.agent.runningExecutionContext();
-            const catch_env = running_context.ecmascript_code.?.lexical_environment;
-            if (!try catch_env.hasBinding(name)) {
-                try catch_env.createMutableBinding(self.agent, name, false);
-                try catch_env.initializeBinding(self.agent, name, thrown_value);
-            } else {
-                catch_env.setMutableBinding(
-                    self.agent,
-                    name,
-                    thrown_value,
-                    false,
-                ) catch unreachable;
-            }
-        },
-        .create_object_property_iterator => {
-            const value = self.result.?;
-
-            // b. Let obj be ! ToObject(exprValue).
-            const object = value.toObject(self.agent) catch |err| try noexcept(err);
-
-            // c. Let iterator be EnumerateObjectProperties(obj).
-            const iterator = try createForInIterator(self.agent, object);
-
-            // d. Let nextMethod be ! GetV(iterator, "next").
-            const next_method = iterator.get(PropertyKey.from("next")) catch |err| try noexcept(err);
-
-            // e. Return the Iterator Record { [[Iterator]]: iterator, [[NextMethod]]: nextMethod, [[Done]]: false }.
-            self.iterator = .{ .iterator = iterator, .next_method = next_method, .done = false };
-        },
-        .create_with_environment => {
-            const object = self.result.?.asObject();
-            const old_env = self.lexical_environment_stack.getLast();
-            const new_env: Environment = .{
-                .object_environment = try newObjectEnvironment(
-                    self.agent.gc_allocator,
-                    object,
-                    true,
-                    old_env,
-                ),
-            };
-            self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = new_env;
-        },
-        .decrement => {
-            const value = self.result.?;
-            self.result = switch (value.type()) {
-                .number => Value.from(value.asNumber().subtract(.{ .i32 = 1 })),
-                .big_int => Value.from(
-                    try value.asBigInt().subtract(self.agent, self.agent.pre_allocated.one),
-                ),
-                else => @panic("decrement instruction must only be used with numeric value"),
-            };
-        },
-        .delete => {
-            // NOTE: 1-2. are part of the generated bytecode.
-            const reference = self.reference.?;
-
-            // 3. If IsUnresolvableReference(ref) is true, then
-            if (reference.isUnresolvableReference()) {
-                // a. Assert: ref.[[Strict]] is false.
-                std.debug.assert(!reference.strict);
-
-                // b. Return true.
-                self.result = Value.from(true);
-                return;
-            }
-
-            // 4. If IsPropertyReference(ref) is true, then
-            if (reference.isPropertyReference()) {
-                // a. Assert: IsPrivateReference(ref) is false.
-                std.debug.assert(!reference.isPrivateReference());
-
-                // b. If IsSuperReference(ref) is true, throw a ReferenceError exception.
-                if (reference.isSuperReference()) {
-                    return self.agent.throwException(
-                        .reference_error,
-                        "Cannot delete super reference",
-                        .{},
-                    );
-                }
-
-                // c. Let baseObj be ? ToObject(ref.[[Base]]).
-                const base_obj = try reference.base.value.toObject(self.agent);
-
-                // d. If ref.[[ReferencedName]] is not a property key, then
-                const property_key = switch (reference.referenced_name.value.type()) {
-                    .string => PropertyKey.from(reference.referenced_name.value.asString()),
-                    .symbol => PropertyKey.from(reference.referenced_name.value.asSymbol()),
-                    // i. Set ref.[[ReferencedName]] to ? ToPropertyKey(ref.[[ReferencedName]]).
-                    else => try reference.referenced_name.value.toPropertyKey(self.agent),
-                };
-
-                // e. Let deleteStatus be ? baseObj.[[Delete]](ref.[[ReferencedName]]).
-                const delete_status = try base_obj.internalMethods().delete(base_obj, property_key);
-
-                // f. If deleteStatus is false and ref.[[Strict]] is true, throw a TypeError exception.
-                if (!delete_status and reference.strict) {
-                    return self.agent.throwException(.type_error, "Could not delete property", .{});
-                }
-
-                // g. Return deleteStatus.
-                self.result = Value.from(delete_status);
-            }
-            // 5. Else,
-            else {
-                // a. Let base be ref.[[Base]].
-                // b. Assert: base is an Environment Record.
-                const base = reference.base.environment;
-
-                // c. Return ? base.DeleteBinding(ref.[[ReferencedName]]).
-                self.result = Value.from(try base.deleteBinding(reference.referenced_name.value.asString()));
-            }
-        },
-        .evaluate_call => {
-            const maybe_reference = self.reference_stack.getLastOrNull() orelse null;
-            const argument_count = self.fetchIndex(executable);
-            const strict = self.fetchIndex(executable) == 1;
-            const arguments = try self.getArguments(argument_count);
-            const this_value = self.stack.pop();
-            const function = self.stack.pop();
-
-            const realm = self.agent.currentRealm();
-            const eval = try realm.intrinsics.@"%eval%"();
-
-            // 6. If ref is a Reference Record, IsPropertyReference(ref) is false, and
-            //    ref.[[ReferencedName]] is "eval", then
-            if (maybe_reference) |reference| {
-                if (!reference.isPropertyReference() and
-                    reference.referenced_name == .value and
-                    reference.referenced_name.value.isString() and
-                    reference.referenced_name.value.asString().eql(String.fromLiteral("eval")) and
-
-                    // a. If SameValue(func, %eval%) is true, then
-                    function.asObject().sameValue(eval))
-                {
-                    self.result = try directEval(self.agent, arguments, strict);
-                    return;
-                }
-            }
-
-            self.result = try evaluateCall(
-                self.agent,
-                function,
-                this_value,
-                arguments,
-            );
-        },
-        .evaluate_import_call => {
-            const realm = self.agent.currentRealm();
-
-            // 1. Let referrer be GetActiveScriptOrModule().
-            // 2. If referrer is null, set referrer to the current Realm Record.
-            const referrer: ImportedModuleReferrer = if (self.agent.getActiveScriptOrModule()) |script_or_module|
-                switch (script_or_module) {
-                    .script => |script| .{ .script = script },
-                    .module => |module| .{ .module = module },
-                }
-            else
-                .{ .realm = realm };
-
-            // 3. Let argRef be ? Evaluation of AssignmentExpression.
-            // 4. Let specifier be ? GetValue(argRef).
-            const specifier = self.stack.pop();
-
-            // 5. Let promiseCapability be ! NewPromiseCapability(%Promise%).
-            const promise_capability = newPromiseCapability(
-                self.agent,
-                Value.from(try realm.intrinsics.@"%Promise%"()),
-            ) catch |err| try noexcept(err);
-
-            // 6. Let specifierString be Completion(ToString(specifier)).
-            const specifier_string = specifier.toString(self.agent) catch |err| {
-                // 7. IfAbruptRejectPromise(specifierString, promiseCapability).
-                self.result = Value.from(try promise_capability.rejectPromise(self.agent, err));
-                return;
-            };
-
-            // 8. Perform HostLoadImportedModule(referrer, specifierString, empty, promiseCapability).
-            try self.agent.host_hooks.hostLoadImportedModule(
-                self.agent,
-                referrer,
-                specifier_string,
-                SafePointer.null_pointer,
-                .{ .promise_capability = promise_capability },
-            );
-
-            // 9. Return promiseCapability.[[Promise]].
-            self.result = Value.from(promise_capability.promise);
-        },
-        .evaluate_new => {
-            const argument_count = self.fetchIndex(executable);
-            const arguments = try self.getArguments(argument_count);
-            const constructor = self.stack.pop();
-            self.result = try evaluateNew(self.agent, constructor, arguments);
-        },
-        // 13.3.3 EvaluatePropertyAccessWithExpressionKey ( baseValue, expression, strict )
-        // https://tc39.es/ecma262/#sec-evaluate-property-access-with-expression-key
-        .evaluate_property_access_with_expression_key => {
-            // 1. Let propertyNameReference be ? Evaluation of expression.
-            // 2. Let propertyNameValue be ? GetValue(propertyNameReference).
-            const property_name_value = self.stack.pop();
-
-            const strict = self.fetchIndex(executable) == 1;
-            const base_value = self.stack.pop();
-
-            // 3. NOTE: In most cases, ToPropertyKey will be performed on propertyNameValue
-            //    immediately after this step. However, in the case of a[b] = c, it will not be
-            //    performed until after evaluation of c.
-
-            // 4. Return the Reference Record {
-            //      [[Base]]: baseValue,
-            //      [[ReferencedName]]: propertyNameValue,
-            //      [[Strict]]: strict,
-            //      [[ThisValue]]: empty
-            //    }.
-            self.reference = .{
-                .base = .{ .value = base_value },
-                .referenced_name = .{ .value = property_name_value },
-                .strict = strict,
-                .this_value = null,
-            };
-        },
-        // 13.3.4 EvaluatePropertyAccessWithIdentifierKey ( baseValue, identifierName, strict )
-        // https://tc39.es/ecma262/#sec-evaluate-property-access-with-identifier-key
-        .evaluate_property_access_with_identifier_key => {
-            // 1. Let propertyNameString be the StringValue of identifierName.
-            const property_name_string = self.fetchIdentifier(executable);
-
-            const strict = self.fetchIndex(executable) == 1;
-            const base_value = self.stack.pop();
-
-            // 2. Return the Reference Record {
-            //      [[Base]]: baseValue,
-            //      [[ReferencedName]]: propertyNameString,
-            //      [[Strict]]: strict,
-            //      [[ThisValue]]: empty
-            //    }.
-            self.reference = .{
-                .base = .{ .value = base_value },
-                .referenced_name = .{
-                    .value = Value.from(property_name_string),
-                },
-                .strict = strict,
-                .this_value = null,
-            };
-        },
-        .evaluate_super_call => {
-            const argument_count = self.fetchIndex(executable);
-
-            // 1. Let newTarget be GetNewTarget().
-            const new_target = self.agent.getNewTarget();
-
-            // 2. Assert: newTarget is an Object.
-            std.debug.assert(new_target != null);
-
-            // 3. Let func be GetSuperConstructor().
-            const function = try getSuperConstructor(self.agent);
-
-            // 4. Let argList be ? ArgumentListEvaluation of Arguments.
-            const arguments = try self.getArguments(argument_count);
-
-            // 5. If IsConstructor(func) is false, throw a TypeError exception.
-            if (!function.isConstructor()) {
-                return self.agent.throwException(
-                    .type_error,
-                    "{} is not a constructor",
-                    .{function},
-                );
-            }
-
-            // 6. Let result be ? Construct(func, argList, newTarget).
-            var result = try function.asObject().construct(arguments, new_target);
-
-            // 7. Let thisER be GetThisEnvironment().
-            const this_environment = self.agent.getThisEnvironment();
-
-            // 8. Perform ? thisER.BindThisValue(result).
-            _ = try this_environment.bindThisValue(Value.from(result));
-
-            // 9. Let F be thisER.[[FunctionObject]].
-            // 10. Assert: F is an ECMAScript function object.
-            const constructor = this_environment.function_environment.function_object.object();
-
-            // 11. Perform ? InitializeInstanceElements(result, F).
-            try result.initializeInstanceElements(constructor);
-
-            // 12. Return result.
-            self.result = Value.from(result);
-        },
-        .for_declaration_binding_instantiation => {
-            const lexical_declaration = self.fetchAstNode(executable).lexical_declaration;
-
-            // iii. Let iterationEnv be NewDeclarativeEnvironment(oldEnv).
-            const old_env = self.lexical_environment_stack.getLast();
-            const environment = try newDeclarativeEnvironment(self.agent.gc_allocator, old_env);
-
-            // iv. Perform ForDeclarationBindingInstantiation of lhs with argument iterationEnv.
-
-            // 14.7.5.4 Runtime Semantics: ForDeclarationBindingInstantiation
-            // https://tc39.es/ecma262/#sec-runtime-semantics-fordeclarationbindinginstantiation
-            var bound_names = std.ArrayList(ast.Identifier).init(self.agent.gc_allocator);
-            defer bound_names.deinit();
-            try lexical_declaration.collectBoundNames(&bound_names);
-
-            // 1. For each element name of the BoundNames of ForBinding, do
-            for (bound_names.items) |name_utf8| {
-                const name = try String.fromUtf8(self.agent.gc_allocator, name_utf8);
-
-                // a. If IsConstantDeclaration of LetOrConst is true, then
-                if (lexical_declaration.isConstantDeclaration()) {
-                    // i. Perform ! environment.CreateImmutableBinding(name, true).
-                    environment.createImmutableBinding(
-                        self.agent,
-                        name,
-                        true,
-                    ) catch |err| try noexcept(err);
-                }
-                // b. Else,
-                else {
-                    // i. Perform ! environment.CreateMutableBinding(name, false).
-                    environment.createMutableBinding(
-                        self.agent,
-                        name,
-                        false,
-                    ) catch |err| try noexcept(err);
-                }
-
-                // 2. Return unused.
-            }
-
-            // v. Set the running execution context's LexicalEnvironment to iterationEnv.
-            self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{
-                .declarative_environment = environment,
-            };
-        },
-        .get_iterator => {
-            const iterator_kind: IteratorKind = @enumFromInt((self.fetchIndex(executable)));
-            self.iterator = try getIterator(self.agent, self.result.?, iterator_kind);
-        },
-        .get_new_target => {
-            self.result = if (self.agent.getNewTarget()) |new_target|
-                Value.from(new_target)
-            else
-                Value.undefined;
-        },
-        .get_or_create_import_meta => {
-            // 1. Let module be GetActiveScriptOrModule().
-            // 2. Assert: module is a Source Text Module Record.
-            var module = self.agent.getActiveScriptOrModule().?.module;
-
-            // 3. Let importMeta be module.[[ImportMeta]].
-            // 4. If importMeta is empty, then
-            if (module.import_meta == null) {
-                // a. Set importMeta to OrdinaryObjectCreate(null).
-                const import_meta = try ordinaryObjectCreate(self.agent, null);
-
-                // b. Let importMetaValues be HostGetImportMetaProperties(module).
-                var import_meta_values = try self.agent.host_hooks.hostGetImportMetaProperties(module);
-                defer import_meta_values.deinit();
-
-                // c. For each Record { [[Key]], [[Value]] } p of importMetaValues, do
-                var it = import_meta_values.iterator();
-                while (it.next()) |entry| {
-                    // i. Perform ! CreateDataPropertyOrThrow(importMeta, p.[[Key]], p.[[Value]]).
-                    import_meta.createDataPropertyOrThrow(
-                        entry.key_ptr.*,
-                        entry.value_ptr.*,
-                    ) catch |err| try noexcept(err);
-                }
-
-                // d. Perform HostFinalizeImportMeta(importMeta, module).
-                self.agent.host_hooks.hostFinalizeImportMeta(import_meta, module);
-
-                // e. Set module.[[ImportMeta]] to importMeta.
-                module.import_meta = import_meta;
-
-                // f. Return importMeta.
-                self.result = Value.from(import_meta);
-            }
-            // 5. Else,
-            else {
-                // a. Assert: importMeta is an Object.
-                // b. Return importMeta.
-                self.result = Value.from(module.import_meta.?);
-            }
-        },
-        .get_template_object => {
-            const template_literal = &self.fetchAstNode(executable).template_literal;
-            self.result = Value.from(try getTemplateObject(self.agent, template_literal));
-        },
-        .get_value => {
-            if (self.reference) |reference| self.result = try reference.getValue(self.agent);
-            self.reference = null;
-        },
-        .greater_than => {
-            const rval = self.stack.pop();
-            const lval = self.stack.pop();
-
-            // 5. Let r be ? IsLessThan(rval, lval, false).
-            const result = try isLessThan(self.agent, rval, lval, .right_first);
-
-            // 6. If r is undefined, return false. Otherwise, return r.
-            self.result = Value.from(result orelse false);
-        },
-        .greater_than_equals => {
-            const rval = self.stack.pop();
-            const lval = self.stack.pop();
-
-            // 5. Let r be ? IsLessThan(lval, rval, true).
-            const result = try isLessThan(self.agent, lval, rval, .left_first);
-
-            // 6. If r is either true or undefined, return false. Otherwise, return true.
-            self.result = Value.from(!(result orelse true));
-        },
-        .has_private_element => {
-            const private_identifier = self.fetchIdentifier(executable);
-            const rval = self.stack.pop();
-
-            // 4. If rval is not an Object, throw a TypeError exception.
-            if (!rval.isObject()) {
-                return self.agent.throwException(
-                    .type_error,
-                    "Right-hand side of 'in' operator must be an object",
-                    .{},
-                );
-            }
-
-            // 5. Let privateEnv be the running execution context's PrivateEnvironment.
-            const private_environment = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
-
-            // 6. Let privateName be ResolvePrivateIdentifier(privateEnv, privateIdentifier).
-            const private_name = private_environment.resolvePrivateIdentifier(
-                try private_identifier.toUtf8(self.agent.gc_allocator),
-            );
-
-            // 7. If PrivateElementFind(rval, privateName) is not empty, return true.
-            // 8. Return false.
-            self.result = Value.from(rval.asObject().privateElementFind(private_name) != null);
-        },
-        .has_property => {
-            const rval = self.stack.pop();
-            const lval = self.stack.pop();
-
-            // 5. If rval is not an Object, throw a TypeError exception.
-            if (!rval.isObject()) {
-                return self.agent.throwException(
-                    .type_error,
-                    "Right-hand side of 'in' operator must be an object",
-                    .{},
-                );
-            }
-
-            // 6. Return ? HasProperty(rval, ? ToPropertyKey(lval)).
-            self.result = Value.from(
-                try rval.asObject().hasProperty(try lval.toPropertyKey(self.agent)),
-            );
-        },
-        .increment => {
-            const value = self.result.?;
-            self.result = switch (value.type()) {
-                .number => Value.from(value.asNumber().add(.{ .i32 = 1 })),
-                .big_int => Value.from(
-                    try value.asBigInt().add(self.agent, self.agent.pre_allocated.one),
-                ),
-                else => unreachable,
-            };
-        },
-        .initialize_default_export => {
-            const value = self.result.?;
-
-            // 3. Let env be the running execution context's LexicalEnvironment.
-            const environment = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
-
-            // 4. Perform ? InitializeBoundName("*default*", value, env).
-            try initializeBoundName(
-                self.agent,
-                String.fromLiteral("*default*"),
-                value,
-                .{ .environment = environment },
-            );
-        },
-        .initialize_referenced_binding => {
-            const reference = self.reference_stack.getLast().?;
-            const value = self.result.?;
-            try reference.initializeReferencedBinding(self.agent, value);
-            self.reference = null;
-        },
-        .instanceof_operator => {
-            const rval = self.stack.pop();
-            const lval = self.stack.pop();
-
-            // 5. Return ? InstanceofOperator(lval, rval).
-            self.result = Value.from(try lval.instanceofOperator(self.agent, rval));
-        },
-        .instantiate_arrow_function_expression => {
-            const arrow_function = self.fetchAstNode(executable).arrow_function;
-            const closure = try instantiateArrowFunctionExpression(
-                self.agent,
-                arrow_function,
-                null,
-            );
-            self.result = Value.from(closure);
-        },
-        .instantiate_async_arrow_function_expression => {
-            const async_arrow_function = self.fetchAstNode(executable).async_arrow_function;
-            const closure = try instantiateAsyncArrowFunctionExpression(
-                self.agent,
-                async_arrow_function,
-                null,
-            );
-            self.result = Value.from(closure);
-        },
-        .instantiate_async_function_expression => {
-            const async_function_expression = self.fetchAstNode(executable).async_function_expression;
-            const closure = try instantiateAsyncFunctionExpression(
-                self.agent,
-                async_function_expression,
-                null,
-            );
-            self.result = Value.from(closure);
-        },
-        .instantiate_async_generator_function_expression => {
-            const async_generator_expression = self.fetchAstNode(executable).async_generator_expression;
-            const closure = try instantiateAsyncGeneratorFunctionExpression(
-                self.agent,
-                async_generator_expression,
-                null,
-            );
-            self.result = Value.from(closure);
-        },
-        .instantiate_generator_function_expression => {
-            const generator_expression = self.fetchAstNode(executable).generator_expression;
-            const closure = try instantiateGeneratorFunctionExpression(
-                self.agent,
-                generator_expression,
-                null,
-            );
-            self.result = Value.from(closure);
-        },
-        .instantiate_ordinary_function_expression => {
-            const function_expression = self.fetchAstNode(executable).function_expression;
-            const closure = try instantiateOrdinaryFunctionExpression(
-                self.agent,
-                function_expression,
-                null,
-            );
-            self.result = Value.from(closure);
-        },
-        .is_loosely_equal => {
-            const rval = self.stack.pop();
-            const lval = self.stack.pop();
-
-            // 5. Return IsLooselyEqual(rval, lval).
-            self.result = Value.from(try isLooselyEqual(self.agent, rval, lval));
-        },
-        .is_strictly_equal => {
-            const rval = self.stack.pop();
-            const lval = self.stack.pop();
-
-            // 5. Return IsStrictlyEqual(rval, lval).
-            self.result = Value.from(isStrictlyEqual(rval, lval));
-        },
-        .jump => self.ip = self.fetchIndex(executable),
-        .jump_conditional => {
-            const ip_consequent = self.fetchIndex(executable);
-            const ip_alternate = self.fetchIndex(executable);
-            const value = self.result.?;
-            self.ip = if (value.toBoolean()) ip_consequent else ip_alternate;
-        },
-        .less_than => {
-            const rval = self.stack.pop();
-            const lval = self.stack.pop();
-
-            // 5. Let r be ? IsLessThan(lval, rval, true).
-            const result = try isLessThan(self.agent, lval, rval, .left_first);
-
-            // 6. If r is undefined, return false. Otherwise, return r.
-            self.result = Value.from(result orelse false);
-        },
-        .less_than_equals => {
-            const rval = self.stack.pop();
-            const lval = self.stack.pop();
-
-            // 5. Let r be ? IsLessThan(rval, lval, false).
-            const result = try isLessThan(self.agent, rval, lval, .right_first);
-
-            // 6. If r is either true or undefined, return false. Otherwise, return true.
-            self.result = Value.from(!(result orelse true));
-        },
-        .load => {
-            // Handle null value to allow load of 'empty' result at beginning of script
-            if (self.result) |value| try self.stack.append(value);
-        },
-        .load_constant => {
-            const value = self.fetchConstant(executable);
-            try self.stack.append(value);
-        },
-        .load_iterator_next_args => {
-            const iterator = self.iterator_stack.getLast();
-            try self.stack.append(iterator.next_method);
-            try self.stack.append(Value.from(iterator.iterator));
-        },
-        .load_this_value_for_evaluate_call => {
-            const maybe_reference = self.reference_stack.getLast();
-            const this_value = evaluateCallGetThisValue(maybe_reference);
-            try self.stack.append(this_value);
-        },
-        .load_this_value_for_make_super_property_reference => {
-            // 1. Let env be GetThisEnvironment().
-            const env = self.agent.getThisEnvironment();
-
-            // 2. Let actualThis be ? env.GetThisBinding().
-            const actual_this = try env.getThisBinding();
-
-            try self.stack.append(actual_this);
-        },
-        .logical_not => {
-            const value = self.result.?;
-            self.result = Value.from(!value.toBoolean());
-        },
-        // 6.2.5.9 MakePrivateReference ( baseValue, privateIdentifier )
-        // https://tc39.es/ecma262/#sec-makeprivatereference
-        .make_private_reference => {
-            const private_identifier = self.fetchIdentifier(executable);
-            const base_value = self.stack.pop();
-
-            // 1. Let privEnv be the running execution context's PrivateEnvironment.
-            // 2. Assert: privEnv is not null.
-            const private_environment = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
-
-            // 3. Let privateName be ResolvePrivateIdentifier(privEnv, privateIdentifier).
-            const private_name = private_environment.resolvePrivateIdentifier(
-                try private_identifier.toUtf8(self.agent.gc_allocator),
-            );
-
-            // 4. Return the Reference Record {
-            //      [[Base]]: baseValue, [[ReferencedName]]: privateName, [[Strict]]: true, [[ThisValue]]: empty
-            //    }.
-            self.reference = .{
-                .base = .{ .value = base_value },
-                .referenced_name = .{ .private_name = private_name },
-                .strict = true,
-                .this_value = null,
-            };
-        },
-        // 13.3.7.3 MakeSuperPropertyReference ( actualThis, propertyKey, strict )
-        // https://tc39.es/ecma262/#sec-makesuperpropertyreference
-        .make_super_property_reference => {
-            const property_key = self.stack.pop();
-            const strict = self.fetchIndex(executable) == 1;
-            const actual_this = self.stack.pop();
-
-            // 1. Let env be GetThisEnvironment().
-            const env = self.agent.getThisEnvironment();
-
-            // 2. Assert: env.HasSuperBinding() is true.
-            std.debug.assert(env.hasSuperBinding());
-
-            // 3. Let baseValue be ? env.GetSuperBase().
-            const base_value = try env.getSuperBase();
-
-            // 4. Return the Reference Record {
-            //      [[Base]]: baseValue, [[ReferencedName]]: propertyKey, [[Strict]]: strict, [[ThisValue]]: actualThis
-            //    }.
-            self.reference = .{
-                .base = .{ .value = base_value },
-                .referenced_name = .{ .value = property_key },
-                .strict = strict,
-                .this_value = actual_this,
-            };
-        },
-        .object_create => {
-            const object = try ordinaryObjectCreate(
-                self.agent,
-                try self.agent.currentRealm().intrinsics.@"%Object.prototype%"(),
-            );
-            self.result = Value.from(object);
-        },
-        .object_define_method => {
-            const function_or_class = self.fetchAstNode(executable);
-            const method_type: ast.MethodDefinition.Type = @enumFromInt((self.fetchIndex(executable)));
-            const method = switch (method_type) {
-                inline else => |@"type"| @unionInit(
-                    ast.MethodDefinition.Method,
-                    @tagName(@"type"),
-                    @field(function_or_class, switch (@"type") {
-                        .method, .get, .set => "function_expression",
-                        .generator => "generator_expression",
-                        .@"async" => "async_function_expression",
-                        .async_generator => "async_generator_expression",
-                    }),
-                ),
-            };
-            const property_name = self.stack.pop();
-            const object = self.stack.pop().asObject();
-            _ = try methodDefinitionEvaluation(
-                self.agent,
-                .{ .property_name = property_name, .method = method },
-                object,
-                true,
-            );
-            self.result = Value.from(object);
-        },
-        .object_set_property => {
-            const property_value = self.stack.pop();
-            const property_name = try self.stack.pop().toPropertyKey(self.agent);
-            const object = self.stack.pop().asObject();
-            // From PropertyDefinitionEvaluation:
-            // 5. Perform ! CreateDataPropertyOrThrow(object, propName, propValue).
-            object.createDataPropertyOrThrow(property_name, property_value) catch |err| try noexcept(err);
-            self.result = Value.from(object);
-        },
-        .object_spread_value => {
-            const from_value = self.stack.pop();
-            var object = self.stack.pop().asObject();
-            const excluded_names: []const PropertyKey = &.{};
-            // From PropertyDefinitionEvaluation:
-            // 4. Perform ? CopyDataProperties(object, fromValue, excludedNames).
-            try object.copyDataProperties(from_value, excluded_names);
-            self.result = Value.from(object);
-        },
-        .pop_exception_jump_target => _ = self.exception_jump_target_stack.pop(),
-        .pop_iterator => _ = self.iterator_stack.pop(),
-        .pop_lexical_environment => _ = self.lexical_environment_stack.pop(),
-        .pop_reference => _ = self.reference_stack.pop(),
-        .push_lexical_environment => {
-            const lexical_environment = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
-            try self.lexical_environment_stack.append(lexical_environment);
-        },
-        .push_exception_jump_target => {
-            const jump_target = self.fetchIndex(executable);
-            try self.exception_jump_target_stack.append(jump_target);
-        },
-        .push_iterator => try self.iterator_stack.append(self.iterator.?),
-        .push_reference => try self.reference_stack.append(self.reference),
-        .put_value => {
-            const lref = self.reference_stack.getLast().?;
-            const rval = self.result.?;
-            try lref.putValue(self.agent, rval);
-            self.reference = null;
-        },
-        .reg_exp_create => {
-            const flags = self.stack.pop();
-            const pattern = self.stack.pop();
-            self.result = Value.from(try builtins.regExpCreate(self.agent, pattern, flags));
-        },
-        .resolve_binding => {
-            const name = self.fetchIdentifier(executable);
-            const strict = self.fetchIndex(executable) == 1;
-            const environment_lookup_cache_index = self.fetchIndex(executable);
-            const lookup_cache_entry = &self.environment_lookup_cache.items[
-                environment_lookup_cache_index
-            ];
-            self.reference = try self.agent.resolveBinding(name, null, strict, lookup_cache_entry);
-        },
-        .resolve_private_identifier => {
-            // 1. Let privateIdentifier be the StringValue of PrivateIdentifier.
-            const private_identifier = self.fetchIdentifier(executable);
-
-            // 2. Let privateEnvRec be the running execution context's PrivateEnvironment.
-            const private_environment = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
-
-            // 3. Let names be privateEnvRec.[[Names]].
-            // 4. Assert: Exactly one element of names is a Private Name whose [[Description]] is privateIdentifier.
-            // 5. Let privateName be the Private Name in names whose [[Description]] is privateIdentifier.
-            // 6. Return privateName.
-            const private_name = private_environment.names.get(
-                try private_identifier.toUtf8(self.agent.gc_allocator),
-            ).?;
-            std.debug.assert(private_name.symbol.data.is_private);
-            self.result = Value.from(private_name.symbol);
-        },
-        .resolve_this_binding => self.result = try self.agent.resolveThisBinding(),
-        .restore_lexical_environment => {
-            const lexical_environment = self.lexical_environment_stack.getLast();
-            self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = lexical_environment;
-        },
-        .rethrow_exception_if_any => if (self.exception) |value| {
-            self.agent.exception = value;
-            return error.ExceptionThrown;
-        },
-        .@"return" => {}, // Handled in run()
-        .store => {
-            // Handle empty stack to allow restoring a null `.load`
-            self.result = self.stack.popOrNull();
-        },
-        .store_constant => {
-            const value = self.fetchConstant(executable);
-            self.result = value;
-        },
-        .throw => {
-            const value = self.result.?;
-            self.agent.exception = value;
-            return error.ExceptionThrown;
-        },
-        .to_number => {
-            const value = self.result.?;
-            self.result = Value.from(try value.toNumber(self.agent));
-        },
-        .to_numeric => {
-            const value = self.result.?;
-            const numeric = try value.toNumeric(self.agent);
-            self.result = switch (numeric) {
-                .number => |number| Value.from(number),
-                .big_int => |big_int| Value.from(big_int),
-            };
-        },
-        .to_object => {
-            const value = self.result.?;
-            self.result = Value.from(try value.toObject(self.agent));
-        },
-        .to_string => {
-            const value = self.result.?;
-            self.result = Value.from(try value.toString(self.agent));
-        },
-        .typeof => {
-            // 1. Let val be ? Evaluation of UnaryExpression.
-            // NOTE: This is part of the generated bytecode.
-
-            // 2. If val is a Reference Record, then
-            if (self.reference) |reference| {
-                // a. If IsUnresolvableReference(val) is true, return "undefined".
-                if (reference.isUnresolvableReference()) {
-                    self.result = Value.from("undefined");
-                    return;
-                }
-            }
-
-            // 3. Set val to ? GetValue(val).
-            const value = if (self.reference) |reference|
-                try reference.getValue(self.agent)
-            else
-                self.result.?;
-
-            self.result = switch (value.type()) {
-                // 4. If val is undefined, return "undefined".
-                .undefined => Value.from("undefined"),
-
-                // 5. If val is null, return "object".
-                .null => Value.from("object"),
-
-                // 6. If val is a String, return "string".
-                .string => Value.from("string"),
-
-                // 7. If val is a Symbol, return "symbol".
-                .symbol => Value.from("symbol"),
-
-                // 8. If val is a Boolean, return "boolean".
-                .boolean => Value.from("boolean"),
-
-                // 9. If val is a Number, return "number".
-                .number => Value.from("number"),
-
-                // 10. If val is a BigInt, return "bigint".
-                .big_int => Value.from("bigint"),
-
-                // 11. Assert: val is an Object.
-                .object => blk: {
-                    // B.3.6.3 Changes to the typeof Operator
-                    // https://tc39.es/ecma262/#sec-IsHTMLDDA-internal-slot-typeof
-                    if (build_options.enable_annex_b) {
-                        // 12. If val has an [[IsHTMLDDA]] internal slot, return "undefined".
-                        if (value.asObject().isHTMLDDA()) break :blk Value.from("undefined");
-                    } else {
-                        // 12. NOTE: This step is replaced in section B.3.6.3.
-                    }
-
-                    // 13. If val has a [[Call]] internal slot, return "function".
-                    if (value.asObject().internalMethods().call) |_| break :blk Value.from("function");
-
-                    // 14. Return "object".
-                    break :blk Value.from("object");
-                },
-            };
-        },
-        .unary_minus => {
-            const value = self.result.?;
-            self.result = switch (value.type()) {
-                .number => Value.from(value.asNumber().unaryMinus()),
-                .big_int => Value.from(try value.asBigInt().unaryMinus(self.agent)),
-                else => unreachable,
-            };
-        },
-        _ => unreachable,
+fn executeApplyStringOrNumericBinaryOperator(self: *Self, executable: Executable) Agent.Error!void {
+    const operator_type = self.fetchIndex(executable);
+    const operator: ast.BinaryExpression.Operator = @enumFromInt(operator_type);
+    const rval = self.stack.pop();
+    const lval = self.stack.pop();
+    self.result = try applyStringOrNumericBinaryOperator(self.agent, lval, operator, rval);
+}
+
+fn executeArrayCreate(self: *Self, _: Executable) Agent.Error!void {
+    self.result = Value.from(try arrayCreate(self.agent, 0, null));
+}
+
+fn executeArrayPushValue(self: *Self, _: Executable) Agent.Error!void {
+    const init_value = self.stack.pop();
+    const array = self.stack.pop().asObject();
+    const index = getArrayLength(array);
+    // From ArrayAccumulation:
+    // 4. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), initValue).
+    array.createDataPropertyOrThrow(
+        PropertyKey.from(@as(PropertyKey.IntegerIndex, index)),
+        init_value,
+    ) catch |err| try noexcept(err);
+    self.result = Value.from(array);
+}
+
+fn executeArraySetLength(self: *Self, executable: Executable) Agent.Error!void {
+    const length = self.fetchIndex(executable);
+    const array = self.result.?.asObject();
+    // From ArrayAccumulation:
+    // 2. Perform ? Set(array, "length", 𝔽(len), true).
+    try array.set(PropertyKey.from("length"), Value.from(length), .throw);
+}
+
+fn executeArraySpreadValue(self: *Self, _: Executable) Agent.Error!void {
+    const spread_obj = self.stack.pop();
+    const array = self.stack.pop().asObject();
+    var next_index: u53 = @intCast(getArrayLength(array));
+
+    // From ArrayAccumulation:
+    // 3. Let iteratorRecord be ? GetIterator(spreadObj, sync).
+    var iterator = try getIterator(self.agent, spread_obj, .sync);
+
+    // 4. Repeat,
+    //     a. Let next be ? IteratorStepValue(iteratorRecord).
+    //     b. If next is done, return nextIndex.
+    while (try iterator.stepValue()) |next| : (next_index += 1) {
+        // c. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), next).
+        array.createDataPropertyOrThrow(
+            PropertyKey.from(next_index),
+            next,
+        ) catch |err| try noexcept(err);
+
+        // d. Set nextIndex to nextIndex + 1.
     }
+    self.result = Value.from(array);
+}
+
+fn executeAwait(self: *Self, _: Executable) Agent.Error!void {
+    const value = self.result.?;
+    self.result = try @"await"(self.agent, value);
+}
+
+fn executeBindingClassDeclarationEvaluation(self: *Self, executable: Executable) Agent.Error!void {
+    const class_declaration = self.fetchAstNode(executable).class_declaration;
+    self.result = Value.from(try bindingClassDeclarationEvaluation(self.agent, class_declaration));
+}
+
+fn executeBitwiseNot(self: *Self, _: Executable) Agent.Error!void {
+    const value = self.result.?;
+    self.result = switch (value.type()) {
+        .number => Value.from(value.asNumber().bitwiseNOT()),
+        .big_int => Value.from(try value.asBigInt().bitwiseNOT(self.agent)),
+        else => unreachable,
+    };
+}
+
+fn executeBlockDeclarationInstantiation(self: *Self, executable: Executable) Agent.Error!void {
+    const block = self.fetchAstNode(executable);
+    const old_env = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+    const block_env = try newDeclarativeEnvironment(self.agent.gc_allocator, old_env);
+    try blockDeclarationInstantiation(
+        self.agent,
+        switch (block.*) {
+            .statement_list => |statement_list| .{ .statement_list = statement_list },
+            .case_block => |case_block| .{ .case_block = case_block },
+            else => unreachable,
+        },
+        .{ .declarative_environment = block_env },
+    );
+    self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{
+        .declarative_environment = block_env,
+    };
+}
+
+/// 15.7.16 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-class-definitions-runtime-semantics-evaluation
+fn executeClassDefinitionEvaluation(self: *Self, executable: Executable) Agent.Error!void {
+    const class_expression = self.fetchAstNode(executable).class_expression;
+
+    // ClassExpression : class BindingIdentifier ClassTail
+    if (class_expression.identifier) |identifier| {
+        // 1. Let className be the StringValue of BindingIdentifier.
+        const class_name = try String.fromUtf8(self.agent.gc_allocator, identifier);
+
+        // 2. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments className and className.
+        const value = try classDefinitionEvaluation(
+            self.agent,
+            class_expression.class_tail,
+            class_name,
+            class_name,
+        );
+
+        // 3. Set value.[[SourceText]] to the source text matched by ClassExpression.
+        if (value.is(builtins.ECMAScriptFunction)) {
+            value.as(builtins.ECMAScriptFunction).fields.source_text = class_expression.source_text;
+        } else if (value.is(builtins.BuiltinFunction)) {
+            const class_constructor_fields = value.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+            class_constructor_fields.source_text = class_expression.source_text;
+        } else unreachable;
+
+        // 4. Return value.
+        self.result = Value.from(value);
+    }
+    // ClassExpression : class ClassTail
+    else {
+        // 1. Let value be ? ClassDefinitionEvaluation of ClassTail with arguments undefined and "".
+        const value = try classDefinitionEvaluation(
+            self.agent,
+            class_expression.class_tail,
+            null,
+            String.empty,
+        );
+
+        // 2. Set value.[[SourceText]] to the source text matched by ClassExpression.
+        if (value.is(builtins.ECMAScriptFunction)) {
+            value.as(builtins.ECMAScriptFunction).fields.source_text = class_expression.source_text;
+        } else if (value.is(builtins.BuiltinFunction)) {
+            const class_constructor_fields = value.as(builtins.BuiltinFunction).fields.additional_fields.cast(*ClassConstructorFields);
+            class_constructor_fields.source_text = class_expression.source_text;
+        } else unreachable;
+
+        // 3. Return value.
+        self.result = Value.from(value);
+    }
+}
+
+fn executeCreateCatchBinding(self: *Self, executable: Executable) Agent.Error!void {
+    // TODO: This should create a new environment - for now we approximate this by creating
+    //       a new binding and ignoring the error if one already exists.
+    const name = self.fetchIdentifier(executable);
+    const thrown_value = self.exception.?;
+    self.exception = null;
+    const running_context = self.agent.runningExecutionContext();
+    const catch_env = running_context.ecmascript_code.?.lexical_environment;
+    if (!try catch_env.hasBinding(name)) {
+        try catch_env.createMutableBinding(self.agent, name, false);
+        try catch_env.initializeBinding(self.agent, name, thrown_value);
+    } else {
+        catch_env.setMutableBinding(
+            self.agent,
+            name,
+            thrown_value,
+            false,
+        ) catch unreachable;
+    }
+}
+
+fn executeCreateObjectPropertyIterator(self: *Self, _: Executable) Agent.Error!void {
+    const value = self.result.?;
+
+    // From ForIn/OfHeadEvaluation:
+    // b. Let obj be ! ToObject(exprValue).
+    const object = value.toObject(self.agent) catch |err| try noexcept(err);
+
+    // c. Let iterator be EnumerateObjectProperties(obj).
+    const iterator = try createForInIterator(self.agent, object);
+
+    // d. Let nextMethod be ! GetV(iterator, "next").
+    const next_method = iterator.get(PropertyKey.from("next")) catch |err| try noexcept(err);
+
+    // e. Return the Iterator Record { [[Iterator]]: iterator, [[NextMethod]]: nextMethod, [[Done]]: false }.
+    self.iterator = .{ .iterator = iterator, .next_method = next_method, .done = false };
+}
+
+fn executeCreateWithEnvironment(self: *Self, _: Executable) Agent.Error!void {
+    const object = self.result.?.asObject();
+    const old_env = self.lexical_environment_stack.getLast();
+    const new_env: Environment = .{
+        .object_environment = try newObjectEnvironment(
+            self.agent.gc_allocator,
+            object,
+            true,
+            old_env,
+        ),
+    };
+    self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = new_env;
+}
+
+fn executeDecrement(self: *Self, _: Executable) Agent.Error!void {
+    const value = self.result.?;
+    self.result = switch (value.type()) {
+        .number => Value.from(value.asNumber().subtract(.{ .i32 = 1 })),
+        .big_int => Value.from(
+            try value.asBigInt().subtract(self.agent, self.agent.pre_allocated.one),
+        ),
+        else => @panic("decrement instruction must only be used with numeric value"),
+    };
+}
+
+/// 13.5.1.2 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-delete-operator-runtime-semantics-evaluation
+fn executeDelete(self: *Self, _: Executable) Agent.Error!void {
+    // NOTE: 1-2. are part of the generated bytecode.
+    const reference = self.reference.?;
+
+    // 3. If IsUnresolvableReference(ref) is true, then
+    if (reference.isUnresolvableReference()) {
+        // a. Assert: ref.[[Strict]] is false.
+        std.debug.assert(!reference.strict);
+
+        // b. Return true.
+        self.result = Value.from(true);
+        return;
+    }
+
+    // 4. If IsPropertyReference(ref) is true, then
+    if (reference.isPropertyReference()) {
+        // a. Assert: IsPrivateReference(ref) is false.
+        std.debug.assert(!reference.isPrivateReference());
+
+        // b. If IsSuperReference(ref) is true, throw a ReferenceError exception.
+        if (reference.isSuperReference()) {
+            return self.agent.throwException(
+                .reference_error,
+                "Cannot delete super reference",
+                .{},
+            );
+        }
+
+        // c. Let baseObj be ? ToObject(ref.[[Base]]).
+        const base_obj = try reference.base.value.toObject(self.agent);
+
+        // d. If ref.[[ReferencedName]] is not a property key, then
+        const property_key = switch (reference.referenced_name.value.type()) {
+            .string => PropertyKey.from(reference.referenced_name.value.asString()),
+            .symbol => PropertyKey.from(reference.referenced_name.value.asSymbol()),
+            // i. Set ref.[[ReferencedName]] to ? ToPropertyKey(ref.[[ReferencedName]]).
+            else => try reference.referenced_name.value.toPropertyKey(self.agent),
+        };
+
+        // e. Let deleteStatus be ? baseObj.[[Delete]](ref.[[ReferencedName]]).
+        const delete_status = try base_obj.internalMethods().delete(base_obj, property_key);
+
+        // f. If deleteStatus is false and ref.[[Strict]] is true, throw a TypeError exception.
+        if (!delete_status and reference.strict) {
+            return self.agent.throwException(.type_error, "Could not delete property", .{});
+        }
+
+        // g. Return deleteStatus.
+        self.result = Value.from(delete_status);
+    }
+    // 5. Else,
+    else {
+        // a. Let base be ref.[[Base]].
+        // b. Assert: base is an Environment Record.
+        const base = reference.base.environment;
+
+        // c. Return ? base.DeleteBinding(ref.[[ReferencedName]]).
+        self.result = Value.from(try base.deleteBinding(reference.referenced_name.value.asString()));
+    }
+}
+
+fn executeEvaluateCall(self: *Self, executable: Executable) Agent.Error!void {
+    const maybe_reference = self.reference_stack.getLastOrNull() orelse null;
+    const argument_count = self.fetchIndex(executable);
+    const strict = self.fetchIndex(executable) == 1;
+    const arguments = try self.getArguments(argument_count);
+    const this_value = self.stack.pop();
+    const function = self.stack.pop();
+
+    const realm = self.agent.currentRealm();
+    const eval = try realm.intrinsics.@"%eval%"();
+
+    // 6. If ref is a Reference Record, IsPropertyReference(ref) is false, and
+    //    ref.[[ReferencedName]] is "eval", then
+    if (maybe_reference) |reference| {
+        if (!reference.isPropertyReference() and
+            reference.referenced_name == .value and
+            reference.referenced_name.value.isString() and
+            reference.referenced_name.value.asString().eql(String.fromLiteral("eval")) and
+
+            // a. If SameValue(func, %eval%) is true, then
+            function.asObject().sameValue(eval))
+        {
+            self.result = try directEval(self.agent, arguments, strict);
+            return;
+        }
+    }
+
+    self.result = try evaluateCall(
+        self.agent,
+        function,
+        this_value,
+        arguments,
+    );
+}
+
+/// 13.3.10.1 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-import-call-runtime-semantics-evaluation
+fn executeEvaluateImportCall(self: *Self, _: Executable) Agent.Error!void {
+    const realm = self.agent.currentRealm();
+
+    // 1. Let referrer be GetActiveScriptOrModule().
+    // 2. If referrer is null, set referrer to the current Realm Record.
+    const referrer: ImportedModuleReferrer = if (self.agent.getActiveScriptOrModule()) |script_or_module|
+        switch (script_or_module) {
+            .script => |script| .{ .script = script },
+            .module => |module| .{ .module = module },
+        }
+    else
+        .{ .realm = realm };
+
+    // 3. Let argRef be ? Evaluation of AssignmentExpression.
+    // 4. Let specifier be ? GetValue(argRef).
+    const specifier = self.stack.pop();
+
+    // 5. Let promiseCapability be ! NewPromiseCapability(%Promise%).
+    const promise_capability = newPromiseCapability(
+        self.agent,
+        Value.from(try realm.intrinsics.@"%Promise%"()),
+    ) catch |err| try noexcept(err);
+
+    // 6. Let specifierString be Completion(ToString(specifier)).
+    const specifier_string = specifier.toString(self.agent) catch |err| {
+        // 7. IfAbruptRejectPromise(specifierString, promiseCapability).
+        self.result = Value.from(try promise_capability.rejectPromise(self.agent, err));
+        return;
+    };
+
+    // 8. Perform HostLoadImportedModule(referrer, specifierString, empty, promiseCapability).
+    try self.agent.host_hooks.hostLoadImportedModule(
+        self.agent,
+        referrer,
+        specifier_string,
+        SafePointer.null_pointer,
+        .{ .promise_capability = promise_capability },
+    );
+
+    // 9. Return promiseCapability.[[Promise]].
+    self.result = Value.from(promise_capability.promise);
+}
+
+fn executeEvaluateNew(self: *Self, executable: Executable) Agent.Error!void {
+    const argument_count = self.fetchIndex(executable);
+    const arguments = try self.getArguments(argument_count);
+    const constructor = self.stack.pop();
+    self.result = try evaluateNew(self.agent, constructor, arguments);
+}
+
+/// 13.3.3 EvaluatePropertyAccessWithExpressionKey ( baseValue, expression, strict )
+/// https://tc39.es/ecma262/#sec-evaluate-property-access-with-expression-key
+fn executeEvaluatePropertyAccessWithExpressionKey(self: *Self, executable: Executable) Agent.Error!void {
+    // 1. Let propertyNameReference be ? Evaluation of expression.
+    // 2. Let propertyNameValue be ? GetValue(propertyNameReference).
+    const property_name_value = self.stack.pop();
+
+    const strict = self.fetchIndex(executable) == 1;
+    const base_value = self.stack.pop();
+
+    // 3. NOTE: In most cases, ToPropertyKey will be performed on propertyNameValue
+    //    immediately after this step. However, in the case of a[b] = c, it will not be
+    //    performed until after evaluation of c.
+
+    // 4. Return the Reference Record {
+    //      [[Base]]: baseValue,
+    //      [[ReferencedName]]: propertyNameValue,
+    //      [[Strict]]: strict,
+    //      [[ThisValue]]: empty
+    //    }.
+    self.reference = .{
+        .base = .{ .value = base_value },
+        .referenced_name = .{ .value = property_name_value },
+        .strict = strict,
+        .this_value = null,
+    };
+}
+
+/// 13.3.4 EvaluatePropertyAccessWithIdentifierKey ( baseValue, identifierName, strict )
+/// https://tc39.es/ecma262/#sec-evaluate-property-access-with-identifier-key
+fn executeEvaluatePropertyAccessWithIdentifierKey(self: *Self, executable: Executable) Agent.Error!void {
+    // 1. Let propertyNameString be the StringValue of identifierName.
+    const property_name_string = self.fetchIdentifier(executable);
+
+    const strict = self.fetchIndex(executable) == 1;
+    const base_value = self.stack.pop();
+
+    // 2. Return the Reference Record {
+    //      [[Base]]: baseValue,
+    //      [[ReferencedName]]: propertyNameString,
+    //      [[Strict]]: strict,
+    //      [[ThisValue]]: empty
+    //    }.
+    self.reference = .{
+        .base = .{ .value = base_value },
+        .referenced_name = .{
+            .value = Value.from(property_name_string),
+        },
+        .strict = strict,
+        .this_value = null,
+    };
+}
+
+/// 13.3.7.1 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
+fn executeEvaluateSuperCall(self: *Self, executable: Executable) Agent.Error!void {
+    const argument_count = self.fetchIndex(executable);
+
+    // 1. Let newTarget be GetNewTarget().
+    const new_target = self.agent.getNewTarget();
+
+    // 2. Assert: newTarget is an Object.
+    std.debug.assert(new_target != null);
+
+    // 3. Let func be GetSuperConstructor().
+    const function = try getSuperConstructor(self.agent);
+
+    // 4. Let argList be ? ArgumentListEvaluation of Arguments.
+    const arguments = try self.getArguments(argument_count);
+
+    // 5. If IsConstructor(func) is false, throw a TypeError exception.
+    if (!function.isConstructor()) {
+        return self.agent.throwException(
+            .type_error,
+            "{} is not a constructor",
+            .{function},
+        );
+    }
+
+    // 6. Let result be ? Construct(func, argList, newTarget).
+    var result = try function.asObject().construct(arguments, new_target);
+
+    // 7. Let thisER be GetThisEnvironment().
+    const this_environment = self.agent.getThisEnvironment();
+
+    // 8. Perform ? thisER.BindThisValue(result).
+    _ = try this_environment.bindThisValue(Value.from(result));
+
+    // 9. Let F be thisER.[[FunctionObject]].
+    // 10. Assert: F is an ECMAScript function object.
+    const constructor = this_environment.function_environment.function_object.object();
+
+    // 11. Perform ? InitializeInstanceElements(result, F).
+    try result.initializeInstanceElements(constructor);
+
+    // 12. Return result.
+    self.result = Value.from(result);
+}
+
+fn executeForDeclarationBindingInstantiation(self: *Self, executable: Executable) Agent.Error!void {
+    const lexical_declaration = self.fetchAstNode(executable).lexical_declaration;
+
+    // From ForIn/OfBodyEvaluation:
+    // iii. Let iterationEnv be NewDeclarativeEnvironment(oldEnv).
+    const old_env = self.lexical_environment_stack.getLast();
+    const environment = try newDeclarativeEnvironment(self.agent.gc_allocator, old_env);
+
+    // iv. Perform ForDeclarationBindingInstantiation of lhs with argument iterationEnv.
+
+    // 14.7.5.4 Runtime Semantics: ForDeclarationBindingInstantiation
+    // https://tc39.es/ecma262/#sec-runtime-semantics-fordeclarationbindinginstantiation
+    var bound_names = std.ArrayList(ast.Identifier).init(self.agent.gc_allocator);
+    defer bound_names.deinit();
+    try lexical_declaration.collectBoundNames(&bound_names);
+
+    // 1. For each element name of the BoundNames of ForBinding, do
+    for (bound_names.items) |name_utf8| {
+        const name = try String.fromUtf8(self.agent.gc_allocator, name_utf8);
+
+        // a. If IsConstantDeclaration of LetOrConst is true, then
+        if (lexical_declaration.isConstantDeclaration()) {
+            // i. Perform ! environment.CreateImmutableBinding(name, true).
+            environment.createImmutableBinding(
+                self.agent,
+                name,
+                true,
+            ) catch |err| try noexcept(err);
+        }
+        // b. Else,
+        else {
+            // i. Perform ! environment.CreateMutableBinding(name, false).
+            environment.createMutableBinding(
+                self.agent,
+                name,
+                false,
+            ) catch |err| try noexcept(err);
+        }
+
+        // 2. Return unused.
+    }
+
+    // v. Set the running execution context's LexicalEnvironment to iterationEnv.
+    self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{
+        .declarative_environment = environment,
+    };
+}
+
+fn executeGetIterator(self: *Self, executable: Executable) Agent.Error!void {
+    const iterator_kind: IteratorKind = @enumFromInt((self.fetchIndex(executable)));
+    self.iterator = try getIterator(self.agent, self.result.?, iterator_kind);
+}
+
+fn executeGetNewTarget(self: *Self, _: Executable) Agent.Error!void {
+    self.result = if (self.agent.getNewTarget()) |new_target|
+        Value.from(new_target)
+    else
+        Value.undefined;
+}
+
+/// 13.3.12.1 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-meta-properties-runtime-semantics-evaluation
+fn executeGetOrCreateImportMeta(self: *Self, _: Executable) Agent.Error!void {
+    // 1. Let module be GetActiveScriptOrModule().
+    // 2. Assert: module is a Source Text Module Record.
+    var module = self.agent.getActiveScriptOrModule().?.module;
+
+    // 3. Let importMeta be module.[[ImportMeta]].
+    // 4. If importMeta is empty, then
+    if (module.import_meta == null) {
+        // a. Set importMeta to OrdinaryObjectCreate(null).
+        const import_meta = try ordinaryObjectCreate(self.agent, null);
+
+        // b. Let importMetaValues be HostGetImportMetaProperties(module).
+        var import_meta_values = try self.agent.host_hooks.hostGetImportMetaProperties(module);
+        defer import_meta_values.deinit();
+
+        // c. For each Record { [[Key]], [[Value]] } p of importMetaValues, do
+        var it = import_meta_values.iterator();
+        while (it.next()) |entry| {
+            // i. Perform ! CreateDataPropertyOrThrow(importMeta, p.[[Key]], p.[[Value]]).
+            import_meta.createDataPropertyOrThrow(
+                entry.key_ptr.*,
+                entry.value_ptr.*,
+            ) catch |err| try noexcept(err);
+        }
+
+        // d. Perform HostFinalizeImportMeta(importMeta, module).
+        self.agent.host_hooks.hostFinalizeImportMeta(import_meta, module);
+
+        // e. Set module.[[ImportMeta]] to importMeta.
+        module.import_meta = import_meta;
+
+        // f. Return importMeta.
+        self.result = Value.from(import_meta);
+    }
+    // 5. Else,
+    else {
+        // a. Assert: importMeta is an Object.
+        // b. Return importMeta.
+        self.result = Value.from(module.import_meta.?);
+    }
+}
+
+fn executeGetTemplateObject(self: *Self, executable: Executable) Agent.Error!void {
+    const template_literal = &self.fetchAstNode(executable).template_literal;
+    self.result = Value.from(try getTemplateObject(self.agent, template_literal));
+}
+
+fn executeGetValue(self: *Self, _: Executable) Agent.Error!void {
+    if (self.reference) |reference| self.result = try reference.getValue(self.agent);
+    self.reference = null;
+}
+
+fn executeGreaterThan(self: *Self, _: Executable) Agent.Error!void {
+    const rval = self.stack.pop();
+    const lval = self.stack.pop();
+
+    // 5. Let r be ? IsLessThan(rval, lval, false).
+    const result = try isLessThan(self.agent, rval, lval, .right_first);
+
+    // 6. If r is undefined, return false. Otherwise, return r.
+    self.result = Value.from(result orelse false);
+}
+
+fn executeGreaterThanEquals(self: *Self, _: Executable) Agent.Error!void {
+    const rval = self.stack.pop();
+    const lval = self.stack.pop();
+
+    // 5. Let r be ? IsLessThan(lval, rval, true).
+    const result = try isLessThan(self.agent, lval, rval, .left_first);
+
+    // 6. If r is either true or undefined, return false. Otherwise, return true.
+    self.result = Value.from(!(result orelse true));
+}
+
+fn executeHasPrivateElement(self: *Self, executable: Executable) Agent.Error!void {
+    const private_identifier = self.fetchIdentifier(executable);
+    const rval = self.stack.pop();
+
+    // 4. If rval is not an Object, throw a TypeError exception.
+    if (!rval.isObject()) {
+        return self.agent.throwException(
+            .type_error,
+            "Right-hand side of 'in' operator must be an object",
+            .{},
+        );
+    }
+
+    // 5. Let privateEnv be the running execution context's PrivateEnvironment.
+    const private_environment = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
+
+    // 6. Let privateName be ResolvePrivateIdentifier(privateEnv, privateIdentifier).
+    const private_name = private_environment.resolvePrivateIdentifier(
+        try private_identifier.toUtf8(self.agent.gc_allocator),
+    );
+
+    // 7. If PrivateElementFind(rval, privateName) is not empty, return true.
+    // 8. Return false.
+    self.result = Value.from(rval.asObject().privateElementFind(private_name) != null);
+}
+
+fn executeHasProperty(self: *Self, _: Executable) Agent.Error!void {
+    const rval = self.stack.pop();
+    const lval = self.stack.pop();
+
+    // 5. If rval is not an Object, throw a TypeError exception.
+    if (!rval.isObject()) {
+        return self.agent.throwException(
+            .type_error,
+            "Right-hand side of 'in' operator must be an object",
+            .{},
+        );
+    }
+
+    // 6. Return ? HasProperty(rval, ? ToPropertyKey(lval)).
+    self.result = Value.from(
+        try rval.asObject().hasProperty(try lval.toPropertyKey(self.agent)),
+    );
+}
+
+fn executeIncrement(self: *Self, _: Executable) Agent.Error!void {
+    const value = self.result.?;
+    self.result = switch (value.type()) {
+        .number => Value.from(value.asNumber().add(.{ .i32 = 1 })),
+        .big_int => Value.from(
+            try value.asBigInt().add(self.agent, self.agent.pre_allocated.one),
+        ),
+        else => unreachable,
+    };
+}
+
+fn executeInitializeDefaultExport(self: *Self, _: Executable) Agent.Error!void {
+    const value = self.result.?;
+
+    // 3. Let env be the running execution context's LexicalEnvironment.
+    const environment = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+
+    // 4. Perform ? InitializeBoundName("*default*", value, env).
+    try initializeBoundName(
+        self.agent,
+        String.fromLiteral("*default*"),
+        value,
+        .{ .environment = environment },
+    );
+}
+
+fn executeInitializeReferencedBinding(self: *Self, _: Executable) Agent.Error!void {
+    const reference = self.reference_stack.getLast().?;
+    const value = self.result.?;
+    try reference.initializeReferencedBinding(self.agent, value);
+    self.reference = null;
+}
+
+fn executeInstanceofOperator(self: *Self, _: Executable) Agent.Error!void {
+    const rval = self.stack.pop();
+    const lval = self.stack.pop();
+
+    // 5. Return ? InstanceofOperator(lval, rval).
+    self.result = Value.from(try lval.instanceofOperator(self.agent, rval));
+}
+
+fn executeInstantiateArrowFunctionExpression(self: *Self, executable: Executable) Agent.Error!void {
+    const arrow_function = self.fetchAstNode(executable).arrow_function;
+    const closure = try instantiateArrowFunctionExpression(
+        self.agent,
+        arrow_function,
+        null,
+    );
+    self.result = Value.from(closure);
+}
+
+fn executeInstantiateAsyncArrowFunctionExpression(self: *Self, executable: Executable) Agent.Error!void {
+    const async_arrow_function = self.fetchAstNode(executable).async_arrow_function;
+    const closure = try instantiateAsyncArrowFunctionExpression(
+        self.agent,
+        async_arrow_function,
+        null,
+    );
+    self.result = Value.from(closure);
+}
+
+fn executeInstantiateAsyncFunctionExpression(self: *Self, executable: Executable) Agent.Error!void {
+    const async_function_expression = self.fetchAstNode(executable).async_function_expression;
+    const closure = try instantiateAsyncFunctionExpression(
+        self.agent,
+        async_function_expression,
+        null,
+    );
+    self.result = Value.from(closure);
+}
+
+fn executeInstantiateAsyncGeneratorFunctionExpression(self: *Self, executable: Executable) Agent.Error!void {
+    const async_generator_expression = self.fetchAstNode(executable).async_generator_expression;
+    const closure = try instantiateAsyncGeneratorFunctionExpression(
+        self.agent,
+        async_generator_expression,
+        null,
+    );
+    self.result = Value.from(closure);
+}
+
+fn executeInstantiateGeneratorFunctionExpression(self: *Self, executable: Executable) Agent.Error!void {
+    const generator_expression = self.fetchAstNode(executable).generator_expression;
+    const closure = try instantiateGeneratorFunctionExpression(
+        self.agent,
+        generator_expression,
+        null,
+    );
+    self.result = Value.from(closure);
+}
+
+fn executeInstantiateOrdinaryFunctionExpression(self: *Self, executable: Executable) Agent.Error!void {
+    const function_expression = self.fetchAstNode(executable).function_expression;
+    const closure = try instantiateOrdinaryFunctionExpression(
+        self.agent,
+        function_expression,
+        null,
+    );
+    self.result = Value.from(closure);
+}
+
+fn executeIsLooselyEqual(self: *Self, _: Executable) Agent.Error!void {
+    const rval = self.stack.pop();
+    const lval = self.stack.pop();
+
+    // 5. Return IsLooselyEqual(rval, lval).
+    self.result = Value.from(try isLooselyEqual(self.agent, rval, lval));
+}
+
+fn executeIsStrictlyEqual(self: *Self, _: Executable) Agent.Error!void {
+    const rval = self.stack.pop();
+    const lval = self.stack.pop();
+
+    // 5. Return IsStrictlyEqual(rval, lval).
+    self.result = Value.from(isStrictlyEqual(rval, lval));
+}
+
+fn executeJump(self: *Self, executable: Executable) Agent.Error!void {
+    self.ip = self.fetchIndex(executable);
+}
+
+fn executeJumpConditional(self: *Self, executable: Executable) Agent.Error!void {
+    const ip_consequent = self.fetchIndex(executable);
+    const ip_alternate = self.fetchIndex(executable);
+    const value = self.result.?;
+    self.ip = if (value.toBoolean()) ip_consequent else ip_alternate;
+}
+
+fn executeLessThan(self: *Self, _: Executable) Agent.Error!void {
+    const rval = self.stack.pop();
+    const lval = self.stack.pop();
+
+    // 5. Let r be ? IsLessThan(lval, rval, true).
+    const result = try isLessThan(self.agent, lval, rval, .left_first);
+
+    // 6. If r is undefined, return false. Otherwise, return r.
+    self.result = Value.from(result orelse false);
+}
+
+fn executeLessThanEquals(self: *Self, _: Executable) Agent.Error!void {
+    const rval = self.stack.pop();
+    const lval = self.stack.pop();
+
+    // 5. Let r be ? IsLessThan(rval, lval, false).
+    const result = try isLessThan(self.agent, rval, lval, .right_first);
+
+    // 6. If r is either true or undefined, return false. Otherwise, return true.
+    self.result = Value.from(!(result orelse true));
+}
+
+fn executeLoad(self: *Self, _: Executable) Agent.Error!void {
+    // Handle null value to allow load of 'empty' result at beginning of script
+    if (self.result) |value| try self.stack.append(value);
+}
+
+fn executeLoadConstant(self: *Self, executable: Executable) Agent.Error!void {
+    const value = self.fetchConstant(executable);
+    try self.stack.append(value);
+}
+
+fn executeLoadIteratorNextArgs(self: *Self, _: Executable) Agent.Error!void {
+    const iterator = self.iterator_stack.getLast();
+    try self.stack.append(iterator.next_method);
+    try self.stack.append(Value.from(iterator.iterator));
+}
+
+fn executeLoadThisValueForEvaluateCall(self: *Self, _: Executable) Agent.Error!void {
+    const maybe_reference = self.reference_stack.getLast();
+    const this_value = evaluateCallGetThisValue(maybe_reference);
+    try self.stack.append(this_value);
+}
+
+fn executeLoadThisValueForMakeSuperPropertyReference(self: *Self, _: Executable) Agent.Error!void {
+    // 1. Let env be GetThisEnvironment().
+    const env = self.agent.getThisEnvironment();
+
+    // 2. Let actualThis be ? env.GetThisBinding().
+    const actual_this = try env.getThisBinding();
+
+    try self.stack.append(actual_this);
+}
+
+fn executeLogicalNot(self: *Self, _: Executable) Agent.Error!void {
+    const value = self.result.?;
+    self.result = Value.from(!value.toBoolean());
+}
+
+/// 6.2.5.9 MakePrivateReference ( baseValue, privateIdentifier )
+/// https://tc39.es/ecma262/#sec-makeprivatereference
+fn executeMakePrivateReference(self: *Self, executable: Executable) Agent.Error!void {
+    const private_identifier = self.fetchIdentifier(executable);
+    const base_value = self.stack.pop();
+
+    // 1. Let privEnv be the running execution context's PrivateEnvironment.
+    // 2. Assert: privEnv is not null.
+    const private_environment = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
+
+    // 3. Let privateName be ResolvePrivateIdentifier(privEnv, privateIdentifier).
+    const private_name = private_environment.resolvePrivateIdentifier(
+        try private_identifier.toUtf8(self.agent.gc_allocator),
+    );
+
+    // 4. Return the Reference Record {
+    //      [[Base]]: baseValue, [[ReferencedName]]: privateName, [[Strict]]: true, [[ThisValue]]: empty
+    //    }.
+    self.reference = .{
+        .base = .{ .value = base_value },
+        .referenced_name = .{ .private_name = private_name },
+        .strict = true,
+        .this_value = null,
+    };
+}
+
+/// 13.3.7.3 MakeSuperPropertyReference ( actualThis, propertyKey, strict )
+/// https://tc39.es/ecma262/#sec-makesuperpropertyreference
+fn executeMakeSuperPropertyReference(self: *Self, executable: Executable) Agent.Error!void {
+    const property_key = self.stack.pop();
+    const strict = self.fetchIndex(executable) == 1;
+    const actual_this = self.stack.pop();
+
+    // 1. Let env be GetThisEnvironment().
+    const env = self.agent.getThisEnvironment();
+
+    // 2. Assert: env.HasSuperBinding() is true.
+    std.debug.assert(env.hasSuperBinding());
+
+    // 3. Let baseValue be ? env.GetSuperBase().
+    const base_value = try env.getSuperBase();
+
+    // 4. Return the Reference Record {
+    //      [[Base]]: baseValue, [[ReferencedName]]: propertyKey, [[Strict]]: strict, [[ThisValue]]: actualThis
+    //    }.
+    self.reference = .{
+        .base = .{ .value = base_value },
+        .referenced_name = .{ .value = property_key },
+        .strict = strict,
+        .this_value = actual_this,
+    };
+}
+
+fn executeObjectCreate(self: *Self, _: Executable) Agent.Error!void {
+    const object = try ordinaryObjectCreate(
+        self.agent,
+        try self.agent.currentRealm().intrinsics.@"%Object.prototype%"(),
+    );
+    self.result = Value.from(object);
+}
+
+fn executeObjectDefineMethod(self: *Self, executable: Executable) Agent.Error!void {
+    const function_or_class = self.fetchAstNode(executable);
+    const method_type: ast.MethodDefinition.Type = @enumFromInt((self.fetchIndex(executable)));
+    const method = switch (method_type) {
+        inline else => |@"type"| @unionInit(
+            ast.MethodDefinition.Method,
+            @tagName(@"type"),
+            @field(function_or_class, switch (@"type") {
+                .method, .get, .set => "function_expression",
+                .generator => "generator_expression",
+                .@"async" => "async_function_expression",
+                .async_generator => "async_generator_expression",
+            }),
+        ),
+    };
+    const property_name = self.stack.pop();
+    const object = self.stack.pop().asObject();
+    _ = try methodDefinitionEvaluation(
+        self.agent,
+        .{ .property_name = property_name, .method = method },
+        object,
+        true,
+    );
+    self.result = Value.from(object);
+}
+
+fn executeObjectSetProperty(self: *Self, _: Executable) Agent.Error!void {
+    const property_value = self.stack.pop();
+    const property_name = try self.stack.pop().toPropertyKey(self.agent);
+    const object = self.stack.pop().asObject();
+    // From PropertyDefinitionEvaluation:
+    // 5. Perform ! CreateDataPropertyOrThrow(object, propName, propValue).
+    object.createDataPropertyOrThrow(property_name, property_value) catch |err| try noexcept(err);
+    self.result = Value.from(object);
+}
+
+fn executeObjectSpreadValue(self: *Self, _: Executable) Agent.Error!void {
+    const from_value = self.stack.pop();
+    var object = self.stack.pop().asObject();
+    const excluded_names: []const PropertyKey = &.{};
+    // From PropertyDefinitionEvaluation:
+    // 4. Perform ? CopyDataProperties(object, fromValue, excludedNames).
+    try object.copyDataProperties(from_value, excluded_names);
+    self.result = Value.from(object);
+}
+
+fn executePopExceptionJumpTarget(self: *Self, _: Executable) Agent.Error!void {
+    _ = self.exception_jump_target_stack.pop();
+}
+
+fn executePopIterator(self: *Self, _: Executable) Agent.Error!void {
+    _ = self.iterator_stack.pop();
+}
+
+fn executePopLexicalEnvironment(self: *Self, _: Executable) Agent.Error!void {
+    _ = self.lexical_environment_stack.pop();
+}
+
+fn executePopReference(self: *Self, _: Executable) Agent.Error!void {
+    _ = self.reference_stack.pop();
+}
+
+fn executePushLexicalEnvironment(self: *Self, _: Executable) Agent.Error!void {
+    const lexical_environment = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
+    try self.lexical_environment_stack.append(lexical_environment);
+}
+
+fn executePushExceptionJumpTarget(self: *Self, executable: Executable) Agent.Error!void {
+    const jump_target = self.fetchIndex(executable);
+    try self.exception_jump_target_stack.append(jump_target);
+}
+
+fn executePushIterator(self: *Self, _: Executable) Agent.Error!void {
+    try self.iterator_stack.append(self.iterator.?);
+}
+
+fn executePushReference(self: *Self, _: Executable) Agent.Error!void {
+    try self.reference_stack.append(self.reference);
+}
+
+fn executePutValue(self: *Self, _: Executable) Agent.Error!void {
+    const lref = self.reference_stack.getLast().?;
+    const rval = self.result.?;
+    try lref.putValue(self.agent, rval);
+    self.reference = null;
+}
+
+fn executeRegExpCreate(self: *Self, _: Executable) Agent.Error!void {
+    const flags = self.stack.pop();
+    const pattern = self.stack.pop();
+    self.result = Value.from(try builtins.regExpCreate(self.agent, pattern, flags));
+}
+
+fn executeResolveBinding(self: *Self, executable: Executable) Agent.Error!void {
+    const name = self.fetchIdentifier(executable);
+    const strict = self.fetchIndex(executable) == 1;
+    const environment_lookup_cache_index = self.fetchIndex(executable);
+    const lookup_cache_entry = &self.environment_lookup_cache.items[
+        environment_lookup_cache_index
+    ];
+    self.reference = try self.agent.resolveBinding(name, null, strict, lookup_cache_entry);
+}
+
+/// 15.7.16 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-class-definitions-runtime-semantics-evaluation
+fn executeResolvePrivateIdentifier(self: *Self, executable: Executable) Agent.Error!void {
+    // 1. Let privateIdentifier be the StringValue of PrivateIdentifier.
+    const private_identifier = self.fetchIdentifier(executable);
+
+    // 2. Let privateEnvRec be the running execution context's PrivateEnvironment.
+    const private_environment = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
+
+    // 3. Let names be privateEnvRec.[[Names]].
+    // 4. Assert: Exactly one element of names is a Private Name whose [[Description]] is privateIdentifier.
+    // 5. Let privateName be the Private Name in names whose [[Description]] is privateIdentifier.
+    // 6. Return privateName.
+    const private_name = private_environment.names.get(
+        try private_identifier.toUtf8(self.agent.gc_allocator),
+    ).?;
+    std.debug.assert(private_name.symbol.data.is_private);
+    self.result = Value.from(private_name.symbol);
+}
+
+fn executeResolveThisBinding(self: *Self, _: Executable) Agent.Error!void {
+    self.result = try self.agent.resolveThisBinding();
+}
+
+fn executeRestoreLexicalEnvironment(self: *Self, _: Executable) Agent.Error!void {
+    const lexical_environment = self.lexical_environment_stack.getLast();
+    self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = lexical_environment;
+}
+
+fn executeRethrowExceptionIfAny(self: *Self, _: Executable) Agent.Error!void {
+    if (self.exception) |value| {
+        self.agent.exception = value;
+        return error.ExceptionThrown;
+    }
+}
+
+fn executeReturn(_: *Self, _: Executable) Agent.Error!void {
+    @compileError("Should not be used"); // Handled in run()
+}
+
+fn executeStore(self: *Self, _: Executable) Agent.Error!void {
+    // Handle empty stack to allow restoring a null `.load`
+    self.result = self.stack.popOrNull();
+}
+
+fn executeStoreConstant(self: *Self, executable: Executable) Agent.Error!void {
+    const value = self.fetchConstant(executable);
+    self.result = value;
+}
+
+fn executeThrow(self: *Self, _: Executable) Agent.Error!void {
+    const value = self.result.?;
+    self.agent.exception = value;
+    return error.ExceptionThrown;
+}
+
+fn executeToNumber(self: *Self, _: Executable) Agent.Error!void {
+    const value = self.result.?;
+    self.result = Value.from(try value.toNumber(self.agent));
+}
+
+fn executeToNumeric(self: *Self, _: Executable) Agent.Error!void {
+    const value = self.result.?;
+    const numeric = try value.toNumeric(self.agent);
+    self.result = switch (numeric) {
+        .number => |number| Value.from(number),
+        .big_int => |big_int| Value.from(big_int),
+    };
+}
+
+fn executeToObject(self: *Self, _: Executable) Agent.Error!void {
+    const value = self.result.?;
+    self.result = Value.from(try value.toObject(self.agent));
+}
+
+fn executeToString(self: *Self, _: Executable) Agent.Error!void {
+    const value = self.result.?;
+    self.result = Value.from(try value.toString(self.agent));
+}
+
+/// 13.5.3.1 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-typeof-operator-runtime-semantics-evaluation
+fn executeTypeof(self: *Self, _: Executable) Agent.Error!void {
+    // 1. Let val be ? Evaluation of UnaryExpression.
+    // NOTE: This is part of the generated bytecode.
+
+    // 2. If val is a Reference Record, then
+    if (self.reference) |reference| {
+        // a. If IsUnresolvableReference(val) is true, return "undefined".
+        if (reference.isUnresolvableReference()) {
+            self.result = Value.from("undefined");
+            return;
+        }
+    }
+
+    // 3. Set val to ? GetValue(val).
+    const value = if (self.reference) |reference|
+        try reference.getValue(self.agent)
+    else
+        self.result.?;
+
+    self.result = switch (value.type()) {
+        // 4. If val is undefined, return "undefined".
+        .undefined => Value.from("undefined"),
+
+        // 5. If val is null, return "object".
+        .null => Value.from("object"),
+
+        // 6. If val is a String, return "string".
+        .string => Value.from("string"),
+
+        // 7. If val is a Symbol, return "symbol".
+        .symbol => Value.from("symbol"),
+
+        // 8. If val is a Boolean, return "boolean".
+        .boolean => Value.from("boolean"),
+
+        // 9. If val is a Number, return "number".
+        .number => Value.from("number"),
+
+        // 10. If val is a BigInt, return "bigint".
+        .big_int => Value.from("bigint"),
+
+        // 11. Assert: val is an Object.
+        .object => blk: {
+            // B.3.6.3 Changes to the typeof Operator
+            // https://tc39.es/ecma262/#sec-IsHTMLDDA-internal-slot-typeof
+            if (build_options.enable_annex_b) {
+                // 12. If val has an [[IsHTMLDDA]] internal slot, return "undefined".
+                if (value.asObject().isHTMLDDA()) break :blk Value.from("undefined");
+            } else {
+                // 12. NOTE: This step is replaced in section B.3.6.3.
+            }
+
+            // 13. If val has a [[Call]] internal slot, return "function".
+            if (value.asObject().internalMethods().call) |_| break :blk Value.from("function");
+
+            // 14. Return "object".
+            break :blk Value.from("object");
+        },
+    };
+}
+
+fn executeUnaryMinus(self: *Self, _: Executable) Agent.Error!void {
+    const value = self.result.?;
+    self.result = switch (value.type()) {
+        .number => Value.from(value.asNumber().unaryMinus()),
+        .big_int => Value.from(try value.asBigInt().unaryMinus(self.agent)),
+        else => unreachable,
+    };
 }
 
 pub fn run(self: *Self, executable: Executable) Agent.Error!Completion {
@@ -1206,19 +1318,101 @@ pub fn run(self: *Self, executable: Executable) Agent.Error!Completion {
         Self.fetchInstruction,
         .{ self, executable },
     )) |instruction| {
-        @call(
-            .always_inline,
-            Self.executeInstruction,
-            .{ self, executable, instruction },
-        ) catch |err| {
-            if (self.exception_jump_target_stack.items.len != 0) {
-                self.exception = self.agent.clearException();
-                self.ip = self.exception_jump_target_stack.getLast();
-            } else return err;
+        (switch (instruction) {
+            .apply_string_or_numeric_binary_operator => self.executeApplyStringOrNumericBinaryOperator(executable),
+            .array_create => self.executeArrayCreate(executable),
+            .array_push_value => self.executeArrayPushValue(executable),
+            .array_set_length => self.executeArraySetLength(executable),
+            .array_spread_value => self.executeArraySpreadValue(executable),
+            .@"await" => self.executeAwait(executable),
+            .binding_class_declaration_evaluation => self.executeBindingClassDeclarationEvaluation(executable),
+            .bitwise_not => self.executeBitwiseNot(executable),
+            .block_declaration_instantiation => self.executeBlockDeclarationInstantiation(executable),
+            .class_definition_evaluation => self.executeClassDefinitionEvaluation(executable),
+            .create_catch_binding => self.executeCreateCatchBinding(executable),
+            .create_object_property_iterator => self.executeCreateObjectPropertyIterator(executable),
+            .create_with_environment => self.executeCreateWithEnvironment(executable),
+            .decrement => self.executeDecrement(executable),
+            .delete => self.executeDelete(executable),
+            .evaluate_call => self.executeEvaluateCall(executable),
+            .evaluate_import_call => self.executeEvaluateImportCall(executable),
+            .evaluate_new => self.executeEvaluateNew(executable),
+            .evaluate_property_access_with_expression_key => self.executeEvaluatePropertyAccessWithExpressionKey(executable),
+            .evaluate_property_access_with_identifier_key => self.executeEvaluatePropertyAccessWithIdentifierKey(executable),
+            .evaluate_super_call => self.executeEvaluateSuperCall(executable),
+            .for_declaration_binding_instantiation => self.executeForDeclarationBindingInstantiation(executable),
+            .get_iterator => self.executeGetIterator(executable),
+            .get_new_target => self.executeGetNewTarget(executable),
+            .get_or_create_import_meta => self.executeGetOrCreateImportMeta(executable),
+            .get_template_object => self.executeGetTemplateObject(executable),
+            .get_value => self.executeGetValue(executable),
+            .greater_than => self.executeGreaterThan(executable),
+            .greater_than_equals => self.executeGreaterThanEquals(executable),
+            .has_private_element => self.executeHasPrivateElement(executable),
+            .has_property => self.executeHasProperty(executable),
+            .increment => self.executeIncrement(executable),
+            .initialize_default_export => self.executeInitializeDefaultExport(executable),
+            .initialize_referenced_binding => self.executeInitializeReferencedBinding(executable),
+            .instanceof_operator => self.executeInstanceofOperator(executable),
+            .instantiate_arrow_function_expression => self.executeInstantiateArrowFunctionExpression(executable),
+            .instantiate_async_arrow_function_expression => self.executeInstantiateAsyncArrowFunctionExpression(executable),
+            .instantiate_async_function_expression => self.executeInstantiateAsyncFunctionExpression(executable),
+            .instantiate_async_generator_function_expression => self.executeInstantiateAsyncGeneratorFunctionExpression(executable),
+            .instantiate_generator_function_expression => self.executeInstantiateGeneratorFunctionExpression(executable),
+            .instantiate_ordinary_function_expression => self.executeInstantiateOrdinaryFunctionExpression(executable),
+            .is_loosely_equal => self.executeIsLooselyEqual(executable),
+            .is_strictly_equal => self.executeIsStrictlyEqual(executable),
+            .jump => self.executeJump(executable),
+            .jump_conditional => self.executeJumpConditional(executable),
+            .less_than => self.executeLessThan(executable),
+            .less_than_equals => self.executeLessThanEquals(executable),
+            .load => self.executeLoad(executable),
+            .load_constant => self.executeLoadConstant(executable),
+            .load_iterator_next_args => self.executeLoadIteratorNextArgs(executable),
+            .load_this_value_for_evaluate_call => self.executeLoadThisValueForEvaluateCall(executable),
+            .load_this_value_for_make_super_property_reference => self.executeLoadThisValueForMakeSuperPropertyReference(executable),
+            .logical_not => self.executeLogicalNot(executable),
+            .make_private_reference => self.executeMakePrivateReference(executable),
+            .make_super_property_reference => self.executeMakeSuperPropertyReference(executable),
+            .object_create => self.executeObjectCreate(executable),
+            .object_define_method => self.executeObjectDefineMethod(executable),
+            .object_set_property => self.executeObjectSetProperty(executable),
+            .object_spread_value => self.executeObjectSpreadValue(executable),
+            .pop_exception_jump_target => self.executePopExceptionJumpTarget(executable),
+            .pop_iterator => self.executePopIterator(executable),
+            .pop_lexical_environment => self.executePopLexicalEnvironment(executable),
+            .pop_reference => self.executePopReference(executable),
+            .push_lexical_environment => self.executePushLexicalEnvironment(executable),
+            .push_exception_jump_target => self.executePushExceptionJumpTarget(executable),
+            .push_iterator => self.executePushIterator(executable),
+            .push_reference => self.executePushReference(executable),
+            .put_value => self.executePutValue(executable),
+            .reg_exp_create => self.executeRegExpCreate(executable),
+            .resolve_binding => self.executeResolveBinding(executable),
+            .resolve_private_identifier => self.executeResolvePrivateIdentifier(executable),
+            .resolve_this_binding => self.executeResolveThisBinding(executable),
+            .restore_lexical_environment => self.executeRestoreLexicalEnvironment(executable),
+            .rethrow_exception_if_any => self.executeRethrowExceptionIfAny(executable),
+            .@"return" => return .{ .type = .@"return", .value = self.result, .target = null },
+            .store => self.executeStore(executable),
+            .store_constant => self.executeStoreConstant(executable),
+            .throw => self.executeThrow(executable),
+            .to_number => self.executeToNumber(executable),
+            .to_numeric => self.executeToNumeric(executable),
+            .to_object => self.executeToObject(executable),
+            .to_string => self.executeToString(executable),
+            .typeof => self.executeTypeof(executable),
+            .unary_minus => self.executeUnaryMinus(executable),
+            _ => unreachable,
+        }) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.ExceptionThrown => {
+                if (self.exception_jump_target_stack.items.len != 0) {
+                    self.exception = self.agent.clearException();
+                    self.ip = self.exception_jump_target_stack.getLast();
+                } else return err;
+            },
         };
-        if (instruction == .@"return") {
-            return .{ .type = .@"return", .value = self.result, .target = null };
-        }
     }
     return Completion.normal(self.result);
 }

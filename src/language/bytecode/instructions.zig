@@ -52,7 +52,7 @@ pub const Instruction = enum(u8) {
     evaluate_property_access_with_expression_key,
     /// Store EvaluatePropertyAccessWithIdentifierKey() as the result value.
     evaluate_property_access_with_identifier_key,
-    // Store evaluation of a super() call as the result value.
+    /// Store evaluation of a super() call as the result value.
     evaluate_super_call,
     /// Perform ForDeclarationBindingInstantiation with the given identifier and constant-ness.
     for_declaration_binding_instantiation,
