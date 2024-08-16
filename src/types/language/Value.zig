@@ -1411,7 +1411,14 @@ pub fn stringToNumber(allocator: Allocator, string: String) Allocator.Error!Numb
     if (std.mem.eql(u8, trimmed_string, "Infinity")) return Number.from(std.math.inf(f64));
     // Don't pass other strings starting with "inf" to `std.fmt.parseFloat()`
     if (std.ascii.startsWithIgnoreCase(trimmed_string, "inf")) return Number.from(std.math.nan(f64));
-    return Number.from(std.fmt.parseFloat(f64, trimmed_string) catch std.math.nan(f64));
+    // Don't pass strings containing underscores to `std.fmt.parseInt()`
+    if (std.mem.indexOfScalar(u8, trimmed_string, '_') != null) return Number.from(std.math.nan(f64));
+    if (std.fmt.parseFloat(f64, trimmed_string)) |float|
+        return Number.from(float)
+    else |_| if (std.fmt.parseInt(i32, trimmed_string, 0)) |int|
+        return Number.from(int)
+    else |_|
+        return Number.from(std.math.nan(f64));
 }
 
 /// 7.1.14 StringToBigInt ( str )
@@ -1425,8 +1432,8 @@ pub fn stringToBigInt(allocator: Allocator, string: String) Allocator.Error!?Big
     // TODO: Implement the proper string parsing grammar!
     var trimmed_string = try (try string.trim(allocator, .@"start+end")).toUtf8(allocator);
     if (trimmed_string.len == 0) return try types.BigInt.from(allocator, 0);
-    // Unlike std.fmt.parseFloat(), std.math.big.int.Managed.setString() doesn't like the prefix
-    // so we have to cut it off manually.
+    // Unlike std.fmt.parseFloat() and std.fmt.parseInt() with base 0, std.math.big.int.Managed.setString()
+    // doesn't like the prefix so we have to cut it off manually.
     const base: u8 = if (std.ascii.startsWithIgnoreCase(trimmed_string, "0b")) blk: {
         trimmed_string = trimmed_string[2..];
         if (trimmed_string.len == 0) return null;
