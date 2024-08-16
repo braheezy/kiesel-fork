@@ -258,7 +258,7 @@ pub const NumberPrototype = struct {
         try defineBuiltinFunction(object, "toFixed", toFixed, 1, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toPrecision", toPrecision, 1, realm);
-        try defineBuiltinFunction(object, "toString", toString, 0, realm);
+        try defineBuiltinFunction(object, "toString", toString, 1, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
 
         // 21.1.3.1 Number.prototype.constructor
