@@ -617,11 +617,11 @@ fn repl(allocator: Allocator, realm: *Realm, options: struct {
     } = .{ .editor = &editor };
     editor.setHandler(&handler);
 
-    const history_path = try getHistoryPath(allocator);
-    defer allocator.free(history_path);
+    const history_path = if (builtin.os.tag != .wasi) try getHistoryPath(allocator) else "";
+    defer if (builtin.os.tag != .wasi) allocator.free(history_path);
 
-    editor.loadHistory(history_path) catch stdout.writeAll("Failed to load history\n") catch {};
-    defer editor.saveHistory(history_path) catch stdout.writeAll("Failed to save history\n") catch {};
+    if (builtin.os.tag != .wasi) editor.loadHistory(history_path) catch stdout.writeAll("Failed to load history\n") catch {};
+    defer if (builtin.os.tag != .wasi) editor.saveHistory(history_path) catch stdout.writeAll("Failed to save history\n") catch {};
 
     while (true) {
         const source_text = editor.getLine("> ") catch |err| switch (err) {
@@ -643,52 +643,6 @@ fn repl(allocator: Allocator, realm: *Realm, options: struct {
             .print_promise_rejection_warnings = options.print_promise_rejection_warnings,
         })) |result| {
             try stdout.print("{pretty}", .{result});
-            if (options.debug) {
-                const tty_config = realm.agent.platform.tty_config;
-                try printValueDebugInfo(stdout, tty_config, result);
-            }
-            try stdout.writeAll("\n");
-        }
-        // Handled exception & printed something, carry on
-        else continue;
-    }
-}
-
-fn replBasic(allocator: Allocator, realm: *Realm, options: struct {
-    debug: bool = false,
-    module: bool = false,
-    print_promise_rejection_warnings: bool = true,
-}) !void {
-    const stdin = std.io.getStdIn().reader();
-    const stdout = std.io.getStdOut().writer();
-
-    try stdout.writeAll(repl_preamble);
-
-    while (true) {
-        var array_list = std.ArrayList(u8).init(allocator);
-        defer array_list.deinit();
-        try stdout.writeAll("> ");
-        stdin.streamUntilDelimiter(array_list.writer(), '\n', std.math.maxInt(usize)) catch |err| switch (err) {
-            error.EndOfStream => {
-                try stdout.writeAll("\n");
-                break;
-            },
-            else => return err,
-        };
-        const source_text = try array_list.toOwnedSlice();
-        defer allocator.free(source_text);
-
-        // Directly show another prompt when spamming enter, whitespace is evaluated
-        // however (and will print 'undefined').
-        if (source_text.len == 0) continue;
-
-        if (try run(allocator, realm, source_text, .{
-            .base_dir = std.fs.cwd(),
-            .origin = .repl,
-            .module = options.module,
-            .print_promise_rejection_warnings = options.print_promise_rejection_warnings,
-        })) |result| {
-            try stdout.print("{pretty}\n", .{result});
             if (options.debug) {
                 const tty_config = realm.agent.platform.tty_config;
                 try printValueDebugInfo(stdout, tty_config, result);
@@ -924,14 +878,8 @@ pub fn main() !u8 {
             if (parsed_args.options.@"print-result")
                 try stdout.print("{pretty}\n", .{result});
         } else return 1;
-    } else if (builtin.os.tag != .wasi) {
-        try repl(allocator, realm, .{
-            .debug = parsed_args.options.debug,
-            .module = parsed_args.options.module,
-            .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
-        });
     } else {
-        try replBasic(allocator, realm, .{
+        try repl(allocator, realm, .{
             .debug = parsed_args.options.debug,
             .module = parsed_args.options.module,
             .print_promise_rejection_warnings = parsed_args.options.@"print-promise-rejection-warnings",
