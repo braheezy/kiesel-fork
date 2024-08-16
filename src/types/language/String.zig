@@ -34,9 +34,17 @@ pub const Data = struct {
     pub const Slice = union(enum) {
         ascii: []const u8,
         utf16: []const u16,
+
+        fn hash(self: @This()) u64 {
+            return std.hash.Wyhash.hash(0, switch (self) {
+                .ascii => |ascii| ascii,
+                .utf16 => |utf16| std.mem.sliceAsBytes(utf16),
+            });
+        }
     };
 
     slice: Slice,
+    hash: u64,
 };
 
 data: *Data,
@@ -56,6 +64,7 @@ pub fn format(
 }
 
 pub fn fromLiteral(comptime utf8: []const u8) Self {
+    @setEvalBranchQuota(10_000);
     const data: *const Data = comptime data: {
         const slice: Data.Slice = if (utf8IsAscii(utf8)) blk: {
             break :blk .{ .ascii = utf8 };
@@ -63,7 +72,7 @@ pub fn fromLiteral(comptime utf8: []const u8) Self {
             const utf16 = std.unicode.utf8ToUtf16LeStringLiteral(utf8);
             break :blk .{ .utf16 = utf16 };
         };
-        break :data &.{ .slice = slice };
+        break :data &.{ .slice = slice, .hash = slice.hash() };
     };
     // Once we actually use the mutable pointer for something (e.g. storing a computed hash) we'll
     // have to record that this one *is not* and make sure that data is available at comptime.
@@ -81,21 +90,21 @@ pub fn fromUtf8(allocator: Allocator, utf8: []const u8) Allocator.Error!Self {
         break :blk .{ .utf16 = utf16 };
     };
     const data = try allocator.create(Data);
-    data.* = .{ .slice = slice };
+    data.* = .{ .slice = slice, .hash = slice.hash() };
     return .{ .data = data };
 }
 
 pub fn fromAscii(allocator: Allocator, ascii: []const u8) Allocator.Error!Self {
     const slice: Data.Slice = .{ .ascii = ascii };
     const data = try allocator.create(Data);
-    data.* = .{ .slice = slice };
+    data.* = .{ .slice = slice, .hash = slice.hash() };
     return .{ .data = data };
 }
 
 pub fn fromUtf16(allocator: Allocator, utf16: []const u16) Allocator.Error!Self {
     const slice: Data.Slice = .{ .utf16 = utf16 };
     const data = try allocator.create(Data);
-    data.* = .{ .slice = slice };
+    data.* = .{ .slice = slice, .hash = slice.hash() };
     return .{ .data = data };
 }
 
@@ -147,15 +156,6 @@ pub fn eql(a: Self, b: Self) bool {
         if (c1 != c2) return false;
     }
     return true;
-}
-
-pub fn hash(self: Self) u64 {
-    var hasher = std.hash.Wyhash.init(0);
-    var it = self.codeUnitIterator();
-    while (it.next()) |code_unit| {
-        hasher.update(std.mem.asBytes(&code_unit));
-    }
-    return hasher.final();
 }
 
 pub fn startsWith(self: Self, other: Self) bool {
@@ -586,7 +586,7 @@ pub fn concat(allocator: Allocator, strings: []const Self) Allocator.Error!Self 
 pub fn StringHashMap(comptime V: type) type {
     return std.HashMap(Self, V, struct {
         pub fn hash(_: @This(), key: Self) u64 {
-            return key.hash();
+            return key.data.hash;
         }
 
         pub fn eql(_: @This(), a: Self, b: Self) bool {
@@ -598,7 +598,7 @@ pub fn StringHashMap(comptime V: type) type {
 pub fn StringArrayHashMap(comptime V: type) type {
     return std.ArrayHashMap(Self, V, struct {
         pub fn hash(_: @This(), key: Self) u32 {
-            return @truncate(key.hash());
+            return @truncate(key.data.hash);
         }
 
         pub fn eql(_: @This(), a: Self, b: Self, _: usize) bool {

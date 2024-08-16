@@ -69,7 +69,7 @@ pub const PropertyKey = union(enum) {
             const slice: String.Data.Slice = .{
                 .ascii = std.fmt.bufPrint(&buf, "{d}", .{index}) catch unreachable,
             };
-            const data: *const String.Data = &.{ .slice = slice };
+            const data: *const String.Data = &.{ .slice = slice, .hash = undefined };
             break :blk .{ .data = @constCast(data) };
         };
         return string.eql(index_string);

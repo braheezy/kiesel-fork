@@ -1926,7 +1926,7 @@ pub fn ValueArrayHashMap(comptime V: type, comptime eqlFn: fn (Self, Self) bool)
             const value_hash = switch (key.type()) {
                 .undefined, .null => 0,
                 .boolean => std.array_hash_map.getAutoHashFn(bool, void)({}, key.asBoolean()),
-                .string => @as(u32, @truncate(key.asString().hash())),
+                .string => @as(u32, @truncate(key.asString().data.hash)),
                 .symbol => std.array_hash_map.getAutoHashStratFn(Symbol, void, .Shallow)({}, key.asSymbol()),
                 .number => switch (key.asNumber()) {
                     .i32 => |n| std.array_hash_map.getAutoHashFn(i32, void)({}, n),

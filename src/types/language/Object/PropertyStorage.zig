@@ -162,7 +162,7 @@ pub fn remove(self: *Self, property_key: PropertyKey) void {
 pub const PropertyKeyArrayHashMapContext = struct {
     pub fn hash(_: anytype, property_key: PropertyKey) u64 {
         return switch (property_key) {
-            .string => |string| string.hash(),
+            .string => |string| string.data.hash,
             .symbol => |symbol| std.hash_map.getAutoHashFn(*Symbol.Data, void)({}, symbol.data),
             .integer_index => |integer_index| std.hash_map.getAutoHashFn(PropertyKey.IntegerIndex, void)({}, integer_index),
         };
