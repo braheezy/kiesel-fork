@@ -21,8 +21,8 @@ const Self = @This();
 /// be large on the stack :^)
 const Entry = union(enum) {
     accessor: struct {
-        get: ?Object,
-        set: ?Object,
+        get: ?*Object.Data,
+        set: ?*Object.Data,
         attributes: Attributes,
     },
     data: struct {
@@ -40,8 +40,8 @@ const Entry = union(enum) {
         if (property_descriptor.isAccessorDescriptor()) {
             return .{
                 .accessor = .{
-                    .get = property_descriptor.get.?,
-                    .set = property_descriptor.set.?,
+                    .get = if (property_descriptor.get.?) |object| object.data else null,
+                    .set = if (property_descriptor.set.?) |object| object.data else null,
                     .attributes = .{
                         .writable = false,
                         .enumerable = property_descriptor.enumerable.?,
@@ -66,8 +66,8 @@ const Entry = union(enum) {
     fn toPropertyDescriptor(self: Entry) PropertyDescriptor {
         return switch (self) {
             .accessor => |accessor| .{
-                .get = accessor.get,
-                .set = accessor.set,
+                .get = if (accessor.get) |data| .{ .data = data } else @as(?Object, null),
+                .set = if (accessor.set) |data| .{ .data = data } else @as(?Object, null),
                 .enumerable = accessor.attributes.enumerable,
                 .configurable = accessor.attributes.configurable,
             },
@@ -85,8 +85,8 @@ comptime {
     // Let's make sure the size doesn't quietly change
     switch (builtin.target.ptrBitWidth()) {
         // Only some 32-bit platforms have certain bitpacking optimizations applied
-        32 => std.debug.assert(@sizeOf(Entry) == 24 or @sizeOf(Entry) == 32),
-        64 => std.debug.assert(@sizeOf(Entry) == 48),
+        32 => std.debug.assert(@sizeOf(Entry) == 20 or @sizeOf(Entry) == 32),
+        64 => std.debug.assert(@sizeOf(Entry) == 32),
         else => unreachable,
     }
 }
