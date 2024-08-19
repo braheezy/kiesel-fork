@@ -32,6 +32,8 @@ jobs:
           # Outputs zig-out/bin/kiesel.wasm, no `mv` needed
       - name: Build kiesel-linux-aarch64
         run: |
+          # Verify building without NaN-boxing on aarch64.
+          zig build -Dtarget=aarch64-linux-musl -Doptimize=ReleaseSafe -Denable-nan-boxing=false
           zig build -Dtarget=aarch64-linux-musl -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-aarch64
       - name: Build kiesel-linux-arm
@@ -67,6 +69,8 @@ jobs:
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-x86
       - name: Build kiesel-linux-x86_64
         run: |
+          # Verify building without NaN-boxing on x86_64.
+          zig build -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe -Denable-nan-boxing=false
           zig build -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-x86_64
       - name: Build kiesel-linux-x86_64 (ReleaseFast)

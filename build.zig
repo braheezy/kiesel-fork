@@ -39,6 +39,14 @@ pub fn build(b: *std.Build) void {
         "enable-libregexp",
         "Enable building with libregexp (uses stubs otherwise)",
     ) orelse true;
+    const enable_nan_boxing = b.option(
+        bool,
+        "enable-nan-boxing",
+        "Enable NaN-boxing (requires a maximum of 48 bits of addressable memory and enabled by default on x86_64 and aarch64)",
+    ) orelse switch (target.result.cpu.arch) {
+        .x86_64, .aarch64 => true,
+        else => false,
+    };
 
     var version = std.SemanticVersion.parse("0.1.0-dev") catch unreachable;
     var code: u8 = undefined;
@@ -56,6 +64,7 @@ pub fn build(b: *std.Build) void {
     options.addOption(bool, "enable_legacy", enable_legacy);
     options.addOption(bool, "enable_libgc", enable_libgc);
     options.addOption(bool, "enable_libregexp", enable_libregexp);
+    options.addOption(bool, "enable_nan_boxing", enable_nan_boxing);
     options.addOption(std.SemanticVersion, "version", version);
 
     const any_pointer = b.dependency("any_pointer", .{});
@@ -67,6 +76,7 @@ pub fn build(b: *std.Build) void {
         .enable_java_finalization = false,
         .enable_large_config = true,
         .disable_gc_debug = true,
+        .enable_dynamic_pointer_mask = enable_nan_boxing,
     });
     const libregexp = b.dependency("libregexp", .{
         .target = target,

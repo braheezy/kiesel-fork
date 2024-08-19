@@ -92,26 +92,282 @@ const TaggedUnionImpl = union(enum) {
     number_f64: f64,
     big_int: BigInt,
     object: Object,
+
+    pub inline fn from(value: anytype) TaggedUnionImpl {
+        const T = @TypeOf(value);
+        const is_number = switch (@typeInfo(T)) {
+            .Int, .ComptimeInt, .Float, .ComptimeFloat => true,
+            else => false,
+        };
+        if (T == bool) {
+            return .{ .boolean = value };
+        } else if (isZigString(T)) {
+            const string = String.fromLiteral(value);
+            return .{ .string = string };
+        } else if (is_number or T == Number) {
+            const number = if (T == Number) value else Number.from(value);
+            return switch (number) {
+                .i32 => |x| .{ .number_i32 = x },
+                .f64 => |x| .{ .number_f64 = x },
+            };
+        } else if (T == BigInt) {
+            return .{ .big_int = value };
+        } else if (T == Object) {
+            return .{ .object = value };
+        } else if (T == String) {
+            return .{ .string = value };
+        } else if (T == Symbol) {
+            return .{ .symbol = value };
+        } else {
+            @compileError("from() called with incompatible type " ++ @typeName(T));
+        }
+    }
+
+    pub fn @"type"(self: TaggedUnionImpl) Type {
+        return switch (self) {
+            .undefined => .undefined,
+            .null => .null,
+            .boolean => .boolean,
+            .string => .string,
+            .symbol => .symbol,
+            .number_i32, .number_f64 => .number,
+            .big_int => .big_int,
+            .object => .object,
+        };
+    }
+
+    pub fn asBoolean(self: TaggedUnionImpl) bool {
+        return self.boolean;
+    }
+
+    pub fn asString(self: TaggedUnionImpl) String {
+        return self.string;
+    }
+
+    pub fn asSymbol(self: TaggedUnionImpl) Symbol {
+        return self.symbol;
+    }
+
+    pub fn asNumber(self: TaggedUnionImpl) Number {
+        return switch (self) {
+            .number_i32 => |number_i32| .{ .i32 = number_i32 },
+            .number_f64 => |number_f64| .{ .f64 = number_f64 },
+            else => unreachable,
+        };
+    }
+
+    pub fn asBigInt(self: TaggedUnionImpl) BigInt {
+        return self.big_int;
+    }
+
+    pub fn asObject(self: TaggedUnionImpl) Object {
+        return self.object;
+    }
+};
+
+/// NaN boxing is a technique of hiding extra variants and payloads within an
+/// f64. For reference, this is the layout of a f64:
+///
+/// - Sign (1 bit)
+/// - Exponent (11 bits)
+/// - Fraction (52 bits)
+///
+/// A NaN value must have all the exponent bits set to 1 and at least one
+/// fraction bit set to 1.
+const NanBoxingImpl = enum(u64) {
+    /// NaN with the quiet bit (highest fraction bit) set.
+    const nan_mask: u64 = 0x7ff8000000000000;
+    const payload_len = 48;
+
+    undefined = initBits(.undefined, 0, {}),
+    null = initBits(.null, 0, {}),
+    boolean_false = initBits(.boolean, 0, false),
+    boolean_true = initBits(.boolean, 0, true),
+    number_nan = nan_mask,
+    _,
+
+    /// We always have the highest bit in the 52 bits of the fraction field
+    /// (the quiet bit) set. Then, we use the 3 bits below the quiet bit as
+    /// a tag for non-f64 values (except f64-NaN itself).
+    const Tag = enum(u3) {
+        number_f64 = 0,
+        undefined,
+        null,
+        boolean,
+        string,
+        symbol_or_big_int,
+        number_i32,
+        object,
+    };
+
+    fn TagPayload(comptime tag: Tag, comptime sign_bit: u1) type {
+        return switch (tag) {
+            .number_f64 => f64,
+            .undefined,
+            .null,
+            => void,
+            .boolean => bool,
+            .string => *String.Data,
+            .symbol_or_big_int => switch (sign_bit) {
+                0 => *Symbol.Data,
+                1 => *std.math.big.int.Managed,
+            },
+            .number_i32 => i32,
+            .object => *allowzero Object.Data,
+        };
+    }
+
+    fn initBits(comptime tag: Tag, comptime sign_bit: u1, payload: TagPayload(tag, sign_bit)) u64 {
+        const T = @TypeOf(payload);
+        const tag_bits: u64 = @as(u64, @intFromEnum(tag)) << payload_len;
+        if (T == f64) {
+            return @bitCast(payload);
+        } else if (@typeInfo(T) == .Pointer) {
+            const high_sign_bit = @bitReverse(@as(u64, sign_bit));
+            const ptr_bits = @intFromPtr(payload);
+            std.debug.assert(nan_mask & ptr_bits == 0);
+            return nan_mask | tag_bits | high_sign_bit | ptr_bits;
+        } else if (@sizeOf(T) != 0) {
+            // @bitCast() doesn't work on void
+            const payload_bits: std.meta.Int(.unsigned, @bitSizeOf(T)) = @bitCast(payload);
+            return nan_mask | tag_bits | payload_bits;
+        } else {
+            return nan_mask | tag_bits;
+        }
+    }
+
+    fn init(comptime tag: Tag, comptime sign_bit: u1, payload: TagPayload(tag, sign_bit)) NanBoxingImpl {
+        return @enumFromInt(initBits(tag, sign_bit, payload));
+    }
+
+    /// If the NaN bits are set, then parses the tag from the fraction section.
+    /// Otherwise, returns number_f64.
+    fn getTag(self: NanBoxingImpl) Tag {
+        const bits: u64 = @intFromEnum(self);
+        const tag_bits: u3 = @truncate(bits >> payload_len);
+        return if (bits & nan_mask == nan_mask) @enumFromInt(tag_bits) else .number_f64;
+    }
+
+    fn getPayload(self: NanBoxingImpl, comptime tag: Tag, comptime sign_bit: u1) TagPayload(tag, sign_bit) {
+        std.debug.assert(self.getTag() == tag);
+        const T = TagPayload(tag, sign_bit);
+        const bits: u64 = @intFromEnum(self);
+        if (@typeInfo(T) == .Pointer) {
+            const ptr_bits: if (@sizeOf(T) >= 8) u48 else usize = @truncate(bits);
+            return @ptrFromInt(ptr_bits);
+        } else {
+            const payload_bits: std.meta.Int(.unsigned, @bitSizeOf(T)) = @truncate(bits);
+            return @bitCast(payload_bits);
+        }
+    }
+
+    pub inline fn from(value: anytype) NanBoxingImpl {
+        const T = @TypeOf(value);
+        const is_number = switch (@typeInfo(T)) {
+            .Int, .ComptimeInt, .Float, .ComptimeFloat => true,
+            else => false,
+        };
+        if (T == bool) {
+            return if (value) .boolean_true else .boolean_false;
+        } else if (isZigString(T)) {
+            const string = String.fromLiteral(value);
+            return init(.string, 0, string.data);
+        } else if (is_number or T == Number) {
+            const number = if (T == Number) value else Number.from(value);
+            switch (number) {
+                .i32 => |x| return init(.number_i32, 0, x),
+                .f64 => |x| {
+                    // Normalize all NaN values to avoid type confusion vulnerabilities.
+                    return if (std.math.isNan(x)) .number_nan else init(.number_f64, 0, x);
+                },
+            }
+        } else if (T == BigInt) {
+            return init(.symbol_or_big_int, 1, value.managed);
+        } else if (T == Object) {
+            return init(.object, 0, value.data);
+        } else if (T == String) {
+            return init(.string, 0, value.data);
+        } else if (T == Symbol) {
+            return init(.symbol_or_big_int, 0, value.data);
+        } else {
+            @compileError("from() called with incompatible type " ++ @typeName(T));
+        }
+    }
+
+    pub fn @"type"(self: NanBoxingImpl) Type {
+        return switch (self.getTag()) {
+            .undefined => .undefined,
+            .null => .null,
+            .boolean => .boolean,
+            .string => .string,
+            .symbol_or_big_int => {
+                const bits: u64 = @intFromEnum(self);
+                const high_bit: u1 = @truncate(@bitReverse(bits));
+                return switch (high_bit) {
+                    0 => .symbol,
+                    1 => .big_int,
+                };
+            },
+            .number_i32, .number_f64 => .number,
+            .object => .object,
+        };
+    }
+
+    pub fn asBoolean(self: NanBoxingImpl) bool {
+        return switch (self) {
+            .boolean_false => false,
+            .boolean_true => true,
+            else => unreachable,
+        };
+    }
+
+    pub fn asNumber(self: NanBoxingImpl) Number {
+        return switch (self.getTag()) {
+            .number_i32 => .{ .i32 = self.getPayload(.number_i32, 0) },
+            .number_f64 => .{ .f64 = self.getPayload(.number_f64, 0) },
+            else => unreachable,
+        };
+    }
+
+    pub fn asString(self: NanBoxingImpl) String {
+        return .{ .data = self.getPayload(.string, 0) };
+    }
+
+    pub fn asSymbol(self: NanBoxingImpl) Symbol {
+        return .{ .data = self.getPayload(.symbol_or_big_int, 0) };
+    }
+
+    pub fn asBigInt(self: NanBoxingImpl) BigInt {
+        return .{ .managed = self.getPayload(.symbol_or_big_int, 1) };
+    }
+
+    pub fn asObject(self: NanBoxingImpl) Object {
+        return .{ .data = self.getPayload(.object, 0) };
+    }
 };
 
 comptime {
     // Let's make sure the size doesn't quietly change
-    switch (builtin.target.ptrBitWidth()) {
-        // Only some 32-bit platforms have certain bitpacking optimizations applied
-        32 => std.debug.assert(@sizeOf(TaggedUnionImpl) == 12 or @sizeOf(TaggedUnionImpl) == 16),
-        64 => std.debug.assert(@sizeOf(TaggedUnionImpl) == 16),
+    switch (Impl) {
+        TaggedUnionImpl => switch (builtin.target.ptrBitWidth()) {
+            // Only some 32-bit platforms have certain bitpacking optimizations applied
+            32 => std.debug.assert(@sizeOf(Impl) == 12 or @sizeOf(Impl) == 16),
+            64 => std.debug.assert(@sizeOf(Impl) == 16),
+            else => unreachable,
+        },
+        NanBoxingImpl => std.debug.assert(@sizeOf(Impl) == 8),
         else => unreachable,
     }
 }
 
-// TODO: Conditionally use a NaN-boxed impl on supported platforms
-impl: TaggedUnionImpl,
+const Impl = if (build_options.enable_nan_boxing) NanBoxingImpl else TaggedUnionImpl;
+impl: Impl,
 
-pub const @"undefined": Self = .{ .impl = .undefined };
-pub const @"null": Self = .{ .impl = .null };
-pub const nan: Self = .{ .impl = .{ .number_f64 = std.math.nan(f64) } };
-pub const infinity: Self = .{ .impl = .{ .number_f64 = std.math.inf(f64) } };
-pub const negative_infinity: Self = .{ .impl = .{ .number_f64 = -std.math.inf(f64) } };
+pub const @"undefined": Self = .{ .impl = Impl.undefined };
+pub const @"null": Self = .{ .impl = Impl.null };
+pub const nan: Self = from(std.math.nan(f64));
+pub const infinity: Self = from(std.math.inf(f64));
+pub const negative_infinity: Self = from(-std.math.inf(f64));
 
 pub fn format(
     self: Self,
@@ -144,51 +400,11 @@ pub fn format(
 }
 
 pub inline fn from(value: anytype) Self {
-    const T = @TypeOf(value);
-    const is_number = switch (@typeInfo(T)) {
-        .Int, .ComptimeInt, .Float, .ComptimeFloat => true,
-        else => false,
-    };
-    if (T == bool) {
-        return .{ .impl = .{ .boolean = value } };
-    } else if (isZigString(T)) {
-        const string = String.fromLiteral(value);
-        return .{ .impl = .{ .string = string } };
-    } else if (is_number) {
-        const number = Number.from(value);
-        return switch (number) {
-            .i32 => |x| .{ .impl = .{ .number_i32 = x } },
-            .f64 => |x| .{ .impl = .{ .number_f64 = x } },
-        };
-    } else if (T == BigInt) {
-        return .{ .impl = .{ .big_int = value } };
-    } else if (T == Number) {
-        return switch (value) {
-            .i32 => |x| .{ .impl = .{ .number_i32 = x } },
-            .f64 => |x| .{ .impl = .{ .number_f64 = x } },
-        };
-    } else if (T == Object) {
-        return .{ .impl = .{ .object = value } };
-    } else if (T == String) {
-        return .{ .impl = .{ .string = value } };
-    } else if (T == Symbol) {
-        return .{ .impl = .{ .symbol = value } };
-    } else {
-        @compileError("from() called with incompatible type " ++ @typeName(T));
-    }
+    return .{ .impl = Impl.from(value) };
 }
 
 pub fn @"type"(self: Self) Type {
-    return switch (self.impl) {
-        .undefined => .undefined,
-        .null => .null,
-        .boolean => .boolean,
-        .string => .string,
-        .symbol => .symbol,
-        .number_i32, .number_f64 => .number,
-        .big_int => .big_int,
-        .object => .object,
-    };
+    return self.impl.type();
 }
 
 pub fn isUndefined(self: Self) bool {
@@ -200,55 +416,51 @@ pub fn isNull(self: Self) bool {
 }
 
 pub fn isBoolean(self: Self) bool {
-    return self.impl == .boolean;
+    return self.impl.type() == .boolean;
 }
 
 pub fn asBoolean(self: Self) bool {
-    return self.impl.boolean;
+    return self.impl.asBoolean();
 }
 
 pub fn isString(self: Self) bool {
-    return self.impl == .string;
+    return self.impl.type() == .string;
 }
 
 pub fn asString(self: Self) String {
-    return self.impl.string;
+    return self.impl.asString();
 }
 
 pub fn isSymbol(self: Self) bool {
-    return self.impl == .symbol;
+    return self.impl.type() == .symbol;
 }
 
 pub fn asSymbol(self: Self) Symbol {
-    return self.impl.symbol;
+    return self.impl.asSymbol();
 }
 
 pub fn isNumber(self: Self) bool {
-    return self.impl == .number_i32 or self.impl == .number_f64;
+    return self.impl.type() == .number;
 }
 
 pub fn asNumber(self: Self) Number {
-    return switch (self.impl) {
-        .number_i32 => |x| .{ .i32 = x },
-        .number_f64 => |x| .{ .f64 = x },
-        else => unreachable,
-    };
+    return self.impl.asNumber();
 }
 
 pub fn isBigInt(self: Self) bool {
-    return self.impl == .big_int;
+    return self.impl.type() == .big_int;
 }
 
 pub fn asBigInt(self: Self) BigInt {
-    return self.impl.big_int;
+    return self.impl.asBigInt();
 }
 
 pub fn isObject(self: Self) bool {
-    return self.impl == .object;
+    return self.impl.type() == .object;
 }
 
 pub fn asObject(self: Self) Object {
-    return self.impl.object;
+    return self.impl.asObject();
 }
 
 /// 6.2.6.5 ToPropertyDescriptor ( Obj )
