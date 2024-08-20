@@ -15,6 +15,8 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = Object.PropertyKey;
 const Value = types.Value;
 
+const InternalMethods = @This();
+
 /// [[GetPrototypeOf]]
 getPrototypeOf: *const fn (
     object: Object,
@@ -94,3 +96,18 @@ construct: ?*const fn (
     arguments: Arguments,
     new_target: Object,
 ) Agent.Error!Object = null,
+
+pub fn create(allocator: std.mem.Allocator, initial: *const InternalMethods, to_insert: *const InternalMethods) std.mem.Allocator.Error!*const InternalMethods {
+    const ordinary: *const InternalMethods = &.{};
+    if (initial == ordinary) {
+        return to_insert;
+    }
+    const methods = try allocator.create(InternalMethods);
+    methods.* = initial.*;
+    inline for (comptime std.meta.fieldNames(InternalMethods)) |field_name| {
+        if (@field(to_insert, field_name) != @field(ordinary, field_name)) {
+            @field(methods, field_name) = @field(to_insert, field_name);
+        }
+    }
+    return methods;
+}

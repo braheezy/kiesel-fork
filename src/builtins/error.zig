@@ -75,7 +75,7 @@ pub const ErrorConstructor = struct {
         );
 
         // Non-standard
-        object.data.internal_methods.set = internalSet;
+        object.data.internal_methods = try Object.InternalMethods.create(agent.gc_allocator, object.data.internal_methods, &.{ .set = internalSet });
 
         // 3. If message is not undefined, then
         if (!message.isUndefined()) {
@@ -298,7 +298,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
             );
 
             // Non-standard
-            object.data.internal_methods.set = internalSet;
+            object.data.internal_methods = try Object.InternalMethods.create(agent.gc_allocator, object.data.internal_methods, &.{ .set = internalSet });
 
             // 3. If message is not undefined, then
             if (!message.isUndefined()) {
@@ -422,7 +422,7 @@ pub const AggregateErrorConstructor = struct {
         );
 
         // Non-standard
-        object.data.internal_methods.set = internalSet;
+        object.data.internal_methods = try Object.InternalMethods.create(agent.gc_allocator, object.data.internal_methods, &.{ .set = internalSet });
 
         // 3. If message is not undefined, then
         if (!message.isUndefined()) {

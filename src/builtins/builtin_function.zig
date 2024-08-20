@@ -176,10 +176,10 @@ pub fn createBuiltinFunction(
     //    parameters specified by behaviour. The new function object has internal slots whose names
     //    are the elements of internalSlotsList, and an [[InitialName]] internal slot.
     const function = try BuiltinFunction.create(agent, .{
-        .internal_methods = .{
+        .internal_methods = if (behaviour == .constructor) &.{
             .call = call,
-            .construct = if (behaviour == .constructor) construct else null,
-        },
+            .construct = construct,
+        } else &.{ .call = call },
 
         // 6. Set func.[[Prototype]] to prototype.
         .prototype = prototype,

@@ -24,5 +24,5 @@ private_elements: PrivateNameArrayHashMap(PrivateElement),
 is_htmldda: if (build_options.enable_annex_b) bool else void,
 
 agent: *Agent,
-internal_methods: InternalMethods,
+internal_methods: *const InternalMethods,
 property_storage: PropertyStorage,

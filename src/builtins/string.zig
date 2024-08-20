@@ -431,7 +431,7 @@ pub fn stringCreate(agent: *Agent, value: types.String, prototype: Object) Alloc
             .string_data = value,
         },
 
-        .internal_methods = .{
+        .internal_methods = &.{
             // 4. Set S.[[GetOwnProperty]] as specified in 10.4.3.1.
             .getOwnProperty = getOwnProperty,
 

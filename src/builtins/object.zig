@@ -695,7 +695,7 @@ pub const ObjectPrototype = struct {
     pub fn create(realm: *Realm) Allocator.Error!Object_ {
         return Object.create(realm.agent, .{
             .prototype = null,
-            .internal_methods = .{
+            .internal_methods = &.{
                 .setPrototypeOf = immutable_prototype.setPrototypeOf,
             },
         });

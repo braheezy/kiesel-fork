@@ -3234,7 +3234,7 @@ pub fn allocateTypedArray(
         // 1. Let internalSlotsList be « [[Prototype]], [[Extensible]], [[ViewedArrayBuffer]],
         //    [[TypedArrayName]], [[ContentType]], [[ByteLength]], [[ByteOffset]], [[ArrayLength]] ».
         // 2. Let A be MakeBasicObject(internalSlotsList).
-        .internal_methods = .{
+        .internal_methods = &.{
             // 3. Set A.[[GetOwnProperty]] as specified in 10.4.5.1.
             .getOwnProperty = getOwnProperty,
 

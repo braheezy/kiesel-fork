@@ -142,8 +142,8 @@ pub inline fn agent(self: Self) *Agent {
     return self.data.agent;
 }
 
-pub inline fn internalMethods(self: Self) *InternalMethods {
-    return &self.data.internal_methods;
+pub inline fn internalMethods(self: Self) *const InternalMethods {
+    return self.data.internal_methods;
 }
 
 pub inline fn propertyStorage(self: Self) *PropertyStorage {

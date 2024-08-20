@@ -286,7 +286,7 @@ pub fn createMappedArgumentsObject(
 
     // 3. Let obj be MakeBasicObject(« [[Prototype]], [[Extensible]], [[ParameterMap]] »).
     const object = try Arguments.create(agent, .{
-        .internal_methods = .{
+        .internal_methods = &.{
             // 4. Set obj.[[GetOwnProperty]] as specified in 10.4.4.1.
             .getOwnProperty = getOwnProperty,
 

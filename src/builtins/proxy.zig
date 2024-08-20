@@ -1051,35 +1051,46 @@ fn proxyCreate(agent: *Agent, target: Value, handler: Value) Agent.Error!Object 
         },
 
         // 4. Set P's essential internal methods, except for [[Call]] and [[Construct]], to the definitions specified in 10.5.
-        .internal_methods = .{
-            .getPrototypeOf = getPrototypeOf,
-            .setPrototypeOf = setPrototypeOf,
-            .isExtensible = isExtensible,
-            .preventExtensions = preventExtensions,
-            .getOwnProperty = getOwnProperty,
-            .defineOwnProperty = defineOwnProperty,
-            .hasProperty = hasProperty,
-            .get = get,
-            .set = set,
-            .delete = delete,
-            .ownPropertyKeys = ownPropertyKeys,
-        },
+        .internal_methods = comptime &proxyInternalMethods(false, false),
     });
 
     // 5. If IsCallable(target) is true, then
     if (target.isCallable()) {
         // a. Set P.[[Call]] as specified in 10.5.12.
-        proxy.data.internal_methods.call = call;
+        proxy.data.internal_methods = comptime &proxyInternalMethods(true, false);
 
         // b. If IsConstructor(target) is true, then
         if (target.isConstructor()) {
             // i. Set P.[[Construct]] as specified in 10.5.13.
-            proxy.data.internal_methods.construct = construct;
+            proxy.data.internal_methods = comptime &proxyInternalMethods(true, true);
         }
     }
 
     // 8. Return P.
     return proxy;
+}
+
+fn proxyInternalMethods(target_is_callable: bool, target_is_constructor: bool) Object.InternalMethods {
+    var internal_methods: Object.InternalMethods = .{
+        .getPrototypeOf = getPrototypeOf,
+        .setPrototypeOf = setPrototypeOf,
+        .isExtensible = isExtensible,
+        .preventExtensions = preventExtensions,
+        .getOwnProperty = getOwnProperty,
+        .defineOwnProperty = defineOwnProperty,
+        .hasProperty = hasProperty,
+        .get = get,
+        .set = set,
+        .delete = delete,
+        .ownPropertyKeys = ownPropertyKeys,
+    };
+    if (target_is_callable) {
+        internal_methods.call = call;
+        if (target_is_constructor) {
+            internal_methods.construct = construct;
+        }
+    }
+    return internal_methods;
 }
 
 /// 28.2.2 Properties of the Proxy Constructor

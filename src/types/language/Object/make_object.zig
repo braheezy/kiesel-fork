@@ -29,21 +29,21 @@ pub fn MakeObject(
         prototype: ?Object,
         extensible: bool = true,
         is_htmldda: bool = false,
-        internal_methods: InternalMethods = .{},
+        internal_methods: *const InternalMethods = &.{},
     } else if (has_fields) struct {
         fields: options.Fields,
         prototype: ?Object,
         extensible: bool = true,
-        internal_methods: InternalMethods = .{},
+        internal_methods: *const InternalMethods = &.{},
     } else if (has_is_htmldda) struct {
         prototype: ?Object,
         extensible: bool = true,
         is_htmldda: bool = false,
-        internal_methods: InternalMethods = .{},
+        internal_methods: *const InternalMethods = &.{},
     } else struct {
         prototype: ?Object,
         extensible: bool = true,
-        internal_methods: InternalMethods = .{},
+        internal_methods: *const InternalMethods = &.{},
     };
 
     return struct {

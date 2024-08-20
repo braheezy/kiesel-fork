@@ -91,7 +91,7 @@ pub fn boundFunctionCreate(
         // 4. Set obj.[[Prototype]] to proto.
         .prototype = prototype,
 
-        .internal_methods = .{
+        .internal_methods = &.{
             // 5. Set obj.[[Call]] as described in 10.4.1.1.
             .call = call,
         },
@@ -110,8 +110,12 @@ pub fn boundFunctionCreate(
 
     // 6. If IsConstructor(targetFunction) is true, then
     if (Value.from(target_function).isConstructor()) {
-        // a. Set obj.[[Construct]] as described in 10.4.1.2.
-        object.data.internal_methods.construct = construct;
+        object.data.internal_methods = &.{
+            // NOTE: We have to duplicate step 5 to create a static vtable.
+            .call = call,
+            // a. Set obj.[[Construct]] as described in 10.4.1.2.
+            .construct = construct,
+        };
     }
 
     // 10. Return obj.

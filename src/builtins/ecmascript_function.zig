@@ -569,7 +569,7 @@ pub fn ordinaryFunctionCreate(
     // 1. Let internalSlotsList be the internal slots listed in Table 30.
     // 2. Let F be OrdinaryObjectCreate(functionPrototype, internalSlotsList).
     const function = try ECMAScriptFunction.create(agent, .{
-        .internal_methods = .{
+        .internal_methods = &.{
             // 3. Set F.[[Call]] to the definition specified in 10.2.1.
             .call = call,
         },
@@ -693,12 +693,12 @@ pub fn makeConstructor(
         );
 
         // c. Set F.[[Construct]] to the definition specified in 10.2.2.
-        function.internalMethods().construct = construct;
+        function.data.internal_methods = try Object.InternalMethods.create(agent.gc_allocator, function.data.internal_methods, &.{ .construct = construct });
     }
     // 2. Else,
     else {
         // a. Set F.[[Construct]] to the definition specified in 10.3.2.
-        function.internalMethods().construct = builtin_function.construct;
+        function.data.internal_methods = try Object.InternalMethods.create(agent.gc_allocator, function.data.internal_methods, &.{ .construct = builtin_function.construct });
     }
 
     // 3. Set F.[[ConstructorKind]] to base.
