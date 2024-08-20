@@ -33,6 +33,8 @@ pub const PropertyStorage = @import("Object/PropertyStorage.zig");
 const Self = @This();
 
 pub const Tag = enum(u32) {
+    unset,
+
     // ECMA-262
     arguments,
     array,
@@ -108,13 +110,12 @@ pub fn format(
 }
 
 pub inline fn is(self: Self, comptime T: type) bool {
-    comptime std.debug.assert(T.tag != null);
-    if (self.data.tag == null) return false;
-    return T.tag.? == self.data.tag.?;
+    comptime std.debug.assert(T.tag != .unset);
+    return T.tag == self.data.tag;
 }
 
 pub inline fn as(self: Self, comptime T: type) *T {
-    std.debug.assert(self.data.tag.? == T.tag);
+    std.debug.assert(self.data.tag == T.tag);
     // Casting alignment is safe because we allocate objects as *T
     return @alignCast(@fieldParentPtr("data", @as(*Data, @ptrCast(self.data))));
 }

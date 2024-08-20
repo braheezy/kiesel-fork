@@ -17,7 +17,7 @@ const PrivateNameArrayHashMap = types.PrivateNameArrayHashMap;
 pub fn MakeObject(
     comptime options: struct {
         Fields: type = void,
-        tag: ?Object.Tag = null,
+        tag: Object.Tag = .unset,
     },
 ) type {
     const has_fields = options.Fields != void;
