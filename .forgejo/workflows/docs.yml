@@ -20,6 +20,8 @@ jobs:
           components: "rust-src"
       - uses: https://github.com/Swatinem/rust-cache@v2
       - run: zig build docs
+      - name: Compile man-page
+        run: sudo apt update && sudo apt install -y mandoc && mandoc -Thtml docs/kiesel.1 > zig-out/docs/kiesel.1.html
       - name: Upload files
         if: ${{ github.ref_name == 'main' }}
         run: |
