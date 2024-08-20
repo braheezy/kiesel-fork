@@ -47,13 +47,14 @@ export fn lre_check_stack_overflow(_: ?*anyopaque, _: usize) c_int {
 
 export fn lre_realloc(@"opaque": ?*anyopaque, maybe_ptr: ?*anyopaque, size: usize) ?*anyopaque {
     const lre_opaque = @as(*LreOpaque, @alignCast(@ptrCast(@"opaque".?)));
-    if (maybe_ptr) |ptr| {
-        var old_mem: []u8 = @as(*[0]u8, @ptrCast(ptr));
-        old_mem.len = gc.GcAllocator.alignedAllocSize(old_mem.ptr);
-        return if (lre_opaque.allocator.realloc(old_mem, size)) |slice| slice.ptr else |_| null;
-    } else {
-        return if (lre_opaque.allocator.alloc(u8, size)) |slice| slice.ptr else |_| null;
+    if (build_options.enable_libgc) {
+        if (maybe_ptr) |ptr| {
+            var old_mem: []u8 = @as(*[0]u8, @ptrCast(ptr));
+            old_mem.len = gc.GcAllocator.alignedAllocSize(old_mem.ptr);
+            return if (lre_opaque.allocator.realloc(old_mem, size)) |slice| slice.ptr else |_| null;
+        }
     }
+    return if (lre_opaque.allocator.alloc(u8, size)) |slice| slice.ptr else |_| null;
 }
 
 comptime {
