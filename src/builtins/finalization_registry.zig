@@ -5,8 +5,10 @@ const std = @import("std");
 
 const Allocator = std.mem.Allocator;
 
+const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
+const gc = @import("../gc.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
@@ -84,6 +86,7 @@ pub const FinalizationRegistryConstructor = struct {
                 .cleanup_callback = agent.host_hooks.hostMakeJobCallback(cleanup_callback.asObject()),
 
                 // 7. Set finalizationRegistry.[[Cells]] to a new empty List.
+                .cells = .{},
             },
         );
 
@@ -168,8 +171,51 @@ pub const FinalizationRegistryPrototype = struct {
             maybe_unregister_token = null;
         }
 
-        // TODO: 6-7.
-        _ = finalization_registry;
+        // 6. Let cell be the Record { [[WeakRefTarget]]: target, [[HeldValue]]: heldValue, [[UnregisterToken]]: unregisterToken }.
+        const cell: Cell = .{
+            .is_unregistered = false,
+            .finalization_registry = finalization_registry,
+            .held_value = held_value,
+            .unregister_token = if (maybe_unregister_token) |unregister_token_| Value.Weak.init(unregister_token_) else null,
+        };
+
+        const finalizer_data = try agent.gc_allocator.create(gc.FinalizerData(Cell));
+        finalizer_data.* = .{ .data = cell };
+
+        // 7. Append cell to finalizationRegistry.[[Cells]].
+        try finalization_registry.fields.cells.append(agent.gc_allocator, &finalizer_data.data);
+
+        if (build_options.enable_libgc) {
+            // Implements 9.9.3 Execution step 1.b
+            // https://tc39.es/ecma262/#sec-weakref-execution
+            gc.registerFinalizer(Value.Weak.init(target).getPtr(), finalizer_data, struct {
+                fn finalizer(finalizer_cell: *Cell) void {
+                    // unregister() calls will set this
+                    if (finalizer_cell.is_unregistered) return;
+
+                    // i. Set cell.[[WeakRefTarget]] to empty.
+                    // NOTE: The weak ref target is managed by libgc.
+
+                    // ii. Optionally, perform HostEnqueueFinalizationRegistryCleanupJob(fg).
+                    const finalizer_agent = finalizer_cell.finalization_registry.object().agent();
+                    finalizer_agent.host_hooks.hostEnqueueFinalizationRegistryCleanupJob(finalizer_agent, finalizer_cell) catch {
+                        // We are not required to run finalizers, so we can ignore OOMs.
+                    };
+                }
+            }.finalizer);
+
+            // Guarantee cell.[[UnregisterToken]] is empty when it is no longer live.
+            if (cell.unregister_token) |weak_unregister_token| {
+                const unregister_finalizer_data = try agent.gc_allocator.create(gc.FinalizerData(*Cell));
+                unregister_finalizer_data.* = .{ .data = &finalizer_data.data };
+
+                gc.registerFinalizer(weak_unregister_token.getPtr(), unregister_finalizer_data, struct {
+                    fn finalizer(finalizer_cell: **Cell) void {
+                        finalizer_cell.*.unregister_token = null;
+                    }
+                }.finalizer);
+            }
+        }
 
         // 8. Return undefined.
         return Value.undefined;
@@ -193,10 +239,76 @@ pub const FinalizationRegistryPrototype = struct {
             );
         }
 
-        // TODO: 4-6.
-        _ = finalization_registry;
-        return Value.from(false);
+        // 4. Let removed be false.
+        var removed = false;
+
+        // 5. For each Record { [[WeakRefTarget]], [[HeldValue]], [[UnregisterToken]] } cell
+        //    of finalizationRegistry.[[Cells]], do
+        var index = finalization_registry.fields.cells.items.len;
+        while (index > 0) {
+            index -= 1;
+            const cell = finalization_registry.fields.cells.items[index];
+            // a. If cell.[[UnregisterToken]] is not empty and
+            //    SameValue(cell.[[UnregisterToken]], unregisterToken) is true, then
+            if (cell.unregister_token) |cell_unregister_token| {
+                if (cell_unregister_token.get().sameValue(unregister_token)) {
+                    // i. Remove cell from finalizationRegistry.[[Cells]].
+                    _ = finalization_registry.fields.cells.swapRemove(index);
+                    cell.is_unregistered = true;
+
+                    // ii. Set removed to true.
+                    removed = true;
+                }
+            }
+        }
+
+        // 6. Return removed.
+        return Value.from(removed);
     }
+};
+
+/// 9.12 CleanupFinalizationRegistry ( finalizationRegistry )
+/// https://tc39.es/ecma262/#sec-cleanup-finalization-registry
+pub fn cleanupFinalizationRegistry(cell: *Cell) Agent.Error!void {
+    const agent = cell.finalization_registry.data.agent;
+
+    // 1. Assert: finalizationRegistry has [[Cells]] and [[CleanupCallback]] internal slots.
+    const finalization_registry = cell.finalization_registry;
+
+    // 2. Let callback be finalizationRegistry.[[CleanupCallback]].
+    const callback = finalization_registry.fields.cleanup_callback;
+
+    // 3. While finalizationRegistry.[[Cells]] contains a Record cell such that cell.[[WeakRefTarget]] is empty, an implementation may perform the following steps:
+    //    a. Choose any such cell.
+    // NOTE: Steps 3 and 3.a are completed by libgc which is why this function takes
+    //       a single cell instead.
+
+    //    b. Remove cell from finalizationRegistry.[[Cells]].
+    const cell_index = std.mem.indexOfScalar(*Cell, cell.finalization_registry.fields.cells.items, cell) orelse return;
+    _ = finalization_registry.fields.cells.swapRemove(cell_index);
+
+    if (!cell.is_unregistered) {
+        // c. Perform ? HostCallJobCallback(callback, undefined, « cell.[[HeldValue]] »).
+        _ = try agent.host_hooks.hostCallJobCallback(callback, Value.undefined, &.{cell.held_value});
+    }
+
+    // 4. Return unused.
+}
+
+pub const Cell = struct {
+    // libgc does not support unregistering finalizers so we use a flag to
+    // achieve the functionality.
+    is_unregistered: bool,
+    finalization_registry: *FinalizationRegistry,
+
+    // [[WeakRefTarget]]
+    // NOTE: This is tracked by libgc's finalizer.
+
+    /// [[HeldValue]]
+    held_value: Value,
+
+    /// [[UnregisterToken]]
+    unregister_token: ?Value.Weak,
 };
 
 /// 26.2.4 Properties of FinalizationRegistry Instances
@@ -209,7 +321,8 @@ pub const FinalizationRegistry = MakeObject(.{
         /// [[CleanupCallback]]
         cleanup_callback: JobCallback,
 
-        // NOTE: [[Cells]] is implemented via libgc finalizers.
+        /// [[Cells]]
+        cells: std.ArrayListUnmanaged(*Cell),
     },
     .tag = .finalization_registry,
 });

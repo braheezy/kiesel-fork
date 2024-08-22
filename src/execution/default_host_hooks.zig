@@ -8,6 +8,7 @@ const language = @import("../language.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
+const Cell = @import("../builtins/finalization_registry.zig").Cell;
 const HostHooks = execution.HostHooks;
 const ImportedModulePayload = language.ImportedModulePayload;
 const ImportedModuleReferrer = language.ImportedModuleReferrer;
@@ -19,6 +20,7 @@ const SafePointer = types.SafePointer;
 const SourceTextModule = language.SourceTextModule;
 const String = types.String;
 const Value = types.Value;
+const cleanupFinalizationRegistry = @import("../builtins/finalization_registry.zig").cleanupFinalizationRegistry;
 const finishLoadingImportedModule = language.finishLoadingImportedModule;
 
 /// 7.3.29 HostEnsureCanAddPrivateElement ( O )
@@ -59,6 +61,33 @@ pub fn hostEnqueueGenericJob(agent: *Agent, job: Job, realm: *Realm) Allocator.E
 /// https://tc39.es/ecma262/#sec-hostenqueuepromisejob
 pub fn hostEnqueuePromiseJob(agent: *Agent, job: Job, realm: ?*Realm) Allocator.Error!void {
     try agent.queued_jobs.append(.{ .job = job, .realm = realm });
+}
+
+/// 9.9.4.1 HostEnqueueFinalizationRegistryCleanupJob ( finalizationRegistry )
+/// https://tc39.es/ecma262/#sec-host-cleanup-finalization-registry
+pub fn hostEnqueueFinalizationRegistryCleanupJob(agent: *Agent, cell: *Cell) Allocator.Error!void {
+    // Let cleanupJob be a new Job Abstract Closure with no parameters that captures
+    // finalizationRegistry and performs the following steps when called:
+    const cleanup_job: Job = .{
+        .captures = SafePointer.make(*Cell, cell),
+        .func = struct {
+            fn cleanupJob(cell_ptr: SafePointer) Agent.Error!Value {
+                // 1. Let cleanupResult be Completion(CleanupFinalizationRegistry(finalizationRegistry)).
+                // 2. If cleanupResult is an abrupt completion, perform any host-defined
+                //    steps for reporting the error.
+                const cleanup_result = try cleanupFinalizationRegistry(cell_ptr.cast(*Cell));
+                _ = cleanup_result;
+
+                // 3. Return unused.
+                return Value.undefined;
+            }
+        }.cleanupJob,
+    };
+
+    // An implementation of HostEnqueueFinalizationRegistryCleanupJob schedules cleanupJob
+    // to be performed at some future time, if possible. It must also conform to the
+    // requirements in 9.5.
+    try agent.queued_jobs.append(.{ .job = cleanup_job, .realm = null });
 }
 
 /// 13.3.12.1.1 HostGetImportMetaProperties ( moduleRecord )

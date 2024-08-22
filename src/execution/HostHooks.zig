@@ -12,6 +12,7 @@ const language = @import("../language.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
+const Cell = @import("../builtins/finalization_registry.zig").Cell;
 const ImportedModulePayload = language.ImportedModulePayload;
 const ImportedModuleReferrer = language.ImportedModuleReferrer;
 const Job = @import("job.zig").Job;
@@ -46,6 +47,10 @@ hostCallJobCallback: *const fn (
     this_value: Value,
     arguments_list: []const Value,
 ) Agent.Error!Value = default_host_hooks.hostCallJobCallback,
+hostEnqueueFinalizationRegistryCleanupJob: *const fn (
+    agent: *Agent,
+    cell: *Cell,
+) Allocator.Error!void = default_host_hooks.hostEnqueueFinalizationRegistryCleanupJob,
 hostEnqueueGenericJob: *const fn (
     agent: *Agent,
     job: Job,

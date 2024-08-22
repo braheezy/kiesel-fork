@@ -35,6 +35,8 @@ const prettyPrintValue = pretty_printing.prettyPrintValue;
 const stringCreate = builtins.stringCreate;
 const validateNonRevokedProxy = builtins.validateNonRevokedProxy;
 
+pub const Weak = @import("Value/weak.zig").Weak;
+
 const pow_2_8 = std.math.pow(f64, 2, 8);
 const pow_2_16 = std.math.pow(f64, 2, 16);
 const pow_2_32 = std.math.pow(f64, 2, 32);

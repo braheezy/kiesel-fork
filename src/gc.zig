@@ -40,3 +40,29 @@ pub fn disableWarnings() void {
         fn func(_: [*c]const u8, _: libgc.GC_word) callconv(.C) void {}
     }.func);
 }
+
+pub fn FinalizerData(comptime T: type) type {
+    return struct {
+        nextFinalizerFunc: ?*const fn (?*anyopaque, ?*anyopaque) callconv(.C) void = null,
+        next_finalizer_data: ?*anyopaque = null,
+        data: T,
+
+        pub const Data = T;
+    };
+}
+
+pub fn registerFinalizer(
+    target: *anyopaque,
+    data: anytype,
+    comptime finalizer: *const fn (data: *@TypeOf(data.*).Data) void,
+) void {
+    libgc.GC_register_finalizer(target, struct {
+        fn func(func_target: ?*anyopaque, func_data: ?*anyopaque) callconv(.C) void {
+            const finalizer_data: @TypeOf(data) = @alignCast(@ptrCast(func_data));
+            finalizer(&finalizer_data.data);
+            if (finalizer_data.nextFinalizerFunc) |nextFinalizerFunc| {
+                nextFinalizerFunc(func_target, finalizer_data.next_finalizer_data);
+            }
+        }
+    }.func, data, &data.nextFinalizerFunc, &data.next_finalizer_data);
+}
