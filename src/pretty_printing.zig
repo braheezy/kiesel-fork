@@ -19,6 +19,7 @@ const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferW
 const ordinaryOwnPropertyKeys = builtins.ordinaryOwnPropertyKeys;
 const typedArrayElementSize = builtins.typedArrayElementSize;
 const typedArrayLength = builtins.typedArrayLength;
+const weakRefDeref = @import("builtins/weak_ref.zig").weakRefDeref;
 
 const SeenObjects = std.AutoHashMap(*allowzero Object.Data, usize);
 const State = struct {
@@ -542,6 +543,18 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintWeakRef(weak_ref: *const builtins.WeakRef, writer: anytype) !void {
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("WeakRef(");
+    try tty_config.setColor(writer, .reset);
+    try prettyPrintValue(weakRefDeref(weak_ref), writer);
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintIntlCollator(
     intl_collator: *const builtins.Intl.Collator,
     writer: anytype,
@@ -882,6 +895,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.StringIterator, prettyPrintStringIterator },
             .{ builtins.Symbol, prettyPrintPrimitiveWrapper },
             .{ builtins.TypedArray, prettyPrintTypedArray },
+            .{ builtins.WeakRef, prettyPrintWeakRef },
         } ++ if (build_options.enable_intl) .{
             .{ builtins.Intl.Collator, prettyPrintIntlCollator },
             .{ builtins.Intl.DateTimeFormat, prettyPrintIntlDateTimeFormat },
