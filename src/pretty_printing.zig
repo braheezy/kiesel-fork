@@ -555,6 +555,25 @@ fn prettyPrintWeakRef(weak_ref: *const builtins.WeakRef, writer: anytype) !void 
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintWeakSet(weak_set: *const builtins.WeakSet, writer: anytype) !void {
+    const weak_set_data = weak_set.fields.weak_set_data;
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("WeakSet(");
+    try tty_config.setColor(writer, .reset);
+    var it = weak_set_data.iterator();
+    while (it.next()) |entry| {
+        try writer.print("{pretty}", .{entry.key_ptr.*.get()});
+        if (it.index < weak_set_data.count()) {
+            try writer.writeAll(", ");
+        }
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintIntlCollator(
     intl_collator: *const builtins.Intl.Collator,
     writer: anytype,
@@ -896,6 +915,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.Symbol, prettyPrintPrimitiveWrapper },
             .{ builtins.TypedArray, prettyPrintTypedArray },
             .{ builtins.WeakRef, prettyPrintWeakRef },
+            .{ builtins.WeakSet, prettyPrintWeakSet },
         } ++ if (build_options.enable_intl) .{
             .{ builtins.Intl.Collator, prettyPrintIntlCollator },
             .{ builtins.Intl.DateTimeFormat, prettyPrintIntlDateTimeFormat },

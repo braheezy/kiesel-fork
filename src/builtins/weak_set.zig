@@ -1,0 +1,256 @@
+//! 24.4 WeakSet Objects
+//! https://tc39.es/ecma262/#sec-weakset-objects
+
+const std = @import("std");
+
+const Allocator = std.mem.Allocator;
+
+const build_options = @import("build-options");
+const builtins = @import("../builtins.zig");
+const execution = @import("../execution.zig");
+const gc = @import("../gc.zig");
+const types = @import("../types.zig");
+const utils = @import("../utils.zig");
+
+const Agent = execution.Agent;
+const Arguments = types.Arguments;
+const MakeObject = types.MakeObject;
+const Object = types.Object;
+const PropertyDescriptor = types.PropertyDescriptor;
+const PropertyKey = types.PropertyKey;
+const Realm = execution.Realm;
+const Value = types.Value;
+const createBuiltinFunction = builtins.createBuiltinFunction;
+const defineBuiltinFunction = utils.defineBuiltinFunction;
+const defineBuiltinProperty = utils.defineBuiltinProperty;
+const getIterator = types.getIterator;
+const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
+const sameValue = types.sameValue;
+
+/// 24.4.2 Properties of the WeakSet Constructor
+/// https://tc39.es/ecma262/#sec-properties-of-the-weakset-constructor
+pub const WeakSetConstructor = struct {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
+        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+            .length = 0,
+            .name = "WeakSet",
+            .realm = realm,
+            .prototype = try realm.intrinsics.@"%Function.prototype%"(),
+        });
+    }
+
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+        // 24.4.2.1 WeakSet.prototype
+        // https://tc39.es/ecma262/#sec-weakset.prototype
+        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
+            .value = Value.from(try realm.intrinsics.@"%WeakSet.prototype%"()),
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        });
+    }
+
+    /// 24.4.1.1 WeakSet ( [ iterable ] )
+    /// https://tc39.es/ecma262/#sec-weak-ref-target
+    fn constructor(agent: *Agent, arguments: Arguments, maybe_new_target: ?Object) Agent.Error!Value {
+        const iterable = arguments.get(0);
+
+        const new_target = maybe_new_target orelse {
+            // 1. If NewTarget is undefined, throw a TypeError exception.
+            return agent.throwException(
+                .type_error,
+                "WeakSet must be constructed with 'new'",
+                .{},
+            );
+        };
+
+        // 2. Let set be ? OrdinaryCreateFromConstructor(NewTarget, "%WeakSet.prototype%", « [[WeakSetData]] »).
+        const set = try ordinaryCreateFromConstructor(
+            WeakSet,
+            agent,
+            new_target,
+            "%WeakSet.prototype%",
+            .{
+                // 3. Set set.[[WeakSetData]] to a new empty List.
+                .weak_set_data = WeakSetData.init(agent.gc_allocator),
+            },
+        );
+
+        // 4. If iterable is either undefined or null, return set.
+        if (iterable.isUndefined() or iterable.isNull()) {
+            return Value.from(set);
+        }
+
+        // 5. Let adder be ? Get(set, "add").
+        const adder = try set.get(PropertyKey.from("add"));
+
+        // 6. If IsCallable(adder) is false, throw a TypeError exception.
+        if (!adder.isCallable()) {
+            return agent.throwException(
+                .type_error,
+                "{} is not callable",
+                .{adder},
+            );
+        }
+
+        // 7. Let iteratorRecord be ? GetIterator(iterable, sync).
+        var iterator = try getIterator(agent, iterable, .sync);
+
+        // 8. Repeat,
+        //     a. Let next be ? IteratorStepValue(iteratorRecord).
+        //     b. If next is done, return set.
+        while (try iterator.stepValue()) |next| {
+            // c. Let status be Completion(Call(adder, set, « next »)).
+            _ = adder.callAssumeCallable(Value.from(set), &.{next}) catch |err| {
+                // d. IfAbruptCloseIterator(status, iteratorRecord).
+                return iterator.close(@as(Agent.Error!Value, err));
+            };
+        }
+
+        return Value.from(set);
+    }
+};
+
+/// 24.4.3 Properties of the WeakSet Prototype Object
+/// https://tc39.es/ecma262/#sec-properties-of-the-weakset-prototype-object
+pub const WeakSetPrototype = struct {
+    pub fn create(realm: *Realm) Allocator.Error!Object {
+        return builtins.Object.create(realm.agent, .{
+            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
+        });
+    }
+
+    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+        try defineBuiltinFunction(object, "add", add, 1, realm);
+        try defineBuiltinFunction(object, "delete", delete, 1, realm);
+        try defineBuiltinFunction(object, "has", has, 1, realm);
+
+        // 24.4.3.2 WeakSet.prototype.constructor
+        // https://tc39.es/ecma262/#sec-weakset.prototype.constructor
+        try defineBuiltinProperty(
+            object,
+            "constructor",
+            Value.from(try realm.intrinsics.@"%WeakSet%"()),
+        );
+
+        // 24.4.3.5 WeakSet.prototype [ %Symbol.toStringTag% ]
+        // https://tc39.es/ecma262/#sec-weakset.prototype-%symbol.tostringtag%
+        try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
+            .value = Value.from("WeakSet"),
+            .writable = false,
+            .enumerable = false,
+            .configurable = true,
+        });
+    }
+
+    /// 24.4.3.1 WeakSet.prototype.add ( value )
+    /// https://tc39.es/ecma262/#sec-weakset.prototype.add
+    fn add(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const value = arguments.get(0);
+
+        // 1. Let S be the this value.
+        // 2. Perform ? RequireInternalSlot(S, [[WeakSetData]]).
+        const set = try this_value.requireInternalSlot(agent, WeakSet);
+
+        // 3. If CanBeHeldWeakly(value) is false, throw a TypeError exception.
+        if (!value.canBeHeldWeakly(agent)) {
+            return agent.throwException(
+                .type_error,
+                "Value {} cannot be held weakly",
+                .{value},
+            );
+        }
+
+        // 4. For each element e of S.[[WeakSetData]], do
+        //    a. If e is not empty and SameValue(e, value) is true, then
+        //       i. Return S.
+        // 5. Append value to S.[[WeakSetData]].
+        const weak_set_data = &set.fields.weak_set_data;
+        const weak_value = Value.Weak.init(value);
+        const gop = try weak_set_data.getOrPut(weak_value);
+        if (!gop.found_existing) {
+            gop.key_ptr.* = weak_value;
+
+            if (build_options.enable_libgc) {
+                // Implements 9.9.3 Execution step 1.d
+                // https://tc39.es/ecma262/#sec-weakref-execution
+                const finalizer_data = try agent.gc_allocator.create(gc.FinalizerData(CleanupValueData));
+                finalizer_data.* = .{ .data = .{
+                    .value = weak_value,
+                    .weak_set_data = weak_set_data,
+                } };
+                gc.registerFinalizer(weak_value.getPtr(), finalizer_data, struct {
+                    pub fn finalizer(data: *CleanupValueData) void {
+                        // i. Replace the element of set.[[WeakSetData]] whose value
+                        //    is value with an element whose value is empty.
+                        _ = data.weak_set_data.*.remove(data.value);
+                    }
+                }.finalizer);
+            }
+        }
+
+        // 6. Return S.
+        return this_value;
+    }
+
+    const CleanupValueData = struct {
+        value: Value.Weak,
+        weak_set_data: *WeakSetData,
+    };
+
+    /// 24.4.3.3 WeakSet.prototype.delete ( value )
+    /// https://tc39.es/ecma262/#sec-weakset.prototype.delete
+    fn delete(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const value = arguments.get(0);
+
+        // 1. Let S be the this value.
+        // 2. Perform ? RequireInternalSlot(S, [[WeakSetData]]).
+        const set = try this_value.requireInternalSlot(agent, WeakSet);
+
+        // 3. If CanBeHeldWeakly(value) is false, return false.
+        if (!value.canBeHeldWeakly(agent)) {
+            return Value.from(false);
+        }
+
+        // 4. For each element e of S.[[WeakSetData]], do
+        //     a. If e is not empty and SameValue(e, value) is true, then
+        //         i. Replace the element of S.[[WeakSetData]] whose value is e with an element whose value is empty.
+        //         ii. Return true.
+        // 5. Return false.
+        const is_removed = set.fields.weak_set_data.remove(Value.Weak.init(value));
+        return Value.from(is_removed);
+    }
+
+    /// 24.4.3.4 WeakSet.prototype.has ( value )
+    /// https://tc39.es/ecma262/#sec-weakset.prototype.has
+    fn has(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const value = arguments.get(0);
+
+        // 1. Let S be the this value.
+        // 2. Perform ? RequireInternalSlot(S, [[WeakSetData]]).
+        const set = try this_value.requireInternalSlot(agent, WeakSet);
+
+        // 3. If CanBeHeldWeakly(value) is false, return false.
+        if (!value.canBeHeldWeakly(agent)) {
+            return Value.from(false);
+        }
+
+        // 4. For each element e of S.[[WeakSetData]], do
+        //     a. If e is not empty and SameValue(e, value) is true, return true.
+        // 5. Return false.
+        const is_present = set.fields.weak_set_data.contains(Value.Weak.init(value));
+        return Value.from(is_present);
+    }
+};
+
+const WeakSetData = Value.Weak.HashMap(void);
+
+/// 24.4.4 Properties of WeakSet Instances
+/// https://tc39.es/ecma262/#sec-properties-of-weakset-instances
+pub const WeakSet = MakeObject(.{
+    .Fields = struct {
+        /// [[WeakSetData]]
+        weak_set_data: WeakSetData,
+    },
+    .tag = .weak_set,
+});

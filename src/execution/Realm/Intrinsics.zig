@@ -157,6 +157,8 @@ lazy_intrinsics: struct {
     @"%URIError.prototype%": Object = null_intrinsic,
     @"%WeakRef%": Object = null_intrinsic,
     @"%WeakRef.prototype%": Object = null_intrinsic,
+    @"%WeakSet%": Object = null_intrinsic,
+    @"%WeakSet.prototype%": Object = null_intrinsic,
 } = .{},
 
 inline fn lazyIntrinsic(
@@ -590,4 +592,10 @@ pub fn @"%WeakRef%"(self: *Self) Allocator.Error!Object {
 }
 pub fn @"%WeakRef.prototype%"(self: *Self) Allocator.Error!Object {
     return self.lazyIntrinsic("%WeakRef.prototype%", builtins.WeakRefPrototype);
+}
+pub fn @"%WeakSet%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%WeakSet%", builtins.WeakSetConstructor);
+}
+pub fn @"%WeakSet.prototype%"(self: *Self) Allocator.Error!Object {
+    return self.lazyIntrinsic("%WeakSet.prototype%", builtins.WeakSetPrototype);
 }

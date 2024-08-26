@@ -36,6 +36,29 @@ pub const Weak = union(enum) {
             .symbol => |symbol_ptr| symbol_ptr.get(),
         };
     }
+
+    /// Shortcut for the SameValue AO applied on two weak values (i.e. pointer equality)
+    pub fn sameValue(a: Weak, b: Weak) bool {
+        // The tags must be the same if they point to the same value.
+        return a.getPtr() == b.getPtr();
+    }
+
+    pub fn HashMap(comptime V: type) type {
+        return std.HashMap(Value.Weak, V, struct {
+            pub fn hash(_: @This(), weak: Weak) u64 {
+                // Store the masked version of the pointers.
+                return switch (weak) {
+                    .object => |object| @intFromEnum(object),
+                    .symbol => |symbol| @intFromEnum(symbol),
+                };
+            }
+            pub fn eql(_: @This(), a: Weak, b: Weak) bool {
+                // We must use the shortcut version of SameValue to avoid reading
+                // garbage collected pointers when we remove finalized keys.
+                return a.sameValue(b);
+            }
+        }, std.hash_map.default_max_load_percentage);
+    }
 };
 
 fn MaskedPtr(comptime T: type) type {

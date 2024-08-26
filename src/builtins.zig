@@ -47,6 +47,7 @@ const symbol = @import("builtins/symbol.zig");
 const throw_type_error = @import("builtins/throw_type_error.zig");
 const typed_array = @import("builtins/typed_array.zig");
 const weak_ref = @import("builtins/weak_ref.zig");
+const weak_set = @import("builtins/weak_set.zig");
 
 pub const global_functions = global.global_functions;
 pub const ordinary_internal_methods = ordinary.ordinary_internal_methods;
@@ -196,6 +197,9 @@ pub const URIErrorPrototype = @"error".URIErrorPrototype;
 pub const WeakRef = weak_ref.WeakRef;
 pub const WeakRefConstructor = weak_ref.WeakRefConstructor;
 pub const WeakRefPrototype = weak_ref.WeakRefPrototype;
+pub const WeakSet = weak_set.WeakSet;
+pub const WeakSetConstructor = weak_set.WeakSetConstructor;
+pub const WeakSetPrototype = weak_set.WeakSetPrototype;
 pub const addEntriesFromIterable = map.addEntriesFromIterable;
 pub const addRestrictedFunctionProperties = ecmascript_function.addRestrictedFunctionProperties;
 pub const advanceStringIndex = reg_exp.advanceStringIndex;

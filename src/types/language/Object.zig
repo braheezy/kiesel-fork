@@ -67,6 +67,7 @@ pub const Tag = enum(u32) {
     symbol,
     typed_array,
     weak_ref,
+    weak_set,
 
     // ECMA-402
     intl_collator,
