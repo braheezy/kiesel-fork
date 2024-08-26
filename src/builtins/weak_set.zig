@@ -168,25 +168,21 @@ pub const WeakSetPrototype = struct {
         const weak_set_data = &set.fields.weak_set_data;
         const weak_value = Value.Weak.init(value);
         const gop = try weak_set_data.getOrPut(weak_value);
-        if (!gop.found_existing) {
-            gop.key_ptr.* = weak_value;
-
-            if (build_options.enable_libgc) {
-                // Implements 9.9.3 Execution step 1.d
-                // https://tc39.es/ecma262/#sec-weakref-execution
-                const finalizer_data = try agent.gc_allocator.create(gc.FinalizerData(CleanupValueData));
-                finalizer_data.* = .{ .data = .{
-                    .value = weak_value,
-                    .weak_set_data = weak_set_data,
-                } };
-                gc.registerFinalizer(weak_value.getPtr(), finalizer_data, struct {
-                    pub fn finalizer(data: *CleanupValueData) void {
-                        // i. Replace the element of set.[[WeakSetData]] whose value
-                        //    is value with an element whose value is empty.
-                        _ = data.weak_set_data.*.remove(data.value);
-                    }
-                }.finalizer);
-            }
+        if (build_options.enable_libgc and !gop.found_existing) {
+            // Implements 9.9.3 Execution step 1.d
+            // https://tc39.es/ecma262/#sec-weakref-execution
+            const finalizer_data = try agent.gc_allocator.create(gc.FinalizerData(CleanupValueData));
+            finalizer_data.* = .{ .data = .{
+                .value = weak_value,
+                .weak_set_data = weak_set_data,
+            } };
+            gc.registerFinalizer(weak_value.getPtr(), finalizer_data, struct {
+                pub fn finalizer(data: *CleanupValueData) void {
+                    // i. Replace the element of set.[[WeakSetData]] whose value
+                    //    is value with an element whose value is empty.
+                    _ = data.weak_set_data.*.remove(data.value);
+                }
+            }.finalizer);
         }
 
         // 6. Return S.
