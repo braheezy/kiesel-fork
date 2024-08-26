@@ -66,6 +66,7 @@ pub const Tag = enum(u32) {
     string_iterator,
     symbol,
     typed_array,
+    weak_map,
     weak_ref,
     weak_set,
 

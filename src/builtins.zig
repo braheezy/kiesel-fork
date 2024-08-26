@@ -46,6 +46,7 @@ const string_iterator = @import("builtins/string_iterator.zig");
 const symbol = @import("builtins/symbol.zig");
 const throw_type_error = @import("builtins/throw_type_error.zig");
 const typed_array = @import("builtins/typed_array.zig");
+const weak_map = @import("builtins/weak_map.zig");
 const weak_ref = @import("builtins/weak_ref.zig");
 const weak_set = @import("builtins/weak_set.zig");
 
@@ -194,6 +195,9 @@ pub const Uint32ArrayConstructor = typed_array.Uint32ArrayConstructor;
 pub const URIError = @"error".URIError;
 pub const URIErrorConstructor = @"error".URIErrorConstructor;
 pub const URIErrorPrototype = @"error".URIErrorPrototype;
+pub const WeakMap = weak_map.WeakMap;
+pub const WeakMapConstructor = weak_map.WeakMapConstructor;
+pub const WeakMapPrototype = weak_map.WeakMapPrototype;
 pub const WeakRef = weak_ref.WeakRef;
 pub const WeakRefConstructor = weak_ref.WeakRefConstructor;
 pub const WeakRefPrototype = weak_ref.WeakRefPrototype;

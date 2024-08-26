@@ -31,7 +31,7 @@ const GlobalObjectProperty = struct {
     },
 };
 
-const num_properties = 57 +
+const num_properties = 58 +
     (if (build_options.enable_annex_b) 2 else 0) +
     (if (build_options.enable_intl) 1 else 0);
 
@@ -241,6 +241,10 @@ pub fn globalObjectProperties(realm: *Realm) [num_properties]GlobalObjectPropert
         // 19.3.37 URIError ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-urierror
         .{ "URIError", .{ .lazy_intrinsic = Realm.Intrinsics.@"%URIError%" } },
+
+        // 19.3.38 WeakMap ( . . . )
+        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-weakmap
+        .{ "WeakMap", .{ .lazy_intrinsic = Realm.Intrinsics.@"%WeakMap%" } },
 
         // 19.3.39 WeakRef ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-weakref

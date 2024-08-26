@@ -543,6 +543,28 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintWeakMap(
+    map: *const builtins.WeakMap,
+    writer: anytype,
+) !void {
+    const weak_map_data = map.fields.weak_map_data;
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("WeakMap(");
+    try tty_config.setColor(writer, .reset);
+    var it = weak_map_data.iterator();
+    while (it.next()) |entry| {
+        try writer.print("{pretty} → {pretty}", .{ entry.key_ptr.*.get(), entry.value_ptr.* });
+        if (it.index < weak_map_data.count()) {
+            try writer.writeAll(", ");
+        }
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintWeakRef(weak_ref: *const builtins.WeakRef, writer: anytype) !void {
     const tty_config = state.tty_config;
 
@@ -914,6 +936,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.StringIterator, prettyPrintStringIterator },
             .{ builtins.Symbol, prettyPrintPrimitiveWrapper },
             .{ builtins.TypedArray, prettyPrintTypedArray },
+            .{ builtins.WeakMap, prettyPrintWeakMap },
             .{ builtins.WeakRef, prettyPrintWeakRef },
             .{ builtins.WeakSet, prettyPrintWeakSet },
         } ++ if (build_options.enable_intl) .{
