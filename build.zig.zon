@@ -48,8 +48,8 @@
             .hash = "12207b3a0abfdf208a6f456d31f3f03054dda60db0d8e88065aee202a3195f8b00e0",
         },
         .zigline = .{
-            .url = "https://github.com/alimpfard/zigline/archive/83c078ba07c6474a1b4de6b8d2da393dffde7df2.tar.gz",
-            .hash = "12209e70eee0d5da2b41710361ed00796c0860663e747f40052042fd85ff752b0b9b",
+            .url = "https://github.com/alimpfard/zigline/archive/67ec44be71931c960ef9860ddc2ff58f9ca63cb9.tar.gz",
+            .hash = "1220003f8c62f41c5a952e2a9a9ed8428fcdc1cf76979ced9e30c657bc79a380e1c3",
         },
     },
     .paths = .{

@@ -9,6 +9,8 @@ const Realm = kiesel.execution.Realm;
 const Script = kiesel.language.Script;
 const Value = kiesel.types.Value;
 
+const Editor = @import("zigline").Editor;
+
 const WriterContext = struct {
     console_out: *std.os.uefi.protocol.SimpleTextOutput,
     attribute: usize,
@@ -87,19 +89,28 @@ pub fn main() std.os.uefi.Status {
         .revision = std.os.uefi.system_table.firmware_revision,
     }) catch unreachable;
 
-    const lines: []const []const u8 = &.{
-        \\Array(16).join("wat" - 1) + " Batman!"
-        ,
-        \\throw new Error("Oops!")
-        ,
-    };
-    for (lines) |source_text| {
-        stdout.print("> {s}\r\n", .{source_text}) catch unreachable;
+    var editor = Editor.init(allocator, .{});
+    defer editor.deinit();
+
+    while (true) {
+        const source_text = editor.getLine("> ") catch |err| switch (err) {
+            error.Eof => break,
+            else => {
+                stderr.print("Error: {!}\r\n", .{err}) catch unreachable;
+                continue;
+            },
+        };
+        defer allocator.free(source_text);
+
+        // Directly show another prompt when spamming enter, whitespace is evaluated
+        // however (and will print 'undefined').
+        if (source_text.len == 0) continue;
+
         if (run(allocator, realm, source_text)) |result| {
             stdout.print("{pretty}\r\n", .{result}) catch unreachable;
         } else |err| switch (err) {
             error.OutOfMemory => return .OutOfResources,
-            error.ParseError => unreachable,
+            error.ParseError => stderr.print("Invalid syntax in input: {s}\r\n", .{source_text}) catch unreachable,
             error.ExceptionThrown => {
                 const exception = agent.clearException();
                 stderr.print("Uncaught exception: {pretty}\r\n", .{exception}) catch unreachable;
@@ -107,5 +118,5 @@ pub fn main() std.os.uefi.Status {
         }
     }
 
-    while (true) std.atomic.spinLoopHint();
+    return .Success;
 }
