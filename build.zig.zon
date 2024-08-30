@@ -3,12 +3,13 @@
     .version = "0.1.0",
     .dependencies = .{
         .any_pointer = .{
-            .url = "https://github.com/ikskuh/any-pointer/archive/33851c78c2dd6bd1921dee2aac17a441b285aec7.tar.gz",
-            .hash = "122068e632c479fa771ed988bf36c10db5bd0b2918b92569b2fa440785e4013055a8",
+            // FIXME: This points to https://github.com/ikskuh/any-pointer/pull/10, update once merged
+            .url = "https://github.com/ikskuh/any-pointer/archive/4f4fcf736ceae0bfa172c68b6c56333ce139cd47.tar.gz",
+            .hash = "12200da24a57da99d213b012c3af926202c8535517f502caef7238d0e952e2dd1808",
         },
         .icu4zig = .{
-            .url = "https://codeberg.org/linusg/icu4zig/archive/84b6c77fcb3dbf08c3f8c03ba88ff2f7b3504c6f.tar.gz",
-            .hash = "1220a3d479dc6b2c29e8edaa0413014867163050389977b479ec73d94032b384f69f",
+            .url = "https://codeberg.org/linusg/icu4zig/archive/57a6b951246b75e2e58e7beefd95b24c7ad51d93.tar.gz",
+            .hash = "1220b7f7a9e40ad34ebc5ccbce8ccdcb3a104cd99b25e2df1b65277678206263a60c",
             .lazy = true,
         },
         .kiesel_runtime = .{
@@ -33,20 +34,22 @@
             .lazy = true,
         },
         .parser_toolkit = .{
-            .url = "https://github.com/ikskuh/parser-toolkit/archive/0f3e2179346fa9948556595cbbb1c7ca575877d7.tar.gz",
-            .hash = "1220989ea38c6e870da7cf5012b552813d2867f010b4964ef7cbd137b1c534d5b0be",
+            // FIXME: This points to https://github.com/ikskuh/parser-toolkit/pull/15, update once merged
+            .url = "https://github.com/ikskuh/parser-toolkit/archive/17754610741d862b2d4638d6651c23740df6a1d8.tar.gz",
+            .hash = "122020dcea6890882c8abe90b9e3ecf1af54b8a60ce1295c4e92d40fffcae3158e7d",
         },
         .zig_args = .{
-            .url = "https://github.com/ikskuh/zig-args/archive/03af1b6c5bfda9646a562c861055024daed5b238.tar.gz",
-            .hash = "1220904d2fdcd970dd0d216211d092eb3ef6da01117163cc9393ab845a1d66c029d9",
+            // FIXME: This points to https://github.com/ikskuh/zig-args/pull/61, update once merged
+            .url = "https://github.com/ikskuh/zig-args/archive/ea9c72f785cfffa1f9764a927fdfa5d0ffa6c5f1.tar.gz",
+            .hash = "1220411a8c46d95bbf3b6e2059854bcb3c5159d428814099df5294232b9980517e9c",
         },
         .zig_stackinfo = .{
             .url = "https://codeberg.org/linusg/zig-stackinfo/archive/9d02cd3077250fe7b0cbaef9eafd5c7e40c84b89.tar.gz",
             .hash = "12207b3a0abfdf208a6f456d31f3f03054dda60db0d8e88065aee202a3195f8b00e0",
         },
         .zigline = .{
-            .url = "https://github.com/alimpfard/zigline/archive/038584c5c73464fd1b6e982c0860177ae5e96ca0.tar.gz",
-            .hash = "1220563be3c200eafac9338551e87fd88e8520582ee532043b954738fdc3a88e27cc",
+            .url = "https://github.com/alimpfard/zigline/archive/83c078ba07c6474a1b4de6b8d2da393dffde7df2.tar.gz",
+            .hash = "12209e70eee0d5da2b41710361ed00796c0860663e747f40052042fd85ff752b0b9b",
         },
     },
     .paths = .{

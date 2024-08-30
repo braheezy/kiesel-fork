@@ -236,7 +236,7 @@ pub fn isDetachedBuffer(array_buffer: anytype) bool {
             .shared_array_buffer => false,
         };
     } else {
-        comptime std.debug.assert(@typeInfo(@TypeOf(array_buffer)).Pointer.child == ArrayBuffer);
+        comptime std.debug.assert(@typeInfo(@TypeOf(array_buffer)).pointer.child == ArrayBuffer);
         return array_buffer.fields.array_buffer_data == null;
     }
 }
@@ -329,7 +329,7 @@ pub fn isFixedLengthArrayBuffer(array_buffer: anytype) bool {
             .shared_array_buffer => |object| object.fields.array_buffer_max_byte_length == null,
         };
     } else {
-        comptime std.debug.assert(@typeInfo(@TypeOf(array_buffer)).Pointer.child == ArrayBuffer);
+        comptime std.debug.assert(@typeInfo(@TypeOf(array_buffer)).pointer.child == ArrayBuffer);
         return array_buffer.fields.array_buffer_max_byte_length == null;
     }
 }

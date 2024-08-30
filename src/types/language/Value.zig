@@ -98,7 +98,7 @@ const TaggedUnionImpl = union(enum) {
     pub inline fn from(value: anytype) TaggedUnionImpl {
         const T = @TypeOf(value);
         const is_number = switch (@typeInfo(T)) {
-            .Int, .ComptimeInt, .Float, .ComptimeFloat => true,
+            .int, .comptime_int, .float, .comptime_float => true,
             else => false,
         };
         if (T == bool) {
@@ -224,7 +224,7 @@ const NanBoxingImpl = enum(u64) {
         const tag_bits: u64 = @as(u64, @intFromEnum(tag)) << payload_len;
         if (T == f64) {
             return @bitCast(payload);
-        } else if (@typeInfo(T) == .Pointer) {
+        } else if (@typeInfo(T) == .pointer) {
             const high_sign_bit = @bitReverse(@as(u64, sign_bit));
             const ptr_bits = @intFromPtr(payload);
             std.debug.assert(nan_mask & ptr_bits == 0);
@@ -254,7 +254,7 @@ const NanBoxingImpl = enum(u64) {
         std.debug.assert(self.getTag() == tag);
         const T = TagPayload(tag, sign_bit);
         const bits: u64 = @intFromEnum(self);
-        if (@typeInfo(T) == .Pointer) {
+        if (@typeInfo(T) == .pointer) {
             const ptr_bits: if (@sizeOf(T) >= 8) u48 else usize = @truncate(bits);
             return @ptrFromInt(ptr_bits);
         } else {
@@ -266,7 +266,7 @@ const NanBoxingImpl = enum(u64) {
     pub inline fn from(value: anytype) NanBoxingImpl {
         const T = @TypeOf(value);
         const is_number = switch (@typeInfo(T)) {
-            .Int, .ComptimeInt, .Float, .ComptimeFloat => true,
+            .int, .comptime_int, .float, .comptime_float => true,
             else => false,
         };
         if (T == bool) {

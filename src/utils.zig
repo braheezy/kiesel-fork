@@ -46,7 +46,7 @@ pub fn temporaryChange(
     new_value: @TypeOf(field.*),
 ) TemporaryChange(@TypeOf(field.*)) {
     const T = @TypeOf(field);
-    if (@typeInfo(T) != .Pointer) {
+    if (@typeInfo(T) != .pointer) {
         @compileError("temporaryChange() called with incompatible type " ++ @typeName(T));
     }
     defer field.* = new_value;
@@ -58,9 +58,9 @@ pub inline fn isZigString(comptime T: type) bool {
     return comptime blk: {
         // Only pointer types can be strings, no optionals
         const info = @typeInfo(T);
-        if (info != .Pointer) break :blk false;
+        if (info != .pointer) break :blk false;
 
-        const ptr = &info.Pointer;
+        const ptr = &info.pointer;
         // Check for CV qualifiers that would prevent coerction to []const u8
         if (ptr.is_volatile or ptr.is_allowzero) break :blk false;
 
@@ -72,8 +72,8 @@ pub inline fn isZigString(comptime T: type) bool {
         // Otherwise check if it's an array type that coerces to slice.
         if (ptr.size == .One) {
             const child = @typeInfo(ptr.child);
-            if (child == .Array) {
-                const arr = &child.Array;
+            if (child == .array) {
+                const arr = &child.array;
                 break :blk arr.child == u8;
             }
         }

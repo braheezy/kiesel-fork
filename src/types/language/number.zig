@@ -48,8 +48,8 @@ pub const Number = union(enum) {
     pub inline fn from(number: anytype) Self {
         const T = @TypeOf(number);
         switch (@typeInfo(T)) {
-            .Int, .ComptimeInt => {
-                if (@typeInfo(T) == .Int and @typeInfo(T).Int.bits > 53) {
+            .int, .comptime_int => {
+                if (@typeInfo(T) == .int and @typeInfo(T).int.bits > 53) {
                     @compileError("Number.from() is only safe up to 53 bit integers");
                 }
                 if (std.math.cast(i32, number)) |x| {
@@ -57,7 +57,7 @@ pub const Number = union(enum) {
                 }
                 return .{ .f64 = @floatFromInt(number) };
             },
-            .Float, .ComptimeFloat => {
+            .float, .comptime_float => {
                 const truncated = std.math.trunc(number);
                 if (std.math.isFinite(@as(f64, number)) and
                     !std.math.signbit(@as(f64, number)) and
