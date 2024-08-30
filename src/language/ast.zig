@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const libregexp = @import("../c/libregexp.zig").libregexp;
 
 const language = @import("../language.zig");
@@ -39,7 +37,7 @@ pub const LexicallyScopedDeclaration = union(enum) {
     pub fn collectBoundNames(
         self: LexicallyScopedDeclaration,
         bound_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         switch (self) {
             // ExportDeclaration : export default AssignmentExpression ;
             .export_declaration => {
@@ -232,7 +230,10 @@ pub const NumericLiteral = struct {
 
     /// 12.9.3.3 Static Semantics: NumericValue
     /// https://tc39.es/ecma262/#sec-numericvalue
-    pub fn numericValue(self: NumericLiteral, allocator: Allocator) Allocator.Error!Value {
+    pub fn numericValue(
+        self: NumericLiteral,
+        allocator: std.mem.Allocator,
+    ) std.mem.Allocator.Error!Value {
         const base: u8 = switch (self.system) {
             .binary => 2,
             .octal => 8,
@@ -270,7 +271,10 @@ pub const NumericLiteral = struct {
     }
 };
 
-pub fn stringValueImpl(allocator: Allocator, text: []const u8) Allocator.Error!String {
+pub fn stringValueImpl(
+    allocator: std.mem.Allocator,
+    text: []const u8,
+) std.mem.Allocator.Error!String {
     var result = String.Builder.init(allocator);
     try result.segments.ensureTotalCapacity(text.len);
     defer result.deinit();
@@ -347,7 +351,10 @@ pub const StringLiteral = struct {
 
     /// 12.9.4.2 Static Semantics: SV
     /// https://tc39.es/ecma262/#sec-static-semantics-sv
-    pub fn stringValue(self: StringLiteral, allocator: Allocator) Allocator.Error!String {
+    pub fn stringValue(
+        self: StringLiteral,
+        allocator: std.mem.Allocator,
+    ) std.mem.Allocator.Error!String {
         std.debug.assert(self.text.len >= 2);
         return stringValueImpl(allocator, self.text[1 .. self.text.len - 1]);
     }
@@ -412,8 +419,8 @@ pub const RegularExpressionLiteral = struct {
     /// https://tc39.es/ecma262/#sec-isvalidregularexpressionliteral
     pub fn isValidRegularExpressionLiteral(
         self: RegularExpressionLiteral,
-        allocator: Allocator,
-    ) Allocator.Error!ValidationResult {
+        allocator: std.mem.Allocator,
+    ) std.mem.Allocator.Error!ValidationResult {
         // 1. Let flags be the FlagText of literal.
         // 2. If flags contains any code points other than d, g, i, m, s, u, v, or y, or if flags
         //    contains any code point more than once, return false.
@@ -461,7 +468,10 @@ pub const TemplateLiteral = struct {
 
         /// 12.9.6.1 Static Semantics: TV
         /// https://tc39.es/ecma262/#sec-static-semantics-tv
-        pub fn templateValue(self: Span, allocator: Allocator) Allocator.Error!String {
+        pub fn templateValue(
+            self: Span,
+            allocator: std.mem.Allocator,
+        ) std.mem.Allocator.Error!String {
             std.debug.assert(self.text[0] == '`' or self.text[0] == '}');
             return if (self.text[self.text.len - 1] == '`')
                 stringValueImpl(allocator, self.text[1 .. self.text.len - 1])
@@ -471,7 +481,10 @@ pub const TemplateLiteral = struct {
 
         /// 12.9.6.2 Static Semantics: TRV
         /// https://tc39.es/ecma262/#sec-static-semantics-trv
-        pub fn templateRawValue(self: Span, allocator: Allocator) Allocator.Error!String {
+        pub fn templateRawValue(
+            self: Span,
+            allocator: std.mem.Allocator,
+        ) std.mem.Allocator.Error!String {
             std.debug.assert(self.text[0] == '`' or self.text[0] == '}');
             return if (self.text[self.text.len - 1] == '`')
                 String.fromUtf8(allocator, self.text[1 .. self.text.len - 1])
@@ -481,7 +494,11 @@ pub const TemplateLiteral = struct {
 
         /// 13.2.8.3 Static Semantics: TemplateString ( templateToken, raw )
         /// https://tc39.es/ecma262/#sec-templatestring
-        pub fn templateString(self: Span, allocator: Allocator, raw: bool) Allocator.Error!String {
+        pub fn templateString(
+            self: Span,
+            allocator: std.mem.Allocator,
+            raw: bool,
+        ) std.mem.Allocator.Error!String {
             // 1. If raw is true, then
             const string = if (raw) blk: {
                 // a. Let string be the TRV of templateToken.
@@ -502,9 +519,9 @@ pub const TemplateLiteral = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-templatestrings
     pub fn templateStrings(
         self: TemplateLiteral,
-        allocator: Allocator,
+        allocator: std.mem.Allocator,
         raw: bool,
-    ) Allocator.Error![]const String {
+    ) std.mem.Allocator.Error![]const String {
         var template_strings = std.ArrayList(String).init(allocator);
         for (self.spans) |span| switch (span) {
             .text => try template_strings.append(try span.templateString(allocator, raw)),
@@ -775,7 +792,7 @@ pub const Statement = union(enum) {
     pub fn collectVarDeclaredNames(
         self: Statement,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         switch (self) {
             // Statement :
             //     EmptyStatement
@@ -815,7 +832,7 @@ pub const Statement = union(enum) {
     pub fn collectVarScopedDeclarations(
         self: Statement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         switch (self) {
             // Statement :
             //     EmptyStatement
@@ -869,7 +886,7 @@ pub const Declaration = union(enum) {
     pub fn collectBoundNames(
         self: Declaration,
         bound_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         switch (self) {
             inline else => |node| try node.collectBoundNames(bound_names),
         }
@@ -888,7 +905,7 @@ pub const HoistableDeclaration = union(enum) {
     pub fn collectBoundNames(
         self: HoistableDeclaration,
         bound_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         switch (self) {
             inline else => |node| try node.collectBoundNames(bound_names),
         }
@@ -935,7 +952,7 @@ pub const StatementList = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: StatementList,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let declarations1 be the LexicallyScopedDeclarations of StatementList.
         // 2. Let declarations2 be the LexicallyScopedDeclarations of StatementListItem.
@@ -950,7 +967,7 @@ pub const StatementList = struct {
     pub fn collectVarDeclaredNames(
         self: StatementList,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let names1 be the VarDeclaredNames of StatementList.
         // 2. Let names2 be the VarDeclaredNames of StatementListItem.
@@ -967,7 +984,7 @@ pub const StatementList = struct {
     pub fn collectVarScopedDeclarations(
         self: StatementList,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let declarations1 be the VarScopedDeclarations of StatementList.
         // 2. Let declarations2 be the VarScopedDeclarations of StatementListItem.
@@ -984,7 +1001,7 @@ pub const StatementList = struct {
     pub fn collectTopLevelLexicallyScopedDeclarations(
         self: StatementList,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let declarations1 be the TopLevelLexicallyScopedDeclarations of StatementList.
         // 2. Let declarations2 be the TopLevelLexicallyScopedDeclarations of StatementListItem.
@@ -999,7 +1016,7 @@ pub const StatementList = struct {
     pub fn collectTopLevelVarDeclaredNames(
         self: StatementList,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let names1 be the TopLevelVarDeclaredNames of StatementList.
         // 2. Let names2 be the TopLevelVarDeclaredNames of StatementListItem.
@@ -1038,7 +1055,7 @@ pub const StatementList = struct {
     pub fn collectTopLevelVarScopedDeclarations(
         self: StatementList,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
         // 1. Let declarations1 be the TopLevelVarScopedDeclarations of StatementList.
         // 2. Let declarations2 be the TopLevelVarScopedDeclarations of StatementListItem.
@@ -1106,7 +1123,7 @@ pub const StatementListItem = union(enum) {
     pub fn collectLexicallyScopedDeclarations(
         self: StatementListItem,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         switch (self) {
             // StatementListItem : Statement
             .statement => |statement| switch (statement.*) {
@@ -1135,7 +1152,7 @@ pub const StatementListItem = union(enum) {
     pub fn collectVarDeclaredNames(
         self: StatementListItem,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         switch (self) {
             .statement => |statement| try statement.collectVarDeclaredNames(var_declared_names),
             .declaration => {},
@@ -1147,7 +1164,7 @@ pub const StatementListItem = union(enum) {
     pub fn collectVarScopedDeclarations(
         self: StatementListItem,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         switch (self) {
             .statement => |statement| try statement.collectVarScopedDeclarations(var_scoped_declarations),
             .declaration => {},
@@ -1159,7 +1176,7 @@ pub const StatementListItem = union(enum) {
     pub fn collectTopLevelLexicallyScopedDeclarations(
         self: StatementListItem,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         switch (self) {
             // StatementListItem : Statement
             .statement => {
@@ -1202,7 +1219,7 @@ pub const LexicalDeclaration = struct {
     pub fn collectBoundNames(
         self: LexicalDeclaration,
         bound_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // LexicalDeclaration : LetOrConst BindingList ;
         // 1. Return the BoundNames of BindingList.
         try self.binding_list.collectBoundNames(bound_names);
@@ -1237,7 +1254,7 @@ pub const BindingList = struct {
     pub fn collectBoundNames(
         self: BindingList,
         bound_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // BindingList : BindingList , LexicalBinding
         // 1. Let names1 be the BoundNames of BindingList.
         // 2. Let names2 be the BoundNames of LexicalBinding.
@@ -1264,7 +1281,7 @@ pub const LexicalBinding = union(enum) {
     pub fn collectBoundNames(
         self: LexicalBinding,
         bound_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         switch (self) {
             // LexicalBinding : BindingIdentifier Initializer[opt]
             .binding_identifier => |binding_identifier| {
@@ -1294,7 +1311,7 @@ pub const VariableDeclarationList = struct {
     pub fn collectVarDeclaredNames(
         self: VariableDeclarationList,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // VariableStatement : var VariableDeclarationList ;
         // 1. Return the BoundNames of VariableDeclarationList.
         try self.collectBoundNames(var_declared_names);
@@ -1305,7 +1322,7 @@ pub const VariableDeclarationList = struct {
     pub fn collectBoundNames(
         self: VariableDeclarationList,
         bound_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // VariableDeclarationList : VariableDeclarationList , VariableDeclaration
         // 1. Let names1 be the BoundNames of VariableDeclarationList.
         // 2. Let names2 be the BoundNames of VariableDeclaration.
@@ -1323,7 +1340,7 @@ pub const VariableDeclarationList = struct {
     pub fn collectVarScopedDeclarations(
         self: VariableDeclarationList,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // VariableDeclarationList : VariableDeclaration
         // 1. Return « VariableDeclaration ».
         // VariableDeclarationList : VariableDeclarationList , VariableDeclaration
@@ -1352,7 +1369,7 @@ pub const BindingPattern = union(enum) {
     pub fn collectBoundNames(
         self: BindingPattern,
         bound_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         switch (self) {
             // ObjectBindingPattern : { }
             // ObjectBindingPattern : { BindingPropertyList , BindingRestProperty }
@@ -1540,7 +1557,7 @@ pub const IfStatement = struct {
     pub fn collectVarDeclaredNames(
         self: IfStatement,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // IfStatement : if ( Expression ) Statement
         // 1. Return the VarDeclaredNames of Statement.
         // IfStatement : if ( Expression ) Statement else Statement
@@ -1558,7 +1575,7 @@ pub const IfStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: IfStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // IfStatement : if ( Expression ) Statement
         // 1. Return the VarScopedDeclarations of Statement.
         // IfStatement : if ( Expression ) Statement else Statement
@@ -1590,7 +1607,7 @@ pub const DoWhileStatement = struct {
     pub fn collectVarDeclaredNames(
         self: DoWhileStatement,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // DoWhileStatement : do Statement while ( Expression ) ;
         // 1. Return the VarDeclaredNames of Statement.
         try self.consequent_statement.collectVarDeclaredNames(var_declared_names);
@@ -1601,7 +1618,7 @@ pub const DoWhileStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: DoWhileStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // DoWhileStatement : do Statement while ( Expression ) ;
         // 1. Return the VarScopedDeclarations of Statement.
         try self.consequent_statement.collectVarScopedDeclarations(var_scoped_declarations);
@@ -1618,7 +1635,7 @@ pub const WhileStatement = struct {
     pub fn collectVarDeclaredNames(
         self: WhileStatement,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // WhileStatement : while ( Expression ) Statement
         // 1. Return the VarDeclaredNames of Statement.
         try self.consequent_statement.collectVarDeclaredNames(var_declared_names);
@@ -1629,7 +1646,7 @@ pub const WhileStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: WhileStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // WhileStatement : while ( Expression ) Statement
         // 1. Return the VarScopedDeclarations of Statement.
         try self.consequent_statement.collectVarScopedDeclarations(var_scoped_declarations);
@@ -1654,7 +1671,7 @@ pub const ForStatement = struct {
     pub fn collectVarDeclaredNames(
         self: ForStatement,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
         // 1. Let names1 be the BoundNames of VariableDeclarationList.
         // 2. Let names2 be the VarDeclaredNames of Statement.
@@ -1677,7 +1694,7 @@ pub const ForStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: ForStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
         // 1. Let declarations1 be the VarScopedDeclarations of VariableDeclarationList.
         // 2. Let declarations2 be the VarScopedDeclarations of Statement.
@@ -1720,7 +1737,7 @@ pub const ForInOfStatement = struct {
     pub fn collectVarDeclaredNames(
         self: ForInOfStatement,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // ForInOfStatement :
         //     for ( LeftHandSideExpression in Expression ) Statement
         //     for ( ForDeclaration in Expression ) Statement
@@ -1750,7 +1767,7 @@ pub const ForInOfStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: ForInOfStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // ForInOfStatement :
         //     for ( LeftHandSideExpression in Expression ) Statement
         //     for ( ForDeclaration in Expression ) Statement
@@ -1815,7 +1832,7 @@ pub const WithStatement = struct {
     pub fn collectVarDeclaredNames(
         self: WithStatement,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // WithStatement : with ( Expression ) Statement
         // 1. Return the VarDeclaredNames of Statement.
         try self.statement.collectVarDeclaredNames(var_declared_names);
@@ -1826,7 +1843,7 @@ pub const WithStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: WithStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // WithStatement : with ( Expression ) Statement
         // 1. Return the VarScopedDeclarations of Statement.
         try self.statement.collectVarScopedDeclarations(var_scoped_declarations);
@@ -1843,7 +1860,7 @@ pub const SwitchStatement = struct {
     pub fn collectVarDeclaredNames(
         self: SwitchStatement,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // SwitchStatement : switch ( Expression ) CaseBlock
         // 1. Return the VarDeclaredNames of CaseBlock.
         try self.case_block.collectVarDeclaredNames(var_declared_names);
@@ -1854,7 +1871,7 @@ pub const SwitchStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: SwitchStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // SwitchStatement : switch ( Expression ) CaseBlock
         // 1. Return the VarScopedDeclarations of CaseBlock.
         try self.case_block.collectVarScopedDeclarations(var_scoped_declarations);
@@ -1875,7 +1892,7 @@ pub const CaseBlock = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: CaseBlock,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // CaseBlock : { }
         // 1. Return a new empty List.
         // CaseBlock : { CaseClauses[opt] DefaultClause CaseClauses[opt] }
@@ -1899,7 +1916,7 @@ pub const CaseBlock = struct {
     pub fn collectVarDeclaredNames(
         self: CaseBlock,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // CaseBlock : { }
         // 1. Return a new empty List.
         // CaseBlock : { CaseClauses[opt] DefaultClause CaseClauses[opt] }
@@ -1923,7 +1940,7 @@ pub const CaseBlock = struct {
     pub fn collectVarScopedDeclarations(
         self: CaseBlock,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // CaseBlock : { }
         // 1. Return a new empty List.
         // CaseBlock : { CaseClauses[opt] DefaultClause CaseClauses[opt] }
@@ -1953,7 +1970,7 @@ pub const CaseClause = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: CaseClause,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // CaseClause : case Expression : StatementList[opt]
         // 1. If the StatementList is present, return the LexicallyScopedDeclarations of StatementList.
         // 2. Return a new empty List.
@@ -1965,7 +1982,7 @@ pub const CaseClause = struct {
     pub fn collectVarDeclaredNames(
         self: CaseClause,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // CaseClause : case Expression : StatementList[opt]
         // 1. If the StatementList is present, return the VarDeclaredNames of StatementList.
         // 2. Return a new empty List.
@@ -1977,7 +1994,7 @@ pub const CaseClause = struct {
     pub fn collectVarScopedDeclarations(
         self: CaseClause,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // CaseClause : case Expression : StatementList[opt]
         // 1. If the StatementList is present, return the VarScopedDeclarations of StatementList.
         // 2. Return a new empty List.
@@ -1994,7 +2011,7 @@ pub const DefaultClause = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: DefaultClause,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // DefaultClause : default : StatementList[opt]
         // 1. If the StatementList is present, return the LexicallyScopedDeclarations of StatementList.
         // 2. Return a new empty List.
@@ -2006,7 +2023,7 @@ pub const DefaultClause = struct {
     pub fn collectVarDeclaredNames(
         self: DefaultClause,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // DefaultClause : default : StatementList[opt]
         // 1. If the StatementList is present, return the VarDeclaredNames of StatementList.
         // 2. Return a new empty List.
@@ -2018,7 +2035,7 @@ pub const DefaultClause = struct {
     pub fn collectVarScopedDeclarations(
         self: DefaultClause,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // DefaultClause : default : StatementList[opt]
         // 1. If the StatementList is present, return the VarScopedDeclarations of StatementList.
         // 2. Return a new empty List.
@@ -2048,7 +2065,7 @@ pub const LabelledStatement = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: LabelledStatement,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         //  LabelledStatement : LabelIdentifier : LabelledItem
         // 1. Return the LexicallyScopedDeclarations of LabelledItem.
         switch (self.labelled_item) {
@@ -2072,7 +2089,7 @@ pub const LabelledStatement = struct {
     pub fn collectVarDeclaredNames(
         self: LabelledStatement,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         switch (self.labelled_item) {
             // LabelledStatement : LabelIdentifier : LabelledItem
             .statement => |statement| {
@@ -2092,7 +2109,7 @@ pub const LabelledStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: LabelledStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         switch (self.labelled_item) {
             //  LabelledStatement : LabelIdentifier : LabelledItem
             .statement => |statement| {
@@ -2112,7 +2129,7 @@ pub const LabelledStatement = struct {
     pub fn collectTopLevelVarDeclaredNames(
         self: LabelledStatement,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // LabelledStatement : LabelIdentifier : LabelledItem
         // 1. Return the TopLevelVarDeclaredNames of LabelledItem.
         switch (self.labelled_item) {
@@ -2142,7 +2159,7 @@ pub const LabelledStatement = struct {
     pub fn collectTopLevelVarScopedDeclarations(
         self: LabelledStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // LabelledStatement : LabelIdentifier : LabelledItem
         // 1. Return the TopLevelVarScopedDeclarations of LabelledItem.
         switch (self.labelled_item) {
@@ -2187,7 +2204,7 @@ pub const TryStatement = struct {
     pub fn collectVarDeclaredNames(
         self: TryStatement,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // TryStatement : try Block Catch
         // 1. Let names1 be the VarDeclaredNames of Block.
         // 2. Let names2 be the VarDeclaredNames of Catch.
@@ -2217,7 +2234,7 @@ pub const TryStatement = struct {
     pub fn collectVarScopedDeclarations(
         self: TryStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // TryStatement : try Block Catch
         // 1. Let declarations1 be the VarScopedDeclarations of Block.
         // 2. Let declarations2 be the VarScopedDeclarations of Catch.
@@ -2258,7 +2275,7 @@ pub const FormalParameters = struct {
     pub fn collectBoundNames(
         self: FormalParameters,
         bound_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // FormalParameterList : FormalParameterList , FormalParameter
         // 1. Let names1 be the BoundNames of FormalParameterList.
         // 2. Let names2 be the BoundNames of FormalParameter.
@@ -2370,7 +2387,7 @@ pub const FunctionDeclaration = struct {
     pub fn collectBoundNames(
         self: FunctionDeclaration,
         bound_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // FunctionDeclaration : function BindingIdentifier ( FormalParameters ) { FunctionBody }
         // 1. Return the BoundNames of BindingIdentifier.
         // FunctionDeclaration : function ( FormalParameters ) { FunctionBody }
@@ -2416,7 +2433,7 @@ pub const FunctionBody = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: FunctionBody,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // FunctionStatementList : [empty]
         // 1. Return a new empty List.
         // FunctionStatementList : StatementList
@@ -2429,7 +2446,7 @@ pub const FunctionBody = struct {
     pub fn collectVarDeclaredNames(
         self: FunctionBody,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // FunctionStatementList : [empty]
         // 1. Return a new empty List.
         // FunctionStatementList : StatementList
@@ -2442,7 +2459,7 @@ pub const FunctionBody = struct {
     pub fn collectVarScopedDeclarations(
         self: FunctionBody,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // FunctionStatementList : [empty]
         // 1. Return a new empty List.
         // FunctionStatementList : StatementList
@@ -2502,7 +2519,7 @@ pub const GeneratorDeclaration = struct {
     pub fn collectBoundNames(
         self: GeneratorDeclaration,
         bound_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // GeneratorDeclaration : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
         // 1. Return the BoundNames of BindingIdentifier.
         // GeneratorDeclaration : function * ( FormalParameters ) { GeneratorBody }
@@ -2541,7 +2558,7 @@ pub const AsyncGeneratorDeclaration = struct {
     pub fn collectBoundNames(
         self: AsyncGeneratorDeclaration,
         bound_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // AsyncGeneratorDeclaration : async function * BindingIdentifier ( FormalParameters ) { AsyncGeneratorBody }
         // 1. Return the BoundNames of BindingIdentifier.
         // AsyncGeneratorDeclaration : async function * ( FormalParameters ) { AsyncGeneratorBody }
@@ -2579,7 +2596,7 @@ pub const ClassDeclaration = struct {
     pub fn collectBoundNames(
         self: ClassDeclaration,
         bound_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // ClassDeclaration : class BindingIdentifier ClassTail
         // 1. Return the BoundNames of BindingIdentifier.
         // ClassDeclaration : class ClassTail
@@ -2638,8 +2655,8 @@ pub const ClassBody = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-nonconstructorelements
     pub fn nonConstructorElements(
         self: ClassBody,
-        allocator: Allocator,
-    ) Allocator.Error![]const ClassElement {
+        allocator: std.mem.Allocator,
+    ) std.mem.Allocator.Error![]const ClassElement {
         // ClassElementList : ClassElement
         // 1. If the ClassElementKind of ClassElement is non-constructor-method, then
         //     a. Return « ClassElement ».
@@ -2665,8 +2682,8 @@ pub const ClassBody = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-privateboundidentifiers
     pub fn privateBoundIdentifiers(
         self: ClassBody,
-        allocator: Allocator,
-    ) Allocator.Error![]const PrivateIdentifier {
+        allocator: std.mem.Allocator,
+    ) std.mem.Allocator.Error![]const PrivateIdentifier {
         // ClassElementList : ClassElementList ClassElement
         // 1. Let names1 be the PrivateBoundIdentifiers of ClassElementList.
         // 2. Let names2 be the PrivateBoundIdentifiers of ClassElement.
@@ -2846,7 +2863,7 @@ pub const AsyncFunctionDeclaration = struct {
     pub fn collectBoundNames(
         self: AsyncFunctionDeclaration,
         bound_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // AsyncFunctionDeclaration : async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
         // 1. Return the BoundNames of BindingIdentifier.
         // AsyncFunctionDeclaration : async function ( FormalParameters ) { AsyncFunctionBody }
@@ -2894,7 +2911,7 @@ pub const Script = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: Script,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // Script : [empty]
         // 1. Return a new empty List.
         // ScriptBody : StatementList
@@ -2907,7 +2924,7 @@ pub const Script = struct {
     pub fn collectVarDeclaredNames(
         self: Script,
         var_declared_names: *std.ArrayList(Identifier),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // Script : [empty]
         // 1. Return a new empty List.
         // ScriptBody : StatementList
@@ -2920,7 +2937,7 @@ pub const Script = struct {
     pub fn collectVarScopedDeclarations(
         self: Script,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // Script : [empty]
         // 1. Return a new empty List.
         // ScriptBody : StatementList
@@ -2946,7 +2963,7 @@ pub const Module = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: Module,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // Module : [empty]
         // 1. Return a new empty List.
         // ModuleItemList : ModuleItemList ModuleItem
@@ -2961,7 +2978,7 @@ pub const Module = struct {
     pub fn collectVarScopedDeclarations(
         self: Module,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         try self.module_item_list.collectVarScopedDeclarations(var_scoped_declarations);
     }
 
@@ -2969,8 +2986,8 @@ pub const Module = struct {
     /// https://tc39.es/ecma262/#sec-static-semantics-modulerequests
     pub fn moduleRequests(
         self: Module,
-        allocator: Allocator,
-    ) Allocator.Error![]const String {
+        allocator: std.mem.Allocator,
+    ) std.mem.Allocator.Error![]const String {
         // Module : [empty]
         // 1. Return a new empty List.
         // ModuleItemList : ModuleItem
@@ -3033,7 +3050,7 @@ pub const Module = struct {
     pub fn collectImportEntries(
         self: Module,
         import_entries: *std.ArrayList(ImportEntry),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // Module : [empty]
         // 1. Return a new empty List.
         // ModuleItemList : ModuleItemList ModuleItem
@@ -3068,7 +3085,7 @@ pub const Module = struct {
     pub fn collectExportEntries(
         self: Module,
         export_entries: *std.ArrayList(ExportEntry),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // Module : [empty]
         // 1. Return a new empty List.
         // ModuleItemList : ModuleItemList ModuleItem
@@ -3230,7 +3247,7 @@ pub const ModuleItemList = struct {
     pub fn collectLexicallyScopedDeclarations(
         self: ModuleItemList,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         for (self.items) |item| switch (item) {
             .statement_list_item => |statement_list_item| {
                 try statement_list_item.collectLexicallyScopedDeclarations(lexically_scoped_declarations);
@@ -3286,7 +3303,7 @@ pub const ModuleItemList = struct {
     pub fn collectVarScopedDeclarations(
         self: ModuleItemList,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // ModuleItemList : ModuleItemList ModuleItem
         // 1. Let declarations1 be the VarScopedDeclarations of ModuleItemList.
         // 2. Let declarations2 be the VarScopedDeclarations of ModuleItem.
@@ -3344,7 +3361,7 @@ pub const ImportClause = union(enum) {
         self: ImportClause,
         import_entries: *std.ArrayList(ImportEntry),
         module: String,
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         const allocator = import_entries.allocator;
         switch (self) {
             // TODO: ImportClause : ImportedDefaultBinding , NameSpaceImport
@@ -3479,7 +3496,7 @@ pub const ExportFromClause = union(enum) {
         self: ExportFromClause,
         export_entries: *std.ArrayList(ExportEntry),
         module: ?[]const u8,
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         const allocator = export_entries.allocator;
         switch (self) {
             // ExportFromClause : *
@@ -3535,7 +3552,7 @@ pub const NamedExports = struct {
         self: NamedExports,
         export_entries: *std.ArrayList(ExportEntry),
         module: ?[]const u8,
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         // ExportsList : ExportsList , ExportSpecifier
         // 1. Let specs1 be the ExportEntriesForModule of ExportsList with argument module.
         // 2. Let specs2 be the ExportEntriesForModule of ExportSpecifier with argument module.

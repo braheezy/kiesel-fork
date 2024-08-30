@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const default_host_hooks = @import("default_host_hooks.zig");
 const execution = @import("../execution.zig");
@@ -50,17 +48,17 @@ hostCallJobCallback: *const fn (
 hostEnqueueFinalizationRegistryCleanupJob: *const fn (
     agent: *Agent,
     cell: *Cell,
-) Allocator.Error!void = default_host_hooks.hostEnqueueFinalizationRegistryCleanupJob,
+) std.mem.Allocator.Error!void = default_host_hooks.hostEnqueueFinalizationRegistryCleanupJob,
 hostEnqueueGenericJob: *const fn (
     agent: *Agent,
     job: Job,
     realm: *Realm,
-) Allocator.Error!void = default_host_hooks.hostEnqueueGenericJob,
+) std.mem.Allocator.Error!void = default_host_hooks.hostEnqueueGenericJob,
 hostEnqueuePromiseJob: *const fn (
     agent: *Agent,
     job: Job,
     realm: ?*Realm,
-) Allocator.Error!void = default_host_hooks.hostEnqueuePromiseJob,
+) std.mem.Allocator.Error!void = default_host_hooks.hostEnqueuePromiseJob,
 hostEnsureCanAddPrivateElement: *const fn (
     agent: *Agent,
     object: Object,
@@ -77,7 +75,7 @@ hostFinalizeImportMeta: *const fn (
 ) void = default_host_hooks.hostFinalizeImportMeta,
 hostGetImportMetaProperties: *const fn (
     module: *SourceTextModule,
-) Allocator.Error!ImportMetaProperties = default_host_hooks.hostGetImportMetaProperties,
+) std.mem.Allocator.Error!ImportMetaProperties = default_host_hooks.hostGetImportMetaProperties,
 hostGrowSharedArrayBuffer: *const fn (
     buffer: *builtins.SharedArrayBuffer,
     new_byte_length: u53,
@@ -91,7 +89,7 @@ hostLoadImportedModule: *const fn (
     specifier: String,
     host_defined: SafePointer,
     payload: ImportedModulePayload,
-) Allocator.Error!void = default_host_hooks.hostLoadImportedModule,
+) std.mem.Allocator.Error!void = default_host_hooks.hostLoadImportedModule,
 hostMakeJobCallback: *const fn (
     callback: Object,
 ) JobCallback = default_host_hooks.hostMakeJobCallback,

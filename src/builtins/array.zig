@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const ordinary = @import("ordinary.zig");
@@ -372,7 +370,7 @@ pub fn arraySetLength(
 /// 23.1.2 Properties of the Array Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-array-constructor
 pub const ArrayConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Array",
@@ -381,7 +379,7 @@ pub const ArrayConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "from", from, 1, realm);
         try defineBuiltinFunction(object, "isArray", isArray, 1, realm);
         try defineBuiltinFunction(object, "of", of, 0, realm);
@@ -710,7 +708,7 @@ pub const ArrayConstructor = struct {
 /// 23.1.3 Properties of the Array Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-array-prototype-object
 pub const ArrayPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return arrayCreate(
             realm.agent,
             0,
@@ -718,7 +716,7 @@ pub const ArrayPrototype = struct {
         ) catch |err| try noexcept(err);
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinFunction(object, "concat", concat, 1, realm);
         try defineBuiltinFunction(object, "copyWithin", copyWithin, 2, realm);

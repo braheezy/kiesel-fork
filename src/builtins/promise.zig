@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -94,7 +92,7 @@ const ResolvingFunctions = struct {
 pub fn createResolvingFunctions(
     agent: *Agent,
     promise: *Promise,
-) Allocator.Error!ResolvingFunctions {
+) std.mem.Allocator.Error!ResolvingFunctions {
     const AlreadyResolved = struct { value: bool };
     const AdditionalFields = struct {
         promise: *Promise,
@@ -276,7 +274,11 @@ pub fn createResolvingFunctions(
 
 /// 27.2.1.4 FulfillPromise ( promise, value )
 /// https://tc39.es/ecma262/#sec-fulfillpromise
-pub fn fulfillPromise(agent: *Agent, promise: *Promise, value: Value) Allocator.Error!void {
+pub fn fulfillPromise(
+    agent: *Agent,
+    promise: *Promise,
+    value: Value,
+) std.mem.Allocator.Error!void {
     // 1. Assert: The value of promise.[[PromiseState]] is pending.
     std.debug.assert(promise.fields.promise_state == .pending);
 
@@ -402,7 +404,11 @@ pub fn newPromiseCapability(agent: *Agent, constructor: Value) Agent.Error!Promi
 
 /// 27.2.1.7 RejectPromise ( promise, reason )
 /// https://tc39.es/ecma262/#sec-rejectpromise
-pub fn rejectPromise(agent: *Agent, promise: *Promise, reason: Value) Allocator.Error!void {
+pub fn rejectPromise(
+    agent: *Agent,
+    promise: *Promise,
+    reason: Value,
+) std.mem.Allocator.Error!void {
     // 1. Assert: The value of promise.[[PromiseState]] is pending.
     std.debug.assert(promise.fields.promise_state == .pending);
 
@@ -438,7 +444,7 @@ pub fn triggerPromiseReactions(
     agent: *Agent,
     reactions: []const PromiseReaction,
     argument: Value,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. For each element reaction of reactions, do
     for (reactions) |reaction| {
         // a. Let job be NewPromiseReactionJob(reaction, argument).
@@ -479,7 +485,7 @@ pub fn newPromiseReactionJob(
     agent: *Agent,
     reaction: PromiseReaction,
     argument: Value,
-) Allocator.Error!struct { job: Job, realm: ?*Realm } {
+) std.mem.Allocator.Error!struct { job: Job, realm: ?*Realm } {
     const Captures = struct {
         agent: *Agent,
         reaction: PromiseReaction,
@@ -595,7 +601,7 @@ pub fn newPromiseResolveThenableJob(
     promise_to_resolve: *Promise,
     thenable: Object,
     then: JobCallback,
-) Allocator.Error!struct { job: Job, realm: *Realm } {
+) std.mem.Allocator.Error!struct { job: Job, realm: *Realm } {
     const Captures = struct {
         agent: *Agent,
         promise_to_resolve: *Promise,
@@ -1398,7 +1404,7 @@ pub fn performPromiseThen(
     on_fulfilled: Value,
     on_rejected: Value,
     result_capability: ?PromiseCapability,
-) Allocator.Error!?Object {
+) std.mem.Allocator.Error!?Object {
     // 1. Assert: IsPromise(promise) is true.
     // 2. If resultCapability is not present, then
     //     a. Set resultCapability to undefined.
@@ -1503,7 +1509,7 @@ pub fn performPromiseThen(
 /// 27.2.4 Properties of the Promise Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-constructor
 pub const PromiseConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Promise",
@@ -1512,7 +1518,7 @@ pub const PromiseConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "all", all, 1, realm);
         try defineBuiltinFunction(object, "allSettled", allSettled, 1, realm);
         try defineBuiltinFunction(object, "any", any, 1, realm);
@@ -1921,13 +1927,13 @@ pub const PromiseConstructor = struct {
 /// 27.2.5 Properties of the Promise Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-prototype-object
 pub const PromisePrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "catch", @"catch", 1, realm);
         try defineBuiltinFunction(object, "finally", finally, 1, realm);
         try defineBuiltinFunction(object, "then", then, 2, realm);

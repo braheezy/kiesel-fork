@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
@@ -585,7 +583,10 @@ pub fn parseDateTimeString(string: String) f64 {
 
 /// 21.4.4.41.1 TimeString ( tv )
 /// https://tc39.es/ecma262/#sec-timestring
-pub fn timeString(allocator: Allocator, time_value: f64) Allocator.Error![]const u8 {
+pub fn timeString(
+    allocator: std.mem.Allocator,
+    time_value: f64,
+) std.mem.Allocator.Error![]const u8 {
     // 1. Let hour be ToZeroPaddedDecimalString(ℝ(HourFromTime(tv)), 2).
     // 2. Let minute be ToZeroPaddedDecimalString(ℝ(MinFromTime(tv)), 2).
     // 3. Let second be ToZeroPaddedDecimalString(ℝ(SecFromTime(tv)), 2).
@@ -600,7 +601,10 @@ pub fn timeString(allocator: Allocator, time_value: f64) Allocator.Error![]const
 
 /// 21.4.4.41.2 DateString ( tv )
 /// https://tc39.es/ecma262/#sec-datestring
-pub fn dateString(allocator: Allocator, time_value: f64) Allocator.Error![]const u8 {
+pub fn dateString(
+    allocator: std.mem.Allocator,
+    time_value: f64,
+) std.mem.Allocator.Error![]const u8 {
     // 1. Let weekday be the Name of the entry in Table 62 with the Number WeekDay(tv).
     const weekday = week_day_names[weekDay(time_value)];
 
@@ -631,7 +635,10 @@ pub fn dateString(allocator: Allocator, time_value: f64) Allocator.Error![]const
 
 /// 21.4.4.41.3 TimeZoneString ( tv )
 /// https://tc39.es/ecma262/#sec-timezoneestring
-pub fn timeZoneString(allocator: Allocator, time_value: f64) Allocator.Error![]const u8 {
+pub fn timeZoneString(
+    allocator: std.mem.Allocator,
+    time_value: f64,
+) std.mem.Allocator.Error![]const u8 {
     // 1. Let systemTimeZoneIdentifier be SystemTimeZoneIdentifier().
     const system_time_zone_identifier = systemTimeZoneIdentifier();
 
@@ -680,7 +687,10 @@ pub fn timeZoneString(allocator: Allocator, time_value: f64) Allocator.Error![]c
 
 /// 21.4.4.41.4 ToDateString ( tv )
 /// https://tc39.es/ecma262/#sec-todatestring
-pub fn toDateString(allocator: Allocator, time_value: f64) Allocator.Error![]const u8 {
+pub fn toDateString(
+    allocator: std.mem.Allocator,
+    time_value: f64,
+) std.mem.Allocator.Error![]const u8 {
     // 1. If tv is NaN, return "Invalid Date".
     if (std.math.isNan(time_value)) return "Invalid Date";
 
@@ -698,7 +708,7 @@ pub fn toDateString(allocator: Allocator, time_value: f64) Allocator.Error![]con
 /// 21.4.3 Properties of the Date Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-date-constructor
 pub const DateConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 7,
             .name = "Date",
@@ -707,7 +717,7 @@ pub const DateConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "now", now, 0, realm);
         try defineBuiltinFunction(object, "parse", parse, 1, realm);
         try defineBuiltinFunction(object, "UTC", UTC, 7, realm);
@@ -884,13 +894,13 @@ pub const DateConstructor = struct {
 /// 21.4.4 Properties of the Date Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-date-prototype-object
 pub const DatePrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "getDate", getDate, 0, realm);
         try defineBuiltinFunction(object, "getDay", getDay, 0, realm);
         try defineBuiltinFunction(object, "getFullYear", getFullYear, 0, realm);

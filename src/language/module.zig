@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const language = @import("../language.zig");
@@ -34,13 +32,16 @@ pub const Module = union(enum) {
         self: Module,
         agent: *Agent,
         host_defined: ?SafePointer,
-    ) Allocator.Error!*builtins.Promise {
+    ) std.mem.Allocator.Error!*builtins.Promise {
         return switch (self) {
             inline else => |module| module.loadRequestedModules(agent, host_defined),
         };
     }
 
-    pub fn getExportedNames(self: Module, agent: *Agent) Allocator.Error![]const []const u8 {
+    pub fn getExportedNames(
+        self: Module,
+        agent: *Agent,
+    ) std.mem.Allocator.Error![]const []const u8 {
         return switch (self) {
             inline else => |module| module.getExportedNames(agent),
         };
@@ -50,7 +51,7 @@ pub const Module = union(enum) {
         self: Module,
         agent: *Agent,
         export_name: []const u8,
-    ) Allocator.Error!?ResolvedBindingOrAmbiguous {
+    ) std.mem.Allocator.Error!?ResolvedBindingOrAmbiguous {
         return switch (self) {
             inline else => |module| module.resolveExport(agent, export_name),
         };
@@ -62,7 +63,7 @@ pub const Module = union(enum) {
         };
     }
 
-    pub fn evaluate(self: Module, agent: *Agent) Allocator.Error!*builtins.Promise {
+    pub fn evaluate(self: Module, agent: *Agent) std.mem.Allocator.Error!*builtins.Promise {
         return switch (self) {
             inline else => |module| module.evaluate(agent),
         };
@@ -123,7 +124,7 @@ fn continueDynamicImport(
     agent: *Agent,
     promise_capability: PromiseCapability,
     module_completion: Agent.Error!Module,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. If moduleCompletion is an abrupt completion, then
     // 2. Let module be moduleCompletion.[[Value]].
     const module = module_completion catch |err| switch (err) {
@@ -319,7 +320,7 @@ pub fn finishLoadingImportedModule(
     specifier: String,
     payload: ImportedModulePayload,
     result: Agent.Error!Module,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. If result is a normal completion, then
     if (!std.meta.isError(result)) {
         switch (referrer) {
@@ -362,7 +363,7 @@ pub fn finishLoadingImportedModule(
 
 /// 16.2.1.10 GetModuleNamespace ( module )
 /// https://tc39.es/ecma262/#sec-getmodulenamespace
-pub fn getModuleNamespace(agent: *Agent, module: Module) Allocator.Error!Object {
+pub fn getModuleNamespace(agent: *Agent, module: Module) std.mem.Allocator.Error!Object {
     // 1. Assert: If module is a Cyclic Module Record, then module.[[Status]] is not new or unlinked.
     if (module == .source_text_module) {
         std.debug.assert(switch (module.source_text_module.status) {

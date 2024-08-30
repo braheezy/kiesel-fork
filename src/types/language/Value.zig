@@ -4,8 +4,6 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const build_options = @import("build-options");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
@@ -1375,7 +1373,7 @@ fn addValueToKeyedGroup(
     groups: anytype,
     key: anytype,
     value: Value,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. For each Record { [[Key]], [[Elements]] } g of groups, do
     //     a. If SameValue(g.[[Key]], key) is true, then
     if (groups.getPtr(key)) |group| {
@@ -1591,7 +1589,7 @@ pub fn isPromise(self: Value) bool {
 }
 
 /// Non-standard helper to get the right prototype for a primitive value, if applicable.
-pub fn synthesizePrototype(self: Value, agent: *Agent) Allocator.Error!?Object {
+pub fn synthesizePrototype(self: Value, agent: *Agent) std.mem.Allocator.Error!?Object {
     const realm = agent.currentRealm();
 
     return switch (self.type()) {
@@ -1613,7 +1611,10 @@ pub fn toPrivateName(self: Value) ?PrivateName {
 
 /// 7.1.4.1.1 StringToNumber ( str )
 /// https://tc39.es/ecma262/#sec-stringtonumber
-pub fn stringToNumber(allocator: Allocator, string: String) Allocator.Error!Number {
+pub fn stringToNumber(
+    allocator: std.mem.Allocator,
+    string: String,
+) std.mem.Allocator.Error!Number {
     // 1. Let literal be ParseText(str, StringNumericLiteral).
     // 2. If literal is a List of errors, return NaN.
     // 3. Return the StringNumericValue of literal.
@@ -1637,7 +1638,10 @@ pub fn stringToNumber(allocator: Allocator, string: String) Allocator.Error!Numb
 
 /// 7.1.14 StringToBigInt ( str )
 /// https://tc39.es/ecma262/#sec-stringtobigint
-pub fn stringToBigInt(allocator: Allocator, string: String) Allocator.Error!?BigInt {
+pub fn stringToBigInt(
+    allocator: std.mem.Allocator,
+    string: String,
+) std.mem.Allocator.Error!?BigInt {
     // 1. Let literal be ParseText(str, StringIntegerLiteral).
     // 2. If literal is a List of errors, return undefined.
     // 3. Let mv be the MV of literal.
@@ -1988,7 +1992,7 @@ pub fn isStrictlyEqual(x: Value, y: Value) bool {
 
 /// 7.3.17 CreateArrayFromList ( elements )
 /// https://tc39.es/ecma262/#sec-createarrayfromlist
-pub fn createArrayFromList(agent: *Agent, elements: []const Value) Allocator.Error!Object {
+pub fn createArrayFromList(agent: *Agent, elements: []const Value) std.mem.Allocator.Error!Object {
     // 1. Let array be ! ArrayCreate(0).
     const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
 
@@ -2011,8 +2015,8 @@ pub fn createArrayFromListMapToValue(
     agent: *Agent,
     comptime T: type,
     elements: []const T,
-    mapFn: fn (*Agent, T) Allocator.Error!Value,
-) Allocator.Error!Object {
+    mapFn: fn (*Agent, T) std.mem.Allocator.Error!Value,
+) std.mem.Allocator.Error!Object {
     // 1. Let array be ! ArrayCreate(0).
     const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
 

@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const icu4zig = @import("icu4zig");
 
 const abstract_operations = @import("abstract_operations.zig");
@@ -88,7 +86,7 @@ const AnySegmenter = union(enum) {
 /// 18.2 Properties of the Intl.Segmenter Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-segmenter-constructor
 pub const SegmenterConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "Segmenter",
@@ -97,7 +95,7 @@ pub const SegmenterConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         // 18.2.1 Intl.Segmenter.prototype
         // https://tc39.es/ecma402/#sec-intl.segmenter.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -194,13 +192,13 @@ pub const SegmenterConstructor = struct {
 /// 18.3 Properties of the Intl.Segmenter Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-segmenter-prototype-object
 pub const SegmenterPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "segment", segment, 1, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
@@ -316,7 +314,7 @@ fn createSegmentsObject(
     agent: *Agent,
     segmenter: *Segmenter,
     string: String,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // 1. Let internalSlotsList be « [[SegmentsSegmenter]], [[SegmentsString]] ».
@@ -341,13 +339,13 @@ fn createSegmentsObject(
 /// 18.5.2 The %IntlSegmentsPrototype% Object
 /// https://tc39.es/ecma402/#sec-%intlsegmentsprototype%-object
 pub const IntlSegmentsPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "containing", containing, 1, realm);
         try defineBuiltinFunction(object, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
     }
@@ -435,7 +433,7 @@ pub fn createSegmentIterator(
     agent: *Agent,
     segmenter: *Segmenter,
     string: String,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // 1. Let internalSlotsList be « [[IteratingSegmenter]], [[IteratedString]], [[IteratedStringNextSegmentCodeUnitIndex]] ».
@@ -461,13 +459,13 @@ pub fn createSegmentIterator(
 /// 18.6.2 The %IntlSegmentIteratorPrototype% Object
 /// https://tc39.es/ecma402/#sec-%intlsegmentiteratorprototype%-object
 pub const IntlSegmentIteratorPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 0, realm);
 
         // 18.6.2.2 %IntlSegmentIteratorPrototype% [ %Symbol.toStringTag% ]
@@ -546,7 +544,7 @@ fn createSegmentDataObject(
     start_index: usize,
     end_index: usize,
     is_word_like: bool,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // 1. Let len be the length of string.

@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const ast = @import("../language/ast.zig");
 const builtin_function = @import("./builtin_function.zig");
 const builtins = @import("../builtins.zig");
@@ -191,7 +189,7 @@ fn prepareForOrdinaryCall(
     agent: *Agent,
     function: *ECMAScriptFunction,
     new_target: ?Object,
-) Allocator.Error!*ExecutionContext {
+) std.mem.Allocator.Error!*ExecutionContext {
     // 1. Let callerContext be the running execution context.
     // NOTE: This is only used to suspend the context, which we don't do yet.
 
@@ -239,7 +237,7 @@ pub fn ordinaryCallBindThis(
     function: *ECMAScriptFunction,
     callee_context: *ExecutionContext,
     this_argument: Value,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. Let thisMode be F.[[ThisMode]].
     const this_mode = function.fields.this_mode;
 
@@ -415,7 +413,7 @@ fn evaluateAsyncFunctionBody(
     agent: *Agent,
     function: *ECMAScriptFunction,
     arguments_list: Arguments,
-) Allocator.Error!Completion {
+) std.mem.Allocator.Error!Completion {
     // AsyncFunctionBody : FunctionBody
     const realm = agent.currentRealm();
 
@@ -562,7 +560,7 @@ pub fn ordinaryFunctionCreate(
     this_mode: enum { lexical_this, non_lexical_this },
     env: Environment,
     private_env: ?*PrivateEnvironment,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     // 7. Let Strict be IsStrict(Body).
     const strict = body.strict;
 
@@ -639,7 +637,10 @@ pub fn ordinaryFunctionCreate(
 
 /// 10.2.4 AddRestrictedFunctionProperties ( F, realm )
 /// https://tc39.es/ecma262/#sec-addrestrictedfunctionproperties
-pub fn addRestrictedFunctionProperties(function: Object, realm: *Realm) Allocator.Error!void {
+pub fn addRestrictedFunctionProperties(
+    function: Object,
+    realm: *Realm,
+) std.mem.Allocator.Error!void {
     // 1. Assert: realm.[[Intrinsics]].[[%ThrowTypeError%]] exists and has been initialized.
     // 2. Let thrower be realm.[[Intrinsics]].[[%ThrowTypeError%]].
     const thrower = try realm.intrinsics.@"%ThrowTypeError%"();
@@ -678,7 +679,7 @@ pub fn makeConstructor(
         writable_prototype: bool = true,
         prototype: ?Object = null,
     },
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     const agent = function.agent();
     const realm = agent.currentRealm();
 
@@ -818,7 +819,7 @@ pub fn setFunctionName(
     function: Object,
     key: anytype,
     prefix: ?[]const u8,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     comptime std.debug.assert(@TypeOf(key) == PropertyKey or @TypeOf(key) == PropertyKeyOrPrivateName);
     const agent = function.agent();
 
@@ -894,7 +895,7 @@ pub fn setFunctionName(
 
 /// 10.2.10 SetFunctionLength ( F, length )
 /// https://tc39.es/ecma262/#sec-setfunctionlength
-pub fn setFunctionLength(function: Object, length: f64) Allocator.Error!void {
+pub fn setFunctionLength(function: Object, length: f64) std.mem.Allocator.Error!void {
     std.debug.assert(
         std.math.isPositiveInf(length) or
             (std.math.isFinite(length) and std.math.trunc(length) == length and length >= 0),

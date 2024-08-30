@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const build_options = @import("build-options");
 const libgc = @import("./c/libgc.zig").libgc;
 
@@ -13,7 +11,7 @@ pub const libgc_version: std.SemanticVersion = .{
 
 pub const GcAllocator = @import("gc/GcAllocator.zig");
 
-pub fn allocator() Allocator {
+pub fn allocator() std.mem.Allocator {
     if (libgc.GC_is_init_called() == 0) {
         libgc.GC_init();
         if (build_options.enable_nan_boxing) {

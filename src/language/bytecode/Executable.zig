@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const ast = @import("../ast.zig");
 const instructions_ = @import("instructions.zig");
 const types = @import("../../types.zig");
@@ -17,7 +15,7 @@ const sameValue = types.sameValue;
 
 const Executable = @This();
 
-allocator: Allocator,
+allocator: std.mem.Allocator,
 instructions: std.ArrayList(Instruction),
 constants: ValueArrayHashMap(void, sameValue),
 identifiers: StringArrayHashMap(void),
@@ -41,9 +39,9 @@ pub const AstNode = union(enum) {
 
 pub const IndexType = u16;
 
-pub const Error = error{IndexOutOfRange} || Allocator.Error;
+pub const Error = error{IndexOutOfRange} || std.mem.Allocator.Error;
 
-pub fn init(allocator: Allocator) Executable {
+pub fn init(allocator: std.mem.Allocator) Executable {
     return .{
         .allocator = allocator,
         .instructions = std.ArrayList(Instruction).init(allocator),
@@ -60,22 +58,22 @@ pub fn deinit(self: *Executable) void {
     self.ast_nodes.deinit();
 }
 
-pub fn addInstruction(self: *Executable, instruction: Instruction) Allocator.Error!void {
+pub fn addInstruction(self: *Executable, instruction: Instruction) std.mem.Allocator.Error!void {
     try self.instructions.append(instruction);
 }
 
-pub fn addConstant(self: *Executable, constant: Value) Allocator.Error!usize {
+pub fn addConstant(self: *Executable, constant: Value) std.mem.Allocator.Error!usize {
     const result = try self.constants.getOrPut(constant);
     return result.index;
 }
 
-pub fn addIdentifier(self: *Executable, identifier: ast.Identifier) Allocator.Error!usize {
+pub fn addIdentifier(self: *Executable, identifier: ast.Identifier) std.mem.Allocator.Error!usize {
     const string = try String.fromUtf8(self.allocator, identifier);
     const result = try self.identifiers.getOrPut(string);
     return result.index;
 }
 
-pub fn addAstNode(self: *Executable, ast_node: AstNode) Allocator.Error!void {
+pub fn addAstNode(self: *Executable, ast_node: AstNode) std.mem.Allocator.Error!void {
     try self.ast_nodes.append(ast_node);
 }
 
@@ -130,7 +128,7 @@ pub const JumpIndex = struct {
     }
 };
 
-pub fn addJumpIndex(self: *Executable) Allocator.Error!JumpIndex {
+pub fn addJumpIndex(self: *Executable) std.mem.Allocator.Error!JumpIndex {
     self.addIndex(0) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.IndexOutOfRange => unreachable,

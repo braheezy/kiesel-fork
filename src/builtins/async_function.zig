@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -29,7 +27,7 @@ const promiseResolve = builtins.promiseResolve;
 /// 27.7.2 Properties of the AsyncFunction Constructor
 /// https://tc39.es/ecma262/#sec-async-function-constructor-properties
 pub const AsyncFunctionConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "AsyncFunction",
@@ -38,7 +36,7 @@ pub const AsyncFunctionConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         // 27.7.2.1 AsyncFunction.prototype
         // https://tc39.es/ecma262/#sec-async-function-constructor-prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -76,13 +74,13 @@ pub const AsyncFunctionConstructor = struct {
 /// 27.7.3 Properties of the AsyncFunction Prototype Object
 /// https://tc39.es/ecma262/#sec-async-function-prototype-properties
 pub const AsyncFunctionPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         // 27.7.3.1 AsyncFunction.prototype.constructor
         // https://tc39.es/ecma262/#sec-async-function-prototype-properties-constructor
         try defineBuiltinProperty(
@@ -113,7 +111,7 @@ pub fn asyncFunctionStart(
     agent: *Agent,
     promise_capability: PromiseCapability,
     async_function: *builtins.ECMAScriptFunction,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. Let runningContext be the running execution context.
     const running_context = agent.runningExecutionContext();
 
@@ -135,7 +133,7 @@ pub fn asyncBlockStart(
     promise_capability: PromiseCapability,
     async_function: *builtins.ECMAScriptFunction,
     async_context: ExecutionContext,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. Let runningContext be the running execution context.
     const running_context = agent.runningExecutionContext();
 
@@ -146,7 +144,7 @@ pub fn asyncBlockStart(
             agent_: *Agent,
             promise_capability_: PromiseCapability,
             async_function_: *builtins.ECMAScriptFunction,
-        ) Allocator.Error!void {
+        ) std.mem.Allocator.Error!void {
             // a. Let acAsyncContext be the running execution context.
 
             // b. Let result be Completion(Evaluation of asyncBody).

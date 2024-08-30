@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -84,7 +82,7 @@ pub fn addEntriesFromIterable(
 /// 24.1.2 Properties of the Map Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-map-constructor
 pub const MapConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "Map",
@@ -93,7 +91,7 @@ pub const MapConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "groupBy", groupBy, 2, realm);
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
@@ -183,13 +181,13 @@ pub const MapConstructor = struct {
 /// 24.1.3 Properties of the Map Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-map-prototype-object
 pub const MapPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "clear", clear, 0, realm);
         try defineBuiltinFunction(object, "delete", delete, 1, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
@@ -455,7 +453,7 @@ pub const Map = MakeObject(.{
         iterable_keys: ?IterableKeys = null,
         active_iterators: usize = 0,
 
-        pub fn registerIterator(self: *@This()) Allocator.Error!*IterableKeys {
+        pub fn registerIterator(self: *@This()) std.mem.Allocator.Error!*IterableKeys {
             if (self.active_iterators == 0) {
                 std.debug.assert(self.iterable_keys == null);
                 self.iterable_keys = try IterableKeys.initCapacity(self.map_data.allocator, self.map_data.count());

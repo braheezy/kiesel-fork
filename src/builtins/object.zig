@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
@@ -37,7 +35,7 @@ const sameValue = types.sameValue;
 /// 20.1.2 Properties of the Object Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-object-constructor
 pub const ObjectConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object_ {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object_ {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Object",
@@ -46,7 +44,7 @@ pub const ObjectConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object_) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object_) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "assign", assign, 2, realm);
         try defineBuiltinFunction(object, "create", create_, 2, realm);
         try defineBuiltinFunction(object, "defineProperties", defineProperties, 2, realm);
@@ -431,7 +429,7 @@ pub const ObjectConstructor = struct {
         defer property_keys.deinit();
         return Value.from(
             try createArrayFromListMapToValue(agent, PropertyKey, property_keys.items, struct {
-                fn mapFn(agent_: *Agent, property_key: PropertyKey) Allocator.Error!Value {
+                fn mapFn(agent_: *Agent, property_key: PropertyKey) std.mem.Allocator.Error!Value {
                     return property_key.toValue(agent_);
                 }
             }.mapFn),
@@ -448,7 +446,7 @@ pub const ObjectConstructor = struct {
         defer property_keys.deinit();
         return Value.from(
             try createArrayFromListMapToValue(agent, PropertyKey, property_keys.items, struct {
-                fn mapFn(agent_: *Agent, property_key: PropertyKey) Allocator.Error!Value {
+                fn mapFn(agent_: *Agent, property_key: PropertyKey) std.mem.Allocator.Error!Value {
                     return property_key.toValue(agent_);
                 }
             }.mapFn),
@@ -692,7 +690,7 @@ pub const ObjectConstructor = struct {
 /// 20.1.3 Properties of the Object Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-object-prototype-object
 pub const ObjectPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object_ {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object_ {
         return Object.create(realm.agent, .{
             .prototype = null,
             .internal_methods = &.{
@@ -701,7 +699,7 @@ pub const ObjectPrototype = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object_) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object_) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "hasOwnProperty", hasOwnProperty, 1, realm);
         try defineBuiltinFunction(object, "isPrototypeOf", isPrototypeOf, 1, realm);
         try defineBuiltinFunction(object, "propertyIsEnumerable", propertyIsEnumerable, 1, realm);

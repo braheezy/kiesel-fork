@@ -1,8 +1,6 @@
 const ptk = @import("ptk");
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const build_options = @import("build-options");
 const ast = @import("ast.zig");
 const literals = @import("literals.zig");
@@ -20,7 +18,7 @@ const reserved_words = tokenizer_.reserved_words;
 
 const Parser = @This();
 
-allocator: Allocator,
+allocator: std.mem.Allocator,
 core: ParserCore,
 diagnostics: *ptk.Diagnostics,
 state: struct {
@@ -42,7 +40,7 @@ state: struct {
 const RuleSet = ptk.RuleSet(Tokenizer.TokenType);
 const ParserCore = ptk.ParserCore(Tokenizer, .{ .whitespace, .comment });
 
-pub const AcceptError = Allocator.Error || ParserCore.AcceptError;
+pub const AcceptError = std.mem.Allocator.Error || ParserCore.AcceptError;
 
 pub const Error = error{
     ParseError,
@@ -183,7 +181,7 @@ fn getAssociativityAlt(flag: PrecedenceAndAssociativityAltFlag) ?Associativity {
 
 pub fn parse(
     comptime T: type,
-    allocator: Allocator,
+    allocator: std.mem.Allocator,
     source_text: []const u8,
     ctx: ParseContext,
 ) Error!T {
@@ -209,7 +207,7 @@ pub fn parse(
 pub fn parseNode(
     comptime T: type,
     comptime acceptFn: fn (*Parser) anyerror!T,
-    allocator: Allocator,
+    allocator: std.mem.Allocator,
     source_text: []const u8,
     ctx: ParseContext,
 ) Error!T {
@@ -247,7 +245,7 @@ pub fn parseNode(
     return ast_node.?;
 }
 
-fn emitError(self: *Parser, comptime fmt: []const u8, args: anytype) Allocator.Error!void {
+fn emitError(self: *Parser, comptime fmt: []const u8, args: anytype) std.mem.Allocator.Error!void {
     try self.diagnostics.emit(self.core.tokenizer.current_location, .@"error", fmt, args);
 }
 
@@ -256,11 +254,14 @@ fn emitErrorAt(
     location: ptk.Location,
     comptime fmt: []const u8,
     args: anytype,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     try self.diagnostics.emit(location, .@"error", fmt, args);
 }
 
-fn utf8StringValue(allocator: Allocator, text: []const u8) Allocator.Error!?[]const u8 {
+fn utf8StringValue(
+    allocator: std.mem.Allocator,
+    text: []const u8,
+) std.mem.Allocator.Error!?[]const u8 {
     const string = try ast.stringValueImpl(allocator, text);
     return switch (string.data.slice) {
         .ascii => |ascii| ascii,
@@ -313,7 +314,7 @@ fn ensureSimpleParameterList(
     self: *Parser,
     formal_parameters: ast.FormalParameters,
     location: ptk.Location,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     if (!formal_parameters.isSimpleParameterList()) {
         try self.emitErrorAt(
             location,
@@ -328,7 +329,7 @@ fn ensureUniqueParameterNames(
     kind: enum { strict, arrow, method },
     formal_parameters: ast.FormalParameters,
     location: ptk.Location,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     var bound_names = std.ArrayList(ast.Identifier).init(self.allocator);
     defer bound_names.deinit();
     try formal_parameters.collectBoundNames(&bound_names);
@@ -376,7 +377,7 @@ fn ensureAllowedIdentifier(
     kind: enum { binding_identifier, identifier_reference, function_parameter },
     value: []const u8,
     location: ptk.Location,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     if (std.mem.eql(u8, value, "eval") or
         std.mem.eql(u8, value, "arguments"))
     {

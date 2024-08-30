@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -26,7 +24,7 @@ const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// Recursively convert a `std.json.Value` to a JS `Value`.
-fn convertJsonValue(agent: *Agent, value: std.json.Value) Allocator.Error!Value {
+fn convertJsonValue(agent: *Agent, value: std.json.Value) std.mem.Allocator.Error!Value {
     return switch (value) {
         .null => Value.null,
         .bool => |x| Value.from(x),
@@ -280,7 +278,7 @@ fn serializeJSONProperty(
 
 /// 25.5.2.3 QuoteJSONString ( value )
 /// https://tc39.es/ecma262/#sec-quotejsonstring
-fn quoteJSONString(agent: *Agent, value: String) Allocator.Error!String {
+fn quoteJSONString(agent: *Agent, value: String) std.mem.Allocator.Error!String {
     // 1. Let product be the String value consisting solely of the code unit 0x0022 (QUOTATION MARK).
     var product = std.ArrayList(u8).init(agent.gc_allocator);
     try product.append('"');
@@ -334,7 +332,7 @@ fn quoteJSONString(agent: *Agent, value: String) Allocator.Error!String {
 
 /// 25.5.2.4 UnicodeEscape ( C )
 /// https://tc39.es/ecma262/#sec-unicodeescape
-fn unicodeEscape(agent: *Agent, c: u16) Allocator.Error![]const u8 {
+fn unicodeEscape(agent: *Agent, c: u16) std.mem.Allocator.Error![]const u8 {
     // 1. Let n be the numeric value of C.
     // 2. Assert: n ≤ 0xFFFF.
     // 3. Let hex be the String representation of n, formatted as a lowercase hexadecimal number.
@@ -593,13 +591,13 @@ fn serializeJSONArray(
 }
 
 pub const JSON = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         // 25.5.3 JSON [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-json-%symbol.tostringtag%
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{

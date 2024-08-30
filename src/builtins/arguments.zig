@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const ast = @import("../language/ast.zig");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
@@ -33,7 +31,10 @@ const sameValue = types.sameValue;
 
 /// 10.4.4.1 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-getownproperty-p
-fn getOwnProperty(object: Object, property_key: PropertyKey) Allocator.Error!?PropertyDescriptor {
+fn getOwnProperty(
+    object: Object,
+    property_key: PropertyKey,
+) std.mem.Allocator.Error!?PropertyDescriptor {
     // 1. Let desc be OrdinaryGetOwnProperty(args, P).
     var descriptor = ordinaryGetOwnProperty(object, property_key) catch unreachable;
 
@@ -62,7 +63,7 @@ fn defineOwnProperty(
     object: Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
-) Allocator.Error!bool {
+) std.mem.Allocator.Error!bool {
     // 1. Let map be args.[[ParameterMap]].
     const map = object.as(Arguments).fields.parameter_map;
 
@@ -203,7 +204,7 @@ fn delete(object: Object, property_key: PropertyKey) Agent.Error!bool {
 pub fn createUnmappedArgumentsObject(
     agent: *Agent,
     arguments_list: []const Value,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // 1. Let len be the number of elements in argumentsList.
@@ -272,7 +273,7 @@ pub fn createMappedArgumentsObject(
     formals: ast.FormalParameters,
     arguments_list: []const Value,
     env: Environment,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // 1. Assert: formals does not contain a rest parameter, any binding patterns, or any
@@ -420,7 +421,7 @@ pub fn createMappedArgumentsObject(
 
 /// 10.4.4.7.1 MakeArgGetter ( name, env )
 /// https://tc39.es/ecma262/#sec-makearggetter
-fn makeArgGetter(agent: *Agent, name: String, env: Environment) Allocator.Error!Object {
+fn makeArgGetter(agent: *Agent, name: String, env: Environment) std.mem.Allocator.Error!Object {
     const Captures = struct {
         name: String,
         env: Environment,
@@ -456,7 +457,7 @@ fn makeArgGetter(agent: *Agent, name: String, env: Environment) Allocator.Error!
 
 /// 10.4.4.7.2 MakeArgSetter ( name, env )
 /// https://tc39.es/ecma262/#sec-makeargsetter
-fn makeArgSetter(agent: *Agent, name: String, env: Environment) Allocator.Error!Object {
+fn makeArgSetter(agent: *Agent, name: String, env: Environment) std.mem.Allocator.Error!Object {
     const Captures = struct {
         name: String,
         env: Environment,

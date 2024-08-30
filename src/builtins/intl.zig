@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const icu4zig = @import("icu4zig");
 
 const abstract_operations = @import("intl/abstract_operations.zig");
@@ -58,13 +56,13 @@ pub const Intl = struct {
     pub const IntlSegmentsPrototype = @import("./intl/segmenter.zig").IntlSegmentsPrototype;
     pub const IntlSegmentIteratorPrototype = @import("./intl/segmenter.zig").IntlSegmentIteratorPrototype;
 
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "getCanonicalLocales", getCanonicalLocales, 1, realm);
         try defineBuiltinFunction(object, "supportedValuesOf", supportedValuesOf, 1, realm);
 
@@ -153,7 +151,7 @@ pub const Intl = struct {
         // 2. Return CreateArrayFromList(ll).
         return Value.from(
             try createArrayFromListMapToValue(agent, icu4zig.Locale, locale_list.items, struct {
-                fn mapFn(agent_: *Agent, locale: icu4zig.Locale) Allocator.Error!Value {
+                fn mapFn(agent_: *Agent, locale: icu4zig.Locale) std.mem.Allocator.Error!Value {
                     return Value.from(
                         try String.fromAscii(
                             agent_.gc_allocator,
@@ -214,7 +212,7 @@ pub const Intl = struct {
         // 9. Return CreateArrayFromList( list ).
         return Value.from(
             try createArrayFromListMapToValue(agent, String, list, struct {
-                fn mapFn(_: *Agent, string: String) Allocator.Error!Value {
+                fn mapFn(_: *Agent, string: String) std.mem.Allocator.Error!Value {
                     return Value.from(string);
                 }
             }.mapFn),

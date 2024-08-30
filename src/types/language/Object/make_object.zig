@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const AnyPointer = @import("any-pointer").AnyPointer;
 
 const execution = @import("../../../execution.zig");
@@ -53,7 +51,7 @@ pub fn MakeObject(
         fields: Fields,
         data: Data,
 
-        pub fn create(agent: *Agent, args: Args) Allocator.Error!Object {
+        pub fn create(agent: *Agent, args: Args) std.mem.Allocator.Error!Object {
             const self = try agent.gc_allocator.create(@This());
             self.* = .{
                 .fields = if (has_fields) args.fields,

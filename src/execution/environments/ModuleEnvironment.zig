@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../../builtins.zig");
 const environments = @import("../environments.zig");
 const execution = @import("../../execution.zig");
@@ -112,7 +110,7 @@ pub fn createImportBinding(
     name: String,
     module: *SourceTextModule,
     binding_name: String,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. Assert: envRec does not already have a binding for N.
     // 2. Assert: When M.[[Environment]] is instantiated, it will have a direct binding for N2.
     // 3. Create an immutable indirect binding in envRec for N that references M and N2 as its

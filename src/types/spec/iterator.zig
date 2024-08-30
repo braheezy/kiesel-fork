@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
@@ -295,7 +293,11 @@ pub fn getIterator(
 
 /// 7.4.12 CreateIterResultObject ( value, done )
 /// https://tc39.es/ecma262/#sec-createiterresultobject
-pub fn createIterResultObject(agent: *Agent, value: Value, done: bool) Allocator.Error!Object {
+pub fn createIterResultObject(
+    agent: *Agent,
+    value: Value,
+    done: bool,
+) std.mem.Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // 1. Let obj be OrdinaryObjectCreate(%Object.prototype%).

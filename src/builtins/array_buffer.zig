@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const typed_array = @import("../builtins/typed_array.zig");
@@ -427,7 +425,7 @@ pub fn numericToRawBytes(
     comptime @"type": TypedArrayElementType,
     value: Value,
     is_little_endian: bool,
-) Allocator.Error![@sizeOf(@"type".T)]u8 {
+) std.mem.Allocator.Error![@sizeOf(@"type".T)]u8 {
     // 1. If type is Float16, then
     var raw_bytes = if (@"type".T == f16) blk: {
         // a. Let rawBytes be a List whose elements are the 2 bytes that are the result of
@@ -510,7 +508,7 @@ pub fn setValueInBuffer(
     is_typed_array: bool,
     order: Order,
     maybe_is_little_endian: ?bool,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. Assert: IsDetachedBuffer(arrayBuffer) is false.
     std.debug.assert(!isDetachedBuffer(array_buffer));
 
@@ -559,7 +557,7 @@ pub fn getModifySetValueInBuffer(
     comptime @"type": TypedArrayElementType,
     value: Value,
     comptime op: std.builtin.AtomicRmwOp,
-) Allocator.Error!@"type".T {
+) std.mem.Allocator.Error!@"type".T {
     // 1. Assert: IsDetachedBuffer(arrayBuffer) is false.
     std.debug.assert(!isDetachedBuffer(array_buffer));
 
@@ -616,7 +614,7 @@ pub fn getModifySetValueInBuffer(
 /// 25.1.5 Properties of the ArrayBuffer Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-constructor
 pub const ArrayBufferConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "ArrayBuffer",
@@ -625,7 +623,7 @@ pub const ArrayBufferConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "isView", isView, 1, realm);
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
@@ -695,13 +693,13 @@ pub const ArrayBufferConstructor = struct {
 /// 25.1.6 Properties of the ArrayBuffer Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-prototype-object
 pub const ArrayBufferPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinAccessor(object, "detached", detached, null, realm);
         try defineBuiltinAccessor(object, "maxByteLength", maxByteLength, null, realm);

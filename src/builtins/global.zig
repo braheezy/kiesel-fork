@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
@@ -27,7 +25,7 @@ const GlobalObjectProperty = struct {
     []const u8,
     union(enum) {
         property_descriptor: PropertyDescriptor,
-        lazy_intrinsic: *const fn (*Realm.Intrinsics) Allocator.Error!Object,
+        lazy_intrinsic: *const fn (*Realm.Intrinsics) std.mem.Allocator.Error!Object,
     },
 };
 
@@ -279,14 +277,14 @@ pub fn globalObjectProperties(realm: *Realm) [num_properties]GlobalObjectPropert
 
 fn GlobalFunction(comptime options: struct { name: []const u8, length: u32 }) type {
     return struct {
-        pub fn create(realm: *Realm) Allocator.Error!Object {
+        pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
             return createBuiltinFunction(realm.agent, .{ .function = @field(module, options.name) }, .{
                 .length = options.length,
                 .name = options.name,
                 .realm = realm,
             });
         }
-        pub fn init(_: *Realm, _: Object) Allocator.Error!void {}
+        pub fn init(_: *Realm, _: Object) std.mem.Allocator.Error!void {}
     };
 }
 
@@ -536,7 +534,7 @@ fn encode(
     agent: *Agent,
     string: String,
     comptime extra_unescaped: []const u8,
-) Allocator.Error!String {
+) std.mem.Allocator.Error!String {
     // 3. Let alwaysUnescaped be the string-concatenation of the ASCII word characters and
     //    "-.!~*'()".
     const always_unescaped = String.ascii_word_characters ++ "-.!~*'()";

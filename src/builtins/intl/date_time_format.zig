@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const icu4zig = @import("icu4zig");
 
 const abstract_operations = @import("abstract_operations.zig");
@@ -475,7 +473,7 @@ pub fn createDateTimeFormat(
 /// 11.2 Properties of the Intl.DateTimeFormat Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-datetimeformat-constructor
 pub const DateTimeFormatConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "DateTimeFormat",
@@ -484,7 +482,7 @@ pub const DateTimeFormatConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         // 11.2.1 Intl.DateTimeFormat.prototype
         // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -527,13 +525,13 @@ pub const DateTimeFormatConstructor = struct {
 /// 11.3 Properties of the Intl.DateTimeFormat Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-datetimeformat-prototype-object
 pub const DateTimeFormatPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "format", format, null, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
@@ -777,10 +775,10 @@ pub fn formatDateTime(agent: *Agent, date_time_format: *const DateTimeFormat, x_
 }
 
 fn formatDateTimeImpl(
-    allocator: Allocator,
+    allocator: std.mem.Allocator,
     date_time_format: *const DateTimeFormat,
     x: f64,
-) (Allocator.Error || icu4zig.Error || icu4zig.CalendarError)![]const u8 {
+) (std.mem.Allocator.Error || icu4zig.Error || icu4zig.CalendarError)![]const u8 {
     const date = @import("../date.zig");
 
     const data_provider = icu4zig.DataProvider.init();

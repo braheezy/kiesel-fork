@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const ast = @import("ast.zig");
 const ast_printing = @import("ast_printing.zig");
 const builtins = @import("../builtins.zig");
@@ -160,7 +158,7 @@ pub fn loadRequestedModules(
     self: *SourceTextModule,
     agent: *Agent,
     host_defined: ?SafePointer,
-) Allocator.Error!*builtins.Promise {
+) std.mem.Allocator.Error!*builtins.Promise {
     const realm = agent.currentRealm();
 
     // 1. If hostDefined is not present, let hostDefined be empty.
@@ -196,7 +194,7 @@ fn innerModuleLoading(
     agent: *Agent,
     state: *GraphLoadingState,
     module: Module,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. Assert: state.[[IsLoading]] is true.
     std.debug.assert(state.is_loading);
 
@@ -279,7 +277,7 @@ pub fn continueModuleLoading(
     agent: *Agent,
     state: *GraphLoadingState,
     module_completion: Agent.Error!Module,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. If state.[[IsLoading]] is false, return unused.
     if (!state.is_loading) return;
 
@@ -604,7 +602,7 @@ pub fn parse(
 
 /// 16.2.1.5.3 Evaluate ( )
 /// https://tc39.es/ecma262/#sec-moduleevaluation
-pub fn evaluate(self: *SourceTextModule, agent: *Agent) Allocator.Error!*builtins.Promise {
+pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!*builtins.Promise {
     const realm = agent.currentRealm();
     var module = self;
 
@@ -882,7 +880,10 @@ fn innerModuleEvaluation(
 }
 /// 16.2.1.6.2 GetExportedNames ( [ exportStarSet ] )
 /// https://tc39.es/ecma262/#sec-getexportednames
-pub fn getExportedNames(self: SourceTextModule, agent: *Agent) Allocator.Error![]const []const u8 {
+pub fn getExportedNames(
+    self: SourceTextModule,
+    agent: *Agent,
+) std.mem.Allocator.Error![]const []const u8 {
     // 1. Assert: module.[[Status]] is not new.
     std.debug.assert(self.status != .new);
 
@@ -919,7 +920,7 @@ pub fn resolveExport(
     self: *SourceTextModule,
     agent: *Agent,
     export_name: []const u8,
-) Allocator.Error!?ResolvedBindingOrAmbiguous {
+) std.mem.Allocator.Error!?ResolvedBindingOrAmbiguous {
     // 1. Assert: module.[[Status]] is not new.
     std.debug.assert(self.status != .new);
 

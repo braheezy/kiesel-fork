@@ -3,8 +3,6 @@
 const ptk = @import("ptk");
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("builtins.zig");
 const execution = @import("execution.zig");
 pub const float16 = @import("utils/float16.zig");
@@ -21,7 +19,7 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 
 /// '!' in the spec, ensures that the error is not a throw completion (`error.ExceptionThrown`).
 /// OOM is still propagated. The name is a nod to C++, of course :^)
-pub fn noexcept(err: error{ ExceptionThrown, OutOfMemory }) Allocator.Error!noreturn {
+pub fn noexcept(err: error{ ExceptionThrown, OutOfMemory }) std.mem.Allocator.Error!noreturn {
     switch (err) {
         error.ExceptionThrown => @panic("Throw completion was returned from '!' function call"),
         error.OutOfMemory => return error.OutOfMemory,
@@ -87,7 +85,10 @@ pub fn containsSlice(haystack: []const []const u8, needle: []const u8) bool {
     return false;
 }
 
-pub fn formatParseError(allocator: Allocator, parse_error: ptk.Error) Allocator.Error![]const u8 {
+pub fn formatParseError(
+    allocator: std.mem.Allocator,
+    parse_error: ptk.Error,
+) std.mem.Allocator.Error![]const u8 {
     return std.fmt.allocPrint(allocator, "{s} ({s}:{}:{})", .{
         parse_error.message,
         parse_error.location.source orelse "<unknown>",
@@ -97,10 +98,10 @@ pub fn formatParseError(allocator: Allocator, parse_error: ptk.Error) Allocator.
 }
 
 pub fn formatParseErrorHint(
-    allocator: Allocator,
+    allocator: std.mem.Allocator,
     parse_error: ptk.Error,
     source_text: []const u8,
-) Allocator.Error![]const u8 {
+) std.mem.Allocator.Error![]const u8 {
     // NOTE: parse-toolkit only uses '\n' to advance the line counter - for \r\n newlines this
     //       doesn't matter, and LS/PS are rare enough to not matter for now.
     var line_iterator = std.mem.splitScalar(u8, source_text, '\n');
@@ -142,7 +143,7 @@ pub fn defineBuiltinAccessor(
     getter: ?*const Behaviour.Function,
     setter: ?*const Behaviour.Function,
     realm: *Realm,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     return defineBuiltinAccessorWithAttributes(
         object,
         name,
@@ -163,7 +164,7 @@ pub fn defineBuiltinAccessorWithAttributes(
         enumerable: bool,
         configurable: bool,
     },
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     std.debug.assert(getter != null or setter != null);
     const getter_function = if (getter) |function| blk: {
         const function_name = std.fmt.comptimePrint("get {s}", .{comptime getFunctionName(name)});
@@ -197,7 +198,7 @@ pub fn defineBuiltinFunction(
     function: *const Behaviour.Function,
     length: u32,
     realm: *Realm,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     const function_name = comptime getFunctionName(name);
     const builtin_function = try createBuiltinFunction(realm.agent, .{ .function = function }, .{
         .length = length,
@@ -218,7 +219,7 @@ pub fn defineBuiltinFunctionWithAttributes(
         enumerable: bool,
         configurable: bool,
     },
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     const function_name = comptime getFunctionName(name);
     const builtin_function = try createBuiltinFunction(realm.agent, .{ .function = function }, .{
         .length = length,
@@ -237,7 +238,7 @@ pub fn defineBuiltinProperty(
     object: Object,
     comptime name: []const u8,
     value: anytype,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     const T = @TypeOf(value);
     const property_key = getPropertyKey(name, object.agent());
     const property_descriptor = if (T == Value)

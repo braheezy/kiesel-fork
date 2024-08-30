@@ -4,8 +4,6 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -415,13 +413,13 @@ fn atomicReadModifyWrite(
 }
 
 pub const Atomics = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "add", add, 3, realm);
         try defineBuiltinFunction(object, "and", @"and", 3, realm);
         try defineBuiltinFunction(object, "compareExchange", compareExchange, 4, realm);

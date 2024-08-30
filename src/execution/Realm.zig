@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const ast = @import("../language/ast.zig");
 const builtins = @import("../builtins.zig");
 const environments = @import("environments.zig");
@@ -139,7 +137,7 @@ pub fn initializeHostDefinedRealm(
 
 /// 9.3.2 CreateIntrinsics ( realmRec )
 /// https://tc39.es/ecma262/#sec-createintrinsics
-fn createIntrinsics(self: *Realm) Allocator.Error!void {
+fn createIntrinsics(self: *Realm) std.mem.Allocator.Error!void {
     // 1. Set realmRec.[[Intrinsics]] to a new Record.
     self.intrinsics = .{ .realm = self };
 

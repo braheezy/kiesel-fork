@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const language = @import("../language.zig");
@@ -53,19 +51,22 @@ pub fn hostCallJobCallback(
 
 /// 9.5.4 HostEnqueueGenericJob ( job, realm )
 /// https://tc39.es/ecma262/#sec-hostenqueuegenericjob
-pub fn hostEnqueueGenericJob(agent: *Agent, job: Job, realm: *Realm) Allocator.Error!void {
+pub fn hostEnqueueGenericJob(agent: *Agent, job: Job, realm: *Realm) std.mem.Allocator.Error!void {
     try agent.queued_jobs.append(.{ .job = job, .realm = realm });
 }
 
 /// 9.5.5 HostEnqueuePromiseJob ( job, realm )
 /// https://tc39.es/ecma262/#sec-hostenqueuepromisejob
-pub fn hostEnqueuePromiseJob(agent: *Agent, job: Job, realm: ?*Realm) Allocator.Error!void {
+pub fn hostEnqueuePromiseJob(agent: *Agent, job: Job, realm: ?*Realm) std.mem.Allocator.Error!void {
     try agent.queued_jobs.append(.{ .job = job, .realm = realm });
 }
 
 /// 9.9.4.1 HostEnqueueFinalizationRegistryCleanupJob ( finalizationRegistry )
 /// https://tc39.es/ecma262/#sec-host-cleanup-finalization-registry
-pub fn hostEnqueueFinalizationRegistryCleanupJob(agent: *Agent, cell: *Cell) Allocator.Error!void {
+pub fn hostEnqueueFinalizationRegistryCleanupJob(
+    agent: *Agent,
+    cell: *Cell,
+) std.mem.Allocator.Error!void {
     // Let cleanupJob be a new Job Abstract Closure with no parameters that captures
     // finalizationRegistry and performs the following steps when called:
     const cleanup_job: Job = .{
@@ -114,7 +115,7 @@ pub fn hostLoadImportedModule(
     specifier: String,
     _: SafePointer,
     payload: ImportedModulePayload,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     const result = agent.throwException(.internal_error, "Module loading is disabled", .{});
     try finishLoadingImportedModule(agent, referrer, specifier, payload, result);
 }

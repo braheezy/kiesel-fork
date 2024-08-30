@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -20,7 +18,7 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 pub const ThrowTypeError = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .function = function }, .{
             .length = 0,
             .name = "",
@@ -28,7 +26,7 @@ pub const ThrowTypeError = struct {
         });
     }
 
-    pub fn init(_: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(_: *Realm, object: Object) std.mem.Allocator.Error!void {
         // The value of the [[Extensible]] internal slot of this function is false.
         object.data.extensible = false;
 

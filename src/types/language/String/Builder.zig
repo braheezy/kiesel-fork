@@ -1,12 +1,10 @@
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const String = @import("../String.zig");
 
 const Builder = @This();
 
-allocator: Allocator,
+allocator: std.mem.Allocator,
 segments: std.ArrayList(Segment),
 
 pub const Segment = union(enum) {
@@ -25,7 +23,7 @@ pub const Segment = union(enum) {
     }
 };
 
-pub fn init(allocator: Allocator) Builder {
+pub fn init(allocator: std.mem.Allocator) Builder {
     return .{
         .allocator = allocator,
         .segments = std.ArrayList(Segment).init(allocator),
@@ -36,27 +34,27 @@ pub fn deinit(self: Builder) void {
     self.segments.deinit();
 }
 
-pub fn appendSegment(self: *Builder, segment: Segment) Allocator.Error!void {
+pub fn appendSegment(self: *Builder, segment: Segment) std.mem.Allocator.Error!void {
     try self.segments.append(segment);
 }
 
-pub fn appendString(self: *Builder, string: String) Allocator.Error!void {
+pub fn appendString(self: *Builder, string: String) std.mem.Allocator.Error!void {
     try self.segments.append(.{ .string = string });
 }
 
-pub fn appendChar(self: *Builder, char: u8) Allocator.Error!void {
+pub fn appendChar(self: *Builder, char: u8) std.mem.Allocator.Error!void {
     try self.segments.append(.{ .char = char });
 }
 
-pub fn appendCodeUnit(self: *Builder, code_unit: u16) Allocator.Error!void {
+pub fn appendCodeUnit(self: *Builder, code_unit: u16) std.mem.Allocator.Error!void {
     try self.segments.append(.{ .code_unit = code_unit });
 }
 
-pub fn appendCodePoint(self: *Builder, code_point: u21) Allocator.Error!void {
+pub fn appendCodePoint(self: *Builder, code_point: u21) std.mem.Allocator.Error!void {
     try self.segments.append(.{ .code_point = code_point });
 }
 
-pub fn build(self: Builder) Allocator.Error!String {
+pub fn build(self: Builder) std.mem.Allocator.Error!String {
     const is_ascii = for (self.segments.items) |segment| {
         if (!segment.isAscii()) break false;
     } else true;

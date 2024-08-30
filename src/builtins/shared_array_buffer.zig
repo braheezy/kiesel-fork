@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -110,7 +108,7 @@ pub fn allocateSharedArrayBuffer(
 /// 25.2.4 Properties of the SharedArrayBuffer Constructor
 /// https://tc39.es/ecma262/#sec-sharedarraybuffer-constructor
 pub const SharedArrayBufferConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "SharedArrayBuffer",
@@ -119,7 +117,7 @@ pub const SharedArrayBufferConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 25.2.4.1 SharedArrayBuffer.prototype
@@ -175,13 +173,13 @@ pub const SharedArrayBufferConstructor = struct {
 /// 25.2.5 Properties of the SharedArrayBuffer Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-sharedarraybuffer-prototype-object
 pub const SharedArrayBufferPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinFunction(object, "grow", grow, 1, realm);
         try defineBuiltinAccessor(object, "growable", growable, null, realm);

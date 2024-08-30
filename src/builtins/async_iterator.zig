@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -17,13 +15,13 @@ const defineBuiltinFunction = utils.defineBuiltinFunction;
 /// 27.1.3 The %AsyncIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-asynciteratorprototype
 pub const AsyncIteratorPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "%Symbol.asyncIterator%", @"%Symbol.asyncIterator%", 0, realm);
     }
 

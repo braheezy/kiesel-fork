@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const icu4zig = @import("icu4zig");
 
 const abstract_operations = @import("abstract_operations.zig");
@@ -90,7 +88,11 @@ fn updateLanguageId(agent: *Agent, tag: icu4zig.Locale, options: Object) Agent.E
 
 /// 14.1.3 MakeLocaleRecord ( tag, options, relevantExtensionKeys )
 /// https://tc39.es/ecma402/#sec-makelocalerecord
-fn makeLocaleRecord(agent: *Agent, tag: icu4zig.Locale, options: UnicodeExtensions) Allocator.Error!icu4zig.Locale {
+fn makeLocaleRecord(
+    agent: *Agent,
+    tag: icu4zig.Locale,
+    options: UnicodeExtensions,
+) std.mem.Allocator.Error!icu4zig.Locale {
     // 1-8.
     // This code ain't nice, I know.
     const str = try tag.toString(agent.gc_allocator);
@@ -146,7 +148,7 @@ fn makeLocaleRecord(agent: *Agent, tag: icu4zig.Locale, options: UnicodeExtensio
 /// 14.2 Properties of the Intl.Locale Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-constructor
 pub const LocaleConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "Locale",
@@ -155,7 +157,7 @@ pub const LocaleConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         // 14.2.1 Intl.Locale.prototype
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -361,13 +363,13 @@ pub const LocaleConstructor = struct {
 /// 14.3 Properties of the Intl.Locale Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-prototype-object
 pub const LocalePrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "maximize", maximize, 0, realm);
         try defineBuiltinFunction(object, "minimize", minimize, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);

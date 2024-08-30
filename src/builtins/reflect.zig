@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -22,13 +20,13 @@ const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 pub const Reflect = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "apply", apply, 3, realm);
         try defineBuiltinFunction(object, "construct", construct, 2, realm);
         try defineBuiltinFunction(object, "defineProperty", defineProperty, 3, realm);
@@ -255,7 +253,7 @@ pub const Reflect = struct {
         // 3. Return CreateArrayFromList(keys).
         return Value.from(
             try createArrayFromListMapToValue(agent, PropertyKey, keys.items, struct {
-                fn mapFn(agent_: *Agent, property_key: PropertyKey) Allocator.Error!Value {
+                fn mapFn(agent_: *Agent, property_key: PropertyKey) std.mem.Allocator.Error!Value {
                     return property_key.toValue(agent_);
                 }
             }.mapFn),

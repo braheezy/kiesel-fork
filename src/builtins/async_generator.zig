@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -33,13 +31,13 @@ const promiseResolve = builtins.promiseResolve;
 /// 27.6.1 The %AsyncGeneratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgenerator-prototype
 pub const AsyncGeneratorPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%AsyncIteratorPrototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 1, realm);
         try defineBuiltinFunction(object, "return", @"return", 1, realm);
         try defineBuiltinFunction(object, "throw", throw, 1, realm);
@@ -274,7 +272,7 @@ pub const AsyncGenerator = MakeObject(.{
 
         // Non-standard
         evaluation_state: struct {
-            closure: *const fn (*Agent, *builtins.ECMAScriptFunction) Allocator.Error!void,
+            closure: *const fn (*Agent, *builtins.ECMAScriptFunction) std.mem.Allocator.Error!void,
             generator_function: *builtins.ECMAScriptFunction,
         },
     },
@@ -313,7 +311,7 @@ pub fn asyncGeneratorStart(
         fn func(
             agent_: *Agent,
             generator_function_: *builtins.ECMAScriptFunction,
-        ) Allocator.Error!void {
+        ) std.mem.Allocator.Error!void {
             // a. Let acGenContext be the running execution context.
             const closure_generator_context = agent_.runningExecutionContext();
 
@@ -402,7 +400,7 @@ pub fn asyncGeneratorEnqueue(
     generator: *AsyncGenerator,
     completion: Completion,
     promise_capability: PromiseCapability,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. Let request be AsyncGeneratorRequest {
     //      [[Completion]]: completion, [[Capability]]: promiseCapability
     //    }.
@@ -422,7 +420,7 @@ pub fn asyncGeneratorCompleteStep(
     completion: Completion,
     done: bool,
     realm: ?*Realm,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. Assert: generator.[[AsyncGeneratorQueue]] is not empty.
     std.debug.assert(generator.fields.async_generator_queue.items.len != 0);
 
@@ -485,7 +483,7 @@ pub fn asyncGeneratorResume(
     agent: *Agent,
     generator: *AsyncGenerator,
     completion: Completion,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. Assert: generator.[[AsyncGeneratorState]] is either suspended-start or suspended-yield.
     std.debug.assert(generator.fields.async_generator_state == .suspended_start or
         generator.fields.async_generator_state == .suspended_yield);
@@ -531,7 +529,7 @@ pub fn asyncGeneratorResume(
 pub fn asyncGeneratorDrainQueue(
     agent: *Agent,
     generator: *AsyncGenerator,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. Assert: generator.[[AsyncGeneratorState]] is completed.
     std.debug.assert(generator.fields.async_generator_state == .completed);
 
@@ -585,7 +583,10 @@ pub fn asyncGeneratorDrainQueue(
 ///
 /// NOTE: This includes the changes from https://github.com/tc39/ecma262/pull/2683 to avoid
 ///       crashing on broken promises.
-pub fn asyncGeneratorAwaitReturn(agent: *Agent, generator: *AsyncGenerator) Allocator.Error!void {
+pub fn asyncGeneratorAwaitReturn(
+    agent: *Agent,
+    generator: *AsyncGenerator,
+) std.mem.Allocator.Error!void {
     const realm = agent.currentRealm();
 
     // 1. Let queue be generator.[[AsyncGeneratorQueue]].

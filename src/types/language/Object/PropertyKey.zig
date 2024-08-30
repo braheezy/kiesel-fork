@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const execution = @import("../../../execution.zig");
 const types = @import("../../../types.zig");
 const utils = @import("../../../utils.zig");
@@ -96,7 +94,7 @@ pub const PropertyKey = union(enum) {
 
     /// Non-standard helper to convert a `PropertyKey` to a `Value` - they *are* plain (string or
     /// symbol) values in the spec.
-    pub fn toValue(self: PropertyKey, agent: *Agent) Allocator.Error!Value {
+    pub fn toValue(self: PropertyKey, agent: *Agent) std.mem.Allocator.Error!Value {
         return switch (self) {
             .string => |string| Value.from(string),
             .symbol => |symbol| Value.from(symbol),
@@ -115,7 +113,7 @@ pub const PropertyKey = union(enum) {
 
     /// Non-standard helper to convert a `PropertyKey` to a `[]const u8` or `Symbol` (i.e. bypassing
     /// the integer index optimization).
-    pub fn toStringOrSymbol(self: PropertyKey, agent: *Agent) Allocator.Error!union(enum) {
+    pub fn toStringOrSymbol(self: PropertyKey, agent: *Agent) std.mem.Allocator.Error!union(enum) {
         string: String,
         symbol: Symbol,
     } {

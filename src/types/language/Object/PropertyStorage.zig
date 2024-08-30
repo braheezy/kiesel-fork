@@ -1,8 +1,6 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const execution = @import("../../../execution.zig");
 const types = @import("../../../types.zig");
 
@@ -93,14 +91,14 @@ comptime {
 
 const LazyIntrinsic = struct {
     realm: *Realm,
-    lazyIntrinsicFn: *const fn (*Realm.Intrinsics) Allocator.Error!Object,
+    lazyIntrinsicFn: *const fn (*Realm.Intrinsics) std.mem.Allocator.Error!Object,
 };
 
 // TODO: Shapes, linear storage for arrays, etc. Gotta start somewhere :^)
 hash_map: PropertyKeyArrayHashMap(Entry),
 lazy_intrinsics: std.StringHashMap(LazyIntrinsic),
 
-pub fn init(allocator: Allocator) PropertyStorage {
+pub fn init(allocator: std.mem.Allocator) PropertyStorage {
     return .{
         .hash_map = PropertyKeyArrayHashMap(Entry).init(allocator),
         .lazy_intrinsics = std.StringHashMap(LazyIntrinsic).init(allocator),
@@ -122,7 +120,10 @@ pub fn get(self: PropertyStorage, property_key: PropertyKey) ?PropertyDescriptor
     return null;
 }
 
-pub fn getCreateIntrinsicIfNeeded(self: *PropertyStorage, property_key: PropertyKey) Allocator.Error!?PropertyDescriptor {
+pub fn getCreateIntrinsicIfNeeded(
+    self: *PropertyStorage,
+    property_key: PropertyKey,
+) std.mem.Allocator.Error!?PropertyDescriptor {
     if (self.hash_map.getPtr(property_key)) |entry| {
         if (property_key == .string and property_key.string.data.slice == .ascii) {
             const name = property_key.string.data.slice.ascii;
@@ -141,7 +142,7 @@ pub fn set(
     self: *PropertyStorage,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     const entry = Entry.fromPropertyDescriptor(property_descriptor);
     try self.hash_map.put(property_key, entry);
     if (property_key == .string and property_key.string.data.slice == .ascii) {

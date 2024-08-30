@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const language = @import("../language.zig");
@@ -183,7 +181,7 @@ pub const Environment = union(enum) {
         name: String,
         module: *SourceTextModule,
         binding_name: String,
-    ) Allocator.Error!void {
+    ) std.mem.Allocator.Error!void {
         return switch (self) {
             .module_environment => |env| env.createImportBinding(name, module, binding_name),
             else => unreachable,
@@ -264,9 +262,9 @@ pub fn getIdentifierReference(
 /// 9.1.2.2 NewDeclarativeEnvironment ( E )
 /// https://tc39.es/ecma262/#sec-newdeclarativeenvironment
 pub fn newDeclarativeEnvironment(
-    allocator: Allocator,
+    allocator: std.mem.Allocator,
     outer_env: ?Environment,
-) Allocator.Error!*DeclarativeEnvironment {
+) std.mem.Allocator.Error!*DeclarativeEnvironment {
     // 1. Let env be a new Declarative Environment Record containing no bindings.
     const env = try allocator.create(DeclarativeEnvironment);
 
@@ -284,11 +282,11 @@ pub fn newDeclarativeEnvironment(
 /// 9.1.2.3 NewObjectEnvironment ( O, W, E )
 /// https://tc39.es/ecma262/#sec-newobjectenvironment
 pub fn newObjectEnvironment(
-    allocator: Allocator,
+    allocator: std.mem.Allocator,
     binding_object: Object,
     is_with_environment: bool,
     outer_env: ?Environment,
-) Allocator.Error!*ObjectEnvironment {
+) std.mem.Allocator.Error!*ObjectEnvironment {
     // 1. Let env be a new Object Environment Record.
     const env = try allocator.create(ObjectEnvironment);
 
@@ -310,10 +308,10 @@ pub fn newObjectEnvironment(
 /// 9.1.2.4 NewFunctionEnvironment ( F, newTarget )
 /// https://tc39.es/ecma262/#sec-newfunctionenvironment
 pub fn newFunctionEnvironment(
-    allocator: Allocator,
+    allocator: std.mem.Allocator,
     function: *ECMAScriptFunction,
     new_target: ?Object,
-) Allocator.Error!*FunctionEnvironment {
+) std.mem.Allocator.Error!*FunctionEnvironment {
     // 1. Let env be a new Function Environment Record containing no bindings.
     const env = try allocator.create(FunctionEnvironment);
 
@@ -344,10 +342,10 @@ pub fn newFunctionEnvironment(
 /// 9.1.2.5 NewGlobalEnvironment ( G, thisValue )
 /// https://tc39.es/ecma262/#sec-newglobalenvironment
 pub fn newGlobalEnvironment(
-    allocator: Allocator,
+    allocator: std.mem.Allocator,
     global_object: Object,
     this_value: Object,
-) Allocator.Error!*GlobalEnvironment {
+) std.mem.Allocator.Error!*GlobalEnvironment {
     // 1. Let objRec be NewObjectEnvironment(G, false, null).
     const object_record = try newObjectEnvironment(allocator, global_object, false, null);
 
@@ -381,9 +379,9 @@ pub fn newGlobalEnvironment(
 /// 9.1.2.6 NewModuleEnvironment ( E )
 /// https://tc39.es/ecma262/#sec-newmoduleenvironment
 pub fn newModuleEnvironment(
-    allocator: Allocator,
+    allocator: std.mem.Allocator,
     outer_env: Environment,
-) Allocator.Error!*ModuleEnvironment {
+) std.mem.Allocator.Error!*ModuleEnvironment {
     // 1. Let env be a new Module Environment Record containing no bindings.
     const env = try allocator.create(ModuleEnvironment);
 
@@ -401,9 +399,9 @@ pub fn newModuleEnvironment(
 /// 9.2.1.1 NewPrivateEnvironment ( outerPrivEnv )
 /// https://tc39.es/ecma262/#sec-newprivateenvironment
 pub fn newPrivateEnvironment(
-    allocator: Allocator,
+    allocator: std.mem.Allocator,
     outer_private_environment: ?*PrivateEnvironment,
-) Allocator.Error!*PrivateEnvironment {
+) std.mem.Allocator.Error!*PrivateEnvironment {
     // 1. Let names be a new empty List.
     const names = std.StringHashMap(PrivateName).init(allocator);
 

@@ -4,11 +4,9 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const libgc = @import("../c/libgc.zig").libgc;
 
-pub const vtable: Allocator.VTable = .{
+pub const vtable: std.mem.Allocator.VTable = .{
     .alloc = alloc,
     .resize = resize,
     .free = free,
@@ -19,7 +17,7 @@ fn getHeader(ptr: [*]u8) *[*]u8 {
 }
 
 fn alignedAlloc(len: usize, log2_align: u8) ?[*]u8 {
-    const alignment = @as(usize, 1) << @as(Allocator.Log2Align, @intCast(log2_align));
+    const alignment = @as(usize, 1) << @as(std.mem.Allocator.Log2Align, @intCast(log2_align));
 
     // Thin wrapper around regular malloc, overallocate to account for
     // alignment padding and store the original malloc()'ed pointer before
@@ -86,7 +84,7 @@ fn free(
 }
 
 test {
-    const allocator: Allocator = .{
+    const allocator: std.mem.Allocator = .{
         .ptr = undefined,
         .vtable = &vtable,
     };

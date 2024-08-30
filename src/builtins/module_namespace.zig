@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const immutable_prototype = @import("immutable_prototype.zig");
@@ -42,7 +40,7 @@ fn getPrototypeOf(_: Object) error{}!?Object {
 
 /// 10.4.6.2 [[SetPrototypeOf]] ( V )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-setprototypeof-v
-fn setPrototypeOf(object: Object, prototype: ?Object) Allocator.Error!bool {
+fn setPrototypeOf(object: Object, prototype: ?Object) std.mem.Allocator.Error!bool {
     // 1. Return ! SetImmutablePrototype(O, V).
     return setImmutablePrototype(object, prototype) catch |err| try noexcept(err);
 }
@@ -127,7 +125,7 @@ fn defineOwnProperty(
 
 /// 10.4.6.7 [[HasProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-hasproperty-p
-fn hasProperty(object: Object, property_key: PropertyKey) Allocator.Error!bool {
+fn hasProperty(object: Object, property_key: PropertyKey) std.mem.Allocator.Error!bool {
     const agent = object.agent();
 
     // 1. If P is a Symbol, return ! OrdinaryHasProperty(O, P).
@@ -209,7 +207,7 @@ fn set(_: Object, _: PropertyKey, _: Value, _: Value) error{}!bool {
 
 /// 10.4.6.10 [[Delete]] ( P )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-delete-p
-fn delete(object: Object, property_key: PropertyKey) Allocator.Error!bool {
+fn delete(object: Object, property_key: PropertyKey) std.mem.Allocator.Error!bool {
     const agent = object.agent();
 
     // 1. If P is a Symbol, then
@@ -234,7 +232,7 @@ fn delete(object: Object, property_key: PropertyKey) Allocator.Error!bool {
 
 /// 10.4.6.11 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-ownpropertykeys
-fn ownPropertyKeys(object: Object) Allocator.Error!std.ArrayList(PropertyKey) {
+fn ownPropertyKeys(object: Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
     const agent = object.agent();
 
     // 1. Let exports be O.[[Exports]].
@@ -258,7 +256,7 @@ pub fn moduleNamespaceCreate(
     agent: *Agent,
     module: Module,
     exports: []const []const u8,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     // 1. Assert: module.[[Namespace]] is empty.
     switch (module) {
         .source_text_module => |source_text_module| std.debug.assert(source_text_module.namespace == null),

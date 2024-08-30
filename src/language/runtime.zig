@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const ast = @import("ast.zig");
 const builtins = @import("../builtins.zig");
 const bytecode = @import("bytecode.zig");
@@ -80,7 +78,7 @@ pub fn initializeBoundName(
 pub fn getTemplateObject(
     agent: *Agent,
     template_literal: *ast.TemplateLiteral,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     // 1. Let realm be the current Realm Record.
     const realm = agent.currentRealm();
 
@@ -255,7 +253,7 @@ pub fn evaluateCall(
 
 /// 13.3.7.2 GetSuperConstructor ( )
 /// https://tc39.es/ecma262/#sec-getsuperconstructor
-pub fn getSuperConstructor(agent: *Agent) Allocator.Error!Value {
+pub fn getSuperConstructor(agent: *Agent) std.mem.Allocator.Error!Value {
     // 1. Let envRec be GetThisEnvironment().
     const env = agent.getThisEnvironment();
 
@@ -416,7 +414,7 @@ pub fn blockDeclarationInstantiation(
         case_block: ast.CaseBlock,
     },
     env: Environment,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // NOTE: Keeping this wrapped in a generic `Environment` makes a bunch of stuff below easier.
     std.debug.assert(env == .declarative_environment);
 
@@ -492,7 +490,7 @@ pub fn instantiateOrdinaryFunctionObject(
     function_declaration: ast.FunctionDeclaration,
     env: Environment,
     private_env: ?*PrivateEnvironment,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // FunctionDeclaration : function BindingIdentifier ( FormalParameters ) { FunctionBody }
@@ -566,7 +564,7 @@ pub fn instantiateOrdinaryFunctionExpression(
     agent: *Agent,
     function_expression: ast.FunctionExpression,
     default_name: ?[]const u8,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // FunctionExpression : function BindingIdentifier ( FormalParameters ) { FunctionBody }
@@ -664,7 +662,7 @@ pub fn instantiateArrowFunctionExpression(
     agent: *Agent,
     arrow_function: ast.ArrowFunction,
     default_name: ?[]const u8,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // 1. If name is not present, set name to "".
@@ -1095,7 +1093,7 @@ pub fn instantiateGeneratorFunctionObject(
     generator_declaration: ast.GeneratorDeclaration,
     env: Environment,
     private_env: ?*PrivateEnvironment,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // GeneratorDeclaration : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
@@ -1191,7 +1189,7 @@ pub fn instantiateGeneratorFunctionExpression(
     agent: *Agent,
     generator_expression: ast.GeneratorExpression,
     default_name: ?[]const u8,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // GeneratorExpression : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
@@ -1316,7 +1314,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
     async_generator_declaration: ast.AsyncGeneratorDeclaration,
     env: Environment,
     private_env: ?*PrivateEnvironment,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // AsyncGeneratorDeclaration : async function * BindingIdentifier ( FormalParameters ) { AsyncGeneratorBody }
@@ -1411,7 +1409,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
     agent: *Agent,
     async_generator_expression: ast.AsyncGeneratorExpression,
     default_name: ?[]const u8,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // GeneratorExpression : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
@@ -1622,7 +1620,7 @@ fn classStaticBlockDefinitionEvaluation(
     agent: *Agent,
     class_static_block: ast.ClassStaticBlock,
     home_object: Object,
-) Allocator.Error!ClassStaticBlockDefinition {
+) std.mem.Allocator.Error!ClassStaticBlockDefinition {
     const realm = agent.currentRealm();
 
     // 1. Let lex be the running execution context's LexicalEnvironment.
@@ -2277,7 +2275,7 @@ pub fn instantiateAsyncFunctionObject(
     async_function_declaration: ast.AsyncFunctionDeclaration,
     env: Environment,
     private_env: ?*PrivateEnvironment,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // AsyncFunctionDeclaration : async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
@@ -2339,7 +2337,7 @@ pub fn instantiateAsyncFunctionExpression(
     agent: *Agent,
     async_function_expression: ast.AsyncFunctionExpression,
     default_name: ?[]const u8,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // AsyncFunctionExpression : async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
@@ -2431,7 +2429,7 @@ pub fn instantiateAsyncArrowFunctionExpression(
     agent: *Agent,
     async_arrow_function: ast.AsyncArrowFunction,
     default_name: ?[]const u8,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // 1. If name is not present, set name to "".

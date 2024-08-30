@@ -97,7 +97,11 @@ construct: ?*const fn (
     new_target: Object,
 ) Agent.Error!Object = null,
 
-pub fn create(allocator: std.mem.Allocator, initial: *const InternalMethods, to_insert: *const InternalMethods) std.mem.Allocator.Error!*const InternalMethods {
+pub fn create(
+    allocator: std.mem.Allocator,
+    initial: *const InternalMethods,
+    to_insert: *const InternalMethods,
+) std.mem.Allocator.Error!*const InternalMethods {
     const ordinary: *const InternalMethods = &.{};
     if (initial == ordinary) {
         return to_insert;

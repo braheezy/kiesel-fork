@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -23,7 +21,7 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 /// 27.4.2 Properties of the AsyncGeneratorFunction Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgeneratorfunction
 pub const AsyncGeneratorFunctionConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "AsyncGeneratorFunction",
@@ -32,7 +30,7 @@ pub const AsyncGeneratorFunctionConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         // 27.4.2.1 AsyncGeneratorFunction.prototype
         // https://tc39.es/ecma262/#sec-asyncgeneratorfunction-prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -70,13 +68,13 @@ pub const AsyncGeneratorFunctionConstructor = struct {
 /// 27.4.3 Properties of the AsyncGeneratorFunction Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgeneratorfunction-prototype
 pub const AsyncGeneratorFunctionPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         // 27.4.3.1 AsyncGeneratorFunction.prototype.constructor
         // https://tc39.es/ecma262/#sec-asyncgeneratorfunction-prototype-constructor
         try defineBuiltinProperty(object, "constructor", PropertyDescriptor{

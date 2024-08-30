@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -33,7 +31,7 @@ const promiseResolve = builtins.promiseResolve;
 pub fn createAsyncFromSyncIterator(
     agent: *Agent,
     sync_iterator: Iterator,
-) Allocator.Error!Iterator {
+) std.mem.Allocator.Error!Iterator {
     const realm = agent.currentRealm();
 
     // 1. Let asyncIterator be OrdinaryObjectCreate(%AsyncFromSyncIteratorPrototype%,
@@ -65,13 +63,13 @@ pub fn createAsyncFromSyncIterator(
 /// 27.1.4.2 The %AsyncFromSyncIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%-object
 pub const AsyncFromSyncIteratorPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%AsyncIteratorPrototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 0, realm);
         try defineBuiltinFunction(object, "return", @"return", 0, realm);
         try defineBuiltinFunction(object, "throw", throw, 0, realm);
@@ -293,7 +291,11 @@ pub const AsyncFromSyncIterator = MakeObject(.{
 
 /// 27.1.4.4 AsyncFromSyncIteratorContinuation ( result, promiseCapability )
 /// https://tc39.es/ecma262/#sec-asyncfromsynciteratorcontinuation
-fn asyncFromSyncIteratorContinuation(agent: *Agent, result: Object, promise_capability: PromiseCapability) Allocator.Error!Object {
+fn asyncFromSyncIteratorContinuation(
+    agent: *Agent,
+    result: Object,
+    promise_capability: PromiseCapability,
+) std.mem.Allocator.Error!Object {
     const realm = agent.currentRealm();
 
     // 1. NOTE: Because promiseCapability is derived from the intrinsic %Promise%, the calls to

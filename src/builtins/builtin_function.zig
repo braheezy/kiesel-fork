@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const ecmascript_function = @import("ecmascript_function.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -160,7 +158,7 @@ pub fn createBuiltinFunction(
         prefix: ?[]const u8 = null,
         additional_fields: SafePointer = SafePointer.null_pointer,
     },
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     // 1. If realm is not present, set realm to the current Realm Record.
     const realm = args.realm orelse agent.currentRealm();
 

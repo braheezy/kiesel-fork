@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const build_options = @import("build-options");
 const ast = @import("../ast.zig");
 const builtins = @import("../../builtins.zig");
@@ -74,7 +72,7 @@ exception: ?Value = null,
 iterator: ?Iterator = null,
 reference: ?Reference = null,
 
-pub fn init(agent: *Agent) Allocator.Error!Vm {
+pub fn init(agent: *Agent) std.mem.Allocator.Error!Vm {
     const stack = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 32);
     const iterator_stack = std.ArrayList(Iterator).init(agent.gc_allocator);
     const lexical_environment_stack = std.ArrayList(Environment).init(agent.gc_allocator);
@@ -133,7 +131,7 @@ fn fetchIndex(self: *Vm, executable: Executable) Executable.IndexType {
     return std.mem.bytesToValue(Executable.IndexType, &[_]u8{ b1, b2 });
 }
 
-fn getArgumentSpreadIndices(self: *Vm) Allocator.Error![]const usize {
+fn getArgumentSpreadIndices(self: *Vm) std.mem.Allocator.Error![]const usize {
     const value = self.stack.pop();
     if (value.isUndefined()) return &.{};
     const array = value.asObject();

@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -140,14 +138,20 @@ pub fn ordinaryPreventExtensions(object: Object) bool {
 
 /// 10.1.5 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-getownproperty-p
-fn getOwnProperty(object: Object, property_key: PropertyKey) Allocator.Error!?PropertyDescriptor {
+fn getOwnProperty(
+    object: Object,
+    property_key: PropertyKey,
+) std.mem.Allocator.Error!?PropertyDescriptor {
     // 1. Return OrdinaryGetOwnProperty(O, P).
     return ordinaryGetOwnProperty(object, property_key);
 }
 
 /// 10.1.5.1 OrdinaryGetOwnProperty ( O, P )
 /// https://tc39.es/ecma262/#sec-ordinarygetownproperty
-pub fn ordinaryGetOwnProperty(object: Object, property_key: PropertyKey) Allocator.Error!?PropertyDescriptor {
+pub fn ordinaryGetOwnProperty(
+    object: Object,
+    property_key: PropertyKey,
+) std.mem.Allocator.Error!?PropertyDescriptor {
     // 1. If O does not have an own property with key P, return undefined.
     // 3. Let X be O's own property whose key is P.
     const x = (try object.propertyStorage().getCreateIntrinsicIfNeeded(property_key)) orelse return null;
@@ -244,7 +248,7 @@ fn validateAndApplyPropertyDescriptor(
     extensible: bool,
     descriptor: PropertyDescriptor,
     maybe_current: ?PropertyDescriptor,
-) Allocator.Error!bool {
+) std.mem.Allocator.Error!bool {
     // 1. Assert: P is a property key.
 
     // 2. If current is undefined, then
@@ -623,14 +627,14 @@ pub fn ordinaryDelete(object: Object, property_key: PropertyKey) Agent.Error!boo
 
 /// 10.1.11 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-ownpropertykeys
-fn ownPropertyKeys(object: Object) Allocator.Error!std.ArrayList(PropertyKey) {
+fn ownPropertyKeys(object: Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
     // 1. Return OrdinaryOwnPropertyKeys(O).
     return ordinaryOwnPropertyKeys(object);
 }
 
 /// 10.1.11.1 OrdinaryOwnPropertyKeys ( O )
 /// https://tc39.es/ecma262/#sec-ordinaryownpropertykeys
-pub fn ordinaryOwnPropertyKeys(object: Object) Allocator.Error!std.ArrayList(PropertyKey) {
+pub fn ordinaryOwnPropertyKeys(object: Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
     const agent = object.agent();
     const property_storage_hash_map = object.propertyStorage().hash_map;
 
@@ -676,7 +680,7 @@ pub fn ordinaryOwnPropertyKeys(object: Object) Allocator.Error!std.ArrayList(Pro
     return keys;
 }
 
-pub fn ordinaryObjectCreate(agent: *Agent, prototype: ?Object) Allocator.Error!Object {
+pub fn ordinaryObjectCreate(agent: *Agent, prototype: ?Object) std.mem.Allocator.Error!Object {
     return ordinaryObjectCreateWithType(builtins.Object, agent, prototype, {});
 }
 
@@ -687,7 +691,7 @@ pub fn ordinaryObjectCreateWithType(
     agent: *Agent,
     prototype: ?Object,
     fields: T.Fields,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     // 1. Let internalSlotsList be « [[Prototype]], [[Extensible]] ».
     // 2. If additionalInternalSlotsList is present, set internalSlotsList to the list-concatenation
     //    of internalSlotsList and additionalInternalSlotsList.

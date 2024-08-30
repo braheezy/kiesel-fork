@@ -8,8 +8,6 @@ const kiesel_runtime = @import("kiesel-runtime");
 
 const Editor = @import("zigline").Editor;
 
-const Allocator = std.mem.Allocator;
-
 const Agent = kiesel.execution.Agent;
 const Arguments = kiesel.types.Arguments;
 const Diagnostics = kiesel.language.Diagnostics;
@@ -85,7 +83,7 @@ fn initializeGlobalObject(realm: *Realm, global_object: Object) Agent.Error!void
 }
 
 const Kiesel = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         const kiesel_object = try ordinaryObjectCreate(realm.agent, try realm.intrinsics.@"%Object.prototype%"());
         try defineBuiltinFunction(kiesel_object, "createIsHTMLDDA", createIsHTMLDDA, 0, realm);
         try defineBuiltinFunction(kiesel_object, "createRealm", createRealm, 0, realm);
@@ -322,7 +320,7 @@ const Kiesel = struct {
     }
 };
 
-fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: struct {
+fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, options: struct {
     base_dir: std.fs.Dir,
     origin: union(enum) {
         repl,
@@ -461,21 +459,25 @@ fn run(allocator: Allocator, realm: *Realm, source_text: []const u8, options: st
     };
 }
 
-const ReadFileError = Allocator.Error || std.fs.File.OpenError || std.fs.File.ReadError;
+const ReadFileError = std.mem.Allocator.Error || std.fs.File.OpenError || std.fs.File.ReadError;
 
-fn readFile(allocator: Allocator, base_dir: std.fs.Dir, sub_path: []const u8) ReadFileError![]const u8 {
+fn readFile(
+    allocator: std.mem.Allocator,
+    base_dir: std.fs.Dir,
+    sub_path: []const u8,
+) ReadFileError![]const u8 {
     const file = try base_dir.openFile(sub_path, .{});
     defer file.close();
     return file.readToEndAlloc(allocator, std.math.maxInt(usize));
 }
 
 const GetHistoryPathError =
-    Allocator.Error ||
+    std.mem.Allocator.Error ||
     std.fs.GetAppDataDirError ||
     std.fs.Dir.MakeError ||
     std.fs.File.OpenError;
 
-fn getHistoryPath(allocator: Allocator) GetHistoryPathError![]const u8 {
+fn getHistoryPath(allocator: std.mem.Allocator) GetHistoryPathError![]const u8 {
     const app_data_dir = try std.fs.getAppDataDir(allocator, "kiesel");
     defer allocator.free(app_data_dir);
 
@@ -509,7 +511,7 @@ fn printValueDebugInfo(
     try tty_config.setColor(writer, .reset);
 }
 
-fn repl(allocator: Allocator, realm: *Realm, options: struct {
+fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
     debug: bool = false,
     module: bool = false,
     print_promise_rejection_warnings: bool = true,
@@ -760,7 +762,7 @@ pub fn main() !u8 {
             specifier: String,
             _: SafePointer,
             payload: ImportedModulePayload,
-        ) Allocator.Error!void {
+        ) std.mem.Allocator.Error!void {
             const result = blk: {
                 const module_path = switch (referrer) {
                     .script => |script| resolveModulePath(agent_, .{ .script = script }, specifier),

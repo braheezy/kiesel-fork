@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
@@ -30,7 +28,7 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// 24.3.2 Properties of the WeakMap Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-weakmap-constructor
 pub const WeakMapConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "WeakMap",
@@ -39,7 +37,7 @@ pub const WeakMapConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         // 24.3.2.1 WeakMap.prototype
         // https://tc39.es/ecma262/#sec-weakmap.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -101,13 +99,13 @@ pub const WeakMapConstructor = struct {
 /// 24.3.3 Properties of the WeakMap Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-weakmap-prototype-object
 pub const WeakMapPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "delete", delete, 1, realm);
         try defineBuiltinFunction(object, "get", get, 1, realm);
         try defineBuiltinFunction(object, "has", has, 1, realm);

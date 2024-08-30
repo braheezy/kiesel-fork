@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const icu4zig = @import("icu4zig");
 
 const abstract_operations = @import("abstract_operations.zig");
@@ -35,7 +33,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// 12.2 Properties of the Intl.DisplayNames Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-displaynames-constructor
 pub const DisplayNamesConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 2,
             .name = "DisplayNames",
@@ -44,7 +42,7 @@ pub const DisplayNamesConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         // 12.2.1 Intl.DisplayNames.prototype
         // https://tc39.es/ecma402/#sec-Intl.DisplayNames.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -248,13 +246,13 @@ pub const DisplayNamesConstructor = struct {
 /// 12.3 Properties of the Intl.DisplayNames Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-displaynames-prototype-object
 pub const DisplayNamesPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "of", of, 1, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 

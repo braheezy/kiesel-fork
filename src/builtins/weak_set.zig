@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
@@ -30,7 +28,7 @@ const sameValue = types.sameValue;
 /// 24.4.2 Properties of the WeakSet Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-weakset-constructor
 pub const WeakSetConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "WeakSet",
@@ -39,7 +37,7 @@ pub const WeakSetConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         // 24.4.2.1 WeakSet.prototype
         // https://tc39.es/ecma262/#sec-weakset.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -114,13 +112,13 @@ pub const WeakSetConstructor = struct {
 /// 24.4.3 Properties of the WeakSet Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-weakset-prototype-object
 pub const WeakSetPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "add", add, 1, realm);
         try defineBuiltinFunction(object, "delete", delete, 1, realm);
         try defineBuiltinFunction(object, "has", has, 1, realm);

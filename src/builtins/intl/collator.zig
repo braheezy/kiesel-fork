@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const icu4zig = @import("icu4zig");
 
 const abstract_operations = @import("abstract_operations.zig");
@@ -36,7 +34,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// 10.2 Properties of the Intl.Collator Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-the-intl-collator-constructor
 pub const CollatorConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "Collator",
@@ -45,7 +43,7 @@ pub const CollatorConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         // 10.2.1 Intl.Collator.prototype
         // https://tc39.es/ecma402/#sec-intl.collator.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -254,13 +252,13 @@ pub const CollatorConstructor = struct {
 /// 10.3 Properties of the Intl.Collator Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-the-intl-collator-prototype-object
 pub const CollatorPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "compare", compare, null, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
@@ -405,7 +403,12 @@ pub const CollatorPrototype = struct {
 
 /// 10.3.3.2 CompareStrings ( collator, x, y )
 /// https://tc39.es/ecma402/#sec-collator-comparestrings
-pub fn compareStrings(allocator: Allocator, collator_object: *const Collator, x: String, y: String) Allocator.Error!Value {
+pub fn compareStrings(
+    allocator: std.mem.Allocator,
+    collator_object: *const Collator,
+    x: String,
+    y: String,
+) std.mem.Allocator.Error!Value {
     const data_provider = icu4zig.DataProvider.init();
     defer data_provider.deinit();
     const collator = icu4zig.Collator.init(

@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
 
@@ -23,14 +21,14 @@ pub const Data = struct {
 
 data: *Data,
 
-pub fn init(allocator: Allocator, description: ?String) Allocator.Error!Symbol {
+pub fn init(allocator: std.mem.Allocator, description: ?String) std.mem.Allocator.Error!Symbol {
     const data = try allocator.create(Data);
     data.* = .{ .description = description };
     return .{ .data = data };
 }
 
 /// For tests not using the GC allocator.
-pub fn deinit(self: Symbol, allocator: Allocator) void {
+pub fn deinit(self: Symbol, allocator: std.mem.Allocator) void {
     // TODO: To deinit the description string we need to know if it was dynamically allocated.
     allocator.destroy(self.data);
 }
@@ -57,7 +55,7 @@ pub fn sameValue(self: Symbol, other: Symbol) bool {
 
 /// 20.4.3.3.1 SymbolDescriptiveString ( sym )
 /// https://tc39.es/ecma262/#sec-symboldescriptivestring
-pub fn descriptiveString(self: Symbol, agent: *Agent) Allocator.Error!String {
+pub fn descriptiveString(self: Symbol, agent: *Agent) std.mem.Allocator.Error!String {
     // 1. Let desc be sym's [[Description]] value.
     // 2. If desc is undefined, set desc to the empty String.
     // 3. Assert: desc is a String.

@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const libregexp = @import("../c/libregexp.zig").libregexp;
 
 const build_options = @import("build-options");
@@ -37,7 +35,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const sameValue = types.sameValue;
 
 pub const LreOpaque = struct {
-    allocator: Allocator,
+    allocator: std.mem.Allocator,
 };
 
 export fn lre_check_stack_overflow(_: ?*anyopaque, _: usize) c_int {
@@ -545,7 +543,7 @@ const Match = struct {
 
 /// 22.2.7.6 GetMatchString ( S, match )
 /// https://tc39.es/ecma262/#sec-getmatchstring
-fn getMatchString(agent: *Agent, string: String, match: Match) Allocator.Error!String {
+fn getMatchString(agent: *Agent, string: String, match: Match) std.mem.Allocator.Error!String {
     // 1. Assert: match.[[StartIndex]] ≤ match.[[EndIndex]] ≤ the length of S.
     std.debug.assert(match.start_index <= match.end_index);
     std.debug.assert(match.end_index <= string.length());
@@ -556,7 +554,7 @@ fn getMatchString(agent: *Agent, string: String, match: Match) Allocator.Error!S
 
 /// 22.2.7.7 GetMatchIndexPair ( S, match )
 /// https://tc39.es/ecma262/#sec-getmatchindexpair
-fn getMatchIndexPair(agent: *Agent, string: String, match: Match) Allocator.Error!Object {
+fn getMatchIndexPair(agent: *Agent, string: String, match: Match) std.mem.Allocator.Error!Object {
     // 1. Assert: match.[[StartIndex]] ≤ match.[[EndIndex]] ≤ the length of S.
     std.debug.assert(match.start_index <= match.end_index);
     std.debug.assert(match.end_index <= string.length());
@@ -579,7 +577,7 @@ fn makeMatchIndicesIndexPairArray(
     indices: []const ?Match,
     group_names: []const ?[]const u8,
     has_groups: bool,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     // 1. Let n be the number of elements in indices.
     const n = indices.len;
 
@@ -660,7 +658,7 @@ fn makeMatchIndicesIndexPairArray(
 /// 22.2.5 Properties of the RegExp Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-regexp-constructor
 pub const RegExpConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 2,
             .name = "RegExp",
@@ -669,7 +667,7 @@ pub const RegExpConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 22.2.5.1 RegExp.prototype
@@ -773,13 +771,13 @@ pub const RegExpConstructor = struct {
 /// 22.2.6 Properties of the RegExp Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-regexp-prototype-object
 pub const RegExpPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "dotAll", dotAll, null, realm);
         try defineBuiltinFunction(object, "exec", exec, 1, realm);
         try defineBuiltinAccessor(object, "flags", flags, null, realm);
@@ -1426,10 +1424,10 @@ pub const RegExpPrototype = struct {
     /// 22.2.6.13.1 EscapeRegExpPattern ( P, F )
     /// https://tc39.es/ecma262/#sec-escaperegexppattern
     fn escapeRegExpPattern(
-        allocator: Allocator,
+        allocator: std.mem.Allocator,
         pattern: String,
         _: c_int,
-    ) Allocator.Error!String {
+    ) std.mem.Allocator.Error!String {
         // TODO: 1-4.
         // 5. The code points / or any LineTerminator occurring in the pattern shall be escaped in
         //    S as necessary to ensure that the string-concatenation of "/", S, "/", and F can be

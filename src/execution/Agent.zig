@@ -4,8 +4,6 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const environments = @import("environments.zig");
 const pretty_printing = @import("../pretty_printing.zig");
@@ -30,7 +28,7 @@ const noexcept = utils.noexcept;
 
 const Agent = @This();
 
-gc_allocator: Allocator,
+gc_allocator: std.mem.Allocator,
 options: Options,
 pre_allocated: struct {
     zero: BigInt,
@@ -57,14 +55,14 @@ pub const Options = struct {
     } = .{},
 };
 
-pub const Error = Allocator.Error || error{ExceptionThrown};
+pub const Error = std.mem.Allocator.Error || error{ExceptionThrown};
 
 pub const QueuedJob = struct {
     job: Job,
     realm: ?*Realm,
 };
 
-pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Agent {
+pub fn init(gc_allocator: std.mem.Allocator, options: Options) std.mem.Allocator.Error!Agent {
     const platform = options.platform orelse if (@TypeOf(Platform.default) != void)
         Platform.default()
     else
@@ -156,7 +154,7 @@ pub fn createException(
     comptime exception_type: ExceptionType,
     comptime fmt: []const u8,
     args: anytype,
-) Allocator.Error!Object {
+) std.mem.Allocator.Error!Object {
     const realm = self.currentRealm();
     const constructor = try @field(
         Realm.Intrinsics,

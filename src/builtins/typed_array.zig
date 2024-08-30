@@ -4,8 +4,6 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -151,7 +149,10 @@ pub const typed_array_element_types = [_]struct { []const u8, TypedArrayElementT
 
 /// 10.4.5.1 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-typedarray-getownproperty
-fn getOwnProperty(object: Object, property_key: PropertyKey) Allocator.Error!?PropertyDescriptor {
+fn getOwnProperty(
+    object: Object,
+    property_key: PropertyKey,
+) std.mem.Allocator.Error!?PropertyDescriptor {
     const agent = object.agent();
 
     // 1. If P is a String, then
@@ -289,7 +290,7 @@ fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value)
 
 /// 10.4.5.6 [[Delete]] ( P )
 /// https://tc39.es/ecma262/#sec-typedarray-delete
-fn delete(object: Object, property_key: PropertyKey) Allocator.Error!bool {
+fn delete(object: Object, property_key: PropertyKey) std.mem.Allocator.Error!bool {
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
     //     b. If numericIndex is not undefined, then
@@ -306,7 +307,7 @@ fn delete(object: Object, property_key: PropertyKey) Allocator.Error!bool {
 
 /// 10.4.5.7 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-typedarray-ownpropertykeys
-fn ownPropertyKeys(object: Object) Allocator.Error!std.ArrayList(PropertyKey) {
+fn ownPropertyKeys(object: Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
     const agent = object.agent();
     const property_storage_hash_map = object.propertyStorage().hash_map;
 
@@ -538,7 +539,11 @@ fn isValidIntegerIndex(typed_array: *const TypedArray, index: f64) bool {
 
 /// 10.4.5.15 TypedArrayGetElement ( O, index )
 /// https://tc39.es/ecma262/#sec-typedarraygetelement
-fn typedArrayGetElement(agent: *Agent, typed_array: *const TypedArray, index: u53) Allocator.Error!Value {
+fn typedArrayGetElement(
+    agent: *Agent,
+    typed_array: *const TypedArray,
+    index: u53,
+) std.mem.Allocator.Error!Value {
     // 1. If IsValidIntegerIndex(O, index) is false, return undefined.
     if (!isValidIntegerIndex(typed_array, @floatFromInt(index))) return Value.undefined;
 
@@ -622,7 +627,7 @@ fn typedArraySetElement(agent: *Agent, typed_array: *const TypedArray, index: f6
 /// 23.2.2 Properties of the %TypedArray% Intrinsic Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-%typedarray%-intrinsic-object
 pub const TypedArrayConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "TypedArray",
@@ -631,7 +636,7 @@ pub const TypedArrayConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "from", from, 1, realm);
         try defineBuiltinFunction(object, "of", of, 0, realm);
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
@@ -847,13 +852,13 @@ pub const TypedArrayConstructor = struct {
 /// 23.2.3 Properties of the %TypedArray% Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-%typedarrayprototype%-object
 pub const TypedArrayPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinAccessor(object, "buffer", buffer, null, realm);
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
@@ -3700,7 +3705,7 @@ fn allocateTypedArrayBuffer(
 /// https://tc39.es/ecma262/#sec-properties-of-the-typedarray-constructors
 fn MakeTypedArrayConstructor(comptime name: []const u8) type {
     return struct {
-        pub fn create(realm: *Realm) Allocator.Error!Object {
+        pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
             return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
                 .length = 3,
                 .name = name,
@@ -3709,7 +3714,7 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
             });
         }
 
-        pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+        pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
             const prototypeFn = @field(Realm.Intrinsics, "%" ++ name ++ ".prototype%");
 
             // 23.2.6.1 TypedArray.BYTES_PER_ELEMENT
@@ -3891,13 +3896,13 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
 /// https://tc39.es/ecma262/#sec-properties-of-typedarray-prototype-objects
 fn MakeTypedArrayPrototype(comptime name: []const u8) type {
     return struct {
-        pub fn create(realm: *Realm) Allocator.Error!Object {
+        pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
             return builtins.Object.create(realm.agent, .{
                 .prototype = try realm.intrinsics.@"%TypedArray.prototype%"(),
             });
         }
 
-        pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+        pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
             // 23.2.7.1 TypedArray.prototype.BYTES_PER_ELEMENT
             // https://tc39.es/ecma262/#sec-typedarray.prototype.bytes_per_element
             try defineBuiltinProperty(object, "BYTES_PER_ELEMENT", PropertyDescriptor{

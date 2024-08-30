@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -25,13 +23,13 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 /// 22.1.5.1 The %StringIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%stringiteratorprototype%-object
 pub const StringIteratorPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 0, realm);
 
         // 22.1.5.1.2 %StringIteratorPrototype% [ %Symbol.toStringTag% ]

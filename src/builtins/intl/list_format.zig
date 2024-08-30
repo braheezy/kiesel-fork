@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const icu4zig = @import("icu4zig");
 
 const abstract_operations = @import("abstract_operations.zig");
@@ -36,7 +34,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// 13.2 Properties of the Intl.ListFormat Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-constructor
 pub const ListFormatConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "ListFormat",
@@ -45,7 +43,7 @@ pub const ListFormatConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         // 13.2.1 Intl.ListFormat.prototype
         // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -175,13 +173,13 @@ pub const ListFormatConstructor = struct {
 /// 13.3 Properties of the Intl.ListFormat Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-prototype-object
 pub const ListFormatPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "format", format, 1, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
@@ -315,10 +313,10 @@ pub const ListFormat = MakeObject(.{
 /// 13.5.3 FormatList ( listFormat, list )
 /// https://tc39.es/ecma402/#sec-formatlist
 fn formatList(
-    allocator: Allocator,
+    allocator: std.mem.Allocator,
     list_format: *const ListFormat,
     list: []const []const u8,
-) Allocator.Error!String {
+) std.mem.Allocator.Error!String {
     const data_provider = icu4zig.DataProvider.init();
     defer data_provider.deinit();
     const list_formatter = icu4zig.ListFormatter.init(

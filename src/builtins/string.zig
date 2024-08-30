@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
@@ -313,7 +311,10 @@ pub fn getSubstitution(
 
 /// 10.4.3.1 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-getownproperty-p
-fn getOwnProperty(object: Object, property_key: PropertyKey) Allocator.Error!?PropertyDescriptor {
+fn getOwnProperty(
+    object: Object,
+    property_key: PropertyKey,
+) std.mem.Allocator.Error!?PropertyDescriptor {
     // 1. Let desc be OrdinaryGetOwnProperty(S, P).
     const property_descriptor = ordinaryGetOwnProperty(object, property_key) catch unreachable;
 
@@ -330,7 +331,7 @@ fn defineOwnProperty(
     object: Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
-) Allocator.Error!bool {
+) std.mem.Allocator.Error!bool {
     const string = object.as(String);
 
     // 1. Let stringDesc be StringGetOwnProperty(S, P).
@@ -359,7 +360,7 @@ fn defineOwnProperty(
 
 /// 10.4.3.3 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-ownpropertykeys
-fn ownPropertyKeys(object: Object) Allocator.Error!std.ArrayList(PropertyKey) {
+fn ownPropertyKeys(object: Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
     const agent = object.agent();
     const property_storage_hash_map = object.propertyStorage().hash_map;
 
@@ -420,7 +421,11 @@ fn ownPropertyKeys(object: Object) Allocator.Error!std.ArrayList(PropertyKey) {
 
 /// 10.4.3.4 StringCreate ( value, prototype )
 /// https://tc39.es/ecma262/#sec-stringcreate
-pub fn stringCreate(agent: *Agent, value: types.String, prototype: Object) Allocator.Error!Object {
+pub fn stringCreate(
+    agent: *Agent,
+    value: types.String,
+    prototype: Object,
+) std.mem.Allocator.Error!Object {
     // 1. Let S be MakeBasicObject(« [[Prototype]], [[Extensible]], [[StringData]] »).
     const string = try String.create(agent, .{
         // 2. Set S.[[Prototype]] to prototype.
@@ -465,7 +470,7 @@ pub fn stringCreate(agent: *Agent, value: types.String, prototype: Object) Alloc
 fn stringGetOwnProperty(
     string: *const String,
     property_key: PropertyKey,
-) Allocator.Error!?PropertyDescriptor {
+) std.mem.Allocator.Error!?PropertyDescriptor {
     const agent = string.data.agent;
 
     // 1. If P is not a String, return undefined.
@@ -499,7 +504,7 @@ fn stringGetOwnProperty(
 /// 22.1.2 Properties of the String Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-string-constructor
 pub const StringConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "String",
@@ -508,7 +513,7 @@ pub const StringConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "fromCharCode", fromCharCode, 1, realm);
         try defineBuiltinFunction(object, "fromCodePoint", fromCodePoint, 1, realm);
         try defineBuiltinFunction(object, "raw", raw, 1, realm);
@@ -679,7 +684,7 @@ pub const StringConstructor = struct {
 /// 22.1.3 Properties of the String Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-string-prototype-object
 pub const StringPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return String.create(realm.agent, .{
             .fields = .{
                 .string_data = types.String.empty,
@@ -688,7 +693,7 @@ pub const StringPrototype = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinFunction(object, "charAt", charAt, 1, realm);
         try defineBuiltinFunction(object, "charCodeAt", charCodeAt, 1, realm);
@@ -1782,7 +1787,7 @@ pub const StringPrototype = struct {
             // c. Return CreateArrayFromList(codeUnits).
             return Value.from(
                 try createArrayFromListMapToValue(agent, u16, code_units, struct {
-                    fn mapFn(agent_: *Agent, code_unit: u16) Allocator.Error!Value {
+                    fn mapFn(agent_: *Agent, code_unit: u16) std.mem.Allocator.Error!Value {
                         const code_unit_string = if (code_unit > 0x7F) blk: {
                             var utf16 = try agent_.gc_allocator.alloc(u16, 1);
                             utf16[0] = code_unit;
@@ -1825,7 +1830,7 @@ pub const StringPrototype = struct {
             if (substrings.items.len == limit) {
                 return Value.from(
                     try createArrayFromListMapToValue(agent, types.String, substrings.items, struct {
-                        fn mapFn(_: *Agent, string_: types.String) Allocator.Error!Value {
+                        fn mapFn(_: *Agent, string_: types.String) std.mem.Allocator.Error!Value {
                             return Value.from(string_);
                         }
                     }.mapFn),
@@ -1848,7 +1853,7 @@ pub const StringPrototype = struct {
         // 17. Return CreateArrayFromList(substrings).
         return Value.from(
             try createArrayFromListMapToValue(agent, types.String, substrings.items, struct {
-                fn mapFn(_: *Agent, string_: types.String) Allocator.Error!Value {
+                fn mapFn(_: *Agent, string_: types.String) std.mem.Allocator.Error!Value {
                     return Value.from(string_);
                 }
             }.mapFn),

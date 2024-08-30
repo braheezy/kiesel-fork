@@ -3,8 +3,6 @@ const std = @import("std");
 
 const kiesel = @import("kiesel");
 
-const Allocator = std.mem.Allocator;
-
 const Agent = kiesel.execution.Agent;
 const Diagnostics = kiesel.language.Diagnostics;
 const Realm = kiesel.execution.Realm;
@@ -30,7 +28,7 @@ const Writer = std.io.GenericWriter(
     }.write,
 );
 
-fn run(allocator: Allocator, realm: *Realm, source_text: []const u8) !Value {
+fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8) !Value {
     var diagnostics = Diagnostics.init(allocator);
     defer diagnostics.deinit();
     const script = try Script.parse(source_text, realm, null, .{ .diagnostics = &diagnostics });

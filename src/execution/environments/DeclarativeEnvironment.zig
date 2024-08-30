@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const environments = @import("../environments.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
@@ -45,7 +43,7 @@ pub fn createMutableBinding(
     _: *Agent,
     name: String,
     deletable: bool,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. Assert: envRec does not already have a binding for N.
     // 2. Create a mutable binding in envRec for N and record that it is uninitialized. If D is
     //    true, record that the newly created binding may be deleted by a subsequent DeleteBinding
@@ -67,7 +65,7 @@ pub fn createImmutableBinding(
     _: *Agent,
     name: String,
     strict: bool,
-) Allocator.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. Assert: envRec does not already have a binding for N.
     // 2. Create an immutable binding in envRec for N and record that it is uninitialized. If S is
     //    true, record that the newly created binding is a strict binding.

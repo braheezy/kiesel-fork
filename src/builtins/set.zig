@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -158,7 +156,7 @@ fn setDataSize(set_data: SetData) usize {
 /// 24.2.3 Properties of the Set Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-set-constructor
 pub const SetConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 0,
             .name = "Set",
@@ -167,7 +165,7 @@ pub const SetConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 24.2.3.1 Set.prototype
@@ -241,13 +239,13 @@ pub const SetConstructor = struct {
 /// 24.2.4 Properties of the Set Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-set-prototype-object
 pub const SetPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "add", add, 1, realm);
         try defineBuiltinFunction(object, "clear", clear, 0, realm);
         try defineBuiltinFunction(object, "delete", delete, 1, realm);
@@ -964,7 +962,7 @@ pub const Set = MakeObject(.{
         iterable_values: ?IterableValues = null,
         active_iterators: usize = 0,
 
-        pub fn registerIterator(self: *@This()) Allocator.Error!*IterableValues {
+        pub fn registerIterator(self: *@This()) std.mem.Allocator.Error!*IterableValues {
             if (self.active_iterators == 0) {
                 std.debug.assert(self.iterable_values == null);
                 self.iterable_values = try IterableValues.initCapacity(

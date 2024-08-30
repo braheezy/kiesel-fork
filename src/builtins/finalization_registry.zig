@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
@@ -29,7 +27,7 @@ const sameValue = types.sameValue;
 /// 26.2.1 The FinalizationRegistry Constructor
 /// https://tc39.es/ecma262/#sec-finalization-registry-constructor
 pub const FinalizationRegistryConstructor = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
             .length = 1,
             .name = "FinalizationRegistry",
@@ -38,7 +36,7 @@ pub const FinalizationRegistryConstructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         // 26.2.2.1 FinalizationRegistry.prototype
         // https://tc39.es/ecma262/#sec-finalization-registry.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -98,13 +96,13 @@ pub const FinalizationRegistryConstructor = struct {
 /// 26.2.3 Properties of the FinalizationRegistry Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-finalization-registry-prototype-object
 pub const FinalizationRegistryPrototype = struct {
-    pub fn create(realm: *Realm) Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) Allocator.Error!void {
+    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "register", register, 2, realm);
         try defineBuiltinFunction(object, "unregister", unregister, 1, realm);
 

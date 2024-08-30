@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const types = @import("../../types.zig");
 const utils = @import("../../utils.zig");
 
@@ -591,7 +589,11 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.20 Number::toString ( x, radix )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-tostring
-    pub fn toString(self: Number, allocator: Allocator, radix: u8) Allocator.Error!String {
+    pub fn toString(
+        self: Number,
+        allocator: std.mem.Allocator,
+        radix: u8,
+    ) std.mem.Allocator.Error!String {
         // 1. If x is NaN, return "NaN".
         if (self.isNan()) return String.fromLiteral("NaN");
 

@@ -4,8 +4,6 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-const Allocator = std.mem.Allocator;
-
 const icu4zig = @import("icu4zig");
 
 const build_options = @import("build-options");
@@ -79,7 +77,7 @@ pub fn fromLiteral(comptime utf8: []const u8) String {
     return .{ .data = @constCast(data) };
 }
 
-pub fn fromUtf8(allocator: Allocator, utf8: []const u8) Allocator.Error!String {
+pub fn fromUtf8(allocator: std.mem.Allocator, utf8: []const u8) std.mem.Allocator.Error!String {
     const slice: Data.Slice = if (utf8IsAscii(utf8)) blk: {
         break :blk .{ .ascii = utf8 };
     } else blk: {
@@ -94,14 +92,14 @@ pub fn fromUtf8(allocator: Allocator, utf8: []const u8) Allocator.Error!String {
     return .{ .data = data };
 }
 
-pub fn fromAscii(allocator: Allocator, ascii: []const u8) Allocator.Error!String {
+pub fn fromAscii(allocator: std.mem.Allocator, ascii: []const u8) std.mem.Allocator.Error!String {
     const slice: Data.Slice = .{ .ascii = ascii };
     const data = try allocator.create(Data);
     data.* = .{ .slice = slice, .hash = slice.hash() };
     return .{ .data = data };
 }
 
-pub fn fromUtf16(allocator: Allocator, utf16: []const u16) Allocator.Error!String {
+pub fn fromUtf16(allocator: std.mem.Allocator, utf16: []const u16) std.mem.Allocator.Error!String {
     const slice: Data.Slice = .{ .utf16 = utf16 };
     const data = try allocator.create(Data);
     data.* = .{ .slice = slice, .hash = slice.hash() };
@@ -119,7 +117,7 @@ pub fn length(self: String) usize {
     };
 }
 
-pub fn toUtf8(self: String, allocator: Allocator) Allocator.Error![]const u8 {
+pub fn toUtf8(self: String, allocator: std.mem.Allocator) std.mem.Allocator.Error![]const u8 {
     return switch (self.data.slice) {
         .ascii => |ascii| allocator.dupe(u8, ascii),
         .utf16 => |utf16| std.fmt.allocPrint(
@@ -130,7 +128,7 @@ pub fn toUtf8(self: String, allocator: Allocator) Allocator.Error![]const u8 {
     };
 }
 
-pub fn toUtf16(self: String, allocator: Allocator) Allocator.Error![]const u16 {
+pub fn toUtf16(self: String, allocator: std.mem.Allocator) std.mem.Allocator.Error![]const u16 {
     return switch (self.data.slice) {
         .ascii => |ascii| blk: {
             const utf16 = try allocator.alloc(u16, ascii.len);
@@ -174,10 +172,10 @@ pub fn startsWith(self: String, other: String) bool {
 /// https://tc39.es/ecma262/#substring
 pub fn substring(
     self: String,
-    allocator: Allocator,
+    allocator: std.mem.Allocator,
     inclusive_start: usize,
     exclusive_end: ?usize,
-) Allocator.Error!String {
+) std.mem.Allocator.Error!String {
     if (inclusive_start == 0 and (exclusive_end == null or exclusive_end == self.length())) {
         return self;
     }
@@ -389,7 +387,7 @@ pub fn codeUnitAt(self: String, index: usize) u16 {
     };
 }
 
-pub fn toLowerCase(self: String, allocator: Allocator) Allocator.Error!String {
+pub fn toLowerCase(self: String, allocator: std.mem.Allocator) std.mem.Allocator.Error!String {
     if (self.isEmpty()) return empty;
     switch (self.data.slice) {
         .ascii => |ascii| {
@@ -424,7 +422,7 @@ pub fn toLowerCase(self: String, allocator: Allocator) Allocator.Error!String {
     }
 }
 
-pub fn toUpperCase(self: String, allocator: Allocator) Allocator.Error!String {
+pub fn toUpperCase(self: String, allocator: std.mem.Allocator) std.mem.Allocator.Error!String {
     if (self.isEmpty()) return empty;
     switch (self.data.slice) {
         .ascii => |ascii| {
@@ -461,9 +459,9 @@ pub fn toUpperCase(self: String, allocator: Allocator) Allocator.Error!String {
 
 pub fn trim(
     self: String,
-    allocator: Allocator,
+    allocator: std.mem.Allocator,
     where: enum { start, end, @"start+end" },
-) Allocator.Error!String {
+) std.mem.Allocator.Error!String {
     const whitespace_code_units = comptime blk: {
         var code_units: [whitespace.len]u21 = undefined;
         for (whitespace, 0..) |utf8, i| {
@@ -532,10 +530,10 @@ pub fn trim(
 
 pub fn replace(
     self: String,
-    allocator: Allocator,
+    allocator: std.mem.Allocator,
     needle: []const u8,
     replacement: []const u8,
-) Allocator.Error!String {
+) std.mem.Allocator.Error!String {
     // For now this only deals with simple ASCII replacements.
     switch (self.data.slice) {
         .ascii => |ascii| {
@@ -569,14 +567,21 @@ pub fn replace(
     }
 }
 
-pub fn repeat(self: String, allocator: Allocator, n: usize) Allocator.Error!String {
+pub fn repeat(
+    self: String,
+    allocator: std.mem.Allocator,
+    n: usize,
+) std.mem.Allocator.Error!String {
     var builder = Builder.init(allocator);
     defer builder.deinit();
     for (0..n) |_| try builder.appendString(self);
     return builder.build();
 }
 
-pub fn concat(allocator: Allocator, strings: []const String) Allocator.Error!String {
+pub fn concat(
+    allocator: std.mem.Allocator,
+    strings: []const String,
+) std.mem.Allocator.Error!String {
     var builder = Builder.init(allocator);
     defer builder.deinit();
     for (strings) |string| try builder.appendString(string);
