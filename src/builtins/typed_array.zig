@@ -88,8 +88,6 @@ pub const Float64ArrayConstructor = MakeTypedArrayConstructor("Float64Array");
 pub const Float64ArrayPrototype = MakeTypedArrayPrototype("Float64Array");
 
 pub const TypedArrayElementType = struct {
-    const Self = @This();
-
     pub const Clamping = enum {
         clamped,
         unclamped,
@@ -98,11 +96,13 @@ pub const TypedArrayElementType = struct {
     T: type,
     clamping: Clamping = .unclamped,
 
-    pub fn elementSize(comptime self: Self) comptime_int {
+    pub fn elementSize(comptime self: TypedArrayElementType) comptime_int {
         return @sizeOf(self.T);
     }
 
-    pub fn conversationOperation(comptime self: Self) fn (Value, *Agent) Agent.Error!self.T {
+    pub fn conversationOperation(
+        comptime self: TypedArrayElementType,
+    ) fn (Value, *Agent) Agent.Error!self.T {
         const field_name = switch (self.T) {
             i8 => "toInt8",
             u8 => if (self.clamping == .unclamped) "toUint8" else "toUint8Clamp",
@@ -119,7 +119,7 @@ pub const TypedArrayElementType = struct {
 
     /// 25.1.3.10 IsUnclampedIntegerElementType ( type )
     /// https://tc39.es/ecma262/#sec-isunclampedintegerelementtype
-    pub inline fn isUnclampedIntegerElementType(comptime self: Self) bool {
+    pub inline fn isUnclampedIntegerElementType(comptime self: TypedArrayElementType) bool {
         // 1. If type is one of int8, uint8, int16, uint16, int32, or uint32, return true.
         // 2. Return false.
         return self.clamping != .clamped and self.T != f16 and self.T != f32 and self.T != f64;
@@ -127,7 +127,7 @@ pub const TypedArrayElementType = struct {
 
     /// 25.1.3.11 IsBigIntElementType ( type )
     /// https://tc39.es/ecma262/#sec-isbigintelementtype
-    pub inline fn isBigIntElementType(comptime self: Self) bool {
+    pub inline fn isBigIntElementType(comptime self: TypedArrayElementType) bool {
         // 1. If type is either biguint64 or bigint64, return true.
         // 2. Return false.
         return self.T == u64 or self.T == i64;

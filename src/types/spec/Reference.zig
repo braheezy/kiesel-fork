@@ -14,7 +14,7 @@ const String = types.String;
 const Symbol = types.Symbol;
 const Value = types.Value;
 
-const Self = @This();
+const Reference = @This();
 
 /// [[Base]]
 base: union(enum) {
@@ -37,7 +37,7 @@ this_value: ?Value,
 
 /// 6.2.5.1 IsPropertyReference ( V )
 /// https://tc39.es/ecma262/#sec-ispropertyreference
-pub fn isPropertyReference(self: Self) bool {
+pub fn isPropertyReference(self: Reference) bool {
     switch (self.base) {
         // 1. if V.[[Base]] is unresolvable, return false.
         .unresolvable => return false,
@@ -50,27 +50,27 @@ pub fn isPropertyReference(self: Self) bool {
 
 /// 6.2.5.2 IsUnresolvableReference ( V )
 /// https://tc39.es/ecma262/#sec-isunresolvablereference
-pub fn isUnresolvableReference(self: Self) bool {
+pub fn isUnresolvableReference(self: Reference) bool {
     // 1. If V.[[Base]] is unresolvable, return true; otherwise return false.
     return self.base == .unresolvable;
 }
 
 /// 6.2.5.3 IsSuperReference ( V )
 /// https://tc39.es/ecma262/#sec-issuperreference
-pub fn isSuperReference(self: Self) bool {
+pub fn isSuperReference(self: Reference) bool {
     // 1. If V.[[ThisValue]] is not empty, return true; otherwise return false.
     return self.this_value != null;
 }
 
 /// 6.2.5.4 IsPrivateReference ( V )
-pub fn isPrivateReference(self: Self) bool {
+pub fn isPrivateReference(self: Reference) bool {
     // 1. If V.[[ReferencedName]] is a Private Name, return true; otherwise return false.
     return self.referenced_name == .private_name;
 }
 
 /// 6.2.5.5 GetValue ( V )
 /// https://tc39.es/ecma262/#sec-getvalue
-pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
+pub fn getValue(self: Reference, agent: *Agent) Agent.Error!Value {
     // 1. If V is not a Reference Record, return V.
     // NOTE: This is handled at the call site.
 
@@ -136,7 +136,7 @@ pub fn getValue(self: Self, agent: *Agent) Agent.Error!Value {
 
 /// 6.2.5.6 PutValue ( V, W )
 /// https://tc39.es/ecma262/#sec-putvalue
-pub fn putValue(self: Self, agent: *Agent, value: Value) Agent.Error!void {
+pub fn putValue(self: Reference, agent: *Agent, value: Value) Agent.Error!void {
     // 1. If V is not a Reference Record, throw a ReferenceError exception.
     // NOTE: This is handled at the call site.
 
@@ -208,7 +208,7 @@ pub fn putValue(self: Self, agent: *Agent, value: Value) Agent.Error!void {
 
 /// 6.2.5.7 GetThisValue ( V )
 /// https://tc39.es/ecma262/#sec-getthisvalue
-pub fn getThisValue(self: Self) Value {
+pub fn getThisValue(self: Reference) Value {
     // 1. Assert: IsPropertyReference(V) is true.
     std.debug.assert(self.isPropertyReference());
 
@@ -218,7 +218,7 @@ pub fn getThisValue(self: Self) Value {
 
 /// 6.2.5.8 InitializeReferencedBinding ( V, W )
 /// https://tc39.es/ecma262/#sec-initializereferencedbinding
-pub fn initializeReferencedBinding(self: Self, agent: *Agent, value: Value) Agent.Error!void {
+pub fn initializeReferencedBinding(self: Reference, agent: *Agent, value: Value) Agent.Error!void {
     // 1. Assert: IsUnresolvableReference(V) is false.
     std.debug.assert(!self.isUnresolvableReference());
 

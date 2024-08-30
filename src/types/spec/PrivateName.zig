@@ -7,7 +7,7 @@ const types = @import("../../types.zig");
 
 const Symbol = types.Symbol;
 
-const Self = @This();
+const PrivateName = @This();
 
 /// As symbols already have uniqueness via pointers, as well as a description string, private
 /// names can easily be implemented using symbols.
@@ -15,7 +15,7 @@ const Self = @This();
 symbol: Symbol,
 
 pub fn format(
-    self: Self,
+    self: PrivateName,
     comptime fmt: []const u8,
     options: std.fmt.FormatOptions,
     writer: anytype,
@@ -25,17 +25,17 @@ pub fn format(
     try writer.print("{}", .{self.symbol.data.description.?});
 }
 
-pub fn eql(a: Self, b: Self) bool {
+pub fn eql(a: PrivateName, b: PrivateName) bool {
     return a.symbol.sameValue(b.symbol);
 }
 
 pub fn PrivateNameArrayHashMap(comptime V: type) type {
-    return std.ArrayHashMap(Self, V, struct {
-        pub fn hash(_: @This(), key: Self) u32 {
+    return std.ArrayHashMap(PrivateName, V, struct {
+        pub fn hash(_: @This(), key: PrivateName) u32 {
             return std.array_hash_map.getAutoHashFn(*Symbol.Data, void)({}, key.symbol.data);
         }
 
-        pub fn eql(_: @This(), a: Self, b: Self, _: usize) bool {
+        pub fn eql(_: @This(), a: PrivateName, b: PrivateName, _: usize) bool {
             return a.eql(b);
         }
     }, false);

@@ -27,7 +27,7 @@ const instantiateAsyncGeneratorFunctionObject = language.instantiateAsyncGenerat
 const instantiateGeneratorFunctionObject = language.instantiateGeneratorFunctionObject;
 const instantiateOrdinaryFunctionObject = language.instantiateOrdinaryFunctionObject;
 
-const Self = @This();
+const Script = @This();
 
 /// [[Realm]]
 realm: *Realm,
@@ -41,7 +41,7 @@ loaded_modules: StringHashMap(Module),
 /// [[HostDefined]]
 host_defined: SafePointer,
 
-pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
+pub fn print(self: Script, writer: anytype) @TypeOf(writer).Error!void {
     try ast_printing.printScript(self.ecmascript_code, writer, 0);
 }
 
@@ -52,7 +52,7 @@ pub fn parse(
     realm: *Realm,
     host_defined: ?SafePointer,
     ctx: Parser.ParseContext,
-) Parser.Error!*Self {
+) Parser.Error!*Script {
     const agent = realm.agent;
 
     // 1. Let script be ParseText(sourceText, Script).
@@ -62,7 +62,7 @@ pub fn parse(
     // 3. Return Script Record {
     //      [[Realm]]: realm, [[ECMAScriptCode]]: script, [[LoadedModules]]: « », [[HostDefined]]: hostDefined
     //    }.
-    const self = try agent.gc_allocator.create(Self);
+    const self = try agent.gc_allocator.create(Script);
     self.* = .{
         .realm = realm,
         .ecmascript_code = script,
@@ -74,7 +74,7 @@ pub fn parse(
 
 /// 16.1.6 ScriptEvaluation ( scriptRecord )
 /// https://tc39.es/ecma262/#sec-runtime-semantics-scriptevaluation
-pub fn evaluate(self: *Self) Agent.Error!Value {
+pub fn evaluate(self: *Script) Agent.Error!Value {
     const agent = self.realm.agent;
 
     // 1. Let globalEnv be scriptRecord.[[Realm]].[[GlobalEnv]].

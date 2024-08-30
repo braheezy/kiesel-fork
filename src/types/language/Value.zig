@@ -41,7 +41,7 @@ const pow_2_8 = std.math.pow(f64, 2, 8);
 const pow_2_16 = std.math.pow(f64, 2, 16);
 const pow_2_32 = std.math.pow(f64, 2, 32);
 
-const Self = @This();
+const Value = @This();
 
 pub const PreferredType = enum { string, number };
 
@@ -365,14 +365,14 @@ comptime {
 const Impl = if (build_options.enable_nan_boxing) NanBoxingImpl else TaggedUnionImpl;
 impl: Impl,
 
-pub const @"undefined": Self = .{ .impl = Impl.undefined };
-pub const @"null": Self = .{ .impl = Impl.null };
-pub const nan: Self = from(std.math.nan(f64));
-pub const infinity: Self = from(std.math.inf(f64));
-pub const negative_infinity: Self = from(-std.math.inf(f64));
+pub const @"undefined": Value = .{ .impl = Impl.undefined };
+pub const @"null": Value = .{ .impl = Impl.null };
+pub const nan: Value = from(std.math.nan(f64));
+pub const infinity: Value = from(std.math.inf(f64));
+pub const negative_infinity: Value = from(-std.math.inf(f64));
 
 pub fn format(
-    self: Self,
+    self: Value,
     comptime fmt: []const u8,
     options: std.fmt.FormatOptions,
     writer: anytype,
@@ -401,73 +401,73 @@ pub fn format(
     }
 }
 
-pub inline fn from(value: anytype) Self {
+pub inline fn from(value: anytype) Value {
     return .{ .impl = Impl.from(value) };
 }
 
-pub fn @"type"(self: Self) Type {
+pub fn @"type"(self: Value) Type {
     return self.impl.type();
 }
 
-pub fn isUndefined(self: Self) bool {
+pub fn isUndefined(self: Value) bool {
     return self.impl == .undefined;
 }
 
-pub fn isNull(self: Self) bool {
+pub fn isNull(self: Value) bool {
     return self.impl == .null;
 }
 
-pub fn isBoolean(self: Self) bool {
+pub fn isBoolean(self: Value) bool {
     return self.impl.type() == .boolean;
 }
 
-pub fn asBoolean(self: Self) bool {
+pub fn asBoolean(self: Value) bool {
     return self.impl.asBoolean();
 }
 
-pub fn isString(self: Self) bool {
+pub fn isString(self: Value) bool {
     return self.impl.type() == .string;
 }
 
-pub fn asString(self: Self) String {
+pub fn asString(self: Value) String {
     return self.impl.asString();
 }
 
-pub fn isSymbol(self: Self) bool {
+pub fn isSymbol(self: Value) bool {
     return self.impl.type() == .symbol;
 }
 
-pub fn asSymbol(self: Self) Symbol {
+pub fn asSymbol(self: Value) Symbol {
     return self.impl.asSymbol();
 }
 
-pub fn isNumber(self: Self) bool {
+pub fn isNumber(self: Value) bool {
     return self.impl.type() == .number;
 }
 
-pub fn asNumber(self: Self) Number {
+pub fn asNumber(self: Value) Number {
     return self.impl.asNumber();
 }
 
-pub fn isBigInt(self: Self) bool {
+pub fn isBigInt(self: Value) bool {
     return self.impl.type() == .big_int;
 }
 
-pub fn asBigInt(self: Self) BigInt {
+pub fn asBigInt(self: Value) BigInt {
     return self.impl.asBigInt();
 }
 
-pub fn isObject(self: Self) bool {
+pub fn isObject(self: Value) bool {
     return self.impl.type() == .object;
 }
 
-pub fn asObject(self: Self) Object {
+pub fn asObject(self: Value) Object {
     return self.impl.asObject();
 }
 
 /// 6.2.6.5 ToPropertyDescriptor ( Obj )
 /// https://tc39.es/ecma262/#sec-topropertydescriptor
-pub fn toPropertyDescriptor(self: Self, agent: *Agent) Agent.Error!PropertyDescriptor {
+pub fn toPropertyDescriptor(self: Value, agent: *Agent) Agent.Error!PropertyDescriptor {
     // 1. If Obj is not an Object, throw a TypeError exception.
     if (!self.isObject()) {
         return agent.throwException(.type_error, "{} is not an Object", .{self});
@@ -579,7 +579,7 @@ pub fn toPropertyDescriptor(self: Self, agent: *Agent) Agent.Error!PropertyDescr
 
 /// 7.1.1 ToPrimitive ( input [ , preferredType ] )
 /// https://tc39.es/ecma262/#sec-toprimitive
-pub fn toPrimitive(self: Self, agent: *Agent, preferred_type: ?PreferredType) Agent.Error!Self {
+pub fn toPrimitive(self: Value, agent: *Agent, preferred_type: ?PreferredType) Agent.Error!Value {
     // 1. If input is an Object, then
     if (self.isObject()) {
         // a. Let exoticToPrim be ? GetMethod(input, %Symbol.toPrimitive%).
@@ -635,7 +635,7 @@ pub fn toPrimitive(self: Self, agent: *Agent, preferred_type: ?PreferredType) Ag
 
 /// 7.1.2 ToBoolean ( argument )
 /// https://tc39.es/ecma262/#sec-toboolean
-pub fn toBoolean(self: Self) bool {
+pub fn toBoolean(self: Value) bool {
     // 1. If argument is a Boolean, return argument.
     if (self.isBoolean()) return self.asBoolean();
 
@@ -671,7 +671,7 @@ pub fn toBoolean(self: Self) bool {
 
 /// 7.1.3 ToNumeric ( value )
 /// https://tc39.es/ecma262/#sec-tonumeric
-pub fn toNumeric(self: Self, agent: *Agent) Agent.Error!Numeric {
+pub fn toNumeric(self: Value, agent: *Agent) Agent.Error!Numeric {
     // 1. Let primValue be ? ToPrimitive(value, number).
     const primitive_value = try self.toPrimitive(agent, .number);
 
@@ -684,7 +684,7 @@ pub fn toNumeric(self: Self, agent: *Agent) Agent.Error!Numeric {
 
 /// 7.1.4 ToNumber ( argument )
 /// https://tc39.es/ecma262/#sec-tonumber
-pub fn toNumber(self: Self, agent: *Agent) Agent.Error!Number {
+pub fn toNumber(self: Value, agent: *Agent) Agent.Error!Number {
     switch (self.type()) {
         // 1. If argument is a Number, return argument.
         .number => return self.asNumber(),
@@ -728,7 +728,7 @@ pub fn toNumber(self: Self, agent: *Agent) Agent.Error!Number {
 
 /// 7.1.5 ToIntegerOrInfinity ( argument )
 /// https://tc39.es/ecma262/#sec-tointegerorinfinity
-pub fn toIntegerOrInfinity(self: Self, agent: *Agent) Agent.Error!f64 {
+pub fn toIntegerOrInfinity(self: Value, agent: *Agent) Agent.Error!f64 {
     // 1. Let number be ? ToNumber(argument).
     const number = try self.toNumber(agent);
 
@@ -749,7 +749,7 @@ pub fn toIntegerOrInfinity(self: Self, agent: *Agent) Agent.Error!f64 {
 
 /// 7.1.6 ToInt32 ( argument )
 /// https://tc39.es/ecma262/#sec-toint32
-pub fn toInt32(self: Self, agent: *Agent) Agent.Error!i32 {
+pub fn toInt32(self: Value, agent: *Agent) Agent.Error!i32 {
     // OPTIMIZATION: We may already have an i32 :^)
     if (self.isNumber() and self.asNumber() == .i32) return self.asNumber().i32;
 
@@ -771,7 +771,7 @@ pub fn toInt32(self: Self, agent: *Agent) Agent.Error!i32 {
 
 /// 7.1.7 ToUint32 ( argument )
 /// https://tc39.es/ecma262/#sec-touint32
-pub fn toUint32(self: Self, agent: *Agent) Agent.Error!u32 {
+pub fn toUint32(self: Value, agent: *Agent) Agent.Error!u32 {
     // OPTIMIZATION: We may already have a positive i32 :^)
     if (self.isNumber() and self.asNumber() == .i32 and self.asNumber().i32 >= 0)
         return @intCast(self.asNumber().i32);
@@ -794,7 +794,7 @@ pub fn toUint32(self: Self, agent: *Agent) Agent.Error!u32 {
 
 /// 7.1.8 ToInt16 ( argument )
 /// https://tc39.es/ecma262/#sec-toint16
-pub fn toInt16(self: Self, agent: *Agent) Agent.Error!i16 {
+pub fn toInt16(self: Value, agent: *Agent) Agent.Error!i16 {
     // 1. Let number be ? ToNumber(argument).
     const number = try self.toNumber(agent);
 
@@ -813,7 +813,7 @@ pub fn toInt16(self: Self, agent: *Agent) Agent.Error!i16 {
 
 /// 7.1.9 ToUint16 ( argument )
 /// https://tc39.es/ecma262/#sec-touint16
-pub fn toUint16(self: Self, agent: *Agent) Agent.Error!u16 {
+pub fn toUint16(self: Value, agent: *Agent) Agent.Error!u16 {
     // 1. Let number be ? ToNumber(argument).
     const number = try self.toNumber(agent);
 
@@ -832,7 +832,7 @@ pub fn toUint16(self: Self, agent: *Agent) Agent.Error!u16 {
 
 /// 7.1.10 ToInt8 ( argument )
 /// https://tc39.es/ecma262/#sec-toint8
-pub fn toInt8(self: Self, agent: *Agent) Agent.Error!i8 {
+pub fn toInt8(self: Value, agent: *Agent) Agent.Error!i8 {
     // 1. Let number be ? ToNumber(argument).
     const number = try self.toNumber(agent);
 
@@ -851,7 +851,7 @@ pub fn toInt8(self: Self, agent: *Agent) Agent.Error!i8 {
 
 /// 7.1.11 ToUint8 ( argument )
 /// https://tc39.es/ecma262/#sec-touint8
-pub fn toUint8(self: Self, agent: *Agent) Agent.Error!u8 {
+pub fn toUint8(self: Value, agent: *Agent) Agent.Error!u8 {
     // 1. Let number be ? ToNumber(argument).
     const number = try self.toNumber(agent);
 
@@ -870,7 +870,7 @@ pub fn toUint8(self: Self, agent: *Agent) Agent.Error!u8 {
 
 /// 7.1.12 ToUint8Clamp ( argument )
 /// https://tc39.es/ecma262/#sec-touint8clamp
-pub fn toUint8Clamp(self: Self, agent: *Agent) Agent.Error!u8 {
+pub fn toUint8Clamp(self: Value, agent: *Agent) Agent.Error!u8 {
     // 1. Let number be ? ToNumber(argument).
     const number = try self.toNumber(agent);
 
@@ -897,7 +897,7 @@ pub fn toUint8Clamp(self: Self, agent: *Agent) Agent.Error!u8 {
 
 /// 7.1.13 ToBigInt ( argument )
 /// https://tc39.es/ecma262/#sec-tobigint
-pub fn toBigInt(self: Self, agent: *Agent) Agent.Error!BigInt {
+pub fn toBigInt(self: Value, agent: *Agent) Agent.Error!BigInt {
     // 1. Let prim be ? ToPrimitive(argument, number).
     const primitive = try self.toPrimitive(agent, .number);
 
@@ -937,7 +937,7 @@ pub fn toBigInt(self: Self, agent: *Agent) Agent.Error!BigInt {
 
 /// 7.1.15 ToBigInt64 ( argument )
 /// https://tc39.es/ecma262/#sec-tobigint64
-pub fn toBigInt64(self: Self, agent: *Agent) Agent.Error!i64 {
+pub fn toBigInt64(self: Value, agent: *Agent) Agent.Error!i64 {
     // 1. Let n be ? ToBigInt(argument).
     const n = try self.toBigInt(agent);
 
@@ -950,7 +950,7 @@ pub fn toBigInt64(self: Self, agent: *Agent) Agent.Error!i64 {
 
 /// 7.1.16 ToBigUint64 ( argument )
 /// https://tc39.es/ecma262/#sec-tobiguint64
-pub fn toBigUint64(self: Self, agent: *Agent) Agent.Error!u64 {
+pub fn toBigUint64(self: Value, agent: *Agent) Agent.Error!u64 {
     // 1. Let n be ? ToBigInt(argument).
     const n = try self.toBigInt(agent);
 
@@ -963,7 +963,7 @@ pub fn toBigUint64(self: Self, agent: *Agent) Agent.Error!u64 {
 
 /// 7.1.17 ToString ( argument )
 /// https://tc39.es/ecma262/#sec-tostring
-pub fn toString(self: Self, agent: *Agent) Agent.Error!String {
+pub fn toString(self: Value, agent: *Agent) Agent.Error!String {
     return switch (self.type()) {
         // 1. If argument is a String, return argument.
         .string => self.asString(),
@@ -1010,7 +1010,7 @@ pub fn toString(self: Self, agent: *Agent) Agent.Error!String {
 
 /// 7.1.18 ToObject ( argument )
 /// https://tc39.es/ecma262/#sec-toobject
-pub fn toObject(self: Self, agent: *Agent) Agent.Error!Object {
+pub fn toObject(self: Value, agent: *Agent) Agent.Error!Object {
     const realm = agent.currentRealm();
     return switch (self.type()) {
         .undefined => agent.throwException(.type_error, "Cannot convert undefined to Object", .{}),
@@ -1042,7 +1042,7 @@ pub fn toObject(self: Self, agent: *Agent) Agent.Error!Object {
 
 /// 7.1.19 ToPropertyKey ( argument )
 /// https://tc39.es/ecma262/#sec-topropertykey
-pub fn toPropertyKey(self: Self, agent: *Agent) Agent.Error!PropertyKey {
+pub fn toPropertyKey(self: Value, agent: *Agent) Agent.Error!PropertyKey {
     // 1. Let key be ? ToPrimitive(argument, string).
     const key = try self.toPrimitive(agent, .string);
 
@@ -1072,7 +1072,7 @@ pub fn toPropertyKey(self: Self, agent: *Agent) Agent.Error!PropertyKey {
 
 /// 7.1.20 ToLength ( argument )
 /// https://tc39.es/ecma262/#sec-tolength
-pub fn toLength(self: Self, agent: *Agent) Agent.Error!u53 {
+pub fn toLength(self: Value, agent: *Agent) Agent.Error!u53 {
     // 1. Let len be ? ToIntegerOrInfinity(argument).
     const length = try self.toIntegerOrInfinity(agent);
 
@@ -1085,7 +1085,7 @@ pub fn toLength(self: Self, agent: *Agent) Agent.Error!u53 {
 
 /// 7.1.22 ToIndex ( value )
 /// https://tc39.es/ecma262/#sec-toindex
-pub fn toIndex(self: Self, agent: *Agent) Agent.Error!u53 {
+pub fn toIndex(self: Value, agent: *Agent) Agent.Error!u53 {
     // 1. Let integer be ? ToIntegerOrInfinity(value).
     const integer = try self.toIntegerOrInfinity(agent);
 
@@ -1099,7 +1099,7 @@ pub fn toIndex(self: Self, agent: *Agent) Agent.Error!u53 {
 
 /// 7.2.1 RequireObjectCoercible ( argument )
 /// https://tc39.es/ecma262/#sec-requireobjectcoercible
-pub fn requireObjectCoercible(self: Self, agent: *Agent) error{ExceptionThrown}!Self {
+pub fn requireObjectCoercible(self: Value, agent: *Agent) error{ExceptionThrown}!Value {
     switch (self.type()) {
         .undefined => return agent.throwException(.type_error, "Cannot convert undefined to Object", .{}),
         .null => return agent.throwException(.type_error, "Cannot convert null to Object", .{}),
@@ -1109,7 +1109,7 @@ pub fn requireObjectCoercible(self: Self, agent: *Agent) error{ExceptionThrown}!
 
 /// 7.2.2 IsArray ( argument )
 /// https://tc39.es/ecma262/#sec-isarray
-pub fn isArray(self: Self) error{ExceptionThrown}!bool {
+pub fn isArray(self: Value) error{ExceptionThrown}!bool {
     // 1. If argument is not an Object, return false.
     if (!self.isObject()) return false;
 
@@ -1134,7 +1134,7 @@ pub fn isArray(self: Self) error{ExceptionThrown}!bool {
 
 /// 7.2.3 IsCallable ( argument )
 /// https://tc39.es/ecma262/#sec-iscallable
-pub fn isCallable(self: Self) bool {
+pub fn isCallable(self: Value) bool {
     // 1. If argument is not an Object, return false.
     if (!self.isObject()) return false;
 
@@ -1147,7 +1147,7 @@ pub fn isCallable(self: Self) bool {
 
 /// 7.2.4 IsConstructor ( argument )
 /// https://tc39.es/ecma262/#sec-isconstructor
-pub fn isConstructor(self: Self) bool {
+pub fn isConstructor(self: Value) bool {
     // 1. If argument is not an Object, return false.
     if (!self.isObject()) return false;
 
@@ -1160,7 +1160,7 @@ pub fn isConstructor(self: Self) bool {
 
 /// 7.2.6 IsRegExp ( argument )
 /// https://tc39.es/ecma262/#sec-isregexp
-pub fn isRegExp(self: Self) Agent.Error!bool {
+pub fn isRegExp(self: Value) Agent.Error!bool {
     // 1. If argument is not an Object, return false.
     if (!self.isObject()) return false;
 
@@ -1181,7 +1181,7 @@ pub fn isRegExp(self: Self) Agent.Error!bool {
 
 /// 7.3.3 GetV ( V, P )
 /// https://tc39.es/ecma262/#sec-getv
-pub fn get(self: Self, agent: *Agent, property_key: PropertyKey) Agent.Error!Self {
+pub fn get(self: Value, agent: *Agent, property_key: PropertyKey) Agent.Error!Value {
     // 1. Let O be ? ToObject(V).
     const object = try self.toObject(agent);
 
@@ -1191,7 +1191,7 @@ pub fn get(self: Self, agent: *Agent, property_key: PropertyKey) Agent.Error!Sel
 
 /// 7.3.10 GetMethod ( V, P )
 /// https://tc39.es/ecma262/#sec-getmethod
-pub fn getMethod(self: Self, agent: *Agent, property_key: PropertyKey) Agent.Error!?Object {
+pub fn getMethod(self: Value, agent: *Agent, property_key: PropertyKey) Agent.Error!?Object {
     // 1. Let func be ? GetV(V, P).
     const function = try self.get(agent, property_key);
 
@@ -1210,11 +1210,11 @@ pub fn getMethod(self: Self, agent: *Agent, property_key: PropertyKey) Agent.Err
 /// 7.3.13 Call ( F, V [ , argumentsList ] )
 /// https://tc39.es/ecma262/#sec-call
 pub fn call(
-    self: Self,
+    self: Value,
     agent: *Agent,
-    this_value: Self,
-    arguments_list: []const Self,
-) Agent.Error!Self {
+    this_value: Value,
+    arguments_list: []const Value,
+) Agent.Error!Value {
     // 1. If argumentsList is not present, set argumentsList to a new empty List.
     // NOTE: This is done via the NoArgs variant of the function.
 
@@ -1231,11 +1231,11 @@ pub fn call(
     );
 }
 
-pub fn callNoArgs(self: Self, agent: *Agent, this_value: Self) Agent.Error!Self {
+pub fn callNoArgs(self: Value, agent: *Agent, this_value: Value) Agent.Error!Value {
     return self.call(agent, this_value, &.{});
 }
 
-pub fn callAssumeCallable(self: Self, this_value: Self, arguments_list: []const Self) Agent.Error!Self {
+pub fn callAssumeCallable(self: Value, this_value: Value, arguments_list: []const Value) Agent.Error!Value {
     return self.asObject().internalMethods().call.?(
         self.asObject(),
         this_value,
@@ -1243,15 +1243,15 @@ pub fn callAssumeCallable(self: Self, this_value: Self, arguments_list: []const 
     );
 }
 
-pub fn callAssumeCallableNoArgs(self: Self, this_value: Self) Agent.Error!Self {
+pub fn callAssumeCallableNoArgs(self: Value, this_value: Value) Agent.Error!Value {
     return self.callAssumeCallable(this_value, &.{});
 }
 
 /// 7.3.19 CreateListFromArrayLike ( obj [ , elementTypes ] )
 /// https://tc39.es/ecma262/#sec-createlistfromarraylike
-pub fn createListFromArrayLike(self: Self, agent: *Agent, args: struct {
+pub fn createListFromArrayLike(self: Value, agent: *Agent, args: struct {
     element_types: ?[]const Type = null,
-}) Agent.Error![]Self {
+}) Agent.Error![]Value {
     // 1. If elementTypes is not present, set elementTypes to « Undefined, Null, Boolean,
     //    String, Symbol, Number, BigInt, Object ».
     const element_types = args.element_types orelse std.enums.values(Type);
@@ -1266,7 +1266,7 @@ pub fn createListFromArrayLike(self: Self, agent: *Agent, args: struct {
 
     // 4. Let list be a new empty List.
     if (len > std.math.maxInt(usize)) return error.OutOfMemory;
-    var list = try std.ArrayList(Self).initCapacity(agent.gc_allocator, @intCast(len));
+    var list = try std.ArrayList(Value).initCapacity(agent.gc_allocator, @intCast(len));
     defer list.deinit();
 
     // 5. Let index be 0.
@@ -1302,11 +1302,11 @@ pub fn createListFromArrayLike(self: Self, agent: *Agent, args: struct {
 /// 7.3.20 Invoke ( V, P [ , argumentsList ] )
 /// https://tc39.es/ecma262/#sec-invoke
 pub fn invoke(
-    self: Self,
+    self: Value,
     agent: *Agent,
     property_key: PropertyKey,
-    arguments_list: []const Self,
-) Agent.Error!Self {
+    arguments_list: []const Value,
+) Agent.Error!Value {
     // 1. If argumentsList is not present, set argumentsList to a new empty List.
     // NOTE: This is done via the NoArgs variant of the function.
 
@@ -1318,16 +1318,16 @@ pub fn invoke(
 }
 
 pub fn invokeNoArgs(
-    self: Self,
+    self: Value,
     agent: *Agent,
     property_key: PropertyKey,
-) Agent.Error!Self {
+) Agent.Error!Value {
     return self.invoke(agent, property_key, &.{});
 }
 
 /// 7.3.21 OrdinaryHasInstance ( C, O )
 /// https://tc39.es/ecma262/#sec-ordinaryhasinstance
-pub fn ordinaryHasInstance(self: Self, object_value: Self) Agent.Error!bool {
+pub fn ordinaryHasInstance(self: Value, object_value: Value) Agent.Error!bool {
     // 1. If IsCallable(C) is false, return false.
     if (!self.isCallable()) return false;
 
@@ -1374,7 +1374,7 @@ fn addValueToKeyedGroup(
     agent: *Agent,
     groups: anytype,
     key: anytype,
-    value: Self,
+    value: Value,
 ) Allocator.Error!void {
     // 1. For each Record { [[Key]], [[Elements]] } g of groups, do
     //     a. If SameValue(g.[[Key]], key) is true, then
@@ -1387,7 +1387,7 @@ fn addValueToKeyedGroup(
     } else {
         // 2. Let group be the Record { [[Key]]: key, [[Elements]]: « value » }.
         // 3. Append group to groups.
-        var group = std.ArrayList(Self).init(agent.gc_allocator);
+        var group = std.ArrayList(Value).init(agent.gc_allocator);
         try group.append(value);
         try groups.putNoClobber(key, group);
 
@@ -1399,17 +1399,17 @@ const KeyCoercion = enum { property, collection };
 
 fn GroupByContainer(comptime key_coercion: KeyCoercion) type {
     return switch (key_coercion) {
-        .property => PropertyKeyArrayHashMap(std.ArrayList(Self)),
-        .collection => ValueArrayHashMap(std.ArrayList(Self), sameValue),
+        .property => PropertyKeyArrayHashMap(std.ArrayList(Value)),
+        .collection => ValueArrayHashMap(std.ArrayList(Value), sameValue),
     };
 }
 
 /// 7.3.36 GroupBy ( items, callbackfn, keyCoercion )
 /// https://tc39.es/ecma262/#sec-groupby
 pub fn groupBy(
-    self: Self,
+    self: Value,
     agent: *Agent,
-    callback_fn: Self,
+    callback_fn: Value,
     comptime key_coercion: KeyCoercion,
 ) Agent.Error!GroupByContainer(key_coercion) {
     // 1. Perform ? RequireObjectCoercible(items).
@@ -1487,7 +1487,7 @@ pub fn groupBy(
 
 /// 9.13 CanBeHeldWeakly ( v )
 /// https://tc39.es/ecma262/#sec-canbeheldweakly
-pub fn canBeHeldWeakly(self: Self, agent: *Agent) bool {
+pub fn canBeHeldWeakly(self: Value, agent: *Agent) bool {
     // 1. If v is an Object, return true.
     if (self.isObject()) return true;
 
@@ -1501,7 +1501,7 @@ pub fn canBeHeldWeakly(self: Self, agent: *Agent) bool {
 /// 10.1.15 RequireInternalSlot ( O, internalSlot )
 /// https://tc39.es/ecma262/#sec-requireinternalslot
 pub fn requireInternalSlot(
-    self: Self,
+    self: Value,
     agent: *Agent,
     comptime T: type,
 ) error{ExceptionThrown}!*T {
@@ -1536,7 +1536,7 @@ pub fn requireInternalSlot(
 
 /// 13.10.2 InstanceofOperator ( V, target )
 /// https://tc39.es/ecma262/#sec-instanceofoperator
-pub fn instanceofOperator(self: Self, agent: *Agent, target: Self) Agent.Error!bool {
+pub fn instanceofOperator(self: Value, agent: *Agent, target: Value) Agent.Error!bool {
     // 1. If target is not an Object, throw a TypeError exception.
     if (!target.isObject()) {
         return agent.throwException(
@@ -1569,7 +1569,7 @@ pub fn instanceofOperator(self: Self, agent: *Agent, target: Self) Agent.Error!b
 
 /// 24.5.1 CanonicalizeKeyedCollectionKey ( key )
 /// https://tc39.es/ecma262/#sec-canonicalizekeyedcollectionkey
-pub fn canonicalizeKeyedCollectionKey(self: Self) Self {
+pub fn canonicalizeKeyedCollectionKey(self: Value) Value {
     // 1. If key is -0𝔽, return +0𝔽.
     if (self.isNumber() and self.asNumber().isNegativeZero()) return from(0);
 
@@ -1579,7 +1579,7 @@ pub fn canonicalizeKeyedCollectionKey(self: Self) Self {
 
 /// 27.2.1.6 IsPromise ( x )
 /// https://tc39.es/ecma262/#sec-ispromise
-pub fn isPromise(self: Self) bool {
+pub fn isPromise(self: Value) bool {
     // 1. If x is not an Object, return false.
     if (!self.isObject()) return false;
 
@@ -1591,7 +1591,7 @@ pub fn isPromise(self: Self) bool {
 }
 
 /// Non-standard helper to get the right prototype for a primitive value, if applicable.
-pub fn synthesizePrototype(self: Self, agent: *Agent) Allocator.Error!?Object {
+pub fn synthesizePrototype(self: Value, agent: *Agent) Allocator.Error!?Object {
     const realm = agent.currentRealm();
 
     return switch (self.type()) {
@@ -1606,7 +1606,7 @@ pub fn synthesizePrototype(self: Self, agent: *Agent) Allocator.Error!?Object {
 }
 
 /// Non-standard helper to turn a symbol value into a private name.
-pub fn toPrivateName(self: Self) ?PrivateName {
+pub fn toPrivateName(self: Value) ?PrivateName {
     if (!self.isSymbol() or !self.asSymbol().data.is_private) return null;
     return .{ .symbol = self.asSymbol() };
 }
@@ -1677,7 +1677,7 @@ pub fn stringToBigInt(allocator: Allocator, string: String) Allocator.Error!?Big
 
 /// 7.2.10 SameValue ( x, y )
 /// https://tc39.es/ecma262/#sec-samevalue
-pub fn sameValue(x: Self, y: Self) bool {
+pub fn sameValue(x: Value, y: Value) bool {
     // 1. If Type(x) is not Type(y), return false.
     if (x.type() != y.type()) return false;
 
@@ -1693,7 +1693,7 @@ pub fn sameValue(x: Self, y: Self) bool {
 
 /// 7.2.11 SameValueZero ( x, y )
 /// https://tc39.es/ecma262/#sec-samevaluezero
-pub fn sameValueZero(x: Self, y: Self) bool {
+pub fn sameValueZero(x: Value, y: Value) bool {
     // 1. If Type(x) is not Type(y), return false.
     if (x.type() != y.type()) return false;
 
@@ -1709,7 +1709,7 @@ pub fn sameValueZero(x: Self, y: Self) bool {
 
 /// 7.2.12 SameValueNonNumber ( x, y )
 /// https://tc39.es/ecma262/#sec-samevaluenonnumber
-pub fn sameValueNonNumber(x: Self, y: Self) bool {
+pub fn sameValueNonNumber(x: Value, y: Value) bool {
     // 1. Assert: Type(x) is Type(y).
     std.debug.assert(x.type() == y.type());
 
@@ -1743,12 +1743,12 @@ pub fn sameValueNonNumber(x: Self, y: Self) bool {
 /// https://tc39.es/ecma262/#sec-islessthan
 pub fn isLessThan(
     agent: *Agent,
-    x: Self,
-    y: Self,
+    x: Value,
+    y: Value,
     order: enum { left_first, right_first },
 ) Agent.Error!?bool {
-    var px: Self = undefined;
-    var py: Self = undefined;
+    var px: Value = undefined;
+    var py: Value = undefined;
 
     // 1. If LeftFirst is true, then
     if (order == .left_first) {
@@ -1862,7 +1862,7 @@ pub fn isLessThan(
 
 /// 7.2.14 IsLooselyEqual ( x, y )
 /// https://tc39.es/ecma262/#sec-islooselyequal
-pub fn isLooselyEqual(agent: *Agent, x: Self, y: Self) Agent.Error!bool {
+pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) Agent.Error!bool {
     // 1. If Type(x) is Type(y), then
     if (x.type() == y.type()) {
         // a. Return IsStrictlyEqual(x, y).
@@ -1972,7 +1972,7 @@ pub fn isLooselyEqual(agent: *Agent, x: Self, y: Self) Agent.Error!bool {
 
 /// 7.2.15 IsStrictlyEqual ( x, y )
 /// https://tc39.es/ecma262/#sec-isstrictlyequal
-pub fn isStrictlyEqual(x: Self, y: Self) bool {
+pub fn isStrictlyEqual(x: Value, y: Value) bool {
     // 1. If Type(x) is not Type(y), return false.
     if (x.type() != y.type()) return false;
 
@@ -1988,7 +1988,7 @@ pub fn isStrictlyEqual(x: Self, y: Self) bool {
 
 /// 7.3.17 CreateArrayFromList ( elements )
 /// https://tc39.es/ecma262/#sec-createarrayfromlist
-pub fn createArrayFromList(agent: *Agent, elements: []const Self) Allocator.Error!Object {
+pub fn createArrayFromList(agent: *Agent, elements: []const Value) Allocator.Error!Object {
     // 1. Let array be ! ArrayCreate(0).
     const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
 
@@ -2011,7 +2011,7 @@ pub fn createArrayFromListMapToValue(
     agent: *Agent,
     comptime T: type,
     elements: []const T,
-    mapFn: fn (*Agent, T) Allocator.Error!Self,
+    mapFn: fn (*Agent, T) Allocator.Error!Value,
 ) Allocator.Error!Object {
     // 1. Let array be ! ArrayCreate(0).
     const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
@@ -2036,7 +2036,7 @@ pub fn createArrayFromListMapToValue(
 
 /// 9.2.12 CoerceOptionsToObject ( options )
 /// https://tc39.es/ecma402/#sec-coerceoptionstoobject
-pub fn coerceOptionsToObject(self: Self, agent: *Agent) Agent.Error!Object {
+pub fn coerceOptionsToObject(self: Value, agent: *Agent) Agent.Error!Object {
     // 1. If options is undefined, then
     if (self.isUndefined()) {
         // a. Return OrdinaryObjectCreate(null).
@@ -2141,9 +2141,9 @@ pub fn getOption(
     return coerced_value;
 }
 
-pub fn ValueArrayHashMap(comptime V: type, comptime eqlFn: fn (Self, Self) bool) type {
-    return std.ArrayHashMap(Self, V, struct {
-        pub fn hash(_: @This(), key: Self) u32 {
+pub fn ValueArrayHashMap(comptime V: type, comptime eqlFn: fn (Value, Value) bool) type {
+    return std.ArrayHashMap(Value, V, struct {
+        pub fn hash(_: @This(), key: Value) u32 {
             const value_hash = switch (key.type()) {
                 .undefined, .null => 0,
                 .boolean => std.array_hash_map.getAutoHashFn(bool, void)({}, key.asBoolean()),
@@ -2160,7 +2160,7 @@ pub fn ValueArrayHashMap(comptime V: type, comptime eqlFn: fn (Self, Self) bool)
             return tag ^ value_hash;
         }
 
-        pub fn eql(_: @This(), a: Self, b: Self, _: usize) bool {
+        pub fn eql(_: @This(), a: Value, b: Value, _: usize) bool {
             return eqlFn(a, b);
         }
     }, false);
@@ -2177,7 +2177,7 @@ test format {
     const object = try builtins.Object.create(&agent, .{
         .prototype = null,
     });
-    const test_cases = [_]struct { Self, []const u8 }{
+    const test_cases = [_]struct { Value, []const u8 }{
         .{ @"undefined", "undefined" },
         .{ @"null", "null" },
         .{ from(true), "true" },

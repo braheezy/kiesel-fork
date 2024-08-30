@@ -447,8 +447,6 @@ const IterableKeys = std.ArrayList(?Value);
 /// https://tc39.es/ecma262/#sec-properties-of-map-instances
 pub const Map = MakeObject(.{
     .Fields = struct {
-        const Self = @This();
-
         /// [[MapData]]
         map_data: MapData,
 
@@ -457,7 +455,7 @@ pub const Map = MakeObject(.{
         iterable_keys: ?IterableKeys = null,
         active_iterators: usize = 0,
 
-        pub fn registerIterator(self: *Self) Allocator.Error!*IterableKeys {
+        pub fn registerIterator(self: *@This()) Allocator.Error!*IterableKeys {
             if (self.active_iterators == 0) {
                 std.debug.assert(self.iterable_keys == null);
                 self.iterable_keys = try IterableKeys.initCapacity(self.map_data.allocator, self.map_data.count());
@@ -469,7 +467,7 @@ pub const Map = MakeObject(.{
             return &self.iterable_keys.?;
         }
 
-        pub fn unregisterIterator(self: *Self) void {
+        pub fn unregisterIterator(self: *@This()) void {
             self.active_iterators -= 1;
             if (self.active_iterators == 0) {
                 std.debug.assert(self.iterable_keys != null);

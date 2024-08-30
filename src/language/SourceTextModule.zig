@@ -39,7 +39,7 @@ const newModuleEnvironment = execution.newModuleEnvironment;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
 
-const Self = @This();
+const SourceTextModule = @This();
 
 /// [[Realm]]
 realm: *Realm,
@@ -92,7 +92,7 @@ requested_modules: std.ArrayList(String),
 loaded_modules: StringHashMap(Module),
 
 /// [[CycleRoot]]
-cycle_root: ?*Self,
+cycle_root: ?*SourceTextModule,
 
 /// [[HasTLA]]
 has_tla: bool,
@@ -150,14 +150,14 @@ pub const ExportEntry = struct {
     local_name: ?[]const u8,
 };
 
-pub fn print(self: Self, writer: anytype) @TypeOf(writer).Error!void {
+pub fn print(self: SourceTextModule, writer: anytype) @TypeOf(writer).Error!void {
     try ast_printing.printModule(self.ecmascript_code, writer, 0);
 }
 
 /// 16.2.1.5.1 LoadRequestedModules ( [ hostDefined ] )
 /// https://tc39.es/ecma262/#sec-LoadRequestedModules
 pub fn loadRequestedModules(
-    self: *Self,
+    self: *SourceTextModule,
     agent: *Agent,
     host_defined: ?SafePointer,
 ) Allocator.Error!*builtins.Promise {
@@ -311,7 +311,7 @@ pub fn continueModuleLoading(
 
 /// 16.2.1.5.2 Link ( )
 /// https://tc39.es/ecma262/#sec-moduledeclarationlinking
-pub fn link(self: *Self, agent: *Agent) Agent.Error!void {
+pub fn link(self: *SourceTextModule, agent: *Agent) Agent.Error!void {
     // 1. Assert: module.[[Status]] is one of unlinked, linked, evaluating-async, or evaluated.
     std.debug.assert(switch (self.status) {
         .unlinked, .linked, .evaluating_async, .evaluated => true,
@@ -319,7 +319,7 @@ pub fn link(self: *Self, agent: *Agent) Agent.Error!void {
     });
 
     // 2. Let stack be a new empty List.
-    var stack = std.ArrayList(*Self).init(agent.gc_allocator);
+    var stack = std.ArrayList(*SourceTextModule).init(agent.gc_allocator);
     defer stack.deinit();
 
     // 3. Let result be Completion(InnerModuleLinking(module, stack, 0)).
@@ -357,7 +357,7 @@ pub fn link(self: *Self, agent: *Agent) Agent.Error!void {
 
 /// 16.2.1.5.2.1 InnerModuleLinking ( module, stack, index )
 /// https://tc39.es/ecma262/#sec-InnerModuleLinking
-fn innerModuleLinking(agent: *Agent, module: Module, stack: *std.ArrayList(*Self), index: usize) Agent.Error!usize {
+fn innerModuleLinking(agent: *Agent, module: Module, stack: *std.ArrayList(*SourceTextModule), index: usize) Agent.Error!usize {
     // 1. If module is not a Cyclic Module Record, then
     if (module != .source_text_module) {
         // a. Perform ? module.Link().
@@ -413,7 +413,7 @@ fn innerModuleLinking(agent: *Agent, module: Module, stack: *std.ArrayList(*Self
 
             // ii. Assert: requiredModule.[[Status]] is linking if and only if stack contains
             //     requiredModule.
-            std.debug.assert(if (std.mem.indexOfScalar(*Self, stack.items, required_module.source_text_module) != null)
+            std.debug.assert(if (std.mem.indexOfScalar(*SourceTextModule, stack.items, required_module.source_text_module) != null)
                 required_module.source_text_module.status == .linking
             else
                 required_module.source_text_module.status != .linking);
@@ -467,7 +467,7 @@ pub fn parse(
     realm: *Realm,
     host_defined: ?SafePointer,
     ctx: Parser.ParseContext,
-) Parser.Error!*Self {
+) Parser.Error!*SourceTextModule {
     const agent = realm.agent;
 
     // 1. Let body be ParseText(sourceText, Module).
@@ -575,7 +575,7 @@ pub fn parse(
     //       [[IndirectExportEntries]]: indirectExportEntries, [[StarExportEntries]]: starExportEntries,
     //       [[DFSIndex]]: empty, [[DFSAncestorIndex]]: empty
     //     }.
-    const self = try agent.gc_allocator.create(Self);
+    const self = try agent.gc_allocator.create(SourceTextModule);
     self.* = .{
         .realm = realm,
         .environment = null,
@@ -604,7 +604,7 @@ pub fn parse(
 
 /// 16.2.1.5.3 Evaluate ( )
 /// https://tc39.es/ecma262/#sec-moduleevaluation
-pub fn evaluate(self: *Self, agent: *Agent) Allocator.Error!*builtins.Promise {
+pub fn evaluate(self: *SourceTextModule, agent: *Agent) Allocator.Error!*builtins.Promise {
     const realm = agent.currentRealm();
     var module = self;
 
@@ -635,7 +635,7 @@ pub fn evaluate(self: *Self, agent: *Agent) Allocator.Error!*builtins.Promise {
     }
 
     // 5. Let stack be a new empty List.
-    var stack = std.ArrayList(*Self).init(agent.gc_allocator);
+    var stack = std.ArrayList(*SourceTextModule).init(agent.gc_allocator);
     defer stack.deinit();
 
     // 6. Let capability be ! NewPromiseCapability(%Promise%).
@@ -717,7 +717,7 @@ pub fn evaluate(self: *Self, agent: *Agent) Allocator.Error!*builtins.Promise {
 fn innerModuleEvaluation(
     agent: *Agent,
     module: Module,
-    stack: *std.ArrayList(*Self),
+    stack: *std.ArrayList(*SourceTextModule),
     index: usize,
 ) Agent.Error!usize {
     // 1. If module is not a Cyclic Module Record, then
@@ -791,7 +791,7 @@ fn innerModuleEvaluation(
 
             // ii. Assert: requiredModule.[[Status]] is evaluating if and only if stack contains
             //     requiredModule.
-            std.debug.assert(if (std.mem.indexOfScalar(*Self, stack.items, required_module.source_text_module) != null)
+            std.debug.assert(if (std.mem.indexOfScalar(*SourceTextModule, stack.items, required_module.source_text_module) != null)
                 required_module.source_text_module.status == .evaluating
             else
                 required_module.source_text_module.status != .evaluating);
@@ -882,7 +882,7 @@ fn innerModuleEvaluation(
 }
 /// 16.2.1.6.2 GetExportedNames ( [ exportStarSet ] )
 /// https://tc39.es/ecma262/#sec-getexportednames
-pub fn getExportedNames(self: Self, agent: *Agent) Allocator.Error![]const []const u8 {
+pub fn getExportedNames(self: SourceTextModule, agent: *Agent) Allocator.Error![]const []const u8 {
     // 1. Assert: module.[[Status]] is not new.
     std.debug.assert(self.status != .new);
 
@@ -916,7 +916,7 @@ pub fn getExportedNames(self: Self, agent: *Agent) Allocator.Error![]const []con
 /// 16.2.1.6.3 ResolveExport ( exportName [ , resolveSet ] )
 /// https://tc39.es/ecma262/#sec-resolveexport
 pub fn resolveExport(
-    self: *Self,
+    self: *SourceTextModule,
     agent: *Agent,
     export_name: []const u8,
 ) Allocator.Error!?ResolvedBindingOrAmbiguous {
@@ -989,7 +989,7 @@ pub fn resolveExport(
 
 /// 16.2.1.6.4 InitializeEnvironment ( )
 /// https://tc39.es/ecma262/#sec-source-text-module-record-initialize-environment
-pub fn initializeEnvironment(self: *Self) Agent.Error!void {
+pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
     const agent = self.realm.agent;
 
     // TODO: 1. For each ExportEntry Record e of module.[[IndirectExportEntries]], do
@@ -1219,7 +1219,7 @@ pub fn initializeEnvironment(self: *Self) Agent.Error!void {
 
 /// 16.2.1.6.5 ExecuteModule ( [ capability ] )
 /// https://tc39.es/ecma262/#sec-source-text-module-record-execute-module
-pub fn executeModule(self: *Self, capability: ?PromiseCapability) Agent.Error!void {
+pub fn executeModule(self: *SourceTextModule, capability: ?PromiseCapability) Agent.Error!void {
     const agent = self.realm.agent;
 
     // 1. Let moduleContext be a new ECMAScript code execution context.

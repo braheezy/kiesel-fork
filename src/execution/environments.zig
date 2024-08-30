@@ -30,8 +30,6 @@ pub const PrivateEnvironment = @import("environments/PrivateEnvironment.zig");
 /// 9.1.1 The Environment Record Type Hierarchy
 /// https://tc39.es/ecma262/#sec-the-environment-record-type-hierarchy
 pub const Environment = union(enum) {
-    const Self = @This();
-
     declarative_environment: *DeclarativeEnvironment,
     object_environment: *ObjectEnvironment,
     function_environment: *FunctionEnvironment,
@@ -42,7 +40,7 @@ pub const Environment = union(enum) {
         distance: usize,
     };
 
-    pub fn outerEnv(self: Self) ?Self {
+    pub fn outerEnv(self: Environment) ?Environment {
         return switch (self) {
             inline .function_environment,
             .module_environment,
@@ -51,7 +49,7 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn hasBinding(self: Self, name: String) Agent.Error!bool {
+    pub fn hasBinding(self: Environment, name: String) Agent.Error!bool {
         return switch (self) {
             .function_environment => |env| env.declarative_environment.hasBinding(name),
             inline else => |env| env.hasBinding(name),
@@ -59,7 +57,7 @@ pub const Environment = union(enum) {
     }
 
     pub fn createMutableBinding(
-        self: Self,
+        self: Environment,
         agent: *Agent,
         name: String,
         deletable: bool,
@@ -73,7 +71,7 @@ pub const Environment = union(enum) {
     }
 
     pub fn createImmutableBinding(
-        self: Self,
+        self: Environment,
         agent: *Agent,
         name: String,
         strict: bool,
@@ -87,7 +85,7 @@ pub const Environment = union(enum) {
     }
 
     pub fn initializeBinding(
-        self: Self,
+        self: Environment,
         agent: *Agent,
         name: String,
         value: Value,
@@ -101,7 +99,7 @@ pub const Environment = union(enum) {
     }
 
     pub fn setMutableBinding(
-        self: Self,
+        self: Environment,
         agent: *Agent,
         name: String,
         value: Value,
@@ -116,7 +114,7 @@ pub const Environment = union(enum) {
     }
 
     pub fn getBindingValue(
-        self: Self,
+        self: Environment,
         agent: *Agent,
         name: String,
         strict: bool,
@@ -127,27 +125,27 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn deleteBinding(self: Self, name: String) Agent.Error!bool {
+    pub fn deleteBinding(self: Environment, name: String) Agent.Error!bool {
         return switch (self) {
             .function_environment => |env| env.declarative_environment.deleteBinding(name),
             inline else => |env| env.deleteBinding(name),
         };
     }
 
-    pub fn hasThisBinding(self: Self) bool {
+    pub fn hasThisBinding(self: Environment) bool {
         return switch (self) {
             inline else => |env| env.hasThisBinding(),
         };
     }
 
-    pub fn hasSuperBinding(self: Self) bool {
+    pub fn hasSuperBinding(self: Environment) bool {
         return switch (self) {
             .module_environment => |env| env.declarative_environment.hasSuperBinding(),
             inline else => |env| env.hasSuperBinding(),
         };
     }
 
-    pub fn withBaseObject(self: Self) ?Object {
+    pub fn withBaseObject(self: Environment) ?Object {
         return switch (self) {
             inline .function_environment,
             .module_environment,
@@ -156,7 +154,7 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn getThisBinding(self: Self) error{ExceptionThrown}!Value {
+    pub fn getThisBinding(self: Environment) error{ExceptionThrown}!Value {
         return switch (self) {
             .declarative_environment,
             .object_environment,
@@ -166,14 +164,14 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn bindThisValue(self: Self, value: Value) error{ExceptionThrown}!Value {
+    pub fn bindThisValue(self: Environment, value: Value) error{ExceptionThrown}!Value {
         return switch (self) {
             .function_environment => |env| env.bindThisValue(value),
             else => unreachable,
         };
     }
 
-    pub fn getSuperBase(self: Self) Agent.Error!Value {
+    pub fn getSuperBase(self: Environment) Agent.Error!Value {
         return switch (self) {
             .function_environment => |env| env.getSuperBase(),
             else => unreachable,
@@ -181,7 +179,7 @@ pub const Environment = union(enum) {
     }
 
     pub fn createImportBinding(
-        self: Self,
+        self: Environment,
         name: String,
         module: *SourceTextModule,
         binding_name: String,

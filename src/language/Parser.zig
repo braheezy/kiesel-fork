@@ -18,7 +18,7 @@ const parseStringLiteral = literals.parseStringLiteral;
 const temporaryChange = utils.temporaryChange;
 const reserved_words = tokenizer_.reserved_words;
 
-const Self = @This();
+const Parser = @This();
 
 allocator: Allocator,
 core: ParserCore,
@@ -193,7 +193,7 @@ pub fn parse(
     return parseNode(
         T,
         struct {
-            fn accept(parser: *Self) AcceptError!T {
+            fn accept(parser: *Parser) AcceptError!T {
                 if (T == ast.Script)
                     return parser.acceptScript()
                 else
@@ -208,14 +208,14 @@ pub fn parse(
 
 pub fn parseNode(
     comptime T: type,
-    comptime acceptFn: fn (*Self) anyerror!T,
+    comptime acceptFn: fn (*Parser) anyerror!T,
     allocator: Allocator,
     source_text: []const u8,
     ctx: ParseContext,
 ) Error!T {
     var tokenizer = Tokenizer.init(source_text, ctx.file_name);
     const core = ParserCore.init(&tokenizer);
-    var parser: Self = .{
+    var parser: Parser = .{
         .allocator = allocator,
         .core = core,
         .diagnostics = ctx.diagnostics,
@@ -247,12 +247,12 @@ pub fn parseNode(
     return ast_node.?;
 }
 
-fn emitError(self: *Self, comptime fmt: []const u8, args: anytype) Allocator.Error!void {
+fn emitError(self: *Parser, comptime fmt: []const u8, args: anytype) Allocator.Error!void {
     try self.diagnostics.emit(self.core.tokenizer.current_location, .@"error", fmt, args);
 }
 
 fn emitErrorAt(
-    self: *Self,
+    self: *Parser,
     location: ptk.Location,
     comptime fmt: []const u8,
     args: anytype,
@@ -277,7 +277,7 @@ fn utf8StringValue(allocator: Allocator, text: []const u8) Allocator.Error!?[]co
     };
 }
 
-fn unescapeIdentifier(self: *Self, token: Tokenizer.Token) AcceptError![]const u8 {
+fn unescapeIdentifier(self: *Parser, token: Tokenizer.Token) AcceptError![]const u8 {
     const identifier = (try utf8StringValue(
         self.allocator,
         token.text,
@@ -310,7 +310,7 @@ fn unescapeIdentifier(self: *Self, token: Tokenizer.Token) AcceptError![]const u
 }
 
 fn ensureSimpleParameterList(
-    self: *Self,
+    self: *Parser,
     formal_parameters: ast.FormalParameters,
     location: ptk.Location,
 ) Allocator.Error!void {
@@ -324,7 +324,7 @@ fn ensureSimpleParameterList(
 }
 
 fn ensureUniqueParameterNames(
-    self: *Self,
+    self: *Parser,
     kind: enum { strict, arrow, method },
     formal_parameters: ast.FormalParameters,
     location: ptk.Location,
@@ -359,7 +359,7 @@ fn ensureUniqueParameterNames(
 }
 
 fn ensureAllowedParameterNames(
-    self: *Self,
+    self: *Parser,
     formal_parameters: ast.FormalParameters,
     location: ptk.Location,
 ) AcceptError!void {
@@ -372,7 +372,7 @@ fn ensureAllowedParameterNames(
 }
 
 fn ensureAllowedIdentifier(
-    self: *Self,
+    self: *Parser,
     kind: enum { binding_identifier, identifier_reference, function_parameter },
     value: []const u8,
     location: ptk.Location,
@@ -402,7 +402,7 @@ fn ensureAllowedIdentifier(
 
 /// 5.1.5.8 [no LineTerminator here]
 /// https://tc39.es/ecma262/#sec-no-lineterminator-here
-fn noLineTerminatorHere(self: *Self) AcceptError!void {
+fn noLineTerminatorHere(self: *Parser) AcceptError!void {
     // Same as peek() but without immediately restoring the state; we need to look at what's
     // between the current and next token.
     const state = self.core.saveState();
@@ -421,7 +421,7 @@ fn noLineTerminatorHere(self: *Self) AcceptError!void {
 
 /// 12.10 Automatic Semicolon Insertion
 /// https://tc39.es/ecma262/#sec-automatic-semicolon-insertion
-pub fn acceptOrInsertSemicolon(self: *Self) AcceptError!void {
+pub fn acceptOrInsertSemicolon(self: *Parser) AcceptError!void {
     // Next token is ';', consume semicolon
     if (self.core.accept(RuleSet.is(.@";"))) |_|
         return
@@ -451,7 +451,7 @@ pub fn acceptOrInsertSemicolon(self: *Self) AcceptError!void {
     return error.UnexpectedToken;
 }
 
-pub fn acceptKeyword(self: *Self, value: []const u8) AcceptError!Tokenizer.Token {
+pub fn acceptKeyword(self: *Parser, value: []const u8) AcceptError!Tokenizer.Token {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -460,7 +460,7 @@ pub fn acceptKeyword(self: *Self, value: []const u8) AcceptError!Tokenizer.Token
     return token;
 }
 
-pub fn acceptParenthesizedExpression(self: *Self) AcceptError!ast.ParenthesizedExpression {
+pub fn acceptParenthesizedExpression(self: *Parser) AcceptError!ast.ParenthesizedExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -472,7 +472,7 @@ pub fn acceptParenthesizedExpression(self: *Self) AcceptError!ast.ParenthesizedE
     return .{ .expression = expression };
 }
 
-pub fn acceptIdentifierName(self: *Self) AcceptError!ast.Identifier {
+pub fn acceptIdentifierName(self: *Parser) AcceptError!ast.Identifier {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -490,7 +490,7 @@ pub fn acceptIdentifierName(self: *Self) AcceptError!ast.Identifier {
     )) orelse return error.UnexpectedToken;
 }
 
-pub fn acceptIdentifierReference(self: *Self) AcceptError!ast.IdentifierReference {
+pub fn acceptIdentifierReference(self: *Parser) AcceptError!ast.IdentifierReference {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -509,7 +509,7 @@ pub fn acceptIdentifierReference(self: *Self) AcceptError!ast.IdentifierReferenc
     return self.unescapeIdentifier(token);
 }
 
-pub fn acceptBindingIdentifier(self: *Self) AcceptError!ast.Identifier {
+pub fn acceptBindingIdentifier(self: *Parser) AcceptError!ast.Identifier {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -525,7 +525,7 @@ pub fn acceptBindingIdentifier(self: *Self) AcceptError!ast.Identifier {
     return string_value;
 }
 
-pub fn acceptLabelIdentifier(self: *Self) AcceptError!ast.Identifier {
+pub fn acceptLabelIdentifier(self: *Parser) AcceptError!ast.Identifier {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -533,7 +533,7 @@ pub fn acceptLabelIdentifier(self: *Self) AcceptError!ast.Identifier {
     return self.unescapeIdentifier(token);
 }
 
-pub fn acceptPrivateIdentifier(self: *Self) AcceptError!ast.PrivateIdentifier {
+pub fn acceptPrivateIdentifier(self: *Parser) AcceptError!ast.PrivateIdentifier {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -552,7 +552,7 @@ pub fn acceptPrivateIdentifier(self: *Self) AcceptError!ast.PrivateIdentifier {
     return self.unescapeIdentifier(token);
 }
 
-pub fn acceptPrimaryExpression(self: *Self) AcceptError!ast.PrimaryExpression {
+pub fn acceptPrimaryExpression(self: *Parser) AcceptError!ast.PrimaryExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -601,7 +601,7 @@ pub fn acceptPrimaryExpression(self: *Self) AcceptError!ast.PrimaryExpression {
 }
 
 pub fn acceptSecondaryExpression(
-    self: *Self,
+    self: *Parser,
     primary_expression: ast.Expression,
     ctx: AcceptContext,
 ) AcceptError!ast.Expression {
@@ -626,7 +626,7 @@ pub fn acceptSecondaryExpression(
 }
 
 pub fn acceptMemberExpression(
-    self: *Self,
+    self: *Parser,
     primary_expression: ast.Expression,
 ) AcceptError!ast.MemberExpression {
     const state = self.core.saveState();
@@ -657,7 +657,7 @@ pub fn acceptMemberExpression(
     return .{ .expression = expression, .property = property };
 }
 
-pub fn acceptSuperProperty(self: *Self) AcceptError!ast.SuperProperty {
+pub fn acceptSuperProperty(self: *Parser) AcceptError!ast.SuperProperty {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -686,7 +686,7 @@ pub fn acceptSuperProperty(self: *Self) AcceptError!ast.SuperProperty {
     };
 }
 
-pub fn acceptMetaProperty(self: *Self) AcceptError!ast.MetaProperty {
+pub fn acceptMetaProperty(self: *Parser) AcceptError!ast.MetaProperty {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -698,7 +698,7 @@ pub fn acceptMetaProperty(self: *Self) AcceptError!ast.MetaProperty {
         return error.UnexpectedToken;
 }
 
-pub fn acceptNewTarget(self: *Self) AcceptError!void {
+pub fn acceptNewTarget(self: *Parser) AcceptError!void {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -712,7 +712,7 @@ pub fn acceptNewTarget(self: *Self) AcceptError!void {
     }
 }
 
-pub fn acceptImportMeta(self: *Self) AcceptError!void {
+pub fn acceptImportMeta(self: *Parser) AcceptError!void {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -726,7 +726,7 @@ pub fn acceptImportMeta(self: *Self) AcceptError!void {
     }
 }
 
-pub fn acceptNewExpression(self: *Self) AcceptError!ast.NewExpression {
+pub fn acceptNewExpression(self: *Parser) AcceptError!ast.NewExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -761,7 +761,7 @@ pub fn acceptNewExpression(self: *Self) AcceptError!ast.NewExpression {
 }
 
 pub fn acceptCallExpression(
-    self: *Self,
+    self: *Parser,
     primary_expression: ast.Expression,
 ) AcceptError!ast.CallExpression {
     const state = self.core.saveState();
@@ -776,7 +776,7 @@ pub fn acceptCallExpression(
     return .{ .expression = expression, .arguments = arguments };
 }
 
-pub fn acceptSuperCall(self: *Self) AcceptError!ast.SuperCall {
+pub fn acceptSuperCall(self: *Parser) AcceptError!ast.SuperCall {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -795,7 +795,7 @@ pub fn acceptSuperCall(self: *Self) AcceptError!ast.SuperCall {
     return .{ .arguments = arguments };
 }
 
-pub fn acceptImportCall(self: *Self) AcceptError!ast.ImportCall {
+pub fn acceptImportCall(self: *Parser) AcceptError!ast.ImportCall {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -808,7 +808,7 @@ pub fn acceptImportCall(self: *Self) AcceptError!ast.ImportCall {
     return .{ .expression = expression };
 }
 
-pub fn acceptArguments(self: *Self) AcceptError!ast.Arguments {
+pub fn acceptArguments(self: *Parser) AcceptError!ast.Arguments {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -830,7 +830,7 @@ pub fn acceptArguments(self: *Self) AcceptError!ast.Arguments {
 }
 
 pub fn acceptOptionalExpression(
-    self: *Self,
+    self: *Parser,
     primary_expression: ast.Expression,
 ) AcceptError!ast.OptionalExpression {
     const state = self.core.saveState();
@@ -858,7 +858,7 @@ pub fn acceptOptionalExpression(
 }
 
 pub fn acceptUpdateExpression(
-    self: *Self,
+    self: *Parser,
     primary_expression: ?ast.Expression,
 ) AcceptError!ast.UpdateExpression {
     const state = self.core.saveState();
@@ -919,7 +919,7 @@ pub fn acceptUpdateExpression(
     };
 }
 
-pub fn acceptLiteral(self: *Self) AcceptError!ast.Literal {
+pub fn acceptLiteral(self: *Parser) AcceptError!ast.Literal {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -937,7 +937,7 @@ pub fn acceptLiteral(self: *Self) AcceptError!ast.Literal {
         return error.UnexpectedToken;
 }
 
-pub fn acceptNumericLiteral(self: *Self) AcceptError!ast.NumericLiteral {
+pub fn acceptNumericLiteral(self: *Parser) AcceptError!ast.NumericLiteral {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -947,7 +947,7 @@ pub fn acceptNumericLiteral(self: *Self) AcceptError!ast.NumericLiteral {
     return numeric_literal;
 }
 
-pub fn acceptStringLiteral(self: *Self) AcceptError!ast.StringLiteral {
+pub fn acceptStringLiteral(self: *Parser) AcceptError!ast.StringLiteral {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -957,7 +957,7 @@ pub fn acceptStringLiteral(self: *Self) AcceptError!ast.StringLiteral {
     return string_literal;
 }
 
-pub fn acceptArrayLiteral(self: *Self) AcceptError!ast.ArrayLiteral {
+pub fn acceptArrayLiteral(self: *Parser) AcceptError!ast.ArrayLiteral {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -981,7 +981,7 @@ pub fn acceptArrayLiteral(self: *Self) AcceptError!ast.ArrayLiteral {
     return .{ .element_list = try elements.toOwnedSlice() };
 }
 
-pub fn acceptObjectLiteral(self: *Self) AcceptError!ast.ObjectLiteral {
+pub fn acceptObjectLiteral(self: *Parser) AcceptError!ast.ObjectLiteral {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -991,7 +991,7 @@ pub fn acceptObjectLiteral(self: *Self) AcceptError!ast.ObjectLiteral {
     return .{ .property_definition_list = property_definition_list };
 }
 
-pub fn acceptPropertyDefinitionList(self: *Self) AcceptError!ast.PropertyDefinitionList {
+pub fn acceptPropertyDefinitionList(self: *Parser) AcceptError!ast.PropertyDefinitionList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1004,7 +1004,7 @@ pub fn acceptPropertyDefinitionList(self: *Self) AcceptError!ast.PropertyDefinit
     return .{ .items = try property_definitions.toOwnedSlice() };
 }
 
-pub fn acceptPropertyDefinition(self: *Self) AcceptError!ast.PropertyDefinition {
+pub fn acceptPropertyDefinition(self: *Parser) AcceptError!ast.PropertyDefinition {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1029,7 +1029,7 @@ pub fn acceptPropertyDefinition(self: *Self) AcceptError!ast.PropertyDefinition 
     } else |_| return error.UnexpectedToken;
 }
 
-pub fn acceptPropertyName(self: *Self) AcceptError!ast.PropertyName {
+pub fn acceptPropertyName(self: *Parser) AcceptError!ast.PropertyName {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1050,7 +1050,7 @@ pub fn acceptPropertyName(self: *Self) AcceptError!ast.PropertyName {
     } else |_| return error.UnexpectedToken;
 }
 
-pub fn acceptUnaryExpression(self: *Self) AcceptError!ast.UnaryExpression {
+pub fn acceptUnaryExpression(self: *Parser) AcceptError!ast.UnaryExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1085,7 +1085,7 @@ pub fn acceptUnaryExpression(self: *Self) AcceptError!ast.UnaryExpression {
 }
 
 pub fn acceptBinaryExpression(
-    self: *Self,
+    self: *Parser,
     primary_expression: ast.Expression,
     ctx: AcceptContext,
 ) AcceptError!ast.BinaryExpression {
@@ -1136,7 +1136,7 @@ pub fn acceptBinaryExpression(
 }
 
 pub fn acceptRelationalExpression(
-    self: *Self,
+    self: *Parser,
     primary_expression: union(enum) {
         expression: ast.Expression,
         private_identifier: ast.PrivateIdentifier,
@@ -1182,7 +1182,7 @@ pub fn acceptRelationalExpression(
 }
 
 pub fn acceptEqualityExpression(
-    self: *Self,
+    self: *Parser,
     primary_expression: ast.Expression,
     ctx: AcceptContext,
 ) AcceptError!ast.EqualityExpression {
@@ -1212,7 +1212,7 @@ pub fn acceptEqualityExpression(
 }
 
 pub fn acceptLogicalExpression(
-    self: *Self,
+    self: *Parser,
     primary_expression: ast.Expression,
     ctx: AcceptContext,
 ) AcceptError!ast.LogicalExpression {
@@ -1241,7 +1241,7 @@ pub fn acceptLogicalExpression(
 }
 
 pub fn acceptConditionalExpression(
-    self: *Self,
+    self: *Parser,
     primary_expression: ast.Expression,
     ctx: AcceptContext,
 ) AcceptError!ast.ConditionalExpression {
@@ -1268,7 +1268,7 @@ pub fn acceptConditionalExpression(
 }
 
 pub fn acceptAssignmentExpression(
-    self: *Self,
+    self: *Parser,
     primary_expression: ast.Expression,
     ctx: AcceptContext,
 ) AcceptError!ast.AssignmentExpression {
@@ -1353,7 +1353,7 @@ pub fn acceptAssignmentExpression(
 }
 
 pub fn acceptSequenceExpression(
-    self: *Self,
+    self: *Parser,
     primary_expression: ast.Expression,
 ) AcceptError!ast.SequenceExpression {
     const state = self.core.saveState();
@@ -1370,7 +1370,7 @@ pub fn acceptSequenceExpression(
 }
 
 pub fn acceptTaggedTemplate(
-    self: *Self,
+    self: *Parser,
     primary_expression: ast.Expression,
 ) AcceptError!ast.TaggedTemplate {
     const state = self.core.saveState();
@@ -1384,7 +1384,7 @@ pub fn acceptTaggedTemplate(
     return .{ .expression = expression, .template_literal = template_literal };
 }
 
-pub fn acceptExpression(self: *Self, ctx: AcceptContext) AcceptError!ast.Expression {
+pub fn acceptExpression(self: *Parser, ctx: AcceptContext) AcceptError!ast.Expression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1463,7 +1463,7 @@ pub fn acceptExpression(self: *Self, ctx: AcceptContext) AcceptError!ast.Express
     return expression;
 }
 
-pub fn acceptStatement(self: *Self) AcceptError!*ast.Statement {
+pub fn acceptStatement(self: *Parser) AcceptError!*ast.Statement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1498,7 +1498,7 @@ pub fn acceptStatement(self: *Self) AcceptError!*ast.Statement {
     return statement;
 }
 
-pub fn acceptDeclaration(self: *Self) AcceptError!*ast.Declaration {
+pub fn acceptDeclaration(self: *Parser) AcceptError!*ast.Declaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1516,7 +1516,7 @@ pub fn acceptDeclaration(self: *Self) AcceptError!*ast.Declaration {
     return declaration;
 }
 
-pub fn acceptHoistableDeclaration(self: *Self) AcceptError!ast.HoistableDeclaration {
+pub fn acceptHoistableDeclaration(self: *Parser) AcceptError!ast.HoistableDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1532,7 +1532,7 @@ pub fn acceptHoistableDeclaration(self: *Self) AcceptError!ast.HoistableDeclarat
         return error.UnexpectedToken;
 }
 
-pub fn acceptBreakableStatement(self: *Self) AcceptError!ast.BreakableStatement {
+pub fn acceptBreakableStatement(self: *Parser) AcceptError!ast.BreakableStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1547,14 +1547,14 @@ pub fn acceptBreakableStatement(self: *Self) AcceptError!ast.BreakableStatement 
         return error.UnexpectedToken;
 }
 
-pub fn acceptBlockStatement(self: *Self) AcceptError!ast.BlockStatement {
+pub fn acceptBlockStatement(self: *Parser) AcceptError!ast.BlockStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
     return .{ .block = try self.acceptBlock() };
 }
 
-pub fn acceptBlock(self: *Self) AcceptError!ast.Block {
+pub fn acceptBlock(self: *Parser) AcceptError!ast.Block {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1564,7 +1564,7 @@ pub fn acceptBlock(self: *Self) AcceptError!ast.Block {
     return block;
 }
 
-pub fn acceptStatementList(self: *Self, ctx: AcceptContext) AcceptError!ast.StatementList {
+pub fn acceptStatementList(self: *Parser, ctx: AcceptContext) AcceptError!ast.StatementList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1588,7 +1588,7 @@ pub fn acceptStatementList(self: *Self, ctx: AcceptContext) AcceptError!ast.Stat
     return .{ .items = try statement_list_items.toOwnedSlice() };
 }
 
-pub fn acceptStatementListItem(self: *Self) AcceptError!ast.StatementListItem {
+pub fn acceptStatementListItem(self: *Parser) AcceptError!ast.StatementListItem {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1602,7 +1602,7 @@ pub fn acceptStatementListItem(self: *Self) AcceptError!ast.StatementListItem {
 }
 
 pub fn acceptLexicalDeclaration(
-    self: *Self,
+    self: *Parser,
     for_initializer: bool,
 ) AcceptError!ast.LexicalDeclaration {
     const state = self.core.saveState();
@@ -1619,7 +1619,7 @@ pub fn acceptLexicalDeclaration(
     return .{ .type = @"type", .binding_list = binding_list };
 }
 
-pub fn acceptBindingList(self: *Self) AcceptError!ast.BindingList {
+pub fn acceptBindingList(self: *Parser) AcceptError!ast.BindingList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1633,7 +1633,7 @@ pub fn acceptBindingList(self: *Self) AcceptError!ast.BindingList {
     return .{ .items = try lexical_bindings.toOwnedSlice() };
 }
 
-pub fn acceptLexicalBinding(self: *Self) AcceptError!ast.LexicalBinding {
+pub fn acceptLexicalBinding(self: *Parser) AcceptError!ast.LexicalBinding {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1662,7 +1662,7 @@ pub fn acceptLexicalBinding(self: *Self) AcceptError!ast.LexicalBinding {
 }
 
 pub fn acceptVariableStatement(
-    self: *Self,
+    self: *Parser,
     for_initializer: bool,
 ) AcceptError!ast.VariableStatement {
     const state = self.core.saveState();
@@ -1674,7 +1674,7 @@ pub fn acceptVariableStatement(
     return .{ .variable_declaration_list = variable_declaration_list };
 }
 
-pub fn acceptVariableDeclarationList(self: *Self) AcceptError!ast.VariableDeclarationList {
+pub fn acceptVariableDeclarationList(self: *Parser) AcceptError!ast.VariableDeclarationList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1688,7 +1688,7 @@ pub fn acceptVariableDeclarationList(self: *Self) AcceptError!ast.VariableDeclar
     return .{ .items = try variable_declarations.toOwnedSlice() };
 }
 
-pub fn acceptVariableDeclaration(self: *Self) AcceptError!ast.VariableDeclaration {
+pub fn acceptVariableDeclaration(self: *Parser) AcceptError!ast.VariableDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1701,7 +1701,7 @@ pub fn acceptVariableDeclaration(self: *Self) AcceptError!ast.VariableDeclaratio
     return .{ .binding_identifier = binding_identifier, .initializer = initializer };
 }
 
-pub fn acceptBindingPattern(self: *Self) AcceptError!ast.BindingPattern {
+pub fn acceptBindingPattern(self: *Parser) AcceptError!ast.BindingPattern {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1713,7 +1713,7 @@ pub fn acceptBindingPattern(self: *Self) AcceptError!ast.BindingPattern {
         return error.UnexpectedToken;
 }
 
-pub fn acceptObjectBindingPattern(self: *Self) AcceptError!ast.ObjectBindingPattern {
+pub fn acceptObjectBindingPattern(self: *Parser) AcceptError!ast.ObjectBindingPattern {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1732,7 +1732,7 @@ pub fn acceptObjectBindingPattern(self: *Self) AcceptError!ast.ObjectBindingPatt
     return .{ .properties = try properties.toOwnedSlice() };
 }
 
-pub fn acceptArrayBindingPattern(self: *Self) AcceptError!ast.ArrayBindingPattern {
+pub fn acceptArrayBindingPattern(self: *Parser) AcceptError!ast.ArrayBindingPattern {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1751,7 +1751,7 @@ pub fn acceptArrayBindingPattern(self: *Self) AcceptError!ast.ArrayBindingPatter
     return .{ .elements = try elements.toOwnedSlice() };
 }
 
-pub fn acceptBindingElement(self: *Self) AcceptError!ast.BindingElement {
+pub fn acceptBindingElement(self: *Parser) AcceptError!ast.BindingElement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1772,7 +1772,7 @@ pub fn acceptBindingElement(self: *Self) AcceptError!ast.BindingElement {
     } else |_| return error.UnexpectedToken;
 }
 
-pub fn acceptSingleNameBinding(self: *Self) AcceptError!ast.SingleNameBinding {
+pub fn acceptSingleNameBinding(self: *Parser) AcceptError!ast.SingleNameBinding {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1785,7 +1785,7 @@ pub fn acceptSingleNameBinding(self: *Self) AcceptError!ast.SingleNameBinding {
     return .{ .binding_identifier = binding_identifier, .initializer = initializer };
 }
 
-pub fn acceptBindingRestElement(self: *Self) AcceptError!ast.BindingRestElement {
+pub fn acceptBindingRestElement(self: *Parser) AcceptError!ast.BindingRestElement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1798,7 +1798,7 @@ pub fn acceptBindingRestElement(self: *Self) AcceptError!ast.BindingRestElement 
         return error.UnexpectedToken;
 }
 
-pub fn acceptLabelledStatement(self: *Self) AcceptError!ast.LabelledStatement {
+pub fn acceptLabelledStatement(self: *Parser) AcceptError!ast.LabelledStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1828,7 +1828,7 @@ pub fn acceptLabelledStatement(self: *Self) AcceptError!ast.LabelledStatement {
     return .{ .label_identifier = label_identifier, .labelled_item = labelled_item };
 }
 
-pub fn acceptExpressionStatement(self: *Self) AcceptError!ast.ExpressionStatement {
+pub fn acceptExpressionStatement(self: *Parser) AcceptError!ast.ExpressionStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1837,7 +1837,7 @@ pub fn acceptExpressionStatement(self: *Self) AcceptError!ast.ExpressionStatemen
     return .{ .expression = expression };
 }
 
-pub fn acceptIfStatement(self: *Self) AcceptError!ast.IfStatement {
+pub fn acceptIfStatement(self: *Parser) AcceptError!ast.IfStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1857,7 +1857,7 @@ pub fn acceptIfStatement(self: *Self) AcceptError!ast.IfStatement {
     };
 }
 
-pub fn acceptIterationStatement(self: *Self) AcceptError!ast.IterationStatement {
+pub fn acceptIterationStatement(self: *Parser) AcceptError!ast.IterationStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1876,7 +1876,7 @@ pub fn acceptIterationStatement(self: *Self) AcceptError!ast.IterationStatement 
         return error.UnexpectedToken;
 }
 
-pub fn acceptDoWhileStatement(self: *Self) AcceptError!ast.DoWhileStatement {
+pub fn acceptDoWhileStatement(self: *Parser) AcceptError!ast.DoWhileStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1892,7 +1892,7 @@ pub fn acceptDoWhileStatement(self: *Self) AcceptError!ast.DoWhileStatement {
     };
 }
 
-pub fn acceptWhileStatement(self: *Self) AcceptError!ast.WhileStatement {
+pub fn acceptWhileStatement(self: *Parser) AcceptError!ast.WhileStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1907,7 +1907,7 @@ pub fn acceptWhileStatement(self: *Self) AcceptError!ast.WhileStatement {
     };
 }
 
-pub fn acceptForStatement(self: *Self) AcceptError!ast.ForStatement {
+pub fn acceptForStatement(self: *Parser) AcceptError!ast.ForStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1935,7 +1935,7 @@ pub fn acceptForStatement(self: *Self) AcceptError!ast.ForStatement {
     };
 }
 
-pub fn acceptForInOfStatement(self: *Self) AcceptError!ast.ForInOfStatement {
+pub fn acceptForInOfStatement(self: *Parser) AcceptError!ast.ForInOfStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -1996,7 +1996,7 @@ pub fn acceptForInOfStatement(self: *Self) AcceptError!ast.ForInOfStatement {
     };
 }
 
-pub fn acceptForDeclaration(self: *Self) AcceptError!ast.ForDeclaration {
+pub fn acceptForDeclaration(self: *Parser) AcceptError!ast.ForDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2010,7 +2010,7 @@ pub fn acceptForDeclaration(self: *Self) AcceptError!ast.ForDeclaration {
     return .{ .type = @"type", .for_binding = for_binding };
 }
 
-pub fn acceptForBinding(self: *Self) AcceptError!ast.ForBinding {
+pub fn acceptForBinding(self: *Parser) AcceptError!ast.ForBinding {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2022,7 +2022,7 @@ pub fn acceptForBinding(self: *Self) AcceptError!ast.ForBinding {
         return error.UnexpectedToken;
 }
 
-pub fn acceptContinueStatement(self: *Self) AcceptError!ast.ContinueStatement {
+pub fn acceptContinueStatement(self: *Parser) AcceptError!ast.ContinueStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2061,7 +2061,7 @@ pub fn acceptContinueStatement(self: *Self) AcceptError!ast.ContinueStatement {
     return .{ .label = null };
 }
 
-pub fn acceptBreakStatement(self: *Self) AcceptError!ast.BreakStatement {
+pub fn acceptBreakStatement(self: *Parser) AcceptError!ast.BreakStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2101,7 +2101,7 @@ pub fn acceptBreakStatement(self: *Self) AcceptError!ast.BreakStatement {
     return .{ .label = null };
 }
 
-pub fn acceptReturnStatement(self: *Self) AcceptError!ast.ReturnStatement {
+pub fn acceptReturnStatement(self: *Parser) AcceptError!ast.ReturnStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2126,7 +2126,7 @@ pub fn acceptReturnStatement(self: *Self) AcceptError!ast.ReturnStatement {
     return .{ .expression = null };
 }
 
-pub fn acceptWithStatement(self: *Self) AcceptError!ast.WithStatement {
+pub fn acceptWithStatement(self: *Parser) AcceptError!ast.WithStatement {
     if (!build_options.enable_legacy) return error.UnexpectedToken;
 
     const state = self.core.saveState();
@@ -2144,7 +2144,7 @@ pub fn acceptWithStatement(self: *Self) AcceptError!ast.WithStatement {
     return .{ .expression = expression, .statement = statement };
 }
 
-pub fn acceptSwitchStatement(self: *Self) AcceptError!ast.SwitchStatement {
+pub fn acceptSwitchStatement(self: *Parser) AcceptError!ast.SwitchStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2156,7 +2156,7 @@ pub fn acceptSwitchStatement(self: *Self) AcceptError!ast.SwitchStatement {
     return .{ .expression = expression, .case_block = case_block };
 }
 
-pub fn acceptCaseBlock(self: *Self) AcceptError!ast.CaseBlock {
+pub fn acceptCaseBlock(self: *Parser) AcceptError!ast.CaseBlock {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2172,7 +2172,7 @@ pub fn acceptCaseBlock(self: *Self) AcceptError!ast.CaseBlock {
     return .{ .items = try case_block_items.toOwnedSlice() };
 }
 
-pub fn acceptCaseBlockItem(self: *Self, has_default_clause: bool) AcceptError!ast.CaseBlock.Item {
+pub fn acceptCaseBlockItem(self: *Parser, has_default_clause: bool) AcceptError!ast.CaseBlock.Item {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2184,7 +2184,7 @@ pub fn acceptCaseBlockItem(self: *Self, has_default_clause: bool) AcceptError!as
         return error.UnexpectedToken;
 }
 
-pub fn acceptCaseClause(self: *Self) AcceptError!ast.CaseClause {
+pub fn acceptCaseClause(self: *Parser) AcceptError!ast.CaseClause {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2195,7 +2195,7 @@ pub fn acceptCaseClause(self: *Self) AcceptError!ast.CaseClause {
     return .{ .expression = expression, .statement_list = statement_list };
 }
 
-pub fn acceptDefaultClause(self: *Self, has_default_clause: bool) AcceptError!ast.DefaultClause {
+pub fn acceptDefaultClause(self: *Parser, has_default_clause: bool) AcceptError!ast.DefaultClause {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2213,7 +2213,7 @@ pub fn acceptDefaultClause(self: *Self, has_default_clause: bool) AcceptError!as
     return .{ .statement_list = statement_list };
 }
 
-pub fn acceptThrowStatement(self: *Self) AcceptError!ast.ThrowStatement {
+pub fn acceptThrowStatement(self: *Parser) AcceptError!ast.ThrowStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2224,7 +2224,7 @@ pub fn acceptThrowStatement(self: *Self) AcceptError!ast.ThrowStatement {
     return .{ .expression = expression };
 }
 
-pub fn acceptTryStatement(self: *Self) AcceptError!ast.TryStatement {
+pub fn acceptTryStatement(self: *Parser) AcceptError!ast.TryStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2254,7 +2254,7 @@ pub fn acceptTryStatement(self: *Self) AcceptError!ast.TryStatement {
     };
 }
 
-pub fn acceptDebuggerStatement(self: *Self) AcceptError!void {
+pub fn acceptDebuggerStatement(self: *Parser) AcceptError!void {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2262,7 +2262,7 @@ pub fn acceptDebuggerStatement(self: *Self) AcceptError!void {
     try self.acceptOrInsertSemicolon();
 }
 
-pub fn acceptFormalParameters(self: *Self) AcceptError!ast.FormalParameters {
+pub fn acceptFormalParameters(self: *Parser) AcceptError!ast.FormalParameters {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2296,7 +2296,7 @@ pub fn acceptFormalParameters(self: *Self) AcceptError!ast.FormalParameters {
     };
 }
 
-pub fn acceptFunctionDeclaration(self: *Self) AcceptError!ast.FunctionDeclaration {
+pub fn acceptFunctionDeclaration(self: *Parser) AcceptError!ast.FunctionDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2337,7 +2337,7 @@ pub fn acceptFunctionDeclaration(self: *Self) AcceptError!ast.FunctionDeclaratio
     };
 }
 
-pub fn acceptFunctionExpression(self: *Self) AcceptError!ast.FunctionExpression {
+pub fn acceptFunctionExpression(self: *Parser) AcceptError!ast.FunctionExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2376,7 +2376,7 @@ pub fn acceptFunctionExpression(self: *Self) AcceptError!ast.FunctionExpression 
 }
 
 pub fn acceptFunctionBody(
-    self: *Self,
+    self: *Parser,
     @"type": ast.FunctionBody.Type,
 ) AcceptError!ast.FunctionBody {
     const state = self.core.saveState();
@@ -2404,7 +2404,7 @@ pub fn acceptFunctionBody(
     };
 }
 
-pub fn acceptArrowFunction(self: *Self) AcceptError!ast.ArrowFunction {
+pub fn acceptArrowFunction(self: *Parser) AcceptError!ast.ArrowFunction {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2483,7 +2483,7 @@ pub fn acceptArrowFunction(self: *Self) AcceptError!ast.ArrowFunction {
 }
 
 pub fn acceptMethodDefinition(
-    self: *Self,
+    self: *Parser,
     parsed: ?struct {
         method_type: ast.MethodDefinition.Type,
         start_offset: usize,
@@ -2583,7 +2583,7 @@ pub fn acceptMethodDefinition(
     return .{ .class_element_name = class_element_name, .method = method };
 }
 
-fn acceptGeneratorDeclaration(self: *Self) AcceptError!ast.GeneratorDeclaration {
+fn acceptGeneratorDeclaration(self: *Parser) AcceptError!ast.GeneratorDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2623,7 +2623,7 @@ fn acceptGeneratorDeclaration(self: *Self) AcceptError!ast.GeneratorDeclaration 
     };
 }
 
-pub fn acceptGeneratorExpression(self: *Self) AcceptError!ast.GeneratorExpression {
+pub fn acceptGeneratorExpression(self: *Parser) AcceptError!ast.GeneratorExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2662,7 +2662,7 @@ pub fn acceptGeneratorExpression(self: *Self) AcceptError!ast.GeneratorExpressio
     };
 }
 
-fn acceptAsyncGeneratorDeclaration(self: *Self) AcceptError!ast.AsyncGeneratorDeclaration {
+fn acceptAsyncGeneratorDeclaration(self: *Parser) AcceptError!ast.AsyncGeneratorDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2704,7 +2704,7 @@ fn acceptAsyncGeneratorDeclaration(self: *Self) AcceptError!ast.AsyncGeneratorDe
     };
 }
 
-pub fn acceptAsyncGeneratorExpression(self: *Self) AcceptError!ast.AsyncGeneratorExpression {
+pub fn acceptAsyncGeneratorExpression(self: *Parser) AcceptError!ast.AsyncGeneratorExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2745,7 +2745,7 @@ pub fn acceptAsyncGeneratorExpression(self: *Self) AcceptError!ast.AsyncGenerato
     };
 }
 
-fn acceptClassDeclaration(self: *Self) AcceptError!ast.ClassDeclaration {
+fn acceptClassDeclaration(self: *Parser) AcceptError!ast.ClassDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2775,7 +2775,7 @@ fn acceptClassDeclaration(self: *Self) AcceptError!ast.ClassDeclaration {
     };
 }
 
-fn acceptClassExpression(self: *Self) AcceptError!ast.ClassExpression {
+fn acceptClassExpression(self: *Parser) AcceptError!ast.ClassExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2804,7 +2804,7 @@ fn acceptClassExpression(self: *Self) AcceptError!ast.ClassExpression {
     };
 }
 
-fn acceptClassTail(self: *Self) AcceptError!ast.ClassTail {
+fn acceptClassTail(self: *Parser) AcceptError!ast.ClassTail {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2820,7 +2820,7 @@ fn acceptClassTail(self: *Self) AcceptError!ast.ClassTail {
     return .{ .class_heritage = class_heritage, .class_body = class_body };
 }
 
-fn acceptClassBody(self: *Self) AcceptError!ast.ClassBody {
+fn acceptClassBody(self: *Parser) AcceptError!ast.ClassBody {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2831,7 +2831,7 @@ fn acceptClassBody(self: *Self) AcceptError!ast.ClassBody {
     return .{ .class_element_list = class_element_list };
 }
 
-fn acceptClassElementList(self: *Self) AcceptError!ast.ClassElementList {
+fn acceptClassElementList(self: *Parser) AcceptError!ast.ClassElementList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2843,7 +2843,7 @@ fn acceptClassElementList(self: *Self) AcceptError!ast.ClassElementList {
     return .{ .items = try class_elements.toOwnedSlice() };
 }
 
-fn acceptClassElement(self: *Self) AcceptError!ast.ClassElement {
+fn acceptClassElement(self: *Parser) AcceptError!ast.ClassElement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2868,7 +2868,7 @@ fn acceptClassElement(self: *Self) AcceptError!ast.ClassElement {
     } else |_| return error.UnexpectedToken;
 }
 
-fn acceptFieldDefinition(self: *Self) AcceptError!ast.FieldDefinition {
+fn acceptFieldDefinition(self: *Parser) AcceptError!ast.FieldDefinition {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2880,7 +2880,7 @@ fn acceptFieldDefinition(self: *Self) AcceptError!ast.FieldDefinition {
     return .{ .class_element_name = class_element_name, .initializer = initializer };
 }
 
-fn acceptClassElementName(self: *Self) AcceptError!ast.ClassElementName {
+fn acceptClassElementName(self: *Parser) AcceptError!ast.ClassElementName {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2901,7 +2901,7 @@ fn acceptClassElementName(self: *Self) AcceptError!ast.ClassElementName {
     } else |_| return error.UnexpectedToken;
 }
 
-fn acceptRegularExpressionLiteral(self: *Self) AcceptError!ast.RegularExpressionLiteral {
+fn acceptRegularExpressionLiteral(self: *Parser) AcceptError!ast.RegularExpressionLiteral {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2931,7 +2931,7 @@ fn acceptRegularExpressionLiteral(self: *Self) AcceptError!ast.RegularExpression
     };
 }
 
-fn acceptTemplateLiteral(self: *Self) AcceptError!ast.TemplateLiteral {
+fn acceptTemplateLiteral(self: *Parser) AcceptError!ast.TemplateLiteral {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -2957,7 +2957,7 @@ fn acceptTemplateLiteral(self: *Self) AcceptError!ast.TemplateLiteral {
     return .{ .spans = try spans.toOwnedSlice() };
 }
 
-fn acceptAsyncFunctionDeclaration(self: *Self) AcceptError!ast.AsyncFunctionDeclaration {
+fn acceptAsyncFunctionDeclaration(self: *Parser) AcceptError!ast.AsyncFunctionDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3000,7 +3000,7 @@ fn acceptAsyncFunctionDeclaration(self: *Self) AcceptError!ast.AsyncFunctionDecl
     };
 }
 
-pub fn acceptAsyncFunctionExpression(self: *Self) AcceptError!ast.AsyncFunctionExpression {
+pub fn acceptAsyncFunctionExpression(self: *Parser) AcceptError!ast.AsyncFunctionExpression {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3040,7 +3040,7 @@ pub fn acceptAsyncFunctionExpression(self: *Self) AcceptError!ast.AsyncFunctionE
     };
 }
 
-pub fn acceptAwaitExpression(self: *Self) AcceptError!ast.AwaitExpression {
+pub fn acceptAwaitExpression(self: *Parser) AcceptError!ast.AwaitExpression {
     if (!(self.state.in_async_function_body or self.state.in_module)) return error.UnexpectedToken;
 
     const state = self.core.saveState();
@@ -3053,7 +3053,7 @@ pub fn acceptAwaitExpression(self: *Self) AcceptError!ast.AwaitExpression {
     return .{ .expression = expression };
 }
 
-pub fn acceptAsyncArrowFunction(self: *Self) AcceptError!ast.AsyncArrowFunction {
+pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunction {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3130,7 +3130,7 @@ pub fn acceptAsyncArrowFunction(self: *Self) AcceptError!ast.AsyncArrowFunction 
     };
 }
 
-pub fn acceptScript(self: *Self) AcceptError!ast.Script {
+pub fn acceptScript(self: *Parser) AcceptError!ast.Script {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3139,7 +3139,7 @@ pub fn acceptScript(self: *Self) AcceptError!ast.Script {
     return .{ .statement_list = statement_list };
 }
 
-pub fn acceptModule(self: *Self) AcceptError!ast.Module {
+pub fn acceptModule(self: *Parser) AcceptError!ast.Module {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3155,7 +3155,7 @@ pub fn acceptModule(self: *Self) AcceptError!ast.Module {
     return .{ .module_item_list = module_item_list };
 }
 
-pub fn acceptModuleItemList(self: *Self) AcceptError!ast.ModuleItemList {
+pub fn acceptModuleItemList(self: *Parser) AcceptError!ast.ModuleItemList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3167,7 +3167,7 @@ pub fn acceptModuleItemList(self: *Self) AcceptError!ast.ModuleItemList {
     return .{ .items = try module_items.toOwnedSlice() };
 }
 
-pub fn acceptModuleItem(self: *Self) AcceptError!ast.ModuleItem {
+pub fn acceptModuleItem(self: *Parser) AcceptError!ast.ModuleItem {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3181,7 +3181,7 @@ pub fn acceptModuleItem(self: *Self) AcceptError!ast.ModuleItem {
         return error.UnexpectedToken;
 }
 
-pub fn acceptModuleExportName(self: *Self) AcceptError!ast.ModuleExportName {
+pub fn acceptModuleExportName(self: *Parser) AcceptError!ast.ModuleExportName {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3193,7 +3193,7 @@ pub fn acceptModuleExportName(self: *Self) AcceptError!ast.ModuleExportName {
         return error.UnexpectedToken;
 }
 
-pub fn acceptImportDeclaration(self: *Self) AcceptError!ast.ImportDeclaration {
+pub fn acceptImportDeclaration(self: *Parser) AcceptError!ast.ImportDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3207,7 +3207,7 @@ pub fn acceptImportDeclaration(self: *Self) AcceptError!ast.ImportDeclaration {
     return .{ .import_clause = import_clause, .module_specifier = module_specifier };
 }
 
-pub fn acceptImportClause(self: *Self) AcceptError!ast.ImportClause {
+pub fn acceptImportClause(self: *Parser) AcceptError!ast.ImportClause {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3221,7 +3221,7 @@ pub fn acceptImportClause(self: *Self) AcceptError!ast.ImportClause {
         return error.UnexpectedToken;
 }
 
-pub fn acceptNameSpaceImport(self: *Self) AcceptError!ast.Identifier {
+pub fn acceptNameSpaceImport(self: *Parser) AcceptError!ast.Identifier {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3230,7 +3230,7 @@ pub fn acceptNameSpaceImport(self: *Self) AcceptError!ast.Identifier {
     return self.acceptBindingIdentifier();
 }
 
-pub fn acceptImportsList(self: *Self) AcceptError!ast.ImportsList {
+pub fn acceptImportsList(self: *Parser) AcceptError!ast.ImportsList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3245,7 +3245,7 @@ pub fn acceptImportsList(self: *Self) AcceptError!ast.ImportsList {
     return .{ .items = try import_specifiers.toOwnedSlice() };
 }
 
-pub fn acceptImportSpecifier(self: *Self) AcceptError!ast.ImportSpecifier {
+pub fn acceptImportSpecifier(self: *Parser) AcceptError!ast.ImportSpecifier {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3264,7 +3264,7 @@ pub fn acceptImportSpecifier(self: *Self) AcceptError!ast.ImportSpecifier {
         return error.UnexpectedToken;
 }
 
-pub fn acceptExportDeclaration(self: *Self) AcceptError!ast.ExportDeclaration {
+pub fn acceptExportDeclaration(self: *Parser) AcceptError!ast.ExportDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3290,7 +3290,7 @@ pub fn acceptExportDeclaration(self: *Self) AcceptError!ast.ExportDeclaration {
     } else |_| return error.UnexpectedToken;
 }
 
-pub fn acceptExportFrom(self: *Self) AcceptError!ast.ExportDeclaration.ExportFrom {
+pub fn acceptExportFrom(self: *Parser) AcceptError!ast.ExportDeclaration.ExportFrom {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3301,7 +3301,7 @@ pub fn acceptExportFrom(self: *Self) AcceptError!ast.ExportDeclaration.ExportFro
     return .{ .export_from_clause = export_from_clause, .module_specifier = module_specifier };
 }
 
-pub fn acceptExportFromClause(self: *Self) AcceptError!ast.ExportFromClause {
+pub fn acceptExportFromClause(self: *Parser) AcceptError!ast.ExportFromClause {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3316,7 +3316,7 @@ pub fn acceptExportFromClause(self: *Self) AcceptError!ast.ExportFromClause {
         return error.UnexpectedToken;
 }
 
-pub fn acceptNamedExports(self: *Self) AcceptError!ast.NamedExports {
+pub fn acceptNamedExports(self: *Parser) AcceptError!ast.NamedExports {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3324,7 +3324,7 @@ pub fn acceptNamedExports(self: *Self) AcceptError!ast.NamedExports {
     return .{ .exports_list = exports_list };
 }
 
-pub fn acceptExportsList(self: *Self) AcceptError!ast.ExportsList {
+pub fn acceptExportsList(self: *Parser) AcceptError!ast.ExportsList {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
@@ -3339,7 +3339,7 @@ pub fn acceptExportsList(self: *Self) AcceptError!ast.ExportsList {
     return .{ .items = try export_specifiers.toOwnedSlice() };
 }
 
-pub fn acceptExportSpecifier(self: *Self) AcceptError!ast.ExportSpecifier {
+pub fn acceptExportSpecifier(self: *Parser) AcceptError!ast.ExportSpecifier {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 

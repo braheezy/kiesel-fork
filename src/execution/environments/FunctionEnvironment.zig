@@ -15,7 +15,7 @@ const Environment = environments.Environment;
 const Object = types.Object;
 const Value = types.Value;
 
-const Self = @This();
+const FunctionEnvironment = @This();
 
 pub const ThisBindingStatus = enum {
     lexical,
@@ -40,7 +40,7 @@ declarative_environment: *DeclarativeEnvironment,
 
 /// 9.1.1.3.1 BindThisValue ( V )
 /// https://tc39.es/ecma262/#sec-bindthisvalue
-pub fn bindThisValue(self: *Self, value: Value) error{ExceptionThrown}!Value {
+pub fn bindThisValue(self: *FunctionEnvironment, value: Value) error{ExceptionThrown}!Value {
     const agent = self.function_object.object().agent();
 
     // 1. Assert: envRec.[[ThisBindingStatus]] is not lexical.
@@ -67,14 +67,14 @@ pub fn bindThisValue(self: *Self, value: Value) error{ExceptionThrown}!Value {
 
 /// 9.1.1.3.2 HasThisBinding ( )
 /// https://tc39.es/ecma262/#sec-function-environment-records-hasthisbinding
-pub fn hasThisBinding(self: Self) bool {
+pub fn hasThisBinding(self: FunctionEnvironment) bool {
     // 1. If envRec.[[ThisBindingStatus]] is lexical, return false; otherwise, return true.
     return self.this_binding_status != .lexical;
 }
 
 /// 9.1.1.3.3 HasSuperBinding ( )
 /// https://tc39.es/ecma262/#sec-function-environment-records-hassuperbinding
-pub fn hasSuperBinding(self: Self) bool {
+pub fn hasSuperBinding(self: FunctionEnvironment) bool {
     // 1. If envRec.[[ThisBindingStatus]] is lexical, return false.
     if (self.this_binding_status == .lexical) return false;
 
@@ -84,7 +84,7 @@ pub fn hasSuperBinding(self: Self) bool {
 
 /// 9.1.1.3.4 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-function-environment-records-getthisbinding
-pub fn getThisBinding(self: Self) error{ExceptionThrown}!Value {
+pub fn getThisBinding(self: FunctionEnvironment) error{ExceptionThrown}!Value {
     const agent = self.function_object.object().agent();
 
     // 1. Assert: envRec.[[ThisBindingStatus]] is not lexical.
@@ -105,7 +105,7 @@ pub fn getThisBinding(self: Self) error{ExceptionThrown}!Value {
 
 /// 9.1.1.3.5 GetSuperBase ( )
 /// https://tc39.es/ecma262/#sec-getsuperbase
-pub fn getSuperBase(self: Self) Agent.Error!Value {
+pub fn getSuperBase(self: FunctionEnvironment) Agent.Error!Value {
     // 1. Let home be envRec.[[FunctionObject]].[[HomeObject]].
     const home = self.function_object.fields.home_object;
 

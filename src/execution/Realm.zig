@@ -28,7 +28,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 pub const Intrinsics = @import("Realm/Intrinsics.zig");
 
-const Self = @This();
+const Realm = @This();
 
 /// [[AgentSignifier]]
 agent: *Agent,
@@ -64,7 +64,7 @@ pub fn initializeHostDefinedRealm(
     },
 ) Agent.Error!void {
     // 1. Let realm be a new Realm Record.
-    var realm = try agent.gc_allocator.create(Self);
+    var realm = try agent.gc_allocator.create(Realm);
 
     // Set this early, it'll be accessed before the realm struct is fully initialized.
     realm.agent = agent;
@@ -139,7 +139,7 @@ pub fn initializeHostDefinedRealm(
 
 /// 9.3.2 CreateIntrinsics ( realmRec )
 /// https://tc39.es/ecma262/#sec-createintrinsics
-fn createIntrinsics(self: *Self) Allocator.Error!void {
+fn createIntrinsics(self: *Realm) Allocator.Error!void {
     // 1. Set realmRec.[[Intrinsics]] to a new Record.
     self.intrinsics = .{ .realm = self };
 
@@ -169,7 +169,7 @@ fn createIntrinsics(self: *Self) Allocator.Error!void {
 
 /// 9.3.3 SetDefaultGlobalBindings ( realmRec )
 /// https://tc39.es/ecma262/#sec-setdefaultglobalbindings
-fn setDefaultGlobalBindings(self: *Self) Agent.Error!void {
+fn setDefaultGlobalBindings(self: *Realm) Agent.Error!void {
     // 1. Let global be realmRec.[[GlobalObject]].
     const global = self.global_object;
 

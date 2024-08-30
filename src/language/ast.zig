@@ -29,8 +29,6 @@ pub const VarScopedDeclaration = union(enum) {
 };
 
 pub const LexicallyScopedDeclaration = union(enum) {
-    const Self = @This();
-
     hoistable_declaration: HoistableDeclaration,
     class_declaration: ClassDeclaration,
     lexical_declaration: LexicalDeclaration,
@@ -39,7 +37,7 @@ pub const LexicallyScopedDeclaration = union(enum) {
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
-        self: Self,
+        self: LexicallyScopedDeclaration,
         bound_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         switch (self) {
@@ -54,7 +52,7 @@ pub const LexicallyScopedDeclaration = union(enum) {
 
     /// 8.2.3 Static Semantics: IsConstantDeclaration
     /// https://tc39.es/ecma262/#sec-static-semantics-isconstantdeclaration
-    pub fn isConstantDeclaration(self: Self) bool {
+    pub fn isConstantDeclaration(self: LexicallyScopedDeclaration) bool {
         switch (self) {
             // ExportDeclaration :
             //     export ExportFromClause FromClause ;
@@ -71,11 +69,9 @@ pub const LexicallyScopedDeclaration = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-ParenthesizedExpression
 pub const ParenthesizedExpression = struct {
-    const Self = @This();
-
     expression: *Expression,
 
-    pub fn analyze(self: Self, query: AnalyzeQuery) bool {
+    pub fn analyze(self: ParenthesizedExpression, query: AnalyzeQuery) bool {
         return switch (query) {
             .is_reference => self.expression.analyze(query),
             .is_string_literal => false,
@@ -94,8 +90,6 @@ pub const PrivateIdentifier = []const u8;
 
 /// https://tc39.es/ecma262/#prod-PrimaryExpression
 pub const PrimaryExpression = union(enum) {
-    const Self = @This();
-
     this,
     identifier_reference: IdentifierReference,
     literal: Literal,
@@ -112,7 +106,7 @@ pub const PrimaryExpression = union(enum) {
     async_arrow_function: AsyncArrowFunction,
     parenthesized_expression: ParenthesizedExpression,
 
-    pub fn analyze(self: Self, query: AnalyzeQuery) bool {
+    pub fn analyze(self: PrimaryExpression, query: AnalyzeQuery) bool {
         return switch (query) {
             .is_reference => switch (self) {
                 .identifier_reference => true,
@@ -195,14 +189,12 @@ pub const OptionalExpression = struct {
 
 /// https://tc39.es/ecma262/#prod-Literal
 pub const Literal = union(enum) {
-    const Self = @This();
-
     null,
     boolean: bool,
     numeric: NumericLiteral,
     string: StringLiteral,
 
-    pub fn analyze(self: Self, query: AnalyzeQuery) bool {
+    pub fn analyze(self: Literal, query: AnalyzeQuery) bool {
         return switch (query) {
             .is_reference => false,
             .is_string_literal => self == .string,
@@ -212,8 +204,6 @@ pub const Literal = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-NumericLiteral
 pub const NumericLiteral = struct {
-    const Self = @This();
-
     pub const System = enum {
         binary,
         octal,
@@ -242,7 +232,7 @@ pub const NumericLiteral = struct {
 
     /// 12.9.3.3 Static Semantics: NumericValue
     /// https://tc39.es/ecma262/#sec-numericvalue
-    pub fn numericValue(self: Self, allocator: Allocator) Allocator.Error!Value {
+    pub fn numericValue(self: NumericLiteral, allocator: Allocator) Allocator.Error!Value {
         const base: u8 = switch (self.system) {
             .binary => 2,
             .octal => 8,
@@ -353,13 +343,11 @@ pub fn stringValueImpl(allocator: Allocator, text: []const u8) Allocator.Error!S
 
 /// https://tc39.es/ecma262/#prod-StringLiteral
 pub const StringLiteral = struct {
-    const Self = @This();
-
     text: []const u8,
 
     /// 12.9.4.2 Static Semantics: SV
     /// https://tc39.es/ecma262/#sec-static-semantics-sv
-    pub fn stringValue(self: Self, allocator: Allocator) Allocator.Error!String {
+    pub fn stringValue(self: StringLiteral, allocator: Allocator) Allocator.Error!String {
         std.debug.assert(self.text.len >= 2);
         return stringValueImpl(allocator, self.text[1 .. self.text.len - 1]);
     }
@@ -411,8 +399,6 @@ pub const PropertyName = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-RegularExpressionLiteral
 pub const RegularExpressionLiteral = struct {
-    const Self = @This();
-
     pattern: []const u8,
     flags: []const u8,
 
@@ -425,7 +411,7 @@ pub const RegularExpressionLiteral = struct {
     /// 13.2.7.2 Static Semantics: IsValidRegularExpressionLiteral ( literal )
     /// https://tc39.es/ecma262/#sec-isvalidregularexpressionliteral
     pub fn isValidRegularExpressionLiteral(
-        self: Self,
+        self: RegularExpressionLiteral,
         allocator: Allocator,
     ) Allocator.Error!ValidationResult {
         // 1. Let flags be the FlagText of literal.
@@ -469,8 +455,6 @@ pub const RegularExpressionLiteral = struct {
 
 /// https://tc39.es/ecma262/#prod-TemplateLiteral
 pub const TemplateLiteral = struct {
-    const Self = @This();
-
     pub const Span = union(enum) {
         text: []const u8,
         expression: Expression,
@@ -516,7 +500,11 @@ pub const TemplateLiteral = struct {
 
     /// 13.2.8.2 Static Semantics: TemplateStrings
     /// https://tc39.es/ecma262/#sec-static-semantics-templatestrings
-    pub fn templateStrings(self: Self, allocator: Allocator, raw: bool) Allocator.Error![]const String {
+    pub fn templateStrings(
+        self: TemplateLiteral,
+        allocator: Allocator,
+        raw: bool,
+    ) Allocator.Error![]const String {
         var template_strings = std.ArrayList(String).init(allocator);
         for (self.spans) |span| switch (span) {
             .text => try template_strings.append(try span.templateString(allocator, raw)),
@@ -679,8 +667,6 @@ pub const TaggedTemplate = struct {
 
 /// https://tc39.es/ecma262/#prod-Expression
 pub const Expression = union(enum) {
-    const Self = @This();
-
     primary_expression: PrimaryExpression,
     member_expression: MemberExpression,
     super_property: SuperProperty,
@@ -704,7 +690,7 @@ pub const Expression = union(enum) {
 
     /// 8.6.4 Static Semantics: AssignmentTargetType
     /// https://tc39.es/ecma262/#sec-static-semantics-assignmenttargettype
-    pub fn assignmentTargetType(self: Self) enum { simple, invalid } {
+    pub fn assignmentTargetType(self: Expression) enum { simple, invalid } {
         switch (self) {
             .primary_expression => |primary_expression| switch (primary_expression) {
                 .identifier_reference => {
@@ -736,7 +722,7 @@ pub const Expression = union(enum) {
         return .invalid;
     }
 
-    pub fn analyze(self: Self, query: AnalyzeQuery) bool {
+    pub fn analyze(self: Expression, query: AnalyzeQuery) bool {
         return switch (query) {
             .is_reference => switch (self) {
                 .primary_expression => |primary_expression| primary_expression.analyze(query),
@@ -756,8 +742,6 @@ pub const Expression = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-Statement
 pub const Statement = union(enum) {
-    const Self = @This();
-
     block_statement: BlockStatement,
     variable_statement: VariableStatement,
     empty_statement,
@@ -773,7 +757,7 @@ pub const Statement = union(enum) {
     try_statement: TryStatement,
     debugger_statement,
 
-    pub fn analyze(self: Self, query: AnalyzeQuery) bool {
+    pub fn analyze(self: Statement, query: AnalyzeQuery) bool {
         return switch (query) {
             .is_reference => switch (self) {
                 .expression_statement => |expression_statement| expression_statement.analyze(query),
@@ -789,7 +773,7 @@ pub const Statement = union(enum) {
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: Statement,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         switch (self) {
@@ -829,7 +813,7 @@ pub const Statement = union(enum) {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: Statement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         switch (self) {
@@ -869,13 +853,11 @@ pub const Statement = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-Declaration
 pub const Declaration = union(enum) {
-    const Self = @This();
-
     hoistable_declaration: HoistableDeclaration,
     class_declaration: ClassDeclaration,
     lexical_declaration: LexicalDeclaration,
 
-    pub fn analyze(_: Self, query: AnalyzeQuery) bool {
+    pub fn analyze(_: Declaration, query: AnalyzeQuery) bool {
         return switch (query) {
             .is_reference => false,
             .is_string_literal => false,
@@ -885,7 +867,7 @@ pub const Declaration = union(enum) {
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
-        self: Self,
+        self: Declaration,
         bound_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         switch (self) {
@@ -896,8 +878,6 @@ pub const Declaration = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-HoistableDeclaration
 pub const HoistableDeclaration = union(enum) {
-    const Self = @This();
-
     function_declaration: FunctionDeclaration,
     generator_declaration: GeneratorDeclaration,
     async_function_declaration: AsyncFunctionDeclaration,
@@ -906,7 +886,7 @@ pub const HoistableDeclaration = union(enum) {
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
-        self: Self,
+        self: HoistableDeclaration,
         bound_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         switch (self) {
@@ -916,7 +896,7 @@ pub const HoistableDeclaration = union(enum) {
 
     /// 8.2.3 Static Semantics: IsConstantDeclaration
     /// https://tc39.es/ecma262/#sec-static-semantics-isconstantdeclaration
-    pub fn isConstantDeclaration(self: Self) bool {
+    pub fn isConstantDeclaration(self: HoistableDeclaration) bool {
         switch (self) {
             inline else => |node| return node.isConstantDeclaration(),
         }
@@ -941,11 +921,9 @@ pub const Block = struct {
 
 /// https://tc39.es/ecma262/#prod-StatementList
 pub const StatementList = struct {
-    const Self = @This();
-
     items: []const StatementListItem,
 
-    pub fn hasLexicallyScopedDeclarations(self: Self) bool {
+    pub fn hasLexicallyScopedDeclarations(self: StatementList) bool {
         for (self.items) |item| {
             if (item.hasLexicallyScopedDeclarations()) return true;
         }
@@ -955,7 +933,7 @@ pub const StatementList = struct {
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
-        self: Self,
+        self: StatementList,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) Allocator.Error!void {
         // StatementList : StatementList StatementListItem
@@ -970,7 +948,7 @@ pub const StatementList = struct {
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: StatementList,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // StatementList : StatementList StatementListItem
@@ -987,7 +965,7 @@ pub const StatementList = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: StatementList,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // StatementList : StatementList StatementListItem
@@ -1004,7 +982,7 @@ pub const StatementList = struct {
     /// 8.2.9 Static Semantics: TopLevelLexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevellexicallyscopeddeclarations
     pub fn collectTopLevelLexicallyScopedDeclarations(
-        self: Self,
+        self: StatementList,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) Allocator.Error!void {
         // StatementList : StatementList StatementListItem
@@ -1019,7 +997,7 @@ pub const StatementList = struct {
     /// 8.2.10 Static Semantics: TopLevelVarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevelvardeclarednames
     pub fn collectTopLevelVarDeclaredNames(
-        self: Self,
+        self: StatementList,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // StatementList : StatementList StatementListItem
@@ -1058,7 +1036,7 @@ pub const StatementList = struct {
     /// 8.2.11 Static Semantics: TopLevelVarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevelvarscopeddeclarations
     pub fn collectTopLevelVarScopedDeclarations(
-        self: Self,
+        self: StatementList,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // StatementList : StatementList StatementListItem
@@ -1097,7 +1075,7 @@ pub const StatementList = struct {
 
     /// 11.2.1 Directive Prologues and the Use Strict Directive
     /// https://tc39.es/ecma262/#sec-directive-prologues-and-the-use-strict-directive
-    pub fn containsDirective(self: Self, directive: []const u8) bool {
+    pub fn containsDirective(self: StatementList, directive: []const u8) bool {
         for (self.items) |item| {
             if (!item.analyze(.is_string_literal)) break;
             const string_literal = item.statement.expression_statement.expression.primary_expression.literal.string;
@@ -1110,12 +1088,10 @@ pub const StatementList = struct {
 
 /// https://tc39.es/ecma262/#prod-StatementListItem
 pub const StatementListItem = union(enum) {
-    const Self = @This();
-
     statement: *Statement,
     declaration: *Declaration,
 
-    pub fn hasLexicallyScopedDeclarations(self: Self) bool {
+    pub fn hasLexicallyScopedDeclarations(self: StatementListItem) bool {
         return switch (self) {
             .statement => |statement| switch (statement.*) {
                 .labelled_statement => |labelled_statement| labelled_statement.hasLexicallyScopedDeclarations(),
@@ -1128,7 +1104,7 @@ pub const StatementListItem = union(enum) {
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
-        self: Self,
+        self: StatementListItem,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) Allocator.Error!void {
         switch (self) {
@@ -1157,7 +1133,7 @@ pub const StatementListItem = union(enum) {
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: StatementListItem,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         switch (self) {
@@ -1169,7 +1145,7 @@ pub const StatementListItem = union(enum) {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: StatementListItem,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         switch (self) {
@@ -1181,7 +1157,7 @@ pub const StatementListItem = union(enum) {
     /// 8.2.9 Static Semantics: TopLevelLexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevellexicallyscopeddeclarations
     pub fn collectTopLevelLexicallyScopedDeclarations(
-        self: Self,
+        self: StatementListItem,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) Allocator.Error!void {
         switch (self) {
@@ -1204,7 +1180,7 @@ pub const StatementListItem = union(enum) {
         }
     }
 
-    pub fn analyze(self: Self, query: AnalyzeQuery) bool {
+    pub fn analyze(self: StatementListItem, query: AnalyzeQuery) bool {
         return switch (self) {
             inline else => |node| node.analyze(query),
         };
@@ -1213,8 +1189,6 @@ pub const StatementListItem = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-LexicalDeclaration
 pub const LexicalDeclaration = struct {
-    const Self = @This();
-
     pub const Type = enum {
         let,
         @"const",
@@ -1226,7 +1200,7 @@ pub const LexicalDeclaration = struct {
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
-        self: Self,
+        self: LexicalDeclaration,
         bound_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // LexicalDeclaration : LetOrConst BindingList ;
@@ -1236,7 +1210,7 @@ pub const LexicalDeclaration = struct {
 
     /// 8.2.3 Static Semantics: IsConstantDeclaration
     /// https://tc39.es/ecma262/#sec-static-semantics-isconstantdeclaration
-    pub fn isConstantDeclaration(self: Self) bool {
+    pub fn isConstantDeclaration(self: LexicalDeclaration) bool {
         // LexicalDeclaration : LetOrConst BindingList ;
         // 1. Return IsConstantDeclaration of LetOrConst.
         switch (self.type) {
@@ -1256,14 +1230,12 @@ pub const LexicalDeclaration = struct {
 
 /// https://tc39.es/ecma262/#prod-BindingList
 pub const BindingList = struct {
-    const Self = @This();
-
     items: []const LexicalBinding,
 
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
-        self: Self,
+        self: BindingList,
         bound_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // BindingList : BindingList , LexicalBinding
@@ -1278,8 +1250,6 @@ pub const BindingList = struct {
 
 /// https://tc39.es/ecma262/#prod-LexicalBinding
 pub const LexicalBinding = union(enum) {
-    const Self = @This();
-
     binding_identifier: struct {
         binding_identifier: Identifier,
         initializer: ?Expression,
@@ -1292,7 +1262,7 @@ pub const LexicalBinding = union(enum) {
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
-        self: Self,
+        self: LexicalBinding,
         bound_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         switch (self) {
@@ -1317,14 +1287,12 @@ pub const VariableStatement = struct {
 
 /// https://tc39.es/ecma262/#prod-VariableDeclarationList
 pub const VariableDeclarationList = struct {
-    const Self = @This();
-
     items: []const VariableDeclaration,
 
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: VariableDeclarationList,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // VariableStatement : var VariableDeclarationList ;
@@ -1335,7 +1303,7 @@ pub const VariableDeclarationList = struct {
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
-        self: Self,
+        self: VariableDeclarationList,
         bound_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // VariableDeclarationList : VariableDeclarationList , VariableDeclaration
@@ -1353,7 +1321,7 @@ pub const VariableDeclarationList = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: VariableDeclarationList,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // VariableDeclarationList : VariableDeclaration
@@ -1376,15 +1344,13 @@ pub const VariableDeclaration = struct {
 
 /// https://tc39.es/ecma262/#prod-BindingPattern
 pub const BindingPattern = union(enum) {
-    const Self = @This();
-
     object_binding_pattern: ObjectBindingPattern,
     array_binding_pattern: ArrayBindingPattern,
 
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
-        self: Self,
+        self: BindingPattern,
         bound_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         switch (self) {
@@ -1431,7 +1397,7 @@ pub const BindingPattern = union(enum) {
 
     /// 15.1.2 Static Semantics: ContainsExpression
     /// https://tc39.es/ecma262/#sec-static-semantics-containsexpression
-    pub fn containsExpression(self: Self) bool {
+    pub fn containsExpression(self: BindingPattern) bool {
         switch (self) {
             .object_binding_pattern => |object_binding_pattern| for (object_binding_pattern.properties) |property| switch (property) {
                 .binding_property => |binding_property| if (binding_property.containsExpression()) return true,
@@ -1470,20 +1436,16 @@ pub const ArrayBindingPattern = struct {
 
 /// https://tc39.es/ecma262/#prod-BindingRestProperty
 pub const BindingRestProperty = struct {
-    const Self = @This();
-
     binding_identifier: Identifier,
 };
 
 /// https://tc39.es/ecma262/#prod-BindingProperty
 pub const BindingProperty = union(enum) {
-    const Self = @This();
-
     single_name_binding: SingleNameBinding,
 
     /// 15.1.2 Static Semantics: ContainsExpression
     /// https://tc39.es/ecma262/#sec-static-semantics-containsexpression
-    pub fn containsExpression(self: Self) bool {
+    pub fn containsExpression(self: BindingProperty) bool {
         // TODO: BindingProperty : PropertyName : BindingElement
         // SingleNameBinding : BindingIdentifier
         // 1. Return false.
@@ -1497,8 +1459,6 @@ pub const BindingProperty = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-BindingElement
 pub const BindingElement = union(enum) {
-    const Self = @This();
-
     single_name_binding: SingleNameBinding,
     binding_pattern: struct {
         binding_pattern: BindingPattern,
@@ -1507,7 +1467,7 @@ pub const BindingElement = union(enum) {
 
     /// 15.1.2 Static Semantics: ContainsExpression
     /// https://tc39.es/ecma262/#sec-static-semantics-containsexpression
-    pub fn containsExpression(self: Self) bool {
+    pub fn containsExpression(self: BindingElement) bool {
         // BindingElement : BindingPattern Initializer
         // 1. Return true.
         // SingleNameBinding : BindingIdentifier
@@ -1522,7 +1482,7 @@ pub const BindingElement = union(enum) {
 
     /// 15.1.3 Static Semantics: IsSimpleParameterList
     /// https://tc39.es/ecma262/#sec-static-semantics-issimpleparameterlist
-    pub fn isSimpleParameterList(self: Self) bool {
+    pub fn isSimpleParameterList(self: BindingElement) bool {
         // BindingElement : BindingPattern
         // 1. Return false.
         // BindingElement : BindingPattern Initializer
@@ -1543,14 +1503,12 @@ pub const SingleNameBinding = struct {
 
 /// https://tc39.es/ecma262/#prod-BindingRestElement
 pub const BindingRestElement = union(enum) {
-    const Self = @This();
-
     binding_identifier: Identifier,
     binding_pattern: BindingPattern,
 
     /// 15.1.2 Static Semantics: ContainsExpression
     /// https://tc39.es/ecma262/#sec-static-semantics-containsexpression
-    pub fn containsExpression(self: Self) bool {
+    pub fn containsExpression(self: BindingRestElement) bool {
         // BindingRestElement : ... BindingIdentifier
         // 1. Return false.
         // BindingRestElement : ... BindingPattern
@@ -1564,19 +1522,15 @@ pub const BindingRestElement = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-ExpressionStatement
 pub const ExpressionStatement = struct {
-    const Self = @This();
-
     expression: Expression,
 
-    pub fn analyze(self: Self, query: AnalyzeQuery) bool {
+    pub fn analyze(self: ExpressionStatement, query: AnalyzeQuery) bool {
         return self.expression.analyze(query);
     }
 };
 
 /// https://tc39.es/ecma262/#prod-IfStatement
 pub const IfStatement = struct {
-    const Self = @This();
-
     test_expression: Expression,
     consequent_statement: *Statement,
     alternate_statement: ?*Statement,
@@ -1584,7 +1538,7 @@ pub const IfStatement = struct {
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: IfStatement,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // IfStatement : if ( Expression ) Statement
@@ -1602,7 +1556,7 @@ pub const IfStatement = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: IfStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // IfStatement : if ( Expression ) Statement
@@ -1628,15 +1582,13 @@ pub const IterationStatement = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-DoWhileStatement
 pub const DoWhileStatement = struct {
-    const Self = @This();
-
     test_expression: Expression,
     consequent_statement: *Statement,
 
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: DoWhileStatement,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // DoWhileStatement : do Statement while ( Expression ) ;
@@ -1647,7 +1599,7 @@ pub const DoWhileStatement = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: DoWhileStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // DoWhileStatement : do Statement while ( Expression ) ;
@@ -1658,15 +1610,13 @@ pub const DoWhileStatement = struct {
 
 /// https://tc39.es/ecma262/#prod-WhileStatement
 pub const WhileStatement = struct {
-    const Self = @This();
-
     test_expression: Expression,
     consequent_statement: *Statement,
 
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: WhileStatement,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // WhileStatement : while ( Expression ) Statement
@@ -1677,7 +1627,7 @@ pub const WhileStatement = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: WhileStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // WhileStatement : while ( Expression ) Statement
@@ -1688,8 +1638,6 @@ pub const WhileStatement = struct {
 
 /// https://tc39.es/ecma262/#prod-ForStatement
 pub const ForStatement = struct {
-    const Self = @This();
-
     pub const Initializer = union(enum) {
         expression: Expression,
         variable_statement: VariableStatement,
@@ -1704,7 +1652,7 @@ pub const ForStatement = struct {
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: ForStatement,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
@@ -1727,7 +1675,7 @@ pub const ForStatement = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: ForStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
@@ -1750,8 +1698,6 @@ pub const ForStatement = struct {
 
 /// https://tc39.es/ecma262/#prod-ForInOfStatement
 pub const ForInOfStatement = struct {
-    const Self = @This();
-
     pub const Type = enum {
         in,
         of,
@@ -1772,7 +1718,7 @@ pub const ForInOfStatement = struct {
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: ForInOfStatement,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // ForInOfStatement :
@@ -1802,7 +1748,7 @@ pub const ForInOfStatement = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: ForInOfStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // ForInOfStatement :
@@ -1861,15 +1807,13 @@ pub const ReturnStatement = struct {
 
 /// https://tc39.es/ecma262/#prod-WithStatement
 pub const WithStatement = struct {
-    const Self = @This();
-
     expression: Expression,
     statement: *Statement,
 
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: WithStatement,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // WithStatement : with ( Expression ) Statement
@@ -1880,7 +1824,7 @@ pub const WithStatement = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: WithStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // WithStatement : with ( Expression ) Statement
@@ -1891,15 +1835,13 @@ pub const WithStatement = struct {
 
 /// https://tc39.es/ecma262/#prod-SwitchStatement
 pub const SwitchStatement = struct {
-    const Self = @This();
-
     expression: Expression,
     case_block: CaseBlock,
 
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: SwitchStatement,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // SwitchStatement : switch ( Expression ) CaseBlock
@@ -1910,7 +1852,7 @@ pub const SwitchStatement = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: SwitchStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // SwitchStatement : switch ( Expression ) CaseBlock
@@ -1921,8 +1863,6 @@ pub const SwitchStatement = struct {
 
 /// https://tc39.es/ecma262/#prod-CaseBlock
 pub const CaseBlock = struct {
-    const Self = @This();
-
     pub const Item = union(enum) {
         case_clause: CaseClause,
         default_clause: DefaultClause,
@@ -1933,7 +1873,7 @@ pub const CaseBlock = struct {
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
-        self: Self,
+        self: CaseBlock,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) Allocator.Error!void {
         // CaseBlock : { }
@@ -1957,7 +1897,7 @@ pub const CaseBlock = struct {
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: CaseBlock,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // CaseBlock : { }
@@ -1981,7 +1921,7 @@ pub const CaseBlock = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: CaseBlock,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // CaseBlock : { }
@@ -2005,15 +1945,13 @@ pub const CaseBlock = struct {
 
 /// https://tc39.es/ecma262/#prod-CaseClause
 pub const CaseClause = struct {
-    const Self = @This();
-
     expression: Expression,
     statement_list: StatementList,
 
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
-        self: Self,
+        self: CaseClause,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) Allocator.Error!void {
         // CaseClause : case Expression : StatementList[opt]
@@ -2025,7 +1963,7 @@ pub const CaseClause = struct {
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: CaseClause,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // CaseClause : case Expression : StatementList[opt]
@@ -2037,7 +1975,7 @@ pub const CaseClause = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: CaseClause,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // CaseClause : case Expression : StatementList[opt]
@@ -2049,14 +1987,12 @@ pub const CaseClause = struct {
 
 /// https://tc39.es/ecma262/#prod-DefaultClause
 pub const DefaultClause = struct {
-    const Self = @This();
-
     statement_list: StatementList,
 
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
-        self: Self,
+        self: DefaultClause,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) Allocator.Error!void {
         // DefaultClause : default : StatementList[opt]
@@ -2068,7 +2004,7 @@ pub const DefaultClause = struct {
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: DefaultClause,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // DefaultClause : default : StatementList[opt]
@@ -2080,7 +2016,7 @@ pub const DefaultClause = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: DefaultClause,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // DefaultClause : default : StatementList[opt]
@@ -2092,8 +2028,6 @@ pub const DefaultClause = struct {
 
 /// https://tc39.es/ecma262/#prod-LabelledStatement
 pub const LabelledStatement = struct {
-    const Self = @This();
-
     pub const LabelledItem = union(enum) {
         statement: *Statement,
         function_declaration: FunctionDeclaration,
@@ -2102,7 +2036,7 @@ pub const LabelledStatement = struct {
     label_identifier: Identifier,
     labelled_item: LabelledItem,
 
-    pub fn hasLexicallyScopedDeclarations(self: Self) bool {
+    pub fn hasLexicallyScopedDeclarations(self: LabelledStatement) bool {
         return switch (self.labelled_item) {
             .statement => false,
             .function_declaration => true,
@@ -2112,7 +2046,7 @@ pub const LabelledStatement = struct {
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
-        self: Self,
+        self: LabelledStatement,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) Allocator.Error!void {
         //  LabelledStatement : LabelIdentifier : LabelledItem
@@ -2136,7 +2070,7 @@ pub const LabelledStatement = struct {
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: LabelledStatement,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         switch (self.labelled_item) {
@@ -2156,7 +2090,7 @@ pub const LabelledStatement = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: LabelledStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         switch (self.labelled_item) {
@@ -2176,7 +2110,7 @@ pub const LabelledStatement = struct {
     /// 8.2.10 Static Semantics: TopLevelVarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevelvardeclarednames
     pub fn collectTopLevelVarDeclaredNames(
-        self: Self,
+        self: LabelledStatement,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // LabelledStatement : LabelIdentifier : LabelledItem
@@ -2206,7 +2140,7 @@ pub const LabelledStatement = struct {
     /// 8.2.11 Static Semantics: TopLevelVarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevelvarscopeddeclarations
     pub fn collectTopLevelVarScopedDeclarations(
-        self: Self,
+        self: LabelledStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // LabelledStatement : LabelIdentifier : LabelledItem
@@ -2243,8 +2177,6 @@ pub const ThrowStatement = struct {
 
 /// https://tc39.es/ecma262/#prod-TryStatement
 pub const TryStatement = struct {
-    const Self = @This();
-
     try_block: Block,
     catch_parameter: ?Identifier, // TODO: Binding patterns
     catch_block: ?Block,
@@ -2253,7 +2185,7 @@ pub const TryStatement = struct {
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: TryStatement,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // TryStatement : try Block Catch
@@ -2283,7 +2215,7 @@ pub const TryStatement = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: TryStatement,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // TryStatement : try Block Catch
@@ -2313,8 +2245,6 @@ pub const TryStatement = struct {
 
 /// https://tc39.es/ecma262/#prod-FormalParameters
 pub const FormalParameters = struct {
-    const Self = @This();
-
     pub const Item = union(enum) {
         formal_parameter: FormalParameter,
         function_rest_parameter: FunctionRestParameter,
@@ -2326,7 +2256,7 @@ pub const FormalParameters = struct {
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
-        self: Self,
+        self: FormalParameters,
         bound_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // FormalParameterList : FormalParameterList , FormalParameter
@@ -2353,7 +2283,7 @@ pub const FormalParameters = struct {
 
     /// 15.1.2 Static Semantics: ContainsExpression
     /// https://tc39.es/ecma262/#sec-static-semantics-containsexpression
-    pub fn containsExpression(self: Self) bool {
+    pub fn containsExpression(self: FormalParameters) bool {
         // FormalParameters : [empty]
         // 1. Return false.
         // FormalParameters : FormalParameterList , FunctionRestParameter
@@ -2375,7 +2305,7 @@ pub const FormalParameters = struct {
 
     /// 15.1.3 Static Semantics: IsSimpleParameterList
     /// https://tc39.es/ecma262/#sec-static-semantics-issimpleparameterlist
-    pub fn isSimpleParameterList(self: Self) bool {
+    pub fn isSimpleParameterList(self: FormalParameters) bool {
         // FormalParameters : [empty]
         // 1. Return true.
         // FormalParameters : FunctionRestParameter
@@ -2398,7 +2328,7 @@ pub const FormalParameters = struct {
 
     /// 15.1.5 Static Semantics: ExpectedArgumentCount
     /// https://tc39.es/ecma262/#sec-static-semantics-expectedargumentcount
-    pub fn expectedArgumentCount(self: Self) usize {
+    pub fn expectedArgumentCount(self: FormalParameters) usize {
         var count: usize = 0;
         for (self.items) |item| switch (item) {
             .formal_parameter => |formal_parameter| switch (formal_parameter.binding_element) {
@@ -2430,8 +2360,6 @@ pub const FormalParameter = struct {
 
 /// https://tc39.es/ecma262/#prod-FunctionDeclaration
 pub const FunctionDeclaration = struct {
-    const Self = @This();
-
     identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
@@ -2440,7 +2368,7 @@ pub const FunctionDeclaration = struct {
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
-        self: Self,
+        self: FunctionDeclaration,
         bound_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // FunctionDeclaration : function BindingIdentifier ( FormalParameters ) { FunctionBody }
@@ -2452,7 +2380,7 @@ pub const FunctionDeclaration = struct {
 
     /// 8.2.3 Static Semantics: IsConstantDeclaration
     /// https://tc39.es/ecma262/#sec-static-semantics-isconstantdeclaration
-    pub fn isConstantDeclaration(_: Self) bool {
+    pub fn isConstantDeclaration(_: FunctionDeclaration) bool {
         // FunctionDeclaration :
         //     function BindingIdentifier ( FormalParameters ) { FunctionBody }
         //     function ( FormalParameters ) { FunctionBody }
@@ -2471,8 +2399,6 @@ pub const FunctionExpression = struct {
 
 /// https://tc39.es/ecma262/#prod-FunctionBody
 pub const FunctionBody = struct {
-    const Self = @This();
-
     pub const Type = enum {
         normal,
         generator,
@@ -2488,7 +2414,7 @@ pub const FunctionBody = struct {
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
-        self: Self,
+        self: FunctionBody,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) Allocator.Error!void {
         // FunctionStatementList : [empty]
@@ -2501,7 +2427,7 @@ pub const FunctionBody = struct {
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: FunctionBody,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // FunctionStatementList : [empty]
@@ -2514,7 +2440,7 @@ pub const FunctionBody = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: FunctionBody,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // FunctionStatementList : [empty]
@@ -2526,7 +2452,7 @@ pub const FunctionBody = struct {
 
     /// 15.2.2 Static Semantics: FunctionBodyContainsUseStrict
     /// https://tc39.es/ecma262/#sec-static-semantics-functionbodycontainsusestrict
-    pub fn functionBodyContainsUseStrict(self: Self) bool {
+    pub fn functionBodyContainsUseStrict(self: FunctionBody) bool {
         // 1. If the Directive Prologue of FunctionBody contains a Use Strict Directive, return
         //    true; otherwise, return false.
         return self.statement_list.containsDirective("use strict");
@@ -2566,8 +2492,6 @@ pub const MethodDefinition = struct {
 
 /// https://tc39.es/ecma262/#prod-GeneratorDeclaration
 pub const GeneratorDeclaration = struct {
-    const Self = @This();
-
     identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
@@ -2576,7 +2500,7 @@ pub const GeneratorDeclaration = struct {
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
-        self: Self,
+        self: GeneratorDeclaration,
         bound_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // GeneratorDeclaration : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
@@ -2588,7 +2512,7 @@ pub const GeneratorDeclaration = struct {
 
     /// 8.2.3 Static Semantics: IsConstantDeclaration
     /// https://tc39.es/ecma262/#sec-static-semantics-isconstantdeclaration
-    pub fn isConstantDeclaration(_: Self) bool {
+    pub fn isConstantDeclaration(_: GeneratorDeclaration) bool {
         // GeneratorDeclaration :
         //     function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
         //     function * ( FormalParameters ) { GeneratorBody }
@@ -2607,8 +2531,6 @@ pub const GeneratorExpression = struct {
 
 /// https://tc39.es/ecma262/#prod-AsyncGeneratorDeclaration
 pub const AsyncGeneratorDeclaration = struct {
-    const Self = @This();
-
     identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
@@ -2617,7 +2539,7 @@ pub const AsyncGeneratorDeclaration = struct {
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
-        self: Self,
+        self: AsyncGeneratorDeclaration,
         bound_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // AsyncGeneratorDeclaration : async function * BindingIdentifier ( FormalParameters ) { AsyncGeneratorBody }
@@ -2629,7 +2551,7 @@ pub const AsyncGeneratorDeclaration = struct {
 
     /// 8.2.3 Static Semantics: IsConstantDeclaration
     /// https://tc39.es/ecma262/#sec-static-semantics-isconstantdeclaration
-    pub fn isConstantDeclaration(_: Self) bool {
+    pub fn isConstantDeclaration(_: AsyncGeneratorDeclaration) bool {
         // AsyncGeneratorDeclaration :
         //     async function * BindingIdentifier ( FormalParameters ) { AsyncGeneratorBody }
         //     async function * ( FormalParameters ) { AsyncGeneratorBody }
@@ -2648,8 +2570,6 @@ pub const AsyncGeneratorExpression = struct {
 
 /// https://tc39.es/ecma262/#prod-ClassDeclaration
 pub const ClassDeclaration = struct {
-    const Self = @This();
-
     identifier: ?Identifier,
     class_tail: ClassTail,
     source_text: []const u8,
@@ -2657,7 +2577,7 @@ pub const ClassDeclaration = struct {
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
-        self: Self,
+        self: ClassDeclaration,
         bound_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // ClassDeclaration : class BindingIdentifier ClassTail
@@ -2669,7 +2589,7 @@ pub const ClassDeclaration = struct {
 
     /// 8.2.3 Static Semantics: IsConstantDeclaration
     /// https://tc39.es/ecma262/#sec-static-semantics-isconstantdeclaration
-    pub fn isConstantDeclaration(_: Self) bool {
+    pub fn isConstantDeclaration(_: ClassDeclaration) bool {
         // ClassDeclaration :
         //     class BindingIdentifier ClassTail
         //     class ClassTail
@@ -2693,13 +2613,11 @@ pub const ClassTail = struct {
 
 /// https://tc39.es/ecma262/#prod-ClassBody
 pub const ClassBody = struct {
-    const Self = @This();
-
     class_element_list: ClassElementList,
 
     /// 15.7.3 Static Semantics: ConstructorMethod
     /// https://tc39.es/ecma262/#sec-static-semantics-constructormethod
-    pub fn constructorMethod(self: Self) ?MethodDefinition {
+    pub fn constructorMethod(self: ClassBody) ?MethodDefinition {
         // ClassElementList : ClassElement
         // 1. If the ClassElementKind of ClassElement is constructor-method, return ClassElement.
         // 2. Return empty.
@@ -2719,7 +2637,7 @@ pub const ClassBody = struct {
     /// 15.7.5 Static Semantics: NonConstructorElements
     /// https://tc39.es/ecma262/#sec-static-semantics-nonconstructorelements
     pub fn nonConstructorElements(
-        self: Self,
+        self: ClassBody,
         allocator: Allocator,
     ) Allocator.Error![]const ClassElement {
         // ClassElementList : ClassElement
@@ -2746,7 +2664,7 @@ pub const ClassBody = struct {
     /// 15.7.8 Static Semantics: PrivateBoundIdentifiers
     /// https://tc39.es/ecma262/#sec-static-semantics-privateboundidentifiers
     pub fn privateBoundIdentifiers(
-        self: Self,
+        self: ClassBody,
         allocator: Allocator,
     ) Allocator.Error![]const PrivateIdentifier {
         // ClassElementList : ClassElementList ClassElement
@@ -2816,8 +2734,6 @@ pub const ClassElementList = struct {
 
 /// https://tc39.es/ecma262/#prod-ClassElement
 pub const ClassElement = union(enum) {
-    const Self = @This();
-
     pub const Kind = enum {
         constructor_method,
         non_constructor_method,
@@ -2833,7 +2749,7 @@ pub const ClassElement = union(enum) {
 
     /// 15.7.2 Static Semantics: ClassElementKind
     /// https://tc39.es/ecma262/#sec-static-semantics-classelementkind
-    pub fn classElementKind(self: Self) Kind {
+    pub fn classElementKind(self: ClassElement) Kind {
         switch (self) {
             // ClassElement : MethodDefinition
             .method_definition => |method_definition| {
@@ -2874,7 +2790,7 @@ pub const ClassElement = union(enum) {
 
     /// 15.7.4 Static Semantics: IsStatic
     /// https://tc39.es/ecma262/#sec-static-semantics-isstatic
-    pub fn isStatic(self: Self) bool {
+    pub fn isStatic(self: ClassElement) bool {
         switch (self) {
             // ClassElement : MethodDefinition
             // ClassElement : FieldDefinition ;
@@ -2920,8 +2836,6 @@ pub const ClassStaticBlock = struct {
 
 /// https://tc39.es/ecma262/#prod-AsyncFunctionDeclaration
 pub const AsyncFunctionDeclaration = struct {
-    const Self = @This();
-
     identifier: ?Identifier,
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
@@ -2930,7 +2844,7 @@ pub const AsyncFunctionDeclaration = struct {
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
     pub fn collectBoundNames(
-        self: Self,
+        self: AsyncFunctionDeclaration,
         bound_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // AsyncFunctionDeclaration : async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
@@ -2942,7 +2856,7 @@ pub const AsyncFunctionDeclaration = struct {
 
     /// 8.2.3 Static Semantics: IsConstantDeclaration
     /// https://tc39.es/ecma262/#sec-static-semantics-isconstantdeclaration
-    pub fn isConstantDeclaration(_: Self) bool {
+    pub fn isConstantDeclaration(_: AsyncFunctionDeclaration) bool {
         // AsyncFunctionDeclaration :
         //     async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
         //     async function ( FormalParameters ) { AsyncFunctionBody }
@@ -2973,14 +2887,12 @@ pub const AsyncArrowFunction = struct {
 
 /// https://tc39.es/ecma262/#prod-Script
 pub const Script = struct {
-    const Self = @This();
-
     statement_list: StatementList,
 
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
-        self: Self,
+        self: Script,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) Allocator.Error!void {
         // Script : [empty]
@@ -2993,7 +2905,7 @@ pub const Script = struct {
     /// 8.2.6 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
-        self: Self,
+        self: Script,
         var_declared_names: *std.ArrayList(Identifier),
     ) Allocator.Error!void {
         // Script : [empty]
@@ -3006,7 +2918,7 @@ pub const Script = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: Script,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // Script : [empty]
@@ -3018,7 +2930,7 @@ pub const Script = struct {
 
     /// 16.1.2 Static Semantics: ScriptIsStrict
     /// https://tc39.es/ecma262/#sec-scriptisstrict
-    pub fn scriptIsStrict(self: Self) bool {
+    pub fn scriptIsStrict(self: Script) bool {
         // 1. If ScriptBody is present and the Directive Prologue of ScriptBody contains a Use
         //    Strict Directive, return true; otherwise, return false.
         return self.statement_list.containsDirective("use strict");
@@ -3027,14 +2939,12 @@ pub const Script = struct {
 
 /// https://tc39.es/ecma262/#prod-Module
 pub const Module = struct {
-    const Self = @This();
-
     module_item_list: ModuleItemList,
 
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
-        self: Self,
+        self: Module,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) Allocator.Error!void {
         // Module : [empty]
@@ -3049,7 +2959,7 @@ pub const Module = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: Module,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         try self.module_item_list.collectVarScopedDeclarations(var_scoped_declarations);
@@ -3058,7 +2968,7 @@ pub const Module = struct {
     /// 16.2.1.3 Static Semantics: ModuleRequests
     /// https://tc39.es/ecma262/#sec-static-semantics-modulerequests
     pub fn moduleRequests(
-        self: Self,
+        self: Module,
         allocator: Allocator,
     ) Allocator.Error![]const String {
         // Module : [empty]
@@ -3121,7 +3031,7 @@ pub const Module = struct {
     /// 16.2.2.2 Static Semantics: ImportEntries
     /// https://tc39.es/ecma262/#sec-static-semantics-importentries
     pub fn collectImportEntries(
-        self: Self,
+        self: Module,
         import_entries: *std.ArrayList(ImportEntry),
     ) Allocator.Error!void {
         // Module : [empty]
@@ -3156,7 +3066,7 @@ pub const Module = struct {
     /// 16.2.3.4 Static Semantics: ExportEntries
     /// https://tc39.es/ecma262/#sec-static-semantics-exportentries
     pub fn collectExportEntries(
-        self: Self,
+        self: Module,
         export_entries: *std.ArrayList(ExportEntry),
     ) Allocator.Error!void {
         // Module : [empty]
@@ -3313,14 +3223,12 @@ pub const Module = struct {
 
 /// https://tc39.es/ecma262/#prod-ModuleItemList
 pub const ModuleItemList = struct {
-    const Self = @This();
-
     items: []const ModuleItem,
 
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
-        self: Self,
+        self: ModuleItemList,
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) Allocator.Error!void {
         for (self.items) |item| switch (item) {
@@ -3376,7 +3284,7 @@ pub const ModuleItemList = struct {
     /// 8.2.7 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
-        self: Self,
+        self: ModuleItemList,
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) Allocator.Error!void {
         // ModuleItemList : ModuleItemList ModuleItem
@@ -3424,8 +3332,6 @@ pub const ImportDeclaration = struct {
 
 /// https://tc39.es/ecma262/#prod-ImportClause
 pub const ImportClause = union(enum) {
-    const Self = @This();
-
     imported_default_binding: Identifier,
     namespace_import: Identifier,
     named_imports: ImportsList,
@@ -3435,7 +3341,7 @@ pub const ImportClause = union(enum) {
     /// 16.2.2.3 Static Semantics: ImportEntriesForModule
     /// https://tc39.es/ecma262/#sec-static-semantics-importentriesformodule
     pub fn collectImportEntriesForModule(
-        self: Self,
+        self: ImportClause,
         import_entries: *std.ArrayList(ImportEntry),
         module: String,
     ) Allocator.Error!void {
@@ -3563,8 +3469,6 @@ pub const ExportDeclaration = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-ExportFromClause
 pub const ExportFromClause = union(enum) {
-    const Self = @This();
-
     star,
     star_as: ModuleExportName,
     named_exports: NamedExports,
@@ -3572,7 +3476,7 @@ pub const ExportFromClause = union(enum) {
     /// 16.2.3.5 Static Semantics: ExportEntriesForModule
     /// https://tc39.es/ecma262/#sec-static-semantics-exportentriesformodule
     pub fn collectExportEntriesForModule(
-        self: Self,
+        self: ExportFromClause,
         export_entries: *std.ArrayList(ExportEntry),
         module: ?[]const u8,
     ) Allocator.Error!void {
@@ -3623,14 +3527,12 @@ pub const ExportFromClause = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-NamedExports
 pub const NamedExports = struct {
-    const Self = @This();
-
     exports_list: ExportsList,
 
     /// 16.2.3.5 Static Semantics: ExportEntriesForModule
     /// https://tc39.es/ecma262/#sec-static-semantics-exportentriesformodule
     pub fn collectExportEntriesForModule(
-        self: Self,
+        self: NamedExports,
         export_entries: *std.ArrayList(ExportEntry),
         module: ?[]const u8,
     ) Allocator.Error!void {

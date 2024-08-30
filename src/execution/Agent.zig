@@ -28,7 +28,7 @@ const WellKnownSymbols = @import("Agent/WellKnownSymbols.zig");
 const getIdentifierReference = environments.getIdentifierReference;
 const noexcept = utils.noexcept;
 
-const Self = @This();
+const Agent = @This();
 
 gc_allocator: Allocator,
 options: Options,
@@ -64,13 +64,13 @@ pub const QueuedJob = struct {
     realm: ?*Realm,
 };
 
-pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
+pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Agent {
     const platform = options.platform orelse if (@TypeOf(Platform.default) != void)
         Platform.default()
     else
         @panic("No default implementation exists for this platform");
     pretty_printing.state.tty_config = platform.tty_config;
-    var self: Self = .{
+    var self: Agent = .{
         .gc_allocator = gc_allocator,
         .options = options,
         .pre_allocated = undefined,
@@ -92,7 +92,7 @@ pub fn init(gc_allocator: Allocator, options: Options) Allocator.Error!Self {
     return self;
 }
 
-pub fn deinit(self: *Self) void {
+pub fn deinit(self: *Agent) void {
     self.pre_allocated.zero.deinit(self.gc_allocator);
     self.pre_allocated.one.deinit(self.gc_allocator);
     self.well_known_symbols.deinit(self.gc_allocator);
@@ -102,7 +102,7 @@ pub fn deinit(self: *Self) void {
     self.platform.deinit();
 }
 
-pub fn drainJobQueue(self: *Self) void {
+pub fn drainJobQueue(self: *Agent) void {
     while (self.queued_jobs.items.len != 0) {
         const queued_job = self.queued_jobs.orderedRemove(0);
         const current_realm = self.runningExecutionContext().realm;
@@ -114,7 +114,7 @@ pub fn drainJobQueue(self: *Self) void {
     }
 }
 
-pub fn checkStackOverflow(self: *Self) error{ExceptionThrown}!void {
+pub fn checkStackOverflow(self: *Agent) error{ExceptionThrown}!void {
     if (self.platform.stack_info) |stack_info| {
         const remaining_stack = @frameAddress() - stack_info.base;
         const required_stack = (if (builtin.mode == .Debug) 128 else 64) * 1024; // Arbitrary limit
@@ -152,7 +152,7 @@ const ExceptionType = enum {
 };
 
 pub fn createException(
-    self: Self,
+    self: Agent,
     comptime exception_type: ExceptionType,
     comptime fmt: []const u8,
     args: anytype,
@@ -174,7 +174,7 @@ pub fn createException(
     return error_object;
 }
 
-pub fn clearException(self: *Self) Value {
+pub fn clearException(self: *Agent) Value {
     defer self.exception = null;
     return self.exception.?;
 }
@@ -182,7 +182,7 @@ pub fn clearException(self: *Self) Value {
 /// 5.2.3.2 Throw an Exception
 /// https://tc39.es/ecma262/#sec-throw-an-exception
 pub fn throwException(
-    self: *Self,
+    self: *Agent,
     comptime exception_type: ExceptionType,
     comptime fmt: []const u8,
     args: anytype,
@@ -199,7 +199,7 @@ pub fn throwException(
 }
 
 /// https://tc39.es/ecma262/#running-execution-context
-pub fn runningExecutionContext(self: Self) *ExecutionContext {
+pub fn runningExecutionContext(self: Agent) *ExecutionContext {
     // At any point in time, there is at most one execution context per agent that is actually
     // executing code. This is known as the agent's running execution context.
     // The running execution context is always the top element of this stack.
@@ -208,14 +208,14 @@ pub fn runningExecutionContext(self: Self) *ExecutionContext {
 }
 
 /// https://tc39.es/ecma262/#current-realm
-pub fn currentRealm(self: Self) *Realm {
+pub fn currentRealm(self: Agent) *Realm {
     // The value of the Realm component of the running execution context is also called the current
     // Realm Record.
     return self.runningExecutionContext().realm;
 }
 
 /// https://tc39.es/ecma262/#active-function-object
-pub fn activeFunctionObject(self: Self) Object {
+pub fn activeFunctionObject(self: Agent) Object {
     // The value of the Function component of the running execution context is also called the
     // active function object.
     return self.runningExecutionContext().function.?;
@@ -223,7 +223,7 @@ pub fn activeFunctionObject(self: Self) Object {
 
 /// 9.4.1 GetActiveScriptOrModule ( )
 /// https://tc39.es/ecma262/#sec-getactivescriptormodule
-pub fn getActiveScriptOrModule(self: Self) ?ExecutionContext.ScriptOrModule {
+pub fn getActiveScriptOrModule(self: Agent) ?ExecutionContext.ScriptOrModule {
     // 1. If the execution context stack is empty, return null.
     if (self.execution_context_stack.items.len == 0) return null;
 
@@ -241,7 +241,7 @@ pub fn getActiveScriptOrModule(self: Self) ?ExecutionContext.ScriptOrModule {
 /// 9.4.2 ResolveBinding ( name [ , env ] )
 /// https://tc39.es/ecma262/#sec-resolvebinding
 pub fn resolveBinding(
-    self: *Self,
+    self: *Agent,
     name: String,
     maybe_env: ?Environment,
     strict: bool,
@@ -261,7 +261,7 @@ pub fn resolveBinding(
 
 /// 9.4.3 GetThisEnvironment ( )
 /// https://tc39.es/ecma262/#sec-getthisenvironment
-pub fn getThisEnvironment(self: *Self) Environment {
+pub fn getThisEnvironment(self: *Agent) Environment {
     // 1. Let env be the running execution context's LexicalEnvironment.
     var env = self.runningExecutionContext().ecmascript_code.?.lexical_environment;
 
@@ -290,7 +290,7 @@ pub fn getThisEnvironment(self: *Self) Environment {
 
 /// 9.4.4 ResolveThisBinding ( )
 /// https://tc39.es/ecma262/#sec-resolvethisbinding
-pub fn resolveThisBinding(self: *Self) Error!Value {
+pub fn resolveThisBinding(self: *Agent) Error!Value {
     // 1. Let envRec be GetThisEnvironment().
     const env = self.getThisEnvironment();
 
@@ -300,7 +300,7 @@ pub fn resolveThisBinding(self: *Self) Error!Value {
 
 /// 9.4.5 GetNewTarget ( )
 /// https://tc39.es/ecma262/#sec-getnewtarget
-pub fn getNewTarget(self: *Self) ?Object {
+pub fn getNewTarget(self: *Agent) ?Object {
     // 1. Let envRec be GetThisEnvironment().
     const env = self.getThisEnvironment();
 
@@ -313,7 +313,7 @@ pub fn getNewTarget(self: *Self) ?Object {
 
 /// 9.4.6 GetGlobalObject ( )
 /// https://tc39.es/ecma262/#sec-getglobalobject
-pub fn getGlobalObject(self: Self) Object {
+pub fn getGlobalObject(self: Agent) Object {
     // 1. Let currentRealm be the current Realm Record.
     const current_realm = self.currentRealm();
 

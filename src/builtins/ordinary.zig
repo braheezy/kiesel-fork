@@ -17,21 +17,21 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const sameValue = types.sameValue;
 
-const Self = @This();
+const module = @This();
 
 // Only export these in a namespace so it's clear what they are.
 pub const ordinary_internal_methods = struct {
-    pub const getPrototypeOf = Self.getPrototypeOf;
-    pub const setPrototypeOf = Self.setPrototypeOf;
-    pub const isExtensible = Self.isExtensible;
-    pub const preventExtensions = Self.preventExtensions;
-    pub const getOwnProperty = Self.getOwnProperty;
-    pub const defineOwnProperty = Self.defineOwnProperty;
-    pub const hasProperty = Self.hasProperty;
-    pub const get = Self.get;
-    pub const set = Self.set;
-    pub const delete = Self.delete;
-    pub const ownPropertyKeys = Self.ownPropertyKeys;
+    pub const getPrototypeOf = module.getPrototypeOf;
+    pub const setPrototypeOf = module.setPrototypeOf;
+    pub const isExtensible = module.isExtensible;
+    pub const preventExtensions = module.preventExtensions;
+    pub const getOwnProperty = module.getOwnProperty;
+    pub const defineOwnProperty = module.defineOwnProperty;
+    pub const hasProperty = module.hasProperty;
+    pub const get = module.get;
+    pub const set = module.set;
+    pub const delete = module.delete;
+    pub const ownPropertyKeys = module.ownPropertyKeys;
 };
 
 /// 10.1.1 [[GetPrototypeOf]] ( )

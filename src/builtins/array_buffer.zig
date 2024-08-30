@@ -33,19 +33,17 @@ const sameValue = types.sameValue;
 const data_block_max_byte_length = types.data_block_max_byte_length;
 
 pub const ArrayBufferLike = union(enum) {
-    const Self = @This();
-
     array_buffer: *const ArrayBuffer,
     shared_array_buffer: *const builtins.SharedArrayBuffer,
 
-    pub inline fn object(self: Self) Object {
+    pub inline fn object(self: ArrayBufferLike) Object {
         return switch (self) {
             .array_buffer => |array_buffer| @constCast(array_buffer).object(),
             .shared_array_buffer => |shared_array_buffer| @constCast(shared_array_buffer).object(),
         };
     }
 
-    pub inline fn arrayBufferData(self: Self) ?*const DataBlock {
+    pub inline fn arrayBufferData(self: ArrayBufferLike) ?*const DataBlock {
         return switch (self) {
             .array_buffer => |array_buffer| if (array_buffer.fields.array_buffer_data) |array_buffer_data|
                 &array_buffer_data

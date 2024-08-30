@@ -15,7 +15,7 @@ const Value = types.Value;
 const ValueArrayHashMap = types.ValueArrayHashMap;
 const sameValue = types.sameValue;
 
-const Self = @This();
+const Executable = @This();
 
 allocator: Allocator,
 instructions: std.ArrayList(Instruction),
@@ -43,7 +43,7 @@ pub const IndexType = u16;
 
 pub const Error = error{IndexOutOfRange} || Allocator.Error;
 
-pub fn init(allocator: Allocator) Self {
+pub fn init(allocator: Allocator) Executable {
     return .{
         .allocator = allocator,
         .instructions = std.ArrayList(Instruction).init(allocator),
@@ -53,34 +53,34 @@ pub fn init(allocator: Allocator) Self {
     };
 }
 
-pub fn deinit(self: *Self) void {
+pub fn deinit(self: *Executable) void {
     self.instructions.deinit();
     self.constants.deinit();
     self.identifiers.deinit();
     self.ast_nodes.deinit();
 }
 
-pub fn addInstruction(self: *Self, instruction: Instruction) Allocator.Error!void {
+pub fn addInstruction(self: *Executable, instruction: Instruction) Allocator.Error!void {
     try self.instructions.append(instruction);
 }
 
-pub fn addConstant(self: *Self, constant: Value) Allocator.Error!usize {
+pub fn addConstant(self: *Executable, constant: Value) Allocator.Error!usize {
     const result = try self.constants.getOrPut(constant);
     return result.index;
 }
 
-pub fn addIdentifier(self: *Self, identifier: ast.Identifier) Allocator.Error!usize {
+pub fn addIdentifier(self: *Executable, identifier: ast.Identifier) Allocator.Error!usize {
     const string = try String.fromUtf8(self.allocator, identifier);
     const result = try self.identifiers.getOrPut(string);
     return result.index;
 }
 
-pub fn addAstNode(self: *Self, ast_node: AstNode) Allocator.Error!void {
+pub fn addAstNode(self: *Executable, ast_node: AstNode) Allocator.Error!void {
     try self.ast_nodes.append(ast_node);
 }
 
 pub fn addInstructionWithConstant(
-    self: *Self,
+    self: *Executable,
     instruction: Instruction,
     constant: Value,
 ) Error!void {
@@ -91,7 +91,7 @@ pub fn addInstructionWithConstant(
 }
 
 pub fn addInstructionWithIdentifier(
-    self: *Self,
+    self: *Executable,
     instruction: Instruction,
     identifier: ast.Identifier,
 ) Error!void {
@@ -102,7 +102,7 @@ pub fn addInstructionWithIdentifier(
 }
 
 pub fn addInstructionWithAstNode(
-    self: *Self,
+    self: *Executable,
     instruction: Instruction,
     ast_node: AstNode,
 ) Error!void {
@@ -113,7 +113,7 @@ pub fn addInstructionWithAstNode(
 }
 
 pub const JumpIndex = struct {
-    executable: *Self,
+    executable: *Executable,
     index: usize,
 
     pub fn setTarget(self: JumpIndex, index: usize) Error!void {
@@ -130,7 +130,7 @@ pub const JumpIndex = struct {
     }
 };
 
-pub fn addJumpIndex(self: *Self) Allocator.Error!JumpIndex {
+pub fn addJumpIndex(self: *Executable) Allocator.Error!JumpIndex {
     self.addIndex(0) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.IndexOutOfRange => unreachable,
@@ -141,14 +141,14 @@ pub fn addJumpIndex(self: *Self) Allocator.Error!JumpIndex {
     };
 }
 
-pub fn addIndex(self: *Self, index: usize) Error!void {
+pub fn addIndex(self: *Executable, index: usize) Error!void {
     if (index >= std.math.maxInt(IndexType)) return error.IndexOutOfRange;
     const bytes = std.mem.toBytes(@as(IndexType, @intCast(index)));
     try self.instructions.append(@enumFromInt(bytes[0]));
     try self.instructions.append(@enumFromInt(bytes[1]));
 }
 
-pub fn print(self: Self, writer: anytype, tty_config: std.io.tty.Config) @TypeOf(writer).Error!void {
+pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @TypeOf(writer).Error!void {
     var iterator: InstructionIterator = .{ .instructions = self.instructions.items };
     while (iterator.next()) |instruction| {
         try writer.print("{:>[1]}: ", .{

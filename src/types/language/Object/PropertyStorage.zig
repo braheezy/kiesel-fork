@@ -13,7 +13,7 @@ const Realm = execution.Realm;
 const Symbol = types.Symbol;
 const Value = types.Value;
 
-const Self = @This();
+const PropertyStorage = @This();
 
 /// `PropertyDescriptor` is designed to have an empty or partial state as well, which makes it
 /// unnecessarily large. Within the property storage hash map we store data using this more compact
@@ -100,18 +100,18 @@ const LazyIntrinsic = struct {
 hash_map: PropertyKeyArrayHashMap(Entry),
 lazy_intrinsics: std.StringHashMap(LazyIntrinsic),
 
-pub fn init(allocator: Allocator) Self {
+pub fn init(allocator: Allocator) PropertyStorage {
     return .{
         .hash_map = PropertyKeyArrayHashMap(Entry).init(allocator),
         .lazy_intrinsics = std.StringHashMap(LazyIntrinsic).init(allocator),
     };
 }
 
-pub fn has(self: Self, property_key: PropertyKey) bool {
+pub fn has(self: PropertyStorage, property_key: PropertyKey) bool {
     return self.hash_map.contains(property_key);
 }
 
-pub fn get(self: Self, property_key: PropertyKey) ?PropertyDescriptor {
+pub fn get(self: PropertyStorage, property_key: PropertyKey) ?PropertyDescriptor {
     if (property_key == .string and property_key.string.data.slice == .ascii) {
         const name = property_key.string.data.slice.ascii;
         std.debug.assert(!self.lazy_intrinsics.contains(name));
@@ -122,7 +122,7 @@ pub fn get(self: Self, property_key: PropertyKey) ?PropertyDescriptor {
     return null;
 }
 
-pub fn getCreateIntrinsicIfNeeded(self: *Self, property_key: PropertyKey) Allocator.Error!?PropertyDescriptor {
+pub fn getCreateIntrinsicIfNeeded(self: *PropertyStorage, property_key: PropertyKey) Allocator.Error!?PropertyDescriptor {
     if (self.hash_map.getPtr(property_key)) |entry| {
         if (property_key == .string and property_key.string.data.slice == .ascii) {
             const name = property_key.string.data.slice.ascii;
@@ -138,7 +138,7 @@ pub fn getCreateIntrinsicIfNeeded(self: *Self, property_key: PropertyKey) Alloca
 }
 
 pub fn set(
-    self: *Self,
+    self: *PropertyStorage,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
 ) Allocator.Error!void {
@@ -150,7 +150,7 @@ pub fn set(
     }
 }
 
-pub fn remove(self: *Self, property_key: PropertyKey) void {
+pub fn remove(self: *PropertyStorage, property_key: PropertyKey) void {
     const removed = self.hash_map.orderedRemove(property_key);
     std.debug.assert(removed);
     if (property_key == .string and property_key.string.data.slice == .ascii) {

@@ -15,8 +15,6 @@ const isZigString = utils.isZigString;
 /// A property key is either a String or a Symbol. All Strings and Symbols, including the empty
 /// String, are valid as property keys.
 pub const PropertyKey = union(enum) {
-    const Self = @This();
-
     /// An integer index is a property name n such that CanonicalNumericIndexString(n) returns an
     /// integral Number in the inclusive interval from +0𝔽 to 𝔽(2^53 - 1).
     /// https://tc39.es/ecma262/#integer-index
@@ -28,7 +26,7 @@ pub const PropertyKey = union(enum) {
     // OPTIMIZATION: If the string is known to be an integer index, store it as a number.
     integer_index: IntegerIndex,
 
-    pub inline fn from(value: anytype) Self {
+    pub inline fn from(value: anytype) PropertyKey {
         const T = @TypeOf(value);
         if (isZigString(T)) {
             // FIXME: This should use CanonicalNumericIndexString to reject numeric strings that
@@ -58,7 +56,7 @@ pub const PropertyKey = union(enum) {
 
     /// An array index is an integer index n such that CanonicalNumericIndexString(n) returns an
     /// integral Number in the inclusive interval from +0𝔽 to 𝔽(2^32 - 2).
-    pub inline fn isArrayIndex(self: Self) bool {
+    pub inline fn isArrayIndex(self: PropertyKey) bool {
         return self == .integer_index and self.integer_index <= (std.math.maxInt(u32) - 1);
     }
 
@@ -76,7 +74,7 @@ pub const PropertyKey = union(enum) {
     }
 
     /// Non-standard helper to check `PropertyKey` equality without going through `sameValue()`.
-    pub fn eql(a: Self, b: Self) bool {
+    pub fn eql(a: PropertyKey, b: PropertyKey) bool {
         return switch (a) {
             .string => |a_string| switch (b) {
                 .string => |b_string| a_string.eql(b_string),
@@ -98,7 +96,7 @@ pub const PropertyKey = union(enum) {
 
     /// Non-standard helper to convert a `PropertyKey` to a `Value` - they *are* plain (string or
     /// symbol) values in the spec.
-    pub fn toValue(self: Self, agent: *Agent) Allocator.Error!Value {
+    pub fn toValue(self: PropertyKey, agent: *Agent) Allocator.Error!Value {
         return switch (self) {
             .string => |string| Value.from(string),
             .symbol => |symbol| Value.from(symbol),
@@ -117,7 +115,7 @@ pub const PropertyKey = union(enum) {
 
     /// Non-standard helper to convert a `PropertyKey` to a `[]const u8` or `Symbol` (i.e. bypassing
     /// the integer index optimization).
-    pub fn toStringOrSymbol(self: Self, agent: *Agent) Allocator.Error!union(enum) {
+    pub fn toStringOrSymbol(self: PropertyKey, agent: *Agent) Allocator.Error!union(enum) {
         string: String,
         symbol: Symbol,
     } {

@@ -4,8 +4,6 @@ const Executable = @import("Executable.zig");
 const IndexType = Executable.IndexType;
 
 pub const Instruction = enum(u8) {
-    const Self = @This();
-
     /// Store ApplyStringOrNumericBinaryOperator() as the result value.
     apply_string_or_numeric_binary_operator,
     /// Store ArrayCreate(0) as the result value.
@@ -185,7 +183,7 @@ pub const Instruction = enum(u8) {
     /// Non-exhaustive enum to allow arbitrary values as constant indices.
     _,
 
-    pub fn argumentCount(self: Self) u2 {
+    pub fn argumentCount(self: Instruction) u2 {
         return switch (self) {
             .resolve_binding => 3,
             .evaluate_call,
@@ -224,14 +222,14 @@ pub const Instruction = enum(u8) {
         };
     }
 
-    pub fn hasConstantIndex(self: Self) bool {
+    pub fn hasConstantIndex(self: Instruction) bool {
         return switch (self) {
             .load_constant, .store_constant => true,
             else => false,
         };
     }
 
-    pub fn hasIdentifierIndex(self: Self) bool {
+    pub fn hasIdentifierIndex(self: Instruction) bool {
         return switch (self) {
             .create_catch_binding,
             .evaluate_property_access_with_identifier_key,
@@ -244,7 +242,7 @@ pub const Instruction = enum(u8) {
         };
     }
 
-    pub fn hasAstNodeIndex(self: Self) bool {
+    pub fn hasAstNodeIndex(self: Instruction) bool {
         return switch (self) {
             .binding_class_declaration_evaluation,
             .block_declaration_instantiation,
@@ -265,14 +263,12 @@ pub const Instruction = enum(u8) {
 };
 
 pub const InstructionIterator = struct {
-    const Self = @This();
-
     instructions: []const Instruction,
     index: usize = 0,
     instruction_index: usize = 0,
     instruction_args: [3]?IndexType = .{ null, null, null },
 
-    pub fn next(self: *Self) ?Instruction {
+    pub fn next(self: *InstructionIterator) ?Instruction {
         if (self.index >= self.instructions.len) return null;
         const instruction = self.instructions[self.index];
         self.instruction_index = self.index;

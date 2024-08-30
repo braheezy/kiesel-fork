@@ -30,12 +30,10 @@ pub fn noexcept(err: error{ ExceptionThrown, OutOfMemory }) Allocator.Error!nore
 
 pub fn TemporaryChange(comptime T: type) type {
     return struct {
-        const Self = @This();
-
         field: *T,
         previous_value: T,
 
-        pub fn restore(self: Self) void {
+        pub fn restore(self: @This()) void {
             self.field.* = self.previous_value;
         }
     };

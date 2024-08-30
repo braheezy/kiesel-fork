@@ -16,7 +16,7 @@ const String = types.String;
 const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 
-const Self = @This();
+const DeclarativeEnvironment = @This();
 
 /// [[OuterEnv]]
 outer_env: ?Environment,
@@ -32,7 +32,7 @@ pub const Binding = struct {
 
 /// 9.1.1.1.1 HasBinding ( N )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-hasbinding-n
-pub fn hasBinding(self: Self, name: String) bool {
+pub fn hasBinding(self: DeclarativeEnvironment, name: String) bool {
     // 1. If envRec has a binding for N, return true.
     // 2. Return false.
     return self.bindings.contains(name);
@@ -41,7 +41,7 @@ pub fn hasBinding(self: Self, name: String) bool {
 /// 9.1.1.2.2 CreateMutableBinding ( N, D )
 /// https://tc39.es/ecma262/#sec-object-environment-records-createmutablebinding-n-d
 pub fn createMutableBinding(
-    self: *Self,
+    self: *DeclarativeEnvironment,
     _: *Agent,
     name: String,
     deletable: bool,
@@ -63,7 +63,7 @@ pub fn createMutableBinding(
 /// 9.1.1.1.3 CreateImmutableBinding ( N, S )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-createimmutablebinding-n-s
 pub fn createImmutableBinding(
-    self: *Self,
+    self: *DeclarativeEnvironment,
     _: *Agent,
     name: String,
     strict: bool,
@@ -83,7 +83,12 @@ pub fn createImmutableBinding(
 
 /// 9.1.1.1.4 InitializeBinding ( N, V )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-initializebinding-n-v
-pub fn initializeBinding(self: Self, _: *Agent, name: String, value: Value) void {
+pub fn initializeBinding(
+    self: DeclarativeEnvironment,
+    _: *Agent,
+    name: String,
+    value: Value,
+) void {
     var binding = self.bindings.getPtr(name).?;
 
     // 1. Assert: envRec must have an uninitialized binding for N.
@@ -99,7 +104,7 @@ pub fn initializeBinding(self: Self, _: *Agent, name: String, value: Value) void
 /// 9.1.1.1.5 SetMutableBinding ( N, V, S )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-setmutablebinding-n-v-s
 pub fn setMutableBinding(
-    self: *Self,
+    self: *DeclarativeEnvironment,
     agent: *Agent,
     name: String,
     value: Value,
@@ -163,7 +168,7 @@ pub fn setMutableBinding(
 /// 9.1.1.1.6 GetBindingValue ( N, S )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-getbindingvalue-n-s
 pub fn getBindingValue(
-    self: Self,
+    self: DeclarativeEnvironment,
     agent: *Agent,
     name: String,
     _: bool,
@@ -182,7 +187,7 @@ pub fn getBindingValue(
 
 /// 9.1.1.1.7 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-deletebinding-n
-pub fn deleteBinding(self: *Self, name: String) bool {
+pub fn deleteBinding(self: *DeclarativeEnvironment, name: String) bool {
     // 1. Assert: envRec has a binding for N.
     const binding = self.bindings.get(name).?;
 
@@ -198,21 +203,21 @@ pub fn deleteBinding(self: *Self, name: String) bool {
 
 /// 9.1.1.1.8 HasThisBinding ( )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-hasthisbinding
-pub fn hasThisBinding(_: Self) bool {
+pub fn hasThisBinding(_: DeclarativeEnvironment) bool {
     // 1. Return false.
     return false;
 }
 
 /// 9.1.1.1.9 HasSuperBinding ( )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-hassuperbinding
-pub fn hasSuperBinding(_: Self) bool {
+pub fn hasSuperBinding(_: DeclarativeEnvironment) bool {
     // 1. Return false.
     return false;
 }
 
 /// 9.1.1.1.10 WithBaseObject ( )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-withbaseobject
-pub fn withBaseObject(_: Self) ?Object {
+pub fn withBaseObject(_: DeclarativeEnvironment) ?Object {
     // 1. Return undefined.
     return null;
 }

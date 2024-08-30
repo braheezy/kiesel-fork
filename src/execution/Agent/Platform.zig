@@ -6,7 +6,7 @@ const stackinfo = @import("stackinfo");
 
 const build_options = @import("build-options");
 
-const Self = @This();
+const Platform = @This();
 
 stdout: std.io.AnyWriter,
 stderr: std.io.AnyWriter,
@@ -45,7 +45,7 @@ comptime {
     }
 }
 
-fn defaultImpl() Self {
+fn defaultImpl() Platform {
     stdout_writer = std.io.getStdOut().writer();
     stderr_writer = std.io.getStdErr().writer();
     return .{
@@ -60,6 +60,6 @@ fn defaultImpl() Self {
     };
 }
 
-pub fn deinit(self: Self) void {
+pub fn deinit(self: Platform) void {
     if (build_options.enable_intl) self.default_locale.deinit();
 }

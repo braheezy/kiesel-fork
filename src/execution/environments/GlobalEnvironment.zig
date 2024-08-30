@@ -20,7 +20,7 @@ const String = types.String;
 const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 
-const Self = @This();
+const GlobalEnvironment = @This();
 
 /// [[ObjectRecord]]
 object_record: *ObjectEnvironment,
@@ -39,7 +39,7 @@ outer_env: ?Environment,
 
 /// 9.1.1.4.1 HasBinding ( N )
 /// https://tc39.es/ecma262/#sec-global-environment-records-hasbinding-n
-pub fn hasBinding(self: Self, name: String) Agent.Error!bool {
+pub fn hasBinding(self: GlobalEnvironment, name: String) Agent.Error!bool {
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, return true.
     if (self.declarative_record.hasBinding(name)) return true;
@@ -52,7 +52,7 @@ pub fn hasBinding(self: Self, name: String) Agent.Error!bool {
 /// 9.1.1.4.2 CreateMutableBinding ( N, D )
 /// https://tc39.es/ecma262/#sec-global-environment-records-createmutablebinding-n-d
 pub fn createMutableBinding(
-    self: *Self,
+    self: *GlobalEnvironment,
     agent: *Agent,
     name: String,
     deletable: bool,
@@ -70,7 +70,7 @@ pub fn createMutableBinding(
 /// 9.1.1.4.3 CreateImmutableBinding ( N, S )
 /// https://tc39.es/ecma262/#sec-global-environment-records-createimmutablebinding-n-s
 pub fn createImmutableBinding(
-    self: *Self,
+    self: *GlobalEnvironment,
     agent: *Agent,
     name: String,
     strict: bool,
@@ -88,7 +88,7 @@ pub fn createImmutableBinding(
 /// 9.1.1.4.4 InitializeBinding ( N, V )
 /// https://tc39.es/ecma262/#sec-global-environment-records-initializebinding-n-v
 pub fn initializeBinding(
-    self: Self,
+    self: GlobalEnvironment,
     agent: *Agent,
     name: String,
     value: Value,
@@ -109,7 +109,7 @@ pub fn initializeBinding(
 /// 9.1.1.4.5 SetMutableBinding ( N, V, S )
 /// https://tc39.es/ecma262/#sec-global-environment-records-setmutablebinding-n-v-s
 pub fn setMutableBinding(
-    self: Self,
+    self: GlobalEnvironment,
     agent: *Agent,
     name: String,
     value: Value,
@@ -130,7 +130,7 @@ pub fn setMutableBinding(
 /// 9.1.1.4.6 GetBindingValue ( N, S )
 /// https://tc39.es/ecma262/#sec-global-environment-records-getbindingvalue-n-s
 pub fn getBindingValue(
-    self: Self,
+    self: GlobalEnvironment,
     agent: *Agent,
     name: String,
     strict: bool,
@@ -149,7 +149,7 @@ pub fn getBindingValue(
 
 /// 9.1.1.4.7 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-global-environment-records-deletebinding-n
-pub fn deleteBinding(self: *Self, name: String) Agent.Error!bool {
+pub fn deleteBinding(self: *GlobalEnvironment, name: String) Agent.Error!bool {
     // 1. Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. If ! DclRec.HasBinding(N) is true, then
     if (self.declarative_record.hasBinding(name)) {
@@ -186,35 +186,35 @@ pub fn deleteBinding(self: *Self, name: String) Agent.Error!bool {
 
 /// 9.1.1.4.8 HasThisBinding ( )
 /// https://tc39.es/ecma262/#sec-global-environment-records-hasthisbinding
-pub fn hasThisBinding(_: Self) bool {
+pub fn hasThisBinding(_: GlobalEnvironment) bool {
     // 1. Return true.
     return true;
 }
 
 /// 9.1.1.4.9 HasSuperBinding ( )
 /// https://tc39.es/ecma262/#sec-global-environment-records-hassuperbinding
-pub fn hasSuperBinding(_: Self) bool {
+pub fn hasSuperBinding(_: GlobalEnvironment) bool {
     // 1. Return false.
     return false;
 }
 
 /// 9.1.1.4.10 WithBaseObject ( )
 /// https://tc39.es/ecma262/#sec-global-environment-records-withbaseobject
-pub fn withBaseObject(_: Self) ?Object {
+pub fn withBaseObject(_: GlobalEnvironment) ?Object {
     // 1. Return undefined.
     return null;
 }
 
 /// 9.1.1.4.11 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-global-environment-records-getthisbinding
-pub fn getThisBinding(self: Self) Object {
+pub fn getThisBinding(self: GlobalEnvironment) Object {
     // 1. Return envRec.[[GlobalThisValue]].
     return self.global_this_value;
 }
 
 /// 9.1.1.4.12 HasVarDeclaration ( N )
 /// https://tc39.es/ecma262/#sec-hasvardeclaration
-pub fn hasVarDeclaration(self: Self, name: String) bool {
+pub fn hasVarDeclaration(self: GlobalEnvironment, name: String) bool {
     // 1. Let varDeclaredNames be envRec.[[VarNames]].
     // 2. If varDeclaredNames contains N, return true.
     // 3. Return false.
@@ -223,14 +223,14 @@ pub fn hasVarDeclaration(self: Self, name: String) bool {
 
 /// 9.1.1.4.13 HasLexicalDeclaration ( N )
 /// https://tc39.es/ecma262/#sec-haslexicaldeclaration
-pub fn hasLexicalDeclaration(self: Self, name: String) bool {
+pub fn hasLexicalDeclaration(self: GlobalEnvironment, name: String) bool {
     // 1.Let DclRec be envRec.[[DeclarativeRecord]].
     // 2. Return ! DclRec.HasBinding(N).
     return self.declarative_record.hasBinding(name);
 }
 /// 9.1.1.4.15 CanDeclareGlobalVar ( N )
 /// https://tc39.es/ecma262/#sec-candeclareglobalvar
-pub fn canDeclareGlobalVar(self: *Self, name: String) Agent.Error!bool {
+pub fn canDeclareGlobalVar(self: *GlobalEnvironment, name: String) Agent.Error!bool {
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
     // 2. Let globalObject be ObjRec.[[BindingObject]].
     const global_object = self.object_record.binding_object;
@@ -247,7 +247,7 @@ pub fn canDeclareGlobalVar(self: *Self, name: String) Agent.Error!bool {
 
 /// 9.1.1.4.16 CanDeclareGlobalFunction ( N )
 /// https://tc39.es/ecma262/#sec-candeclareglobalfunction
-pub fn canDeclareGlobalFunction(self: *Self, name: String) Agent.Error!bool {
+pub fn canDeclareGlobalFunction(self: *GlobalEnvironment, name: String) Agent.Error!bool {
     // 1. Let ObjRec be envRec.[[ObjectRecord]].
     // 2. Let globalObject be ObjRec.[[BindingObject]].
     const global_object = self.object_record.binding_object;
@@ -277,7 +277,7 @@ pub fn canDeclareGlobalFunction(self: *Self, name: String) Agent.Error!bool {
 /// 9.1.1.4.17 CreateGlobalVarBinding ( N, D )
 /// https://tc39.es/ecma262/#sec-createglobalvarbinding
 pub fn createGlobalVarBinding(
-    self: *Self,
+    self: *GlobalEnvironment,
     agent: *Agent,
     name: String,
     deletable: bool,
@@ -313,7 +313,7 @@ pub fn createGlobalVarBinding(
 /// 9.1.1.4.18 CreateGlobalFunctionBinding ( N, V, D )
 /// https://tc39.es/ecma262/#sec-createglobalfunctionbinding
 pub fn createGlobalFunctionBinding(
-    self: *Self,
+    self: *GlobalEnvironment,
     name: String,
     value: Value,
     deletable: bool,

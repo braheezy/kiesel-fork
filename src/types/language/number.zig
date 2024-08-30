@@ -14,15 +14,13 @@ const pow_2_31 = std.math.pow(f64, 2, 31);
 const pow_2_32 = std.math.pow(f64, 2, 32);
 
 pub const Number = union(enum) {
-    const Self = @This();
-
     f64: f64,
     // OPTIMIZATION: Instead of always storing floats we also have a Number type that stores an
     // i32 internally.
     i32: i32,
 
     pub fn format(
-        self: Self,
+        self: Number,
         comptime fmt: []const u8,
         options: std.fmt.FormatOptions,
         writer: anytype,
@@ -45,7 +43,7 @@ pub const Number = union(enum) {
         }
     }
 
-    pub inline fn from(number: anytype) Self {
+    pub inline fn from(number: anytype) Number {
         const T = @TypeOf(number);
         switch (@typeInfo(T)) {
             .int, .comptime_int => {
@@ -73,56 +71,56 @@ pub const Number = union(enum) {
         }
     }
 
-    pub inline fn asFloat(self: Self) f64 {
+    pub inline fn asFloat(self: Number) f64 {
         return switch (self) {
             .f64 => |x| x,
             .i32 => |x| @as(f64, @floatFromInt(x)),
         };
     }
 
-    pub inline fn isNan(self: Self) bool {
+    pub inline fn isNan(self: Number) bool {
         return switch (self) {
             .f64 => |x| std.math.isNan(x),
             .i32 => false,
         };
     }
 
-    pub inline fn isPositiveInf(self: Self) bool {
+    pub inline fn isPositiveInf(self: Number) bool {
         return switch (self) {
             .f64 => |x| std.math.isPositiveInf(x),
             .i32 => false,
         };
     }
 
-    pub inline fn isNegativeInf(self: Self) bool {
+    pub inline fn isNegativeInf(self: Number) bool {
         return switch (self) {
             .f64 => |x| std.math.isNegativeInf(x),
             .i32 => false,
         };
     }
 
-    pub inline fn isZero(self: Self) bool {
+    pub inline fn isZero(self: Number) bool {
         return switch (self) {
             .f64 => |x| x == 0,
             .i32 => |x| x == 0,
         };
     }
 
-    pub inline fn isPositiveZero(self: Self) bool {
+    pub inline fn isPositiveZero(self: Number) bool {
         return switch (self) {
             .f64 => |x| std.math.isPositiveZero(x),
             .i32 => |x| x == 0,
         };
     }
 
-    pub inline fn isNegativeZero(self: Self) bool {
+    pub inline fn isNegativeZero(self: Number) bool {
         return switch (self) {
             .f64 => |x| std.math.isNegativeZero(x),
             .i32 => false,
         };
     }
 
-    pub inline fn isFinite(self: Self) bool {
+    pub inline fn isFinite(self: Number) bool {
         return switch (self) {
             .f64 => |x| std.math.isFinite(x),
             .i32 => true,
@@ -130,32 +128,32 @@ pub const Number = union(enum) {
     }
 
     /// https://tc39.es/ecma262/#integral-number
-    pub inline fn isIntegral(self: Self) bool {
+    pub inline fn isIntegral(self: Number) bool {
         return self.isFinite() and @trunc(self.asFloat()) == self.asFloat();
     }
 
-    pub inline fn truncate(self: Self) Self {
+    pub inline fn truncate(self: Number) Number {
         return switch (self) {
             .f64 => |x| .{ .f64 = @trunc(x) },
             .i32 => |x| .{ .i32 = x },
         };
     }
 
-    pub inline fn ceil(self: Self) Self {
+    pub inline fn ceil(self: Number) Number {
         return switch (self) {
             .f64 => |x| .{ .f64 = @ceil(x) },
             .i32 => |x| .{ .i32 = x },
         };
     }
 
-    pub inline fn floor(self: Self) Self {
+    pub inline fn floor(self: Number) Number {
         return switch (self) {
             .f64 => |x| .{ .f64 = @floor(x) },
             .i32 => |x| .{ .i32 = x },
         };
     }
 
-    inline fn toInt32(self: Self) i32 {
+    inline fn toInt32(self: Number) i32 {
         return switch (self) {
             .f64 => |x| blk: {
                 // Excerpt from Value.toInt32()
@@ -171,7 +169,7 @@ pub const Number = union(enum) {
         };
     }
 
-    inline fn toUint32(self: Self) u32 {
+    inline fn toUint32(self: Number) u32 {
         return switch (self) {
             .f64 => |x| blk: {
                 // Excerpt from Value.toUint32()
@@ -188,13 +186,13 @@ pub const Number = union(enum) {
         };
     }
 
-    pub fn toFloat16(self: Self) f16 {
+    pub fn toFloat16(self: Number) f16 {
         return utils.float16.__truncdfhf2(self.asFloat());
     }
 
     /// 6.1.6.1.1 Number::unaryMinus ( x )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-unaryMinus
-    pub fn unaryMinus(self: Self) Self {
+    pub fn unaryMinus(self: Number) Number {
         // 1. If x is NaN, return NaN.
         if (self.isNan()) return self;
 
@@ -210,7 +208,7 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.2 Number::bitwiseNOT ( x )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-bitwiseNOT
-    pub fn bitwiseNOT(self: Self) Self {
+    pub fn bitwiseNOT(self: Number) Number {
         // 1. Let oldValue be ! ToInt32(x).
         const old_value = self.toInt32();
 
@@ -221,7 +219,7 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.3 Number::exponentiate ( base, exponent )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-exponentiate
-    pub fn exponentiate(base: Self, exponent: Self) Self {
+    pub fn exponentiate(base: Number, exponent: Number) Number {
         // 1. If exponent is NaN, return NaN.
         if (exponent.isNan()) return .{ .f64 = std.math.nan(f64) };
 
@@ -330,7 +328,7 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.4 Number::multiply ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-multiply
-    pub fn multiply(x: Self, y: Self) Self {
+    pub fn multiply(x: Number, y: Number) Number {
         if (x == .i32 and y == .i32) {
             if (std.math.mul(i32, x.i32, y.i32) catch null) |result| return .{ .i32 = result };
         }
@@ -339,13 +337,13 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.5 Number::divide ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-divide
-    pub fn divide(x: Self, y: Self) Self {
+    pub fn divide(x: Number, y: Number) Number {
         return from(x.asFloat() / y.asFloat());
     }
 
     /// 6.1.6.1.6 Number::remainder ( n, d )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-remainder
-    pub fn remainder(n: Self, d: Self) Self {
+    pub fn remainder(n: Number, d: Number) Number {
         // 1. If n is NaN or d is NaN, return NaN.
         if (n.isNan() or d.isNan()) return .{ .f64 = std.math.nan(f64) };
 
@@ -383,7 +381,7 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.7 Number::add ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-add
-    pub fn add(x: Self, y: Self) Self {
+    pub fn add(x: Number, y: Number) Number {
         if (x == .i32 and y == .i32) {
             if (std.math.add(i32, x.i32, y.i32) catch null) |result| return .{ .i32 = result };
         }
@@ -392,7 +390,7 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.8 Number::subtract ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-subtract
-    pub fn subtract(x: Self, y: Self) Self {
+    pub fn subtract(x: Number, y: Number) Number {
         // 1. Return Number::add(x, Number::unaryMinus(y)).
         if (x == .i32 and y == .i32) {
             if (std.math.sub(i32, x.i32, y.i32) catch null) |result| return .{ .i32 = result };
@@ -402,7 +400,7 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.9 Number::leftShift ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-leftShift
-    pub fn leftShift(x: Self, y: Self) Self {
+    pub fn leftShift(x: Number, y: Number) Number {
         // 1. Let lnum be ! ToInt32(x).
         const lnum = x.toInt32();
 
@@ -419,7 +417,7 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.10 Number::signedRightShift ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-signedRightShift
-    pub fn signedRightShift(x: Self, y: Self) Self {
+    pub fn signedRightShift(x: Number, y: Number) Number {
         // 1. Let lnum be ! ToInt32(x).
         const lnum = x.toInt32();
 
@@ -437,7 +435,7 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.11 Number::unsignedRightShift ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-unsignedRightShift
-    pub fn unsignedRightShift(x: Self, y: Self) Self {
+    pub fn unsignedRightShift(x: Number, y: Number) Number {
         // 1. Let lnum be ! ToUint32(x).
         const lnum = x.toUint32();
 
@@ -455,7 +453,7 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.12 Number::lessThan ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-lessThan
-    pub fn lessThan(x: Self, y: Self) ?bool {
+    pub fn lessThan(x: Number, y: Number) ?bool {
         // 1. If x is NaN, return undefined.
         if (x.isNan()) return null;
 
@@ -492,7 +490,7 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.13 Number::equal ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-equal
-    pub fn equal(x: Self, y: Self) bool {
+    pub fn equal(x: Number, y: Number) bool {
         // 1. If x is NaN, return false.
         if (x.isNan()) return false;
 
@@ -508,7 +506,7 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.14 Number::sameValue ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-sameValue
-    pub fn sameValue(x: Self, y: Self) bool {
+    pub fn sameValue(x: Number, y: Number) bool {
         // 1. If x is NaN and y is NaN, return true.
         if (x.isNan() and y.isNan()) return true;
 
@@ -525,7 +523,7 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.15 Number::sameValueZero ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-sameValueZero
-    pub fn sameValueZero(x: Self, y: Self) bool {
+    pub fn sameValueZero(x: Number, y: Number) bool {
         // 1. If x is NaN and y is NaN, return true.
         if (x.isNan() and y.isNan()) return true;
 
@@ -538,7 +536,7 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.16 NumberBitwiseOp ( op, x, y )
     /// https://tc39.es/ecma262/#sec-numberbitwiseop
-    inline fn numberBitwiseOp(comptime op: enum { @"&", @"^", @"|" }, x: Self, y: Self) i32 {
+    inline fn numberBitwiseOp(comptime op: enum { @"&", @"^", @"|" }, x: Number, y: Number) i32 {
         // 1. Let lnum be ! ToInt32(x).
         const lnum = x.toInt32();
 
@@ -572,28 +570,28 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.17 Number::bitwiseAND ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-bitwiseAND
-    pub fn bitwiseAND(x: Self, y: Self) Self {
+    pub fn bitwiseAND(x: Number, y: Number) Number {
         // 1. Return NumberBitwiseOp(&, x, y).
         return .{ .i32 = numberBitwiseOp(.@"&", x, y) };
     }
 
     /// 6.1.6.1.18 Number::bitwiseXOR ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-bitwiseXOR
-    pub fn bitwiseXOR(x: Self, y: Self) Self {
+    pub fn bitwiseXOR(x: Number, y: Number) Number {
         // 1. Return NumberBitwiseOp(^, x, y).
         return .{ .i32 = numberBitwiseOp(.@"^", x, y) };
     }
 
     /// 6.1.6.1.19 Number::bitwiseOR ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-bitwiseOR
-    pub fn bitwiseOR(x: Self, y: Self) Self {
+    pub fn bitwiseOR(x: Number, y: Number) Number {
         // 1. Return NumberBitwiseOp(|, x, y).
         return .{ .i32 = numberBitwiseOp(.@"|", x, y) };
     }
 
     /// 6.1.6.1.20 Number::toString ( x, radix )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-tostring
-    pub fn toString(self: Self, allocator: Allocator, radix: u8) Allocator.Error!String {
+    pub fn toString(self: Number, allocator: Allocator, radix: u8) Allocator.Error!String {
         // 1. If x is NaN, return "NaN".
         if (self.isNan()) return String.fromLiteral("NaN");
 

@@ -18,7 +18,7 @@ const String = types.String;
 const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 
-const Self = @This();
+const ModuleEnvironment = @This();
 
 indirect_bindings: StringHashMap(IndirectBinding),
 
@@ -30,7 +30,7 @@ pub const IndirectBinding = struct {
     binding_name: String,
 };
 
-pub fn hasBinding(self: Self, name: String) bool {
+pub fn hasBinding(self: ModuleEnvironment, name: String) bool {
     // Handled via DeclarativeEnvironment in the spec but with a vague "has a binding", so we need
     // to override the implementation and check the indirect bindings as well.
     return self.indirect_bindings.contains(name) or self.declarative_environment.bindings.contains(name);
@@ -39,7 +39,7 @@ pub fn hasBinding(self: Self, name: String) bool {
 /// 9.1.1.5.1 GetBindingValue ( N, S )
 /// https://tc39.es/ecma262/#sec-module-environment-records-getbindingvalue-n-s
 pub fn getBindingValue(
-    self: Self,
+    self: ModuleEnvironment,
     agent: *Agent,
     name: String,
     strict: bool,
@@ -85,7 +85,7 @@ pub fn getBindingValue(
 
 /// 9.1.1.5.2 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-module-environment-records-deletebinding-n
-pub fn deleteBinding(_: *Self, _: String) bool {
+pub fn deleteBinding(_: *ModuleEnvironment, _: String) bool {
     // The DeleteBinding concrete method of a Module Environment Record is never used within this
     // specification.
     unreachable;
@@ -93,14 +93,14 @@ pub fn deleteBinding(_: *Self, _: String) bool {
 
 /// 9.1.1.5.3 HasThisBinding ( )
 /// https://tc39.es/ecma262/#sec-module-environment-records-hasthisbinding
-pub fn hasThisBinding(_: Self) bool {
+pub fn hasThisBinding(_: ModuleEnvironment) bool {
     // 1. Return true.
     return true;
 }
 
 /// 9.1.1.5.4 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-module-environment-records-getthisbinding
-pub fn getThisBinding(_: Self) Value {
+pub fn getThisBinding(_: ModuleEnvironment) Value {
     // 1. Return undefined.
     return Value.undefined;
 }
@@ -108,7 +108,7 @@ pub fn getThisBinding(_: Self) Value {
 /// 9.1.1.5.5 CreateImportBinding ( N, M, N2 )
 /// https://tc39.es/ecma262/#sec-createimportbinding
 pub fn createImportBinding(
-    self: *Self,
+    self: *ModuleEnvironment,
     name: String,
     module: *SourceTextModule,
     binding_name: String,

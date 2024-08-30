@@ -8,17 +8,17 @@ const types = @import("../../types.zig");
 const PrivateName = types.PrivateName;
 const String = types.String;
 
-const Self = @This();
+const PrivateEnvironment = @This();
 
 /// [[OuterPrivateEnvironment]]
-outer_private_environment: ?*Self,
+outer_private_environment: ?*PrivateEnvironment,
 
 /// [[Names]]
 names: std.StringHashMap(PrivateName),
 
 /// 9.2.1.2 ResolvePrivateIdentifier ( privEnv, identifier )
 /// https://tc39.es/ecma262/#sec-resolve-private-identifier
-pub fn resolvePrivateIdentifier(self: Self, identifier: []const u8) PrivateName {
+pub fn resolvePrivateIdentifier(self: PrivateEnvironment, identifier: []const u8) PrivateName {
     // 1. Let names be privEnv.[[Names]].
     // 2. For each Private Name pn of names, do
     //     a. If pn.[[Description]] is identifier, then

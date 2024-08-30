@@ -21,8 +21,6 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// 7.4.1 Iterator Records
 /// https://tc39.es/ecma262/#sec-iterator-records
 pub const Iterator = struct {
-    const Self = @This();
-
     /// [[Iterator]]
     iterator: Object,
 
@@ -34,7 +32,7 @@ pub const Iterator = struct {
 
     /// 7.4.4 IteratorNext ( iteratorRecord [ , value ] )
     /// https://tc39.es/ecma262/#sec-iteratornext
-    pub fn next(self: *Self, value_: ?Value) Agent.Error!Object {
+    pub fn next(self: *Iterator, value_: ?Value) Agent.Error!Object {
         const agent = self.iterator.agent();
 
         // 1. If value is not present, then
@@ -87,7 +85,7 @@ pub const Iterator = struct {
 
     /// 7.4.7 IteratorStep ( iteratorRecord )
     /// https://tc39.es/ecma262/#sec-iteratorstep
-    pub fn step(self: *Self) Agent.Error!?Object {
+    pub fn step(self: *Iterator) Agent.Error!?Object {
         // 1. Let result be ? IteratorNext(iteratorRecord).
         const result = try next(self, null);
 
@@ -117,7 +115,7 @@ pub const Iterator = struct {
 
     /// 7.4.8 IteratorStepValue ( iteratorRecord )
     /// https://tc39.es/ecma262/#sec-iteratorstepvalue
-    pub fn stepValue(self: *Self) Agent.Error!?Value {
+    pub fn stepValue(self: *Iterator) Agent.Error!?Value {
         // 1. Let result be ? IteratorStep(iteratorRecord).
         const result = try self.step();
 
@@ -142,7 +140,7 @@ pub const Iterator = struct {
 
     /// 7.4.9 IteratorClose ( iteratorRecord, completion )
     /// https://tc39.es/ecma262/#sec-iteratorclose
-    pub fn close(self: Self, completion: anytype) @TypeOf(completion) {
+    pub fn close(self: Iterator, completion: anytype) @TypeOf(completion) {
         const agent = self.iterator.agent();
 
         const completion_exception = agent.exception;
@@ -187,7 +185,7 @@ pub const Iterator = struct {
 
     /// 7.4.14 IteratorToList ( iteratorRecord )
     /// https://tc39.es/ecma262/#sec-iteratortolist
-    pub fn toList(self: *Self) Agent.Error![]const Value {
+    pub fn toList(self: *Iterator) Agent.Error![]const Value {
         const agent = self.iterator.agent();
 
         // 1. Let values be a new empty List.

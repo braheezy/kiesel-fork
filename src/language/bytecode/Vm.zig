@@ -58,7 +58,7 @@ const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
-const Self = @This();
+const Vm = @This();
 
 agent: *Agent,
 ip: usize,
@@ -74,7 +74,7 @@ exception: ?Value = null,
 iterator: ?Iterator = null,
 reference: ?Reference = null,
 
-pub fn init(agent: *Agent) Allocator.Error!Self {
+pub fn init(agent: *Agent) Allocator.Error!Vm {
     const stack = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 32);
     const iterator_stack = std.ArrayList(Iterator).init(agent.gc_allocator);
     const lexical_environment_stack = std.ArrayList(Environment).init(agent.gc_allocator);
@@ -95,7 +95,7 @@ pub fn init(agent: *Agent) Allocator.Error!Self {
     };
 }
 
-pub fn deinit(self: Self) void {
+pub fn deinit(self: Vm) void {
     self.stack.deinit();
     self.iterator_stack.deinit();
     self.lexical_environment_stack.deinit();
@@ -105,35 +105,35 @@ pub fn deinit(self: Self) void {
     self.environment_lookup_cache.deinit();
 }
 
-fn fetchInstruction(self: *Self, executable: Executable) ?Instruction {
+fn fetchInstruction(self: *Vm, executable: Executable) ?Instruction {
     const instructions = executable.instructions.items;
     if (self.ip >= instructions.len) return null;
     defer self.ip += 1;
     return instructions[self.ip];
 }
 
-fn fetchConstant(self: *Self, executable: Executable) Value {
+fn fetchConstant(self: *Vm, executable: Executable) Value {
     const index = self.fetchIndex(executable);
     return executable.constants.unmanaged.entries.get(index).key;
 }
 
-fn fetchIdentifier(self: *Self, executable: Executable) String {
+fn fetchIdentifier(self: *Vm, executable: Executable) String {
     const index = self.fetchIndex(executable);
     return executable.identifiers.unmanaged.entries.get(index).key;
 }
 
-fn fetchAstNode(self: *Self, executable: Executable) *Executable.AstNode {
+fn fetchAstNode(self: *Vm, executable: Executable) *Executable.AstNode {
     const index = self.fetchIndex(executable);
     return &executable.ast_nodes.items[index];
 }
 
-fn fetchIndex(self: *Self, executable: Executable) Executable.IndexType {
+fn fetchIndex(self: *Vm, executable: Executable) Executable.IndexType {
     const b1 = @intFromEnum(self.fetchInstruction(executable).?);
     const b2 = @intFromEnum(self.fetchInstruction(executable).?);
     return std.mem.bytesToValue(Executable.IndexType, &[_]u8{ b1, b2 });
 }
 
-fn getArgumentSpreadIndices(self: *Self) Allocator.Error![]const usize {
+fn getArgumentSpreadIndices(self: *Vm) Allocator.Error![]const usize {
     const value = self.stack.pop();
     if (value.isUndefined()) return &.{};
     const array = value.asObject();
@@ -148,7 +148,7 @@ fn getArgumentSpreadIndices(self: *Self) Allocator.Error![]const usize {
     return argument_spread_indices.toOwnedSlice();
 }
 
-fn getArguments(self: *Self, argument_count: usize) Agent.Error![]const Value {
+fn getArguments(self: *Vm, argument_count: usize) Agent.Error![]const Value {
     self.function_arguments.clearRetainingCapacity();
     try self.function_arguments.ensureTotalCapacity(argument_count); // May still resize when spreading
     const argument_spread_indices = try self.getArgumentSpreadIndices();
@@ -168,7 +168,7 @@ fn getArguments(self: *Self, argument_count: usize) Agent.Error![]const Value {
     return self.function_arguments.items;
 }
 
-fn executeApplyStringOrNumericBinaryOperator(self: *Self, executable: Executable) Agent.Error!void {
+fn executeApplyStringOrNumericBinaryOperator(self: *Vm, executable: Executable) Agent.Error!void {
     const operator_type = self.fetchIndex(executable);
     const operator: ast.BinaryExpression.Operator = @enumFromInt(operator_type);
     const rval = self.stack.pop();
@@ -176,11 +176,11 @@ fn executeApplyStringOrNumericBinaryOperator(self: *Self, executable: Executable
     self.result = try applyStringOrNumericBinaryOperator(self.agent, lval, operator, rval);
 }
 
-fn executeArrayCreate(self: *Self, _: Executable) Agent.Error!void {
+fn executeArrayCreate(self: *Vm, _: Executable) Agent.Error!void {
     self.result = Value.from(try arrayCreate(self.agent, 0, null));
 }
 
-fn executeArrayPushValue(self: *Self, _: Executable) Agent.Error!void {
+fn executeArrayPushValue(self: *Vm, _: Executable) Agent.Error!void {
     const init_value = self.stack.pop();
     const array = self.stack.pop().asObject();
     const index = getArrayLength(array);
@@ -193,7 +193,7 @@ fn executeArrayPushValue(self: *Self, _: Executable) Agent.Error!void {
     self.result = Value.from(array);
 }
 
-fn executeArraySetLength(self: *Self, executable: Executable) Agent.Error!void {
+fn executeArraySetLength(self: *Vm, executable: Executable) Agent.Error!void {
     const length = self.fetchIndex(executable);
     const array = self.result.?.asObject();
     // From ArrayAccumulation:
@@ -201,7 +201,7 @@ fn executeArraySetLength(self: *Self, executable: Executable) Agent.Error!void {
     try array.set(PropertyKey.from("length"), Value.from(length), .throw);
 }
 
-fn executeArraySpreadValue(self: *Self, _: Executable) Agent.Error!void {
+fn executeArraySpreadValue(self: *Vm, _: Executable) Agent.Error!void {
     const spread_obj = self.stack.pop();
     const array = self.stack.pop().asObject();
     var next_index: u53 = @intCast(getArrayLength(array));
@@ -225,17 +225,17 @@ fn executeArraySpreadValue(self: *Self, _: Executable) Agent.Error!void {
     self.result = Value.from(array);
 }
 
-fn executeAwait(self: *Self, _: Executable) Agent.Error!void {
+fn executeAwait(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
     self.result = try @"await"(self.agent, value);
 }
 
-fn executeBindingClassDeclarationEvaluation(self: *Self, executable: Executable) Agent.Error!void {
+fn executeBindingClassDeclarationEvaluation(self: *Vm, executable: Executable) Agent.Error!void {
     const class_declaration = self.fetchAstNode(executable).class_declaration;
     self.result = Value.from(try bindingClassDeclarationEvaluation(self.agent, class_declaration));
 }
 
-fn executeBitwiseNot(self: *Self, _: Executable) Agent.Error!void {
+fn executeBitwiseNot(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
     self.result = switch (value.type()) {
         .number => Value.from(value.asNumber().bitwiseNOT()),
@@ -244,7 +244,7 @@ fn executeBitwiseNot(self: *Self, _: Executable) Agent.Error!void {
     };
 }
 
-fn executeBlockDeclarationInstantiation(self: *Self, executable: Executable) Agent.Error!void {
+fn executeBlockDeclarationInstantiation(self: *Vm, executable: Executable) Agent.Error!void {
     const block = self.fetchAstNode(executable);
     const old_env = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
     const block_env = try newDeclarativeEnvironment(self.agent.gc_allocator, old_env);
@@ -264,7 +264,7 @@ fn executeBlockDeclarationInstantiation(self: *Self, executable: Executable) Age
 
 /// 15.7.16 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-class-definitions-runtime-semantics-evaluation
-fn executeClassDefinitionEvaluation(self: *Self, executable: Executable) Agent.Error!void {
+fn executeClassDefinitionEvaluation(self: *Vm, executable: Executable) Agent.Error!void {
     const class_expression = self.fetchAstNode(executable).class_expression;
 
     // ClassExpression : class BindingIdentifier ClassTail
@@ -314,7 +314,7 @@ fn executeClassDefinitionEvaluation(self: *Self, executable: Executable) Agent.E
     }
 }
 
-fn executeCreateCatchBinding(self: *Self, executable: Executable) Agent.Error!void {
+fn executeCreateCatchBinding(self: *Vm, executable: Executable) Agent.Error!void {
     // TODO: This should create a new environment - for now we approximate this by creating
     //       a new binding and ignoring the error if one already exists.
     const name = self.fetchIdentifier(executable);
@@ -335,7 +335,7 @@ fn executeCreateCatchBinding(self: *Self, executable: Executable) Agent.Error!vo
     }
 }
 
-fn executeCreateObjectPropertyIterator(self: *Self, _: Executable) Agent.Error!void {
+fn executeCreateObjectPropertyIterator(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
 
     // From ForIn/OfHeadEvaluation:
@@ -352,7 +352,7 @@ fn executeCreateObjectPropertyIterator(self: *Self, _: Executable) Agent.Error!v
     self.iterator = .{ .iterator = iterator, .next_method = next_method, .done = false };
 }
 
-fn executeCreateWithEnvironment(self: *Self, _: Executable) Agent.Error!void {
+fn executeCreateWithEnvironment(self: *Vm, _: Executable) Agent.Error!void {
     const object = self.result.?.asObject();
     const old_env = self.lexical_environment_stack.getLast();
     const new_env: Environment = .{
@@ -366,7 +366,7 @@ fn executeCreateWithEnvironment(self: *Self, _: Executable) Agent.Error!void {
     self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = new_env;
 }
 
-fn executeDecrement(self: *Self, _: Executable) Agent.Error!void {
+fn executeDecrement(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
     self.result = switch (value.type()) {
         .number => Value.from(value.asNumber().subtract(.{ .i32 = 1 })),
@@ -379,7 +379,7 @@ fn executeDecrement(self: *Self, _: Executable) Agent.Error!void {
 
 /// 13.5.1.2 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-delete-operator-runtime-semantics-evaluation
-fn executeDelete(self: *Self, _: Executable) Agent.Error!void {
+fn executeDelete(self: *Vm, _: Executable) Agent.Error!void {
     // NOTE: 1-2. are part of the generated bytecode.
     const reference = self.reference.?;
 
@@ -440,7 +440,7 @@ fn executeDelete(self: *Self, _: Executable) Agent.Error!void {
     }
 }
 
-fn executeEvaluateCall(self: *Self, executable: Executable) Agent.Error!void {
+fn executeEvaluateCall(self: *Vm, executable: Executable) Agent.Error!void {
     const maybe_reference = self.reference_stack.getLastOrNull() orelse null;
     const argument_count = self.fetchIndex(executable);
     const strict = self.fetchIndex(executable) == 1;
@@ -477,7 +477,7 @@ fn executeEvaluateCall(self: *Self, executable: Executable) Agent.Error!void {
 
 /// 13.3.10.1 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-import-call-runtime-semantics-evaluation
-fn executeEvaluateImportCall(self: *Self, _: Executable) Agent.Error!void {
+fn executeEvaluateImportCall(self: *Vm, _: Executable) Agent.Error!void {
     const realm = self.agent.currentRealm();
 
     // 1. Let referrer be GetActiveScriptOrModule().
@@ -520,7 +520,7 @@ fn executeEvaluateImportCall(self: *Self, _: Executable) Agent.Error!void {
     self.result = Value.from(promise_capability.promise);
 }
 
-fn executeEvaluateNew(self: *Self, executable: Executable) Agent.Error!void {
+fn executeEvaluateNew(self: *Vm, executable: Executable) Agent.Error!void {
     const argument_count = self.fetchIndex(executable);
     const arguments = try self.getArguments(argument_count);
     const constructor = self.stack.pop();
@@ -529,7 +529,7 @@ fn executeEvaluateNew(self: *Self, executable: Executable) Agent.Error!void {
 
 /// 13.3.3 EvaluatePropertyAccessWithExpressionKey ( baseValue, expression, strict )
 /// https://tc39.es/ecma262/#sec-evaluate-property-access-with-expression-key
-fn executeEvaluatePropertyAccessWithExpressionKey(self: *Self, executable: Executable) Agent.Error!void {
+fn executeEvaluatePropertyAccessWithExpressionKey(self: *Vm, executable: Executable) Agent.Error!void {
     // 1. Let propertyNameReference be ? Evaluation of expression.
     // 2. Let propertyNameValue be ? GetValue(propertyNameReference).
     const property_name_value = self.stack.pop();
@@ -557,7 +557,7 @@ fn executeEvaluatePropertyAccessWithExpressionKey(self: *Self, executable: Execu
 
 /// 13.3.4 EvaluatePropertyAccessWithIdentifierKey ( baseValue, identifierName, strict )
 /// https://tc39.es/ecma262/#sec-evaluate-property-access-with-identifier-key
-fn executeEvaluatePropertyAccessWithIdentifierKey(self: *Self, executable: Executable) Agent.Error!void {
+fn executeEvaluatePropertyAccessWithIdentifierKey(self: *Vm, executable: Executable) Agent.Error!void {
     // 1. Let propertyNameString be the StringValue of identifierName.
     const property_name_string = self.fetchIdentifier(executable);
 
@@ -582,7 +582,7 @@ fn executeEvaluatePropertyAccessWithIdentifierKey(self: *Self, executable: Execu
 
 /// 13.3.7.1 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-super-keyword-runtime-semantics-evaluation
-fn executeEvaluateSuperCall(self: *Self, executable: Executable) Agent.Error!void {
+fn executeEvaluateSuperCall(self: *Vm, executable: Executable) Agent.Error!void {
     const argument_count = self.fetchIndex(executable);
 
     // 1. Let newTarget be GetNewTarget().
@@ -626,7 +626,7 @@ fn executeEvaluateSuperCall(self: *Self, executable: Executable) Agent.Error!voi
     self.result = Value.from(result);
 }
 
-fn executeForDeclarationBindingInstantiation(self: *Self, executable: Executable) Agent.Error!void {
+fn executeForDeclarationBindingInstantiation(self: *Vm, executable: Executable) Agent.Error!void {
     const lexical_declaration = self.fetchAstNode(executable).lexical_declaration;
 
     // From ForIn/OfBodyEvaluation:
@@ -674,12 +674,12 @@ fn executeForDeclarationBindingInstantiation(self: *Self, executable: Executable
     };
 }
 
-fn executeGetIterator(self: *Self, executable: Executable) Agent.Error!void {
+fn executeGetIterator(self: *Vm, executable: Executable) Agent.Error!void {
     const iterator_kind: IteratorKind = @enumFromInt((self.fetchIndex(executable)));
     self.iterator = try getIterator(self.agent, self.result.?, iterator_kind);
 }
 
-fn executeGetNewTarget(self: *Self, _: Executable) Agent.Error!void {
+fn executeGetNewTarget(self: *Vm, _: Executable) Agent.Error!void {
     self.result = if (self.agent.getNewTarget()) |new_target|
         Value.from(new_target)
     else
@@ -688,7 +688,7 @@ fn executeGetNewTarget(self: *Self, _: Executable) Agent.Error!void {
 
 /// 13.3.12.1 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-meta-properties-runtime-semantics-evaluation
-fn executeGetOrCreateImportMeta(self: *Self, _: Executable) Agent.Error!void {
+fn executeGetOrCreateImportMeta(self: *Vm, _: Executable) Agent.Error!void {
     // 1. Let module be GetActiveScriptOrModule().
     // 2. Assert: module is a Source Text Module Record.
     var module = self.agent.getActiveScriptOrModule().?.module;
@@ -730,17 +730,17 @@ fn executeGetOrCreateImportMeta(self: *Self, _: Executable) Agent.Error!void {
     }
 }
 
-fn executeGetTemplateObject(self: *Self, executable: Executable) Agent.Error!void {
+fn executeGetTemplateObject(self: *Vm, executable: Executable) Agent.Error!void {
     const template_literal = &self.fetchAstNode(executable).template_literal;
     self.result = Value.from(try getTemplateObject(self.agent, template_literal));
 }
 
-fn executeGetValue(self: *Self, _: Executable) Agent.Error!void {
+fn executeGetValue(self: *Vm, _: Executable) Agent.Error!void {
     if (self.reference) |reference| self.result = try reference.getValue(self.agent);
     self.reference = null;
 }
 
-fn executeGreaterThan(self: *Self, _: Executable) Agent.Error!void {
+fn executeGreaterThan(self: *Vm, _: Executable) Agent.Error!void {
     const rval = self.stack.pop();
     const lval = self.stack.pop();
 
@@ -751,7 +751,7 @@ fn executeGreaterThan(self: *Self, _: Executable) Agent.Error!void {
     self.result = Value.from(result orelse false);
 }
 
-fn executeGreaterThanEquals(self: *Self, _: Executable) Agent.Error!void {
+fn executeGreaterThanEquals(self: *Vm, _: Executable) Agent.Error!void {
     const rval = self.stack.pop();
     const lval = self.stack.pop();
 
@@ -762,7 +762,7 @@ fn executeGreaterThanEquals(self: *Self, _: Executable) Agent.Error!void {
     self.result = Value.from(!(result orelse true));
 }
 
-fn executeHasPrivateElement(self: *Self, executable: Executable) Agent.Error!void {
+fn executeHasPrivateElement(self: *Vm, executable: Executable) Agent.Error!void {
     const private_identifier = self.fetchIdentifier(executable);
     const rval = self.stack.pop();
 
@@ -788,7 +788,7 @@ fn executeHasPrivateElement(self: *Self, executable: Executable) Agent.Error!voi
     self.result = Value.from(rval.asObject().privateElementFind(private_name) != null);
 }
 
-fn executeHasProperty(self: *Self, _: Executable) Agent.Error!void {
+fn executeHasProperty(self: *Vm, _: Executable) Agent.Error!void {
     const rval = self.stack.pop();
     const lval = self.stack.pop();
 
@@ -807,7 +807,7 @@ fn executeHasProperty(self: *Self, _: Executable) Agent.Error!void {
     );
 }
 
-fn executeIncrement(self: *Self, _: Executable) Agent.Error!void {
+fn executeIncrement(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
     self.result = switch (value.type()) {
         .number => Value.from(value.asNumber().add(.{ .i32 = 1 })),
@@ -818,7 +818,7 @@ fn executeIncrement(self: *Self, _: Executable) Agent.Error!void {
     };
 }
 
-fn executeInitializeDefaultExport(self: *Self, _: Executable) Agent.Error!void {
+fn executeInitializeDefaultExport(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
 
     // 3. Let env be the running execution context's LexicalEnvironment.
@@ -833,14 +833,14 @@ fn executeInitializeDefaultExport(self: *Self, _: Executable) Agent.Error!void {
     );
 }
 
-fn executeInitializeReferencedBinding(self: *Self, _: Executable) Agent.Error!void {
+fn executeInitializeReferencedBinding(self: *Vm, _: Executable) Agent.Error!void {
     const reference = self.reference_stack.getLast().?;
     const value = self.result.?;
     try reference.initializeReferencedBinding(self.agent, value);
     self.reference = null;
 }
 
-fn executeInstanceofOperator(self: *Self, _: Executable) Agent.Error!void {
+fn executeInstanceofOperator(self: *Vm, _: Executable) Agent.Error!void {
     const rval = self.stack.pop();
     const lval = self.stack.pop();
 
@@ -848,7 +848,7 @@ fn executeInstanceofOperator(self: *Self, _: Executable) Agent.Error!void {
     self.result = Value.from(try lval.instanceofOperator(self.agent, rval));
 }
 
-fn executeInstantiateArrowFunctionExpression(self: *Self, executable: Executable) Agent.Error!void {
+fn executeInstantiateArrowFunctionExpression(self: *Vm, executable: Executable) Agent.Error!void {
     const arrow_function = self.fetchAstNode(executable).arrow_function;
     const closure = try instantiateArrowFunctionExpression(
         self.agent,
@@ -858,7 +858,7 @@ fn executeInstantiateArrowFunctionExpression(self: *Self, executable: Executable
     self.result = Value.from(closure);
 }
 
-fn executeInstantiateAsyncArrowFunctionExpression(self: *Self, executable: Executable) Agent.Error!void {
+fn executeInstantiateAsyncArrowFunctionExpression(self: *Vm, executable: Executable) Agent.Error!void {
     const async_arrow_function = self.fetchAstNode(executable).async_arrow_function;
     const closure = try instantiateAsyncArrowFunctionExpression(
         self.agent,
@@ -868,7 +868,7 @@ fn executeInstantiateAsyncArrowFunctionExpression(self: *Self, executable: Execu
     self.result = Value.from(closure);
 }
 
-fn executeInstantiateAsyncFunctionExpression(self: *Self, executable: Executable) Agent.Error!void {
+fn executeInstantiateAsyncFunctionExpression(self: *Vm, executable: Executable) Agent.Error!void {
     const async_function_expression = self.fetchAstNode(executable).async_function_expression;
     const closure = try instantiateAsyncFunctionExpression(
         self.agent,
@@ -878,7 +878,7 @@ fn executeInstantiateAsyncFunctionExpression(self: *Self, executable: Executable
     self.result = Value.from(closure);
 }
 
-fn executeInstantiateAsyncGeneratorFunctionExpression(self: *Self, executable: Executable) Agent.Error!void {
+fn executeInstantiateAsyncGeneratorFunctionExpression(self: *Vm, executable: Executable) Agent.Error!void {
     const async_generator_expression = self.fetchAstNode(executable).async_generator_expression;
     const closure = try instantiateAsyncGeneratorFunctionExpression(
         self.agent,
@@ -888,7 +888,7 @@ fn executeInstantiateAsyncGeneratorFunctionExpression(self: *Self, executable: E
     self.result = Value.from(closure);
 }
 
-fn executeInstantiateGeneratorFunctionExpression(self: *Self, executable: Executable) Agent.Error!void {
+fn executeInstantiateGeneratorFunctionExpression(self: *Vm, executable: Executable) Agent.Error!void {
     const generator_expression = self.fetchAstNode(executable).generator_expression;
     const closure = try instantiateGeneratorFunctionExpression(
         self.agent,
@@ -898,7 +898,7 @@ fn executeInstantiateGeneratorFunctionExpression(self: *Self, executable: Execut
     self.result = Value.from(closure);
 }
 
-fn executeInstantiateOrdinaryFunctionExpression(self: *Self, executable: Executable) Agent.Error!void {
+fn executeInstantiateOrdinaryFunctionExpression(self: *Vm, executable: Executable) Agent.Error!void {
     const function_expression = self.fetchAstNode(executable).function_expression;
     const closure = try instantiateOrdinaryFunctionExpression(
         self.agent,
@@ -908,7 +908,7 @@ fn executeInstantiateOrdinaryFunctionExpression(self: *Self, executable: Executa
     self.result = Value.from(closure);
 }
 
-fn executeIsLooselyEqual(self: *Self, _: Executable) Agent.Error!void {
+fn executeIsLooselyEqual(self: *Vm, _: Executable) Agent.Error!void {
     const rval = self.stack.pop();
     const lval = self.stack.pop();
 
@@ -916,7 +916,7 @@ fn executeIsLooselyEqual(self: *Self, _: Executable) Agent.Error!void {
     self.result = Value.from(try isLooselyEqual(self.agent, rval, lval));
 }
 
-fn executeIsStrictlyEqual(self: *Self, _: Executable) Agent.Error!void {
+fn executeIsStrictlyEqual(self: *Vm, _: Executable) Agent.Error!void {
     const rval = self.stack.pop();
     const lval = self.stack.pop();
 
@@ -924,18 +924,18 @@ fn executeIsStrictlyEqual(self: *Self, _: Executable) Agent.Error!void {
     self.result = Value.from(isStrictlyEqual(rval, lval));
 }
 
-fn executeJump(self: *Self, executable: Executable) Agent.Error!void {
+fn executeJump(self: *Vm, executable: Executable) Agent.Error!void {
     self.ip = self.fetchIndex(executable);
 }
 
-fn executeJumpConditional(self: *Self, executable: Executable) Agent.Error!void {
+fn executeJumpConditional(self: *Vm, executable: Executable) Agent.Error!void {
     const ip_consequent = self.fetchIndex(executable);
     const ip_alternate = self.fetchIndex(executable);
     const value = self.result.?;
     self.ip = if (value.toBoolean()) ip_consequent else ip_alternate;
 }
 
-fn executeLessThan(self: *Self, _: Executable) Agent.Error!void {
+fn executeLessThan(self: *Vm, _: Executable) Agent.Error!void {
     const rval = self.stack.pop();
     const lval = self.stack.pop();
 
@@ -946,7 +946,7 @@ fn executeLessThan(self: *Self, _: Executable) Agent.Error!void {
     self.result = Value.from(result orelse false);
 }
 
-fn executeLessThanEquals(self: *Self, _: Executable) Agent.Error!void {
+fn executeLessThanEquals(self: *Vm, _: Executable) Agent.Error!void {
     const rval = self.stack.pop();
     const lval = self.stack.pop();
 
@@ -957,29 +957,29 @@ fn executeLessThanEquals(self: *Self, _: Executable) Agent.Error!void {
     self.result = Value.from(!(result orelse true));
 }
 
-fn executeLoad(self: *Self, _: Executable) Agent.Error!void {
+fn executeLoad(self: *Vm, _: Executable) Agent.Error!void {
     // Handle null value to allow load of 'empty' result at beginning of script
     if (self.result) |value| try self.stack.append(value);
 }
 
-fn executeLoadConstant(self: *Self, executable: Executable) Agent.Error!void {
+fn executeLoadConstant(self: *Vm, executable: Executable) Agent.Error!void {
     const value = self.fetchConstant(executable);
     try self.stack.append(value);
 }
 
-fn executeLoadIteratorNextArgs(self: *Self, _: Executable) Agent.Error!void {
+fn executeLoadIteratorNextArgs(self: *Vm, _: Executable) Agent.Error!void {
     const iterator = self.iterator_stack.getLast();
     try self.stack.append(iterator.next_method);
     try self.stack.append(Value.from(iterator.iterator));
 }
 
-fn executeLoadThisValueForEvaluateCall(self: *Self, _: Executable) Agent.Error!void {
+fn executeLoadThisValueForEvaluateCall(self: *Vm, _: Executable) Agent.Error!void {
     const maybe_reference = self.reference_stack.getLast();
     const this_value = evaluateCallGetThisValue(maybe_reference);
     try self.stack.append(this_value);
 }
 
-fn executeLoadThisValueForMakeSuperPropertyReference(self: *Self, _: Executable) Agent.Error!void {
+fn executeLoadThisValueForMakeSuperPropertyReference(self: *Vm, _: Executable) Agent.Error!void {
     // 1. Let env be GetThisEnvironment().
     const env = self.agent.getThisEnvironment();
 
@@ -989,14 +989,14 @@ fn executeLoadThisValueForMakeSuperPropertyReference(self: *Self, _: Executable)
     try self.stack.append(actual_this);
 }
 
-fn executeLogicalNot(self: *Self, _: Executable) Agent.Error!void {
+fn executeLogicalNot(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
     self.result = Value.from(!value.toBoolean());
 }
 
 /// 6.2.5.9 MakePrivateReference ( baseValue, privateIdentifier )
 /// https://tc39.es/ecma262/#sec-makeprivatereference
-fn executeMakePrivateReference(self: *Self, executable: Executable) Agent.Error!void {
+fn executeMakePrivateReference(self: *Vm, executable: Executable) Agent.Error!void {
     const private_identifier = self.fetchIdentifier(executable);
     const base_value = self.stack.pop();
 
@@ -1022,7 +1022,7 @@ fn executeMakePrivateReference(self: *Self, executable: Executable) Agent.Error!
 
 /// 13.3.7.3 MakeSuperPropertyReference ( actualThis, propertyKey, strict )
 /// https://tc39.es/ecma262/#sec-makesuperpropertyreference
-fn executeMakeSuperPropertyReference(self: *Self, executable: Executable) Agent.Error!void {
+fn executeMakeSuperPropertyReference(self: *Vm, executable: Executable) Agent.Error!void {
     const property_key = self.stack.pop();
     const strict = self.fetchIndex(executable) == 1;
     const actual_this = self.stack.pop();
@@ -1047,7 +1047,7 @@ fn executeMakeSuperPropertyReference(self: *Self, executable: Executable) Agent.
     };
 }
 
-fn executeObjectCreate(self: *Self, _: Executable) Agent.Error!void {
+fn executeObjectCreate(self: *Vm, _: Executable) Agent.Error!void {
     const object = try ordinaryObjectCreate(
         self.agent,
         try self.agent.currentRealm().intrinsics.@"%Object.prototype%"(),
@@ -1055,7 +1055,7 @@ fn executeObjectCreate(self: *Self, _: Executable) Agent.Error!void {
     self.result = Value.from(object);
 }
 
-fn executeObjectDefineMethod(self: *Self, executable: Executable) Agent.Error!void {
+fn executeObjectDefineMethod(self: *Vm, executable: Executable) Agent.Error!void {
     const function_or_class = self.fetchAstNode(executable);
     const method_type: ast.MethodDefinition.Type = @enumFromInt((self.fetchIndex(executable)));
     const method = switch (method_type) {
@@ -1081,7 +1081,7 @@ fn executeObjectDefineMethod(self: *Self, executable: Executable) Agent.Error!vo
     self.result = Value.from(object);
 }
 
-fn executeObjectSetProperty(self: *Self, _: Executable) Agent.Error!void {
+fn executeObjectSetProperty(self: *Vm, _: Executable) Agent.Error!void {
     const property_value = self.stack.pop();
     const property_name = try self.stack.pop().toPropertyKey(self.agent);
     const object = self.stack.pop().asObject();
@@ -1091,7 +1091,7 @@ fn executeObjectSetProperty(self: *Self, _: Executable) Agent.Error!void {
     self.result = Value.from(object);
 }
 
-fn executeObjectSpreadValue(self: *Self, _: Executable) Agent.Error!void {
+fn executeObjectSpreadValue(self: *Vm, _: Executable) Agent.Error!void {
     const from_value = self.stack.pop();
     var object = self.stack.pop().asObject();
     const excluded_names: []const PropertyKey = &.{};
@@ -1101,54 +1101,54 @@ fn executeObjectSpreadValue(self: *Self, _: Executable) Agent.Error!void {
     self.result = Value.from(object);
 }
 
-fn executePopExceptionJumpTarget(self: *Self, _: Executable) Agent.Error!void {
+fn executePopExceptionJumpTarget(self: *Vm, _: Executable) Agent.Error!void {
     _ = self.exception_jump_target_stack.pop();
 }
 
-fn executePopIterator(self: *Self, _: Executable) Agent.Error!void {
+fn executePopIterator(self: *Vm, _: Executable) Agent.Error!void {
     _ = self.iterator_stack.pop();
 }
 
-fn executePopLexicalEnvironment(self: *Self, _: Executable) Agent.Error!void {
+fn executePopLexicalEnvironment(self: *Vm, _: Executable) Agent.Error!void {
     _ = self.lexical_environment_stack.pop();
 }
 
-fn executePopReference(self: *Self, _: Executable) Agent.Error!void {
+fn executePopReference(self: *Vm, _: Executable) Agent.Error!void {
     _ = self.reference_stack.pop();
 }
 
-fn executePushLexicalEnvironment(self: *Self, _: Executable) Agent.Error!void {
+fn executePushLexicalEnvironment(self: *Vm, _: Executable) Agent.Error!void {
     const lexical_environment = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
     try self.lexical_environment_stack.append(lexical_environment);
 }
 
-fn executePushExceptionJumpTarget(self: *Self, executable: Executable) Agent.Error!void {
+fn executePushExceptionJumpTarget(self: *Vm, executable: Executable) Agent.Error!void {
     const jump_target = self.fetchIndex(executable);
     try self.exception_jump_target_stack.append(jump_target);
 }
 
-fn executePushIterator(self: *Self, _: Executable) Agent.Error!void {
+fn executePushIterator(self: *Vm, _: Executable) Agent.Error!void {
     try self.iterator_stack.append(self.iterator.?);
 }
 
-fn executePushReference(self: *Self, _: Executable) Agent.Error!void {
+fn executePushReference(self: *Vm, _: Executable) Agent.Error!void {
     try self.reference_stack.append(self.reference);
 }
 
-fn executePutValue(self: *Self, _: Executable) Agent.Error!void {
+fn executePutValue(self: *Vm, _: Executable) Agent.Error!void {
     const lref = self.reference_stack.getLast().?;
     const rval = self.result.?;
     try lref.putValue(self.agent, rval);
     self.reference = null;
 }
 
-fn executeRegExpCreate(self: *Self, _: Executable) Agent.Error!void {
+fn executeRegExpCreate(self: *Vm, _: Executable) Agent.Error!void {
     const flags = self.stack.pop();
     const pattern = self.stack.pop();
     self.result = Value.from(try builtins.regExpCreate(self.agent, pattern, flags));
 }
 
-fn executeResolveBinding(self: *Self, executable: Executable) Agent.Error!void {
+fn executeResolveBinding(self: *Vm, executable: Executable) Agent.Error!void {
     const name = self.fetchIdentifier(executable);
     const strict = self.fetchIndex(executable) == 1;
     const environment_lookup_cache_index = self.fetchIndex(executable);
@@ -1160,7 +1160,7 @@ fn executeResolveBinding(self: *Self, executable: Executable) Agent.Error!void {
 
 /// 15.7.16 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-class-definitions-runtime-semantics-evaluation
-fn executeResolvePrivateIdentifier(self: *Self, executable: Executable) Agent.Error!void {
+fn executeResolvePrivateIdentifier(self: *Vm, executable: Executable) Agent.Error!void {
     // 1. Let privateIdentifier be the StringValue of PrivateIdentifier.
     const private_identifier = self.fetchIdentifier(executable);
 
@@ -1178,48 +1178,48 @@ fn executeResolvePrivateIdentifier(self: *Self, executable: Executable) Agent.Er
     self.result = Value.from(private_name.symbol);
 }
 
-fn executeResolveThisBinding(self: *Self, _: Executable) Agent.Error!void {
+fn executeResolveThisBinding(self: *Vm, _: Executable) Agent.Error!void {
     self.result = try self.agent.resolveThisBinding();
 }
 
-fn executeRestoreLexicalEnvironment(self: *Self, _: Executable) Agent.Error!void {
+fn executeRestoreLexicalEnvironment(self: *Vm, _: Executable) Agent.Error!void {
     const lexical_environment = self.lexical_environment_stack.getLast();
     self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = lexical_environment;
 }
 
-fn executeRethrowExceptionIfAny(self: *Self, _: Executable) Agent.Error!void {
+fn executeRethrowExceptionIfAny(self: *Vm, _: Executable) Agent.Error!void {
     if (self.exception) |value| {
         self.agent.exception = value;
         return error.ExceptionThrown;
     }
 }
 
-fn executeReturn(_: *Self, _: Executable) Agent.Error!void {
+fn executeReturn(_: *Vm, _: Executable) Agent.Error!void {
     @compileError("Should not be used"); // Handled in run()
 }
 
-fn executeStore(self: *Self, _: Executable) Agent.Error!void {
+fn executeStore(self: *Vm, _: Executable) Agent.Error!void {
     // Handle empty stack to allow restoring a null `.load`
     self.result = self.stack.popOrNull();
 }
 
-fn executeStoreConstant(self: *Self, executable: Executable) Agent.Error!void {
+fn executeStoreConstant(self: *Vm, executable: Executable) Agent.Error!void {
     const value = self.fetchConstant(executable);
     self.result = value;
 }
 
-fn executeThrow(self: *Self, _: Executable) Agent.Error!void {
+fn executeThrow(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
     self.agent.exception = value;
     return error.ExceptionThrown;
 }
 
-fn executeToNumber(self: *Self, _: Executable) Agent.Error!void {
+fn executeToNumber(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
     self.result = Value.from(try value.toNumber(self.agent));
 }
 
-fn executeToNumeric(self: *Self, _: Executable) Agent.Error!void {
+fn executeToNumeric(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
     const numeric = try value.toNumeric(self.agent);
     self.result = switch (numeric) {
@@ -1228,19 +1228,19 @@ fn executeToNumeric(self: *Self, _: Executable) Agent.Error!void {
     };
 }
 
-fn executeToObject(self: *Self, _: Executable) Agent.Error!void {
+fn executeToObject(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
     self.result = Value.from(try value.toObject(self.agent));
 }
 
-fn executeToString(self: *Self, _: Executable) Agent.Error!void {
+fn executeToString(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
     self.result = Value.from(try value.toString(self.agent));
 }
 
 /// 13.5.3.1 Runtime Semantics: Evaluation
 /// https://tc39.es/ecma262/#sec-typeof-operator-runtime-semantics-evaluation
-fn executeTypeof(self: *Self, _: Executable) Agent.Error!void {
+fn executeTypeof(self: *Vm, _: Executable) Agent.Error!void {
     // 1. Let val be ? Evaluation of UnaryExpression.
     // NOTE: This is part of the generated bytecode.
 
@@ -1301,7 +1301,7 @@ fn executeTypeof(self: *Self, _: Executable) Agent.Error!void {
     };
 }
 
-fn executeUnaryMinus(self: *Self, _: Executable) Agent.Error!void {
+fn executeUnaryMinus(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
     self.result = switch (value.type()) {
         .number => Value.from(value.asNumber().unaryMinus()),
@@ -1310,12 +1310,12 @@ fn executeUnaryMinus(self: *Self, _: Executable) Agent.Error!void {
     };
 }
 
-pub fn run(self: *Self, executable: Executable) Agent.Error!Completion {
+pub fn run(self: *Vm, executable: Executable) Agent.Error!Completion {
     try self.environment_lookup_cache.resize(executable.environment_lookup_cache_size);
     @memset(self.environment_lookup_cache.items, null);
     while (@call(
         .always_inline,
-        Self.fetchInstruction,
+        Vm.fetchInstruction,
         .{ self, executable },
     )) |instruction| {
         (switch (instruction) {

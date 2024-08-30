@@ -47,8 +47,6 @@ pub fn MakeObject(
     };
 
     return struct {
-        const Self = @This();
-
         pub const Fields = options.Fields;
         pub const tag = options.tag;
 
@@ -56,7 +54,7 @@ pub fn MakeObject(
         data: Data,
 
         pub fn create(agent: *Agent, args: Args) Allocator.Error!Object {
-            const self = try agent.gc_allocator.create(Self);
+            const self = try agent.gc_allocator.create(@This());
             self.* = .{
                 .fields = if (has_fields) args.fields,
                 .data = .{
@@ -73,7 +71,7 @@ pub fn MakeObject(
             return self.object();
         }
 
-        pub fn object(self: *Self) Object {
+        pub fn object(self: *@This()) Object {
             return .{
                 .data = &self.data,
             };

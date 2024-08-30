@@ -956,8 +956,6 @@ const IterableValues = std.ArrayList(?Value);
 /// https://tc39.es/ecma262/#sec-properties-of-set-instances
 pub const Set = MakeObject(.{
     .Fields = struct {
-        const Self = @This();
-
         /// [[SetData]]
         set_data: SetData,
 
@@ -966,7 +964,7 @@ pub const Set = MakeObject(.{
         iterable_values: ?IterableValues = null,
         active_iterators: usize = 0,
 
-        pub fn registerIterator(self: *Self) Allocator.Error!*IterableValues {
+        pub fn registerIterator(self: *@This()) Allocator.Error!*IterableValues {
             if (self.active_iterators == 0) {
                 std.debug.assert(self.iterable_values == null);
                 self.iterable_values = try IterableValues.initCapacity(
@@ -981,7 +979,7 @@ pub const Set = MakeObject(.{
             return &self.iterable_values.?;
         }
 
-        pub fn unregisterIterator(self: *Self) void {
+        pub fn unregisterIterator(self: *@This()) void {
             self.active_iterators -= 1;
             if (self.active_iterators == 0) {
                 std.debug.assert(self.iterable_values != null);

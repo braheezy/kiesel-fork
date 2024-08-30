@@ -10,7 +10,7 @@ const types = @import("../../types.zig");
 const String = types.String;
 const Symbol = types.Symbol;
 
-const Self = @This();
+const WellKnownSymbols = @This();
 
 @"%Symbol.asyncIterator%": Symbol,
 @"%Symbol.hasInstance%": Symbol,
@@ -26,7 +26,7 @@ const Self = @This();
 @"%Symbol.toStringTag%": Symbol,
 @"%Symbol.unscopables%": Symbol,
 
-pub fn init(allocator: Allocator) std.mem.Allocator.Error!Self {
+pub fn init(allocator: Allocator) std.mem.Allocator.Error!WellKnownSymbols {
     return .{
         .@"%Symbol.asyncIterator%" = try Symbol.init(allocator, String.fromLiteral("Symbol.asyncIterator")),
         .@"%Symbol.hasInstance%" = try Symbol.init(allocator, String.fromLiteral("Symbol.hasInstance")),
@@ -44,7 +44,7 @@ pub fn init(allocator: Allocator) std.mem.Allocator.Error!Self {
     };
 }
 
-pub fn deinit(self: Self, allocator: Allocator) void {
+pub fn deinit(self: WellKnownSymbols, allocator: Allocator) void {
     self.@"%Symbol.asyncIterator%".deinit(allocator);
     self.@"%Symbol.hasInstance%".deinit(allocator);
     self.@"%Symbol.isConcatSpreadable%".deinit(allocator);

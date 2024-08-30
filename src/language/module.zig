@@ -28,12 +28,10 @@ const performPromiseThen = builtins.performPromiseThen;
 /// 16.2.1.4 Abstract Module Records
 /// https://tc39.es/ecma262/#sec-abstract-module-records
 pub const Module = union(enum) {
-    const Self = @This();
-
     source_text_module: *SourceTextModule,
 
     pub fn loadRequestedModules(
-        self: Self,
+        self: Module,
         agent: *Agent,
         host_defined: ?SafePointer,
     ) Allocator.Error!*builtins.Promise {
@@ -42,14 +40,14 @@ pub const Module = union(enum) {
         };
     }
 
-    pub fn getExportedNames(self: Self, agent: *Agent) Allocator.Error![]const []const u8 {
+    pub fn getExportedNames(self: Module, agent: *Agent) Allocator.Error![]const []const u8 {
         return switch (self) {
             inline else => |module| module.getExportedNames(agent),
         };
     }
 
     pub fn resolveExport(
-        self: Self,
+        self: Module,
         agent: *Agent,
         export_name: []const u8,
     ) Allocator.Error!?ResolvedBindingOrAmbiguous {
@@ -58,13 +56,13 @@ pub const Module = union(enum) {
         };
     }
 
-    pub fn link(self: Self, agent: *Agent) Agent.Error!void {
+    pub fn link(self: Module, agent: *Agent) Agent.Error!void {
         return switch (self) {
             inline else => |module| module.link(agent),
         };
     }
 
-    pub fn evaluate(self: Self, agent: *Agent) Allocator.Error!*builtins.Promise {
+    pub fn evaluate(self: Module, agent: *Agent) Allocator.Error!*builtins.Promise {
         return switch (self) {
             inline else => |module| module.evaluate(agent),
         };

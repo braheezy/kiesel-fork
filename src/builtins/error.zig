@@ -27,7 +27,7 @@ const getIterator = types.getIterator;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
-const Self = @This();
+const module = @This();
 
 /// 20.5.2 Properties of the Error Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-error-constructor
@@ -277,7 +277,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
             const message = arguments.get(0);
             const options = arguments.get(1);
 
-            const T = @field(Self, name);
+            const T = @field(module, name);
 
             // 1. If NewTarget is undefined, let newTarget be the active function object; else let
             //    newTarget be NewTarget.

@@ -17,7 +17,7 @@ fn utf8IsAscii(utf8: []const u8) bool {
     } else true;
 }
 
-const Self = @This();
+const String = @This();
 
 /// https://tc39.es/ecma262/#ASCII-word-characters
 pub const ascii_word_characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_";
@@ -25,7 +25,7 @@ pub const ascii_word_characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrs
 /// The definition of white space is the union of WhiteSpace and LineTerminator.
 pub const whitespace = tokenizer.whitespace ++ tokenizer.line_terminators;
 
-pub const empty: Self = fromLiteral("");
+pub const empty: String = fromLiteral("");
 
 pub const Builder = @import("String/Builder.zig");
 pub const CodeUnitIterator = @import("String/CodeUnitIterator.zig");
@@ -50,7 +50,7 @@ pub const Data = struct {
 data: *Data,
 
 pub fn format(
-    self: Self,
+    self: String,
     comptime fmt: []const u8,
     options: std.fmt.FormatOptions,
     writer: anytype,
@@ -63,7 +63,7 @@ pub fn format(
     }
 }
 
-pub fn fromLiteral(comptime utf8: []const u8) Self {
+pub fn fromLiteral(comptime utf8: []const u8) String {
     @setEvalBranchQuota(10_000);
     const data: *const Data = comptime data: {
         const slice: Data.Slice = if (utf8IsAscii(utf8)) blk: {
@@ -79,7 +79,7 @@ pub fn fromLiteral(comptime utf8: []const u8) Self {
     return .{ .data = @constCast(data) };
 }
 
-pub fn fromUtf8(allocator: Allocator, utf8: []const u8) Allocator.Error!Self {
+pub fn fromUtf8(allocator: Allocator, utf8: []const u8) Allocator.Error!String {
     const slice: Data.Slice = if (utf8IsAscii(utf8)) blk: {
         break :blk .{ .ascii = utf8 };
     } else blk: {
@@ -94,32 +94,32 @@ pub fn fromUtf8(allocator: Allocator, utf8: []const u8) Allocator.Error!Self {
     return .{ .data = data };
 }
 
-pub fn fromAscii(allocator: Allocator, ascii: []const u8) Allocator.Error!Self {
+pub fn fromAscii(allocator: Allocator, ascii: []const u8) Allocator.Error!String {
     const slice: Data.Slice = .{ .ascii = ascii };
     const data = try allocator.create(Data);
     data.* = .{ .slice = slice, .hash = slice.hash() };
     return .{ .data = data };
 }
 
-pub fn fromUtf16(allocator: Allocator, utf16: []const u16) Allocator.Error!Self {
+pub fn fromUtf16(allocator: Allocator, utf16: []const u16) Allocator.Error!String {
     const slice: Data.Slice = .{ .utf16 = utf16 };
     const data = try allocator.create(Data);
     data.* = .{ .slice = slice, .hash = slice.hash() };
     return .{ .data = data };
 }
 
-pub fn isEmpty(self: Self) bool {
+pub fn isEmpty(self: String) bool {
     return self.length() == 0;
 }
 
-pub fn length(self: Self) usize {
+pub fn length(self: String) usize {
     return switch (self.data.slice) {
         .ascii => |ascii| ascii.len,
         .utf16 => |utf16| utf16.len,
     };
 }
 
-pub fn toUtf8(self: Self, allocator: Allocator) Allocator.Error![]const u8 {
+pub fn toUtf8(self: String, allocator: Allocator) Allocator.Error![]const u8 {
     return switch (self.data.slice) {
         .ascii => |ascii| allocator.dupe(u8, ascii),
         .utf16 => |utf16| std.fmt.allocPrint(
@@ -130,7 +130,7 @@ pub fn toUtf8(self: Self, allocator: Allocator) Allocator.Error![]const u8 {
     };
 }
 
-pub fn toUtf16(self: Self, allocator: Allocator) Allocator.Error![]const u16 {
+pub fn toUtf16(self: String, allocator: Allocator) Allocator.Error![]const u16 {
     return switch (self.data.slice) {
         .ascii => |ascii| blk: {
             const utf16 = try allocator.alloc(u16, ascii.len);
@@ -141,11 +141,11 @@ pub fn toUtf16(self: Self, allocator: Allocator) Allocator.Error![]const u16 {
     };
 }
 
-pub fn codeUnitIterator(self: Self) CodeUnitIterator {
+pub fn codeUnitIterator(self: String) CodeUnitIterator {
     return .{ .index = 0, .string = self };
 }
 
-pub fn eql(a: Self, b: Self) bool {
+pub fn eql(a: String, b: String) bool {
     if (a.isEmpty() and b.isEmpty()) return true;
     if (a.length() != b.length()) return false;
     var it1 = a.codeUnitIterator();
@@ -158,7 +158,7 @@ pub fn eql(a: Self, b: Self) bool {
     return true;
 }
 
-pub fn startsWith(self: Self, other: Self) bool {
+pub fn startsWith(self: String, other: String) bool {
     if (other.isEmpty()) return true;
     if (self.length() < other.length()) return false;
     var it1 = self.codeUnitIterator();
@@ -173,11 +173,11 @@ pub fn startsWith(self: Self, other: Self) bool {
 
 /// https://tc39.es/ecma262/#substring
 pub fn substring(
-    self: Self,
+    self: String,
     allocator: Allocator,
     inclusive_start: usize,
     exclusive_end: ?usize,
-) Allocator.Error!Self {
+) Allocator.Error!String {
     if (inclusive_start == 0 and (exclusive_end == null or exclusive_end == self.length())) {
         return self;
     }
@@ -207,7 +207,7 @@ pub fn substring(
 
 /// 6.1.4.1 StringIndexOf ( string, searchValue, fromIndex )
 /// https://tc39.es/ecma262/#sec-stringindexof
-pub fn indexOf(self: Self, search_value: Self, from_index: usize) ?usize {
+pub fn indexOf(self: String, search_value: String, from_index: usize) ?usize {
     // 1. Let len be the length of string.
     const len = self.length();
     const search_len = search_value.length();
@@ -254,7 +254,7 @@ pub fn indexOf(self: Self, search_value: Self, from_index: usize) ?usize {
 
 /// 6.1.4.2 StringLastIndexOf ( string, searchValue, fromIndex )
 /// https://tc39.es/ecma262/#sec-stringlastindexof
-pub fn lastIndexOf(self: Self, search_value: Self, from_index: usize) ?usize {
+pub fn lastIndexOf(self: String, search_value: String, from_index: usize) ?usize {
     // 1. Let len be the length of string.
     const len = self.length();
 
@@ -301,7 +301,7 @@ pub fn lastIndexOf(self: Self, search_value: Self, from_index: usize) ?usize {
 
 /// 7.2.8 Static Semantics: IsStringWellFormedUnicode ( string )
 /// https://tc39.es/ecma262/#sec-isstringwellformedunicode
-pub fn isWellFormedUnicode(self: Self) bool {
+pub fn isWellFormedUnicode(self: String) bool {
     if (self.data.slice == .ascii) return true;
 
     // 1. Let len be the length of string.
@@ -334,7 +334,7 @@ const CodePoint = struct {
 
 /// 11.1.4 Static Semantics: CodePointAt ( string, position )
 /// https://tc39.es/ecma262/#sec-codepointat
-pub fn codePointAt(self: Self, position: usize) CodePoint {
+pub fn codePointAt(self: String, position: usize) CodePoint {
     // 1. Let size be the length of string.
     const size = self.length();
 
@@ -382,14 +382,14 @@ pub fn codePointAt(self: Self, position: usize) CodePoint {
     }
 }
 
-pub fn codeUnitAt(self: Self, index: usize) u16 {
+pub fn codeUnitAt(self: String, index: usize) u16 {
     return switch (self.data.slice) {
         .ascii => |ascii| ascii[index],
         .utf16 => |utf16| utf16[index],
     };
 }
 
-pub fn toLowerCase(self: Self, allocator: Allocator) Allocator.Error!Self {
+pub fn toLowerCase(self: String, allocator: Allocator) Allocator.Error!String {
     if (self.isEmpty()) return empty;
     switch (self.data.slice) {
         .ascii => |ascii| {
@@ -424,7 +424,7 @@ pub fn toLowerCase(self: Self, allocator: Allocator) Allocator.Error!Self {
     }
 }
 
-pub fn toUpperCase(self: Self, allocator: Allocator) Allocator.Error!Self {
+pub fn toUpperCase(self: String, allocator: Allocator) Allocator.Error!String {
     if (self.isEmpty()) return empty;
     switch (self.data.slice) {
         .ascii => |ascii| {
@@ -460,10 +460,10 @@ pub fn toUpperCase(self: Self, allocator: Allocator) Allocator.Error!Self {
 }
 
 pub fn trim(
-    self: Self,
+    self: String,
     allocator: Allocator,
     where: enum { start, end, @"start+end" },
-) Allocator.Error!Self {
+) Allocator.Error!String {
     const whitespace_code_units = comptime blk: {
         var code_units: [whitespace.len]u21 = undefined;
         for (whitespace, 0..) |utf8, i| {
@@ -531,11 +531,11 @@ pub fn trim(
 }
 
 pub fn replace(
-    self: Self,
+    self: String,
     allocator: Allocator,
     needle: []const u8,
     replacement: []const u8,
-) Allocator.Error!Self {
+) Allocator.Error!String {
     // For now this only deals with simple ASCII replacements.
     switch (self.data.slice) {
         .ascii => |ascii| {
@@ -569,14 +569,14 @@ pub fn replace(
     }
 }
 
-pub fn repeat(self: Self, allocator: Allocator, n: usize) Allocator.Error!Self {
+pub fn repeat(self: String, allocator: Allocator, n: usize) Allocator.Error!String {
     var builder = Builder.init(allocator);
     defer builder.deinit();
     for (0..n) |_| try builder.appendString(self);
     return builder.build();
 }
 
-pub fn concat(allocator: Allocator, strings: []const Self) Allocator.Error!Self {
+pub fn concat(allocator: Allocator, strings: []const String) Allocator.Error!String {
     var builder = Builder.init(allocator);
     defer builder.deinit();
     for (strings) |string| try builder.appendString(string);
@@ -584,31 +584,31 @@ pub fn concat(allocator: Allocator, strings: []const Self) Allocator.Error!Self 
 }
 
 pub fn StringHashMap(comptime V: type) type {
-    return std.HashMap(Self, V, struct {
-        pub fn hash(_: @This(), key: Self) u64 {
+    return std.HashMap(String, V, struct {
+        pub fn hash(_: @This(), key: String) u64 {
             return key.data.hash;
         }
 
-        pub fn eql(_: @This(), a: Self, b: Self) bool {
+        pub fn eql(_: @This(), a: String, b: String) bool {
             return a.eql(b);
         }
     }, std.hash_map.default_max_load_percentage);
 }
 
 pub fn StringArrayHashMap(comptime V: type) type {
-    return std.ArrayHashMap(Self, V, struct {
-        pub fn hash(_: @This(), key: Self) u32 {
+    return std.ArrayHashMap(String, V, struct {
+        pub fn hash(_: @This(), key: String) u32 {
             return @truncate(key.data.hash);
         }
 
-        pub fn eql(_: @This(), a: Self, b: Self, _: usize) bool {
+        pub fn eql(_: @This(), a: String, b: String, _: usize) bool {
             return a.eql(b);
         }
     }, false);
 }
 
 test "format" {
-    const test_cases = [_]struct { Self, []const u8 }{
+    const test_cases = [_]struct { String, []const u8 }{
         .{ empty, "" },
         .{ fromLiteral("foo"), "foo" },
         .{ fromLiteral("123"), "123" },

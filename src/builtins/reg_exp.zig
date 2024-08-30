@@ -70,8 +70,6 @@ comptime {
 const FLAG_HAS_INDICES: c_int = 1 << 9;
 
 pub const ParsedFlags = packed struct(u8) {
-    const Self = @This();
-
     d: bool = false,
     g: bool = false,
     i: bool = false,
@@ -81,8 +79,8 @@ pub const ParsedFlags = packed struct(u8) {
     v: bool = false,
     y: bool = false,
 
-    pub fn from(flags: []const u8) ?Self {
-        var parsed_flags: Self = .{};
+    pub fn from(flags: []const u8) ?ParsedFlags {
+        var parsed_flags: ParsedFlags = .{};
         for (flags) |flag| switch (flag) {
             inline 'd', 'g', 'i', 'm', 's', 'u', 'v', 'y' => |c| {
                 if (@field(parsed_flags, &.{c})) return null;
@@ -94,7 +92,7 @@ pub const ParsedFlags = packed struct(u8) {
         return parsed_flags;
     }
 
-    pub fn asLreFlags(self: Self) c_int {
+    pub fn asLreFlags(self: ParsedFlags) c_int {
         var flags: c_int = 0;
         if (self.d) flags |= FLAG_HAS_INDICES;
         if (self.g) flags |= libregexp.LRE_FLAG_GLOBAL;
