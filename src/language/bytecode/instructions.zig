@@ -180,6 +180,8 @@ pub const Instruction = enum(u8) {
     typeof,
     /// Store Number::unaryMinus() / BigInt::unaryMinus() as the result value.
     unary_minus,
+    /// Store Yield() as the result value.
+    yield,
     /// Non-exhaustive enum to allow arbitrary values as constant indices.
     _,
 

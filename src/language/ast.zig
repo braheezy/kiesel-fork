@@ -703,6 +703,7 @@ pub const Expression = union(enum) {
     assignment_expression: AssignmentExpression,
     sequence_expression: SequenceExpression,
     await_expression: AwaitExpression,
+    yield_expression: YieldExpression,
     tagged_template: TaggedTemplate,
 
     /// 8.6.4 Static Semantics: AssignmentTargetType
@@ -2544,6 +2545,10 @@ pub const GeneratorExpression = struct {
     formal_parameters: FormalParameters,
     function_body: FunctionBody,
     source_text: []const u8,
+};
+
+pub const YieldExpression = struct {
+    expression: ?*Expression,
 };
 
 /// https://tc39.es/ecma262/#prod-AsyncGeneratorDeclaration

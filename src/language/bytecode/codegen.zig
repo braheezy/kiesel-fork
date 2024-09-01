@@ -1790,6 +1790,7 @@ pub fn codegenExpression(
         .assignment_expression => |x| try codegenAssignmentExpression(x, executable, ctx),
         .sequence_expression => |x| try codegenSequenceExpression(x, executable, ctx),
         .await_expression => |x| try codegenAwaitExpression(x, executable, ctx),
+        .yield_expression => |x| try codegenYieldExpression(x, executable, ctx),
         .tagged_template => |x| try codegenTaggedTemplate(x, executable, ctx),
     }
 }
@@ -3386,6 +3387,32 @@ pub fn codegenGeneratorExpression(
         .instantiate_generator_function_expression,
         .{ .generator_expression = node },
     );
+}
+
+/// 15.5.5 Runtime Semantics: Evaluation
+/// https://tc39.es/ecma262/#sec-generator-function-definitions-runtime-semantics-evaluation
+pub fn codegenYieldExpression(
+    node: ast.YieldExpression,
+    executable: *Executable,
+    ctx: *Context,
+) Executable.Error!void {
+    // YieldExpression : yield AssignmentExpression
+    if (node.expression) |expression| {
+        // 1. Let exprRef be ? Evaluation of AssignmentExpression.
+        try codegenExpression(expression.*, executable, ctx);
+
+        // 2. Let value be ? GetValue(exprRef).
+        if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+        // 3. Return ? Yield(value).
+        try executable.addInstruction(.yield);
+    }
+    // YieldExpression : yield
+    else {
+        // 1. Return ? Yield(undefined).
+        try executable.addInstructionWithConstant(.store_constant, Value.undefined);
+        try executable.addInstruction(.yield);
+    }
 }
 
 /// 15.6.5 Runtime Semantics: Evaluation

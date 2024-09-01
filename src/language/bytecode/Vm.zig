@@ -55,6 +55,7 @@ const newObjectEnvironment = execution.newObjectEnvironment;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+const yield = builtins.yield;
 
 const Vm = @This();
 
@@ -1308,6 +1309,10 @@ fn executeUnaryMinus(self: *Vm, _: Executable) Agent.Error!void {
     };
 }
 
+fn executeYield(_: *Vm, _: Executable) Agent.Error!void {
+    @compileError("Should not be used"); // Handled in run()
+}
+
 pub fn run(self: *Vm, executable: Executable) Agent.Error!Completion {
     try self.environment_lookup_cache.resize(executable.environment_lookup_cache_size);
     @memset(self.environment_lookup_cache.items, null);
@@ -1401,6 +1406,7 @@ pub fn run(self: *Vm, executable: Executable) Agent.Error!Completion {
             .to_string => self.executeToString(executable),
             .typeof => self.executeTypeof(executable),
             .unary_minus => self.executeUnaryMinus(executable),
+            .yield => return yield(self.agent, self.result.?),
             _ => unreachable,
         }) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,

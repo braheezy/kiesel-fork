@@ -28,6 +28,7 @@ state: struct {
     in_class_constructor: bool = false,
     in_formal_parameters: bool = false,
     in_function_body: bool = false,
+    in_generator_function_body: bool = false,
     in_iteration_statement: bool = false,
     in_labelled_statement: bool = false,
     in_method_definition: bool = false,
@@ -1423,6 +1424,8 @@ pub fn acceptExpression(self: *Parser, ctx: AcceptContext) AcceptError!ast.Expre
         },
         else => if (self.acceptAwaitExpression()) |await_expression|
             .{ .await_expression = await_expression }
+        else |_| if (self.acceptYieldExpression()) |yield_expression|
+            .{ .yield_expression = yield_expression }
         else |_| if (self.acceptPrimaryExpression()) |primary_expression|
             .{ .primary_expression = primary_expression }
         else |_|
@@ -2392,8 +2395,14 @@ pub fn acceptFunctionBody(
     });
     defer tmp2.restore();
 
-    const tmp3 = temporaryChange(&self.state.arguments_object_needed, false);
+    const tmp3 = temporaryChange(&self.state.in_generator_function_body, switch (@"type") {
+        .generator, .async_generator => true,
+        else => false,
+    });
     defer tmp3.restore();
+
+    const tmp4 = temporaryChange(&self.state.arguments_object_needed, false);
+    defer tmp4.restore();
 
     const statement_list = try self.acceptStatementList(.{ .update_strict_mode = true });
     const strict = self.state.in_strict_mode or statement_list.containsDirective("use strict");
@@ -2661,6 +2670,29 @@ pub fn acceptGeneratorExpression(self: *Parser) AcceptError!ast.GeneratorExpress
         .function_body = function_body,
         .source_text = source_text,
     };
+}
+
+pub fn acceptYieldExpression(self: *Parser) AcceptError!ast.YieldExpression {
+    if (!self.state.in_generator_function_body) return error.UnexpectedToken;
+
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.yield));
+    if (self.noLineTerminatorHere()) |_| {
+        if (self.acceptExpression(.{})) |expr| {
+            const expression = try self.allocator.create(ast.Expression);
+            expression.* = expr;
+            return .{ .expression = expression };
+        } else |_| {
+            return .{ .expression = null };
+        }
+    } else |err| switch (err) {
+        // Drop emitted 'unexpected newline' error
+        error.UnexpectedToken => _ = self.diagnostics.errors.pop(),
+        else => {},
+    }
+    return .{ .expression = null };
 }
 
 fn acceptAsyncGeneratorDeclaration(self: *Parser) AcceptError!ast.AsyncGeneratorDeclaration {
