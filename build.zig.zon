@@ -3,8 +3,7 @@
     .version = "0.1.0",
     .dependencies = .{
         .any_pointer = .{
-            // FIXME: This points to https://github.com/ikskuh/any-pointer/pull/10, update once merged
-            .url = "https://github.com/ikskuh/any-pointer/archive/4f4fcf736ceae0bfa172c68b6c56333ce139cd47.tar.gz",
+            .url = "https://github.com/ikskuh/any-pointer/archive/15f40d9feddbb2b063b8817e3f248189558acf31.tar.gz",
             .hash = "12200da24a57da99d213b012c3af926202c8535517f502caef7238d0e952e2dd1808",
         },
         .icu4zig = .{
@@ -34,13 +33,11 @@
             .lazy = true,
         },
         .parser_toolkit = .{
-            // FIXME: This points to https://github.com/ikskuh/parser-toolkit/pull/15, update once merged
-            .url = "https://github.com/ikskuh/parser-toolkit/archive/17754610741d862b2d4638d6651c23740df6a1d8.tar.gz",
+            .url = "https://github.com/ikskuh/parser-toolkit/archive/6aafc4cd8f82e053b35a4b96dd7255164a487f77.tar.gz",
             .hash = "122020dcea6890882c8abe90b9e3ecf1af54b8a60ce1295c4e92d40fffcae3158e7d",
         },
         .zig_args = .{
-            // FIXME: This points to https://github.com/ikskuh/zig-args/pull/61, update once merged
-            .url = "https://github.com/ikskuh/zig-args/archive/ea9c72f785cfffa1f9764a927fdfa5d0ffa6c5f1.tar.gz",
+            .url = "https://github.com/ikskuh/zig-args/archive/0abdd6947a70e6d8cc83b66228cea614aa856206.tar.gz",
             .hash = "1220411a8c46d95bbf3b6e2059854bcb3c5159d428814099df5294232b9980517e9c",
         },
         .zig_stackinfo = .{
