@@ -223,7 +223,9 @@ pub const asyncGeneratorDrainQueue = async_generator.asyncGeneratorDrainQueue;
 pub const asyncGeneratorEnqueue = async_generator.asyncGeneratorEnqueue;
 pub const asyncGeneratorResume = async_generator.asyncGeneratorResume;
 pub const asyncGeneratorStart = async_generator.asyncGeneratorStart;
+pub const asyncGeneratorUnwrapYieldResumption = async_generator.asyncGeneratorUnwrapYieldResumption;
 pub const asyncGeneratorValidate = async_generator.asyncGeneratorValidate;
+pub const asyncGeneratorYield = async_generator.asyncGeneratorYield;
 pub const @"await" = async_function.@"await";
 pub const boundFunctionCreate = bound_function.boundFunctionCreate;
 pub const cloneArrayBuffer = array_buffer.cloneArrayBuffer;
@@ -246,7 +248,9 @@ pub const generatorResume = generator.generatorResume;
 pub const generatorResumeAbrupt = generator.generatorResumeAbrupt;
 pub const generatorStart = generator.generatorStart;
 pub const generatorValidate = generator.generatorValidate;
+pub const generatorYield = generator.generatorYield;
 pub const getArrayBufferMaxByteLengthOption = array_buffer.getArrayBufferMaxByteLengthOption;
+pub const getGeneratorKind = generator.getGeneratorKind;
 pub const getModifySetValueInBuffer = array_buffer.getModifySetValueInBuffer;
 pub const getPrototypeFromConstructor = ordinary.getPrototypeFromConstructor;
 pub const getSubstitution = string.getSubstitution;
@@ -303,6 +307,7 @@ pub const typedArrayElementSize = typed_array.typedArrayElementSize;
 pub const typedArrayLength = typed_array.typedArrayLength;
 pub const validateNonRevokedProxy = proxy.validateNonRevokedProxy;
 pub const validateTypedArray = typed_array.validateTypedArray;
+pub const yield = generator.yield;
 
 test {
     _ = builtin_function;

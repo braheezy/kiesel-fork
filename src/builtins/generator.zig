@@ -17,6 +17,8 @@ const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
+const asyncGeneratorYield = builtins.asyncGeneratorYield;
+const @"await" = builtins.@"await";
 const createIterResultObject = types.createIterResultObject;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
@@ -115,6 +117,7 @@ pub const Generator = MakeObject(.{
         evaluation_state: struct {
             closure: *const fn (*Agent, *builtins.ECMAScriptFunction) Agent.Error!Object,
             generator_function: *builtins.ECMAScriptFunction,
+            suspension_result: ?Value = null,
         },
     },
     .tag = .generator,
@@ -167,6 +170,13 @@ pub fn generatorStart(
             //    context that is at the top of the execution context stack as the running
             //    execution context.
             _ = agent_.execution_context_stack.pop();
+
+            if (closure_generator.fields.evaluation_state.suspension_result) |suspension_result| {
+                closure_generator.fields.evaluation_state.suspension_result = null;
+                // TODO: Support resuming generator evaluation after a yield
+                closure_generator.fields.generator_state = .completed;
+                return suspension_result.asObject();
+            }
 
             // g. Set acGenerator.[[GeneratorState]] to completed.
             closure_generator.fields.generator_state = .completed;
@@ -357,4 +367,74 @@ pub fn generatorResumeAbrupt(
 
     // 12. Return ? result.
     return result;
+}
+
+pub const GeneratorKind = enum {
+    non_generator,
+    sync,
+    @"async",
+};
+
+/// 27.5.3.5 GetGeneratorKind ( )
+/// https://tc39.es/ecma262/#sec-getgeneratorkind
+pub fn getGeneratorKind(agent: *Agent) GeneratorKind {
+    // 1. Let genContext be the running execution context.
+    const generator_context = agent.runningExecutionContext();
+
+    // 2. If genContext does not have a Generator component, return non-generator.
+    // 3. Let generator be the Generator component of genContext.
+    const generator = generator_context.generator orelse return .non_generator;
+
+    switch (generator) {
+        // 4. If generator has an [[AsyncGeneratorState]] internal slot, return async.
+        .async_generator => return .@"async",
+
+        // 5. Else, return sync.
+        .generator => return .sync,
+    }
+}
+
+/// 27.5.3.6 GeneratorYield ( iteratorResult )
+/// https://tc39.es/ecma262/#sec-generatoryield
+pub fn generatorYield(agent: *Agent, iterator_result: Object) Agent.Error!Completion {
+    // 1. Let genContext be the running execution context.
+    const generator_context = agent.runningExecutionContext();
+
+    // 2. Assert: genContext is the execution context of a generator.
+    std.debug.assert(generator_context.generator != null);
+
+    // 3. Let generator be the value of the Generator component of genContext.
+    // 4. Assert: GetGeneratorKind() is sync.
+    const generator = generator_context.generator.?.generator;
+
+    // 5. Set generator.[[GeneratorState]] to suspended-yield.
+    generator.fields.generator_state = .suspended_yield;
+
+    // 6. Remove genContext from the execution context stack and restore the execution context that
+    //    is at the top of the execution context stack as the running execution context.
+    // 7. Let callerContext be the running execution context.
+    // 8. Resume callerContext passing NormalCompletion(iteratorResult). If genContext is ever
+    //    resumed again, let resumptionValue be the Completion Record with which it is resumed.
+    generator.fields.evaluation_state.suspension_result = Value.from(iterator_result);
+
+    // TODO: 9. Assert: If control reaches here, then genContext is the running execution context again.
+    // TODO: 10. Return resumptionValue.
+    return Completion.normal(null);
+}
+
+/// 27.5.3.7 Yield ( value )
+/// https://tc39.es/ecma262/#sec-yield
+pub fn yield(agent: *Agent, value: Value) Agent.Error!Completion {
+    // 1. Let generatorKind be GetGeneratorKind().
+    const generator_kind = getGeneratorKind(agent);
+
+    switch (generator_kind) {
+        // 2. If generatorKind is async, return ? AsyncGeneratorYield(? Await(value)).
+        .@"async" => return asyncGeneratorYield(agent, try @"await"(agent, value)),
+
+        // 3. Otherwise, return ? GeneratorYield(CreateIteratorResultObject(value, false)).
+        .sync => return generatorYield(agent, try createIterResultObject(agent, value, false)),
+
+        .non_generator => unreachable,
+    }
 }

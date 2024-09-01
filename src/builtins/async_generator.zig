@@ -19,6 +19,7 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
 const Value = types.Value;
+const @"await" = builtins.@"await";
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createIterResultObject = types.createIterResultObject;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
@@ -274,6 +275,7 @@ pub const AsyncGenerator = MakeObject(.{
         evaluation_state: struct {
             closure: *const fn (*Agent, *builtins.ECMAScriptFunction) std.mem.Allocator.Error!void,
             generator_function: *builtins.ECMAScriptFunction,
+            suspension_result: ?Value = null,
         },
     },
     .tag = .async_generator,
@@ -336,6 +338,13 @@ pub fn asyncGeneratorStart(
             //    context that is at the top of the execution context stack as the running
             //    execution context.
             _ = agent_.execution_context_stack.pop();
+
+            if (closure_generator.fields.evaluation_state.suspension_result) |_| {
+                closure_generator.fields.evaluation_state.suspension_result = null;
+                // TODO: Support resuming generator evaluation after a yield
+                closure_generator.fields.async_generator_state = .completed;
+                return;
+            }
 
             // g. Set acGenerator.[[AsyncGeneratorState]] to completed.
             closure_generator.fields.async_generator_state = .completed;
@@ -522,6 +531,90 @@ pub fn asyncGeneratorResume(
     _ = caller_context;
 
     // 10. Return unused.
+}
+
+/// 27.6.3.7 AsyncGeneratorUnwrapYieldResumption ( resumptionValue )
+/// https://tc39.es/ecma262/#sec-asyncgeneratorunwrapyieldresumption
+pub fn asyncGeneratorUnwrapYieldResumption(agent: *Agent, resumption_value: Completion) Agent.Error!Completion {
+    // 1. If resumptionValue is not a return completion, return ? resumptionValue.
+    if (resumption_value.type != .@"return") return resumption_value;
+
+    // 2. Let awaited be Completion(Await(resumptionValue.[[Value]])).
+    const awaited = @"await"(agent, resumption_value.value.?);
+
+    // 3. If awaited is a throw completion, return ? awaited.
+    const awaited_value = awaited catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.ExceptionThrown => {
+            const exception = agent.clearException();
+            return Completion.throw(exception);
+        },
+    };
+
+    // 4. Assert: awaited is a normal completion.
+    // 5. Return Completion Record { [[Type]]: return, [[Value]]: awaited.[[Value]], [[Target]]: empty }.
+    return .{ .type = .@"return", .value = awaited_value, .target = null };
+}
+
+/// 27.6.3.8 AsyncGeneratorYield ( value )
+/// https://tc39.es/ecma262/#sec-asyncgeneratoryield
+pub fn asyncGeneratorYield(agent: *Agent, value: Value) Agent.Error!Completion {
+    // 1. Let genContext be the running execution context.
+    const generator_context = agent.runningExecutionContext();
+
+    // 2. Assert: genContext is the execution context of a generator.
+    // 3. Let generator be the value of the Generator component of genContext.
+    // 4. Assert: GetGeneratorKind() is async.
+    const generator = generator_context.generator.?.async_generator;
+
+    // 5. Let completion be NormalCompletion(value).
+    const completion = Completion.normal(value);
+
+    // 6. Assert: The execution context stack has at least two elements.
+    std.debug.assert(agent.execution_context_stack.items.len >= 2);
+
+    // 7. Let previousContext be the second to top element of the execution context stack.
+    const previous_context = agent.execution_context_stack.items[agent.execution_context_stack.items.len - 2];
+
+    // 8. Let previousRealm be previousContext's Realm.
+    const previous_realm = previous_context.realm;
+
+    // 9. Perform AsyncGeneratorCompleteStep(generator, completion, false, previousRealm).
+    try asyncGeneratorCompleteStep(agent, generator, completion, false, previous_realm);
+
+    // 10. Let queue be generator.[[AsyncGeneratorQueue]].
+    const queue = &generator.fields.async_generator_queue;
+
+    // 11. If queue is not empty, then
+    if (queue.items.len != 0) {
+        // a. NOTE: Execution continues without suspending the generator.
+        // b. Let toYield be the first element of queue.
+        const to_yield = queue.items[0];
+
+        // c. Let resumptionValue be Completion(toYield.[[Completion]]).
+        const resumption_value = to_yield.completion;
+
+        // d. Return ? AsyncGeneratorUnwrapYieldResumption(resumptionValue).
+        return asyncGeneratorUnwrapYieldResumption(agent, resumption_value);
+    }
+    // 12. Else,
+    else {
+        // a. Set generator.[[AsyncGeneratorState]] to suspended-yield.
+        generator.fields.async_generator_state = .suspended_yield;
+
+        // b. Remove genContext from the execution context stack and restore the execution context
+        //    that is at the top of the execution context stack as the running execution context.
+        _ = agent.execution_context_stack.pop();
+
+        // c. Let callerContext be the running execution context.
+        // d. Resume callerContext passing undefined. If genContext is ever resumed again, let
+        //    resumptionValue be the Completion Record with which it is resumed.
+        generator.fields.evaluation_state.suspension_result = Value.undefined;
+
+        // TODO: e. Assert: If control reaches here, then genContext is the running execution context again.
+        // TODO: f. Return ? AsyncGeneratorUnwrapYieldResumption(resumptionValue).
+        return Completion.normal(null);
+    }
 }
 
 /// 27.6.3.10 AsyncGeneratorDrainQueue ( generator )
