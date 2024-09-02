@@ -1773,18 +1773,19 @@ pub const StringPrototype = struct {
 
         // 9. If separatorLength = 0, then
         if (separator_length == 0) {
-            // FIXME: This is missing a bounds check. See: https://github.com/tc39/ecma262/issues/3261
-            // a. Let head be the substring of S from 0 to lim.
-            const head = try string.substring(
-                agent.gc_allocator,
-                0,
-                @min(limit, string.length()),
-            );
+            // a. Let strLen be the length of S.
+            const str_len = string.length();
 
-            // b. Let codeUnits be a List consisting of the sequence of code units that are the elements of head.
+            // b. Let outLen be the result of clamping lim between 0 and strLen.
+            const out_len = std.math.clamp(limit, 0, str_len);
+
+            // c. Let head be the substring of S from 0 to outLen.
+            const head = try string.substring(agent.gc_allocator, 0, out_len);
+
+            // d. Let codeUnits be a List consisting of the sequence of code units that are the elements of head.
             const code_units = try head.toUtf16(agent.gc_allocator);
 
-            // c. Return CreateArrayFromList(codeUnits).
+            // e. Return CreateArrayFromList(codeUnits).
             return Value.from(
                 try createArrayFromListMapToValue(agent, u16, code_units, struct {
                     fn mapFn(agent_: *Agent, code_unit: u16) std.mem.Allocator.Error!Value {
