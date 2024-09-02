@@ -777,8 +777,7 @@ pub const Math = struct {
 
         // 2. If n is one of NaN, +0𝔽, -0𝔽, or +∞𝔽, return n.
         // 3. If n < -0𝔽, return NaN.
-        // 4. Return an implementation-approximated Number value representing the square root of
-        //    ℝ(n).
+        // 4. Return 𝔽(the square root of ℝ(n)).
         return Value.from(@sqrt(n.asFloat()));
     }
 
