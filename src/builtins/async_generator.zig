@@ -346,8 +346,8 @@ pub fn asyncGeneratorStart(
                 return;
             }
 
-            // g. Set acGenerator.[[AsyncGeneratorState]] to completed.
-            closure_generator.fields.async_generator_state = .completed;
+            // g. Set acGenerator.[[AsyncGeneratorState]] to awaiting-return.
+            closure_generator.fields.async_generator_state = .awaiting_return;
 
             const result_completion = if (result) |completion| blk: {
                 // h. If result is a normal completion, set result to NormalCompletion(undefined).
@@ -623,14 +623,20 @@ pub fn asyncGeneratorDrainQueue(
     agent: *Agent,
     generator: *AsyncGenerator,
 ) std.mem.Allocator.Error!void {
-    // 1. Assert: generator.[[AsyncGeneratorState]] is completed.
-    std.debug.assert(generator.fields.async_generator_state == .completed);
+    // a. Assert: generator.[[AsyncGeneratorState]] is awaiting-return.
+    std.debug.assert(generator.fields.async_generator_state == .awaiting_return);
 
     // 2. Let queue be generator.[[AsyncGeneratorQueue]].
     const queue = &generator.fields.async_generator_queue;
 
-    // 3. If queue is empty, return unused.
-    if (queue.items.len == 0) return;
+    // 3. If queue is empty, then
+    if (queue.items.len == 0) {
+        // a. Set generator.[[AsyncGeneratorState]] to completed.
+        generator.fields.async_generator_state = .completed;
+
+        // b. Return unused.
+        return;
+    }
 
     // 4. Let done be false.
     // 5. Repeat, while done is false,
@@ -643,13 +649,10 @@ pub fn asyncGeneratorDrainQueue(
 
         // c. If completion is a return completion, then
         if (completion.type == .@"return") {
-            // i. Set generator.[[AsyncGeneratorState]] to awaiting-return.
-            generator.fields.async_generator_state = .awaiting_return;
-
-            // ii. Perform AsyncGeneratorAwaitReturn(generator).
+            // i. Perform AsyncGeneratorAwaitReturn(generator).
             try asyncGeneratorAwaitReturn(agent, generator);
 
-            // iii. Set done to true.
+            // ii. Set done to true.
             break;
         }
         // d. Else,
@@ -663,8 +666,14 @@ pub fn asyncGeneratorDrainQueue(
             // ii. Perform AsyncGeneratorCompleteStep(generator, completion, true).
             try asyncGeneratorCompleteStep(agent, generator, completion, true, null);
 
-            // iii. If queue is empty, set done to true.
-            if (queue.items.len == 0) break;
+            // iii. If queue is empty, then
+            if (queue.items.len == 0) {
+                // 1. Set generator.[[AsyncGeneratorState]] to completed.
+                generator.fields.async_generator_state = .completed;
+
+                // 2. Set done to true.
+                break;
+            }
         }
     }
 
@@ -673,33 +682,33 @@ pub fn asyncGeneratorDrainQueue(
 
 /// 27.6.3.9 AsyncGeneratorAwaitReturn ( generator )
 /// https://tc39.es/ecma262/#sec-asyncgeneratorawaitreturn
-///
-/// NOTE: This includes the changes from https://github.com/tc39/ecma262/pull/2683 to avoid
-///       crashing on broken promises.
 pub fn asyncGeneratorAwaitReturn(
     agent: *Agent,
     generator: *AsyncGenerator,
 ) std.mem.Allocator.Error!void {
     const realm = agent.currentRealm();
 
-    // 1. Let queue be generator.[[AsyncGeneratorQueue]].
+    // 1. Assert: generator.[[AsyncGeneratorState]] is awaiting-return.
+    std.debug.assert(generator.fields.async_generator_state == .awaiting_return);
+
+    // 2. Let queue be generator.[[AsyncGeneratorQueue]].
     const queue = &generator.fields.async_generator_queue;
 
-    // 2. Assert: queue is not empty.
+    // 3. Assert: queue is not empty.
     std.debug.assert(queue.items.len != 0);
 
-    // 3. Let next be the first element of queue.
+    // 4. Let next be the first element of queue.
     const next = queue.items[0];
 
-    // 4. Let completion be Completion(next.[[Completion]]).
+    // 5. Let completion be Completion(next.[[Completion]]).
     const completion = next.completion;
 
-    // 5. Assert: completion is a return completion.
+    // 6. Assert: completion is a return completion.
     std.debug.assert(completion.type == .@"return");
 
-    // 6. Let promiseCompletion be Completion(PromiseResolve(%Promise%, completion.[[Value]])).
-    // 8. Assert: promiseCompletion is a normal completion.
-    // 9. Let promise be promiseCompletion.[[Value]].
+    // 7. Let promiseCompletion be Completion(PromiseResolve(%Promise%, completion.[[Value]])).
+    // 9. Assert: promiseCompletion is a normal completion.
+    // 10. Let promise be promiseCompletion.[[Value]].
     const promise = promiseResolve(
         agent,
         try realm.intrinsics.@"%Promise%"(),
@@ -707,7 +716,7 @@ pub fn asyncGeneratorAwaitReturn(
     ) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
 
-        // 7. If promiseCompletion is an abrupt completion, then
+        // 8. If promiseCompletion is an abrupt completion, then
         error.ExceptionThrown => {
             const promise_completion = Completion.throw(agent.clearException());
 
@@ -733,7 +742,7 @@ pub fn asyncGeneratorAwaitReturn(
         .generator = generator,
     };
 
-    // 10. Let fulfilledClosure be a new Abstract Closure with parameters (value) that captures
+    // 11. Let fulfilledClosure be a new Abstract Closure with parameters (value) that captures
     //    generator and performs the following steps when called:
     const fulfilled_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
@@ -742,8 +751,8 @@ pub fn asyncGeneratorAwaitReturn(
             const generator_ = captures_.generator;
             const value = arguments_.get(0);
 
-            // a. Set generator.[[AsyncGeneratorState]] to completed.
-            generator_.fields.async_generator_state = .completed;
+            // a. Assert: generator.[[AsyncGeneratorState]] is awaiting-return.
+            std.debug.assert(generator_.fields.async_generator_state == .awaiting_return);
 
             // b. Let result be NormalCompletion(value).
             const result = Completion.normal(value);
@@ -759,7 +768,7 @@ pub fn asyncGeneratorAwaitReturn(
         }
     }.func;
 
-    // 11. Let onFulfilled be CreateBuiltinFunction(fulfilledClosure, 1, "", « »).
+    // 12. Let onFulfilled be CreateBuiltinFunction(fulfilledClosure, 1, "", « »).
     const on_fulfilled = Value.from(
         try createBuiltinFunction(agent, .{ .function = fulfilled_closure }, .{
             .length = 1,
@@ -768,7 +777,7 @@ pub fn asyncGeneratorAwaitReturn(
         }),
     );
 
-    // 12. Let rejectedClosure be a new Abstract Closure with parameters (reason) that captures
+    // 13. Let rejectedClosure be a new Abstract Closure with parameters (reason) that captures
     //    generator and performs the following steps when called:
     const rejected_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
@@ -777,8 +786,8 @@ pub fn asyncGeneratorAwaitReturn(
             const generator_ = captures_.generator;
             const reason = arguments_.get(0);
 
-            // a. Set generator.[[AsyncGeneratorState]] to completed.
-            generator_.fields.async_generator_state = .completed;
+            // a. Assert: generator.[[AsyncGeneratorState]] is awaiting-return.
+            std.debug.assert(generator_.fields.async_generator_state == .awaiting_return);
 
             // b. Let result be ThrowCompletion(reason).
             const result = Completion.throw(reason);
@@ -794,7 +803,7 @@ pub fn asyncGeneratorAwaitReturn(
         }
     }.func;
 
-    // 13. Let onRejected be CreateBuiltinFunction(rejectedClosure, 1, "", « »).
+    // 14. Let onRejected be CreateBuiltinFunction(rejectedClosure, 1, "", « »).
     const on_rejected = Value.from(
         try createBuiltinFunction(agent, .{ .function = rejected_closure }, .{
             .length = 1,
@@ -803,7 +812,7 @@ pub fn asyncGeneratorAwaitReturn(
         }),
     );
 
-    // 14. Perform PerformPromiseThen(promise, onFulfilled, onRejected).
+    // 15. Perform PerformPromiseThen(promise, onFulfilled, onRejected).
     _ = try performPromiseThen(
         agent,
         promise.as(builtins.Promise),
@@ -812,5 +821,5 @@ pub fn asyncGeneratorAwaitReturn(
         null,
     );
 
-    // 15. Return unused.
+    // 16. Return unused.
 }
