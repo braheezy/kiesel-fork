@@ -81,7 +81,7 @@ pub const MapIteratorPrototype = struct {
 
         // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
         if (map_iterator.fields == .completed) {
-            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, .undefined, true));
         }
 
         const map = map_iterator.fields.state.map;
@@ -114,7 +114,7 @@ pub const MapIteratorPrototype = struct {
         else {
             map_iterator.fields = .completed;
             map.fields.unregisterIterator();
-            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, .undefined, true));
         };
 
         map_iterator.fields.state.index = index;

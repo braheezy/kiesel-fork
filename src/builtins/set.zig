@@ -196,7 +196,7 @@ pub const SetConstructor = struct {
             "%Set.prototype%",
             .{
                 // 3. Set set.[[SetData]] to a new empty List.
-                .set_data = SetData.init(agent.gc_allocator),
+                .set_data = .init(agent.gc_allocator),
             },
         );
 
@@ -333,7 +333,7 @@ pub const SetPrototype = struct {
         }
 
         // 4. Return undefined.
-        return Value.undefined;
+        return .undefined;
     }
 
     /// 24.2.4.4 Set.prototype.delete ( value )
@@ -513,7 +513,7 @@ pub const SetPrototype = struct {
         }
 
         // 8. Return undefined.
-        return Value.undefined;
+        return .undefined;
     }
 
     /// 24.2.4.8 Set.prototype.has ( value )
@@ -965,7 +965,7 @@ pub const Set = MakeObject(.{
         pub fn registerIterator(self: *@This()) std.mem.Allocator.Error!*IterableValues {
             if (self.active_iterators == 0) {
                 std.debug.assert(self.iterable_values == null);
-                self.iterable_values = try IterableValues.initCapacity(
+                self.iterable_values = try .initCapacity(
                     self.set_data.allocator,
                     self.set_data.count(),
                 );

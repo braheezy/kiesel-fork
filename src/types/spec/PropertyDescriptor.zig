@@ -102,7 +102,7 @@ pub fn fromPropertyDescriptor(
         // a. Perform ! CreateDataPropertyOrThrow(obj, "get", Desc.[[Get]]).
         object.createDataPropertyOrThrow(
             PropertyKey.from("get"),
-            if (get) |o| Value.from(o) else Value.undefined,
+            if (get) |o| Value.from(o) else .undefined,
         ) catch |err| try noexcept(err);
     }
 
@@ -111,7 +111,7 @@ pub fn fromPropertyDescriptor(
         // a. Perform ! CreateDataPropertyOrThrow(obj, "set", Desc.[[Set]]).
         object.createDataPropertyOrThrow(
             PropertyKey.from("set"),
-            if (set) |o| Value.from(o) else Value.undefined,
+            if (set) |o| Value.from(o) else .undefined,
         ) catch |err| try noexcept(err);
     }
 
@@ -149,7 +149,7 @@ pub fn completePropertyDescriptor(self: *PropertyDescriptor) void {
     //      [[Configurable]]: false
     //    }.
     const like: PropertyDescriptor = .{
-        .value = Value.undefined,
+        .value = .undefined,
         .writable = false,
         .enumerable = false,
         .configurable = false,
@@ -208,12 +208,12 @@ test "isAccessorDescriptor" {
     try std.testing.expect((PropertyDescriptor{ .get = getter }).isAccessorDescriptor());
     try std.testing.expect((PropertyDescriptor{ .set = setter }).isAccessorDescriptor());
     try std.testing.expect((PropertyDescriptor{ .get = getter, .set = setter }).isAccessorDescriptor());
-    try std.testing.expect(!(PropertyDescriptor{ .value = Value.undefined }).isAccessorDescriptor());
+    try std.testing.expect(!(PropertyDescriptor{ .value = .undefined }).isAccessorDescriptor());
     try std.testing.expect(!(PropertyDescriptor{}).isAccessorDescriptor());
 }
 
 test "isDataDescriptor" {
-    try std.testing.expect((PropertyDescriptor{ .value = Value.undefined }).isDataDescriptor());
+    try std.testing.expect((PropertyDescriptor{ .value = .undefined }).isDataDescriptor());
     try std.testing.expect((PropertyDescriptor{ .writable = true }).isDataDescriptor());
     try std.testing.expect(!(PropertyDescriptor{ .writable = null }).isDataDescriptor());
     try std.testing.expect(!(PropertyDescriptor{}).isDataDescriptor());

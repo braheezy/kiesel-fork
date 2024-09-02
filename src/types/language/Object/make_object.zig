@@ -60,9 +60,9 @@ pub fn MakeObject(
                     .agent = agent,
                     .prototype = args.prototype,
                     .extensible = args.extensible,
-                    .private_elements = PrivateNameArrayHashMap(PrivateElement).init(agent.gc_allocator),
+                    .private_elements = .init(agent.gc_allocator),
                     .internal_methods = args.internal_methods,
-                    .property_storage = Object.PropertyStorage.init(agent.gc_allocator),
+                    .property_storage = .init(agent.gc_allocator),
                     .is_htmldda = if (has_is_htmldda) args.is_htmldda,
                 },
             };

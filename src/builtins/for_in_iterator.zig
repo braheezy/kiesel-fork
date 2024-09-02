@@ -39,10 +39,10 @@ pub fn createForInIterator(agent: *Agent, object: Object) std.mem.Allocator.Erro
                 .object_was_visited = false,
 
                 // 4. Set iterator.[[VisitedKeys]] to a new empty List.
-                .visited_keys = PropertyKeyArrayHashMap(void).init(agent.gc_allocator),
+                .visited_keys = .init(agent.gc_allocator),
 
                 // 5. Set iterator.[[RemainingKeys]] to a new empty List.
-                .remaining_keys = std.ArrayList(PropertyKey).init(agent.gc_allocator),
+                .remaining_keys = .init(agent.gc_allocator),
             },
         },
     });
@@ -72,7 +72,7 @@ pub const ForInIteratorPrototype = struct {
         const for_in_iterator = this_value.asObject().as(ForInIterator);
 
         if (for_in_iterator.fields == .completed) {
-            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, .undefined, true));
         }
 
         // 4. Let object be O.[[Object]].
@@ -133,7 +133,7 @@ pub const ForInIteratorPrototype = struct {
             object = (try object.internalMethods().getPrototypeOf(object)) orelse {
                 // f. If object is null, return CreateIteratorResultObject(undefined, true).
                 for_in_iterator.fields = .completed;
-                return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
+                return Value.from(try createIteratorResultObject(agent, .undefined, true));
             };
 
             // d. Set O.[[Object]] to object.

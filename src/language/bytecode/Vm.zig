@@ -297,7 +297,7 @@ fn executeClassDefinitionEvaluation(self: *Vm, executable: Executable) Agent.Err
             self.agent,
             class_expression.class_tail,
             null,
-            String.empty,
+            .empty,
         );
 
         // 2. Set value.[[SourceText]] to the source text matched by ClassExpression.
@@ -511,7 +511,7 @@ fn executeEvaluateImportCall(self: *Vm, _: Executable) Agent.Error!void {
         self.agent,
         referrer,
         specifier_string,
-        SafePointer.null_pointer,
+        .null_pointer,
         .{ .promise_capability = promise_capability },
     );
 
@@ -682,7 +682,7 @@ fn executeGetNewTarget(self: *Vm, _: Executable) Agent.Error!void {
     self.result = if (self.agent.getNewTarget()) |new_target|
         Value.from(new_target)
     else
-        Value.undefined;
+        .undefined;
 }
 
 /// 13.3.12.1 Runtime Semantics: Evaluation

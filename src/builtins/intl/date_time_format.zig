@@ -606,7 +606,7 @@ pub const DateTimeFormatPrototype = struct {
             }, .{
                 .length = 1,
                 .name = "",
-                .additional_fields = SafePointer.make(*Captures, captures),
+                .additional_fields = .make(*Captures, captures),
             });
 
             // c. Set dtf.[[BoundFormat]] to F.

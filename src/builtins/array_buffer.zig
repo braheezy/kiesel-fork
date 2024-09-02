@@ -247,7 +247,7 @@ pub fn detachArrayBuffer(
     // 1. Assert: IsSharedArrayBuffer(arrayBuffer) is false.
 
     // 2. If key is not present, set key to undefined.
-    const key = maybe_key orelse Value.undefined;
+    const key: Value = maybe_key orelse .undefined;
 
     // 3. If arrayBuffer.[[ArrayBufferDetachKey]] is not key, throw a TypeError exception.
     if (!sameValue(array_buffer.fields.array_buffer_detach_key, key)) {
@@ -825,7 +825,7 @@ pub const ArrayBufferPrototype = struct {
         const host_handled = try agent.host_hooks.hostResizeArrayBuffer(object, new_byte_length);
 
         // 8. If hostHandled is handled, return undefined.
-        if (host_handled == .handled) return Value.undefined;
+        if (host_handled == .handled) return .undefined;
 
         // 9. Let oldBlock be O.[[ArrayBufferData]].
         // 10. Let newBlock be ? CreateByteDataBlock(newByteLength).
@@ -850,7 +850,7 @@ pub const ArrayBufferPrototype = struct {
         }
 
         // 16. Return undefined.
-        return Value.undefined;
+        return .undefined;
     }
 
     /// 25.1.6.7 ArrayBuffer.prototype.slice ( start, end )
@@ -1005,7 +1005,7 @@ pub const ArrayBuffer = MakeObject(.{
         array_buffer_data: ?DataBlock,
 
         /// [[ArrayBufferDetachKey]]
-        array_buffer_detach_key: Value = Value.undefined,
+        array_buffer_detach_key: Value = .undefined,
 
         /// [[ArrayBufferMaxByteLength]]
         array_buffer_max_byte_length: ?u53 = null,

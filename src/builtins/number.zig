@@ -83,7 +83,7 @@ pub const NumberConstructor = struct {
         // 21.1.2.10 Number.NaN
         // https://tc39.es/ecma262/#sec-number.nan
         try defineBuiltinProperty(object, "NaN", PropertyDescriptor{
-            .value = Value.nan,
+            .value = .nan,
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -92,7 +92,7 @@ pub const NumberConstructor = struct {
         // 21.1.2.11 Number.NEGATIVE_INFINITY
         // https://tc39.es/ecma262/#sec-number.negative_infinity
         try defineBuiltinProperty(object, "NEGATIVE_INFINITY", PropertyDescriptor{
-            .value = Value.negative_infinity,
+            .value = .negative_infinity,
             .writable = false,
             .enumerable = false,
             .configurable = false,
@@ -113,7 +113,7 @@ pub const NumberConstructor = struct {
         // 21.1.2.14 Number.POSITIVE_INFINITY
         // https://tc39.es/ecma262/#sec-number.positive_infinity
         try defineBuiltinProperty(object, "POSITIVE_INFINITY", PropertyDescriptor{
-            .value = Value.infinity,
+            .value = .infinity,
             .writable = false,
             .enumerable = false,
             .configurable = false,

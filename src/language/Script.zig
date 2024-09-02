@@ -66,8 +66,8 @@ pub fn parse(
     self.* = .{
         .realm = realm,
         .ecmascript_code = script,
-        .loaded_modules = StringHashMap(Module).init(agent.gc_allocator),
-        .host_defined = host_defined orelse SafePointer.null_pointer,
+        .loaded_modules = .init(agent.gc_allocator),
+        .host_defined = host_defined orelse .null_pointer,
     };
     return self;
 }
@@ -115,12 +115,12 @@ pub fn evaluate(self: *Script) Agent.Error!Value {
     const result_no_value = globalDeclarationInstantiation(agent, script, global_env);
 
     // 13. If result is a normal completion, then
-    const result = if (result_no_value) |_| blk: {
+    const result: Agent.Error!Value = if (result_no_value) |_| blk: {
         // a. Set result to Completion(Evaluation of script).
         // b. If result is a normal completion and result.[[Value]] is empty, then
         if (generateAndRunBytecode(agent, script, .{})) |completion|
             // i. Set result to NormalCompletion(undefined).
-            break :blk completion.value orelse Value.undefined
+            break :blk completion.value orelse .undefined
         else |err|
             break :blk err;
     } else |err| err;

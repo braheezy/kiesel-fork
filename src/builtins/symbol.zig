@@ -227,7 +227,7 @@ pub const SymbolConstructor = struct {
         }
 
         // 2. Return KeyForSymbol(sym).
-        return Value.from(keyForSymbol(agent, symbol.asSymbol()) orelse return Value.undefined);
+        return Value.from(keyForSymbol(agent, symbol.asSymbol()) orelse return .undefined);
     }
 };
 
@@ -300,7 +300,7 @@ pub const SymbolPrototype = struct {
         const symbol = try thisSymbolValue(agent, this_value);
 
         // 3. Return sym.[[Description]].
-        return Value.from(symbol.data.description orelse return Value.undefined);
+        return Value.from(symbol.data.description orelse return .undefined);
     }
 
     /// 20.4.3.3 Symbol.prototype.toString ( )

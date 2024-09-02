@@ -285,7 +285,7 @@ fn setViewValue(
     );
 
     // 16. Return undefined.
-    return Value.undefined;
+    return .undefined;
 }
 
 /// 25.3.3 Properties of the DataView Constructor

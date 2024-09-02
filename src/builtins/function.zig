@@ -482,7 +482,7 @@ pub const FunctionPrototype = struct {
     }
 
     fn function(_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
-        return Value.undefined;
+        return .undefined;
     }
 
     /// 20.2.3.1 Function.prototype.apply ( thisArg, argArray )
@@ -638,7 +638,7 @@ pub const FunctionPrototype = struct {
         //    func.[[InitialName]].
         if (func.isObject() and func.asObject().is(BuiltinFunction)) {
             const builtin_function = func.asObject().as(BuiltinFunction);
-            const name = builtin_function.fields.initial_name orelse String.empty;
+            const name: String = builtin_function.fields.initial_name orelse .empty;
             const source_text = try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "function {}() {{ [native code] }}",

@@ -144,13 +144,13 @@ pub const AsyncFromSyncIteratorPrototype = struct {
             // a. Let iteratorResult be CreateIteratorResultObject(value, true).
             const iterator_result = try createIteratorResultObject(
                 agent,
-                maybe_value orelse Value.undefined,
+                maybe_value orelse .undefined,
                 true,
             );
 
             // b. Perform ! Call(promiseCapability.[[Resolve]], undefined, « iteratorResult »).
             _ = Value.from(promise_capability.resolve).callAssumeCallable(
-                Value.undefined,
+                .undefined,
                 &.{Value.from(iterator_result)},
             ) catch |err| try noexcept(err);
 
@@ -186,7 +186,7 @@ pub const AsyncFromSyncIteratorPrototype = struct {
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
             //    TypeError object »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
-                Value.undefined,
+                .undefined,
                 &.{Value.from(type_error)},
             ) catch |err| try noexcept(err);
 
@@ -229,8 +229,8 @@ pub const AsyncFromSyncIteratorPrototype = struct {
         if (throw_ == null) {
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « value »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
-                Value.undefined,
-                &.{maybe_value orelse Value.undefined},
+                .undefined,
+                &.{maybe_value orelse .undefined},
             ) catch |err| try noexcept(err);
 
             // b. Return promiseCapability.[[Promise]].
@@ -265,7 +265,7 @@ pub const AsyncFromSyncIteratorPrototype = struct {
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
             //    TypeError object »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
-                Value.undefined,
+                .undefined,
                 &.{Value.from(type_error)},
             ) catch |err| try noexcept(err);
 
@@ -345,7 +345,7 @@ fn asyncFromSyncIteratorContinuation(
         try createBuiltinFunction(agent, .{ .function = unwrap }, .{
             .length = 1,
             .name = "",
-            .additional_fields = SafePointer.make(*Captures, captures),
+            .additional_fields = .make(*Captures, captures),
         }),
     );
 
@@ -358,7 +358,7 @@ fn asyncFromSyncIteratorContinuation(
         agent,
         value_wrapper.as(builtins.Promise),
         on_fulfilled,
-        Value.undefined,
+        .undefined,
         promise_capability,
     );
 

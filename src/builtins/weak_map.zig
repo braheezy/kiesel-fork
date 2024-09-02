@@ -70,7 +70,7 @@ pub const WeakMapConstructor = struct {
             "%WeakMap.prototype%",
             .{
                 // 3. Set map.[[WeakMapData]] to a new empty List.
-                .weak_map_data = WeakMapData.init(agent.gc_allocator),
+                .weak_map_data = .init(agent.gc_allocator),
             },
         );
 
@@ -164,14 +164,14 @@ pub const WeakMapPrototype = struct {
 
         // 3. If CanBeHeldWeakly(key) is false, return undefined.
         if (!key.canBeHeldWeakly(agent)) {
-            return Value.undefined;
+            return .undefined;
         }
 
         // 4. For each Record { [[Key]], [[Value]] } p of M.[[WeakMapData]], do
         // a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return p.[[Value]].
         // 5. Return undefined.
         const maybe_value = map.fields.weak_map_data.get(Value.Weak.init(key));
-        return maybe_value orelse Value.undefined;
+        return maybe_value orelse .undefined;
     }
 
     /// 24.3.3.4 WeakMap.prototype.has ( key )

@@ -326,7 +326,7 @@ pub const CollatorPrototype = struct {
             }, .{
                 .length = 2,
                 .name = "",
-                .additional_fields = SafePointer.make(*Captures, captures),
+                .additional_fields = .make(*Captures, captures),
             });
 
             // c. Set collator.[[BoundCompare]] to F.

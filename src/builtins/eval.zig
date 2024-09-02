@@ -68,7 +68,7 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     };
 
     // c. If script Contains ScriptBody is false, return undefined.
-    if (script.statement_list.items.len == 0) return Value.undefined;
+    if (script.statement_list.items.len == 0) return .undefined;
 
     // d. Let body be the ScriptBody of script.
     const body = script;
@@ -165,14 +165,14 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     );
 
     // 29. If result is a normal completion, then
-    const result = if (result_no_value) |_| blk: {
+    const result: Agent.Error!Value = if (result_no_value) |_| blk: {
         // a. Set result to Completion(Evaluation of body).
         // 30. If result is a normal completion and result.[[Value]] is empty, then
         if (generateAndRunBytecode(agent, body, .{
             .contained_in_strict_mode_code = strict_eval,
         })) |completion|
             // a. Set result to NormalCompletion(undefined).
-            break :blk completion.value orelse Value.undefined
+            break :blk completion.value orelse .undefined
         else |err|
             break :blk err;
     } else |err| err;
@@ -480,7 +480,7 @@ fn evalDeclarationInstantiation(
                 var_env.createMutableBinding(agent, var_name, true) catch |err| try noexcept(err);
 
                 // 3. Perform ! varEnv.InitializeBinding(vn, undefined).
-                var_env.initializeBinding(agent, var_name, Value.undefined) catch |err| try noexcept(err);
+                var_env.initializeBinding(agent, var_name, .undefined) catch |err| try noexcept(err);
             }
         }
     }

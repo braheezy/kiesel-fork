@@ -180,7 +180,7 @@ fn call(object: Object, this_argument: Value, arguments_list: Arguments) Agent.E
     else |err| return err;
 
     // 10. Return undefined.
-    return Value.undefined;
+    return .undefined;
 }
 
 /// 10.2.1.1 PrepareForOrdinaryCall ( F, newTarget )
@@ -431,7 +431,7 @@ fn evaluateAsyncFunctionBody(
 
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « completion.[[Value]] »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
-                Value.undefined,
+                .undefined,
                 &.{exception},
             ) catch |err_| try noexcept(err_);
         },
@@ -826,7 +826,7 @@ pub fn setFunctionName(
         function.extensible().* and !function.propertyStorage().has(PropertyKey.from("name")),
     );
 
-    var name = switch (if (@TypeOf(key) == PropertyKey) PropertyKeyOrPrivateName{ .property_key = key } else key) {
+    var name: String = switch (if (@TypeOf(key) == PropertyKey) PropertyKeyOrPrivateName{ .property_key = key } else key) {
         .property_key => |property_key| switch (try property_key.toStringOrSymbol(agent)) {
             .string => |string| string,
 
@@ -836,7 +836,7 @@ pub fn setFunctionName(
                 const description = symbol.data.description;
 
                 // b. If description is undefined, set name to the empty String.
-                if (description == null) break :blk String.empty;
+                if (description == null) break :blk .empty;
 
                 // c. Else, set name to the string-concatenation of "[", description, and "]".
                 break :blk try String.concat(
@@ -1095,7 +1095,7 @@ fn functionDeclarationInstantiation(
                 env.initializeBinding(
                     agent,
                     parameter_name,
-                    Value.undefined,
+                    .undefined,
                 ) catch |err| try noexcept(err);
             }
         }
@@ -1250,7 +1250,7 @@ fn functionDeclarationInstantiation(
                 env.createMutableBinding(agent, var_name, false) catch |err| try noexcept(err);
 
                 // 3. Perform ! env.InitializeBinding(n, undefined).
-                env.initializeBinding(agent, var_name, Value.undefined) catch |err| try noexcept(err);
+                env.initializeBinding(agent, var_name, .undefined) catch |err| try noexcept(err);
             }
         }
 
@@ -1291,9 +1291,9 @@ fn functionDeclarationInstantiation(
                 //     a. Let initialValue be undefined.
                 // 4. Else,
                 //     a. Let initialValue be ! env.GetBindingValue(n, false).
-                const initial_value = if (!containsSlice(parameter_bindings.items, try var_name.toUtf8(agent.gc_allocator)) or
+                const initial_value: Value = if (!containsSlice(parameter_bindings.items, try var_name.toUtf8(agent.gc_allocator)) or
                     function_names.contains(var_name))
-                    Value.undefined
+                    .undefined
                 else
                     env.getBindingValue(agent, var_name, false) catch |err| try noexcept(err);
 

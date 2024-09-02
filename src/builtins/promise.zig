@@ -56,7 +56,7 @@ pub const PromiseCapability = struct {
                 const exception = agent.clearException();
 
                 // a. Perform ? Call(capability.[[Reject]], undefined, « value.[[Value]] »).
-                _ = try Value.from(self.reject).callAssumeCallable(Value.undefined, &.{exception});
+                _ = try Value.from(self.reject).callAssumeCallable(.undefined, &.{exception});
 
                 // b. Return capability.[[Promise]].
                 return self.promise;
@@ -124,7 +124,7 @@ pub fn createResolvingFunctions(
             const already_resolved_ = &additional_fields_.already_resolved;
 
             // 5. If alreadyResolved.[[Value]] is true, return undefined.
-            if (already_resolved_.value) return Value.undefined;
+            if (already_resolved_.value) return .undefined;
 
             // 6. Set alreadyResolved.[[Value]] to true.
             already_resolved_.value = true;
@@ -142,7 +142,7 @@ pub fn createResolvingFunctions(
                 try rejectPromise(agent_, promise_, Value.from(self_resolution_error));
 
                 // c. Return undefined.
-                return Value.undefined;
+                return .undefined;
             }
 
             // 8. If resolution is not an Object, then
@@ -151,7 +151,7 @@ pub fn createResolvingFunctions(
                 try fulfillPromise(agent_, promise_, resolution);
 
                 // b. Return undefined.
-                return Value.undefined;
+                return .undefined;
             }
 
             // 9. Let then be Completion(Get(resolution, "then")).
@@ -167,7 +167,7 @@ pub fn createResolvingFunctions(
                     try rejectPromise(agent_, promise_, exception);
 
                     // b. Return undefined.
-                    return Value.undefined;
+                    return .undefined;
                 },
             };
 
@@ -177,7 +177,7 @@ pub fn createResolvingFunctions(
                 try fulfillPromise(agent_, promise_, resolution);
 
                 // b. Return undefined.
-                return Value.undefined;
+                return .undefined;
             }
 
             // 13. Let thenJobCallback be HostMakeJobCallback(thenAction).
@@ -195,7 +195,7 @@ pub fn createResolvingFunctions(
             try agent_.host_hooks.hostEnqueuePromiseJob(agent_, job.job, job.realm);
 
             // 16. Return undefined.
-            return Value.undefined;
+            return .undefined;
         }
     }.func;
 
@@ -208,7 +208,7 @@ pub fn createResolvingFunctions(
     const resolve = try createBuiltinFunction(agent, .{ .function = steps_resolve }, .{
         .length = length_resolve,
         .name = "",
-        .additional_fields = SafePointer.make(*AdditionalFields, additional_fields),
+        .additional_fields = .make(*AdditionalFields, additional_fields),
     });
 
     additional_fields.* = .{
@@ -239,7 +239,7 @@ pub fn createResolvingFunctions(
             const already_resolved_ = &additional_fields_.already_resolved;
 
             // 5. If alreadyResolved.[[Value]] is true, return undefined.
-            if (already_resolved_.value) return Value.undefined;
+            if (already_resolved_.value) return .undefined;
 
             // 6. Set alreadyResolved.[[Value]] to true.
             already_resolved_.value = true;
@@ -248,7 +248,7 @@ pub fn createResolvingFunctions(
             try rejectPromise(agent_, promise_, reason);
 
             // 8. Return undefined.
-            return Value.undefined;
+            return .undefined;
         }
     }.func;
 
@@ -261,7 +261,7 @@ pub fn createResolvingFunctions(
     const reject = try createBuiltinFunction(agent, .{ .function = steps_reject }, .{
         .length = length_reject,
         .name = "",
-        .additional_fields = SafePointer.make(*AdditionalFields, additional_fields),
+        .additional_fields = .make(*AdditionalFields, additional_fields),
     });
 
     // 10. Set reject.[[Promise]] to promise.
@@ -358,7 +358,7 @@ pub fn newPromiseCapability(agent: *Agent, constructor: Value) Agent.Error!Promi
             resolving_functions_.reject = reject;
 
             // e. Return undefined.
-            return Value.undefined;
+            return .undefined;
         }
     }.func;
 
@@ -367,12 +367,12 @@ pub fn newPromiseCapability(agent: *Agent, constructor: Value) Agent.Error!Promi
     const executor = try createBuiltinFunction(agent, .{ .function = executor_closure }, .{
         .length = 2,
         .name = "",
-        .additional_fields = SafePointer.make(*AdditionalFields, additional_fields),
+        .additional_fields = .make(*AdditionalFields, additional_fields),
     });
 
     // NOTE: This struct can outlive the function scope if anything holds on to the callback above.
     additional_fields.* = .{
-        .resolving_functions = .{ .resolve = Value.undefined, .reject = Value.undefined },
+        .resolving_functions = .{ .resolve = .undefined, .reject = .undefined },
     };
     const resolving_functions = &additional_fields.resolving_functions;
 
@@ -473,7 +473,7 @@ pub fn promiseResolve(agent: *Agent, constructor: Object, x: Value) Agent.Error!
     const promise_capability = try newPromiseCapability(agent, Value.from(constructor));
 
     // 3. Perform ? Call(promiseCapability.[[Resolve]], undefined, « x »).
-    _ = try Value.from(promise_capability.resolve).callAssumeCallable(Value.undefined, &.{x});
+    _ = try Value.from(promise_capability.resolve).callAssumeCallable(.undefined, &.{x});
 
     // 4. Return promiseCapability.[[Promise]].
     return promise_capability.promise;
@@ -530,7 +530,7 @@ pub fn newPromiseReactionJob(
             // e. Else,
             else blk: {
                 // i. Let handlerResult be Completion(HostCallJobCallback(handler, undefined, « argument »)).
-                if (agent_.host_hooks.hostCallJobCallback(handler.?, Value.undefined, &.{argument_})) |value|
+                if (agent_.host_hooks.hostCallJobCallback(handler.?, .undefined, &.{argument_})) |value|
                     break :blk Completion.normal(value)
                 else |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
@@ -544,7 +544,7 @@ pub fn newPromiseReactionJob(
                 std.debug.assert(handler_result.type == .normal);
 
                 // ii. Return empty.
-                return Value.undefined;
+                return .undefined;
             }
 
             // g. Assert: promiseCapability is a PromiseCapability Record.
@@ -552,7 +552,7 @@ pub fn newPromiseReactionJob(
             if (handler_result.type != .normal) {
                 // i. Return ? Call(promiseCapability.[[Reject]], undefined, « handlerResult.[[Value]] »).
                 return Value.from(promise_capability.?.reject).callAssumeCallable(
-                    Value.undefined,
+                    .undefined,
                     &.{handler_result.value.?},
                 );
             }
@@ -560,13 +560,13 @@ pub fn newPromiseReactionJob(
             else {
                 // i. Return ? Call(promiseCapability.[[Resolve]], undefined, « handlerResult.[[Value]] »).
                 return Value.from(promise_capability.?.resolve).callAssumeCallable(
-                    Value.undefined,
+                    .undefined,
                     &.{handler_result.value.?},
                 );
             }
         }
     }.func;
-    const job: Job = .{ .func = func, .captures = SafePointer.make(*Captures, captures) };
+    const job: Job = .{ .func = func, .captures = .make(*Captures, captures) };
 
     // 2. Let handlerRealm be null.
     var handler_realm: ?*Realm = null;
@@ -645,7 +645,7 @@ pub fn newPromiseResolveThenableJob(
                     // i. Return ? Call(resolvingFunctions.[[Reject]], undefined,
                     //    « thenCallResult.[[Value]] »).
                     return Value.from(resolving_functions.reject).callAssumeCallable(
-                        Value.undefined,
+                        .undefined,
                         &.{agent_.exception.?},
                     );
                 },
@@ -655,7 +655,7 @@ pub fn newPromiseResolveThenableJob(
             return then_call_result;
         }
     }.func;
-    const job: Job = .{ .func = func, .captures = SafePointer.make(*Captures, captures) };
+    const job: Job = .{ .func = func, .captures = .make(*Captures, captures) };
 
     // 2. Let getThenRealmResult be Completion(GetFunctionRealm(then.[[Callback]])).
     const get_handler_realm_result = then.callback.getFunctionRealm();
@@ -730,7 +730,7 @@ fn performPromiseAll(
 
                 // 2. Perform ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
                 _ = try Value.from(result_capability.resolve).callAssumeCallable(
-                    Value.undefined,
+                    .undefined,
                     &.{Value.from(values_array)},
                 );
             }
@@ -740,7 +740,7 @@ fn performPromiseAll(
         };
 
         // c. Append undefined to values.
-        try values.append(Value.undefined);
+        try values.append(.undefined);
 
         // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
@@ -778,7 +778,7 @@ fn performPromiseAll(
                 const additional_fields = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
 
                 // 2. If F.[[AlreadyCalled]] is true, return undefined.
-                if (additional_fields.already_called) return Value.undefined;
+                if (additional_fields.already_called) return .undefined;
 
                 // 3. Set F.[[AlreadyCalled]] to true.
                 additional_fields.already_called = true;
@@ -808,13 +808,13 @@ fn performPromiseAll(
 
                     // b. Return ? Call(promiseCapability.[[Resolve]], undefined, « valuesArray »).
                     return Value.from(promise_capability.resolve).callAssumeCallable(
-                        Value.undefined,
+                        .undefined,
                         &.{Value.from(values_array)},
                     );
                 }
 
                 // 11. Return undefined.
-                return Value.undefined;
+                return .undefined;
             }
         }.func;
 
@@ -828,7 +828,7 @@ fn performPromiseAll(
         const on_fulfilled = try createBuiltinFunction(agent, .{ .function = steps }, .{
             .length = length,
             .name = "",
-            .additional_fields = SafePointer.make(*AdditionalFields, additional_fields),
+            .additional_fields = .make(*AdditionalFields, additional_fields),
         });
 
         additional_fields.* = .{
@@ -898,7 +898,7 @@ fn performPromiseAllSettled(
 
                 // 2. Perform ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
                 _ = try Value.from(result_capability.resolve).callAssumeCallable(
-                    Value.undefined,
+                    .undefined,
                     &.{Value.from(values_array)},
                 );
             }
@@ -908,7 +908,7 @@ fn performPromiseAllSettled(
         };
 
         // c. Append undefined to values.
-        try values.append(Value.undefined);
+        try values.append(.undefined);
 
         // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
@@ -952,7 +952,7 @@ fn performPromiseAllSettled(
                 const already_called_ = additional_fields_.already_called;
 
                 // 3. If alreadyCalled.[[Value]] is true, return undefined.
-                if (already_called_.value) return Value.undefined;
+                if (already_called_.value) return .undefined;
 
                 // 4. Set alreadyCalled.[[Value]] to true.
                 already_called_.value = true;
@@ -1000,13 +1000,13 @@ fn performPromiseAllSettled(
 
                     // b. Return ? Call(promiseCapability.[[Resolve]], undefined, « valuesArray »).
                     return Value.from(promise_capability.resolve).callAssumeCallable(
-                        Value.undefined,
+                        .undefined,
                         &.{Value.from(values_array)},
                     );
                 }
 
                 // 15. Return undefined.
-                return Value.undefined;
+                return .undefined;
             }
         }.func;
 
@@ -1020,7 +1020,7 @@ fn performPromiseAllSettled(
         const on_fulfilled = try createBuiltinFunction(agent, .{ .function = steps_fulfilled }, .{
             .length = length_fulfilled,
             .name = "",
-            .additional_fields = SafePointer.make(*AdditionalFields, on_fulfilled_additional_fields),
+            .additional_fields = .make(*AdditionalFields, on_fulfilled_additional_fields),
         });
 
         // h. Let alreadyCalled be the Record { [[Value]]: false }.
@@ -1062,7 +1062,7 @@ fn performPromiseAllSettled(
                 const already_called_ = additional_fields_.already_called;
 
                 // 3. If alreadyCalled.[[Value]] is true, return undefined.
-                if (already_called_.value) return Value.undefined;
+                if (already_called_.value) return .undefined;
 
                 // 4. Set alreadyCalled.[[Value]] to true.
                 already_called_.value = true;
@@ -1110,13 +1110,13 @@ fn performPromiseAllSettled(
 
                     // b. Return ? Call(promiseCapability.[[Resolve]], undefined, « valuesArray »).
                     return Value.from(promise_capability.resolve).callAssumeCallable(
-                        Value.undefined,
+                        .undefined,
                         &.{Value.from(values_array)},
                     );
                 }
 
                 // 15. Return undefined.
-                return Value.undefined;
+                return .undefined;
             }
         }.func;
 
@@ -1130,7 +1130,7 @@ fn performPromiseAllSettled(
         const on_rejected = try createBuiltinFunction(agent, .{ .function = steps_rejected }, .{
             .length = length_rejected,
             .name = "",
-            .additional_fields = SafePointer.make(*AdditionalFields, on_rejected_additional_fields),
+            .additional_fields = .make(*AdditionalFields, on_rejected_additional_fields),
         });
 
         on_rejected_additional_fields.* = .{
@@ -1223,7 +1223,7 @@ fn performPromiseAny(
         };
 
         // c. Append undefined to errors.
-        try errors.append(Value.undefined);
+        try errors.append(.undefined);
 
         // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
@@ -1262,7 +1262,7 @@ fn performPromiseAny(
                 const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*AdditionalFields);
 
                 // 2. If F.[[AlreadyCalled]] is true, return undefined.
-                if (additional_fields_.already_called) return Value.undefined;
+                if (additional_fields_.already_called) return .undefined;
 
                 // 3. Set F.[[AlreadyCalled]] to true.
                 additional_fields_.already_called = true;
@@ -1307,13 +1307,13 @@ fn performPromiseAny(
 
                     // c. Return ? Call(promiseCapability.[[Reject]], undefined, « error »).
                     return Value.from(promise_capability.reject).callAssumeCallable(
-                        Value.undefined,
+                        .undefined,
                         &.{Value.from(error_)},
                     );
                 }
 
                 // 11. Return undefined.
-                return Value.undefined;
+                return .undefined;
             }
         }.func;
 
@@ -1327,7 +1327,7 @@ fn performPromiseAny(
         const on_rejected = try createBuiltinFunction(agent, .{ .function = steps_rejected }, .{
             .length = length_rejected,
             .name = "",
-            .additional_fields = SafePointer.make(*AdditionalFields, additional_fields),
+            .additional_fields = .make(*AdditionalFields, additional_fields),
         });
 
         additional_fields.* = .{
@@ -1573,10 +1573,10 @@ pub const PromiseConstructor = struct {
                 .promise_state = .pending,
 
                 // 5. Set promise.[[PromiseFulfillReactions]] to a new empty List.
-                .promise_fulfill_reactions = std.ArrayList(PromiseReaction).init(agent.gc_allocator),
+                .promise_fulfill_reactions = .init(agent.gc_allocator),
 
                 // 6. Set promise.[[PromiseRejectReactions]] to a new empty List.
-                .promise_reject_reactions = std.ArrayList(PromiseReaction).init(agent.gc_allocator),
+                .promise_reject_reactions = .init(agent.gc_allocator),
 
                 // 7. Set promise.[[PromiseIsHandled]] to false.
                 .promise_is_handled = false,
@@ -1589,7 +1589,7 @@ pub const PromiseConstructor = struct {
         // 9. Let completion be Completion(Call(executor, undefined, « resolvingFunctions.[[Resolve]],
         //    resolvingFunctions.[[Reject]] »)).
         _ = executor.callAssumeCallable(
-            Value.undefined,
+            .undefined,
             &.{ Value.from(resolving_functions.resolve), Value.from(resolving_functions.reject) },
         ) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
@@ -1600,7 +1600,7 @@ pub const PromiseConstructor = struct {
 
                 // a. Perform ? Call(resolvingFunctions.[[Reject]], undefined, « completion.[[Value]] »).
                 _ = try Value.from(resolving_functions.reject).callAssumeCallable(
-                    Value.undefined,
+                    .undefined,
                     &.{exception},
                 );
             },
@@ -1851,7 +1851,7 @@ pub const PromiseConstructor = struct {
         const promise_capability = try newPromiseCapability(agent, constructor_);
 
         // 4. Let status be Completion(Call(callback, undefined, args)).
-        const status = callback.call(agent, Value.undefined, args);
+        const status = callback.call(agent, .undefined, args);
 
         // 5. If status is an abrupt completion, then
         //     a. Perform ? Call(promiseCapability.[[Reject]], undefined, « status.[[Value]] »).
@@ -1859,7 +1859,7 @@ pub const PromiseConstructor = struct {
         //     a. Perform ? Call(promiseCapability.[[Resolve]], undefined, « status.[[Value]] »).
         if (status) |value| {
             _ = try Value.from(promise_capability.resolve).callAssumeCallable(
-                Value.undefined,
+                .undefined,
                 &.{value},
             );
         } else |err| switch (err) {
@@ -1867,7 +1867,7 @@ pub const PromiseConstructor = struct {
             error.ExceptionThrown => {
                 const exception = agent.clearException();
                 _ = try Value.from(promise_capability.reject).callAssumeCallable(
-                    Value.undefined,
+                    .undefined,
                     &.{exception},
                 );
             },
@@ -1965,7 +1965,7 @@ pub const PromisePrototype = struct {
         const promise = this_value;
 
         // 2. Return ? Invoke(promise, "then", « undefined, onRejected »).
-        return promise.invoke(agent, PropertyKey.from("then"), &.{ Value.undefined, on_rejected });
+        return promise.invoke(agent, PropertyKey.from("then"), &.{ .undefined, on_rejected });
     }
 
     /// 27.2.5.3 Promise.prototype.finally ( onFinally )
@@ -2019,7 +2019,7 @@ pub const PromisePrototype = struct {
                     const value = arguments_.get(0);
 
                     // i. Let result be ? Call(onFinally, undefined).
-                    const result = try on_finally_.callAssumeCallableNoArgs(Value.undefined);
+                    const result = try on_finally_.callAssumeCallableNoArgs(.undefined);
 
                     // ii. Let p be ? PromiseResolve(C, result).
                     const new_promise = try promiseResolve(agent_, constructor_, result);
@@ -2045,7 +2045,7 @@ pub const PromisePrototype = struct {
                     }, .{
                         .length = 0,
                         .name = "",
-                        .additional_fields = SafePointer.make(*Value, value_capture),
+                        .additional_fields = .make(*Value, value_capture),
                     });
 
                     // v. Return ? Invoke(p, "then", « valueThunk »).
@@ -2062,7 +2062,7 @@ pub const PromisePrototype = struct {
                 try createBuiltinFunction(agent, .{ .function = then_finally_closure }, .{
                     .length = 1,
                     .name = "",
-                    .additional_fields = SafePointer.make(*Captures, captures),
+                    .additional_fields = .make(*Captures, captures),
                 }),
             );
 
@@ -2077,7 +2077,7 @@ pub const PromisePrototype = struct {
                     const reason = arguments_.get(0);
 
                     // i. Let result be ? Call(onFinally, undefined).
-                    const result = try on_finally_.callAssumeCallableNoArgs(Value.undefined);
+                    const result = try on_finally_.callAssumeCallableNoArgs(.undefined);
 
                     // ii. Let p be ? PromiseResolve(C, result).
                     const new_promise = try promiseResolve(agent_, constructor_, result);
@@ -2104,7 +2104,7 @@ pub const PromisePrototype = struct {
                     }, .{
                         .length = 0,
                         .name = "",
-                        .additional_fields = SafePointer.make(*Value, reason_capture),
+                        .additional_fields = .make(*Value, reason_capture),
                     });
 
                     // v. Return ? Invoke(p, "then", « thrower »).
@@ -2121,7 +2121,7 @@ pub const PromisePrototype = struct {
                 try createBuiltinFunction(agent, .{ .function = catch_finally_closure }, .{
                     .length = 1,
                     .name = "",
-                    .additional_fields = SafePointer.make(*Captures, captures),
+                    .additional_fields = .make(*Captures, captures),
                 }),
             );
         }
@@ -2161,7 +2161,7 @@ pub const PromisePrototype = struct {
                 on_fulfilled,
                 on_rejected,
                 result_capability,
-            ) orelse return Value.undefined,
+            ) orelse return .undefined,
         );
     }
 };

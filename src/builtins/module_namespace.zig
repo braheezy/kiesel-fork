@@ -165,7 +165,7 @@ fn get(object: Object, property_key: PropertyKey, receiver: Value) Agent.Error!V
 
     // 3. If exports does not contain P, return undefined.
     if (!containsSlice(exports, property_key_string)) {
-        return Value.undefined;
+        return .undefined;
     }
 
     // 4. Let m be O.[[Module]].

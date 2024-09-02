@@ -372,7 +372,7 @@ pub const IntlSegmentsPrototype = struct {
         const n = try index.toIntegerOrInfinity(agent);
 
         // 7. If n < 0 or n ≥ len, return undefined.
-        if (n < 0 or n >= @as(f64, @floatFromInt(len))) return Value.undefined;
+        if (n < 0 or n >= @as(f64, @floatFromInt(len))) return .undefined;
 
         // 8. Let startIndex be FindBoundary(segmenter, string, n, before).
         const boundary_before = findBoundary(segmenter, string, @intFromFloat(n), .before);
@@ -500,7 +500,7 @@ pub const IntlSegmentIteratorPrototype = struct {
         // 7. If startIndex ≥ len, then
         if (start_index >= len) {
             // a. Return CreateIteratorResultObject(undefined, true).
-            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, .undefined, true));
         }
 
         // 8. Let endIndex be FindBoundary(segmenter, string, startIndex, after).
@@ -655,9 +655,9 @@ fn findBoundaryBefore(
     const data_provider = icu4zig.DataProvider.init();
     defer data_provider.deinit();
     const segmenter: AnySegmenter = switch (granularity) {
-        .grapheme => .{ .grapheme = icu4zig.GraphemeClusterSegmenter.init(data_provider) },
-        .word => .{ .word = icu4zig.WordSegmenter.init(data_provider) },
-        .sentence => .{ .sentence = icu4zig.SentenceSegmenter.init(data_provider) },
+        .grapheme => .{ .grapheme = .init(data_provider) },
+        .word => .{ .word = .init(data_provider) },
+        .sentence => .{ .sentence = .init(data_provider) },
     };
     defer segmenter.deinit();
     var iterator = segmenter.segment(string);
@@ -684,9 +684,9 @@ fn findBoundaryAfter(
     const data_provider = icu4zig.DataProvider.init();
     defer data_provider.deinit();
     const segmenter: AnySegmenter = switch (granularity) {
-        .grapheme => .{ .grapheme = icu4zig.GraphemeClusterSegmenter.init(data_provider) },
-        .word => .{ .word = icu4zig.WordSegmenter.init(data_provider) },
-        .sentence => .{ .sentence = icu4zig.SentenceSegmenter.init(data_provider) },
+        .grapheme => .{ .grapheme = .init(data_provider) },
+        .word => .{ .word = .init(data_provider) },
+        .sentence => .{ .sentence = .init(data_provider) },
     };
     defer segmenter.deinit();
     var iterator = segmenter.segment(string);

@@ -177,7 +177,7 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: u64) Ag
         if (this_realm != constructor_realm) {
             // i. If SameValue(C, realmC.[[Intrinsics]].[[%Array%]]) is true, set C to undefined.
             if (constructor.asObject().sameValue(try constructor_realm.intrinsics.@"%Array%"())) {
-                constructor = Value.undefined;
+                constructor = .undefined;
             }
         }
     }
@@ -191,7 +191,7 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: u64) Ag
         );
 
         // b. If C is null, set C to undefined.
-        if (constructor.isNull()) constructor = Value.undefined;
+        if (constructor.isNull()) constructor = .undefined;
     }
 
     // 6. If C is undefined, return ? ArrayCreate(length).
@@ -841,7 +841,7 @@ pub const ArrayPrototype = struct {
             @as(f64, @floatFromInt(len)) + relative_index;
 
         // 6. If k < 0 or k ≥ len, return undefined.
-        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return Value.undefined;
+        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return .undefined;
         const k: u53 = @intFromFloat(k_f64);
 
         // 7. Return ? Get(O, ! ToString(𝔽(k))).
@@ -1566,7 +1566,7 @@ pub const ArrayPrototype = struct {
         }
 
         // 6. Return undefined.
-        return Value.undefined;
+        return .undefined;
     }
 
     /// 23.1.3.16 Array.prototype.includes ( searchElement [ , fromIndex ] )
@@ -1869,7 +1869,7 @@ pub const ArrayPrototype = struct {
             try object.set(PropertyKey.from("length"), Value.from(0), .throw);
 
             // b. Return undefined.
-            return Value.undefined;
+            return .undefined;
         }
         // 4. Else,
         else {
@@ -2013,7 +2013,7 @@ pub const ArrayPrototype = struct {
 
                 // ii. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k), O »).
                 accumulator = try callback.callAssumeCallable(
-                    Value.undefined,
+                    .undefined,
                     &.{ accumulator, k_value, Value.from(k), Value.from(object) },
                 );
             }
@@ -2109,7 +2109,7 @@ pub const ArrayPrototype = struct {
 
                 // ii. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k), O »).
                 accumulator = try callback.callAssumeCallable(
-                    Value.undefined,
+                    .undefined,
                     &.{ accumulator, k_value, Value.from(k.?), Value.from(object) },
                 );
             }
@@ -2219,7 +2219,7 @@ pub const ArrayPrototype = struct {
             try object.set(PropertyKey.from("length"), Value.from(0), .throw);
 
             // b. Return undefined.
-            return Value.undefined;
+            return .undefined;
         }
 
         // 4. Let first be ? Get(O, "0").
@@ -3132,7 +3132,7 @@ pub fn findViaPredicate(
     }
 
     // 5. Return the Record { [[Index]]: -1𝔽, [[Value]]: undefined }.
-    return .{ .index = Value.from(-1), .value = Value.undefined };
+    return .{ .index = Value.from(-1), .value = .undefined };
 }
 
 const SortCompare = struct {
@@ -3239,7 +3239,7 @@ pub fn compareArrayElements(
     if (maybe_comparator) |comparator| {
         // a. Let v be ? ToNumber(? Call(comparator, undefined, « x, y »)).
         const value = try (try Value.from(comparator).callAssumeCallable(
-            Value.undefined,
+            .undefined,
             &.{ x, y },
         )).toNumber(agent);
 

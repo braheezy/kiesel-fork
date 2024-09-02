@@ -296,7 +296,7 @@ pub fn createGlobalVarBinding(
         try self.object_record.createMutableBinding(agent, name, deletable);
 
         // b. Perform ? ObjRec.InitializeBinding(N, undefined).
-        try self.object_record.initializeBinding(agent, name, Value.undefined);
+        try self.object_record.initializeBinding(agent, name, .undefined);
     }
 
     // 6. If envRec.[[VarNames]] does not contain N, then

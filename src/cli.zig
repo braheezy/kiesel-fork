@@ -105,7 +105,7 @@ const Kiesel = struct {
 
     fn collect(_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         kiesel.gc.collect();
-        return Value.undefined;
+        return .undefined;
     }
 
     fn createIsHTMLDDA(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
@@ -136,7 +136,7 @@ const Kiesel = struct {
                         ///
                         /// We pick the most common one :^)
                         fn call(_: Object, _: Value, _: Arguments) Agent.Error!Value {
-                            return Value.null;
+                            return .null;
                         }
                     }.call,
                 },
@@ -163,7 +163,7 @@ const Kiesel = struct {
             array_buffer.asObject().as(kiesel.builtins.ArrayBuffer),
             null,
         );
-        return Value.undefined;
+        return .undefined;
     }
 
     /// Algorithm from https://github.com/tc39/test262/blob/main/INTERPRETING.md
@@ -220,7 +220,7 @@ const Kiesel = struct {
             stdout.print("{pretty}{s}", .{ value, end }) catch {}
         else
             stdout.print("{}{s}", .{ try value.toString(agent), end }) catch {};
-        return Value.undefined;
+        return .undefined;
     }
 
     fn readFile_(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
@@ -291,7 +291,7 @@ const Kiesel = struct {
         }
         const nanoseconds = std.math.lossyCast(u64, milliseconds.asFloat() * 1_000_000);
         std.time.sleep(nanoseconds);
-        return Value.undefined;
+        return .undefined;
     }
 
     fn writeFile(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
@@ -316,7 +316,7 @@ const Kiesel = struct {
                 .{@errorName(err)},
             );
         };
-        return Value.undefined;
+        return .undefined;
     }
 };
 
@@ -749,10 +749,10 @@ pub fn main() !u8 {
         } else |_| {}
     }
 
-    tracked_promise_rejections = @TypeOf(tracked_promise_rejections).init(agent.gc_allocator);
+    tracked_promise_rejections = .init(agent.gc_allocator);
     defer tracked_promise_rejections.deinit();
 
-    module_cache = std.StringHashMap(Module).init(agent.gc_allocator);
+    module_cache = .init(agent.gc_allocator);
     defer module_cache.deinit();
 
     agent.host_hooks.hostLoadImportedModule = struct {

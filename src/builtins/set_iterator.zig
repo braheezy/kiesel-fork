@@ -81,7 +81,7 @@ pub const SetIteratorPrototype = struct {
 
         // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
         if (set_iterator.fields == .completed) {
-            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, .undefined, true));
         }
 
         const set = set_iterator.fields.state.set;
@@ -116,7 +116,7 @@ pub const SetIteratorPrototype = struct {
         else {
             set_iterator.fields = .completed;
             set.fields.unregisterIterator();
-            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, .undefined, true));
         };
 
         set_iterator.fields.state.index = index;

@@ -83,7 +83,7 @@ pub const ArrayIteratorPrototype = struct {
 
         // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
         if (array_iterator.fields == .completed) {
-            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, .undefined, true));
         }
 
         const array = array_iterator.fields.state.array;
@@ -115,7 +115,7 @@ pub const ArrayIteratorPrototype = struct {
         // iii. If index ≥ len, return NormalCompletion(undefined).
         if (index >= len) {
             array_iterator.fields = .completed;
-            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, .undefined, true));
         }
 
         // iv. Let indexNumber be 𝔽(index).

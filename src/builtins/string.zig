@@ -212,14 +212,14 @@ pub fn getSubstitution(
             const ref = try template_reminder.substring(agent.gc_allocator, 0, 1 + digit_count);
 
             // viii. If 1 ≤ index ≤ captureLen, then
-            const ref_replacement = if (index >= 1 and index <= capture_len) blk_ref_replacement: {
+            const ref_replacement: types.String = if (index >= 1 and index <= capture_len) blk_ref_replacement: {
                 // 1. Let capture be captures[index - 1].
                 const capture = captures[index - 1];
 
                 // 2. If capture is undefined, then
                 if (capture == null) {
                     // a. Let refReplacement be the empty String.
-                    break :blk_ref_replacement types.String.empty;
+                    break :blk_ref_replacement .empty;
                 }
                 // 3. Else,
                 else {
@@ -272,8 +272,8 @@ pub fn getSubstitution(
                 //     a. Let refReplacement be the empty String.
                 // 6. Else,
                 //     a. Let refReplacement be ? ToString(capture).
-                const ref_replacement = if (capture.isUndefined())
-                    types.String.empty
+                const ref_replacement: types.String = if (capture.isUndefined())
+                    .empty
                 else
                     try capture.toString(agent);
 
@@ -533,11 +533,11 @@ pub const StringConstructor = struct {
     fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const value = arguments.get(0);
 
-        const s = blk: {
+        const s: types.String = blk: {
             // 1. If value is not present, then
             if (arguments.count() == 0) {
                 // a. Let s be the empty String.
-                break :blk types.String.empty;
+                break :blk .empty;
             }
             // 2. Else,
             else {
@@ -687,7 +687,7 @@ pub const StringPrototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return String.create(realm.agent, .{
             .fields = .{
-                .string_data = types.String.empty,
+                .string_data = .empty,
             },
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
@@ -816,7 +816,7 @@ pub const StringPrototype = struct {
             @as(f64, @floatFromInt(len)) + relative_index;
 
         // 7. If k < 0 or k ≥ len, return undefined.
-        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return Value.undefined;
+        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return .undefined;
         const k: usize = @intFromFloat(k_f64);
 
         // 8. Return the substring of S from k to k + 1.
@@ -866,7 +866,7 @@ pub const StringPrototype = struct {
         const size = string.length();
 
         // 5. If position < 0 or position ≥ size, return NaN.
-        if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return Value.nan;
+        if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return .nan;
         const position: usize = @intFromFloat(position_f64);
 
         // 6. Return the Number value for the numeric value of the code unit at index position
@@ -892,7 +892,7 @@ pub const StringPrototype = struct {
         const size = string.length();
 
         // 5. If position < 0 or position ≥ size, return undefined.
-        if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return Value.undefined;
+        if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return .undefined;
         const position: usize = @intFromFloat(position_f64);
 
         // 6. Let cp be CodePointAt(S, position).
@@ -1188,7 +1188,7 @@ pub const StringPrototype = struct {
         const string = try object.toString(agent);
 
         // 4. Let rx be ? RegExpCreate(regexp, undefined).
-        const rx = try regExpCreate(agent, regexp, Value.undefined);
+        const rx = try regExpCreate(agent, regexp, .undefined);
 
         // 5. Return ? Invoke(rx, %Symbol.match%, « S »).
         return Value.from(rx).invoke(
@@ -1425,7 +1425,7 @@ pub const StringPrototype = struct {
             //    𝔽(position), string »)).
             break :blk try (try replace_value.call(
                 agent,
-                Value.undefined,
+                .undefined,
                 &.{
                     Value.from(search_string),
                     Value.from(@as(f64, @floatFromInt(position.?))),
@@ -1547,7 +1547,7 @@ pub const StringPrototype = struct {
         var end_of_last_match: usize = 0;
 
         // 13. Let result be the empty String.
-        var result = types.String.empty;
+        var result: types.String = .empty;
 
         // 14. For each element p of matchPositions, do
         for (match_positions.items) |position| {
@@ -1559,7 +1559,7 @@ pub const StringPrototype = struct {
                 // i. Let replacement be ? ToString(? Call(replaceValue, undefined, « searchString,
                 //    𝔽(p), string »)).
                 break :blk try (try replace_value.callAssumeCallable(
-                    Value.undefined,
+                    .undefined,
                     &.{
                         Value.from(search_string),
                         Value.from(@as(f64, @floatFromInt(position))),
@@ -1641,7 +1641,7 @@ pub const StringPrototype = struct {
         const string = try object.toString(agent);
 
         // 4. Let rx be ? RegExpCreate(regexp, undefined).
-        const rx = try regExpCreate(agent, regexp, Value.undefined);
+        const rx = try regExpCreate(agent, regexp, .undefined);
 
         // 5. Return ? Invoke(rx, %Symbol.search%, « string »).
         return Value.from(rx).invoke(

@@ -21,9 +21,8 @@ const typedArrayElementSize = builtins.typedArrayElementSize;
 const typedArrayLength = builtins.typedArrayLength;
 const weakRefDeref = @import("builtins/weak_ref.zig").weakRefDeref;
 
-const SeenObjects = std.AutoHashMap(*allowzero Object.Data, usize);
 const State = struct {
-    seen_objects: SeenObjects,
+    seen_objects: std.AutoHashMap(*allowzero Object.Data, usize),
     print_in_progress: bool,
     tty_config: std.io.tty.Config,
 };
@@ -32,7 +31,7 @@ var fba_buf: [64 * 1024]u8 = undefined;
 var fba = std.heap.FixedBufferAllocator.init(&fba_buf);
 var arena = std.heap.ArenaAllocator.init(fba.allocator());
 pub var state: State = .{
-    .seen_objects = SeenObjects.init(arena.allocator()),
+    .seen_objects = .init(arena.allocator()),
     .print_in_progress = false,
     .tty_config = undefined, // Set whenever an `Agent` is created
 };

@@ -26,7 +26,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// Recursively convert a `std.json.Value` to a JS `Value`.
 fn convertJsonValue(agent: *Agent, value: std.json.Value) std.mem.Allocator.Error!Value {
     return switch (value) {
-        .null => Value.null,
+        .null => .null,
         .bool => |x| Value.from(x),
         .float => |x| Value.from(x),
         .integer => |x| Value.from(@as(f64, @floatFromInt(x))),
@@ -688,7 +688,7 @@ pub const JSON = struct {
         defer stack.deinit();
 
         // 2. Let indent be the empty String.
-        const indent = String.empty;
+        const indent: String = .empty;
 
         // 3. Let PropertyList be undefined.
         var property_list: ?PropertyKeyArrayHashMap(void) = null;
@@ -712,7 +712,7 @@ pub const JSON = struct {
                 // ii. If isArray is true, then
                 if (is_array) {
                     // 1. Set PropertyList to a new empty List.
-                    property_list = PropertyKeyArrayHashMap(void).init(agent.gc_allocator);
+                    property_list = .init(agent.gc_allocator);
 
                     // 2. Let len be ? LengthOfArrayLike(replacer).
                     const len = try replacer.asObject().lengthOfArrayLike();
@@ -779,7 +779,7 @@ pub const JSON = struct {
         }
 
         // 7. If space is a Number, then
-        const gap = if (space.isNumber()) blk: {
+        const gap: String = if (space.isNumber()) blk: {
             // a. Let spaceMV be ! ToIntegerOrInfinity(space).
             // b. Set spaceMV to min(10, spaceMV).
             const space_mv = @min(10, space.toIntegerOrInfinity(agent) catch unreachable);
@@ -787,7 +787,7 @@ pub const JSON = struct {
             // c. If spaceMV < 1, let gap be the empty String; otherwise let gap be the String
             //    value containing spaceMV occurrences of the code unit 0x0020 (SPACE).
             if (space_mv < 1)
-                break :blk String.empty
+                break :blk .empty
             else {
                 const s = try agent.gc_allocator.alloc(u8, @intFromFloat(space_mv));
                 @memset(s, ' ');
@@ -806,7 +806,7 @@ pub const JSON = struct {
         // 9. Else,
         else blk: {
             // a. Let gap be the empty String.
-            break :blk String.empty;
+            break :blk .empty;
         };
 
         // 10. Let wrapper be OrdinaryObjectCreate(%Object.prototype%).
@@ -837,6 +837,6 @@ pub const JSON = struct {
         return if (try serializeJSONProperty(agent, &state, PropertyKey.from(""), wrapper)) |string|
             Value.from(string)
         else
-            Value.undefined;
+            .undefined;
     }
 };

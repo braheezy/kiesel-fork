@@ -83,10 +83,10 @@ pub fn init(gc_allocator: std.mem.Allocator, options: Options) std.mem.Allocator
         .zero = try BigInt.from(self.gc_allocator, 0),
         .one = try BigInt.from(self.gc_allocator, 1),
     };
-    self.well_known_symbols = try WellKnownSymbols.init(self.gc_allocator);
-    self.global_symbol_registry = StringHashMap(Symbol).init(self.gc_allocator);
-    self.execution_context_stack = std.ArrayList(ExecutionContext).init(self.gc_allocator);
-    self.queued_jobs = std.ArrayList(QueuedJob).init(self.gc_allocator);
+    self.well_known_symbols = try .init(self.gc_allocator);
+    self.global_symbol_registry = .init(self.gc_allocator);
+    self.execution_context_stack = .init(self.gc_allocator);
+    self.queued_jobs = .init(self.gc_allocator);
     return self;
 }
 

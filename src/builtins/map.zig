@@ -123,7 +123,7 @@ pub const MapConstructor = struct {
             "%Map.prototype%",
             .{
                 // 3. Set map.[[MapData]] to a new empty List.
-                .map_data = MapData.init(agent.gc_allocator),
+                .map_data = .init(agent.gc_allocator),
             },
         );
 
@@ -238,7 +238,7 @@ pub const MapPrototype = struct {
         }
 
         // 4. Return undefined.
-        return Value.undefined;
+        return .undefined;
     }
 
     /// 24.1.3.3 Map.prototype.delete ( key )
@@ -329,7 +329,7 @@ pub const MapPrototype = struct {
         }
 
         // 8. Return undefined.
-        return Value.undefined;
+        return .undefined;
     }
 
     /// 24.1.3.6 Map.prototype.get ( key )
@@ -349,7 +349,7 @@ pub const MapPrototype = struct {
         if (map.fields.map_data.get(key)) |value| return value;
 
         // 5. Return undefined.
-        return Value.undefined;
+        return .undefined;
     }
 
     /// 24.1.3.7 Map.prototype.has ( key )
@@ -456,7 +456,7 @@ pub const Map = MakeObject(.{
         pub fn registerIterator(self: *@This()) std.mem.Allocator.Error!*IterableKeys {
             if (self.active_iterators == 0) {
                 std.debug.assert(self.iterable_keys == null);
-                self.iterable_keys = try IterableKeys.initCapacity(self.map_data.allocator, self.map_data.count());
+                self.iterable_keys = try .initCapacity(self.map_data.allocator, self.map_data.count());
                 for (self.map_data.keys()) |key| {
                     self.iterable_keys.?.appendAssumeCapacity(key);
                 }

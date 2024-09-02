@@ -820,14 +820,14 @@ pub fn defineField(self: *Object, field: ClassFieldDefinition) Agent.Error!void 
 
     // 2. Let initializer be fieldRecord.[[Initializer]].
     // 3. If initializer is not empty, then
-    const init_value = if (field.initializer) |initializer| blk: {
+    const init_value: Value = if (field.initializer) |initializer| blk: {
         // a. Let initValue be ? Call(initializer, receiver).
         break :blk try Value.from(initializer.object()).callAssumeCallableNoArgs(Value.from(self.*));
     }
     // 4. Else,
     else blk: {
         // a. Let initValue be undefined.
-        break :blk Value.undefined;
+        break :blk .undefined;
     };
 
     switch (field.name) {

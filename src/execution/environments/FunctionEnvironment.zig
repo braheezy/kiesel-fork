@@ -110,12 +110,12 @@ pub fn getSuperBase(self: FunctionEnvironment) Agent.Error!Value {
     const home = self.function_object.fields.home_object;
 
     // 2. If home is undefined, return undefined.
-    if (home == null) return Value.undefined;
+    if (home == null) return .undefined;
 
     // 3. Assert: home is an Object.
     // 4. Return ? home.[[GetPrototypeOf]]().
     return if (try home.?.internalMethods().getPrototypeOf(home.?)) |prototype|
         Value.from(prototype)
     else
-        Value.null;
+        .null;
 }

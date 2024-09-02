@@ -177,9 +177,9 @@ pub fn loadRequestedModules(
     state.* = .{
         .is_loading = true,
         .pending_modules_count = 1,
-        .visited = GraphLoadingState.Visited.init(agent.gc_allocator),
+        .visited = .init(agent.gc_allocator),
         .promise_capability = promise_capability,
-        .host_defined = host_defined orelse SafePointer.null_pointer,
+        .host_defined = host_defined orelse .null_pointer,
     };
 
     // 4. Perform InnerModuleLoading(state, module).
@@ -263,8 +263,8 @@ fn innerModuleLoading(
 
         // c. Perform ! Call(state.[[PromiseCapability]].[[Resolve]], undefined, « undefined »).
         _ = Value.from(state.promise_capability.resolve).callAssumeCallable(
-            Value.undefined,
-            &.{Value.undefined},
+            .undefined,
+            &.{.undefined},
         ) catch |err| try noexcept(err);
     }
 
@@ -298,7 +298,7 @@ pub fn continueModuleLoading(
 
             // b. Perform ! Call(state.[[PromiseCapability]].[[Reject]], undefined, « moduleCompletion.[[Value]] »).
             _ = Value.from(state.promise_capability.reject).callAssumeCallable(
-                Value.undefined,
+                .undefined,
                 &.{exception},
             ) catch |err_| try noexcept(err_);
         },
@@ -585,7 +585,7 @@ pub fn parse(
         .pending_async_dependencies = null,
         .status = .new,
         .evaluation_error = null,
-        .host_defined = host_defined orelse SafePointer.null_pointer,
+        .host_defined = host_defined orelse .null_pointer,
         .ecmascript_code = body,
         .context = null,
         .import_meta = null,
@@ -593,7 +593,7 @@ pub fn parse(
         .import_entries = import_entries,
         .local_export_entries = local_export_entries,
         .indirect_export_entries = indirect_export_entries,
-        .loaded_modules = StringHashMap(Module).init(agent.gc_allocator),
+        .loaded_modules = .init(agent.gc_allocator),
         .dfs_index = null,
         .dfs_ancestor_index = null,
     };
@@ -674,7 +674,7 @@ pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!
 
             // d. Perform ! Call(capability.[[Reject]], undefined, « result.[[Value]] »).
             _ = Value.from(capability.reject).callAssumeCallable(
-                Value.undefined,
+                .undefined,
                 &.{exception},
             ) catch |err_| try noexcept(err_);
         },
@@ -697,8 +697,8 @@ pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!
 
             // ii. Perform ! Call(capability.[[Resolve]], undefined, « undefined »).
             _ = Value.from(capability.resolve).callAssumeCallable(
-                Value.undefined,
-                &.{Value.undefined},
+                .undefined,
+                &.{.undefined},
             ) catch |err| try noexcept(err);
         }
 
@@ -1150,7 +1150,7 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
                 env.createMutableBinding(agent, var_name, false) catch |err| try noexcept(err);
 
                 // 2. Perform ! env.InitializeBinding(dn, undefined).
-                env.initializeBinding(agent, var_name, Value.undefined) catch |err| try noexcept(err);
+                env.initializeBinding(agent, var_name, .undefined) catch |err| try noexcept(err);
 
                 // 3. Append dn to declaredVarNames.
                 try declared_var_names.putNoClobber(var_name, {});

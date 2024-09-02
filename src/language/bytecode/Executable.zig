@@ -44,10 +44,10 @@ pub const Error = error{IndexOutOfRange} || std.mem.Allocator.Error;
 pub fn init(allocator: std.mem.Allocator) Executable {
     return .{
         .allocator = allocator,
-        .instructions = std.ArrayList(Instruction).init(allocator),
-        .constants = ValueArrayHashMap(void, sameValue).init(allocator),
-        .identifiers = StringArrayHashMap(void).init(allocator),
-        .ast_nodes = std.ArrayList(AstNode).init(allocator),
+        .instructions = .init(allocator),
+        .constants = .init(allocator),
+        .identifiers = .init(allocator),
+        .ast_nodes = .init(allocator),
     };
 }
 

@@ -59,7 +59,7 @@ pub fn descriptiveString(self: Symbol, agent: *Agent) std.mem.Allocator.Error!St
     // 1. Let desc be sym's [[Description]] value.
     // 2. If desc is undefined, set desc to the empty String.
     // 3. Assert: desc is a String.
-    const description = self.data.description orelse String.empty;
+    const description: String = self.data.description orelse .empty;
 
     // 4. Return the string-concatenation of "Symbol(", desc, and ")".
     return String.concat(
@@ -71,7 +71,7 @@ pub fn descriptiveString(self: Symbol, agent: *Agent) std.mem.Allocator.Error!St
 test "format" {
     var test_cases = [_]struct { Data, []const u8 }{
         .{ .{ .description = null }, "Symbol()" },
-        .{ .{ .description = String.empty }, "Symbol(\"\")" },
+        .{ .{ .description = .empty }, "Symbol(\"\")" },
         .{ .{ .description = String.fromLiteral("foo") }, "Symbol(\"foo\")" },
     };
     for (&test_cases) |*test_case| {

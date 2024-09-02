@@ -344,7 +344,7 @@ pub const ObjectConstructor = struct {
                 object_.createDataPropertyOrThrow(property_key, value) catch |err| try noexcept(err);
 
                 // c. Return undefined.
-                return Value.undefined;
+                return .undefined;
             }
         }.func;
 
@@ -352,7 +352,7 @@ pub const ObjectConstructor = struct {
         const adder = try createBuiltinFunction(agent, .{ .function = closure }, .{
             .length = 2,
             .name = "",
-            .additional_fields = SafePointer.make(*Captures, captures),
+            .additional_fields = .make(*Captures, captures),
         });
 
         // 6. Return ? AddEntriesFromIterable(obj, iterable, adder).
@@ -378,7 +378,7 @@ pub const ObjectConstructor = struct {
         if (maybe_descriptor) |descriptor|
             return Value.from(try descriptor.fromPropertyDescriptor(agent))
         else
-            return Value.undefined;
+            return .undefined;
     }
 
     /// 20.1.2.9 Object.getOwnPropertyDescriptors ( O )
@@ -494,7 +494,7 @@ pub const ObjectConstructor = struct {
         const obj = try object.toObject(agent);
 
         // 2. Return ? obj.[[GetPrototypeOf]]().
-        return Value.from(try obj.internalMethods().getPrototypeOf(obj) orelse return Value.null);
+        return Value.from(try obj.internalMethods().getPrototypeOf(obj) orelse return .null);
     }
 
     /// 20.1.2.13 Object.groupBy ( items, callback )
@@ -880,7 +880,7 @@ pub const ObjectPrototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Return ? O.[[GetPrototypeOf]]().
-        return Value.from(try object.internalMethods().getPrototypeOf(object) orelse return Value.null);
+        return Value.from(try object.internalMethods().getPrototypeOf(object) orelse return .null);
     }
 
     /// 20.1.3.8.2 set Object.prototype.__proto__
@@ -892,10 +892,10 @@ pub const ObjectPrototype = struct {
         const object = try this_value.requireObjectCoercible(agent);
 
         // 2. If proto is not an Object and proto is not null, return undefined.
-        if (!prototype.isObject() and !prototype.isNull()) return Value.undefined;
+        if (!prototype.isObject() and !prototype.isNull()) return .undefined;
 
         // 3. If O is not an Object, return undefined.
-        if (!object.isObject()) return Value.undefined;
+        if (!object.isObject()) return .undefined;
 
         // 4. Let status be ? O.[[SetPrototypeOf]](proto).
         const status = try object.asObject().internalMethods().setPrototypeOf(
@@ -909,7 +909,7 @@ pub const ObjectPrototype = struct {
         }
 
         // 6. Return undefined.
-        return Value.undefined;
+        return .undefined;
     }
 
     /// 20.1.3.9.1 Object.prototype.__defineGetter__ ( P, getter )
@@ -942,7 +942,7 @@ pub const ObjectPrototype = struct {
         try object.definePropertyOrThrow(property_key, property_descriptor);
 
         // 6. Return undefined.
-        return Value.undefined;
+        return .undefined;
     }
 
     /// 20.1.3.9.2 Object.prototype.__defineSetter__ ( P, setter )
@@ -975,7 +975,7 @@ pub const ObjectPrototype = struct {
         try object.definePropertyOrThrow(property_key, property_descriptor);
 
         // 6. Return undefined.
-        return Value.undefined;
+        return .undefined;
     }
 
     /// 20.1.3.9.3 Object.prototype.__lookupGetter__ ( P )
@@ -999,17 +999,17 @@ pub const ObjectPrototype = struct {
             )) |property_descriptor| {
                 // i. If IsAccessorDescriptor(desc) is true, return desc.[[Get]].
                 if (property_descriptor.isAccessorDescriptor()) {
-                    return Value.from(property_descriptor.get.? orelse return Value.undefined);
+                    return Value.from(property_descriptor.get.? orelse return .undefined);
                 }
 
                 // ii. Return undefined.
-                return Value.undefined;
+                return .undefined;
             }
 
             // c. Set O to ? O.[[GetPrototypeOf]]().
             object = try object.internalMethods().getPrototypeOf(object) orelse {
                 // d. If O is null, return undefined.
-                return Value.undefined;
+                return .undefined;
             };
         }
     }
@@ -1035,17 +1035,17 @@ pub const ObjectPrototype = struct {
             )) |property_descriptor| {
                 // i. If IsAccessorDescriptor(desc) is true, return desc.[[Set]].
                 if (property_descriptor.isAccessorDescriptor()) {
-                    return Value.from(property_descriptor.set.? orelse return Value.undefined);
+                    return Value.from(property_descriptor.set.? orelse return .undefined);
                 }
 
                 // ii. Return undefined.
-                return Value.undefined;
+                return .undefined;
             }
 
             // c. Set O to ? O.[[GetPrototypeOf]]().
             object = try object.internalMethods().getPrototypeOf(object) orelse {
                 // d. If O is null, return undefined.
-                return Value.undefined;
+                return .undefined;
             };
         }
     }

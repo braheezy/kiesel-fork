@@ -281,7 +281,7 @@ fn validateAndApplyPropertyDescriptor(
             //    corresponding field in Desc if Desc has that field, or to the attribute's default
             //    value otherwise.
             try object.propertyStorage().set(property_key, .{
-                .value = descriptor.value orelse Value.undefined,
+                .value = descriptor.value orelse .undefined,
                 .writable = descriptor.writable orelse false,
                 .enumerable = descriptor.enumerable orelse false,
                 .configurable = descriptor.configurable orelse false,
@@ -383,7 +383,7 @@ fn validateAndApplyPropertyDescriptor(
             //      set to the value of the corresponding field in Desc if Desc has that field, or
             //      to the attribute's default value otherwise.
             try object.propertyStorage().set(property_key, .{
-                .value = descriptor.value orelse Value.undefined,
+                .value = descriptor.value orelse .undefined,
                 .writable = descriptor.writable orelse false,
                 .enumerable = enumerable,
                 .configurable = configurable,
@@ -456,7 +456,7 @@ pub fn ordinaryGet(object: Object, property_key: PropertyKey, receiver: Value) A
         const parent = try object.internalMethods().getPrototypeOf(object)
 
         // b. If parent is null, return undefined.
-        orelse return Value.undefined;
+        orelse return .undefined;
 
         // c. Return ? parent.[[Get]](P, Receiver).
         return parent.internalMethods().get(parent, property_key, receiver);
@@ -473,7 +473,7 @@ pub fn ordinaryGet(object: Object, property_key: PropertyKey, receiver: Value) A
 
     // 5. Let getter be desc.[[Get]].
     // 6. If getter is undefined, return undefined.
-    const getter = descriptor.get.? orelse return Value.undefined;
+    const getter = descriptor.get.? orelse return .undefined;
 
     // 7. Return ? Call(getter, Receiver).
     return Value.from(getter).callAssumeCallableNoArgs(receiver);
@@ -531,7 +531,7 @@ pub fn ordinarySetWithOwnDescriptor(
             //      [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true
             //    }.
             break :blk PropertyDescriptor{
-                .value = Value.undefined,
+                .value = .undefined,
                 .writable = true,
                 .enumerable = true,
                 .configurable = true,

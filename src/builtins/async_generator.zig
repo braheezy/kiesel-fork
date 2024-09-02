@@ -91,11 +91,11 @@ pub const AsyncGeneratorPrototype = struct {
         // 6. If state is completed, then
         if (state == .completed) {
             // a. Let iteratorResult be CreateIteratorResultObject(undefined, true).
-            const iterator_result = try createIteratorResultObject(agent, Value.undefined, true);
+            const iterator_result = try createIteratorResultObject(agent, .undefined, true);
 
             // b. Perform ! Call(promiseCapability.[[Resolve]], undefined, « iteratorResult »).
             _ = Value.from(promise_capability.resolve).callAssumeCallable(
-                Value.undefined,
+                .undefined,
                 &.{Value.from(iterator_result)},
             ) catch |err| try noexcept(err);
 
@@ -220,7 +220,7 @@ pub const AsyncGeneratorPrototype = struct {
         if (state == .completed) {
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « exception »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
-                Value.undefined,
+                .undefined,
                 &.{exception},
             ) catch |err| try noexcept(err);
 
@@ -353,7 +353,7 @@ pub fn asyncGeneratorStart(
                 // h. If result is a normal completion, set result to NormalCompletion(undefined).
                 // i. If result is a return completion, set result to NormalCompletion(result.[[Value]]).
                 std.debug.assert(completion.type == .normal or completion.type == .@"return");
-                break :blk Completion.normal(completion.value orelse Value.undefined);
+                break :blk Completion.normal(completion.value orelse .undefined);
             } else |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 error.ExceptionThrown => blk: {
@@ -380,7 +380,7 @@ pub fn asyncGeneratorStart(
     generator.fields.async_generator_context = generator_context.*;
 
     // 7. Set generator.[[AsyncGeneratorQueue]] to a new empty List.
-    generator.fields.async_generator_queue = std.ArrayList(AsyncGeneratorRequest).init(agent.gc_allocator);
+    generator.fields.async_generator_queue = .init(agent.gc_allocator);
 
     // 8. Return unused.
 }
@@ -444,7 +444,7 @@ pub fn asyncGeneratorCompleteStep(
     if (completion.type == .throw) {
         // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « value »).
         _ = Value.from(promise_capability.reject).callAssumeCallable(
-            Value.undefined,
+            .undefined,
             &.{value},
         ) catch |err| try noexcept(err);
     }
@@ -475,7 +475,7 @@ pub fn asyncGeneratorCompleteStep(
 
         // d. Perform ! Call(promiseCapability.[[Resolve]], undefined, « iteratorResult »).
         _ = Value.from(promise_capability.resolve).callAssumeCallable(
-            Value.undefined,
+            .undefined,
             &.{Value.from(iterator_result)},
         ) catch |err| try noexcept(err);
     }
@@ -606,7 +606,7 @@ pub fn asyncGeneratorYield(agent: *Agent, value: Value) Agent.Error!Completion {
         // c. Let callerContext be the running execution context.
         // d. Resume callerContext passing undefined. If genContext is ever resumed again, let
         //    resumptionValue be the Completion Record with which it is resumed.
-        generator.fields.evaluation_state.suspension_result = Value.undefined;
+        generator.fields.evaluation_state.suspension_result = .undefined;
 
         // TODO: e. Assert: If control reaches here, then genContext is the running execution context again.
         // TODO: f. Return ? AsyncGeneratorUnwrapYieldResumption(resumptionValue).
@@ -657,7 +657,7 @@ pub fn asyncGeneratorDrainQueue(
             // i. If completion is a normal completion, then
             if (completion.type == .normal) {
                 // 1. Set completion to NormalCompletion(undefined).
-                completion = Completion.normal(Value.undefined);
+                completion = Completion.normal(.undefined);
             }
 
             // ii. Perform AsyncGeneratorCompleteStep(generator, completion, true).
@@ -761,7 +761,7 @@ pub fn asyncGeneratorAwaitReturn(
             try asyncGeneratorDrainQueue(agent_, generator_);
 
             // e. Return undefined.
-            return Value.undefined;
+            return .undefined;
         }
     }.func;
 
@@ -770,7 +770,7 @@ pub fn asyncGeneratorAwaitReturn(
         try createBuiltinFunction(agent, .{ .function = fulfilled_closure }, .{
             .length = 1,
             .name = "",
-            .additional_fields = SafePointer.make(*Captures, captures),
+            .additional_fields = .make(*Captures, captures),
         }),
     );
 
@@ -796,7 +796,7 @@ pub fn asyncGeneratorAwaitReturn(
             try asyncGeneratorDrainQueue(agent_, generator_);
 
             // e. Return undefined.
-            return Value.undefined;
+            return .undefined;
         }
     }.func;
 
@@ -805,7 +805,7 @@ pub fn asyncGeneratorAwaitReturn(
         try createBuiltinFunction(agent, .{ .function = rejected_closure }, .{
             .length = 1,
             .name = "",
-            .additional_fields = SafePointer.make(*Captures, captures),
+            .additional_fields = .make(*Captures, captures),
         }),
     );
 

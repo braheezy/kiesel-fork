@@ -32,7 +32,7 @@ pub fn hostEnsureCanAddPrivateElement(_: *Agent, _: Object) Agent.Error!void {
 /// https://tc39.es/ecma262/#sec-hostmakejobcallback
 pub fn hostMakeJobCallback(callback: Object) JobCallback {
     // 1. Return the JobCallback Record { [[Callback]]: callback, [[HostDefined]]: empty }.
-    return .{ .callback = callback, .host_defined = SafePointer.null_pointer };
+    return .{ .callback = callback, .host_defined = .null_pointer };
 }
 
 /// 9.5.3 HostCallJobCallback ( jobCallback, V, argumentsList )
@@ -70,7 +70,7 @@ pub fn hostEnqueueFinalizationRegistryCleanupJob(
     // Let cleanupJob be a new Job Abstract Closure with no parameters that captures
     // finalizationRegistry and performs the following steps when called:
     const cleanup_job: Job = .{
-        .captures = SafePointer.make(*Cell, cell),
+        .captures = .make(*Cell, cell),
         .func = struct {
             fn cleanupJob(cell_ptr: SafePointer) Agent.Error!Value {
                 // 1. Let cleanupResult be Completion(CleanupFinalizationRegistry(finalizationRegistry)).
@@ -80,7 +80,7 @@ pub fn hostEnqueueFinalizationRegistryCleanupJob(
                 _ = cleanup_result;
 
                 // 3. Return unused.
-                return Value.undefined;
+                return .undefined;
             }
         }.cleanupJob,
     };

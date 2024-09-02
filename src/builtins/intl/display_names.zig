@@ -331,7 +331,7 @@ pub const DisplayNamesPrototype = struct {
                 .{@tagName(display_names.fields.type)},
             ),
         };
-        if (value.len == 0) return Value.undefined;
+        if (value.len == 0) return .undefined;
         return Value.from(try String.fromUtf8(agent.gc_allocator, value));
     }
 

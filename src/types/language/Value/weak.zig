@@ -7,16 +7,13 @@ const Symbol = @import("../Symbol.zig");
 /// A value that does not prevent the underlying data from being garbage
 /// collected. Only supports object and symbol types.
 pub const Weak = union(enum) {
-    const MaskedObjectPtr = MaskedPtr(*allowzero Object.Data);
-    const MaskedSymbolPtr = MaskedPtr(*Symbol.Data);
-
-    object: MaskedObjectPtr,
-    symbol: MaskedSymbolPtr,
+    object: MaskedPtr(*allowzero Object.Data),
+    symbol: MaskedPtr(*Symbol.Data),
 
     pub fn init(value: Value) Weak {
         return switch (value.type()) {
-            .object => .{ .object = MaskedObjectPtr.init(value.asObject().data) },
-            .symbol => .{ .symbol = MaskedSymbolPtr.init(value.asSymbol().data) },
+            .object => .{ .object = .init(value.asObject().data) },
+            .symbol => .{ .symbol = .init(value.asSymbol().data) },
             else => unreachable,
         };
     }

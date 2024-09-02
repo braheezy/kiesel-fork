@@ -79,7 +79,7 @@ pub const WeakRefConstructor = struct {
                 // NOTE: libgc tracks all used pointers
 
                 // 5. Set weakRef.[[WeakRefTarget]] to target.
-                .weak_ref_target = Value.Weak.init(target),
+                .weak_ref_target = .init(target),
             },
         );
 
@@ -160,7 +160,7 @@ pub fn weakRefDeref(weak_ref: *const WeakRef) Value {
     }
 
     // 3. Return undefined.
-    return Value.undefined;
+    return .undefined;
 }
 
 /// 26.1.5 Properties of WeakRef Instances

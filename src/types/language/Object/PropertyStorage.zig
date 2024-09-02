@@ -100,8 +100,8 @@ lazy_intrinsics: std.StringHashMap(LazyIntrinsic),
 
 pub fn init(allocator: std.mem.Allocator) PropertyStorage {
     return .{
-        .hash_map = PropertyKeyArrayHashMap(Entry).init(allocator),
-        .lazy_intrinsics = std.StringHashMap(LazyIntrinsic).init(allocator),
+        .hash_map = .init(allocator),
+        .lazy_intrinsics = .init(allocator),
     };
 }
 

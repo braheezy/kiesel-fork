@@ -72,7 +72,7 @@ pub fn initializeHostDefinedRealm(
 
     realm.* = .{
         .intrinsics = realm.intrinsics,
-        .rng = std.Random.DefaultPrng.init(@intFromPtr(realm)),
+        .rng = .init(@intFromPtr(realm)),
 
         // 3. Set realm.[[AgentSignifier]] to AgentSignifier().
         .agent = realm.agent,
@@ -84,10 +84,10 @@ pub fn initializeHostDefinedRealm(
         .global_env = undefined,
 
         // 6. Set realm.[[TemplateMap]] to a new empty List.
-        .template_map = std.AutoHashMap(*ast.TemplateLiteral, Object).init(agent.gc_allocator),
+        .template_map = .init(agent.gc_allocator),
 
-        .loaded_modules = StringHashMap(Module).init(agent.gc_allocator),
-        .host_defined = SafePointer.null_pointer,
+        .loaded_modules = .init(agent.gc_allocator),
+        .host_defined = .null_pointer,
     };
 
     // 7. Let newContext be a new execution context.

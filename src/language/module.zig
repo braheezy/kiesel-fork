@@ -135,7 +135,7 @@ fn continueDynamicImport(
 
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « moduleCompletion.[[Value]] »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
-                Value.undefined,
+                .undefined,
                 &.{exception},
             ) catch |err_| try noexcept(err_);
 
@@ -164,12 +164,12 @@ fn continueDynamicImport(
 
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « reason »).
             _ = Value.from(promise_capability_.reject).callAssumeCallable(
-                Value.undefined,
+                .undefined,
                 &.{reason},
             ) catch |err| try noexcept(err);
 
             // b. Return unused.
-            return Value.undefined;
+            return .undefined;
         }
     }.func;
 
@@ -177,7 +177,7 @@ fn continueDynamicImport(
     const on_rejected = try createBuiltinFunction(agent, .{ .function = rejected_closure }, .{
         .length = 1,
         .name = "",
-        .additional_fields = SafePointer.make(*RejectedClosureCaptures, rejected_closure_captures),
+        .additional_fields = .make(*RejectedClosureCaptures, rejected_closure_captures),
     });
 
     const LinkAndEvaluateClosureCaptures = struct {
@@ -214,12 +214,12 @@ fn continueDynamicImport(
 
                     // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « link.[[Value]] »).
                     _ = Value.from(promise_capability_.reject).callAssumeCallable(
-                        Value.undefined,
+                        .undefined,
                         &.{exception},
                     ) catch |err_| try noexcept(err_);
 
                     // ii. Return unused.
-                    return Value.undefined;
+                    return .undefined;
                 },
             };
 
@@ -249,12 +249,12 @@ fn continueDynamicImport(
 
                     // ii. Perform ! Call(promiseCapability.[[Resolve]], undefined, « namespace »).
                     _ = Value.from(promise_capability__.resolve).callAssumeCallable(
-                        Value.undefined,
+                        .undefined,
                         &.{Value.from(namespace)},
                     ) catch |err| try noexcept(err);
 
                     // iii. Return unused.
-                    return Value.undefined;
+                    return .undefined;
                 }
             }.func;
 
@@ -262,7 +262,7 @@ fn continueDynamicImport(
             const on_fulfilled = try createBuiltinFunction(agent_, .{ .function = fulfilled_closure }, .{
                 .length = 0,
                 .name = "",
-                .additional_fields = SafePointer.make(*FulfilledClosureCaptures, fulfilled_closure_captures),
+                .additional_fields = .make(*FulfilledClosureCaptures, fulfilled_closure_captures),
             });
 
             // f. Perform PerformPromiseThen(evaluatePromise, onFulfilled, onRejected).
@@ -275,7 +275,7 @@ fn continueDynamicImport(
             );
 
             // g. Return unused.
-            return Value.undefined;
+            return .undefined;
         }
     }.func;
 
@@ -283,7 +283,7 @@ fn continueDynamicImport(
     const link_and_evaluate = try createBuiltinFunction(agent, .{ .function = link_and_evaluate_closure }, .{
         .length = 0,
         .name = "",
-        .additional_fields = SafePointer.make(
+        .additional_fields = .make(
             *LinkAndEvaluateClosureCaptures,
             link_and_evaluate_closure_captures,
         ),

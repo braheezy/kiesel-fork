@@ -95,7 +95,7 @@ pub const RegExpStringIteratorPrototype = struct {
 
         // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
         if (reg_exp_string_iterator.fields == .completed) {
-            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, .undefined, true));
         }
 
         const reg_exp = reg_exp_string_iterator.fields.state.reg_exp;
@@ -109,7 +109,7 @@ pub const RegExpStringIteratorPrototype = struct {
         // ii. If match is null, return undefined.
         if (match == null) {
             reg_exp_string_iterator.fields = .completed;
-            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, .undefined, true));
         }
 
         // iii. If global is false, then

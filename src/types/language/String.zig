@@ -23,7 +23,7 @@ pub const ascii_word_characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrs
 /// The definition of white space is the union of WhiteSpace and LineTerminator.
 pub const whitespace = tokenizer.whitespace ++ tokenizer.line_terminators;
 
-pub const empty: String = fromLiteral("");
+pub const empty = fromLiteral("");
 
 pub const Builder = @import("String/Builder.zig");
 pub const CodeUnitIterator = @import("String/CodeUnitIterator.zig");

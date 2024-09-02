@@ -26,7 +26,7 @@ pub const Segment = union(enum) {
 pub fn init(allocator: std.mem.Allocator) Builder {
     return .{
         .allocator = allocator,
-        .segments = std.ArrayList(Segment).init(allocator),
+        .segments = .init(allocator),
     };
 }
 

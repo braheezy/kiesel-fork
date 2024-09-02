@@ -159,11 +159,11 @@ pub fn regExpInitialize(
 ) Agent.Error!Object {
     // 1. If pattern is undefined, let P be the empty String.
     // 2. Else, let P be ? ToString(pattern).
-    const p = if (pattern.isUndefined()) String.empty else try pattern.toString(agent);
+    const p: String = if (pattern.isUndefined()) .empty else try pattern.toString(agent);
 
     // 3. If flags is undefined, let F be the empty String.
     // 4. Else, let F be ? ToString(flags).
-    const f = if (flags.isUndefined()) String.empty else try flags.toString(agent);
+    const f: String = if (flags.isUndefined()) .empty else try flags.toString(agent);
 
     // 5. If F contains any code unit other than "d", "g", "i", "m", "s", "u", "v", or "y", or if F
     //    contains any code unit more than once, throw a SyntaxError exception.
@@ -404,7 +404,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
     const has_groups = group_name_ptr != null;
 
     // 30. If R contains any GroupName, then
-    const groups = if (has_groups) blk: {
+    const groups: Value = if (has_groups) blk: {
         // a. Let groups be OrdinaryObjectCreate(null).
         break :blk Value.from(try ordinaryObjectCreate(agent, null));
 
@@ -413,7 +413,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
     // 31. Else,
     else blk: {
         // a. Let groups be undefined.
-        break :blk Value.undefined;
+        break :blk .undefined;
 
         // b. Let hasGroups be false.
     };
@@ -435,7 +435,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
         // b. If captureI is undefined, then
         if (capture_i == null) {
             // i. Let capturedValue be undefined.
-            captured_value = Value.undefined;
+            captured_value = .undefined;
 
             // ii. Append undefined to indices.
             try indices.append(null);
@@ -593,14 +593,14 @@ fn makeMatchIndicesIndexPairArray(
     const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
 
     // 6. If hasGroups is true, then
-    const groups = if (has_groups) blk: {
+    const groups: Value = if (has_groups) blk: {
         // a. Let groups be OrdinaryObjectCreate(null).
         break :blk Value.from(try ordinaryObjectCreate(agent, null));
     }
     // 7. Else,
     else blk: {
         // a. Let groups be undefined.
-        break :blk Value.undefined;
+        break :blk .undefined;
     };
 
     // 8. Perform ! CreateDataPropertyOrThrow(A, "groups", groups).
@@ -616,14 +616,14 @@ fn makeMatchIndicesIndexPairArray(
         const match_indices = indices[i];
 
         // b. If matchIndices is not undefined,
-        const match_index_pair = if (match_indices != null) blk: {
+        const match_index_pair: Value = if (match_indices != null) blk: {
             // i. Let matchIndexPair be GetMatchIndexPair(S, matchIndices).
             break :blk Value.from(try getMatchIndexPair(agent, string, match_indices.?));
         }
         // c. Else,
         else blk: {
             // i. Let matchIndexPair be undefined.
-            break :blk Value.undefined;
+            break :blk .undefined;
         };
 
         // d. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(i)), matchIndexPair).
@@ -824,7 +824,7 @@ pub const RegExpPrototype = struct {
         return if (try regExpBuiltinExec(agent, reg_exp, string)) |object|
             Value.from(object)
         else
-            Value.null;
+            .null;
     }
 
     /// 22.2.6.3 get RegExp.prototype.dotAll
@@ -917,7 +917,7 @@ pub const RegExpPrototype = struct {
 
             // a. If SameValue(R, %RegExp.prototype%) is true, return undefined.
             if (reg_exp.sameValue(try realm.intrinsics.@"%RegExp.prototype%"())) {
-                return Value.undefined;
+                return .undefined;
             }
 
             // b. Otherwise, throw a TypeError exception.
@@ -984,7 +984,7 @@ pub const RegExpPrototype = struct {
             return if (try regExpExec(agent, reg_exp, string)) |object|
                 Value.from(object)
             else
-                Value.null;
+                .null;
         }
         // 6. Else,
         else {
@@ -1010,7 +1010,7 @@ pub const RegExpPrototype = struct {
                 // ii. If result is null, then
                 if (result == null) {
                     // 1. If n = 0, return null.
-                    if (n == 0) return Value.null;
+                    if (n == 0) return .null;
 
                     // 2. Return A.
                     return Value.from(array);
@@ -1268,7 +1268,7 @@ pub const RegExpPrototype = struct {
                 );
                 replacer_args.appendAssumeCapacity(Value.from(matched));
                 for (captures.items) |capture| replacer_args.appendAssumeCapacity(
-                    if (capture) |s| Value.from(s) else Value.null,
+                    if (capture) |s| Value.from(s) else .null,
                 );
                 replacer_args.appendAssumeCapacity(Value.from(@as(u53, @intCast(position))));
                 replacer_args.appendAssumeCapacity(Value.from(string));
@@ -1281,7 +1281,7 @@ pub const RegExpPrototype = struct {
 
                 // iii. Let replacementValue be ? Call(replaceValue, undefined, replacerArgs).
                 const replacement_value = try replace_value.callAssumeCallable(
-                    Value.undefined,
+                    .undefined,
                     replacer_args.items,
                 );
 

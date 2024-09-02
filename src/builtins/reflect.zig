@@ -185,7 +185,7 @@ pub const Reflect = struct {
         if (maybe_descriptor) |descriptor|
             return Value.from(try descriptor.fromPropertyDescriptor(agent))
         else
-            return Value.undefined;
+            return .undefined;
     }
 
     /// 28.1.7 Reflect.getPrototypeOf ( target )
@@ -200,7 +200,7 @@ pub const Reflect = struct {
 
         // 2. Return ? target.[[GetPrototypeOf]]().
         return Value.from(
-            try target.asObject().internalMethods().getPrototypeOf(target.asObject()) orelse return Value.null,
+            try target.asObject().internalMethods().getPrototypeOf(target.asObject()) orelse return .null,
         );
     }
 

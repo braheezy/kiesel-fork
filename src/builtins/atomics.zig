@@ -780,7 +780,7 @@ pub const Atomics = struct {
         }
 
         // 3. Return undefined.
-        return Value.undefined;
+        return .undefined;
     }
 
     /// 25.4.11 Atomics.store ( typedArray, index, value )

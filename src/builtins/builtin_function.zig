@@ -156,7 +156,7 @@ pub fn createBuiltinFunction(
         //       so the null state can serve as 'not present'.
         prototype: ?Object = null,
         prefix: ?[]const u8 = null,
-        additional_fields: SafePointer = SafePointer.null_pointer,
+        additional_fields: SafePointer = .null_pointer,
     },
 ) std.mem.Allocator.Error!Object {
     // 1. If realm is not present, set realm to the current Realm Record.

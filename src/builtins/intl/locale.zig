@@ -509,7 +509,7 @@ pub const LocalePrototype = struct {
                     "ca",
                 ) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
-                } orelse return Value.undefined,
+                } orelse return .undefined,
             ),
         );
     }
@@ -530,7 +530,7 @@ pub const LocalePrototype = struct {
                     "kf",
                 ) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
-                } orelse return Value.undefined,
+                } orelse return .undefined,
             ),
         );
     }
@@ -551,7 +551,7 @@ pub const LocalePrototype = struct {
                     "co",
                 ) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
-                } orelse return Value.undefined,
+                } orelse return .undefined,
             ),
         );
     }
@@ -572,7 +572,7 @@ pub const LocalePrototype = struct {
                     "hc",
                 ) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
-                } orelse return Value.undefined,
+                } orelse return .undefined,
             ),
         );
     }
@@ -610,7 +610,7 @@ pub const LocalePrototype = struct {
                     "nu",
                 ) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
-                } orelse return Value.undefined,
+                } orelse return .undefined,
             ),
         );
     }
@@ -642,7 +642,7 @@ pub const LocalePrototype = struct {
         return Value.from(
             try String.fromAscii(
                 agent.gc_allocator,
-                try locale.fields.locale.script(agent.gc_allocator) orelse return Value.undefined,
+                try locale.fields.locale.script(agent.gc_allocator) orelse return .undefined,
             ),
         );
     }
@@ -658,7 +658,7 @@ pub const LocalePrototype = struct {
         return Value.from(
             try String.fromAscii(
                 agent.gc_allocator,
-                try locale.fields.locale.region(agent.gc_allocator) orelse return Value.undefined,
+                try locale.fields.locale.region(agent.gc_allocator) orelse return .undefined,
             ),
         );
     }

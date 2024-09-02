@@ -545,7 +545,7 @@ fn typedArrayGetElement(
     index: u53,
 ) std.mem.Allocator.Error!Value {
     // 1. If IsValidIntegerIndex(O, index) is false, return undefined.
-    if (!isValidIntegerIndex(typed_array, @floatFromInt(index))) return Value.undefined;
+    if (!isValidIntegerIndex(typed_array, @floatFromInt(index))) return .undefined;
 
     // 2. Let offset be O.[[ByteOffset]].
     const offset = typed_array.fields.byte_offset;
@@ -939,7 +939,7 @@ pub const TypedArrayPrototype = struct {
             @as(f64, @floatFromInt(len)) + relative_index;
 
         // 7. If k < 0 or k ≥ len, return undefined.
-        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return Value.undefined;
+        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return .undefined;
         const k: u53 = @intFromFloat(k_f64);
 
         // 8. Return ! Get(O, ! ToString(𝔽(k))).
@@ -1536,7 +1536,7 @@ pub const TypedArrayPrototype = struct {
         }
 
         // 7. Return undefined.
-        return Value.undefined;
+        return .undefined;
     }
 
     /// 23.2.3.16 %TypedArray%.prototype.includes ( searchElement [ , fromIndex ] )
@@ -1911,7 +1911,7 @@ pub const TypedArrayPrototype = struct {
 
             // c. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k), O »).
             accumulator = try callback.callAssumeCallable(
-                Value.undefined,
+                .undefined,
                 &.{ accumulator, k_value, Value.from(k), Value.from(object) },
             );
 
@@ -1983,7 +1983,7 @@ pub const TypedArrayPrototype = struct {
 
             // c. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k), O »).
             accumulator = try callback.callAssumeCallable(
-                Value.undefined,
+                .undefined,
                 &.{ accumulator, k_value, Value.from(k.?), Value.from(object) },
             );
 
@@ -2073,7 +2073,7 @@ pub const TypedArrayPrototype = struct {
         }
 
         // 8. Return undefined.
-        return Value.undefined;
+        return .undefined;
     }
 
     /// 23.2.3.26.1 SetTypedArrayFromTypedArray ( target, targetOffset, source )
@@ -2994,11 +2994,11 @@ pub const TypedArrayPrototype = struct {
     fn @"%Symbol.toStringTag%"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. If O is not an Object, return undefined.
-        if (!this_value.isObject()) return Value.undefined;
+        if (!this_value.isObject()) return .undefined;
         const object = this_value.asObject();
 
         // 3. If O does not have a [[TypedArrayName]] internal slot, return undefined.
-        if (!object.is(TypedArray)) return Value.undefined;
+        if (!object.is(TypedArray)) return .undefined;
 
         // 4. Let name be O.[[TypedArrayName]].
         const name = object.as(TypedArray).fields.typed_array_name;
@@ -3177,7 +3177,7 @@ pub fn compareTypedArrayElements(
     if (maybe_comparator) |comparator| {
         // a. Let v be ? ToNumber(? Call(comparator, undefined, « x, y »)).
         const value = try (try Value.from(comparator).callAssumeCallable(
-            Value.undefined,
+            .undefined,
             &.{ x, y },
         )).toNumber(agent);
 

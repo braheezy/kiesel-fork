@@ -100,7 +100,7 @@ pub fn hasThisBinding(_: ModuleEnvironment) bool {
 /// https://tc39.es/ecma262/#sec-module-environment-records-getthisbinding
 pub fn getThisBinding(_: ModuleEnvironment) Value {
     // 1. Return undefined.
-    return Value.undefined;
+    return .undefined;
 }
 
 /// 9.1.1.5.5 CreateImportBinding ( N, M, N2 )

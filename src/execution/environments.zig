@@ -272,7 +272,7 @@ pub fn newDeclarativeEnvironment(
         // 2. Set env.[[OuterEnv]] to E.
         .outer_env = outer_env,
 
-        .bindings = StringHashMap(DeclarativeEnvironment.Binding).init(allocator),
+        .bindings = .init(allocator),
     };
 
     // 3. Return env.
@@ -332,7 +332,7 @@ pub fn newFunctionEnvironment(
         // 6. Set env.[[OuterEnv]] to F.[[Environment]].
         .declarative_environment = try newDeclarativeEnvironment(allocator, function.fields.environment),
 
-        .this_value = Value.undefined,
+        .this_value = .undefined,
     };
 
     // 7. Return env.
@@ -366,7 +366,7 @@ pub fn newGlobalEnvironment(
         .declarative_record = declarative_record,
 
         // 7. Set env.[[VarNames]] to a new empty List.
-        .var_names = StringHashMap(void).init(allocator),
+        .var_names = .init(allocator),
 
         // 8. Set env.[[OuterEnv]] to null.
         .outer_env = null,
@@ -389,7 +389,7 @@ pub fn newModuleEnvironment(
         // 2. Set env.[[OuterEnv]] to E.
         .declarative_environment = try newDeclarativeEnvironment(allocator, outer_env),
 
-        .indirect_bindings = StringHashMap(ModuleEnvironment.IndirectBinding).init(allocator),
+        .indirect_bindings = .init(allocator),
     };
 
     // 3. Return env.

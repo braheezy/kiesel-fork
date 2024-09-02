@@ -189,9 +189,9 @@ pub fn generatorStart(
             //     i. Let resultValue be undefined.
             // j. Else if result is a return completion, then
             //     i. Let resultValue be result.[[Value]].
-            const result_value = if (result) |completion| blk: {
+            const result_value: Value = if (result) |completion| blk: {
                 std.debug.assert(completion.type == .normal or completion.type == .@"return");
-                break :blk completion.value orelse Value.undefined;
+                break :blk completion.value orelse .undefined;
             }
             // k. Else,
             else |err| {
@@ -246,7 +246,7 @@ pub fn generatorResume(agent: *Agent, generator_value: Value, value: Value) Agen
     const state = try generatorValidate(agent, generator_value);
 
     // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
-    if (state == .completed) return createIteratorResultObject(agent, Value.undefined, true);
+    if (state == .completed) return createIteratorResultObject(agent, .undefined, true);
 
     // 3. Assert: state is either suspended-start or suspended-yield.
     std.debug.assert(state == .suspended_start or state == .suspended_yield);

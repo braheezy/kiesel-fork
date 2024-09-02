@@ -68,7 +68,7 @@ pub const ErrorConstructor = struct {
             "%Error.prototype%",
             .{
                 // Non-standard
-                .error_data = .{ .name = String.fromLiteral("Error"), .message = String.empty },
+                .error_data = .{ .name = String.fromLiteral("Error"), .message = .empty },
             },
         );
 
@@ -174,7 +174,7 @@ pub const ErrorPrototype = struct {
         const msg = try object.get(PropertyKey.from("message"));
 
         // 6. If msg is undefined, set msg to the empty String; otherwise set msg to ? ToString(msg).
-        const msg_string = if (msg.isUndefined()) String.empty else try msg.toString(agent);
+        const msg_string: String = if (msg.isUndefined()) .empty else try msg.toString(agent);
 
         // 7. If name is the empty String, return msg.
         if (name_string.isEmpty()) return Value.from(msg_string);
@@ -291,7 +291,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
                 "%" ++ name ++ ".prototype%",
                 .{
                     // Non-standard
-                    .error_data = .{ .name = String.fromLiteral(name), .message = String.empty },
+                    .error_data = .{ .name = String.fromLiteral(name), .message = .empty },
                 },
             );
 
@@ -415,7 +415,7 @@ pub const AggregateErrorConstructor = struct {
             "%AggregateError.prototype%",
             .{
                 // Non-standard
-                .error_data = .{ .name = String.fromLiteral("AggregateError"), .message = String.empty },
+                .error_data = .{ .name = String.fromLiteral("AggregateError"), .message = .empty },
             },
         );
 

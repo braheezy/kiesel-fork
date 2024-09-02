@@ -80,7 +80,7 @@ fn getPrototypeOf(object: Object) Agent.Error!?Object {
     // 12. If SameValue(handlerProto, targetProto) is false, throw a TypeError exception.
     if (!sameValue(
         handler_prototype,
-        if (target_prototype != null) Value.from(target_prototype.?) else Value.null,
+        if (target_prototype != null) Value.from(target_prototype.?) else .null,
     )) {
         return agent.throwException(
             .type_error,
@@ -121,7 +121,7 @@ fn setPrototypeOf(object: Object, prototype: ?Object) Agent.Error!bool {
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, V »)).
     const boolean_trap_result = (try Value.from(trap.?).callAssumeCallable(
         Value.from(handler),
-        &.{ Value.from(target), if (prototype != null) Value.from(prototype.?) else Value.null },
+        &.{ Value.from(target), if (prototype != null) Value.from(prototype.?) else .null },
     )).toBoolean();
 
     // 8. If booleanTrapResult is false, return false.
@@ -138,8 +138,8 @@ fn setPrototypeOf(object: Object, prototype: ?Object) Agent.Error!bool {
 
     // 12. If SameValue(V, targetProto) is false, throw a TypeError exception.
     if (!sameValue(
-        if (prototype != null) Value.from(prototype.?) else Value.null,
-        if (target_prototype != null) Value.from(target_prototype.?) else Value.null,
+        if (prototype != null) Value.from(prototype.?) else .null,
+        if (target_prototype != null) Value.from(target_prototype.?) else .null,
     )) {
         return agent.throwException(
             .type_error,
@@ -1148,7 +1148,7 @@ pub const ProxyConstructor = struct {
                 const revocable_proxy = additional_fields.revocable_proxy;
 
                 // c. If p is null, return undefined.
-                if (revocable_proxy == null) return Value.undefined;
+                if (revocable_proxy == null) return .undefined;
 
                 // d. Set F.[[RevocableProxy]] to null.
                 additional_fields.revocable_proxy = null;
@@ -1161,7 +1161,7 @@ pub const ProxyConstructor = struct {
                 revocable_proxy.?.as(Proxy).fields.proxy_handler = null;
 
                 // h. Return undefined.
-                return Value.undefined;
+                return .undefined;
             }
         }.func;
 
@@ -1170,7 +1170,7 @@ pub const ProxyConstructor = struct {
         const revoker = try createBuiltinFunction(agent, .{ .function = revoker_closure }, .{
             .length = 0,
             .name = "",
-            .additional_fields = SafePointer.make(*AdditionalFields, additional_fields),
+            .additional_fields = .make(*AdditionalFields, additional_fields),
         });
 
         // 4. Set revoker.[[RevocableProxy]] to proxy.

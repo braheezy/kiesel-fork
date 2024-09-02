@@ -39,15 +39,17 @@ pub fn throw(value: Value) Completion {
 }
 
 test normal {
-    const completion = normal(Value.undefined);
-    try std.testing.expectEqual(completion.type, .normal);
-    try std.testing.expectEqual(completion.value, Value.undefined);
-    try std.testing.expectEqual(completion.target, null);
+    const completion = normal(.undefined);
+    try std.testing.expectEqualDeep(
+        Completion{ .type = .normal, .value = .undefined, .target = null },
+        completion,
+    );
 }
 
 test throw {
-    const completion = throw(Value.undefined);
-    try std.testing.expectEqual(completion.type, .throw);
-    try std.testing.expectEqual(completion.value, Value.undefined);
-    try std.testing.expectEqual(completion.target, null);
+    const completion = throw(.undefined);
+    try std.testing.expectEqualDeep(
+        Completion{ .type = .throw, .value = .undefined, .target = null },
+        completion,
+    );
 }

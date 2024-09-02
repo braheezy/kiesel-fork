@@ -216,7 +216,7 @@ pub const FinalizationRegistryPrototype = struct {
         }
 
         // 8. Return undefined.
-        return Value.undefined;
+        return .undefined;
     }
 
     /// 26.2.3.3 FinalizationRegistry.prototype.unregister ( unregisterToken )
@@ -287,7 +287,7 @@ pub fn cleanupFinalizationRegistry(cell: *Cell) Agent.Error!void {
 
     if (!cell.is_unregistered) {
         // c. Perform ? HostCallJobCallback(callback, undefined, « cell.[[HeldValue]] »).
-        _ = try agent.host_hooks.hostCallJobCallback(callback, Value.undefined, &.{cell.held_value});
+        _ = try agent.host_hooks.hostCallJobCallback(callback, .undefined, &.{cell.held_value});
     }
 
     // 4. Return unused.

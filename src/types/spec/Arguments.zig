@@ -15,7 +15,7 @@ pub fn count(self: Arguments) usize {
 }
 
 pub fn get(self: Arguments, index: usize) Value {
-    return self.getOrNull(index) orelse Value.undefined;
+    return self.getOrNull(index) orelse .undefined;
 }
 
 pub fn getOrNull(self: Arguments, index: usize) ?Value {

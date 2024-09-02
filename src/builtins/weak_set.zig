@@ -70,7 +70,7 @@ pub const WeakSetConstructor = struct {
             "%WeakSet.prototype%",
             .{
                 // 3. Set set.[[WeakSetData]] to a new empty List.
-                .weak_set_data = WeakSetData.init(agent.gc_allocator),
+                .weak_set_data = .init(agent.gc_allocator),
             },
         );
 

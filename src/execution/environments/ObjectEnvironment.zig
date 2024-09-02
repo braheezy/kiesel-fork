@@ -74,7 +74,7 @@ pub fn createMutableBinding(
     //      [[Value]]: undefined, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: D
     //    }).
     try self.binding_object.definePropertyOrThrow(property_key, .{
-        .value = Value.undefined,
+        .value = .undefined,
         .writable = true,
         .enumerable = true,
         .configurable = deletable,
@@ -148,7 +148,7 @@ pub fn getBindingValue(
     // 3. If value is false, then
     if (!value) {
         // a. If S is false, return undefined; otherwise throw a ReferenceError exception.
-        if (!strict) return Value.undefined;
+        if (!strict) return .undefined;
         return agent.throwException(.reference_error, "'{}' is not defined", .{name});
     }
 

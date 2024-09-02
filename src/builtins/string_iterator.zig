@@ -58,7 +58,7 @@ pub const StringIteratorPrototype = struct {
 
         // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
         if (string_iterator.fields == .completed) {
-            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, .undefined, true));
         }
 
         const string = string_iterator.fields.state.string;
@@ -88,7 +88,7 @@ pub const StringIteratorPrototype = struct {
 
         // d. Return undefined.
         string_iterator.fields = .completed;
-        return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
+        return Value.from(try createIteratorResultObject(agent, .undefined, true));
     }
 };
 

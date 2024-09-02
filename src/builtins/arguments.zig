@@ -448,7 +448,7 @@ fn makeArgGetter(agent: *Agent, name: String, env: Environment) std.mem.Allocato
     const getter = try createBuiltinFunction(agent, .{ .function = getter_closure }, .{
         .length = 1,
         .name = "",
-        .additional_fields = SafePointer.make(*Captures, captures),
+        .additional_fields = .make(*Captures, captures),
     });
 
     // 4. Return getter.
@@ -477,7 +477,7 @@ fn makeArgSetter(agent: *Agent, name: String, env: Environment) std.mem.Allocato
 
             // a. Return ! env.SetMutableBinding(name, value, false).
             env_.setMutableBinding(agent_, name_, value, false) catch |err| try noexcept(err);
-            return Value.undefined;
+            return .undefined;
         }
     }.func;
 
@@ -486,7 +486,7 @@ fn makeArgSetter(agent: *Agent, name: String, env: Environment) std.mem.Allocato
     const setter = try createBuiltinFunction(agent, .{ .function = setter_closure }, .{
         .length = 1,
         .name = "",
-        .additional_fields = SafePointer.make(*Captures, captures),
+        .additional_fields = .make(*Captures, captures),
     });
 
     // 4. Return setter.
