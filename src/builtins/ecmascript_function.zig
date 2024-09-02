@@ -423,15 +423,15 @@ fn evaluateAsyncFunctionBody(
         Value.from(try realm.intrinsics.@"%Promise%"()),
     ) catch |err| try noexcept(err);
 
-    // 2. Let declResult be Completion(FunctionDeclarationInstantiation(functionObject, argumentsList)).
+    // 2. Let completion be Completion(FunctionDeclarationInstantiation(functionObject, argumentsList)).
     functionDeclarationInstantiation(agent, function, arguments_list) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
 
-        // 3. If declResult is an abrupt completion, then
+        // 3. If completion is an abrupt completion, then
         error.ExceptionThrown => {
             const exception = agent.clearException();
 
-            // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « declResult.[[Value]] »).
+            // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « completion.[[Value]] »).
             _ = Value.from(promise_capability.reject).callAssumeCallable(
                 Value.undefined,
                 &.{exception},

@@ -21,7 +21,7 @@ const SafePointer = types.SafePointer;
 const Value = types.Value;
 const @"await" = builtins.@"await";
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const createIterResultObject = types.createIterResultObject;
+const createIteratorResultObject = types.createIteratorResultObject;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const newPromiseCapability = builtins.newPromiseCapability;
@@ -90,8 +90,8 @@ pub const AsyncGeneratorPrototype = struct {
 
         // 6. If state is completed, then
         if (state == .completed) {
-            // a. Let iteratorResult be CreateIterResultObject(undefined, true).
-            const iterator_result = try createIterResultObject(agent, Value.undefined, true);
+            // a. Let iteratorResult be CreateIteratorResultObject(undefined, true).
+            const iterator_result = try createIteratorResultObject(agent, Value.undefined, true);
 
             // b. Perform ! Call(promiseCapability.[[Resolve]], undefined, « iteratorResult »).
             _ = Value.from(promise_capability.resolve).callAssumeCallable(
@@ -465,15 +465,15 @@ pub fn asyncGeneratorCompleteStep(
             agent.runningExecutionContext().realm = new_realm;
             defer agent.runningExecutionContext().realm = old_realm;
 
-            // iii. Let iteratorResult be CreateIterResultObject(value, done).
-            break :blk try createIterResultObject(agent, value, done);
+            // iii. Let iteratorResult be CreateIteratorResultObject(value, done).
+            break :blk try createIteratorResultObject(agent, value, done);
 
             // iv. Set the running execution context's Realm to oldRealm.
         }
         // c. Else,
         else blk: {
-            // i. Let iteratorResult be CreateIterResultObject(value, done).
-            break :blk try createIterResultObject(agent, value, done);
+            // i. Let iteratorResult be CreateIteratorResultObject(value, done).
+            break :blk try createIteratorResultObject(agent, value, done);
         };
 
         // d. Perform ! Call(promiseCapability.[[Resolve]], undefined, « iteratorResult »).

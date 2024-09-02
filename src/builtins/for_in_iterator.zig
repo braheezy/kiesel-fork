@@ -17,7 +17,7 @@ const PropertyKeyArrayHashMap = Object.PropertyStorage.PropertyKeyArrayHashMap;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
-const createIterResultObject = types.createIterResultObject;
+const createIteratorResultObject = types.createIteratorResultObject;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 
 /// 14.7.5.10.1 CreateForInIterator ( object )
@@ -72,7 +72,7 @@ pub const ForInIteratorPrototype = struct {
         const for_in_iterator = this_value.asObject().as(ForInIterator);
 
         if (for_in_iterator.fields == .completed) {
-            return Value.from(try createIterResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
         }
 
         // 4. Let object be O.[[Object]].
@@ -115,10 +115,10 @@ pub const ForInIteratorPrototype = struct {
                         // a. Append r to O.[[VisitedKeys]].
                         try for_in_iterator.fields.state.visited_keys.putNoClobber(remaining_key, {});
 
-                        // b. If desc.[[Enumerable]] is true, return CreateIterResultObject(r, false).
+                        // b. If desc.[[Enumerable]] is true, return CreateIteratorResultObject(r, false).
                         if (descriptor.?.enumerable == true) {
                             return Value.from(
-                                try createIterResultObject(
+                                try createIteratorResultObject(
                                     agent,
                                     try remaining_key.toValue(agent),
                                     false,
@@ -131,9 +131,9 @@ pub const ForInIteratorPrototype = struct {
 
             // c. Set object to ? object.[[GetPrototypeOf]]().
             object = (try object.internalMethods().getPrototypeOf(object)) orelse {
-                // f. If object is null, return CreateIterResultObject(undefined, true).
+                // f. If object is null, return CreateIteratorResultObject(undefined, true).
                 for_in_iterator.fields = .completed;
-                return Value.from(try createIterResultObject(agent, Value.undefined, true));
+                return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
             };
 
             // d. Set O.[[Object]] to object.

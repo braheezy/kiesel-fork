@@ -1402,20 +1402,20 @@ fn GroupByContainer(comptime key_coercion: KeyCoercion) type {
     };
 }
 
-/// 7.3.36 GroupBy ( items, callbackfn, keyCoercion )
+/// 7.3.36 GroupBy ( items, callback, keyCoercion )
 /// https://tc39.es/ecma262/#sec-groupby
 pub fn groupBy(
     self: Value,
     agent: *Agent,
-    callback_fn: Value,
+    callback: Value,
     comptime key_coercion: KeyCoercion,
 ) Agent.Error!GroupByContainer(key_coercion) {
     // 1. Perform ? RequireObjectCoercible(items).
     _ = try self.requireObjectCoercible(agent);
 
-    // 2. If IsCallable(callbackfn) is false, throw a TypeError exception.
-    if (!callback_fn.isCallable()) {
-        return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
+    // 2. If IsCallable(callback) is false, throw a TypeError exception.
+    if (!callback.isCallable()) {
+        return agent.throwException(.type_error, "{} is not callable", .{callback});
     }
 
     // 3. Let groups be a new empty List.
@@ -1450,8 +1450,8 @@ pub fn groupBy(
         // d. Let value be next.
         const value = next orelse return groups;
 
-        // e. Let key be Completion(Call(callbackfn, undefined, « value, 𝔽(k) »)).
-        const key = callback_fn.callAssumeCallable(
+        // e. Let key be Completion(Call(callback, undefined, « value, 𝔽(k) »)).
+        const key = callback.callAssumeCallable(
             @"undefined",
             &.{ value, from(k) },
         ) catch |err| {

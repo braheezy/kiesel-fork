@@ -1265,17 +1265,17 @@ pub fn codegenRelationalExpression(
         // RelationalExpression : RelationalExpression instanceof ShiftExpression
         // RelationalExpression : RelationalExpression in ShiftExpression
         .expression => |lhs_expression| {
-            // 1. Let lref be ? Evaluation of RelationalExpression.
+            // 1. Let lRef be ? Evaluation of RelationalExpression.
             try codegenExpression(lhs_expression.*, executable, ctx);
 
-            // 2. Let lval be ? GetValue(lref).
+            // 2. Let lVal be ? GetValue(lRef).
             if (lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
             try executable.addInstruction(.load);
 
-            // 3. Let rref be ? Evaluation of ShiftExpression.
+            // 3. Let rRef be ? Evaluation of ShiftExpression.
             try codegenExpression(node.rhs_expression.*, executable, ctx);
 
-            // 4. Let rval be ? GetValue(rref).
+            // 4. Let rVal be ? GetValue(rRef).
             if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
             try executable.addInstruction(.load);
 
@@ -1295,17 +1295,17 @@ pub fn codegenRelationalExpression(
 
             // 1. Let privateIdentifier be the StringValue of PrivateIdentifier.
 
-            // 2. Let rref be ? Evaluation of ShiftExpression.
+            // 2. Let rRef be ? Evaluation of ShiftExpression.
             try codegenExpression(node.rhs_expression.*, executable, ctx);
 
-            // 3. Let rval be ? GetValue(rref).
+            // 3. Let rVal be ? GetValue(rRef).
             if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
             try executable.addInstruction(.load);
 
-            // 4. If rval is not an Object, throw a TypeError exception.
+            // 4. If rVal is not an Object, throw a TypeError exception.
             // 5. Let privateEnv be the running execution context's PrivateEnvironment.
             // 6. Let privateName be ResolvePrivateIdentifier(privateEnv, privateIdentifier).
-            // 7. If PrivateElementFind(rval, privateName) is not empty, return true.
+            // 7. If PrivateElementFind(rVal, privateName) is not empty, return true.
             // 8. Return false.
             try executable.addInstructionWithIdentifier(.has_private_element, private_identifier);
         },
@@ -1323,38 +1323,38 @@ pub fn codegenEqualityExpression(
     // EqualityExpression : EqualityExpression != RelationalExpression
     // EqualityExpression : EqualityExpression === RelationalExpression
     // EqualityExpression : EqualityExpression !== RelationalExpression
-    // 1. Let lref be ? Evaluation of EqualityExpression.
+    // 1. Let lRef be ? Evaluation of EqualityExpression.
     try codegenExpression(node.lhs_expression.*, executable, ctx);
 
-    // 2. Let lval be ? GetValue(lref).
+    // 2. Let lVal be ? GetValue(lRef).
     if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
     try executable.addInstruction(.load);
 
-    // 3. Let rref be ? Evaluation of RelationalExpression.
+    // 3. Let rRef be ? Evaluation of RelationalExpression.
     try codegenExpression(node.rhs_expression.*, executable, ctx);
 
-    // 4. Let rval be ? GetValue(rref).
+    // 4. Let rVal be ? GetValue(rRef).
     if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
     try executable.addInstruction(.load);
 
     switch (node.operator) {
         .@"==" => {
-            // 5. Return ? IsLooselyEqual(rval, lval).
+            // 5. Return ? IsLooselyEqual(rVal, lVal).
             try executable.addInstruction(.is_loosely_equal);
         },
         .@"!=" => {
-            // 5. Let r be ? IsLooselyEqual(rval, lval).
+            // 5. Let r be ? IsLooselyEqual(rVal, lVal).
             try executable.addInstruction(.is_loosely_equal);
 
             // 6. If r is true, return false. Otherwise, return true.
             try executable.addInstruction(.logical_not);
         },
         .@"===" => {
-            // 5. Return IsStrictlyEqual(rval, lval).
+            // 5. Return IsStrictlyEqual(rVal, lVal).
             try executable.addInstruction(.is_strictly_equal);
         },
         .@"!==" => {
-            // 5. Let r be IsStrictlyEqual(rval, lval).
+            // 5. Let r be IsStrictlyEqual(rVal, lVal).
             try executable.addInstruction(.is_strictly_equal);
 
             // 6. If r is true, return false. Otherwise, return true.
@@ -1373,23 +1373,22 @@ pub fn codegenLogicalExpression(
     switch (node.operator) {
         // LogicalANDExpression : LogicalANDExpression && BitwiseORExpression
         .@"&&" => {
-            // 1. Let lref be ? Evaluation of LogicalANDExpression.
+            // 1. Let lRef be ? Evaluation of LogicalANDExpression.
             try codegenExpression(node.lhs_expression.*, executable, ctx);
 
-            // 2. Let lval be ? GetValue(lref).
+            // 2. Let lVal be ? GetValue(lRef).
             if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
-            // 3. Let lbool be ToBoolean(lval).
-            // 4. If lbool is false, return lval.
+            // 3. If ToBoolean(lVal) is false, return lVal.
             try executable.addInstruction(.jump_conditional);
             const consequent_jump = try executable.addJumpIndex();
             const alternate_jump = try executable.addJumpIndex();
             try consequent_jump.setTargetHere();
 
-            // 5. Let rref be ? Evaluation of BitwiseORExpression.
+            // 4. Let rRef be ? Evaluation of BitwiseORExpression.
             try codegenExpression(node.rhs_expression.*, executable, ctx);
 
-            // 6. Return ? GetValue(rref).
+            // 5. Return ? GetValue(rRef).
             if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
             try alternate_jump.setTargetHere();
@@ -1397,23 +1396,22 @@ pub fn codegenLogicalExpression(
 
         // LogicalORExpression : LogicalORExpression || LogicalANDExpression
         .@"||" => {
-            // 1. Let lref be ? Evaluation of LogicalORExpression.
+            // 1. Let lRef be ? Evaluation of LogicalORExpression.
             try codegenExpression(node.lhs_expression.*, executable, ctx);
 
-            // 2. Let lval be ? GetValue(lref).
+            // 2. Let lVal be ? GetValue(lRef).
             if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
-            // 3. Let lbool be ToBoolean(lval).
-            // 4. If lbool is true, return lval.
+            // 3. If ToBoolean(lVal) is true, return lVal.
             try executable.addInstruction(.jump_conditional);
             const consequent_jump = try executable.addJumpIndex();
             const alternate_jump = try executable.addJumpIndex();
             try alternate_jump.setTargetHere();
 
-            // 5. Let rref be ? Evaluation of LogicalANDExpression.
+            // 4. Let rRef be ? Evaluation of LogicalANDExpression.
             try codegenExpression(node.rhs_expression.*, executable, ctx);
 
-            // 6. Return ? GetValue(rref).
+            // 5. Return ? GetValue(rRef).
             if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
             try consequent_jump.setTargetHere();
@@ -1421,10 +1419,10 @@ pub fn codegenLogicalExpression(
 
         // CoalesceExpression : CoalesceExpressionHead ?? BitwiseORExpression
         .@"??" => {
-            // 1. Let lref be ? Evaluation of CoalesceExpressionHead.
+            // 1. Let lRef be ? Evaluation of CoalesceExpressionHead.
             try codegenExpression(node.lhs_expression.*, executable, ctx);
 
-            // 2. Let lval be ? GetValue(lref).
+            // 2. Let lVal be ? GetValue(lRef).
             if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
             try executable.addInstruction(.load);
@@ -1437,14 +1435,14 @@ pub fn codegenLogicalExpression(
             const consequent_jump = try executable.addJumpIndex();
             const alternate_jump = try executable.addJumpIndex();
 
-            // 3. If lval is either undefined or null, then
+            // 3. If lVal is either undefined or null, then
             try consequent_jump.setTargetHere();
-            try executable.addInstruction(.store); // Drop lval from the stack
+            try executable.addInstruction(.store); // Drop lVal from the stack
 
-            // a. Let rref be ? Evaluation of BitwiseORExpression.
+            // a. Let rRef be ? Evaluation of BitwiseORExpression.
             try codegenExpression(node.rhs_expression.*, executable, ctx);
 
-            // b. Return ? GetValue(rref).
+            // b. Return ? GetValue(rRef).
             if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
             try executable.addInstruction(.jump);
@@ -1453,7 +1451,7 @@ pub fn codegenLogicalExpression(
             // 4. Else,
             try alternate_jump.setTargetHere();
 
-            // a. Return lval.
+            // a. Return lVal.
             try executable.addInstruction(.store);
 
             try end_jump.setTargetHere();
@@ -1469,17 +1467,17 @@ pub fn codegenConditionalExpression(
     ctx: *Context,
 ) Executable.Error!void {
     // ConditionalExpression : ShortCircuitExpression ? AssignmentExpression : AssignmentExpression
-    // 1. Let lref be ? Evaluation of ShortCircuitExpression.
+    // 1. Let lRef be ? Evaluation of ShortCircuitExpression.
     try codegenExpression(node.test_expression.*, executable, ctx);
 
-    // 2. Let lval be ToBoolean(? GetValue(lref)).
+    // 2. Let lVal be ToBoolean(? GetValue(lRef)).
     if (node.test_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
     try executable.addInstruction(.jump_conditional);
     const consequent_jump = try executable.addJumpIndex();
     const alternate_jump = try executable.addJumpIndex();
 
-    // 3. If lval is true, then
+    // 3. If lVal is true, then
     try consequent_jump.setTargetHere();
 
     // a. Let trueRef be ? Evaluation of the first AssignmentExpression.
@@ -1514,7 +1512,7 @@ pub fn codegenAssignmentExpression(
     if (node.operator == .@"=") {
         // 1. If LeftHandSideExpression is neither an ObjectLiteral nor an ArrayLiteral, then
 
-        // a. Let lref be ? Evaluation of LeftHandSideExpression.
+        // a. Let lRef be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.lhs_expression.*, executable, ctx);
         try executable.addInstruction(.push_reference);
 
@@ -1522,36 +1520,36 @@ pub fn codegenAssignmentExpression(
         //          LeftHandSideExpression are both true, then
         if (false) {
             // i. Let lhs be the StringValue of LeftHandSideExpression.
-            // ii. Let rval be ? NamedEvaluation of AssignmentExpression with argument lhs.
+            // ii. Let rVal be ? NamedEvaluation of AssignmentExpression with argument lhs.
         }
         // c. Else,
         else {
-            // i. Let rref be ? Evaluation of AssignmentExpression.
+            // i. Let rRef be ? Evaluation of AssignmentExpression.
             try codegenExpression(node.rhs_expression.*, executable, ctx);
 
-            // ii. Let rval be ? GetValue(rref).
+            // ii. Let rVal be ? GetValue(rRef).
             if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
         }
 
-        // d. Perform ? PutValue(lref, rval).
-        // e. Return rval.
+        // d. Perform ? PutValue(lRef, rVal).
+        // e. Return rVal.
         try executable.addInstruction(.put_value);
         try executable.addInstruction(.pop_reference);
     }
     // AssignmentExpression : LeftHandSideExpression AssignmentOperator AssignmentExpression
     else if (node.operator != .@"&&=" and node.operator != .@"||=" and node.operator != .@"??=") {
-        // 1. Let lref be ? Evaluation of LeftHandSideExpression.
+        // 1. Let lRef be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.lhs_expression.*, executable, ctx);
         try executable.addInstruction(.push_reference);
 
-        // 2. Let lval be ? GetValue(lref).
+        // 2. Let lVal be ? GetValue(lRef).
         if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
         try executable.addInstruction(.load);
 
-        // 3. Let rref be ? Evaluation of AssignmentExpression.
+        // 3. Let rRef be ? Evaluation of AssignmentExpression.
         try codegenExpression(node.rhs_expression.*, executable, ctx);
 
-        // 4. Let rval be ? GetValue(rref).
+        // 4. Let rVal be ? GetValue(rRef).
         if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
         try executable.addInstruction(.load);
 
@@ -1574,113 +1572,111 @@ pub fn codegenAssignmentExpression(
             else => unreachable,
         };
 
-        // 7. Let r be ? ApplyStringOrNumericBinaryOperator(lval, opText, rval).
+        // 7. Let r be ? ApplyStringOrNumericBinaryOperator(lVal, opText, rVal).
         try executable.addInstruction(.apply_string_or_numeric_binary_operator);
         try executable.addIndex(@intFromEnum(operator));
 
-        // 8. Perform ? PutValue(lref, r).
+        // 8. Perform ? PutValue(lRef, r).
         // 9. Return r.
         try executable.addInstruction(.put_value);
         try executable.addInstruction(.pop_reference);
     }
     // AssignmentExpression : LeftHandSideExpression &&= AssignmentExpression
     else if (node.operator == .@"&&=") {
-        // 1. Let lref be ? Evaluation of LeftHandSideExpression.
+        // 1. Let lRef be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.lhs_expression.*, executable, ctx);
         try executable.addInstruction(.push_reference);
 
-        // 2. Let lval be ? GetValue(lref).
+        // 2. Let lVal be ? GetValue(lRef).
         if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
         try executable.addInstruction(.load);
 
-        // 3. Let lbool be ToBoolean(lval).
+        // 3. If ToBoolean(lVal) is false, return lVal.
         try executable.addInstruction(.jump_conditional);
         const consequent_jump = try executable.addJumpIndex();
         const alternate_jump = try executable.addJumpIndex();
 
         try consequent_jump.setTargetHere();
 
-        // TODO: 5. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and IsIdentifierRef
+        // TODO: 4. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and IsIdentifierRef
         //          of LeftHandSideExpression is true, then
         if (false) {
             // a. Let lhs be the StringValue of LeftHandSideExpression.
-            // b. Let rval be ? NamedEvaluation of AssignmentExpression with argument lhs.
+            // b. Let rVal be ? NamedEvaluation of AssignmentExpression with argument lhs.
         }
-        // 6. Else,
+        // 5. Else,
         else {
-            // a. Let rref be ? Evaluation of AssignmentExpression.
+            // a. Let rRef be ? Evaluation of AssignmentExpression.
             try codegenExpression(node.rhs_expression.*, executable, ctx);
 
-            // b. Let rval be ? GetValue(rref).
+            // b. Let rVal be ? GetValue(rRef).
             if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
         }
 
-        // 7. Perform ? PutValue(lref, rval).
-        // 8. Return rval.
+        // 6. Perform ? PutValue(lRef, rVal).
+        // 7. Return rVal.
         try executable.addInstruction(.put_value);
 
         try executable.addInstruction(.jump);
         const end_jump = try executable.addJumpIndex();
 
-        // 4. If lbool is false, return lval.
         try alternate_jump.setTargetHere();
-        try executable.addInstruction(.store); // Restore lval as the result value
+        try executable.addInstruction(.store); // Restore lVal as the result value
 
         try end_jump.setTargetHere();
         try executable.addInstruction(.pop_reference);
     }
     // AssignmentExpression : LeftHandSideExpression ||= AssignmentExpression
     else if (node.operator == .@"||=") {
-        // 1. Let lref be ? Evaluation of LeftHandSideExpression.
+        // 1. Let lRef be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.lhs_expression.*, executable, ctx);
         try executable.addInstruction(.push_reference);
 
-        // 2. Let lval be ? GetValue(lref).
+        // 2. Let lVal be ? GetValue(lRef).
         if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
-        // 3. Let lbool be ToBoolean(lval).
+        // 3. If ToBoolean(lVal) is true, return lVal.
         try executable.addInstruction(.jump_conditional);
         const consequent_jump = try executable.addJumpIndex();
         const alternate_jump = try executable.addJumpIndex();
 
         try alternate_jump.setTargetHere();
 
-        // TODO: 5. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and IsIdentifierRef
+        // TODO: 4. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and IsIdentifierRef
         //          of LeftHandSideExpression is true, then
         if (false) {
             // a. Let lhs be the StringValue of LeftHandSideExpression.
-            // b. Let rval be ? NamedEvaluation of AssignmentExpression with argument lhs.
+            // b. Let rVal be ? NamedEvaluation of AssignmentExpression with argument lhs.
         }
-        // 6. Else,
+        // 5. Else,
         else {
-            // a. Let rref be ? Evaluation of AssignmentExpression.
+            // a. Let rRef be ? Evaluation of AssignmentExpression.
             try codegenExpression(node.rhs_expression.*, executable, ctx);
 
-            // b. Let rval be ? GetValue(rref).
+            // b. Let rVal be ? GetValue(rRef).
             if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
         }
 
-        // 7. Perform ? PutValue(lref, rval).
-        // 8. Return rval.
+        // 6. Perform ? PutValue(lRef, rVal).
+        // 7. Return rVal.
         try executable.addInstruction(.put_value);
 
-        // 4. If lbool is true, return lval.
         try consequent_jump.setTargetHere();
 
         try executable.addInstruction(.pop_reference);
     }
     // AssignmentExpression : LeftHandSideExpression ??= AssignmentExpression
     else if (node.operator == .@"??=") {
-        // 1. Let lref be ? Evaluation of LeftHandSideExpression.
+        // 1. Let lRef be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.lhs_expression.*, executable, ctx);
         try executable.addInstruction(.push_reference);
 
-        // 2. Let lval be ? GetValue(lref).
+        // 2. Let lVal be ? GetValue(lRef).
         if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
         try executable.addInstruction(.load);
 
-        // 3. If lval is neither undefined nor null, return lval.
+        // 3. If lVal is neither undefined nor null, return lVal.
         try executable.addInstruction(.load);
         try executable.addInstructionWithConstant(.load_constant, Value.undefined);
         try executable.addInstruction(.is_loosely_equal);
@@ -1690,32 +1686,32 @@ pub fn codegenAssignmentExpression(
         const alternate_jump = try executable.addJumpIndex();
 
         try consequent_jump.setTargetHere();
-        try executable.addInstruction(.store); // Drop lval from the stack
+        try executable.addInstruction(.store); // Drop lVal from the stack
 
         // TODO: 4. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and
         //          IsIdentifierRef of LeftHandSideExpression is true, then
         if (false) {
             // a. Let lhs be the StringValue of LeftHandSideExpression.
-            // b. Let rval be ? NamedEvaluation of AssignmentExpression with argument lhs.
+            // b. Let rVal be ? NamedEvaluation of AssignmentExpression with argument lhs.
         }
         // 5. Else,
         else {
-            // a. Let rref be ? Evaluation of AssignmentExpression.
+            // a. Let rRef be ? Evaluation of AssignmentExpression.
             try codegenExpression(node.rhs_expression.*, executable, ctx);
 
-            // b. Let rval be ? GetValue(rref).
+            // b. Let rVal be ? GetValue(rRef).
             if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
         }
 
-        // 6. Perform ? PutValue(lref, rval).
-        // 7. Return rval.
+        // 6. Perform ? PutValue(lRef, rVal).
+        // 7. Return rVal.
         try executable.addInstruction(.put_value);
 
         try executable.addInstruction(.jump);
         const end_jump = try executable.addJumpIndex();
 
         try alternate_jump.setTargetHere();
-        try executable.addInstruction(.store); // Restore lval as the result value
+        try executable.addInstruction(.store); // Restore lVal as the result value
 
         try end_jump.setTargetHere();
         try executable.addInstruction(.pop_reference);
@@ -1729,21 +1725,21 @@ pub fn codegenBinaryExpression(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    // 1. Let lref be ? Evaluation of leftOperand.
+    // 1. Let lRef be ? Evaluation of leftOperand.
     try codegenExpression(node.lhs_expression.*, executable, ctx);
 
-    // 2. Let lval be ? GetValue(lref).
+    // 2. Let lVal be ? GetValue(lRef).
     if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
     try executable.addInstruction(.load);
 
-    // 3. Let rref be ? Evaluation of rightOperand.
+    // 3. Let rRef be ? Evaluation of rightOperand.
     try codegenExpression(node.rhs_expression.*, executable, ctx);
 
-    // 4. Let rval be ? GetValue(rref).
+    // 4. Let rVal be ? GetValue(rRef).
     if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
     try executable.addInstruction(.load);
 
-    // 5. Return ? ApplyStringOrNumericBinaryOperator(lval, opText, rval).
+    // 5. Return ? ApplyStringOrNumericBinaryOperator(lVal, opText, rVal).
     try executable.addInstruction(.apply_string_or_numeric_binary_operator);
     try executable.addIndex(@intFromEnum(node.operator));
 }
@@ -1755,10 +1751,10 @@ pub fn codegenSequenceExpression(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    // 1. Let lref be ? Evaluation of Expression.
-    // 2. Perform ? GetValue(lref).
-    // 3. Let rref be ? Evaluation of AssignmentExpression.
-    // 4. Return ? GetValue(rref).
+    // 1. Let lRef be ? Evaluation of Expression.
+    // 2. Perform ? GetValue(lRef).
+    // 3. Let rRef be ? Evaluation of AssignmentExpression.
+    // 4. Return ? GetValue(rRef).
     for (node.expressions) |expression| {
         try codegenExpression(expression, executable, ctx);
         if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);

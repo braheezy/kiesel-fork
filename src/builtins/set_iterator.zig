@@ -17,7 +17,7 @@ const Realm = execution.Realm;
 const Set = builtins.Set;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
-const createIterResultObject = types.createIterResultObject;
+const createIteratorResultObject = types.createIteratorResultObject;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 
@@ -79,9 +79,9 @@ pub const SetIteratorPrototype = struct {
         }
         const set_iterator = this_value.asObject().as(SetIterator);
 
-        // 2. If state is completed, return CreateIterResultObject(undefined, true).
+        // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
         if (set_iterator.fields == .completed) {
-            return Value.from(try createIterResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
         }
 
         const set = set_iterator.fields.state.set;
@@ -116,7 +116,7 @@ pub const SetIteratorPrototype = struct {
         else {
             set_iterator.fields = .completed;
             set.fields.unregisterIterator();
-            return Value.from(try createIterResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
         };
 
         set_iterator.fields.state.index = index;
@@ -127,16 +127,16 @@ pub const SetIteratorPrototype = struct {
                 // a. Let result be CreateArrayFromList(« e, e »).
                 const result = Value.from(try createArrayFromList(agent, &.{ value, value }));
 
-                // b. Perform ? GeneratorYield(CreateIterResultObject(result, false)).
-                return Value.from(try createIterResultObject(agent, result, false));
+                // b. Perform ? GeneratorYield(CreateIteratorResultObject(result, false)).
+                return Value.from(try createIteratorResultObject(agent, result, false));
             },
 
             // 2. Else,
             .value => {
                 // a. Assert: kind is value.
 
-                // b. Perform ? GeneratorYield(CreateIterResultObject(e, false)).
-                return Value.from(try createIterResultObject(agent, value, false));
+                // b. Perform ? GeneratorYield(CreateIteratorResultObject(e, false)).
+                return Value.from(try createIteratorResultObject(agent, value, false));
             },
 
             .key => unreachable,

@@ -16,10 +16,10 @@ outer_private_environment: ?*PrivateEnvironment,
 /// [[Names]]
 names: std.StringHashMap(PrivateName),
 
-/// 9.2.1.2 ResolvePrivateIdentifier ( privEnv, identifier )
+/// 9.2.1.2 ResolvePrivateIdentifier ( privateEnv, identifier )
 /// https://tc39.es/ecma262/#sec-resolve-private-identifier
 pub fn resolvePrivateIdentifier(self: PrivateEnvironment, identifier: []const u8) PrivateName {
-    // 1. Let names be privEnv.[[Names]].
+    // 1. Let names be privateEnv.[[Names]].
     // 2. For each Private Name pn of names, do
     //     a. If pn.[[Description]] is identifier, then
     if (self.names.get(identifier)) |private_name| {
@@ -27,10 +27,10 @@ pub fn resolvePrivateIdentifier(self: PrivateEnvironment, identifier: []const u8
         return private_name;
     }
 
-    // 3. Let outerPrivEnv be privEnv.[[OuterPrivateEnvironment]].
-    // 4. Assert: outerPrivEnv is not null.
-    const outer_private_environment = self.outer_private_environment.?;
+    // 3. Let outerPrivateEnv be privateEnv.[[OuterPrivateEnvironment]].
+    // 4. Assert: outerPrivateEnv is not null.
+    const outer_private_env = self.outer_private_environment.?;
 
-    // 5. Return ResolvePrivateIdentifier(outerPrivEnv, identifier).
-    return outer_private_environment.resolvePrivateIdentifier(identifier);
+    // 5. Return ResolvePrivateIdentifier(outerPrivateEnv, identifier).
+    return outer_private_env.resolvePrivateIdentifier(identifier);
 }

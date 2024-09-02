@@ -291,54 +291,54 @@ pub fn directEval(agent: *Agent, arguments: []const Value, strict: bool) Agent.E
     return performEval(agent, eval_arg, strict_caller, true);
 }
 
-/// 13.15.3 ApplyStringOrNumericBinaryOperator ( lval, opText, rval )
+/// 13.15.3 ApplyStringOrNumericBinaryOperator ( lVal, opText, rVal )
 /// https://tc39.es/ecma262/#sec-applystringornumericbinaryoperator
 pub fn applyStringOrNumericBinaryOperator(
     agent: *Agent,
-    lval: Value,
+    l_val: Value,
     operator: ast.BinaryExpression.Operator,
-    rval: Value,
+    r_val: Value,
 ) Agent.Error!Value {
-    var final_lval = lval;
-    var final_rval = rval;
+    var final_l_val = l_val;
+    var final_r_val = r_val;
 
     // 1. If opText is +, then
     if (operator == .@"+") {
-        // a. Let lprim be ? ToPrimitive(lval).
-        const lprim = try lval.toPrimitive(agent, null);
+        // a. Let lPrim be ? ToPrimitive(lVal).
+        const l_prim = try l_val.toPrimitive(agent, null);
 
-        // b. Let rprim be ? ToPrimitive(rval).
-        const rprim = try rval.toPrimitive(agent, null);
+        // b. Let rPrim be ? ToPrimitive(rVal).
+        const r_prim = try r_val.toPrimitive(agent, null);
 
-        // c. If lprim is a String or rprim is a String, then
-        if (lprim.isString() or rprim.isString()) {
-            // i. Let lstr be ? ToString(lprim).
-            const lstr = try lprim.toString(agent);
+        // c. If lPrim is a String or rPrim is a String, then
+        if (l_prim.isString() or r_prim.isString()) {
+            // i. Let lStr be ? ToString(lPrim).
+            const l_str = try l_prim.toString(agent);
 
-            // ii. Let rstr be ? ToString(rprim).
-            const rstr = try rprim.toString(agent);
+            // ii. Let rStr be ? ToString(rPrim).
+            const r_str = try r_prim.toString(agent);
 
-            // iii. Return the string-concatenation of lstr and rstr.
-            return Value.from(try String.concat(agent.gc_allocator, &.{ lstr, rstr }));
+            // iii. Return the string-concatenation of lStr and rStr.
+            return Value.from(try String.concat(agent.gc_allocator, &.{ l_str, r_str }));
         }
 
-        // d. Set lval to lprim.
-        final_lval = lprim;
+        // d. Set lVal to lPrim.
+        final_l_val = l_prim;
 
-        // e. Set rval to rprim.
-        final_rval = rprim;
+        // e. Set rVal to rPrim.
+        final_r_val = r_prim;
     }
 
     // 2. NOTE: At this point, it must be a numeric operation.
 
-    // 3. Let lnum be ? ToNumeric(lval).
-    const lnum = try final_lval.toNumeric(agent);
+    // 3. Let lNum be ? ToNumeric(lVal).
+    const l_num = try final_l_val.toNumeric(agent);
 
-    // 4. Let rnum be ? ToNumeric(rval).
-    const rnum = try final_rval.toNumeric(agent);
+    // 4. Let rNum be ? ToNumeric(rVal).
+    const r_num = try final_r_val.toNumeric(agent);
 
-    // 5. If Type(lnum) is not Type(rnum), throw a TypeError exception.
-    if (std.meta.activeTag(lnum) != std.meta.activeTag(rnum)) {
+    // 5. If Type(lNum) is not Type(rNum), throw a TypeError exception.
+    if (std.meta.activeTag(l_num) != std.meta.activeTag(r_num)) {
         return agent.throwException(
             .type_error,
             "Left-hand side and right-hand side of numeric binary expression must have the same type",
@@ -346,61 +346,61 @@ pub fn applyStringOrNumericBinaryOperator(
         );
     }
 
-    // 6. If lnum is a BigInt, then
-    if (lnum == .big_int) switch (operator) {
-        // a. If opText is **, return ? BigInt::exponentiate(lnum, rnum).
-        .@"**" => return Value.from(try lnum.big_int.exponentiate(agent, rnum.big_int)),
+    // 6. If lNum is a BigInt, then
+    if (l_num == .big_int) switch (operator) {
+        // a. If opText is **, return ? BigInt::exponentiate(lNum, rNum).
+        .@"**" => return Value.from(try l_num.big_int.exponentiate(agent, r_num.big_int)),
 
-        // b. If opText is /, return ? BigInt::divide(lnum, rnum).
-        .@"/" => return Value.from(try lnum.big_int.divide(agent, rnum.big_int)),
+        // b. If opText is /, return ? BigInt::divide(lNum, rNum).
+        .@"/" => return Value.from(try l_num.big_int.divide(agent, r_num.big_int)),
 
-        // c. If opText is %, return ? BigInt::remainder(lnum, rnum).
-        .@"%" => return Value.from(try lnum.big_int.remainder(agent, rnum.big_int)),
+        // c. If opText is %, return ? BigInt::remainder(lNum, rNum).
+        .@"%" => return Value.from(try l_num.big_int.remainder(agent, r_num.big_int)),
 
-        // d. If opText is >>>, return ? BigInt::unsignedRightShift(lnum, rnum).
-        .@">>>" => return Value.from(try lnum.big_int.unsignedRightShift(agent, rnum.big_int)),
+        // d. If opText is >>>, return ? BigInt::unsignedRightShift(lNum, rNum).
+        .@">>>" => return Value.from(try l_num.big_int.unsignedRightShift(agent, r_num.big_int)),
 
         else => {},
     };
 
-    // 7. Let operation be the abstract operation associated with opText and Type(lnum) in the following table:
-    // 8. Return operation(lnum, rnum).
+    // 7. Let operation be the abstract operation associated with opText and Type(lNum) in the following table:
+    // 8. Return operation(lNum, rNum).
     switch (operator) {
-        .@"**" => return Value.from(lnum.number.exponentiate(rnum.number)),
-        .@"*" => switch (lnum) {
-            .number => return Value.from(lnum.number.multiply(rnum.number)),
-            .big_int => return Value.from(try lnum.big_int.multiply(agent, rnum.big_int)),
+        .@"**" => return Value.from(l_num.number.exponentiate(r_num.number)),
+        .@"*" => switch (l_num) {
+            .number => return Value.from(l_num.number.multiply(r_num.number)),
+            .big_int => return Value.from(try l_num.big_int.multiply(agent, r_num.big_int)),
         },
-        .@"/" => return Value.from(lnum.number.divide(rnum.number)),
-        .@"%" => return Value.from(lnum.number.remainder(rnum.number)),
-        .@"+" => switch (lnum) {
-            .number => return Value.from(lnum.number.add(rnum.number)),
-            .big_int => return Value.from(try lnum.big_int.add(agent, rnum.big_int)),
+        .@"/" => return Value.from(l_num.number.divide(r_num.number)),
+        .@"%" => return Value.from(l_num.number.remainder(r_num.number)),
+        .@"+" => switch (l_num) {
+            .number => return Value.from(l_num.number.add(r_num.number)),
+            .big_int => return Value.from(try l_num.big_int.add(agent, r_num.big_int)),
         },
-        .@"-" => switch (lnum) {
-            .number => return Value.from(lnum.number.subtract(rnum.number)),
-            .big_int => return Value.from(try lnum.big_int.subtract(agent, rnum.big_int)),
+        .@"-" => switch (l_num) {
+            .number => return Value.from(l_num.number.subtract(r_num.number)),
+            .big_int => return Value.from(try l_num.big_int.subtract(agent, r_num.big_int)),
         },
-        .@"<<" => switch (lnum) {
-            .number => return Value.from(lnum.number.leftShift(rnum.number)),
-            .big_int => return Value.from(try lnum.big_int.leftShift(agent, rnum.big_int)),
+        .@"<<" => switch (l_num) {
+            .number => return Value.from(l_num.number.leftShift(r_num.number)),
+            .big_int => return Value.from(try l_num.big_int.leftShift(agent, r_num.big_int)),
         },
-        .@">>" => switch (lnum) {
-            .number => return Value.from(lnum.number.signedRightShift(rnum.number)),
-            .big_int => return Value.from(try lnum.big_int.signedRightShift(agent, rnum.big_int)),
+        .@">>" => switch (l_num) {
+            .number => return Value.from(l_num.number.signedRightShift(r_num.number)),
+            .big_int => return Value.from(try l_num.big_int.signedRightShift(agent, r_num.big_int)),
         },
-        .@">>>" => return Value.from(lnum.number.unsignedRightShift(rnum.number)),
-        .@"&" => switch (lnum) {
-            .number => return Value.from(lnum.number.bitwiseAND(rnum.number)),
-            .big_int => return Value.from(try lnum.big_int.bitwiseAND(agent, rnum.big_int)),
+        .@">>>" => return Value.from(l_num.number.unsignedRightShift(r_num.number)),
+        .@"&" => switch (l_num) {
+            .number => return Value.from(l_num.number.bitwiseAND(r_num.number)),
+            .big_int => return Value.from(try l_num.big_int.bitwiseAND(agent, r_num.big_int)),
         },
-        .@"^" => switch (lnum) {
-            .number => return Value.from(lnum.number.bitwiseXOR(rnum.number)),
-            .big_int => return Value.from(try lnum.big_int.bitwiseXOR(agent, rnum.big_int)),
+        .@"^" => switch (l_num) {
+            .number => return Value.from(l_num.number.bitwiseXOR(r_num.number)),
+            .big_int => return Value.from(try l_num.big_int.bitwiseXOR(agent, r_num.big_int)),
         },
-        .@"|" => switch (lnum) {
-            .number => return Value.from(lnum.number.bitwiseOR(rnum.number)),
-            .big_int => return Value.from(try lnum.big_int.bitwiseOR(agent, rnum.big_int)),
+        .@"|" => switch (l_num) {
+            .number => return Value.from(l_num.number.bitwiseOR(r_num.number)),
+            .big_int => return Value.from(try l_num.big_int.bitwiseOR(agent, r_num.big_int)),
         },
     }
 }

@@ -1833,10 +1833,10 @@ pub const PromiseConstructor = struct {
         return Value.from(try promiseResolve(agent, constructor_.asObject(), resolution));
     }
 
-    /// 1 Promise.try ( callbackfn, ...args )
+    /// 1 Promise.try ( callback, ...args )
     /// https://tc39.es/proposal-promise-try/#sec-promise.try
     fn @"try"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const callbackfn = arguments.get(0);
+        const callback = arguments.get(0);
         const args = if (arguments.count() <= 1) &[_]Value{} else arguments.values[1..];
 
         // 1. Let C be the this value.
@@ -1850,8 +1850,8 @@ pub const PromiseConstructor = struct {
         // 3. Let promiseCapability be ? NewPromiseCapability(C).
         const promise_capability = try newPromiseCapability(agent, constructor_);
 
-        // 4. Let status be Completion(Call(callbackfn, undefined, args)).
-        const status = callbackfn.call(agent, Value.undefined, args);
+        // 4. Let status be Completion(Call(callback, undefined, args)).
+        const status = callback.call(agent, Value.undefined, args);
 
         // 5. If status is an abrupt completion, then
         //     a. Perform ? Call(promiseCapability.[[Reject]], undefined, « status.[[Value]] »).

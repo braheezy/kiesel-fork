@@ -18,7 +18,7 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const advanceStringIndex = builtins.advanceStringIndex;
-const createIterResultObject = types.createIterResultObject;
+const createIteratorResultObject = types.createIteratorResultObject;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const regExpExec = builtins.regExpExec;
@@ -93,9 +93,9 @@ pub const RegExpStringIteratorPrototype = struct {
         }
         const reg_exp_string_iterator = this_value.asObject().as(RegExpStringIterator);
 
-        // 2. If state is completed, return CreateIterResultObject(undefined, true).
+        // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
         if (reg_exp_string_iterator.fields == .completed) {
-            return Value.from(try createIterResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
         }
 
         const reg_exp = reg_exp_string_iterator.fields.state.reg_exp;
@@ -109,15 +109,15 @@ pub const RegExpStringIteratorPrototype = struct {
         // ii. If match is null, return undefined.
         if (match == null) {
             reg_exp_string_iterator.fields = .completed;
-            return Value.from(try createIterResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
         }
 
         // iii. If global is false, then
         if (!global) {
-            // 1. Perform ? GeneratorYield(CreateIterResultObject(match, false)).
+            // 1. Perform ? GeneratorYield(CreateIteratorResultObject(match, false)).
             // 2. Return undefined.
             reg_exp_string_iterator.fields = .completed;
-            return Value.from(try createIterResultObject(agent, Value.from(match.?), false));
+            return Value.from(try createIteratorResultObject(agent, Value.from(match.?), false));
         }
 
         // iv. Let matchStr be ? ToString(? Get(match, "0")).
@@ -135,8 +135,8 @@ pub const RegExpStringIteratorPrototype = struct {
             try reg_exp.set(PropertyKey.from("lastIndex"), Value.from(next_index), .throw);
         }
 
-        // vi. Perform ? GeneratorYield(CreateIterResultObject(match, false)).
-        return Value.from(try createIterResultObject(agent, Value.from(match.?), false));
+        // vi. Perform ? GeneratorYield(CreateIteratorResultObject(match, false)).
+        return Value.from(try createIteratorResultObject(agent, Value.from(match.?), false));
     }
 };
 

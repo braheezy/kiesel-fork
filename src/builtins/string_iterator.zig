@@ -16,7 +16,7 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
-const createIterResultObject = types.createIterResultObject;
+const createIteratorResultObject = types.createIteratorResultObject;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 
@@ -56,9 +56,9 @@ pub const StringIteratorPrototype = struct {
         }
         const string_iterator = this_value.asObject().as(StringIterator);
 
-        // 2. If state is completed, return CreateIterResultObject(undefined, true).
+        // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
         if (string_iterator.fields == .completed) {
-            return Value.from(try createIterResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
         }
 
         const string = string_iterator.fields.state.string;
@@ -82,13 +82,13 @@ pub const StringIteratorPrototype = struct {
             // iv. Set position to nextIndex.
             string_iterator.fields.state.position = next_index;
 
-            // v. Perform ? GeneratorYield(CreateIterResultObject(resultString, false)).
-            return Value.from(try createIterResultObject(agent, Value.from(result_string), false));
+            // v. Perform ? GeneratorYield(CreateIteratorResultObject(resultString, false)).
+            return Value.from(try createIteratorResultObject(agent, Value.from(result_string), false));
         }
 
         // d. Return undefined.
         string_iterator.fields = .completed;
-        return Value.from(try createIterResultObject(agent, Value.undefined, true));
+        return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
     }
 };
 

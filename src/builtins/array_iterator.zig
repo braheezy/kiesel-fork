@@ -17,7 +17,7 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
-const createIterResultObject = types.createIterResultObject;
+const createIteratorResultObject = types.createIteratorResultObject;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const isTypedArrayOutOfBounds = builtins.isTypedArrayOutOfBounds;
@@ -81,9 +81,9 @@ pub const ArrayIteratorPrototype = struct {
         }
         const array_iterator = this_value.asObject().as(ArrayIterator);
 
-        // 2. If state is completed, return CreateIterResultObject(undefined, true).
+        // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
         if (array_iterator.fields == .completed) {
-            return Value.from(try createIterResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
         }
 
         const array = array_iterator.fields.state.array;
@@ -115,7 +115,7 @@ pub const ArrayIteratorPrototype = struct {
         // iii. If index ≥ len, return NormalCompletion(undefined).
         if (index >= len) {
             array_iterator.fields = .completed;
-            return Value.from(try createIterResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
         }
 
         // iv. Let indexNumber be 𝔽(index).
@@ -153,8 +153,8 @@ pub const ArrayIteratorPrototype = struct {
         // viii. Set index to index + 1.
         array_iterator.fields.state.index += 1;
 
-        // vii. Perform ? GeneratorYield(CreateIterResultObject(result, false)).
-        return Value.from(try createIterResultObject(agent, result, false));
+        // vii. Perform ? GeneratorYield(CreateIteratorResultObject(result, false)).
+        return Value.from(try createIteratorResultObject(agent, result, false));
     }
 };
 

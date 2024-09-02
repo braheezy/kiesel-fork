@@ -662,11 +662,11 @@ pub const TypedArrayConstructor = struct {
         );
     }
 
-    /// 23.2.2.1 %TypedArray%.from ( source [ , mapfn [ , thisArg ] ] )
+    /// 23.2.2.1 %TypedArray%.from ( source [ , mapper [ , thisArg ] ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.from
     fn from(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const source = arguments.get(0);
-        const map_fn = arguments.get(1);
+        const mapper = arguments.get(1);
         const this_arg = arguments.get(2);
 
         // 1. Let C be the this value.
@@ -677,16 +677,16 @@ pub const TypedArrayConstructor = struct {
             return agent.throwException(.type_error, "{} is not a constructor", .{constructor_});
         }
 
-        // 3. If mapfn is undefined, then
-        const mapping = if (map_fn.isUndefined()) blk: {
+        // 3. If mapper is undefined, then
+        const mapping = if (mapper.isUndefined()) blk: {
             // a. Let mapping be false.
             break :blk false;
         }
         // 4. Else,
         else blk: {
-            // a. If IsCallable(mapfn) is false, throw a TypeError exception.
-            if (!map_fn.isCallable()) {
-                return agent.throwException(.type_error, "{} is not callable", .{map_fn});
+            // a. If IsCallable(mapper) is false, throw a TypeError exception.
+            if (!mapper.isCallable()) {
+                return agent.throwException(.type_error, "{} is not callable", .{mapper});
             }
 
             // b. Let mapping be true.
@@ -732,8 +732,8 @@ pub const TypedArrayConstructor = struct {
 
                 // iv. If mapping is true, then
                 const mapped_value = if (mapping) blk: {
-                    // 1. Let mappedValue be ? Call(mapfn, thisArg, « kValue, 𝔽(k) »).
-                    break :blk try map_fn.callAssumeCallable(this_arg, &.{ k_value, Value.from(k) });
+                    // 1. Let mappedValue be ? Call(mapper, thisArg, « kValue, 𝔽(k) »).
+                    break :blk try mapper.callAssumeCallable(this_arg, &.{ k_value, Value.from(k) });
                 }
                 // v. Else,
                 else blk: {
@@ -780,8 +780,8 @@ pub const TypedArrayConstructor = struct {
 
             // c. If mapping is true, then
             const mapped_value = if (mapping) blk: {
-                // i. Let mappedValue be ? Call(mapfn, thisArg, « kValue, 𝔽(k) »).
-                break :blk try map_fn.callAssumeCallable(
+                // i. Let mappedValue be ? Call(mapper, thisArg, « kValue, 𝔽(k) »).
+                break :blk try mapper.callAssumeCallable(
                     this_arg,
                     &.{ k_value, Value.from(k) },
                 );
@@ -1193,10 +1193,10 @@ pub const TypedArrayPrototype = struct {
         return Value.from(try createArrayIterator(agent, object, .@"key+value"));
     }
 
-    /// 23.2.3.8 %TypedArray%.prototype.every ( callbackfn [ , thisArg ] )
+    /// 23.2.3.8 %TypedArray%.prototype.every ( callback [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.every
     fn every(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const callback_fn = arguments.get(0);
+        const callback = arguments.get(0);
         const this_arg = arguments.get(1);
 
         // 1. Let O be the this value.
@@ -1207,9 +1207,9 @@ pub const TypedArrayPrototype = struct {
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
 
-        // 4. If IsCallable(callbackfn) is false, throw a TypeError exception.
-        if (!callback_fn.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
+        // 4. If IsCallable(callback) is false, throw a TypeError exception.
+        if (!callback.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{callback});
         }
 
         // 5. Let k be 0.
@@ -1223,8 +1223,8 @@ pub const TypedArrayPrototype = struct {
             // b. Let kValue be ! Get(O, Pk).
             const k_value = object.get(property_key) catch |err| try noexcept(err);
 
-            // c. Let testResult be ToBoolean(? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »)).
-            const test_result = (try callback_fn.callAssumeCallable(
+            // c. Let testResult be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), O »)).
+            const test_result = (try callback.callAssumeCallable(
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(object) },
             )).toBoolean();
@@ -1333,10 +1333,10 @@ pub const TypedArrayPrototype = struct {
         return Value.from(object);
     }
 
-    /// 23.2.3.10 %TypedArray%.prototype.filter ( callbackfn [ , thisArg ] )
+    /// 23.2.3.10 %TypedArray%.prototype.filter ( callback [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.filter
     fn filter(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const callback_fn = arguments.get(0);
+        const callback = arguments.get(0);
         const this_arg = arguments.get(1);
 
         // 1. Let O be the this value.
@@ -1347,9 +1347,9 @@ pub const TypedArrayPrototype = struct {
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
 
-        // 4. If IsCallable(callbackfn) is false, throw a TypeError exception.
-        if (!callback_fn.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
+        // 4. If IsCallable(callback) is false, throw a TypeError exception.
+        if (!callback.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{callback});
         }
 
         // 5. Let kept be a new empty List.
@@ -1370,8 +1370,8 @@ pub const TypedArrayPrototype = struct {
             // b. Let kValue be ! Get(O, Pk).
             const k_value = object.get(property_key) catch |err| try noexcept(err);
 
-            // c. Let selected be ToBoolean(? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »)).
-            const selected = (try callback_fn.callAssumeCallable(
+            // c. Let selected be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), O »)).
+            const selected = (try callback.callAssumeCallable(
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(object) },
             )).toBoolean();
@@ -1496,10 +1496,10 @@ pub const TypedArrayPrototype = struct {
         return find_record.index;
     }
 
-    /// 23.2.3.15 %TypedArray%.prototype.forEach ( callbackfn [ , thisArg ] )
+    /// 23.2.3.15 %TypedArray%.prototype.forEach ( callback [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.foreach
     fn forEach(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const callback_fn = arguments.get(0);
+        const callback = arguments.get(0);
         const this_arg = arguments.get(1);
 
         // 1. Let O be the this value.
@@ -1510,9 +1510,9 @@ pub const TypedArrayPrototype = struct {
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
 
-        // 4. If IsCallable(callbackfn) is false, throw a TypeError exception.
-        if (!callback_fn.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
+        // 4. If IsCallable(callback) is false, throw a TypeError exception.
+        if (!callback.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{callback});
         }
 
         // 5. Let k be 0.
@@ -1526,8 +1526,8 @@ pub const TypedArrayPrototype = struct {
             // b. Let kValue be ! Get(O, Pk).
             const k_value = object.get(property_key) catch |err| try noexcept(err);
 
-            // c. Perform ? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »).
-            _ = try callback_fn.callAssumeCallable(
+            // c. Perform ? Call(callback, thisArg, « kValue, 𝔽(k), O »).
+            _ = try callback.callAssumeCallable(
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(object) },
             );
@@ -1797,10 +1797,10 @@ pub const TypedArrayPrototype = struct {
         return Value.from(length_);
     }
 
-    /// 23.2.3.22 %TypedArray%.prototype.map ( callbackfn [ , thisArg ] )
+    /// 23.2.3.22 %TypedArray%.prototype.map ( callback [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.map
     fn map(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const callback_fn = arguments.get(0);
+        const callback = arguments.get(0);
         const this_arg = arguments.get(1);
 
         // 1. Let O be the this value.
@@ -1811,9 +1811,9 @@ pub const TypedArrayPrototype = struct {
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
 
-        // 4. If IsCallable(callbackfn) is false, throw a TypeError exception.
-        if (!callback_fn.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
+        // 4. If IsCallable(callback) is false, throw a TypeError exception.
+        if (!callback.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{callback});
         }
 
         // 5. Let A be ? TypedArraySpeciesCreate(O, « 𝔽(len) »).
@@ -1834,8 +1834,8 @@ pub const TypedArrayPrototype = struct {
             // b. Let kValue be ! Get(O, Pk).
             const k_value = object.get(property_key) catch |err| try noexcept(err);
 
-            // c. Let mappedValue be ? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »).
-            const mapped_value = try callback_fn.callAssumeCallable(
+            // c. Let mappedValue be ? Call(callback, thisArg, « kValue, 𝔽(k), O »).
+            const mapped_value = try callback.callAssumeCallable(
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(object) },
             );
@@ -1850,10 +1850,10 @@ pub const TypedArrayPrototype = struct {
         return Value.from(array);
     }
 
-    /// 23.2.3.23 %TypedArray%.prototype.reduce ( callbackfn [ , initialValue ] )
+    /// 23.2.3.23 %TypedArray%.prototype.reduce ( callback [ , initialValue ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.reduce
     fn reduce(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const callback_fn = arguments.get(0);
+        const callback = arguments.get(0);
         const initial_value = arguments.getOrNull(1);
 
         // 1. Let O be the this value.
@@ -1864,9 +1864,9 @@ pub const TypedArrayPrototype = struct {
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
 
-        // 4. If IsCallable(callbackfn) is false, throw a TypeError exception.
-        if (!callback_fn.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
+        // 4. If IsCallable(callback) is false, throw a TypeError exception.
+        if (!callback.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{callback});
         }
 
         // 5. If len = 0 and initialValue is not present, throw a TypeError exception.
@@ -1909,8 +1909,8 @@ pub const TypedArrayPrototype = struct {
             // b. Let kValue be ! Get(O, Pk).
             const k_value = object.get(property_key) catch |err| try noexcept(err);
 
-            // c. Set accumulator to ? Call(callbackfn, undefined, « accumulator, kValue, 𝔽(k), O »).
-            accumulator = try callback_fn.callAssumeCallable(
+            // c. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k), O »).
+            accumulator = try callback.callAssumeCallable(
                 Value.undefined,
                 &.{ accumulator, k_value, Value.from(k), Value.from(object) },
             );
@@ -1922,10 +1922,10 @@ pub const TypedArrayPrototype = struct {
         return accumulator;
     }
 
-    /// 23.2.3.24 %TypedArray%.prototype.reduceRight ( callbackfn [ , initialValue ] )
+    /// 23.2.3.24 %TypedArray%.prototype.reduceRight ( callback [ , initialValue ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.reduceright
     fn reduceRight(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const callback_fn = arguments.get(0);
+        const callback = arguments.get(0);
         const initial_value = arguments.getOrNull(1);
 
         // 1. Let O be the this value.
@@ -1936,9 +1936,9 @@ pub const TypedArrayPrototype = struct {
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
 
-        // 4. If IsCallable(callbackfn) is false, throw a TypeError exception.
-        if (!callback_fn.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
+        // 4. If IsCallable(callback) is false, throw a TypeError exception.
+        if (!callback.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{callback});
         }
 
         // 5. If len = 0 and initialValue is not present, throw a TypeError exception.
@@ -1981,8 +1981,8 @@ pub const TypedArrayPrototype = struct {
             // b. Let kValue be ! Get(O, Pk).
             const k_value = object.get(property_key) catch |err| try noexcept(err);
 
-            // c. Set accumulator to ? Call(callbackfn, undefined, « accumulator, kValue, 𝔽(k), O »).
-            accumulator = try callback_fn.callAssumeCallable(
+            // c. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k), O »).
+            accumulator = try callback.callAssumeCallable(
                 Value.undefined,
                 &.{ accumulator, k_value, Value.from(k.?), Value.from(object) },
             );
@@ -2539,10 +2539,10 @@ pub const TypedArrayPrototype = struct {
         return Value.from(new_typed_array);
     }
 
-    /// 23.2.3.28 %TypedArray%.prototype.some ( callbackfn [ , thisArg ] )
+    /// 23.2.3.28 %TypedArray%.prototype.some ( callback [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.some
     fn some(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const callback_fn = arguments.get(0);
+        const callback = arguments.get(0);
         const this_arg = arguments.get(1);
 
         // 1. Let O be the this value.
@@ -2553,9 +2553,9 @@ pub const TypedArrayPrototype = struct {
         // 3. Let len be TypedArrayLength(taRecord).
         const len = typedArrayLength(ta);
 
-        // 4. If IsCallable(callbackfn) is false, throw a TypeError exception.
-        if (!callback_fn.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
+        // 4. If IsCallable(callback) is false, throw a TypeError exception.
+        if (!callback.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{callback});
         }
 
         // 5. Let k be 0.
@@ -2569,8 +2569,8 @@ pub const TypedArrayPrototype = struct {
             // b. Let kValue be ! Get(O, Pk).
             const k_value = object.get(property_key) catch |err| try noexcept(err);
 
-            // c. Let testResult be ToBoolean(? Call(callbackfn, thisArg, « kValue, 𝔽(k), O »)).
-            const test_result = (try callback_fn.callAssumeCallable(
+            // c. Let testResult be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), O »)).
+            const test_result = (try callback.callAssumeCallable(
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(object) },
             )).toBoolean();
@@ -2585,15 +2585,15 @@ pub const TypedArrayPrototype = struct {
         return Value.from(false);
     }
 
-    /// 23.2.3.29 %TypedArray%.prototype.sort ( comparefn )
+    /// 23.2.3.29 %TypedArray%.prototype.sort ( comparator )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.sort
     fn sort(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const compare_fn = arguments.get(0);
+        const comparator = arguments.get(0);
 
-        // 1. If comparefn is not undefined and IsCallable(comparefn) is false, throw a TypeError
+        // 1. If comparator is not undefined and IsCallable(comparator) is false, throw a TypeError
         //    exception.
-        if (!compare_fn.isUndefined() and !compare_fn.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{compare_fn});
+        if (!comparator.isUndefined() and !comparator.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{comparator});
         }
 
         // 2. Let obj be the this value.
@@ -2607,11 +2607,11 @@ pub const TypedArrayPrototype = struct {
         // 5. NOTE: The following closure performs a numeric comparison rather than the string
         //    comparison used in 23.1.3.30.
         // 6. Let SortCompare be a new Abstract Closure with parameters (x, y) that captures
-        //    comparefn and performs the following steps when called:
+        //    comparator and performs the following steps when called:
         const sortCompare = struct {
-            fn func(agent_: *Agent, x: Value, y: Value, compare_fn_: ?Object) Agent.Error!std.math.Order {
-                // a. Return ? CompareTypedArrayElements(x, y, comparefn).
-                return compareTypedArrayElements(agent_, x, y, compare_fn_);
+            fn func(agent_: *Agent, x: Value, y: Value, comparator_: ?Object) Agent.Error!std.math.Order {
+                // a. Return ? CompareTypedArrayElements(x, y, comparator).
+                return compareTypedArrayElements(agent_, x, y, comparator_);
             }
         }.func;
 
@@ -2622,7 +2622,7 @@ pub const TypedArrayPrototype = struct {
             len,
             .{
                 .impl = sortCompare,
-                .compare_fn = if (!compare_fn.isUndefined()) compare_fn.asObject() else null,
+                .comparator = if (!comparator.isUndefined()) comparator.asObject() else null,
             },
             .read_through_holes,
         );
@@ -2834,15 +2834,15 @@ pub const TypedArrayPrototype = struct {
         return Value.from(new_typed_array);
     }
 
-    /// 23.2.3.33 %TypedArray%.prototype.toSorted ( comparefn )
+    /// 23.2.3.33 %TypedArray%.prototype.toSorted ( comparator )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.tosorted
     fn toSorted(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const compare_fn = arguments.get(0);
+        const comparator = arguments.get(0);
 
-        // 1. If comparefn is not undefined and IsCallable(comparefn) is false, throw a TypeError
+        // 1. If comparator is not undefined and IsCallable(comparator) is false, throw a TypeError
         //    exception.
-        if (!compare_fn.isUndefined() and !compare_fn.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{compare_fn});
+        if (!comparator.isUndefined() and !comparator.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{comparator});
         }
 
         // 2. Let O be the this value.
@@ -2864,11 +2864,11 @@ pub const TypedArrayPrototype = struct {
         // 6. NOTE: The following closure performs a numeric comparison rather than the string
         //    comparison used in 23.1.3.34.
         // 7. Let SortCompare be a new Abstract Closure with parameters (x, y) that captures
-        //    comparefn and performs the following steps when called:
+        //    comparator and performs the following steps when called:
         const sortCompare = struct {
-            fn func(agent_: *Agent, x: Value, y: Value, compare_fn_: ?Object) Agent.Error!std.math.Order {
-                // a. Return ? CompareTypedArrayElements(x, y, comparefn).
-                return compareTypedArrayElements(agent_, x, y, compare_fn_);
+            fn func(agent_: *Agent, x: Value, y: Value, comparator_: ?Object) Agent.Error!std.math.Order {
+                // a. Return ? CompareTypedArrayElements(x, y, comparator).
+                return compareTypedArrayElements(agent_, x, y, comparator_);
             }
         }.func;
 
@@ -2879,7 +2879,7 @@ pub const TypedArrayPrototype = struct {
             len,
             .{
                 .impl = sortCompare,
-                .compare_fn = if (!compare_fn.isUndefined()) compare_fn.asObject() else null,
+                .comparator = if (!comparator.isUndefined()) comparator.asObject() else null,
             },
             .read_through_holes,
         );
@@ -3162,21 +3162,21 @@ pub fn typedArrayElementSize(typed_array: *const TypedArray) u53 {
     }).get(typed_array.fields.typed_array_name).?);
 }
 
-/// 23.2.4.7 CompareTypedArrayElements ( x, y, comparefn )
+/// 23.2.4.7 CompareTypedArrayElements ( x, y, comparator )
 /// https://tc39.es/ecma262/#sec-comparetypedarrayelements
 pub fn compareTypedArrayElements(
     agent: *Agent,
     x: Value,
     y: Value,
-    maybe_compare_fn: ?Object,
+    maybe_comparator: ?Object,
 ) Agent.Error!std.math.Order {
     // 1. Assert: x is a Number and y is a Number, or x is a BigInt and y is a BigInt.
     std.debug.assert((x.isNumber() and y.isNumber()) or (x.isBigInt() and y.isBigInt()));
 
-    // 2. If comparefn is not undefined, then
-    if (maybe_compare_fn) |compare_fn| {
-        // a. Let v be ? ToNumber(? Call(comparefn, undefined, « x, y »)).
-        const value = try (try Value.from(compare_fn).callAssumeCallable(
+    // 2. If comparator is not undefined, then
+    if (maybe_comparator) |comparator| {
+        // a. Let v be ? ToNumber(? Call(comparator, undefined, « x, y »)).
+        const value = try (try Value.from(comparator).callAssumeCallable(
             Value.undefined,
             &.{ x, y },
         )).toNumber(agent);

@@ -468,19 +468,19 @@ pub const SetPrototype = struct {
         return Value.from(try createSetIterator(agent, map, .@"key+value"));
     }
 
-    /// 24.2.4.7 Set.prototype.forEach ( callbackfn [ , thisArg ] )
+    /// 24.2.4.7 Set.prototype.forEach ( callback [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-set.prototype.foreach
     fn forEach(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const callback_fn = arguments.get(0);
+        const callback = arguments.get(0);
         const this_arg = arguments.get(1);
 
         // 1. Let S be the this value.
         // 2. Perform ? RequireInternalSlot(S, [[SetData]]).
         const set = try this_value.requireInternalSlot(agent, Set);
 
-        // 3. If IsCallable(callbackfn) is false, throw a TypeError exception.
-        if (!callback_fn.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
+        // 3. If IsCallable(callback) is false, throw a TypeError exception.
+        if (!callback.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{callback});
         }
 
         // 4. Let entries be S.[[SetData]].
@@ -499,14 +499,14 @@ pub const SetPrototype = struct {
             // b. Set index to index + 1.
             // c. If e is not empty, then
             if (iterable_values.items[index]) |value| {
-                // i. Perform ? Call(callbackfn, thisArg, « e, e, S »).
-                _ = try callback_fn.callAssumeCallable(
+                // i. Perform ? Call(callback, thisArg, « e, e, S »).
+                _ = try callback.callAssumeCallable(
                     this_arg,
                     &.{ value, value, Value.from(set.object()) },
                 );
 
                 // ii. NOTE: The number of elements in entries may have increased during execution
-                //     of callbackfn.
+                //     of callback.
                 // iii. Set numEntries to the number of elements in entries.
                 num_entries = iterable_values.items.len;
             }

@@ -440,7 +440,7 @@ pub fn createDynamicFunction(
             try makeConstructor(function, .{});
         },
 
-        // 33. NOTE: Functions whose kind is async are not constructible and do not have a
+        // 33. NOTE: Functions whose kind is async are not constructable and do not have a
         //           [[Construct]] internal method or a "prototype" property.
         .@"async" => {},
     }

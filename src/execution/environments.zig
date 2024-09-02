@@ -396,22 +396,19 @@ pub fn newModuleEnvironment(
     return env;
 }
 
-/// 9.2.1.1 NewPrivateEnvironment ( outerPrivEnv )
+/// 9.2.1.1 NewPrivateEnvironment ( outerPrivateEnv )
 /// https://tc39.es/ecma262/#sec-newprivateenvironment
 pub fn newPrivateEnvironment(
     allocator: std.mem.Allocator,
-    outer_private_environment: ?*PrivateEnvironment,
+    outer_private_env: ?*PrivateEnvironment,
 ) std.mem.Allocator.Error!*PrivateEnvironment {
     // 1. Let names be a new empty List.
     const names = std.StringHashMap(PrivateName).init(allocator);
 
     // 2. Return the PrivateEnvironment Record {
-    //      [[OuterPrivateEnvironment]]: outerPrivEnv, [[Names]]: names
+    //      [[OuterPrivateEnvironment]]: outerPrivateEnv, [[Names]]: names
     //    }.
     const env = try allocator.create(PrivateEnvironment);
-    env.* = .{
-        .outer_private_environment = outer_private_environment,
-        .names = names,
-    };
+    env.* = .{ .outer_private_environment = outer_private_env, .names = names };
     return env;
 }

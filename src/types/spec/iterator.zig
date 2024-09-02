@@ -67,18 +67,18 @@ pub const Iterator = struct {
         return result.asObject();
     }
 
-    /// 7.4.5 IteratorComplete ( iterResult )
+    /// 7.4.5 IteratorComplete ( iteratorResult )
     /// https://tc39.es/ecma262/#sec-iteratorcomplete
-    pub fn complete(iter_result: Object) Agent.Error!bool {
-        // 1. Return ToBoolean(? Get(iterResult, "done")).
-        return (try iter_result.get(PropertyKey.from("done"))).toBoolean();
+    pub fn complete(iterator_result: Object) Agent.Error!bool {
+        // 1. Return ToBoolean(? Get(iteratorResult, "done")).
+        return (try iterator_result.get(PropertyKey.from("done"))).toBoolean();
     }
 
-    /// 7.4.6 IteratorValue ( iterResult )
+    /// 7.4.6 IteratorValue ( iteratorResult )
     /// https://tc39.es/ecma262/#sec-iteratorvalue
-    pub fn value(iter_result: Object) Agent.Error!Value {
-        // Return ? Get(iterResult, "value").
-        return iter_result.get(PropertyKey.from("value"));
+    pub fn value(iterator_result: Object) Agent.Error!Value {
+        // Return ? Get(iteratorResult, "value").
+        return iterator_result.get(PropertyKey.from("value"));
     }
 
     /// 7.4.7 IteratorStep ( iteratorRecord )
@@ -291,9 +291,9 @@ pub fn getIterator(
     return getIteratorFromMethod(agent, object, method.?);
 }
 
-/// 7.4.12 CreateIterResultObject ( value, done )
+/// 7.4.12 CreateIteratorResultObject ( value, done )
 /// https://tc39.es/ecma262/#sec-createiterresultobject
-pub fn createIterResultObject(
+pub fn createIteratorResultObject(
     agent: *Agent,
     value: Value,
     done: bool,

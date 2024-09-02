@@ -1259,7 +1259,7 @@ pub const RegExpPrototype = struct {
             var named_captures = try result.get(PropertyKey.from("groups"));
 
             // k. If functionalReplace is true, then
-            const replacement = if (functional_replace) blk: {
+            const replacement_string = if (functional_replace) blk: {
                 // i. Let replacerArgs be the list-concatenation of « matched », captures, and
                 //    « 𝔽(position), S ».
                 var replacer_args = try std.ArrayList(Value).initCapacity(
@@ -1279,13 +1279,13 @@ pub const RegExpPrototype = struct {
                     replacer_args.appendAssumeCapacity(named_captures);
                 }
 
-                // iii. Let replValue be ? Call(replaceValue, undefined, replacerArgs).
+                // iii. Let replacementValue be ? Call(replaceValue, undefined, replacerArgs).
                 const replacement_value = try replace_value.callAssumeCallable(
                     Value.undefined,
                     replacer_args.items,
                 );
 
-                // iv. Let replacement be ? ToString(replValue).
+                // iv. Let replacementString be ? ToString(replacementValue).
                 break :blk try replacement_value.toString(agent);
             }
             // l. Else,
@@ -1296,7 +1296,7 @@ pub const RegExpPrototype = struct {
                     break :blk_obj try named_captures.toObject(agent);
                 } else null;
 
-                // ii. Let replacement be ? GetSubstitution(matched, S, position, captures,
+                // ii. Let replacementString be ? GetSubstitution(matched, S, position, captures,
                 //           namedCaptures, replaceValue).
                 break :blk try getSubstitution(
                     agent,
@@ -1317,7 +1317,7 @@ pub const RegExpPrototype = struct {
                 //    cases, the corresponding substitution is ignored.
 
                 // ii. Set accumulatedResult to the string-concatenation of accumulatedResult, the
-                //     substring of S from nextSourcePosition to position, and replacement.
+                //     substring of S from nextSourcePosition to position, and replacementString.
                 try accumulated_result.appendString(
                     try string.substring(
                         agent.gc_allocator,
@@ -1325,7 +1325,7 @@ pub const RegExpPrototype = struct {
                         position,
                     ),
                 );
-                try accumulated_result.appendString(replacement);
+                try accumulated_result.appendString(replacement_string);
 
                 // iii. Set nextSourcePosition to position + matchLength.
                 next_source_position = position + matched_length;

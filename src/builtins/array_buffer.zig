@@ -474,12 +474,12 @@ pub fn numericToRawBytes(
     else blk: {
         // a. Let n be the Element Size value specified in Table 71 for Element Type type.
 
-        // b. Let convOp be the abstract operation named in the Conversion Operation column in
-        //    Table 71 for Element Type type.
-        const convOp = @"type".conversationOperation();
+        // b. Let conversionOperation be the abstract operation named in the Conversion Operation
+        //    column in Table 71 for Element Type type.
+        const conversionOperation = @"type".conversationOperation();
 
-        // c. Let intValue be ℝ(convOp(value)).
-        const int_value = convOp(value, agent) catch |err| try noexcept(err);
+        // c. Let intValue be ℝ(conversionOperation(value)).
+        const int_value = conversionOperation(value, agent) catch |err| try noexcept(err);
 
         // d. If intValue ≥ 0, then
         //     i. Let rawBytes be a List whose elements are the n-byte binary encoding of intValue.

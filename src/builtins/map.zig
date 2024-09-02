@@ -142,15 +142,15 @@ pub const MapConstructor = struct {
         return Value.from(try addEntriesFromIterable(agent, map, iterable, adder.asObject()));
     }
 
-    /// 24.1.2.1 Map.groupBy ( items, callbackfn )
+    /// 24.1.2.1 Map.groupBy ( items, callback )
     /// https://tc39.es/ecma262/#sec-map.groupby
     fn groupBy(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const items = arguments.get(0);
-        const callback_fn = arguments.get(1);
+        const callback = arguments.get(1);
 
-        // 1. Let groups be ? GroupBy(items, callbackfn, collection).
-        const groups = try items.groupBy(agent, callback_fn, .collection);
+        // 1. Let groups be ? GroupBy(items, callback, collection).
+        const groups = try items.groupBy(agent, callback, .collection);
 
         // 2. Let map be ! Construct(%Map%).
         const map = (try realm.intrinsics.@"%Map%"()).constructNoArgs() catch |err| try noexcept(err);
@@ -280,19 +280,19 @@ pub const MapPrototype = struct {
         return Value.from(try createMapIterator(agent, map, .@"key+value"));
     }
 
-    /// 24.1.3.5 Map.prototype.forEach ( callbackfn [ , thisArg ] )
+    /// 24.1.3.5 Map.prototype.forEach ( callback [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-map.prototype.foreach
     fn forEach(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const callback_fn = arguments.get(0);
+        const callback = arguments.get(0);
         const this_arg = arguments.get(1);
 
         // 1. Let M be the this value.
         // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
         const map = try this_value.requireInternalSlot(agent, Map);
 
-        // 3. If IsCallable(callbackfn) is false, throw a TypeError exception.
-        if (!callback_fn.isCallable()) {
-            return agent.throwException(.type_error, "{} is not callable", .{callback_fn});
+        // 3. If IsCallable(callback) is false, throw a TypeError exception.
+        if (!callback.isCallable()) {
+            return agent.throwException(.type_error, "{} is not callable", .{callback});
         }
 
         const iterable_keys = try map.fields.registerIterator();
@@ -315,14 +315,14 @@ pub const MapPrototype = struct {
             if (iterable_keys.items[index]) |key| {
                 const value = entries_.get(key).?;
 
-                // i. Perform ? Call(callbackfn, thisArg, « e.[[Value]], e.[[Key]], M »).
-                _ = try callback_fn.callAssumeCallable(
+                // i. Perform ? Call(callback, thisArg, « e.[[Value]], e.[[Key]], M »).
+                _ = try callback.callAssumeCallable(
                     this_arg,
                     &.{ value, key, Value.from(map.object()) },
                 );
 
                 // ii. NOTE: The number of elements in entries may have increased during execution
-                //     of callbackfn.
+                //     of callback.
                 // iii. Set numEntries to the number of elements in entries.
                 num_entries = iterable_keys.items.len;
             }

@@ -497,14 +497,14 @@ pub const ObjectConstructor = struct {
         return Value.from(try obj.internalMethods().getPrototypeOf(obj) orelse return Value.null);
     }
 
-    /// 20.1.2.13 Object.groupBy ( items, callbackfn )
+    /// 20.1.2.13 Object.groupBy ( items, callback )
     /// https://tc39.es/ecma262/#sec-object.groupby
     fn groupBy(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const items = arguments.get(0);
-        const callback_fn = arguments.get(1);
+        const callback = arguments.get(1);
 
-        // 1. Let groups be ? GroupBy(items, callbackfn, property).
-        const groups = try items.groupBy(agent, callback_fn, .property);
+        // 1. Let groups be ? GroupBy(items, callback, property).
+        const groups = try items.groupBy(agent, callback, .property);
 
         // 2. Let obj be OrdinaryObjectCreate(null).
         const object = try ordinaryObjectCreate(agent, null);

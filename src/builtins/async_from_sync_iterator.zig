@@ -19,7 +19,7 @@ const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const createIterResultObject = types.createIterResultObject;
+const createIteratorResultObject = types.createIteratorResultObject;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
@@ -141,17 +141,17 @@ pub const AsyncFromSyncIteratorPrototype = struct {
 
         // 7. If return is undefined, then
         if (return_ == null) {
-            // a. Let iterResult be CreateIterResultObject(value, true).
-            const iter_result = try createIterResultObject(
+            // a. Let iteratorResult be CreateIteratorResultObject(value, true).
+            const iterator_result = try createIteratorResultObject(
                 agent,
                 maybe_value orelse Value.undefined,
                 true,
             );
 
-            // b. Perform ! Call(promiseCapability.[[Resolve]], undefined, « iterResult »).
+            // b. Perform ! Call(promiseCapability.[[Resolve]], undefined, « iteratorResult »).
             _ = Value.from(promise_capability.resolve).callAssumeCallable(
                 Value.undefined,
-                &.{Value.from(iter_result)},
+                &.{Value.from(iterator_result)},
             ) catch |err| try noexcept(err);
 
             // c. Return promiseCapability.[[Promise]].
@@ -335,8 +335,8 @@ fn asyncFromSyncIteratorContinuation(
             const done_ = captures_.done;
             const value_ = arguments_.get(0);
 
-            // a. Return CreateIterResultObject(v, done).
-            return Value.from(try createIterResultObject(agent_, value_, done_));
+            // a. Return CreateIteratorResultObject(v, done).
+            return Value.from(try createIteratorResultObject(agent_, value_, done_));
         }
     }.func;
 

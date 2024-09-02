@@ -357,8 +357,8 @@ fn serializeJSONObject(
     // 2. Append value to state.[[Stack]].
     try state.stack.put(value, {});
 
-    // 3. Let stepback be state.[[Indent]].
-    const stepback = state.indent;
+    // 3. Let stepBack be state.[[Indent]].
+    const step_back = state.indent;
 
     // 4. Set state.[[Indent]] to the string-concatenation of state.[[Indent]] and state.[[Gap]].
     state.indent = try String.concat(agent.gc_allocator, &.{ state.indent, state.gap });
@@ -452,13 +452,13 @@ fn serializeJSONObject(
             const properties = try std.mem.join(agent.gc_allocator, separator, partial.items);
 
             // iii. Let final be the string-concatenation of "{", the code unit 0x000A (LINE FEED),
-            //      state.[[Indent]], properties, the code unit 0x000A (LINE FEED), stepback, and "}".
+            //      state.[[Indent]], properties, the code unit 0x000A (LINE FEED), stepBack, and "}".
             break :blk String.fromUtf8(
                 agent.gc_allocator,
                 try std.fmt.allocPrint(
                     agent.gc_allocator,
                     "{{\n{}{s}\n{s}}}",
-                    .{ state.indent, properties, stepback },
+                    .{ state.indent, properties, step_back },
                 ),
             );
         }
@@ -467,8 +467,8 @@ fn serializeJSONObject(
     // 11. Remove the last element of state.[[Stack]].
     _ = state.stack.remove(value);
 
-    // 12. Set state.[[Indent]] to stepback.
-    state.indent = stepback;
+    // 12. Set state.[[Indent]] to stepBack.
+    state.indent = step_back;
 
     // 13. Return final.
     return final;
@@ -490,8 +490,8 @@ fn serializeJSONArray(
     // 2. Append value to state.[[Stack]].
     try state.stack.put(value, {});
 
-    // 3. Let stepback be state.[[Indent]].
-    const stepback = state.indent;
+    // 3. Let stepBack be state.[[Indent]].
+    const step_back = state.indent;
 
     // 4. Set state.[[Indent]] to the string-concatenation of state.[[Indent]] and state.[[Gap]].
     state.indent = try String.concat(agent.gc_allocator, &.{ state.indent, state.gap });
@@ -568,13 +568,13 @@ fn serializeJSONArray(
             const properties = try std.mem.join(agent.gc_allocator, separator, partial.items);
 
             // iii. Let final be the string-concatenation of "[", the code unit 0x000A (LINE FEED),
-            //      state.[[Indent]], properties, the code unit 0x000A (LINE FEED), stepback, and "]".
+            //      state.[[Indent]], properties, the code unit 0x000A (LINE FEED), stepBack, and "]".
             break :blk try String.fromUtf8(
                 agent.gc_allocator,
                 try std.fmt.allocPrint(
                     agent.gc_allocator,
                     "[\n{s}{s}\n{s}]",
-                    .{ state.indent, properties, stepback },
+                    .{ state.indent, properties, step_back },
                 ),
             );
         }
@@ -583,8 +583,8 @@ fn serializeJSONArray(
     // 11. Remove the last element of state.[[Stack]].
     _ = state.stack.remove(value);
 
-    // 12. Set state.[[Indent]] to stepback.
-    state.indent = stepback;
+    // 12. Set state.[[Indent]] to stepBack.
+    state.indent = step_back;
 
     // 13. Return final.
     return final;

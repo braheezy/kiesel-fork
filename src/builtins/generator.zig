@@ -19,7 +19,7 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const asyncGeneratorYield = builtins.asyncGeneratorYield;
 const @"await" = builtins.@"await";
-const createIterResultObject = types.createIterResultObject;
+const createIteratorResultObject = types.createIteratorResultObject;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 
@@ -200,8 +200,8 @@ pub fn generatorStart(
                 return err;
             };
 
-            // l. Return CreateIterResultObject(resultValue, true).
-            return createIterResultObject(agent_, result_value, true);
+            // l. Return CreateIteratorResultObject(resultValue, true).
+            return createIteratorResultObject(agent_, result_value, true);
         }
     }.func;
 
@@ -248,8 +248,8 @@ pub fn generatorResume(agent: *Agent, generator_value: Value, value: Value) Agen
     // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
     const state = try generatorValidate(agent, generator_value);
 
-    // 2. If state is completed, return CreateIterResultObject(undefined, true).
-    if (state == .completed) return createIterResultObject(agent, Value.undefined, true);
+    // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
+    if (state == .completed) return createIteratorResultObject(agent, Value.undefined, true);
 
     // 3. Assert: state is either suspended-start or suspended-yield.
     std.debug.assert(state == .suspended_start or state == .suspended_yield);
@@ -321,8 +321,8 @@ pub fn generatorResumeAbrupt(
     if (state == .completed) {
         // a. If abruptCompletion is a return completion, then
         if (abrupt_completion.type == .@"return") {
-            // i. Return CreateIterResultObject(abruptCompletion.[[Value]], true).
-            return createIterResultObject(agent, abrupt_completion.value.?, true);
+            // i. Return CreateIteratorResultObject(abruptCompletion.[[Value]], true).
+            return createIteratorResultObject(agent, abrupt_completion.value.?, true);
         }
 
         // b. Return ? abruptCompletion.
@@ -433,7 +433,7 @@ pub fn yield(agent: *Agent, value: Value) Agent.Error!Completion {
         .@"async" => return asyncGeneratorYield(agent, try @"await"(agent, value)),
 
         // 3. Otherwise, return ? GeneratorYield(CreateIteratorResultObject(value, false)).
-        .sync => return generatorYield(agent, try createIterResultObject(agent, value, false)),
+        .sync => return generatorYield(agent, try createIteratorResultObject(agent, value, false)),
 
         .non_generator => unreachable,
     }

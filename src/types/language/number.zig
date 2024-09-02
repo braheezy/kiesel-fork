@@ -399,54 +399,54 @@ pub const Number = union(enum) {
     /// 6.1.6.1.9 Number::leftShift ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-leftShift
     pub fn leftShift(x: Number, y: Number) Number {
-        // 1. Let lnum be ! ToInt32(x).
-        const lnum = x.toInt32();
+        // 1. Let lNum be ! ToInt32(x).
+        const l_num = x.toInt32();
 
-        // 2. Let rnum be ! ToUint32(y).
-        const rnum = y.toUint32();
+        // 2. Let rNum be ! ToUint32(y).
+        const r_num = y.toUint32();
 
-        // 3. Let shiftCount be ℝ(rnum) modulo 32.
-        const shift_count: u5 = @intCast(@mod(rnum, 32));
+        // 3. Let shiftCount be ℝ(rNum) modulo 32.
+        const shift_count: u5 = @intCast(@mod(r_num, 32));
 
-        // 4. Return the result of left shifting lnum by shiftCount bits. The mathematical value of
+        // 4. Return the result of left shifting lNum by shiftCount bits. The mathematical value of
         //    the result is exactly representable as a 32-bit two's complement bit string.
-        return .{ .i32 = lnum << shift_count };
+        return .{ .i32 = l_num << shift_count };
     }
 
     /// 6.1.6.1.10 Number::signedRightShift ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-signedRightShift
     pub fn signedRightShift(x: Number, y: Number) Number {
-        // 1. Let lnum be ! ToInt32(x).
-        const lnum = x.toInt32();
+        // 1. Let lNum be ! ToInt32(x).
+        const l_num = x.toInt32();
 
-        // 2. Let rnum be ! ToUint32(y).
-        const rnum = y.toUint32();
+        // 2. Let rNum be ! ToUint32(y).
+        const r_num = y.toUint32();
 
-        // 3. Let shiftCount be ℝ(rnum) modulo 32.
-        const shift_count: u5 = @intCast(@mod(rnum, 32));
+        // 3. Let shiftCount be ℝ(rNum) modulo 32.
+        const shift_count: u5 = @intCast(@mod(r_num, 32));
 
-        // 4. Return the result of performing a sign-extending right shift of lnum by shiftCount
+        // 4. Return the result of performing a sign-extending right shift of lNum by shiftCount
         //    bits. The most significant bit is propagated. The mathematical value of the result
         //    is exactly representable as a 32-bit two's complement bit string.
-        return .{ .i32 = lnum >> shift_count };
+        return .{ .i32 = l_num >> shift_count };
     }
 
     /// 6.1.6.1.11 Number::unsignedRightShift ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-unsignedRightShift
     pub fn unsignedRightShift(x: Number, y: Number) Number {
-        // 1. Let lnum be ! ToUint32(x).
-        const lnum = x.toUint32();
+        // 1. Let lNum be ! ToUint32(x).
+        const l_num = x.toUint32();
 
-        // 2. Let rnum be ! ToUint32(y).
-        const rnum = y.toUint32();
+        // 2. Let rNum be ! ToUint32(y).
+        const r_num = y.toUint32();
 
-        // 3. Let shiftCount be ℝ(rnum) modulo 32.
-        const shift_count: u5 = @intCast(@mod(rnum, 32));
+        // 3. Let shiftCount be ℝ(rNum) modulo 32.
+        const shift_count: u5 = @intCast(@mod(r_num, 32));
 
-        // 4. Return the result of performing a zero-filling right shift of lnum by shiftCount
+        // 4. Return the result of performing a zero-filling right shift of lNum by shiftCount
         //    bits. Vacated bits are filled with zero. The mathematical value of the result is
         //    exactly representable as a 32-bit unsigned bit string.
-        return from(lnum >> shift_count);
+        return from(l_num >> shift_count);
     }
 
     /// 6.1.6.1.12 Number::lessThan ( x, y )
@@ -535,30 +535,30 @@ pub const Number = union(enum) {
     /// 6.1.6.1.16 NumberBitwiseOp ( op, x, y )
     /// https://tc39.es/ecma262/#sec-numberbitwiseop
     inline fn numberBitwiseOp(comptime op: enum { @"&", @"^", @"|" }, x: Number, y: Number) i32 {
-        // 1. Let lnum be ! ToInt32(x).
-        const lnum = x.toInt32();
+        // 1. Let lNum be ! ToInt32(x).
+        const l_num = x.toInt32();
 
-        // 2. Let rnum be ! ToInt32(y).
-        const rnum = y.toInt32();
+        // 2. Let rNum be ! ToInt32(y).
+        const r_num = y.toInt32();
 
-        // 3. Let lbits be the 32-bit two's complement bit string representing ℝ(lnum).
-        // 4. Let rbits be the 32-bit two's complement bit string representing ℝ(rnum).
+        // 3. Let lBits be the 32-bit two's complement bit string representing ℝ(lNum).
+        // 4. Let rBits be the 32-bit two's complement bit string representing ℝ(rNum).
 
         const result = switch (op) {
             // 5. If op is &, then
-            // a. Let result be the result of applying the bitwise AND operation to lbits and rbits.
-            .@"&" => lnum & rnum,
+            // a. Let result be the result of applying the bitwise AND operation to lBits and rBits.
+            .@"&" => l_num & r_num,
 
             // 6. Else if op is ^, then
             // a. Let result be the result of applying the bitwise exclusive OR (XOR) operation to
-            //    lbits and rbits.
-            .@"^" => lnum ^ rnum,
+            //    lBits and rBits.
+            .@"^" => l_num ^ r_num,
 
             // 7. Else,
             // a. Assert: op is |.
-            // b. Let result be the result of applying the bitwise inclusive OR operation to lbits
-            //    and rbits.
-            .@"|" => lnum | rnum,
+            // b. Let result be the result of applying the bitwise inclusive OR operation to lBits
+            //    and rBits.
+            .@"|" => l_num | r_num,
         };
 
         // 8. Return the Number value for the integer represented by the 32-bit two's complement

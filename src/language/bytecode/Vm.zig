@@ -170,9 +170,9 @@ fn getArguments(self: *Vm, argument_count: usize) Agent.Error![]const Value {
 fn executeApplyStringOrNumericBinaryOperator(self: *Vm, executable: Executable) Agent.Error!void {
     const operator_type = self.fetchIndex(executable);
     const operator: ast.BinaryExpression.Operator = @enumFromInt(operator_type);
-    const rval = self.stack.pop();
-    const lval = self.stack.pop();
-    self.result = try applyStringOrNumericBinaryOperator(self.agent, lval, operator, rval);
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
+    self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, operator, r_val);
 }
 
 fn executeArrayCreate(self: *Vm, _: Executable) Agent.Error!void {
@@ -740,22 +740,22 @@ fn executeGetValue(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeGreaterThan(self: *Vm, _: Executable) Agent.Error!void {
-    const rval = self.stack.pop();
-    const lval = self.stack.pop();
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
 
-    // 5. Let r be ? IsLessThan(rval, lval, false).
-    const result = try isLessThan(self.agent, rval, lval, .right_first);
+    // 5. Let r be ? IsLessThan(rVal, lVal, false).
+    const result = try isLessThan(self.agent, r_val, l_val, .right_first);
 
     // 6. If r is undefined, return false. Otherwise, return r.
     self.result = Value.from(result orelse false);
 }
 
 fn executeGreaterThanEquals(self: *Vm, _: Executable) Agent.Error!void {
-    const rval = self.stack.pop();
-    const lval = self.stack.pop();
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
 
-    // 5. Let r be ? IsLessThan(lval, rval, true).
-    const result = try isLessThan(self.agent, lval, rval, .left_first);
+    // 5. Let r be ? IsLessThan(lVal, rVal, true).
+    const result = try isLessThan(self.agent, l_val, r_val, .left_first);
 
     // 6. If r is either true or undefined, return false. Otherwise, return true.
     self.result = Value.from(!(result orelse true));
@@ -763,10 +763,10 @@ fn executeGreaterThanEquals(self: *Vm, _: Executable) Agent.Error!void {
 
 fn executeHasPrivateElement(self: *Vm, executable: Executable) Agent.Error!void {
     const private_identifier = self.fetchIdentifier(executable);
-    const rval = self.stack.pop();
+    const r_val = self.stack.pop();
 
-    // 4. If rval is not an Object, throw a TypeError exception.
-    if (!rval.isObject()) {
+    // 4. If rVal is not an Object, throw a TypeError exception.
+    if (!r_val.isObject()) {
         return self.agent.throwException(
             .type_error,
             "Right-hand side of 'in' operator must be an object",
@@ -782,17 +782,17 @@ fn executeHasPrivateElement(self: *Vm, executable: Executable) Agent.Error!void 
         try private_identifier.toUtf8(self.agent.gc_allocator),
     );
 
-    // 7. If PrivateElementFind(rval, privateName) is not empty, return true.
+    // 7. If PrivateElementFind(rVal, privateName) is not empty, return true.
     // 8. Return false.
-    self.result = Value.from(rval.asObject().privateElementFind(private_name) != null);
+    self.result = Value.from(r_val.asObject().privateElementFind(private_name) != null);
 }
 
 fn executeHasProperty(self: *Vm, _: Executable) Agent.Error!void {
-    const rval = self.stack.pop();
-    const lval = self.stack.pop();
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
 
-    // 5. If rval is not an Object, throw a TypeError exception.
-    if (!rval.isObject()) {
+    // 5. If rVal is not an Object, throw a TypeError exception.
+    if (!r_val.isObject()) {
         return self.agent.throwException(
             .type_error,
             "Right-hand side of 'in' operator must be an object",
@@ -800,9 +800,9 @@ fn executeHasProperty(self: *Vm, _: Executable) Agent.Error!void {
         );
     }
 
-    // 6. Return ? HasProperty(rval, ? ToPropertyKey(lval)).
+    // 6. Return ? HasProperty(rVal, ? ToPropertyKey(lVal)).
     self.result = Value.from(
-        try rval.asObject().hasProperty(try lval.toPropertyKey(self.agent)),
+        try r_val.asObject().hasProperty(try l_val.toPropertyKey(self.agent)),
     );
 }
 
@@ -840,11 +840,11 @@ fn executeInitializeReferencedBinding(self: *Vm, _: Executable) Agent.Error!void
 }
 
 fn executeInstanceofOperator(self: *Vm, _: Executable) Agent.Error!void {
-    const rval = self.stack.pop();
-    const lval = self.stack.pop();
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
 
-    // 5. Return ? InstanceofOperator(lval, rval).
-    self.result = Value.from(try lval.instanceofOperator(self.agent, rval));
+    // 5. Return ? InstanceofOperator(lVal, rVal).
+    self.result = Value.from(try l_val.instanceofOperator(self.agent, r_val));
 }
 
 fn executeInstantiateArrowFunctionExpression(self: *Vm, executable: Executable) Agent.Error!void {
@@ -908,19 +908,19 @@ fn executeInstantiateOrdinaryFunctionExpression(self: *Vm, executable: Executabl
 }
 
 fn executeIsLooselyEqual(self: *Vm, _: Executable) Agent.Error!void {
-    const rval = self.stack.pop();
-    const lval = self.stack.pop();
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
 
-    // 5. Return IsLooselyEqual(rval, lval).
-    self.result = Value.from(try isLooselyEqual(self.agent, rval, lval));
+    // 5. Return IsLooselyEqual(rVal, lVal).
+    self.result = Value.from(try isLooselyEqual(self.agent, r_val, l_val));
 }
 
 fn executeIsStrictlyEqual(self: *Vm, _: Executable) Agent.Error!void {
-    const rval = self.stack.pop();
-    const lval = self.stack.pop();
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
 
-    // 5. Return IsStrictlyEqual(rval, lval).
-    self.result = Value.from(isStrictlyEqual(rval, lval));
+    // 5. Return IsStrictlyEqual(rVal, lVal).
+    self.result = Value.from(isStrictlyEqual(r_val, l_val));
 }
 
 fn executeJump(self: *Vm, executable: Executable) Agent.Error!void {
@@ -935,22 +935,22 @@ fn executeJumpConditional(self: *Vm, executable: Executable) Agent.Error!void {
 }
 
 fn executeLessThan(self: *Vm, _: Executable) Agent.Error!void {
-    const rval = self.stack.pop();
-    const lval = self.stack.pop();
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
 
-    // 5. Let r be ? IsLessThan(lval, rval, true).
-    const result = try isLessThan(self.agent, lval, rval, .left_first);
+    // 5. Let r be ? IsLessThan(lVal, rVal, true).
+    const result = try isLessThan(self.agent, l_val, r_val, .left_first);
 
     // 6. If r is undefined, return false. Otherwise, return r.
     self.result = Value.from(result orelse false);
 }
 
 fn executeLessThanEquals(self: *Vm, _: Executable) Agent.Error!void {
-    const rval = self.stack.pop();
-    const lval = self.stack.pop();
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
 
-    // 5. Let r be ? IsLessThan(rval, lval, false).
-    const result = try isLessThan(self.agent, rval, lval, .right_first);
+    // 5. Let r be ? IsLessThan(rVal, lVal, false).
+    const result = try isLessThan(self.agent, r_val, l_val, .right_first);
 
     // 6. If r is either true or undefined, return false. Otherwise, return true.
     self.result = Value.from(!(result orelse true));
@@ -999,12 +999,12 @@ fn executeMakePrivateReference(self: *Vm, executable: Executable) Agent.Error!vo
     const private_identifier = self.fetchIdentifier(executable);
     const base_value = self.stack.pop();
 
-    // 1. Let privEnv be the running execution context's PrivateEnvironment.
-    // 2. Assert: privEnv is not null.
-    const private_environment = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
+    // 1. Let privateEnv be the running execution context's PrivateEnvironment.
+    // 2. Assert: privateEnv is not null.
+    const private_env = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
 
-    // 3. Let privateName be ResolvePrivateIdentifier(privEnv, privateIdentifier).
-    const private_name = private_environment.resolvePrivateIdentifier(
+    // 3. Let privateName be ResolvePrivateIdentifier(privateEnv, privateIdentifier).
+    const private_name = private_env.resolvePrivateIdentifier(
         try private_identifier.toUtf8(self.agent.gc_allocator),
     );
 
@@ -1135,9 +1135,9 @@ fn executePushReference(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executePutValue(self: *Vm, _: Executable) Agent.Error!void {
-    const lref = self.reference_stack.getLast().?;
-    const rval = self.result.?;
-    try lref.putValue(self.agent, rval);
+    const l_ref = self.reference_stack.getLast().?;
+    const r_val = self.result.?;
+    try l_ref.putValue(self.agent, r_val);
     self.reference = null;
 }
 

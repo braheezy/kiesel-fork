@@ -22,7 +22,7 @@ const String = types.String;
 const Value = types.Value;
 const canonicalizeLocaleList = abstract_operations.canonicalizeLocaleList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const createIterResultObject = types.createIterResultObject;
+const createIteratorResultObject = types.createIteratorResultObject;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getOption = types.getOption;
@@ -499,8 +499,8 @@ pub const IntlSegmentIteratorPrototype = struct {
 
         // 7. If startIndex ≥ len, then
         if (start_index >= len) {
-            // a. Return CreateIterResultObject(undefined, true).
-            return Value.from(try createIterResultObject(agent, Value.undefined, true));
+            // a. Return CreateIteratorResultObject(undefined, true).
+            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
         }
 
         // 8. Let endIndex be FindBoundary(segmenter, string, startIndex, after).
@@ -521,8 +521,8 @@ pub const IntlSegmentIteratorPrototype = struct {
             is_word_like,
         );
 
-        // 11. Return CreateIterResultObject(segmentData, false).
-        return Value.from(try createIterResultObject(agent, Value.from(segment_data), false));
+        // 11. Return CreateIteratorResultObject(segmentData, false).
+        return Value.from(try createIteratorResultObject(agent, Value.from(segment_data), false));
     }
 };
 

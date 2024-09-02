@@ -17,7 +17,7 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
-const createIterResultObject = types.createIterResultObject;
+const createIteratorResultObject = types.createIteratorResultObject;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 
@@ -79,9 +79,9 @@ pub const MapIteratorPrototype = struct {
         }
         const map_iterator = this_value.asObject().as(MapIterator);
 
-        // 2. If state is completed, return CreateIterResultObject(undefined, true).
+        // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
         if (map_iterator.fields == .completed) {
-            return Value.from(try createIterResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
         }
 
         const map = map_iterator.fields.state.map;
@@ -114,7 +114,7 @@ pub const MapIteratorPrototype = struct {
         else {
             map_iterator.fields = .completed;
             map.fields.unregisterIterator();
-            return Value.from(try createIterResultObject(agent, Value.undefined, true));
+            return Value.from(try createIteratorResultObject(agent, Value.undefined, true));
         };
 
         map_iterator.fields.state.index = index;
@@ -136,8 +136,8 @@ pub const MapIteratorPrototype = struct {
             .@"key+value" => Value.from(try createArrayFromList(agent, &.{ key, value })),
         };
 
-        // 4. Perform ? GeneratorYield(CreateIterResultObject(result, false)).
-        return Value.from(try createIterResultObject(agent, result, false));
+        // 4. Perform ? GeneratorYield(CreateIteratorResultObject(result, false)).
+        return Value.from(try createIteratorResultObject(agent, result, false));
 
         // 5. NOTE: The number of elements in entries may have increased while execution of this
         //    abstract operation was paused by Yield.

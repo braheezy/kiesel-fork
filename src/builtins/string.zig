@@ -2327,15 +2327,15 @@ pub const StringPrototype = struct {
         return Value.from(try createHTML(agent, this_value, "tt", null));
     }
 
-    /// B.2.2.7 String.prototype.fontcolor ( color )
+    /// B.2.2.7 String.prototype.fontcolor ( colour )
     /// https://tc39.es/ecma262/#sec-string.prototype.fontcolor
     fn fontcolor(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const color = arguments.get(0);
+        const colour = arguments.get(0);
 
         // 1. Let S be the this value.
-        // 2. Return ? CreateHTML(S, "font", "color", color).
+        // 2. Return ? CreateHTML(S, "font", "color", colour).
         return Value.from(
-            try createHTML(agent, this_value, "font", .{ .name = "color", .value = color }),
+            try createHTML(agent, this_value, "font", .{ .name = "color", .value = colour }),
         );
     }
 
