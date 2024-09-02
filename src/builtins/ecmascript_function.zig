@@ -349,25 +349,24 @@ fn evaluateGeneratorBody(
 
     // 2. Let G be ? OrdinaryCreateFromConstructor(functionObject, "%GeneratorFunction.prototype.prototype%",
     //    « [[GeneratorState]], [[GeneratorContext]], [[GeneratorBrand]] »).
-    // 3. Set G.[[GeneratorBrand]] to empty.
     const generator = try ordinaryCreateFromConstructor(
         builtins.Generator,
         agent,
         function.object(),
         "%GeneratorPrototype%",
         .{
-            // NOTE: All of these are set in `generatorStart()`, but `generator_state` needs to be
-            //       initialized memory for the assert to work.
-            .generator_state = null,
+            // 3. Set G.[[GeneratorBrand]] to empty.
+            // 4. Set G.[[GeneratorState]] to suspended-start.
+            .generator_state = .suspended_start,
             .generator_context = undefined,
             .evaluation_state = undefined,
         },
     );
 
-    // 4. Perform GeneratorStart(G, FunctionBody).
+    // 5. Perform GeneratorStart(G, FunctionBody).
     generatorStart(agent, generator.as(builtins.Generator), function);
 
-    // 5. Return Completion Record { [[Type]]: return, [[Value]]: G, [[Target]]: empty }.
+    // 6. Return Completion Record { [[Type]]: return, [[Value]]: G, [[Target]]: empty }.
     return .{ .type = .@"return", .value = Value.from(generator), .target = null };
 }
 
@@ -384,26 +383,25 @@ fn evaluateAsyncGeneratorBody(
 
     // 2. Let generator be ? OrdinaryCreateFromConstructor(functionObject, "%AsyncGeneratorFunction.prototype.prototype%",
     //    « [[AsyncGeneratorState]], [[AsyncGeneratorContext]], [[AsyncGeneratorQueue]], [[GeneratorBrand]] »).
-    // 3. Set generator.[[GeneratorBrand]] to empty.
     const generator = try ordinaryCreateFromConstructor(
         builtins.AsyncGenerator,
         agent,
         function.object(),
         "%AsyncGeneratorPrototype%",
         .{
-            // NOTE: All of these are set in `asyncGeneratorStart()`, but `async_generator_state`
-            //       needs to be initialized memory for the assert to work.
-            .async_generator_state = null,
+            // 3. Set generator.[[GeneratorBrand]] to empty.
+            // 4. Set generator.[[AsyncGeneratorState]] to suspended-start.
+            .async_generator_state = .suspended_start,
             .async_generator_context = undefined,
             .async_generator_queue = undefined,
             .evaluation_state = undefined,
         },
     );
 
-    // 4. Perform AsyncGeneratorStart(generator, FunctionBody).
+    // 5. Perform AsyncGeneratorStart(generator, FunctionBody).
     asyncGeneratorStart(agent, generator.as(builtins.AsyncGenerator), function);
 
-    // 5. Return Completion Record { [[Type]]: return, [[Value]]: generator, [[Target]]: empty }.
+    // 6. Return Completion Record { [[Type]]: return, [[Value]]: generator, [[Target]]: empty }.
     return .{ .type = .@"return", .value = Value.from(generator), .target = null };
 }
 

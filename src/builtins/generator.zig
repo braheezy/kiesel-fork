@@ -108,7 +108,7 @@ pub const Generator = MakeObject(.{
         };
 
         /// [[GeneratorState]]
-        generator_state: ?State,
+        generator_state: State,
 
         /// [[GeneratorContext]]
         generator_context: ExecutionContext,
@@ -130,8 +130,8 @@ pub fn generatorStart(
     generator: *Generator,
     generator_function: *builtins.ECMAScriptFunction,
 ) void {
-    // 1. Assert: The value of generator.[[GeneratorState]] is undefined.
-    std.debug.assert(generator.fields.generator_state == null);
+    // 1. Assert: The value of generator.[[GeneratorState]] is suspended-start.
+    std.debug.assert(generator.fields.generator_state == .suspended_start);
 
     // 2. Let genContext be the running execution context.
     const generator_context = agent.runningExecutionContext();
@@ -212,10 +212,7 @@ pub fn generatorStart(
     // 6. Set generator.[[GeneratorContext]] to genContext.
     generator.fields.generator_context = generator_context.*;
 
-    // 7. Set generator.[[GeneratorState]] to suspended-start.
-    generator.fields.generator_state = .suspended_start;
-
-    // 8. Return unused.
+    // 7. Return unused.
 }
 
 /// 27.5.3.2 GeneratorValidate ( generator, generatorBrand )
@@ -231,7 +228,7 @@ pub fn generatorValidate(agent: *Agent, generator_value: Value) Agent.Error!Gene
 
     // 4. Assert: generator also has a [[GeneratorContext]] internal slot.
     // 5. Let state be generator.[[GeneratorState]].
-    const state = generator.fields.generator_state.?;
+    const state = generator.fields.generator_state;
 
     // 6. If state is executing, throw a TypeError exception.
     if (state == .executing) {

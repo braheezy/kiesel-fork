@@ -263,7 +263,7 @@ pub const AsyncGenerator = MakeObject(.{
         };
 
         /// [[AsyncGeneratorState]]
-        async_generator_state: ?State,
+        async_generator_state: State,
 
         /// [[AsyncGeneratorContext]]
         async_generator_context: ExecutionContext,
@@ -298,8 +298,8 @@ pub fn asyncGeneratorStart(
     generator: *AsyncGenerator,
     generator_function: *builtins.ECMAScriptFunction,
 ) void {
-    // 1. Assert: generator.[[AsyncGeneratorState]] is undefined.
-    std.debug.assert(generator.fields.async_generator_state == null);
+    // 1. Assert: generator.[[AsyncGeneratorState]] is suspended-start.
+    std.debug.assert(generator.fields.async_generator_state == .suspended_start);
 
     // 2. Let genContext be the running execution context.
     const generator_context = agent.runningExecutionContext();
@@ -379,13 +379,10 @@ pub fn asyncGeneratorStart(
     // 6. Set generator.[[AsyncGeneratorContext]] to genContext.
     generator.fields.async_generator_context = generator_context.*;
 
-    // 7. Set generator.[[AsyncGeneratorState]] to suspended-start.
-    generator.fields.async_generator_state = .suspended_start;
-
-    // 8. Set generator.[[AsyncGeneratorQueue]] to a new empty List.
+    // 7. Set generator.[[AsyncGeneratorQueue]] to a new empty List.
     generator.fields.async_generator_queue = std.ArrayList(AsyncGeneratorRequest).init(agent.gc_allocator);
 
-    // 9. Return unused.
+    // 8. Return unused.
 }
 
 /// 27.6.3.3 AsyncGeneratorValidate ( generator, generatorBrand )
