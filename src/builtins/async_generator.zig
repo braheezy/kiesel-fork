@@ -116,8 +116,8 @@ pub const AsyncGeneratorPrototype = struct {
         }
         // 10. Else,
         else {
-            // a. Assert: state is either executing or awaiting-return.
-            std.debug.assert(state == .executing or state == .awaiting_return);
+            // a. Assert: state is either executing or draining-queue.
+            std.debug.assert(state == .executing or state == .draining_queue);
         }
 
         // 11. Return promiseCapability.[[Promise]].
@@ -160,8 +160,8 @@ pub const AsyncGeneratorPrototype = struct {
 
         // 8. If state is either suspended-start or completed, then
         if (state == .suspended_start or state == .completed) {
-            // a. Set generator.[[AsyncGeneratorState]] to awaiting-return.
-            generator.fields.async_generator_state = .awaiting_return;
+            // a. Set generator.[[AsyncGeneratorState]] to draining-queue.
+            generator.fields.async_generator_state = .draining_queue;
 
             // b. Perform AsyncGeneratorAwaitReturn(generator).
             try asyncGeneratorAwaitReturn(agent, generator);
@@ -173,8 +173,8 @@ pub const AsyncGeneratorPrototype = struct {
         }
         // 10. Else,
         else {
-            // a. Assert: state is either executing or awaiting-return.
-            std.debug.assert(state == .executing or state == .awaiting_return);
+            // a. Assert: state is either executing or draining-queue.
+            std.debug.assert(state == .executing or state == .draining_queue);
         }
 
         // 11. Return promiseCapability.[[Promise]].
@@ -241,8 +241,8 @@ pub const AsyncGeneratorPrototype = struct {
         }
         // 11. Else,
         else {
-            // a. Assert: state is either executing or awaiting-return.
-            std.debug.assert(state == .executing or state == .awaiting_return);
+            // a. Assert: state is either executing or draining-queue.
+            std.debug.assert(state == .executing or state == .draining_queue);
         }
 
         // 12. Return promiseCapability.[[Promise]].
@@ -258,7 +258,7 @@ pub const AsyncGenerator = MakeObject(.{
             suspended_start,
             suspended_yield,
             executing,
-            awaiting_return,
+            draining_queue,
             completed,
         };
 
@@ -346,8 +346,8 @@ pub fn asyncGeneratorStart(
                 return;
             }
 
-            // g. Set acGenerator.[[AsyncGeneratorState]] to awaiting-return.
-            closure_generator.fields.async_generator_state = .awaiting_return;
+            // g. Set acGenerator.[[AsyncGeneratorState]] to draining-queue.
+            closure_generator.fields.async_generator_state = .draining_queue;
 
             const result_completion = if (result) |completion| blk: {
                 // h. If result is a normal completion, set result to NormalCompletion(undefined).
@@ -623,8 +623,8 @@ pub fn asyncGeneratorDrainQueue(
     agent: *Agent,
     generator: *AsyncGenerator,
 ) std.mem.Allocator.Error!void {
-    // a. Assert: generator.[[AsyncGeneratorState]] is awaiting-return.
-    std.debug.assert(generator.fields.async_generator_state == .awaiting_return);
+    // a. Assert: generator.[[AsyncGeneratorState]] is draining-queue.
+    std.debug.assert(generator.fields.async_generator_state == .draining_queue);
 
     // 2. Let queue be generator.[[AsyncGeneratorQueue]].
     const queue = &generator.fields.async_generator_queue;
@@ -688,8 +688,8 @@ pub fn asyncGeneratorAwaitReturn(
 ) std.mem.Allocator.Error!void {
     const realm = agent.currentRealm();
 
-    // 1. Assert: generator.[[AsyncGeneratorState]] is awaiting-return.
-    std.debug.assert(generator.fields.async_generator_state == .awaiting_return);
+    // 1. Assert: generator.[[AsyncGeneratorState]] is draining-queue.
+    std.debug.assert(generator.fields.async_generator_state == .draining_queue);
 
     // 2. Let queue be generator.[[AsyncGeneratorQueue]].
     const queue = &generator.fields.async_generator_queue;
@@ -751,8 +751,8 @@ pub fn asyncGeneratorAwaitReturn(
             const generator_ = captures_.generator;
             const value = arguments_.get(0);
 
-            // a. Assert: generator.[[AsyncGeneratorState]] is awaiting-return.
-            std.debug.assert(generator_.fields.async_generator_state == .awaiting_return);
+            // a. Assert: generator.[[AsyncGeneratorState]] is draining-queue.
+            std.debug.assert(generator_.fields.async_generator_state == .draining_queue);
 
             // b. Let result be NormalCompletion(value).
             const result = Completion.normal(value);
@@ -786,8 +786,8 @@ pub fn asyncGeneratorAwaitReturn(
             const generator_ = captures_.generator;
             const reason = arguments_.get(0);
 
-            // a. Assert: generator.[[AsyncGeneratorState]] is awaiting-return.
-            std.debug.assert(generator_.fields.async_generator_state == .awaiting_return);
+            // a. Assert: generator.[[AsyncGeneratorState]] is draining-queue.
+            std.debug.assert(generator_.fields.async_generator_state == .draining_queue);
 
             // b. Let result be ThrowCompletion(reason).
             const result = Completion.throw(reason);
