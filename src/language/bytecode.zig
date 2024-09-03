@@ -1,6 +1,5 @@
 const std = @import("std");
 
-const ast = @import("ast.zig");
 const codegen = @import("bytecode/codegen.zig");
 const execution = @import("../execution.zig");
 const instructions = @import("bytecode/instructions.zig");

@@ -1,8 +1,6 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-const icu4zig = @import("icu4zig");
-
 const build_options = @import("build-options");
 const builtins = @import("builtins.zig");
 const types = @import("types.zig");
@@ -15,7 +13,6 @@ const Value = types.Value;
 const getArrayLength = @import("builtins/array.zig").getArrayLength;
 const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferWitnessRecord;
 const ordinaryOwnPropertyKeys = builtins.ordinaryOwnPropertyKeys;
-const typedArrayElementSize = builtins.typedArrayElementSize;
 const typedArrayLength = builtins.typedArrayLength;
 const weakRefDeref = @import("builtins/weak_ref.zig").weakRefDeref;
 

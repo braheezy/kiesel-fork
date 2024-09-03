@@ -16,7 +16,6 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const PropertyKeyArrayHashMapContext = Object.PropertyStorage.PropertyKeyArrayHashMapContext;
 const Realm = execution.Realm;
-const SafePointer = types.SafePointer;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;

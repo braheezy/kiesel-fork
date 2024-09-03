@@ -6,13 +6,10 @@ const types = @import("../../types.zig");
 const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
-const Environment = execution.Environment;
 const Executable = @import("Executable.zig");
 const IteratorKind = types.IteratorKind;
-const PropertyKey = types.PropertyKey;
 const String = types.String;
 const Value = types.Value;
-const noexcept = utils.noexcept;
 const temporaryChange = utils.temporaryChange;
 
 pub const Context = struct {

@@ -22,7 +22,6 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const PropertyKeyOrPrivateName = types.PropertyKeyOrPrivateName;
 const Reference = types.Reference;
-const SafePointer = types.SafePointer;
 const String = types.String;
 const Symbol = types.Symbol;
 const Value = types.Value;

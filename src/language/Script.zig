@@ -11,7 +11,6 @@ const language = @import("../language.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
-const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
 const GlobalEnvironment = execution.GlobalEnvironment;
 const Module = language.Module;

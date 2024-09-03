@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const AnyPointer = @import("any-pointer").AnyPointer;
-
 const execution = @import("../../../execution.zig");
 const types = @import("../../../types.zig");
 
@@ -9,8 +7,6 @@ const Agent = execution.Agent;
 const Data = @import("Data.zig");
 const InternalMethods = @import("InternalMethods.zig");
 const Object = types.Object;
-const PrivateElement = types.PrivateElement;
-const PrivateNameArrayHashMap = types.PrivateNameArrayHashMap;
 
 pub fn MakeObject(
     comptime options: struct {

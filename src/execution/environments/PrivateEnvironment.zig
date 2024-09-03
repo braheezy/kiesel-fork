@@ -6,7 +6,6 @@ const std = @import("std");
 const types = @import("../../types.zig");
 
 const PrivateName = types.PrivateName;
-const String = types.String;
 
 const PrivateEnvironment = @This();
 

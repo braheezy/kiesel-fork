@@ -1,8 +1,6 @@
 //! 9.1.1.4 Global Environment Records
 //! https://tc39.es/ecma262/#sec-global-environment-records
 
-const std = @import("std");
-
 const environments = @import("../environments.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");

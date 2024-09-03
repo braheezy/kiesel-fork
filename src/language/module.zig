@@ -19,7 +19,6 @@ const Value = types.Value;
 const continueModuleLoading = language.continueModuleLoading;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const moduleNamespaceCreate = builtins.moduleNamespaceCreate;
-const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
 const performPromiseThen = builtins.performPromiseThen;
 

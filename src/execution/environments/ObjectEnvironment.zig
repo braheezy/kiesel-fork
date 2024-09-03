@@ -1,8 +1,6 @@
 //! 9.1.1.2 Object Environment Records
 //! https://tc39.es/ecma262/#sec-object-environment-records
 
-const std = @import("std");
-
 const environments = @import("../environments.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");

@@ -11,7 +11,6 @@ const Environment = execution.Environment;
 const PrivateName = types.PrivateName;
 const PropertyKey = types.PropertyKey;
 const String = types.String;
-const Symbol = types.Symbol;
 const Value = types.Value;
 
 const Reference = @This();

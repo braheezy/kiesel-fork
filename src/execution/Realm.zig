@@ -18,7 +18,6 @@ const PropertyKey = types.PropertyKey;
 const SafePointer = types.SafePointer;
 const String = types.String;
 const StringHashMap = types.StringHashMap;
-const Value = types.Value;
 const addRestrictedFunctionProperties = builtins.addRestrictedFunctionProperties;
 const globalObjectProperties = builtins.globalObjectProperties;
 const newGlobalEnvironment = environments.newGlobalEnvironment;

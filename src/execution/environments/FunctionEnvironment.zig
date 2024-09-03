@@ -11,7 +11,6 @@ const types = @import("../../types.zig");
 const Agent = execution.Agent;
 const DeclarativeEnvironment = environments.DeclarativeEnvironment;
 const ECMAScriptFunction = builtins.ECMAScriptFunction;
-const Environment = environments.Environment;
 const Object = types.Object;
 const Value = types.Value;
 

@@ -3,8 +3,6 @@
 
 const std = @import("std");
 
-const AnyPointer = @import("any-pointer").AnyPointer;
-
 const builtins = @import("../../builtins.zig");
 const types = @import("../../types.zig");
 

@@ -3,7 +3,6 @@
 
 const std = @import("std");
 
-const builtins = @import("../../builtins.zig");
 const environments = @import("../environments.zig");
 const execution = @import("../../execution.zig");
 const language = @import("../../language.zig");

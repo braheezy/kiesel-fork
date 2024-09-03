@@ -1,7 +1,6 @@
 //! 23.2 TypedArray Objects
 //! https://tc39.es/ecma262/#sec-typedarray-objects
 
-const builtin = @import("builtin");
 const std = @import("std");
 
 const builtins = @import("../builtins.zig");

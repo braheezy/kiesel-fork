@@ -14,7 +14,6 @@ const Arguments = types.Arguments;
 const ArrayBufferLike = @import("../builtins/array_buffer.zig").ArrayBufferLike;
 const BigInt = types.BigInt;
 const MakeObject = types.MakeObject;
-const Number = types.Number;
 const Object = types.Object;
 const Order = @import("../builtins/array_buffer.zig").Order;
 const PropertyDescriptor = types.PropertyDescriptor;

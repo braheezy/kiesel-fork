@@ -14,7 +14,6 @@ const utils = @import("../../utils.zig");
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const BigInt = types.BigInt;
-const Iterator = types.Iterator;
 const Number = types.Number;
 const Object = types.Object;
 const PrivateName = types.PrivateName;

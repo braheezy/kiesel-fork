@@ -17,7 +17,6 @@ const Object_ = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
-const SafePointer = types.SafePointer;
 const String = types.String;
 const Value = types.Value;
 const addEntriesFromIterable = builtins.addEntriesFromIterable;

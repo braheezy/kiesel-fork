@@ -15,7 +15,6 @@ const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const PropertyKeyArrayHashMap = Object.PropertyStorage.PropertyKeyArrayHashMap;
 const Realm = execution.Realm;
-const String = types.String;
 const Value = types.Value;
 const createIteratorResultObject = types.createIteratorResultObject;
 const defineBuiltinFunction = utils.defineBuiltinFunction;

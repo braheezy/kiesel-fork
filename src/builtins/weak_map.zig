@@ -22,7 +22,6 @@ const addEntriesFromIterable = @import("map.zig").addEntriesFromIterable;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
-const getIterator = types.getIterator;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 24.3.2 Properties of the WeakMap Constructor

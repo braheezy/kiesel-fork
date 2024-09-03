@@ -21,7 +21,6 @@ const Iterator = types.Iterator;
 const IteratorKind = types.IteratorKind;
 const PropertyKey = types.PropertyKey;
 const Reference = types.Reference;
-const SafePointer = types.SafePointer;
 const String = types.String;
 const Value = types.Value;
 const applyStringOrNumericBinaryOperator = runtime.applyStringOrNumericBinaryOperator;

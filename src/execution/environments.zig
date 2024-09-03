@@ -15,7 +15,6 @@ const PrivateName = types.PrivateName;
 const Reference = types.Reference;
 const SourceTextModule = language.SourceTextModule;
 const String = types.String;
-const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 
 pub const DeclarativeEnvironment = @import("environments/DeclarativeEnvironment.zig");

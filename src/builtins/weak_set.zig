@@ -23,7 +23,6 @@ const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 const getIterator = types.getIterator;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
-const sameValue = types.sameValue;
 
 /// 24.4.2 Properties of the WeakSet Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-weakset-constructor
