@@ -440,11 +440,15 @@ pub fn printVariableDeclarationList(node: ast.VariableDeclarationList, writer: a
 
 pub fn printVariableDeclaration(node: ast.VariableDeclaration, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("VariableDeclaration", writer, indentation);
-    try print("binding_identifier:", writer, indentation + 1);
-    try print(node.binding_identifier, writer, indentation + 2);
-    if (node.initializer) |initializer| {
-        try print("initializer:", writer, indentation + 1);
-        try printExpression(initializer, writer, indentation + 2);
+    switch (node) {
+        .binding_identifier => |binding_identifier| {
+            try print(binding_identifier.binding_identifier, writer, indentation + 1);
+            if (binding_identifier.initializer) |initializer| try printExpression(initializer, writer, indentation + 1);
+        },
+        .binding_pattern => |binding_pattern| {
+            try printBindingPattern(binding_pattern.binding_pattern, writer, indentation + 1);
+            try printExpression(binding_pattern.initializer, writer, indentation + 1);
+        },
     }
 }
 

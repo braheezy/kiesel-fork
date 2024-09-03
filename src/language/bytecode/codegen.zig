@@ -113,6 +113,7 @@ fn codegenSingleNameBinding(
     executable: *Executable,
     ctx: *Context,
     property: Value,
+    environment: ?BindingInitializationEnvironment,
 ) Executable.Error!void {
     const strict = ctx.contained_in_strict_mode_code;
 
@@ -160,11 +161,17 @@ fn codegenSingleNameBinding(
     }
 
     // Initialize binding and pop reference
-    try executable.addInstruction(.initialize_referenced_binding);
+    try executable.addInstruction(
+        if (environment) |_| .initialize_referenced_binding else .put_value,
+    );
     try executable.addInstruction(.pop_reference);
 
     try executable.addInstruction(.store); // Restore RHS
 }
+
+const BindingInitializationEnvironment = enum {
+    lexical_environment,
+};
 
 /// 8.6.2 Runtime Semantics: BindingInitialization
 /// https://tc39.es/ecma262/#sec-runtime-semantics-bindinginitialization
@@ -172,6 +179,7 @@ fn bindingInitialization(
     node: ast.BindingPattern,
     executable: *Executable,
     ctx: *Context,
+    environment: ?BindingInitializationEnvironment,
 ) Executable.Error!void {
     // NOTE: RHS value is on the stack
     switch (node) {
@@ -185,6 +193,7 @@ fn bindingInitialization(
                         Value.from(
                             try String.fromUtf8(executable.allocator, binding_property.single_name_binding.binding_identifier),
                         ),
+                        environment,
                     );
                 },
                 .binding_rest_property => {
@@ -201,6 +210,7 @@ fn bindingInitialization(
                         executable,
                         ctx,
                         Value.from(@as(u53, @intCast(i))),
+                        environment,
                     );
                 },
                 .binding_rest_element => {
@@ -2055,7 +2065,12 @@ pub fn codegenLexicalBinding(
 
             // 3. Let env be the running execution context's LexicalEnvironment.
             // 4. Return ? BindingInitialization of BindingPattern with arguments value and env.
-            try bindingInitialization(binding_pattern.binding_pattern, executable, ctx);
+            try bindingInitialization(
+                binding_pattern.binding_pattern,
+                executable,
+                ctx,
+                .lexical_environment,
+            );
 
             try executable.addInstruction(.store);
         },
@@ -2098,39 +2113,61 @@ pub fn codegenVariableDeclaration(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    // VariableDeclaration : BindingIdentifier Initializer
-    if (node.initializer) |initializer| {
-        // 1. Let bindingId be the StringValue of BindingIdentifier.
-        // 2. Let lhs be ? ResolveBinding(bindingId).
-        try executable.addInstruction(.load);
-        try executable.addInstructionWithIdentifier(.resolve_binding, node.binding_identifier);
-        const strict = ctx.contained_in_strict_mode_code;
-        try executable.addIndex(@intFromBool(strict));
-        try executable.addIndex(ctx.environment_lookup_cache_index);
-        ctx.environment_lookup_cache_index += 1;
-        try executable.addInstruction(.push_reference);
+    switch (node) {
+        .binding_identifier => |binding_identifier| {
+            // VariableDeclaration : BindingIdentifier Initializer
+            if (binding_identifier.initializer) |initializer| {
+                // 1. Let bindingId be the StringValue of BindingIdentifier.
+                // 2. Let lhs be ? ResolveBinding(bindingId).
+                try executable.addInstruction(.load);
+                try executable.addInstructionWithIdentifier(
+                    .resolve_binding,
+                    binding_identifier.binding_identifier,
+                );
+                const strict = ctx.contained_in_strict_mode_code;
+                try executable.addIndex(@intFromBool(strict));
+                try executable.addIndex(ctx.environment_lookup_cache_index);
+                ctx.environment_lookup_cache_index += 1;
+                try executable.addInstruction(.push_reference);
 
-        // TODO: 3. If IsAnonymousFunctionDefinition(Initializer) is true, then
-        // 4. Else,
+                // TODO: 3. If IsAnonymousFunctionDefinition(Initializer) is true, then
+                // 4. Else,
 
-        // a. Let rhs be ? Evaluation of Initializer.
-        try codegenExpression(initializer, executable, ctx);
+                // a. Let rhs be ? Evaluation of Initializer.
+                try codegenExpression(initializer, executable, ctx);
 
-        // b. Let value be ? GetValue(rhs).
-        // FIXME: This clobbers the result value and we don't have a good way of restoring it.
-        //        Should probably use the stack more and have explicit result store instructions.
-        if (initializer.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                // b. Let value be ? GetValue(rhs).
+                // FIXME: This clobbers the result value and we don't have a good way of restoring it.
+                //        Should probably use the stack more and have explicit result store instructions.
+                if (initializer.analyze(.is_reference)) try executable.addInstruction(.get_value);
 
-        // 5. Perform ? PutValue(lhs, value).
-        try executable.addInstruction(.put_value);
-        try executable.addInstruction(.pop_reference);
+                // 5. Perform ? PutValue(lhs, value).
+                try executable.addInstruction(.put_value);
+                try executable.addInstruction(.pop_reference);
 
-        // 6. Return empty.
-        try executable.addInstruction(.store);
-    }
-    // VariableDeclaration : BindingIdentifier
-    else {
-        // 1. Return empty.
+                // 6. Return empty.
+                try executable.addInstruction(.store);
+            }
+            // VariableDeclaration : BindingIdentifier
+            else {
+                // 1. Return empty.
+            }
+        },
+        // VariableDeclaration : BindingPattern Initializer
+        .binding_pattern => |binding_pattern| {
+            try executable.addInstruction(.load);
+
+            // 1. Let rhs be ? Evaluation of Initializer.
+            try codegenExpression(binding_pattern.initializer, executable, ctx);
+
+            // 2. Let rVal be ? GetValue(rhs).
+            if (binding_pattern.initializer.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+            // 3. Return ? BindingInitialization of BindingPattern with arguments rVal and undefined.
+            try bindingInitialization(binding_pattern.binding_pattern, executable, ctx, null);
+
+            try executable.addInstruction(.store);
+        },
     }
 }
 
@@ -2781,6 +2818,7 @@ fn forInOfBodyEvaluation(
                 lhs.for_declaration.for_binding.binding_pattern,
                 executable,
                 ctx,
+                .lexical_environment,
             );
         }
         // vii. Else,

@@ -1131,17 +1131,21 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
     var declared_var_names = StringHashMap(void).init(agent.gc_allocator);
     defer declared_var_names.deinit();
 
+    var bound_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
+    defer bound_names.deinit();
+
     // 21. For each element d of varDeclarations, do
     for (var_declarations.items) |var_declaration| {
-        const bound_name = switch (var_declaration) {
-            .variable_declaration => |variable_declaration| variable_declaration.binding_identifier,
+        bound_names.clearRetainingCapacity();
+        switch (var_declaration) {
+            .variable_declaration => |variable_declaration| try variable_declaration.collectBoundNames(&bound_names),
             .hoistable_declaration => |hoistable_declaration| switch (hoistable_declaration) {
-                inline else => |function_declaration| function_declaration.identifier,
+                inline else => |function_declaration| try bound_names.append(function_declaration.identifier.?),
             },
-        }.?;
+        }
 
-        // TODO: a. For each element dn of the BoundNames of d, do
-        for ([_]ast.Identifier{bound_name}) |var_name_utf8| {
+        // a. For each element dn of the BoundNames of d, do
+        for (bound_names.items) |var_name_utf8| {
             const var_name = try String.fromUtf8(agent.gc_allocator, var_name_utf8);
 
             // i. If declaredVarNames does not contain dn, then
@@ -1165,9 +1169,6 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
 
     // 23. Let privateEnv be null.
     const private_env = null;
-
-    var bound_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
-    defer bound_names.deinit();
 
     // 24. For each element d of lexDeclarations, do
     for (lex_declarations.items) |declaration| {

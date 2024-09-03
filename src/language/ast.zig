@@ -1330,9 +1330,8 @@ pub const VariableDeclarationList = struct {
         // 3. Return the list-concatenation of names1 and names2.
         // VariableDeclaration : BindingIdentifier Initializer[opt]
         // 1. Return the BoundNames of BindingIdentifier.
-        try bound_names.ensureUnusedCapacity(self.items.len);
         for (self.items) |variable_declaration| {
-            bound_names.appendAssumeCapacity(variable_declaration.binding_identifier);
+            try variable_declaration.collectBoundNames(bound_names);
         }
     }
 
@@ -1355,9 +1354,35 @@ pub const VariableDeclarationList = struct {
 };
 
 /// https://tc39.es/ecma262/#prod-VariableDeclaration
-pub const VariableDeclaration = struct {
-    binding_identifier: Identifier,
-    initializer: ?Expression,
+pub const VariableDeclaration = union(enum) {
+    binding_identifier: struct {
+        binding_identifier: Identifier,
+        initializer: ?Expression,
+    },
+    binding_pattern: struct {
+        binding_pattern: BindingPattern,
+        initializer: Expression,
+    },
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn collectBoundNames(
+        self: VariableDeclaration,
+        bound_names: *std.ArrayList(Identifier),
+    ) std.mem.Allocator.Error!void {
+        switch (self) {
+            // VariableDeclaration : BindingIdentifier Initializer[opt]
+            .binding_identifier => |binding_identifier| {
+                // 1. Return the BoundNames of BindingIdentifier.
+                try bound_names.append(binding_identifier.binding_identifier);
+            },
+            // VariableDeclaration : BindingPattern Initializer
+            .binding_pattern => |binding_pattern| {
+                // 1. Return the BoundNames of BindingPattern.
+                try binding_pattern.binding_pattern.collectBoundNames(bound_names);
+            },
+        }
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-BindingPattern
@@ -1789,7 +1814,12 @@ pub const ForInOfStatement = struct {
             // 2. Let declarations2 be the VarScopedDeclarations of Statement.
             // 3. Return the list-concatenation of declarations1 and declarations2.
             try var_scoped_declarations.append(.{
-                .variable_declaration = .{ .binding_identifier = self.initializer.for_binding, .initializer = null },
+                .variable_declaration = .{
+                    .binding_identifier = .{
+                        .binding_identifier = self.initializer.for_binding,
+                        .initializer = null,
+                    },
+                },
             });
             try self.consequent_statement.collectVarScopedDeclarations(var_scoped_declarations);
         }

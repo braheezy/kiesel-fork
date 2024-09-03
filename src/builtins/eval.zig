@@ -320,17 +320,18 @@ fn evalDeclarationInstantiation(
     var declared_var_names = StringHashMap(void).init(agent.gc_allocator);
     defer declared_var_names.deinit();
 
+    var bound_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
+    defer bound_names.deinit();
+
     // 12. For each element d of varDeclarations, do
     for (var_declarations.items) |var_declaration| {
         // a. If d is either a VariableDeclaration, a ForBinding, or a BindingIdentifier, then
         if (var_declaration == .variable_declaration) {
-            // TODO: Update this when binding patterns are supported.
-            const bound_names: []const ast.Identifier = &.{
-                var_declaration.variable_declaration.binding_identifier,
-            };
+            bound_names.clearRetainingCapacity();
+            try var_declaration.variable_declaration.collectBoundNames(&bound_names);
 
             // i. For each String vn of the BoundNames of d, do
-            for (bound_names) |var_name_utf8| {
+            for (bound_names.items) |var_name_utf8| {
                 const var_name = try String.fromUtf8(agent.gc_allocator, var_name_utf8);
 
                 // 1. If declaredFunctionNames does not contain vn, then
@@ -368,9 +369,6 @@ fn evalDeclarationInstantiation(
     var lex_declarations = std.ArrayList(ast.LexicallyScopedDeclaration).init(agent.gc_allocator);
     defer lex_declarations.deinit();
     try body.collectLexicallyScopedDeclarations(&lex_declarations);
-
-    var bound_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
-    defer bound_names.deinit();
 
     // 16. For each element d of lexDeclarations, do
     for (lex_declarations.items) |declaration| {

@@ -1696,13 +1696,28 @@ pub fn acceptVariableDeclaration(self: *Parser) AcceptError!ast.VariableDeclarat
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const binding_identifier = try self.acceptBindingIdentifier();
-    var initializer: ?ast.Expression = null;
-    if (self.core.accept(RuleSet.is(.@"="))) |_| {
-        const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
-        initializer = try self.acceptExpression(ctx);
-    } else |_| {}
-    return .{ .binding_identifier = binding_identifier, .initializer = initializer };
+    const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
+    if (self.acceptBindingIdentifier()) |binding_identifier| {
+        var initializer: ?ast.Expression = null;
+        if (self.core.accept(RuleSet.is(.@"="))) |_| {
+            initializer = try self.acceptExpression(ctx);
+        } else |_| {}
+        return .{
+            .binding_identifier = .{
+                .binding_identifier = binding_identifier,
+                .initializer = initializer,
+            },
+        };
+    } else |_| if (self.acceptBindingPattern()) |binding_pattern| {
+        _ = try self.core.accept(RuleSet.is(.@"="));
+        const initializer = try self.acceptExpression(ctx);
+        return .{
+            .binding_pattern = .{
+                .binding_pattern = binding_pattern,
+                .initializer = initializer,
+            },
+        };
+    } else |_| return error.UnexpectedToken;
 }
 
 pub fn acceptBindingPattern(self: *Parser) AcceptError!ast.BindingPattern {
