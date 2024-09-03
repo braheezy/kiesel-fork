@@ -86,7 +86,7 @@ fn updateLanguageId(agent: *Agent, tag: icu4zig.Locale, options: Object) Agent.E
     return new_tag;
 }
 
-/// 14.1.3 MakeLocaleRecord ( tag, options, relevantExtensionKeys )
+/// 14.1.3 MakeLocaleRecord ( tag, options, localeExtensionKeys )
 /// https://tc39.es/ecma402/#sec-makelocalerecord
 fn makeLocaleRecord(
     agent: *Agent,
@@ -183,12 +183,12 @@ pub const LocaleConstructor = struct {
             );
         }
 
-        // 2. Let relevantExtensionKeys be %Intl.Locale%.[[RelevantExtensionKeys]].
+        // 2. Let localeExtensionKeys be %Intl.Locale%.[[LocaleExtensionKeys]].
         // 3. Let internalSlotsList be « [[InitializedLocale]], [[Locale]], [[Calendar]],
         //    [[Collation]], [[HourCycle]], [[NumberingSystem]] ».
-        // TODO: 4. If relevantExtensionKeys contains "kf", then
+        // TODO: 4. If localeExtensionKeys contains "kf", then
         //     a. Append [[CaseFirst]] to internalSlotsList.
-        // TODO: 5. If relevantExtensionKeys contains "kn", then
+        // TODO: 5. If localeExtensionKeys contains "kn", then
         //     a. Append [[Numeric]] to internalSlotsList.
         // 6. Let locale be ? OrdinaryCreateFromConstructor(NewTarget, "%Intl.Locale.prototype%",
         //    internalSlotsList).
@@ -335,7 +335,7 @@ pub const LocaleConstructor = struct {
         // 30. Set opt.[[nu]] to numberingSystem.
         opt.nu = numbering_system;
 
-        // 31. Let r be MakeLocaleRecord(tag, opt, relevantExtensionKeys).
+        // 31. Let r be MakeLocaleRecord(tag, opt, localeExtensionKeys).
         tag = try makeLocaleRecord(agent, tag, opt);
 
         locale.as(Locale).fields = .{
@@ -344,9 +344,9 @@ pub const LocaleConstructor = struct {
             // 33. Set locale.[[Calendar]] to r.[[ca]].
             // 34. Set locale.[[Collation]] to r.[[co]].
             // 35. Set locale.[[HourCycle]] to r.[[hc]].
-            // 36. If relevantExtensionKeys contains "kf", then
+            // 36. If localeExtensionKeys contains "kf", then
             //     a. Set locale.[[CaseFirst]] to r.[[kf]].
-            // 37. If relevantExtensionKeys contains "kn", then
+            // 37. If localeExtensionKeys contains "kn", then
             //     a. If SameValue(r.[[kn]], "true") is true or r.[[kn]] is the empty String, then
             //         i. Set locale.[[Numeric]] to true.
             //     b. Else,
