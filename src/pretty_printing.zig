@@ -1,8 +1,6 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-const Color = std.io.tty.Color;
-
 const icu4zig = @import("icu4zig");
 
 const build_options = @import("build-options");
@@ -967,14 +965,14 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
         return prettyPrintObject(object, writer);
     }
 
-    const color = switch (value.type()) {
-        .undefined => Color.bright_black,
-        .null => Color.yellow,
-        .boolean => Color.blue,
-        .string => Color.green,
-        .symbol => Color.cyan,
-        .number => Color.magenta,
-        .big_int => Color.magenta,
+    const color: std.io.tty.Color = switch (value.type()) {
+        .undefined => .bright_black,
+        .null => .yellow,
+        .boolean => .blue,
+        .string => .green,
+        .symbol => .cyan,
+        .number => .magenta,
+        .big_int => .magenta,
         .object => unreachable,
     };
     try tty_config.setColor(writer, color);
