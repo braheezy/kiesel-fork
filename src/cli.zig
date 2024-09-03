@@ -36,11 +36,6 @@ var tracked_promise_rejections: std.AutoArrayHashMap(
     HostHooks.PromiseRejectionTrackerOperation,
 ) = undefined;
 
-const ModuleCacheKey = struct {
-    normalized_specifier: []const u8,
-    referrer: ImportedModuleReferrer,
-};
-
 var module_cache: std.StringHashMap(Module) = undefined;
 
 // Python REPL my beloved 🐍
