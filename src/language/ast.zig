@@ -402,6 +402,28 @@ pub const PropertyName = union(enum) {
         numeric_literal: NumericLiteral,
     },
     computed_property_name: Expression,
+
+    pub fn isProtoSetter(
+        self: PropertyName,
+        allocator: std.mem.Allocator,
+    ) std.mem.Allocator.Error!bool {
+        switch (self) {
+            .literal_property_name => |literal_property_name| switch (literal_property_name) {
+                .identifier => |identifier| return std.mem.eql(u8, identifier, "__proto__"),
+                .string_literal => |string_literal| {
+                    const string = try string_literal.stringValue(allocator);
+                    // TODO: This needs `String.deinit()`
+                    defer switch (string.data.slice) {
+                        .ascii => |ascii| allocator.free(ascii),
+                        .utf16 => |utf16| allocator.free(utf16),
+                    };
+                    return string.eql(String.fromLiteral("__proto__"));
+                },
+                .numeric_literal => return false,
+            },
+            .computed_property_name => return false,
+        }
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-RegularExpressionLiteral

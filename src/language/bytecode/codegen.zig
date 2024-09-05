@@ -453,11 +453,22 @@ pub fn codegenPropertyDefinition(
 
         // PropertyDefinition : PropertyName : AssignmentExpression
         .property_name_and_expression => |property_name_and_expression| {
-            // 1. Let propKey be ? Evaluation of PropertyName.
-            try codegenPropertyName(property_name_and_expression.property_name, executable, ctx);
-            try executable.addInstruction(.load);
+            // 2. If this PropertyDefinition is contained within a Script that is being evaluated for JSON.parse (see step 7 of JSON.parse), then
+            //     a. Let isProtoSetter be false.
+            // NOTE: JSON parsing is handled by `std.json` so this never applies.
+            // 3. Else if propKey is "__proto__" and IsComputedPropertyKey of PropertyName is false, then
+            //     a. Let isProtoSetter be true.
+            // 4. Else,
+            //     a. Let isProtoSetter be false.
+            const is_proto_setter = try property_name_and_expression.property_name.isProtoSetter(
+                executable.allocator,
+            );
 
-            // TODO: 2-4.
+            // 1. Let propKey be ? Evaluation of PropertyName.
+            if (!is_proto_setter) {
+                try codegenPropertyName(property_name_and_expression.property_name, executable, ctx);
+                try executable.addInstruction(.load);
+            }
 
             // TODO: 5. If IsAnonymousFunctionDefinition(AssignmentExpression) is true and isProtoSetter is false, then
             // 6. Else,
@@ -469,7 +480,15 @@ pub fn codegenPropertyDefinition(
             if (property_name_and_expression.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
             try executable.addInstruction(.load);
 
-            // TODO: 7. If isProtoSetter is true, then
+            // 7. If isProtoSetter is true, then
+            if (is_proto_setter) {
+                // a. If propValue is an Object or propValue is null, then
+                //     i. Perform ! object.[[SetPrototypeOf]](propValue).
+                try executable.addInstruction(.object_set_prototype);
+
+                // b. Return unused.
+                return;
+            }
 
             // 8. Assert: object is an ordinary, extensible object with no non-configurable properties.
             // 9. Perform ! CreateDataPropertyOrThrow(object, propKey, propValue).

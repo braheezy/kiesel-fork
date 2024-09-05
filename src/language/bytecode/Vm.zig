@@ -1089,6 +1089,22 @@ fn executeObjectSetProperty(self: *Vm, _: Executable) Agent.Error!void {
     self.result = Value.from(object);
 }
 
+fn executeObjectSetPrototype(self: *Vm, _: Executable) Agent.Error!void {
+    const property_value = self.stack.pop();
+    const object = self.stack.pop().asObject();
+    // From PropertyDefinitionEvaluation:
+    // a. If propValue is an Object or propValue is null, then
+    if (property_value.isObject() or property_value.isNull()) {
+        // i. Perform ! object.[[SetPrototypeOf]](propValue).
+        const prototype = if (property_value.isObject()) property_value.asObject() else null;
+        _ = object.internalMethods().setPrototypeOf(
+            object,
+            prototype,
+        ) catch |err| try noexcept(err);
+    }
+    self.result = Value.from(object);
+}
+
 fn executeObjectSpreadValue(self: *Vm, _: Executable) Agent.Error!void {
     const from_value = self.stack.pop();
     var object = self.stack.pop().asObject();
@@ -1379,6 +1395,7 @@ pub fn run(self: *Vm, executable: Executable) Agent.Error!Completion {
             .object_create => self.executeObjectCreate(executable),
             .object_define_method => self.executeObjectDefineMethod(executable),
             .object_set_property => self.executeObjectSetProperty(executable),
+            .object_set_prototype => self.executeObjectSetPrototype(executable),
             .object_spread_value => self.executeObjectSpreadValue(executable),
             .pop_exception_jump_target => self.executePopExceptionJumpTarget(executable),
             .pop_iterator => self.executePopIterator(executable),

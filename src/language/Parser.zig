@@ -999,17 +999,19 @@ pub fn acceptPropertyDefinitionList(self: *Parser) AcceptError!ast.PropertyDefin
 
     var property_definitions = std.ArrayList(ast.PropertyDefinition).init(self.allocator);
     errdefer property_definitions.deinit();
-    while (self.acceptPropertyDefinition()) |property_definition| {
+    var has_proto_setter = false;
+    while (self.acceptPropertyDefinition(&has_proto_setter)) |property_definition| {
         try property_definitions.append(property_definition);
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
     } else |_| {}
     return .{ .items = try property_definitions.toOwnedSlice() };
 }
 
-pub fn acceptPropertyDefinition(self: *Parser) AcceptError!ast.PropertyDefinition {
+pub fn acceptPropertyDefinition(self: *Parser, has_proto_setter: *bool) AcceptError!ast.PropertyDefinition {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const location = (try self.core.peek() orelse return error.UnexpectedToken).location;
     const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
     if (self.core.accept(RuleSet.is(.@"..."))) |_| {
         const expression = try self.acceptExpression(ctx);
@@ -1017,6 +1019,14 @@ pub fn acceptPropertyDefinition(self: *Parser) AcceptError!ast.PropertyDefinitio
     } else |_| if (self.acceptMethodDefinition(null)) |method_definition| {
         return .{ .method_definition = method_definition };
     } else |_| if (self.acceptPropertyName()) |property_name| {
+        const is_proto_setter = try property_name.isProtoSetter(self.allocator);
+        if (is_proto_setter) {
+            if (has_proto_setter.*) {
+                try self.emitErrorAt(location, "Duplicate '__proto__' property not allowed", .{});
+                return error.UnexpectedToken;
+            }
+            has_proto_setter.* = true;
+        }
         if (self.core.accept(RuleSet.is(.@":"))) |_| {
             const expression = try self.acceptExpression(ctx);
             return .{
