@@ -1019,16 +1019,19 @@ pub fn acceptPropertyDefinition(self: *Parser, has_proto_setter: *bool) AcceptEr
     } else |_| if (self.acceptMethodDefinition(null)) |method_definition| {
         return .{ .method_definition = method_definition };
     } else |_| if (self.acceptPropertyName()) |property_name| {
-        const is_proto_setter = try property_name.isProtoSetter(self.allocator);
-        if (is_proto_setter) {
-            if (has_proto_setter.*) {
-                try self.emitErrorAt(location, "Duplicate '__proto__' property not allowed", .{});
-                return error.UnexpectedToken;
-            }
-            has_proto_setter.* = true;
-        }
         if (self.core.accept(RuleSet.is(.@":"))) |_| {
             const expression = try self.acceptExpression(ctx);
+            const is_proto_setter = try property_name.isProtoSetter(self.allocator);
+            // It is a Syntax Error if the PropertyNameList of PropertyDefinitionList contains any
+            // duplicate entries for "__proto__" and at least two of those entries were obtained
+            // from productions of the form PropertyDefinition : PropertyName : AssignmentExpression.
+            if (is_proto_setter) {
+                if (has_proto_setter.*) {
+                    try self.emitErrorAt(location, "Duplicate '__proto__' property not allowed", .{});
+                    return error.UnexpectedToken;
+                }
+                has_proto_setter.* = true;
+            }
             return .{
                 .property_name_and_expression = .{
                     .property_name = property_name,
