@@ -128,7 +128,7 @@ fn getFunctionName(comptime name: []const u8) []const u8 {
     }
 }
 
-inline fn getPropertyKey(comptime name: []const u8, agent: *Agent) PropertyKey {
+fn getPropertyKey(comptime name: []const u8, agent: *Agent) PropertyKey {
     if (comptime std.mem.startsWith(u8, name, "%Symbol.")) {
         comptime std.debug.assert(std.mem.endsWith(u8, name, "%"));
         return PropertyKey.from(@field(agent.well_known_symbols, name));

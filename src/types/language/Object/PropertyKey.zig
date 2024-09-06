@@ -54,7 +54,7 @@ pub const PropertyKey = union(enum) {
 
     /// An array index is an integer index n such that CanonicalNumericIndexString(n) returns an
     /// integral Number in the inclusive interval from +0𝔽 to 𝔽(2^32 - 2).
-    pub inline fn isArrayIndex(self: PropertyKey) bool {
+    pub fn isArrayIndex(self: PropertyKey) bool {
         return self == .integer_index and self.integer_index <= (std.math.maxInt(u32) - 1);
     }
 

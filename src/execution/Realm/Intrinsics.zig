@@ -159,7 +159,7 @@ lazy_intrinsics: struct {
     @"%WeakSet.prototype%": Object = null_intrinsic,
 } = .{},
 
-inline fn lazyIntrinsic(
+fn lazyIntrinsic(
     self: *Intrinsics,
     comptime name: []const u8,
     comptime T: type,

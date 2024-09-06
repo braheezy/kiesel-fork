@@ -69,56 +69,56 @@ pub const Number = union(enum) {
         }
     }
 
-    pub inline fn asFloat(self: Number) f64 {
+    pub fn asFloat(self: Number) f64 {
         return switch (self) {
             .f64 => |x| x,
             .i32 => |x| @as(f64, @floatFromInt(x)),
         };
     }
 
-    pub inline fn isNan(self: Number) bool {
+    pub fn isNan(self: Number) bool {
         return switch (self) {
             .f64 => |x| std.math.isNan(x),
             .i32 => false,
         };
     }
 
-    pub inline fn isPositiveInf(self: Number) bool {
+    pub fn isPositiveInf(self: Number) bool {
         return switch (self) {
             .f64 => |x| std.math.isPositiveInf(x),
             .i32 => false,
         };
     }
 
-    pub inline fn isNegativeInf(self: Number) bool {
+    pub fn isNegativeInf(self: Number) bool {
         return switch (self) {
             .f64 => |x| std.math.isNegativeInf(x),
             .i32 => false,
         };
     }
 
-    pub inline fn isZero(self: Number) bool {
+    pub fn isZero(self: Number) bool {
         return switch (self) {
             .f64 => |x| x == 0,
             .i32 => |x| x == 0,
         };
     }
 
-    pub inline fn isPositiveZero(self: Number) bool {
+    pub fn isPositiveZero(self: Number) bool {
         return switch (self) {
             .f64 => |x| std.math.isPositiveZero(x),
             .i32 => |x| x == 0,
         };
     }
 
-    pub inline fn isNegativeZero(self: Number) bool {
+    pub fn isNegativeZero(self: Number) bool {
         return switch (self) {
             .f64 => |x| std.math.isNegativeZero(x),
             .i32 => false,
         };
     }
 
-    pub inline fn isFinite(self: Number) bool {
+    pub fn isFinite(self: Number) bool {
         return switch (self) {
             .f64 => |x| std.math.isFinite(x),
             .i32 => true,
@@ -126,32 +126,32 @@ pub const Number = union(enum) {
     }
 
     /// https://tc39.es/ecma262/#integral-number
-    pub inline fn isIntegral(self: Number) bool {
+    pub fn isIntegral(self: Number) bool {
         return self.isFinite() and @trunc(self.asFloat()) == self.asFloat();
     }
 
-    pub inline fn truncate(self: Number) Number {
+    pub fn truncate(self: Number) Number {
         return switch (self) {
             .f64 => |x| .{ .f64 = @trunc(x) },
             .i32 => |x| .{ .i32 = x },
         };
     }
 
-    pub inline fn ceil(self: Number) Number {
+    pub fn ceil(self: Number) Number {
         return switch (self) {
             .f64 => |x| .{ .f64 = @ceil(x) },
             .i32 => |x| .{ .i32 = x },
         };
     }
 
-    pub inline fn floor(self: Number) Number {
+    pub fn floor(self: Number) Number {
         return switch (self) {
             .f64 => |x| .{ .f64 = @floor(x) },
             .i32 => |x| .{ .i32 = x },
         };
     }
 
-    inline fn toInt32(self: Number) i32 {
+    fn toInt32(self: Number) i32 {
         return switch (self) {
             .f64 => |x| blk: {
                 // Excerpt from Value.toInt32()
@@ -167,7 +167,7 @@ pub const Number = union(enum) {
         };
     }
 
-    inline fn toUint32(self: Number) u32 {
+    fn toUint32(self: Number) u32 {
         return switch (self) {
             .f64 => |x| blk: {
                 // Excerpt from Value.toUint32()
@@ -534,7 +534,7 @@ pub const Number = union(enum) {
 
     /// 6.1.6.1.16 NumberBitwiseOp ( op, x, y )
     /// https://tc39.es/ecma262/#sec-numberbitwiseop
-    inline fn numberBitwiseOp(comptime op: enum { @"&", @"^", @"|" }, x: Number, y: Number) i32 {
+    fn numberBitwiseOp(comptime op: enum { @"&", @"^", @"|" }, x: Number, y: Number) i32 {
         // 1. Let lNum be ! ToInt32(x).
         const l_num = x.toInt32();
 

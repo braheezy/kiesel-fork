@@ -112,12 +112,12 @@ pub fn format(
     try writer.writeAll("[object Object]");
 }
 
-pub inline fn is(self: Object, comptime T: type) bool {
+pub fn is(self: Object, comptime T: type) bool {
     comptime std.debug.assert(T.tag != .unset);
     return T.tag == self.data.tag;
 }
 
-pub inline fn as(self: Object, comptime T: type) *T {
+pub fn as(self: Object, comptime T: type) *T {
     std.debug.assert(self.data.tag == T.tag);
     // Casting alignment is safe because we allocate objects as *T
     return @alignCast(@fieldParentPtr("data", @as(*Data, @ptrCast(self.data))));
@@ -125,32 +125,32 @@ pub inline fn as(self: Object, comptime T: type) *T {
 
 // Helper functions so we don't have to say 'data' all the time
 
-pub inline fn prototype(self: Object) *?Object {
+pub fn prototype(self: Object) *?Object {
     return &self.data.prototype;
 }
 
-pub inline fn extensible(self: Object) *bool {
+pub fn extensible(self: Object) *bool {
     return &self.data.extensible;
 }
 
-pub inline fn privateElements(self: Object) *PrivateNameArrayHashMap(PrivateElement) {
+pub fn privateElements(self: Object) *PrivateNameArrayHashMap(PrivateElement) {
     return &self.data.private_elements;
 }
 
-pub inline fn isHTMLDDA(self: Object) bool {
+pub fn isHTMLDDA(self: Object) bool {
     comptime if (!build_options.enable_annex_b) @compileError("Annex B is not enabled");
     return self.data.is_htmldda;
 }
 
-pub inline fn agent(self: Object) *Agent {
+pub fn agent(self: Object) *Agent {
     return self.data.agent;
 }
 
-pub inline fn internalMethods(self: Object) *const InternalMethods {
+pub fn internalMethods(self: Object) *const InternalMethods {
     return self.data.internal_methods;
 }
 
-pub inline fn propertyStorage(self: Object) *PropertyStorage {
+pub fn propertyStorage(self: Object) *PropertyStorage {
     return &self.data.property_storage;
 }
 
@@ -362,7 +362,7 @@ pub fn construct(
     return self.internalMethods().construct.?(self, Arguments.from(arguments_list), new_target_);
 }
 
-pub inline fn constructNoArgs(self: Object) Agent.Error!Object {
+pub fn constructNoArgs(self: Object) Agent.Error!Object {
     return self.construct(&.{}, null);
 }
 
