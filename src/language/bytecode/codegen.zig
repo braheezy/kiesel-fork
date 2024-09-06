@@ -112,7 +112,10 @@ fn codegenSingleNameBinding(
     node: ast.SingleNameBinding,
     executable: *Executable,
     ctx: *Context,
-    property: Value,
+    property: union(enum) {
+        value: Value,
+        property_name: ast.PropertyName,
+    },
     environment: ?BindingInitializationEnvironment,
 ) Executable.Error!void {
     const strict = ctx.contained_in_strict_mode_code;
@@ -129,7 +132,13 @@ fn codegenSingleNameBinding(
 
     // Evaluate `rhs[n]`
     try executable.addInstruction(.load);
-    try executable.addInstructionWithConstant(.load_constant, property);
+    switch (property) {
+        .value => |value| try executable.addInstructionWithConstant(.load_constant, value),
+        .property_name => |property_name| {
+            try codegenPropertyName(property_name, executable, ctx);
+            try executable.addInstruction(.load);
+        },
+    }
     try executable.addInstruction(.evaluate_property_access_with_expression_key);
     try executable.addIndex(@intFromBool(strict));
     try executable.addInstruction(.get_value);
@@ -185,16 +194,47 @@ fn bindingInitialization(
     switch (node) {
         .object_binding_pattern => |object_binding_pattern| {
             for (object_binding_pattern.properties) |element| switch (element) {
-                .binding_property => |binding_property| {
-                    try codegenSingleNameBinding(
-                        binding_property.single_name_binding,
+                .binding_property => |binding_property| switch (binding_property) {
+                    .single_name_binding => |single_name_binding| try codegenSingleNameBinding(
+                        single_name_binding,
                         executable,
                         ctx,
-                        Value.from(
-                            try String.fromUtf8(executable.allocator, binding_property.single_name_binding.binding_identifier),
-                        ),
+                        .{
+                            .value = Value.from(
+                                try String.fromUtf8(executable.allocator, single_name_binding.binding_identifier),
+                            ),
+                        },
                         environment,
-                    );
+                    ),
+                    .property_name_and_binding_element => |property_name_and_binding_element| {
+                        switch (property_name_and_binding_element.binding_element) {
+                            .single_name_binding => |single_name_binding| try codegenSingleNameBinding(
+                                single_name_binding,
+                                executable,
+                                ctx,
+                                .{ .property_name = property_name_and_binding_element.property_name },
+                                environment,
+                            ),
+                            .binding_pattern => |binding_pattern| {
+                                const strict = ctx.contained_in_strict_mode_code;
+
+                                // Evaluate `rhs[n]`
+                                try executable.addInstruction(.load);
+                                try codegenPropertyName(property_name_and_binding_element.property_name, executable, ctx);
+                                try executable.addInstruction(.load);
+                                try executable.addInstruction(.evaluate_property_access_with_expression_key);
+                                try executable.addIndex(@intFromBool(strict));
+                                try executable.addInstruction(.get_value);
+
+                                try bindingInitialization(
+                                    binding_pattern.binding_pattern,
+                                    executable,
+                                    ctx,
+                                    environment,
+                                );
+                            },
+                        }
+                    },
                 },
                 .binding_rest_property => {
                     // TODO: Implement binding rest properties
@@ -204,14 +244,31 @@ fn bindingInitialization(
         .array_binding_pattern => |array_binding_pattern| {
             for (array_binding_pattern.elements, 0..) |element, i| switch (element) {
                 .elision => {},
-                .binding_element => |binding_element| {
-                    try codegenSingleNameBinding(
-                        binding_element.single_name_binding,
+                .binding_element => |binding_element| switch (binding_element) {
+                    .single_name_binding => |single_name_binding| try codegenSingleNameBinding(
+                        single_name_binding,
                         executable,
                         ctx,
-                        Value.from(@as(u53, @intCast(i))),
+                        .{ .value = Value.from(@as(u53, @intCast(i))) },
                         environment,
-                    );
+                    ),
+                    .binding_pattern => |binding_pattern| {
+                        const strict = ctx.contained_in_strict_mode_code;
+
+                        // Evaluate `rhs[n]`
+                        try executable.addInstruction(.load);
+                        try executable.addInstructionWithConstant(.load_constant, Value.from(@as(u53, @intCast(i))));
+                        try executable.addInstruction(.evaluate_property_access_with_expression_key);
+                        try executable.addIndex(@intFromBool(strict));
+                        try executable.addInstruction(.get_value);
+
+                        try bindingInitialization(
+                            binding_pattern.binding_pattern,
+                            executable,
+                            ctx,
+                            environment,
+                        );
+                    },
                 },
                 .binding_rest_element => {
                     // TODO: Implement binding rest elements

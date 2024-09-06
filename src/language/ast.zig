@@ -1422,36 +1422,15 @@ pub const BindingPattern = union(enum) {
             // ObjectBindingPattern : { }
             // ObjectBindingPattern : { BindingPropertyList , BindingRestProperty }
             .object_binding_pattern => |object_binding_pattern| for (object_binding_pattern.properties) |property| switch (property) {
-                .binding_property => |binding_property| switch (binding_property) {
-                    // SingleNameBinding : BindingIdentifier Initializer[opt]
-                    .single_name_binding => |single_name_binding| {
-                        // 1. Return the BoundNames of BindingIdentifier.
-                        try bound_names.append(single_name_binding.binding_identifier);
-                    },
-                    // TODO: BindingProperty : PropertyName : BindingElement
-                },
-                .binding_rest_property => |binding_rest_property| {
-                    try bound_names.append(binding_rest_property.binding_identifier);
-                },
+                .binding_property => |binding_property| try binding_property.collectBoundNames(bound_names),
+                .binding_rest_property => |binding_rest_property| try bound_names.append(binding_rest_property.binding_identifier),
             },
 
             // ArrayBindingPattern : [ Elision[opt] ]
             //     1. Return a new empty List.
             .array_binding_pattern => |array_binding_pattern| for (array_binding_pattern.elements) |element| switch (element) {
                 .elision => {},
-                // BindingElement : BindingPattern Initializer[opt]
-                .binding_element => |binding_element| switch (binding_element) {
-                    // SingleNameBinding : BindingIdentifier Initializer[opt]
-                    .single_name_binding => |single_name_binding| {
-                        // 1. Return the BoundNames of BindingIdentifier.
-                        try bound_names.append(single_name_binding.binding_identifier);
-                    },
-                    // BindingElement : BindingPattern Initializer[opt]
-                    .binding_pattern => |binding_pattern| {
-                        // 1. Return the BoundNames of BindingPattern.
-                        try binding_pattern.binding_pattern.collectBoundNames(bound_names);
-                    },
-                },
+                .binding_element => |binding_element| try binding_element.collectBoundNames(bound_names),
                 .binding_rest_element => |binding_rest_element| switch (binding_rest_element) {
                     .binding_identifier => |binding_identifier| try bound_names.append(binding_identifier),
                     .binding_pattern => |binding_pattern| try binding_pattern.collectBoundNames(bound_names),
@@ -1506,18 +1485,42 @@ pub const BindingRestProperty = struct {
 
 /// https://tc39.es/ecma262/#prod-BindingProperty
 pub const BindingProperty = union(enum) {
+    pub const PropertyNameAndBindingElement = struct {
+        property_name: PropertyName,
+        binding_element: BindingElement,
+    };
+
     single_name_binding: SingleNameBinding,
+    property_name_and_binding_element: PropertyNameAndBindingElement,
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn collectBoundNames(
+        self: BindingProperty,
+        bound_names: *std.ArrayList(Identifier),
+    ) std.mem.Allocator.Error!void {
+        // BindingProperty : PropertyName : BindingElement
+        // 1. Return the BoundNames of BindingElement.
+        switch (self) {
+            .single_name_binding => |single_name_binding| try single_name_binding.collectBoundNames(bound_names),
+            .property_name_and_binding_element => |property_name_and_binding_element| {
+                try property_name_and_binding_element.binding_element.collectBoundNames(bound_names);
+            },
+        }
+    }
 
     /// 15.1.2 Static Semantics: ContainsExpression
     /// https://tc39.es/ecma262/#sec-static-semantics-containsexpression
     pub fn containsExpression(self: BindingProperty) bool {
-        // TODO: BindingProperty : PropertyName : BindingElement
-        // SingleNameBinding : BindingIdentifier
-        // 1. Return false.
-        // SingleNameBinding : BindingIdentifier Initializer
-        // 1. Return true.
+        // BindingProperty : PropertyName : BindingElement
+        // 1. let has be IsComputedPropertyKey of PropertyName.
+        // 2. If has is true, return true.
+        // 3. Return ContainsExpression of BindingElement.
         return switch (self) {
             .single_name_binding => |single_name_binding| single_name_binding.initializer != null,
+            .property_name_and_binding_element => |property_name_and_binding_element| false or
+                property_name_and_binding_element.property_name == .computed_property_name or
+                property_name_and_binding_element.binding_element.containsExpression(),
         };
     }
 };
@@ -1529,6 +1532,20 @@ pub const BindingElement = union(enum) {
         binding_pattern: BindingPattern,
         initializer: ?Expression,
     },
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn collectBoundNames(
+        self: BindingElement,
+        bound_names: *std.ArrayList(Identifier),
+    ) std.mem.Allocator.Error!void {
+        // BindingElement : BindingPattern Initializer[opt]
+        // 1. Return the BoundNames of BindingPattern.
+        switch (self) {
+            .single_name_binding => |single_name_binding| try single_name_binding.collectBoundNames(bound_names),
+            .binding_pattern => |binding_pattern| try binding_pattern.binding_pattern.collectBoundNames(bound_names),
+        }
+    }
 
     /// 15.1.2 Static Semantics: ContainsExpression
     /// https://tc39.es/ecma262/#sec-static-semantics-containsexpression
@@ -1564,12 +1581,35 @@ pub const BindingElement = union(enum) {
 pub const SingleNameBinding = struct {
     binding_identifier: Identifier,
     initializer: ?Expression,
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn collectBoundNames(
+        self: SingleNameBinding,
+        bound_names: *std.ArrayList(Identifier),
+    ) std.mem.Allocator.Error!void {
+        // SingleNameBinding : BindingIdentifier Initializer[opt]
+        // 1. Return the BoundNames of BindingIdentifier.
+        try bound_names.append(self.binding_identifier);
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-BindingRestElement
 pub const BindingRestElement = union(enum) {
     binding_identifier: Identifier,
     binding_pattern: BindingPattern,
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn collectBoundNames(
+        self: BindingRestElement,
+        bound_names: *std.ArrayList(Identifier),
+    ) std.mem.Allocator.Error!void {
+        switch (self) {
+            .binding_identifier => |binding_identifier| try bound_names.append(binding_identifier),
+            .binding_pattern => |binding_pattern| try binding_pattern.collectBoundNames(bound_names),
+        }
+    }
 
     /// 15.1.2 Static Semantics: ContainsExpression
     /// https://tc39.es/ecma262/#sec-static-semantics-containsexpression
@@ -2333,22 +2373,10 @@ pub const FormalParameters = struct {
         // 1. Let names1 be the BoundNames of FormalParameterList.
         // 2. Let names2 be the BoundNames of FormalParameter.
         // 3. Return the list-concatenation of names1 and names2.
-        for (self.items) |item| {
-            // BindingElement : BindingPattern Initializer[opt]
-            // 1. Return the BoundNames of BindingPattern.
-            // SingleNameBinding : BindingIdentifier Initializer[opt]
-            // 1. Return the BoundNames of BindingIdentifier.
-            switch (item) {
-                .formal_parameter => |formal_parameter| switch (formal_parameter.binding_element) {
-                    .single_name_binding => |single_name_binding| try bound_names.append(single_name_binding.binding_identifier),
-                    .binding_pattern => |binding_pattern| try binding_pattern.binding_pattern.collectBoundNames(bound_names),
-                },
-                .function_rest_parameter => |function_rest_parameter| switch (function_rest_parameter.binding_rest_element) {
-                    .binding_identifier => |binding_identifier| try bound_names.append(binding_identifier),
-                    .binding_pattern => |binding_pattern| try binding_pattern.collectBoundNames(bound_names),
-                },
-            }
-        }
+        for (self.items) |item| switch (item) {
+            .formal_parameter => |formal_parameter| try formal_parameter.binding_element.collectBoundNames(bound_names),
+            .function_rest_parameter => |function_rest_parameter| try function_rest_parameter.binding_rest_element.collectBoundNames(bound_names),
+        };
     }
 
     /// 15.1.2 Static Semantics: ContainsExpression

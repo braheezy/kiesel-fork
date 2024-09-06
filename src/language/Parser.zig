@@ -1749,15 +1749,11 @@ pub fn acceptObjectBindingPattern(self: *Parser) AcceptError!ast.ObjectBindingPa
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    // TODO: Parse all kinds of object binging patterns
+    // TODO: Parse binding rest properties
     var properties = std.ArrayList(ast.ObjectBindingPattern.Property).init(self.allocator);
     _ = try self.core.accept(RuleSet.is(.@"{"));
-    while (self.acceptSingleNameBinding()) |single_name_binding| {
-        try properties.append(.{
-            .binding_property = .{
-                .single_name_binding = single_name_binding,
-            },
-        });
+    while (self.acceptBindingProperty()) |binding_property| {
+        try properties.append(.{ .binding_property = binding_property });
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
     } else |_| {}
     _ = try self.core.accept(RuleSet.is(.@"}"));
@@ -1768,19 +1764,47 @@ pub fn acceptArrayBindingPattern(self: *Parser) AcceptError!ast.ArrayBindingPatt
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    // TODO: Parse all kinds of array binging patterns
+    // TODO: Parse binding rest elements and elisions
     var elements = std.ArrayList(ast.ArrayBindingPattern.Element).init(self.allocator);
     _ = try self.core.accept(RuleSet.is(.@"["));
-    while (self.acceptSingleNameBinding()) |single_name_binding| {
-        try elements.append(.{
-            .binding_element = .{
-                .single_name_binding = single_name_binding,
-            },
-        });
+    while (self.acceptBindingElement()) |binding_element| {
+        try elements.append(.{ .binding_element = binding_element });
         _ = self.core.accept(RuleSet.is(.@",")) catch break;
     } else |_| {}
     _ = try self.core.accept(RuleSet.is(.@"]"));
     return .{ .elements = try elements.toOwnedSlice() };
+}
+
+pub fn acceptBindingProperty(self: *Parser) AcceptError!ast.BindingProperty {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    if (self.acceptPropertyName()) |property_name| {
+        if (self.core.accept(RuleSet.is(.@":"))) |_| {
+            const binding_element = try self.acceptBindingElement();
+            return .{
+                .property_name_and_binding_element = .{
+                    .property_name = property_name,
+                    .binding_element = binding_element,
+                },
+            };
+        } else |_| if (property_name == .literal_property_name and property_name.literal_property_name == .identifier) {
+            const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
+            const initializer = if (self.core.accept(RuleSet.is(.@"="))) |_|
+                try self.acceptExpression(ctx)
+            else |_|
+                null;
+            return .{
+                .single_name_binding = .{
+                    .binding_identifier = property_name.literal_property_name.identifier,
+                    .initializer = initializer,
+                },
+            };
+        } else return error.UnexpectedToken;
+    } else |_| if (self.acceptSingleNameBinding()) |single_name_binding|
+        return .{ .single_name_binding = single_name_binding }
+    else |_|
+        return error.UnexpectedToken;
 }
 
 pub fn acceptBindingElement(self: *Parser) AcceptError!ast.BindingElement {

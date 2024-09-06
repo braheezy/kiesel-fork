@@ -486,6 +486,10 @@ pub fn printBindingProperty(node: ast.BindingProperty, writer: anytype, indentat
     try print("BindingProperty", writer, indentation);
     switch (node) {
         .single_name_binding => |single_name_binding| try printSingleNameBinding(single_name_binding, writer, indentation + 1),
+        .property_name_and_binding_element => |property_name_and_binding_element| {
+            try printPropertyName(property_name_and_binding_element.property_name, writer, indentation + 1);
+            try printBindingElement(property_name_and_binding_element.binding_element, writer, indentation + 1);
+        },
     }
 }
 
