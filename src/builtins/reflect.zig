@@ -64,7 +64,7 @@ pub const Reflect = struct {
         }
 
         // 2. Let args be ? CreateListFromArrayLike(argumentsList).
-        const args = try arguments_list.createListFromArrayLike(agent, .{});
+        const args = try arguments_list.createListFromArrayLike(agent, null);
 
         // TODO: 3. Perform PrepareForTailCall().
 
@@ -94,7 +94,7 @@ pub const Reflect = struct {
         }
 
         // 4. Let args be ? CreateListFromArrayLike(argumentsList).
-        const args = try arguments_list.createListFromArrayLike(agent, .{});
+        const args = try arguments_list.createListFromArrayLike(agent, null);
 
         // 5. Return ? Construct(target, args, newTarget).
         return Value.from(try target.asObject().construct(args, new_target.asObject()));

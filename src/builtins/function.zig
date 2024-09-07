@@ -508,7 +508,7 @@ pub const FunctionPrototype = struct {
         }
 
         // 4. Let argList be ? CreateListFromArrayLike(argArray).
-        const arg_list = try arg_array.createListFromArrayLike(agent, .{});
+        const arg_list = try arg_array.createListFromArrayLike(agent, null);
 
         // TODO: 5. Perform PrepareForTailCall().
 

@@ -1248,14 +1248,20 @@ pub fn callAssumeCallableNoArgs(self: Value, this_value: Value) Agent.Error!Valu
     return self.callAssumeCallable(this_value, &.{});
 }
 
-/// 7.3.19 CreateListFromArrayLike ( obj [ , elementTypes ] )
+const ValidElementTypes = enum {
+    all,
+    property_key,
+};
+
+/// 7.3.19 CreateListFromArrayLike ( obj [ , validElementTypes ] )
 /// https://tc39.es/ecma262/#sec-createlistfromarraylike
-pub fn createListFromArrayLike(self: Value, agent: *Agent, args: struct {
-    element_types: ?[]const Type = null,
-}) Agent.Error![]Value {
-    // 1. If elementTypes is not present, set elementTypes to « Undefined, Null, Boolean,
-    //    String, Symbol, Number, BigInt, Object ».
-    const element_types = args.element_types orelse std.enums.values(Type);
+pub fn createListFromArrayLike(
+    self: Value,
+    agent: *Agent,
+    maybe_valid_element_types: ?ValidElementTypes,
+) Agent.Error![]Value {
+    // 1. If validElementTypes is not present, set validElementTypes to all.
+    const valid_element_types = maybe_valid_element_types orelse .all;
 
     // 2. If obj is not an Object, throw a TypeError exception.
     if (!self.isObject()) {
@@ -1281,12 +1287,16 @@ pub fn createListFromArrayLike(self: Value, agent: *Agent, args: struct {
         // b. Let next be ? Get(obj, indexName).
         const next = try self.get(agent, index_name);
 
-        // c. If elementTypes does not contain Type(next), throw a TypeError exception.
-        if (std.mem.indexOfScalar(Type, element_types, next.type()) == null) {
+        // c. If validElementTypes is property-key and next is not a property key, throw a
+        //    TypeError exception.
+        if (valid_element_types == .property_key and switch (next.type()) {
+            .string, .symbol => false,
+            else => true,
+        }) {
             return agent.throwException(
                 .type_error,
-                "Array element {} has invalid type '{s}'",
-                .{ next, @tagName(next.type()) },
+                "Array element {} must be a string or symbol",
+                .{next},
             );
         }
 

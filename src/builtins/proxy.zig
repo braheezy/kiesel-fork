@@ -799,10 +799,8 @@ fn ownPropertyKeys(object: Object) Agent.Error!std.ArrayList(PropertyKey) {
         &.{Value.from(target)},
     );
 
-    // 8. Let trapResult be ? CreateListFromArrayLike(trapResultArray, « String, Symbol »).
-    const elements = try trap_result_array.createListFromArrayLike(agent, .{
-        .element_types = &.{ .string, .symbol },
-    });
+    // 8. Let trapResult be ? CreateListFromArrayLike(trapResultArray, property-key).
+    const elements = try trap_result_array.createListFromArrayLike(agent, .property_key);
     var trap_result = try std.ArrayList(PropertyKey).initCapacity(
         agent.gc_allocator,
         elements.len,
