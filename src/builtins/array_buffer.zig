@@ -43,8 +43,8 @@ pub const ArrayBufferLike = union(enum) {
 
     pub fn arrayBufferData(self: ArrayBufferLike) ?*const DataBlock {
         return switch (self) {
-            .array_buffer => |array_buffer| if (array_buffer.fields.array_buffer_data) |array_buffer_data|
-                &array_buffer_data
+            .array_buffer => |array_buffer| if (array_buffer.fields.array_buffer_data) |*array_buffer_data|
+                array_buffer_data
             else
                 null,
             .shared_array_buffer => |shared_array_buffer| &shared_array_buffer.fields.array_buffer_data,
