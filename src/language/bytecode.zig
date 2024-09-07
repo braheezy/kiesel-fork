@@ -57,6 +57,9 @@ pub fn generateBytecode(
         error.OutOfMemory => return error.OutOfMemory,
     };
 
+    // The VM requires this to be the last instruction.
+    try executable.addInstruction(.end);
+
     // Already incremented by one by the last caller
     executable.environment_lookup_cache_size = ctx.environment_lookup_cache_index;
 

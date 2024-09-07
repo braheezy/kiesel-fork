@@ -16,7 +16,7 @@ const sameValue = types.sameValue;
 const Executable = @This();
 
 allocator: std.mem.Allocator,
-instructions: std.ArrayList(Instruction),
+instructions: std.ArrayList(u8),
 constants: ValueArrayHashMap(void, sameValue),
 identifiers: StringArrayHashMap(void),
 ast_nodes: std.ArrayList(AstNode),
@@ -59,7 +59,7 @@ pub fn deinit(self: *Executable) void {
 }
 
 pub fn addInstruction(self: *Executable, instruction: Instruction) std.mem.Allocator.Error!void {
-    try self.instructions.append(instruction);
+    try self.instructions.append(@intFromEnum(instruction));
 }
 
 pub fn addConstant(self: *Executable, constant: Value) std.mem.Allocator.Error!usize {
@@ -118,8 +118,8 @@ pub const JumpIndex = struct {
         const instructions = self.executable.instructions.items;
         if (index >= std.math.maxInt(IndexType)) return error.IndexOutOfRange;
         const bytes = std.mem.toBytes(@as(IndexType, @intCast(index)));
-        instructions[self.index] = @enumFromInt(bytes[0]);
-        instructions[self.index + 1] = @enumFromInt(bytes[1]);
+        instructions[self.index] = bytes[0];
+        instructions[self.index + 1] = bytes[1];
     }
 
     pub fn setTargetHere(self: JumpIndex) Error!void {
@@ -142,8 +142,8 @@ pub fn addJumpIndex(self: *Executable) std.mem.Allocator.Error!JumpIndex {
 pub fn addIndex(self: *Executable, index: usize) Error!void {
     if (index >= std.math.maxInt(IndexType)) return error.IndexOutOfRange;
     const bytes = std.mem.toBytes(@as(IndexType, @intCast(index)));
-    try self.instructions.append(@enumFromInt(bytes[0]));
-    try self.instructions.append(@enumFromInt(bytes[1]));
+    try self.instructions.append(bytes[0]);
+    try self.instructions.append(bytes[1]);
 }
 
 pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @TypeOf(writer).Error!void {
@@ -250,5 +250,4 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
         }
         try writer.writeAll("\n");
     }
-    try writer.print("{}: <end>\n", .{self.instructions.items.len});
 }

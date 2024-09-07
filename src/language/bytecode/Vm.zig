@@ -1,3 +1,4 @@
+const builtin = @import("builtin");
 const std = @import("std");
 
 const build_options = @import("build-options");
@@ -103,11 +104,15 @@ pub fn deinit(self: Vm) void {
     self.environment_lookup_cache.deinit();
 }
 
-fn fetchInstruction(self: *Vm, executable: Executable) ?Instruction {
+fn fetchByte(self: *Vm, executable: Executable) ?u8 {
     const instructions = executable.instructions.items;
     if (self.ip >= instructions.len) return null;
     defer self.ip += 1;
     return instructions[self.ip];
+}
+
+fn fetchInstruction(self: *Vm, executable: Executable) Instruction {
+    return @enumFromInt(self.fetchByte(executable).?);
 }
 
 fn fetchConstant(self: *Vm, executable: Executable) Value {
@@ -126,8 +131,8 @@ fn fetchAstNode(self: *Vm, executable: Executable) *Executable.AstNode {
 }
 
 fn fetchIndex(self: *Vm, executable: Executable) Executable.IndexType {
-    const b1 = @intFromEnum(self.fetchInstruction(executable).?);
-    const b2 = @intFromEnum(self.fetchInstruction(executable).?);
+    const b1 = self.fetchByte(executable).?;
+    const b2 = self.fetchByte(executable).?;
     return std.mem.bytesToValue(Executable.IndexType, &[_]u8{ b1, b2 });
 }
 
@@ -1328,111 +1333,133 @@ fn executeYield(_: *Vm, _: Executable) Agent.Error!void {
     @compileError("Should not be used"); // Handled in run()
 }
 
+// TODO: Remove this once the compiler no longer crashes when building for wasm32
+const supports_labeled_switch_loops = switch (builtin.cpu.arch) {
+    .wasm32 => false,
+    else => true,
+};
+
 pub fn run(self: *Vm, executable: Executable) Agent.Error!Completion {
+    std.debug.assert(@as(Instruction, @enumFromInt(executable.instructions.getLast())) == .end);
     try self.environment_lookup_cache.resize(executable.environment_lookup_cache_size);
     @memset(self.environment_lookup_cache.items, null);
-    while (@call(
-        .always_inline,
-        Vm.fetchInstruction,
-        .{ self, executable },
-    )) |instruction| {
-        (switch (instruction) {
-            .apply_string_or_numeric_binary_operator => self.executeApplyStringOrNumericBinaryOperator(executable),
-            .array_create => self.executeArrayCreate(executable),
-            .array_push_value => self.executeArrayPushValue(executable),
-            .array_set_length => self.executeArraySetLength(executable),
-            .array_spread_value => self.executeArraySpreadValue(executable),
-            .@"await" => self.executeAwait(executable),
-            .binding_class_declaration_evaluation => self.executeBindingClassDeclarationEvaluation(executable),
-            .bitwise_not => self.executeBitwiseNot(executable),
-            .block_declaration_instantiation => self.executeBlockDeclarationInstantiation(executable),
-            .class_definition_evaluation => self.executeClassDefinitionEvaluation(executable),
-            .create_catch_binding => self.executeCreateCatchBinding(executable),
-            .create_object_property_iterator => self.executeCreateObjectPropertyIterator(executable),
-            .create_with_environment => self.executeCreateWithEnvironment(executable),
-            .decrement => self.executeDecrement(executable),
-            .delete => self.executeDelete(executable),
-            .evaluate_call => self.executeEvaluateCall(executable),
-            .evaluate_import_call => self.executeEvaluateImportCall(executable),
-            .evaluate_new => self.executeEvaluateNew(executable),
-            .evaluate_property_access_with_expression_key => self.executeEvaluatePropertyAccessWithExpressionKey(executable),
-            .evaluate_property_access_with_identifier_key => self.executeEvaluatePropertyAccessWithIdentifierKey(executable),
-            .evaluate_super_call => self.executeEvaluateSuperCall(executable),
-            .for_declaration_binding_instantiation => self.executeForDeclarationBindingInstantiation(executable),
-            .get_iterator => self.executeGetIterator(executable),
-            .get_new_target => self.executeGetNewTarget(executable),
-            .get_or_create_import_meta => self.executeGetOrCreateImportMeta(executable),
-            .get_template_object => self.executeGetTemplateObject(executable),
-            .get_value => self.executeGetValue(executable),
-            .greater_than => self.executeGreaterThan(executable),
-            .greater_than_equals => self.executeGreaterThanEquals(executable),
-            .has_private_element => self.executeHasPrivateElement(executable),
-            .has_property => self.executeHasProperty(executable),
-            .increment => self.executeIncrement(executable),
-            .initialize_default_export => self.executeInitializeDefaultExport(executable),
-            .initialize_referenced_binding => self.executeInitializeReferencedBinding(executable),
-            .instanceof_operator => self.executeInstanceofOperator(executable),
-            .instantiate_arrow_function_expression => self.executeInstantiateArrowFunctionExpression(executable),
-            .instantiate_async_arrow_function_expression => self.executeInstantiateAsyncArrowFunctionExpression(executable),
-            .instantiate_async_function_expression => self.executeInstantiateAsyncFunctionExpression(executable),
-            .instantiate_async_generator_function_expression => self.executeInstantiateAsyncGeneratorFunctionExpression(executable),
-            .instantiate_generator_function_expression => self.executeInstantiateGeneratorFunctionExpression(executable),
-            .instantiate_ordinary_function_expression => self.executeInstantiateOrdinaryFunctionExpression(executable),
-            .is_loosely_equal => self.executeIsLooselyEqual(executable),
-            .is_strictly_equal => self.executeIsStrictlyEqual(executable),
-            .jump => self.executeJump(executable),
-            .jump_conditional => self.executeJumpConditional(executable),
-            .less_than => self.executeLessThan(executable),
-            .less_than_equals => self.executeLessThanEquals(executable),
-            .load => self.executeLoad(executable),
-            .load_constant => self.executeLoadConstant(executable),
-            .load_iterator_next_args => self.executeLoadIteratorNextArgs(executable),
-            .load_this_value_for_evaluate_call => self.executeLoadThisValueForEvaluateCall(executable),
-            .load_this_value_for_make_super_property_reference => self.executeLoadThisValueForMakeSuperPropertyReference(executable),
-            .logical_not => self.executeLogicalNot(executable),
-            .make_private_reference => self.executeMakePrivateReference(executable),
-            .make_super_property_reference => self.executeMakeSuperPropertyReference(executable),
-            .object_create => self.executeObjectCreate(executable),
-            .object_define_method => self.executeObjectDefineMethod(executable),
-            .object_set_property => self.executeObjectSetProperty(executable),
-            .object_set_prototype => self.executeObjectSetPrototype(executable),
-            .object_spread_value => self.executeObjectSpreadValue(executable),
-            .pop_exception_jump_target => self.executePopExceptionJumpTarget(executable),
-            .pop_iterator => self.executePopIterator(executable),
-            .pop_lexical_environment => self.executePopLexicalEnvironment(executable),
-            .pop_reference => self.executePopReference(executable),
-            .push_lexical_environment => self.executePushLexicalEnvironment(executable),
-            .push_exception_jump_target => self.executePushExceptionJumpTarget(executable),
-            .push_iterator => self.executePushIterator(executable),
-            .push_reference => self.executePushReference(executable),
-            .put_value => self.executePutValue(executable),
-            .reg_exp_create => self.executeRegExpCreate(executable),
-            .resolve_binding => self.executeResolveBinding(executable),
-            .resolve_private_identifier => self.executeResolvePrivateIdentifier(executable),
-            .resolve_this_binding => self.executeResolveThisBinding(executable),
-            .restore_lexical_environment => self.executeRestoreLexicalEnvironment(executable),
-            .rethrow_exception_if_any => self.executeRethrowExceptionIfAny(executable),
+    if (supports_labeled_switch_loops) {
+        main: switch (self.fetchInstruction(executable)) {
             .@"return" => return .{ .type = .@"return", .value = self.result, .target = null },
-            .store => self.executeStore(executable),
-            .store_constant => self.executeStoreConstant(executable),
-            .throw => self.executeThrow(executable),
-            .to_number => self.executeToNumber(executable),
-            .to_numeric => self.executeToNumeric(executable),
-            .to_object => self.executeToObject(executable),
-            .to_string => self.executeToString(executable),
-            .typeof => self.executeTypeof(executable),
-            .unary_minus => self.executeUnaryMinus(executable),
             .yield => return yield(self.agent, self.result.?),
-            _ => unreachable,
-        }) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.ExceptionThrown => {
-                if (self.exception_jump_target_stack.items.len != 0) {
-                    self.exception = self.agent.clearException();
-                    self.ip = self.exception_jump_target_stack.getLast();
-                } else return err;
+            .end => return Completion.normal(self.result),
+            inline else => |instruction| {
+                try self.executeInstruction(instruction, executable);
+                continue :main self.fetchInstruction(executable);
             },
-        };
+        }
+    } else while (true) {
+        const instruction = self.fetchInstruction(executable);
+        switch (instruction) {
+            .@"return" => return .{ .type = .@"return", .value = self.result, .target = null },
+            .yield => return yield(self.agent, self.result.?),
+            .end => return Completion.normal(self.result),
+            inline else => |comptime_instruction| {
+                try self.executeInstruction(comptime_instruction, executable);
+            },
+        }
     }
-    return Completion.normal(self.result);
+}
+
+fn executeInstruction(self: *Vm, comptime instruction: Instruction, executable: Executable) !void {
+    (switch (instruction) {
+        .apply_string_or_numeric_binary_operator => self.executeApplyStringOrNumericBinaryOperator(executable),
+        .array_create => self.executeArrayCreate(executable),
+        .array_push_value => self.executeArrayPushValue(executable),
+        .array_set_length => self.executeArraySetLength(executable),
+        .array_spread_value => self.executeArraySpreadValue(executable),
+        .@"await" => self.executeAwait(executable),
+        .binding_class_declaration_evaluation => self.executeBindingClassDeclarationEvaluation(executable),
+        .bitwise_not => self.executeBitwiseNot(executable),
+        .block_declaration_instantiation => self.executeBlockDeclarationInstantiation(executable),
+        .class_definition_evaluation => self.executeClassDefinitionEvaluation(executable),
+        .create_catch_binding => self.executeCreateCatchBinding(executable),
+        .create_object_property_iterator => self.executeCreateObjectPropertyIterator(executable),
+        .create_with_environment => self.executeCreateWithEnvironment(executable),
+        .decrement => self.executeDecrement(executable),
+        .delete => self.executeDelete(executable),
+        .evaluate_call => self.executeEvaluateCall(executable),
+        .evaluate_import_call => self.executeEvaluateImportCall(executable),
+        .evaluate_new => self.executeEvaluateNew(executable),
+        .evaluate_property_access_with_expression_key => self.executeEvaluatePropertyAccessWithExpressionKey(executable),
+        .evaluate_property_access_with_identifier_key => self.executeEvaluatePropertyAccessWithIdentifierKey(executable),
+        .evaluate_super_call => self.executeEvaluateSuperCall(executable),
+        .for_declaration_binding_instantiation => self.executeForDeclarationBindingInstantiation(executable),
+        .get_iterator => self.executeGetIterator(executable),
+        .get_new_target => self.executeGetNewTarget(executable),
+        .get_or_create_import_meta => self.executeGetOrCreateImportMeta(executable),
+        .get_template_object => self.executeGetTemplateObject(executable),
+        .get_value => self.executeGetValue(executable),
+        .greater_than => self.executeGreaterThan(executable),
+        .greater_than_equals => self.executeGreaterThanEquals(executable),
+        .has_private_element => self.executeHasPrivateElement(executable),
+        .has_property => self.executeHasProperty(executable),
+        .increment => self.executeIncrement(executable),
+        .initialize_default_export => self.executeInitializeDefaultExport(executable),
+        .initialize_referenced_binding => self.executeInitializeReferencedBinding(executable),
+        .instanceof_operator => self.executeInstanceofOperator(executable),
+        .instantiate_arrow_function_expression => self.executeInstantiateArrowFunctionExpression(executable),
+        .instantiate_async_arrow_function_expression => self.executeInstantiateAsyncArrowFunctionExpression(executable),
+        .instantiate_async_function_expression => self.executeInstantiateAsyncFunctionExpression(executable),
+        .instantiate_async_generator_function_expression => self.executeInstantiateAsyncGeneratorFunctionExpression(executable),
+        .instantiate_generator_function_expression => self.executeInstantiateGeneratorFunctionExpression(executable),
+        .instantiate_ordinary_function_expression => self.executeInstantiateOrdinaryFunctionExpression(executable),
+        .is_loosely_equal => self.executeIsLooselyEqual(executable),
+        .is_strictly_equal => self.executeIsStrictlyEqual(executable),
+        .jump => self.executeJump(executable),
+        .jump_conditional => self.executeJumpConditional(executable),
+        .less_than => self.executeLessThan(executable),
+        .less_than_equals => self.executeLessThanEquals(executable),
+        .load => self.executeLoad(executable),
+        .load_constant => self.executeLoadConstant(executable),
+        .load_iterator_next_args => self.executeLoadIteratorNextArgs(executable),
+        .load_this_value_for_evaluate_call => self.executeLoadThisValueForEvaluateCall(executable),
+        .load_this_value_for_make_super_property_reference => self.executeLoadThisValueForMakeSuperPropertyReference(executable),
+        .logical_not => self.executeLogicalNot(executable),
+        .make_private_reference => self.executeMakePrivateReference(executable),
+        .make_super_property_reference => self.executeMakeSuperPropertyReference(executable),
+        .object_create => self.executeObjectCreate(executable),
+        .object_define_method => self.executeObjectDefineMethod(executable),
+        .object_set_property => self.executeObjectSetProperty(executable),
+        .object_set_prototype => self.executeObjectSetPrototype(executable),
+        .object_spread_value => self.executeObjectSpreadValue(executable),
+        .pop_exception_jump_target => self.executePopExceptionJumpTarget(executable),
+        .pop_iterator => self.executePopIterator(executable),
+        .pop_lexical_environment => self.executePopLexicalEnvironment(executable),
+        .pop_reference => self.executePopReference(executable),
+        .push_lexical_environment => self.executePushLexicalEnvironment(executable),
+        .push_exception_jump_target => self.executePushExceptionJumpTarget(executable),
+        .push_iterator => self.executePushIterator(executable),
+        .push_reference => self.executePushReference(executable),
+        .put_value => self.executePutValue(executable),
+        .reg_exp_create => self.executeRegExpCreate(executable),
+        .resolve_binding => self.executeResolveBinding(executable),
+        .resolve_private_identifier => self.executeResolvePrivateIdentifier(executable),
+        .resolve_this_binding => self.executeResolveThisBinding(executable),
+        .restore_lexical_environment => self.executeRestoreLexicalEnvironment(executable),
+        .rethrow_exception_if_any => self.executeRethrowExceptionIfAny(executable),
+        .store => self.executeStore(executable),
+        .store_constant => self.executeStoreConstant(executable),
+        .throw => self.executeThrow(executable),
+        .to_number => self.executeToNumber(executable),
+        .to_numeric => self.executeToNumeric(executable),
+        .to_object => self.executeToObject(executable),
+        .to_string => self.executeToString(executable),
+        .typeof => self.executeTypeof(executable),
+        .unary_minus => self.executeUnaryMinus(executable),
+        .@"return", .yield, .end => unreachable,
+    }) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.ExceptionThrown => {
+            if (self.exception_jump_target_stack.items.len != 0) {
+                self.exception = self.agent.clearException();
+                self.ip = self.exception_jump_target_stack.getLast();
+            } else return err;
+        },
+    };
 }

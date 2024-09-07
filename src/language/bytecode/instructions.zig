@@ -184,8 +184,8 @@ pub const Instruction = enum(u8) {
     unary_minus,
     /// Store Yield() as the result value.
     yield,
-    /// Non-exhaustive enum to allow arbitrary values as constant indices.
-    _,
+    /// The last instruction of an executable. Required for using labeled switch loops.
+    end,
 
     pub fn argumentCount(self: Instruction) u2 {
         return switch (self) {
@@ -267,21 +267,21 @@ pub const Instruction = enum(u8) {
 };
 
 pub const InstructionIterator = struct {
-    instructions: []const Instruction,
+    instructions: []const u8,
     index: usize = 0,
     instruction_index: usize = 0,
     instruction_args: [3]?IndexType = .{ null, null, null },
 
     pub fn next(self: *InstructionIterator) ?Instruction {
         if (self.index >= self.instructions.len) return null;
-        const instruction = self.instructions[self.index];
+        const instruction: Instruction = @enumFromInt(self.instructions[self.index]);
         self.instruction_index = self.index;
         self.index += 1;
         self.instruction_args = .{ null, null, null };
         for (0..instruction.argumentCount()) |i| {
-            const b1 = @intFromEnum(self.instructions[self.index]);
+            const b1 = self.instructions[self.index];
             self.index += 1;
-            const b2 = @intFromEnum(self.instructions[self.index]);
+            const b2 = self.instructions[self.index];
             self.index += 1;
             self.instruction_args[i] = std.mem.bytesToValue(IndexType, &[_]u8{ b1, b2 });
         }
