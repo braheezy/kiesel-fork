@@ -45,6 +45,10 @@ pub const PreferredType = enum { string, number };
 pub const Numeric = union(enum) {
     number: Number,
     big_int: BigInt,
+
+    pub fn sameType(x: Numeric, y: Numeric) bool {
+        return std.meta.activeTag(x) == std.meta.activeTag(y);
+    }
 };
 
 pub const Type = enum {
@@ -1678,11 +1682,26 @@ pub fn stringToBigInt(
     return big_int;
 }
 
-/// 7.2.10 SameValue ( x, y )
+/// 7.2.8 SameType ( x, y )
+/// https://tc39.es/ecma262/#sec-sametype
+pub fn sameType(x: Value, y: Value) bool {
+    // 1. If x is undefined and y is undefined, return true.
+    // 2. If x is null and y is null, return true.
+    // 3. If x is a Boolean and y is a Boolean, return true.
+    // 4. If x is a Number and y is a Number, return true.
+    // 5. If x is a BigInt and y is a BigInt, return true.
+    // 6. If x is a Symbol and y is a Symbol, return true.
+    // 7. If x is a String and y is a String, return true.
+    // 8. If x is an Object and y is an Object, return true.
+    // 9. Return false.
+    return x.type() == y.type();
+}
+
+/// 7.2.9 SameValue ( x, y )
 /// https://tc39.es/ecma262/#sec-samevalue
 pub fn sameValue(x: Value, y: Value) bool {
-    // 1. If Type(x) is not Type(y), return false.
-    if (x.type() != y.type()) return false;
+    // 1. If SameType(x, y) is false, return false.
+    if (!sameType(x, y)) return false;
 
     // 2. If x is a Number, then
     if (x.isNumber()) {
@@ -1694,11 +1713,11 @@ pub fn sameValue(x: Value, y: Value) bool {
     return sameValueNonNumber(x, y);
 }
 
-/// 7.2.11 SameValueZero ( x, y )
+/// 7.2.10 SameValueZero ( x, y )
 /// https://tc39.es/ecma262/#sec-samevaluezero
 pub fn sameValueZero(x: Value, y: Value) bool {
-    // 1. If Type(x) is not Type(y), return false.
-    if (x.type() != y.type()) return false;
+    // 1. If SameType(x, y) is false, return false.
+    if (!sameType(x, y)) return false;
 
     // 2. If x is a Number, then
     if (x.isNumber()) {
@@ -1710,11 +1729,11 @@ pub fn sameValueZero(x: Value, y: Value) bool {
     return sameValueNonNumber(x, y);
 }
 
-/// 7.2.12 SameValueNonNumber ( x, y )
+/// 7.2.11 SameValueNonNumber ( x, y )
 /// https://tc39.es/ecma262/#sec-samevaluenonnumber
 pub fn sameValueNonNumber(x: Value, y: Value) bool {
-    // 1. Assert: Type(x) is Type(y).
-    std.debug.assert(x.type() == y.type());
+    // 1. Assert: SameType(x, y) is true.
+    std.debug.assert(sameType(x, y));
 
     return switch (x.type()) {
         // 2. If x is either null or undefined, return true.
@@ -1742,7 +1761,7 @@ pub fn sameValueNonNumber(x: Value, y: Value) bool {
     };
 }
 
-/// 7.2.13 IsLessThan ( x, y, LeftFirst )
+/// 7.2.12 IsLessThan ( x, y, LeftFirst )
 /// https://tc39.es/ecma262/#sec-islessthan
 pub fn isLessThan(
     agent: *Agent,
@@ -1823,8 +1842,8 @@ pub fn isLessThan(
         // e. Let ny be ? ToNumeric(py).
         const ny = try py.toNumeric(agent);
 
-        // f. If Type(nx) is Type(ny), then
-        if (std.meta.activeTag(nx) == std.meta.activeTag(ny)) {
+        // f. If SameType(nx, yx) is true, then
+        if (Numeric.sameType(nx, ny)) {
             // i. If nx is a Number, then
             if (nx == .number) {
                 // 1. Return Number::lessThan(nx, ny).
@@ -1863,11 +1882,11 @@ pub fn isLessThan(
     }
 }
 
-/// 7.2.14 IsLooselyEqual ( x, y )
+/// 7.2.13 IsLooselyEqual ( x, y )
 /// https://tc39.es/ecma262/#sec-islooselyequal
 pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) Agent.Error!bool {
-    // 1. If Type(x) is Type(y), then
-    if (x.type() == y.type()) {
+    // 1. If SameType(x, y) is true, then
+    if (sameType(x, y)) {
         // a. Return IsStrictlyEqual(x, y).
         return isStrictlyEqual(x, y);
     }
@@ -1973,11 +1992,11 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) Agent.Error!bool {
     return false;
 }
 
-/// 7.2.15 IsStrictlyEqual ( x, y )
+/// 7.2.14 IsStrictlyEqual ( x, y )
 /// https://tc39.es/ecma262/#sec-isstrictlyequal
 pub fn isStrictlyEqual(x: Value, y: Value) bool {
-    // 1. If Type(x) is not Type(y), return false.
-    if (x.type() != y.type()) return false;
+    // 1. If SameType(x, y) is false, return false.
+    if (!sameType(x, y)) return false;
 
     // 2. If x is a Number, then
     if (x.isNumber()) {

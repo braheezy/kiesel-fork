@@ -14,6 +14,7 @@ pub const getOption = Value.getOption;
 pub const isLessThan = Value.isLessThan;
 pub const isLooselyEqual = Value.isLooselyEqual;
 pub const isStrictlyEqual = Value.isStrictlyEqual;
+pub const sameType = Value.sameType;
 pub const sameValue = Value.sameValue;
 pub const sameValueZero = Value.sameValueZero;
 

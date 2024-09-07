@@ -336,8 +336,8 @@ pub fn applyStringOrNumericBinaryOperator(
     // 4. Let rNum be ? ToNumeric(rVal).
     const r_num = try final_r_val.toNumeric(agent);
 
-    // 5. If Type(lNum) is not Type(rNum), throw a TypeError exception.
-    if (std.meta.activeTag(l_num) != std.meta.activeTag(r_num)) {
+    // 5. If SameType(lNum, rNum) is false, throw a TypeError exception.
+    if (!Value.Numeric.sameType(l_num, r_num)) {
         return agent.throwException(
             .type_error,
             "Left-hand side and right-hand side of numeric binary expression must have the same type",
