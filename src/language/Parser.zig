@@ -1337,7 +1337,9 @@ pub fn acceptAssignmentExpression(
 
     // If LeftHandSideExpression is neither an ObjectLiteral nor an ArrayLiteral, it is a Syntax
     // Error if the AssignmentTargetType of LeftHandSideExpression is not simple.
-    if (primary_expression.assignmentTargetType() != .simple) {
+    if (primary_expression != .binding_pattern_for_assignment_expression and
+        primary_expression.assignmentTargetType() != .simple)
+    {
         try self.emitErrorAt(
             primary_expression_location,
             "Invalid left-hand side in assignment expression",
@@ -1438,6 +1440,40 @@ pub fn acceptExpression(self: *Parser, ctx: AcceptContext) AcceptError!ast.Expre
                     ctx,
                 ),
             };
+        },
+        .@"{", .@"[" => blk: {
+            const tmp_state = self.core.saveState();
+            if (self.acceptBindingPattern()) |binding_pattern| {
+                if (try self.core.peek()) |next_token_| switch (next_token_.type) {
+                    // Assignment expression LHS
+                    .@"=",
+                    .@"*=",
+                    .@"/=",
+                    .@"%=",
+                    .@"+=",
+                    .@"-=",
+                    .@"<<=",
+                    .@">>=",
+                    .@">>>=",
+                    .@"&=",
+                    .@"^=",
+                    .@"|=",
+                    .@"**=",
+                    .@"&&=",
+                    .@"||=",
+                    .@"??=",
+                    // For loop initializer
+                    .in,
+                    .identifier,
+                    => if (next_token_.type != .identifier or std.mem.eql(u8, next_token_.text, "of")) {
+                        break :blk .{ .binding_pattern_for_assignment_expression = binding_pattern };
+                    },
+                    else => {},
+                };
+            } else |_| {}
+            self.core.restoreState(tmp_state);
+            const primary_expression = try self.acceptPrimaryExpression();
+            break :blk .{ .primary_expression = primary_expression };
         },
         else => if (self.acceptAwaitExpression()) |await_expression|
             .{ .await_expression = await_expression }
@@ -2014,7 +2050,10 @@ pub fn acceptForInOfStatement(self: *Parser) AcceptError!ast.ForInOfStatement {
 
     // If LeftHandSideExpression is neither an ObjectLiteral nor an ArrayLiteral, it is a Syntax
     // Error if the AssignmentTargetType of LeftHandSideExpression is not simple.
-    if (initializer == .expression and initializer.expression.assignmentTargetType() != .simple) {
+    if (initializer == .expression and
+        initializer.expression != .binding_pattern_for_assignment_expression and
+        initializer.expression.assignmentTargetType() != .simple)
+    {
         try self.emitErrorAt(
             initializer_location,
             "Invalid 'for in'/'for of' loop initializer expression",

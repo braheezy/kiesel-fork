@@ -727,6 +727,8 @@ pub const Expression = union(enum) {
     await_expression: AwaitExpression,
     yield_expression: YieldExpression,
     tagged_template: TaggedTemplate,
+    /// Modern problems (binding pattern LHS) require modern solutions (fake expression type)
+    binding_pattern_for_assignment_expression: BindingPattern,
 
     /// 8.6.4 Static Semantics: AssignmentTargetType
     /// https://tc39.es/ecma262/#sec-static-semantics-assignmenttargettype

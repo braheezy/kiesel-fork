@@ -1594,30 +1594,47 @@ pub fn codegenAssignmentExpression(
     // AssignmentExpression : LeftHandSideExpression = AssignmentExpression
     if (node.operator == .@"=") {
         // 1. If LeftHandSideExpression is neither an ObjectLiteral nor an ArrayLiteral, then
+        if (node.lhs_expression.* != .binding_pattern_for_assignment_expression) {
+            // a. Let lRef be ? Evaluation of LeftHandSideExpression.
+            try codegenExpression(node.lhs_expression.*, executable, ctx);
+            try executable.addInstruction(.push_reference);
 
-        // a. Let lRef be ? Evaluation of LeftHandSideExpression.
-        try codegenExpression(node.lhs_expression.*, executable, ctx);
-        try executable.addInstruction(.push_reference);
+            // TODO: b. If IsAnonymousFunctionDefinition(AssignmentExpression) and IsIdentifierRef of
+            //          LeftHandSideExpression are both true, then
+            if (false) {
+                // i. Let lhs be the StringValue of LeftHandSideExpression.
+                // ii. Let rVal be ? NamedEvaluation of AssignmentExpression with argument lhs.
+            }
+            // c. Else,
+            else {
+                // i. Let rRef be ? Evaluation of AssignmentExpression.
+                try codegenExpression(node.rhs_expression.*, executable, ctx);
 
-        // TODO: b. If IsAnonymousFunctionDefinition(AssignmentExpression) and IsIdentifierRef of
-        //          LeftHandSideExpression are both true, then
-        if (false) {
-            // i. Let lhs be the StringValue of LeftHandSideExpression.
-            // ii. Let rVal be ? NamedEvaluation of AssignmentExpression with argument lhs.
+                // ii. Let rVal be ? GetValue(rRef).
+                if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+            }
+
+            // d. Perform ? PutValue(lRef, rVal).
+            // e. Return rVal.
+            try executable.addInstruction(.put_value);
+            try executable.addInstruction(.pop_reference);
         }
-        // c. Else,
-        else {
-            // i. Let rRef be ? Evaluation of AssignmentExpression.
-            try codegenExpression(node.rhs_expression.*, executable, ctx);
 
-            // ii. Let rVal be ? GetValue(rRef).
-            if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-        }
+        // 2. Let assignmentPattern be the AssignmentPattern that is covered by LeftHandSideExpression.
+        const assignment_pattern = node.lhs_expression.binding_pattern_for_assignment_expression;
 
-        // d. Perform ? PutValue(lRef, rVal).
-        // e. Return rVal.
-        try executable.addInstruction(.put_value);
-        try executable.addInstruction(.pop_reference);
+        // 3. Let rRef be ? Evaluation of AssignmentExpression.
+        try codegenExpression(node.rhs_expression.*, executable, ctx);
+
+        // 4. Let rVal be ? GetValue(rRef).
+        if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+
+        try executable.addInstruction(.load);
+
+        // 5. Perform ? DestructuringAssignmentEvaluation of assignmentPattern with argument rVal.
+        // 6. Return rVal.
+        try bindingInitialization(assignment_pattern, executable, ctx, null);
+        try executable.addInstruction(.store);
     }
     // AssignmentExpression : LeftHandSideExpression AssignmentOperator AssignmentExpression
     else if (node.operator != .@"&&=" and node.operator != .@"||=" and node.operator != .@"??=") {
@@ -1871,6 +1888,7 @@ pub fn codegenExpression(
         .await_expression => |x| try codegenAwaitExpression(x, executable, ctx),
         .yield_expression => |x| try codegenYieldExpression(x, executable, ctx),
         .tagged_template => |x| try codegenTaggedTemplate(x, executable, ctx),
+        .binding_pattern_for_assignment_expression => |x| try bindingInitialization(x, executable, ctx, null),
     }
 }
 
@@ -2755,14 +2773,18 @@ fn forInOfBodyEvaluation(
 
     // 4. Let destructuring be IsDestructuring of lhs.
     const destructuring = switch (lhs) {
-        .expression => false, // TODO: Support AssignmentPattern
+        .expression => |expression| expression == .binding_pattern_for_assignment_expression,
         .for_binding => false,
         .for_declaration => |for_declaration| for_declaration.for_binding == .binding_pattern,
     };
 
+    var assignment_pattern: ast.BindingPattern = undefined;
+
     // 5. If destructuring is true and lhsKind is assignment, then
     if (destructuring and lhs_kind == .assignment) {
-        // TODO: a-b.
+        // a. Assert: lhs is a LeftHandSideExpression.
+        // b. Let assignmentPattern be the AssignmentPattern that is covered by lhs.
+        assignment_pattern = lhs.expression.binding_pattern_for_assignment_expression;
     }
 
     // 6. Repeat,
@@ -2813,8 +2835,10 @@ fn forInOfBodyEvaluation(
         if (destructuring) {
             // 1. If lhsKind is assignment, then
             if (lhs_kind == .assignment) {
-                // TODO: a. Let status be Completion(DestructuringAssignmentEvaluation of
-                //          assignmentPattern with argument nextValue).
+                // a. Let status be Completion(DestructuringAssignmentEvaluation of
+                //    assignmentPattern with argument nextValue).
+                try executable.addInstruction(.load);
+                try bindingInitialization(assignment_pattern, executable, ctx, null);
             }
             // 2. Else,
             else {

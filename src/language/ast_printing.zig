@@ -324,6 +324,7 @@ pub fn printExpression(node: ast.Expression, writer: anytype, indentation: usize
         .await_expression => |x| try printAwaitExpression(x, writer, indentation + 1),
         .yield_expression => |x| try printYieldExpression(x, writer, indentation + 1),
         .tagged_template => |x| try printTaggedTemplate(x, writer, indentation + 1),
+        .binding_pattern_for_assignment_expression => |x| try printBindingPattern(x, writer, indentation + 1),
     }
 }
 
