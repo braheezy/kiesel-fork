@@ -279,11 +279,8 @@ pub const InstructionIterator = struct {
         self.index += 1;
         self.instruction_args = .{ null, null, null };
         for (0..instruction.argumentCount()) |i| {
-            const b1 = self.instructions[self.index];
-            self.index += 1;
-            const b2 = self.instructions[self.index];
-            self.index += 1;
-            self.instruction_args[i] = std.mem.bytesToValue(IndexType, &[_]u8{ b1, b2 });
+            self.instruction_args[i] = std.mem.bytesToValue(IndexType, &self.instructions[self.index]);
+            self.index += @sizeOf(IndexType);
         }
         return instruction;
     }

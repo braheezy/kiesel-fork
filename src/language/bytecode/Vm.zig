@@ -104,15 +104,9 @@ pub fn deinit(self: Vm) void {
     self.environment_lookup_cache.deinit();
 }
 
-fn fetchByte(self: *Vm, executable: Executable) ?u8 {
-    const instructions = executable.instructions.items;
-    if (self.ip >= instructions.len) return null;
-    defer self.ip += 1;
-    return instructions[self.ip];
-}
-
 fn fetchInstruction(self: *Vm, executable: Executable) Instruction {
-    return @enumFromInt(self.fetchByte(executable).?);
+    defer self.ip += 1;
+    return @enumFromInt(executable.instructions.items[self.ip]);
 }
 
 fn fetchConstant(self: *Vm, executable: Executable) Value {
@@ -131,9 +125,8 @@ fn fetchAstNode(self: *Vm, executable: Executable) *Executable.AstNode {
 }
 
 fn fetchIndex(self: *Vm, executable: Executable) Executable.IndexType {
-    const b1 = self.fetchByte(executable).?;
-    const b2 = self.fetchByte(executable).?;
-    return std.mem.bytesToValue(Executable.IndexType, &[_]u8{ b1, b2 });
+    defer self.ip += @sizeOf(Executable.IndexType);
+    return std.mem.bytesToValue(Executable.IndexType, &executable.instructions.items[self.ip]);
 }
 
 fn getArgumentSpreadIndices(self: *Vm) std.mem.Allocator.Error![]const usize {
