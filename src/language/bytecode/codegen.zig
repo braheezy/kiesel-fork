@@ -2774,7 +2774,7 @@ fn forInOfBodyEvaluation(
     // 4. Let destructuring be IsDestructuring of lhs.
     const destructuring = switch (lhs) {
         .expression => |expression| expression == .binding_pattern_for_assignment_expression,
-        .for_binding => false,
+        .for_binding => |for_binding| for_binding == .binding_pattern,
         .for_declaration => |for_declaration| for_declaration.for_binding == .binding_pattern,
     };
 
@@ -2848,8 +2848,10 @@ fn forInOfBodyEvaluation(
                 // b. Assert: lhs is a ForBinding.
                 std.debug.assert(lhs == .for_binding);
 
-                // TODO: c. Let status be Completion(BindingInitialization of lhs with arguments
-                //          nextValue and undefined).
+                // c. Let status be Completion(BindingInitialization of lhs with arguments
+                //    nextValue and undefined).
+                try executable.addInstruction(.load);
+                try bindingInitialization(lhs.for_binding.binding_pattern, executable, ctx, null);
             }
         }
         // ii. Else,
@@ -2857,7 +2859,7 @@ fn forInOfBodyEvaluation(
             // 1. Let lhsRef be Completion(Evaluation of lhs). (It may be evaluated repeatedly.)
             switch (lhs) {
                 .expression => |expression| try codegenExpression(expression, executable, ctx),
-                .for_binding => |identifier| try codegenIdentifierReference(identifier, executable, ctx),
+                .for_binding => |for_binding| try codegenIdentifierReference(for_binding.binding_identifier, executable, ctx),
                 .for_declaration => unreachable,
             }
 

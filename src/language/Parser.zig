@@ -2040,7 +2040,7 @@ pub fn acceptForInOfStatement(self: *Parser) AcceptError!ast.ForInOfStatement {
     _ = try self.core.accept(RuleSet.is(.@"("));
     const initializer_location = (try self.peekToken()).location;
     const initializer: ast.ForInOfStatement.Initializer = if (self.core.accept(RuleSet.is(.@"var"))) |_|
-        .{ .for_binding = try self.acceptBindingIdentifier() }
+        .{ .for_binding = try self.acceptForBinding() }
     else |_| if (self.acceptForDeclaration()) |for_declaration|
         .{ .for_declaration = for_declaration }
     else |_| if (self.acceptExpression(.{ .forbidden = &.{.in} })) |expression|

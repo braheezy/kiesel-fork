@@ -591,9 +591,9 @@ pub fn printForInOfStatement(node: ast.ForInOfStatement, writer: anytype, indent
     try print("ForInOfStatement", writer, indentation);
     switch (node.initializer) {
         .expression => |expression| try printExpression(expression, writer, indentation + 1),
-        .for_binding => |identifier| {
+        .for_binding => |for_binding| {
             try print("var", writer, indentation + 1);
-            try print(identifier, writer, indentation + 1);
+            try printForBinding(for_binding, writer, indentation + 1);
         },
         .for_declaration => |for_declaration| try printForDeclaration(for_declaration, writer, indentation + 1),
     }

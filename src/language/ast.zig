@@ -1813,7 +1813,7 @@ pub const ForInOfStatement = struct {
 
     pub const Initializer = union(enum) {
         expression: Expression,
-        for_binding: Identifier,
+        for_binding: ForBinding,
         for_declaration: ForDeclaration,
     };
 
@@ -1847,7 +1847,7 @@ pub const ForInOfStatement = struct {
             // 1. Let names1 be the BoundNames of ForBinding.
             // 2. Let names2 be the VarDeclaredNames of Statement.
             // 3. Return the list-concatenation of names1 and names2.
-            try var_declared_names.append(self.initializer.for_binding);
+            try self.initializer.for_binding.collectBoundNames(var_declared_names);
             try self.consequent_statement.collectVarDeclaredNames(var_declared_names);
         }
     }
@@ -1878,10 +1878,18 @@ pub const ForInOfStatement = struct {
             // 2. Let declarations2 be the VarScopedDeclarations of Statement.
             // 3. Return the list-concatenation of declarations1 and declarations2.
             try var_scoped_declarations.append(.{
-                .variable_declaration = .{
-                    .binding_identifier = .{
-                        .binding_identifier = self.initializer.for_binding,
-                        .initializer = null,
+                .variable_declaration = switch (self.initializer.for_binding) {
+                    .binding_identifier => |binding_identifier| .{
+                        .binding_identifier = .{
+                            .binding_identifier = binding_identifier,
+                            .initializer = null,
+                        },
+                    },
+                    .binding_pattern => |binding_pattern| .{
+                        .binding_pattern = .{
+                            .binding_pattern = binding_pattern,
+                            .initializer = undefined, // Not relevant here
+                        },
                     },
                 },
             });
@@ -1900,6 +1908,18 @@ pub const ForDeclaration = struct {
 pub const ForBinding = union(enum) {
     binding_identifier: Identifier,
     binding_pattern: BindingPattern,
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn collectBoundNames(
+        self: ForBinding,
+        bound_names: *std.ArrayList(Identifier),
+    ) std.mem.Allocator.Error!void {
+        switch (self) {
+            .binding_identifier => |binding_identifier| try bound_names.append(binding_identifier),
+            .binding_pattern => |binding_pattern| try binding_pattern.collectBoundNames(bound_names),
+        }
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-ContinueStatement
