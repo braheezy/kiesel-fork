@@ -198,13 +198,12 @@ fn executeArraySetLength(self: *Vm, executable: Executable) Agent.Error!void {
 }
 
 fn executeArraySpreadValue(self: *Vm, _: Executable) Agent.Error!void {
-    const spread_obj = self.stack.pop();
     const array = self.stack.pop().asObject();
     var next_index: u53 = @intCast(getArrayLength(array));
 
     // From ArrayAccumulation:
     // 3. Let iteratorRecord be ? GetIterator(spreadObj, sync).
-    var iterator = try getIterator(self.agent, spread_obj, .sync);
+    const iterator = &self.iterator_stack.items[self.iterator_stack.items.len - 1];
 
     // 4. Repeat,
     //     a. Let next be ? IteratorStepValue(iteratorRecord).

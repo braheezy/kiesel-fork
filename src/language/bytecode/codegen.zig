@@ -360,10 +360,15 @@ pub fn codegenArrayLiteral(
 
                 // 2. Let spreadObj be ? GetValue(spreadRef).
                 if (expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-                try executable.addInstruction(.load);
 
-                // 3-4.
+                // 3. Let iteratorRecord be ? GetIterator(spreadObj, sync).
+                try executable.addInstruction(.get_iterator);
+                try executable.addIndex(@intFromEnum(IteratorKind.sync));
+
+                // 4.
+                try executable.addInstruction(.push_iterator);
                 try executable.addInstruction(.array_spread_value);
+                try executable.addInstruction(.pop_iterator);
                 try executable.addInstruction(.load);
             },
         }
