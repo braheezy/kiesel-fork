@@ -1789,13 +1789,17 @@ pub fn acceptObjectBindingPattern(self: *Parser) AcceptError!ast.ObjectBindingPa
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    // TODO: Parse binding rest properties
     var properties = std.ArrayList(ast.ObjectBindingPattern.Property).init(self.allocator);
     _ = try self.core.accept(RuleSet.is(.@"{"));
-    while (self.acceptBindingProperty()) |binding_property| {
-        try properties.append(.{ .binding_property = binding_property });
-        _ = self.core.accept(RuleSet.is(.@",")) catch break;
-    } else |_| {}
+    while (true) {
+        if (self.acceptBindingProperty()) |binding_property| {
+            try properties.append(.{ .binding_property = binding_property });
+            _ = self.core.accept(RuleSet.is(.@",")) catch break;
+        } else |_| if (self.acceptBindingRestProperty()) |binding_rest_property| {
+            try properties.append(.{ .binding_rest_property = binding_rest_property });
+            break;
+        } else |_| break;
+    }
     _ = try self.core.accept(RuleSet.is(.@"}"));
     return .{ .properties = try properties.toOwnedSlice() };
 }
@@ -1819,6 +1823,15 @@ pub fn acceptArrayBindingPattern(self: *Parser) AcceptError!ast.ArrayBindingPatt
     }
     _ = try self.core.accept(RuleSet.is(.@"]"));
     return .{ .elements = try elements.toOwnedSlice() };
+}
+
+pub fn acceptBindingRestProperty(self: *Parser) AcceptError!ast.BindingRestProperty {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"..."));
+    const binding_identifier = try self.acceptBindingIdentifier();
+    return .{ .binding_identifier = binding_identifier };
 }
 
 pub fn acceptBindingProperty(self: *Parser) AcceptError!ast.BindingProperty {

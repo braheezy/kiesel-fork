@@ -236,8 +236,22 @@ fn bindingInitialization(
                         }
                     },
                 },
-                .binding_rest_property => {
-                    // TODO: Implement binding rest properties
+                .binding_rest_property => |binding_rest_property| {
+                    // Resolve binding and push reference
+                    try executable.addInstructionWithIdentifier(.resolve_binding, binding_rest_property.binding_identifier);
+                    try executable.addIndex(@intFromBool(strict));
+                    try executable.addIndex(ctx.environment_lookup_cache_index);
+                    ctx.environment_lookup_cache_index += 1;
+                    try executable.addInstruction(.push_reference);
+
+                    // TODO: Implement this
+                    try executable.addInstruction(.object_create);
+
+                    // Initialize binding and pop reference
+                    try executable.addInstruction(
+                        if (environment) |_| .initialize_referenced_binding else .put_value,
+                    );
+                    try executable.addInstruction(.pop_reference);
                 },
             };
         },
