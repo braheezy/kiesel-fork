@@ -191,6 +191,8 @@ fn bindingInitialization(
     environment: ?BindingInitializationEnvironment,
 ) Executable.Error!void {
     // NOTE: RHS value is on the stack
+    // NOTE: Nothing about this is spec compliant but it works for the majority of cases :^)
+    const strict = ctx.contained_in_strict_mode_code;
     switch (node) {
         .object_binding_pattern => |object_binding_pattern| {
             for (object_binding_pattern.properties) |element| switch (element) {
@@ -216,8 +218,6 @@ fn bindingInitialization(
                                 environment,
                             ),
                             .binding_pattern => |binding_pattern| {
-                                const strict = ctx.contained_in_strict_mode_code;
-
                                 // Evaluate `rhs[n]`
                                 try executable.addInstruction(.load);
                                 try codegenPropertyName(property_name_and_binding_element.property_name, executable, ctx);
@@ -253,8 +253,6 @@ fn bindingInitialization(
                         environment,
                     ),
                     .binding_pattern => |binding_pattern| {
-                        const strict = ctx.contained_in_strict_mode_code;
-
                         // Evaluate `rhs[n]`
                         try executable.addInstruction(.load);
                         try executable.addInstructionWithConstant(.load_constant, Value.from(@as(u53, @intCast(i))));
@@ -270,8 +268,60 @@ fn bindingInitialization(
                         );
                     },
                 },
-                .binding_rest_element => {
-                    // TODO: Implement binding rest elements
+                // Yes, doing codegen like this is an actual crime.
+                .binding_rest_element => |binding_rest_element| switch (binding_rest_element) {
+                    .binding_identifier => |binding_identifier| {
+                        // Resolve binding and push reference
+                        try executable.addInstructionWithIdentifier(.resolve_binding, binding_identifier);
+                        try executable.addIndex(@intFromBool(strict));
+                        try executable.addIndex(ctx.environment_lookup_cache_index);
+                        ctx.environment_lookup_cache_index += 1;
+                        try executable.addInstruction(.push_reference);
+
+                        // Evaluate `rhs.slice(n)`
+                        try executable.addInstruction(.load);
+                        try executable.addInstructionWithIdentifier(.evaluate_property_access_with_identifier_key, "slice");
+                        try executable.addIndex(@intFromBool(strict));
+                        try executable.addInstruction(.push_reference);
+                        try executable.addInstruction(.get_value);
+                        try executable.addInstruction(.load);
+                        try executable.addInstruction(.load_this_value_for_evaluate_call);
+                        try executable.addInstruction(.pop_reference);
+                        try executable.addInstructionWithConstant(.load_constant, Value.from(@as(u53, @intCast(i))));
+                        try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
+                        try executable.addInstruction(.evaluate_call);
+                        try executable.addIndex(1); // One arg
+                        try executable.addIndex(@intFromBool(strict));
+
+                        // Initialize binding and pop reference
+                        try executable.addInstruction(
+                            if (environment) |_| .initialize_referenced_binding else .put_value,
+                        );
+                        try executable.addInstruction(.pop_reference);
+                    },
+                    .binding_pattern => |binding_pattern| {
+                        // Evaluate `rhs.slice(n)`
+                        try executable.addInstruction(.load);
+                        try executable.addInstructionWithIdentifier(.evaluate_property_access_with_identifier_key, "slice");
+                        try executable.addIndex(@intFromBool(strict));
+                        try executable.addInstruction(.push_reference);
+                        try executable.addInstruction(.get_value);
+                        try executable.addInstruction(.load);
+                        try executable.addInstruction(.load_this_value_for_evaluate_call);
+                        try executable.addInstruction(.pop_reference);
+                        try executable.addInstructionWithConstant(.load_constant, Value.from(@as(u53, @intCast(i))));
+                        try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
+                        try executable.addInstruction(.evaluate_call);
+                        try executable.addIndex(1); // One arg
+                        try executable.addIndex(@intFromBool(strict));
+
+                        try bindingInitialization(
+                            binding_pattern,
+                            executable,
+                            ctx,
+                            environment,
+                        );
+                    },
                 },
             };
         },
