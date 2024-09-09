@@ -1618,6 +1618,7 @@ pub fn codegenAssignmentExpression(
             // e. Return rVal.
             try executable.addInstruction(.put_value);
             try executable.addInstruction(.pop_reference);
+            return;
         }
 
         // 2. Let assignmentPattern be the AssignmentPattern that is covered by LeftHandSideExpression.
