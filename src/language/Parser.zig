@@ -1804,13 +1804,17 @@ pub fn acceptArrayBindingPattern(self: *Parser) AcceptError!ast.ArrayBindingPatt
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    // TODO: Parse binding rest elements and elisions
+    // TODO: Parse binding rest elements
     var elements = std.ArrayList(ast.ArrayBindingPattern.Element).init(self.allocator);
     _ = try self.core.accept(RuleSet.is(.@"["));
-    while (self.acceptBindingElement()) |binding_element| {
-        try elements.append(.{ .binding_element = binding_element });
-        _ = self.core.accept(RuleSet.is(.@",")) catch break;
-    } else |_| {}
+    while (true) {
+        if (self.acceptBindingElement()) |binding_element| {
+            try elements.append(.{ .binding_element = binding_element });
+            _ = self.core.accept(RuleSet.is(.@",")) catch break;
+        } else |_| if (self.core.accept(RuleSet.is(.@","))) |_| {
+            try elements.append(.elision);
+        } else |_| break;
+    }
     _ = try self.core.accept(RuleSet.is(.@"]"));
     return .{ .elements = try elements.toOwnedSlice() };
 }
