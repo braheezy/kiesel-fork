@@ -166,17 +166,17 @@ pub fn generatorStart(
             // e. Assert: If we return here, the generator either threw an exception or performed
             //    either an implicit or explicit return.
 
-            // f. Remove acGenContext from the execution context stack and restore the execution
-            //    context that is at the top of the execution context stack as the running
-            //    execution context.
-            _ = agent_.execution_context_stack.pop();
-
             if (closure_generator.fields.evaluation_state.suspension_result) |suspension_result| {
                 closure_generator.fields.evaluation_state.suspension_result = null;
                 // TODO: Support resuming generator evaluation after a yield
                 closure_generator.fields.generator_state = .completed;
                 return suspension_result.asObject();
             }
+
+            // f. Remove acGenContext from the execution context stack and restore the execution
+            //    context that is at the top of the execution context stack as the running
+            //    execution context.
+            _ = agent_.execution_context_stack.pop();
 
             // g. Set acGenerator.[[GeneratorState]] to completed.
             closure_generator.fields.generator_state = .completed;
@@ -409,6 +409,8 @@ pub fn generatorYield(agent: *Agent, iterator_result: Object) Agent.Error!Comple
 
     // 6. Remove genContext from the execution context stack and restore the execution context that
     //    is at the top of the execution context stack as the running execution context.
+    _ = agent.execution_context_stack.pop();
+
     // 7. Let callerContext be the running execution context.
     // 8. Resume callerContext passing NormalCompletion(iteratorResult). If genContext is ever
     //    resumed again, let resumptionValue be the Completion Record with which it is resumed.

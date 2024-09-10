@@ -333,17 +333,17 @@ pub fn asyncGeneratorStart(
             // e. Assert: If we return here, the async generator either threw an exception or
             //    performed either an implicit or explicit return.
 
-            // f. Remove acGenContext from the execution context stack and restore the execution
-            //    context that is at the top of the execution context stack as the running
-            //    execution context.
-            _ = agent_.execution_context_stack.pop();
-
             if (closure_generator.fields.evaluation_state.suspension_result) |_| {
                 closure_generator.fields.evaluation_state.suspension_result = null;
                 // TODO: Support resuming generator evaluation after a yield
                 closure_generator.fields.async_generator_state = .completed;
                 return;
             }
+
+            // f. Remove acGenContext from the execution context stack and restore the execution
+            //    context that is at the top of the execution context stack as the running
+            //    execution context.
+            _ = agent_.execution_context_stack.pop();
 
             // g. Set acGenerator.[[AsyncGeneratorState]] to draining-queue.
             closure_generator.fields.async_generator_state = .draining_queue;
