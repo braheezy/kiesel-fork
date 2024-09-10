@@ -13,11 +13,9 @@ updated fork or submodule:
 git clone https://github.com/tc39/test262
 ```
 
-Install [`eshost`](https://github.com/CanadaHonk/eshost) and
-[`test262-harness`](https://github.com/CanadaHonk/test262-harness):
+Install [`test262-harness`](https://github.com/CanadaHonk/test262-harness):
 
 ```console
-npm install -g github:CanadaHonk/eshost
 npm install -g github:CanadaHonk/test262-harness
 ```
 
@@ -30,6 +28,7 @@ build is available.
 To run all tests (this takes a long time!):
 
 ```console
+cd /path/to/test262
 test262-harness --host-type=kiesel --host-path=/path/to/zig-out/bin/kiesel 'test/**/*.js'
 ```
 
@@ -39,3 +38,16 @@ glob is not necessary but tests often have subdirectories.
 
 Make sure to quote the last argument so that your shell doesn't expand the glob
 and passes individual file paths as arguments.
+
+## Updating Results
+
+The [test262 results file](../tools/test262/results.json) has to be kept up to
+date when making changes to the engine:
+
+```console
+./tools/test262/generate-results.sh /path/to/zig-out/bin/kiesel /path/to/test262 'test/**/*.js' > ./tools/test262/results.json
+```
+
+This should be done atomically for each individual commit. Make sure your copy
+of test262 is in sync with `TEST262_COMMIT` in
+[`ci.yml`](../.forgejo/workflows/ci.yml).
