@@ -190,7 +190,7 @@ fn bindingInitialization(
     ctx: *Context,
     environment: ?BindingInitializationEnvironment,
 ) Executable.Error!void {
-    // NOTE: RHS value is on the stack
+    // NOTE: RHS value is the result value
     // NOTE: Nothing about this is spec compliant but it works for the majority of cases :^)
     const strict = ctx.contained_in_strict_mode_code;
     switch (node) {
@@ -218,6 +218,8 @@ fn bindingInitialization(
                                 environment,
                             ),
                             .binding_pattern => |binding_pattern| {
+                                try executable.addInstruction(.load);
+
                                 // Evaluate `rhs[n]`
                                 try executable.addInstruction(.load);
                                 try codegenPropertyName(property_name_and_binding_element.property_name, executable, ctx);
@@ -232,11 +234,15 @@ fn bindingInitialization(
                                     ctx,
                                     environment,
                                 );
+
+                                try executable.addInstruction(.store);
                             },
                         }
                     },
                 },
                 .binding_rest_property => |binding_rest_property| {
+                    try executable.addInstruction(.load);
+
                     // Resolve binding and push reference
                     try executable.addInstructionWithIdentifier(.resolve_binding, binding_rest_property.binding_identifier);
                     try executable.addIndex(@intFromBool(strict));
@@ -252,6 +258,8 @@ fn bindingInitialization(
                         if (environment) |_| .initialize_referenced_binding else .put_value,
                     );
                     try executable.addInstruction(.pop_reference);
+
+                    try executable.addInstruction(.store);
                 },
             };
         },
@@ -267,6 +275,8 @@ fn bindingInitialization(
                         environment,
                     ),
                     .binding_pattern => |binding_pattern| {
+                        try executable.addInstruction(.load);
+
                         // Evaluate `rhs[n]`
                         try executable.addInstruction(.load);
                         try executable.addInstructionWithConstant(.load_constant, Value.from(@as(u53, @intCast(i))));
@@ -280,11 +290,15 @@ fn bindingInitialization(
                             ctx,
                             environment,
                         );
+
+                        try executable.addInstruction(.store);
                     },
                 },
                 // Yes, doing codegen like this is an actual crime.
                 .binding_rest_element => |binding_rest_element| switch (binding_rest_element) {
                     .binding_identifier => |binding_identifier| {
+                        try executable.addInstruction(.load);
+
                         // Resolve binding and push reference
                         try executable.addInstructionWithIdentifier(.resolve_binding, binding_identifier);
                         try executable.addIndex(@intFromBool(strict));
@@ -312,8 +326,12 @@ fn bindingInitialization(
                             if (environment) |_| .initialize_referenced_binding else .put_value,
                         );
                         try executable.addInstruction(.pop_reference);
+
+                        try executable.addInstruction(.store);
                     },
                     .binding_pattern => |binding_pattern| {
+                        try executable.addInstruction(.load);
+
                         // Evaluate `rhs.slice(n)`
                         try executable.addInstruction(.load);
                         try executable.addInstructionWithIdentifier(.evaluate_property_access_with_identifier_key, "slice");
@@ -335,6 +353,8 @@ fn bindingInitialization(
                             ctx,
                             environment,
                         );
+
+                        try executable.addInstruction(.store);
                     },
                 },
             };
@@ -1698,12 +1718,12 @@ pub fn codegenAssignmentExpression(
 
         // 4. Let rVal be ? GetValue(rRef).
         if (node.rhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
         try executable.addInstruction(.load);
 
         // 5. Perform ? DestructuringAssignmentEvaluation of assignmentPattern with argument rVal.
-        // 6. Return rVal.
         try bindingInitialization(assignment_pattern, executable, ctx, null);
+
+        // 6. Return rVal.
         try executable.addInstruction(.store);
     }
     // AssignmentExpression : LeftHandSideExpression AssignmentOperator AssignmentExpression
@@ -2907,7 +2927,6 @@ fn forInOfBodyEvaluation(
             if (lhs_kind == .assignment) {
                 // a. Let status be Completion(DestructuringAssignmentEvaluation of
                 //    assignmentPattern with argument nextValue).
-                try executable.addInstruction(.load);
                 try bindingInitialization(assignment_pattern, executable, ctx, null);
             }
             // 2. Else,
@@ -2920,7 +2939,6 @@ fn forInOfBodyEvaluation(
 
                 // c. Let status be Completion(BindingInitialization of lhs with arguments
                 //    nextValue and undefined).
-                try executable.addInstruction(.load);
                 try bindingInitialization(lhs.for_binding.binding_pattern, executable, ctx, null);
             }
         }
