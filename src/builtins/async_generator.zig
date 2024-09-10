@@ -322,7 +322,7 @@ pub fn asyncGeneratorStart(
             // c. If generatorBody is a Parse Node, then
             const result = if (true) blk: {
                 // i. Let result be Completion(Evaluation of generatorBody).
-                break :blk generator_function_.fields.generateAndRunBytecode(agent_);
+                break :blk generator_function_.fields.evaluateBody(agent_);
             }
             // d. Else,
             else {

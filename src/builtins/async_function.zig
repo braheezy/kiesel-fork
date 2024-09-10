@@ -147,7 +147,7 @@ pub fn asyncBlockStart(
             // a. Let acAsyncContext be the running execution context.
 
             // b. Let result be Completion(Evaluation of asyncBody).
-            const result = async_function_.fields.generateAndRunBytecode(agent_);
+            const result = async_function_.fields.evaluateBody(agent_);
 
             // c. Assert: If we return here, the async function either threw an exception or
             //    performed an implicit or explicit return; all awaiting is done.

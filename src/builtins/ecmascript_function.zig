@@ -39,6 +39,7 @@ const arrayCreate = builtins.arrayCreate;
 const asyncFunctionStart = builtins.asyncFunctionStart;
 const asyncGeneratorStart = builtins.asyncGeneratorStart;
 const containsSlice = utils.containsSlice;
+const createArrayFromList = types.createArrayFromList;
 const createMappedArgumentsObject = builtins.createMappedArgumentsObject;
 const createUnmappedArgumentsObject = builtins.createUnmappedArgumentsObject;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
@@ -113,17 +114,79 @@ pub const ECMAScriptFunction = MakeObject(.{
         /// [[IsClassConstructor]]
         is_class_constructor: bool,
 
-        cached_executable: ?Executable = null,
+        cached_arguments_executable: ?Executable = null,
+        cached_body_executable: ?Executable = null,
 
-        pub fn generateAndRunBytecode(self: *@This(), agent: *Agent) Agent.Error!Completion {
-            const executable = self.cached_executable orelse blk: {
-                const executable = try generateBytecode(agent, self.ecmascript_code, .{});
-                self.cached_executable = executable;
-                break :blk executable;
-            };
+        /// Maybe a hack, but kind of a neat one :^)
+        pub fn evaluateArgumens(
+            self: *@This(),
+            agent: *Agent,
+            arguments: Arguments,
+            with_env: bool,
+        ) Agent.Error!void {
+            if (self.cached_arguments_executable == null) {
+                var elements = try std.ArrayList(ast.ArrayBindingPattern.Element).initCapacity(
+                    agent.gc_allocator,
+                    self.formal_parameters.items.len,
+                );
+                defer elements.deinit();
+                for (self.formal_parameters.items) |item| {
+                    const element: ast.ArrayBindingPattern.Element = switch (item) {
+                        .formal_parameter => |formal_parameter| .{
+                            .binding_element = formal_parameter.binding_element,
+                        },
+                        .function_rest_parameter => |function_rest_parameter| .{
+                            .binding_rest_element = function_rest_parameter.binding_rest_element,
+                        },
+                    };
+                    elements.appendAssumeCapacity(element);
+                }
+                const binding_pattern: ast.BindingPattern = .{
+                    .array_binding_pattern = .{ .elements = elements.items },
+                };
+                const initializer: ast.Expression = .{
+                    .primary_expression = .{ .literal = .null }, // Placeholder value
+                };
+                var executable = if (with_env)
+                    // Uses InitializeReferencedBinding
+                    try generateBytecode(agent, ast.LexicalBinding{
+                        .binding_pattern = .{
+                            .binding_pattern = binding_pattern,
+                            .initializer = initializer,
+                        },
+                    }, .{})
+                else
+                    // Uses PutValue
+                    try generateBytecode(agent, ast.VariableDeclaration{
+                        .binding_pattern = .{
+                            .binding_pattern = binding_pattern,
+                            .initializer = initializer,
+                        },
+                    }, .{});
+                // Patch executable to put the arguments array on the RHS
+                const dummy = Value.from(try ordinaryObjectCreate(agent, null));
+                const index = try executable.addConstant(dummy);
+                // 0 = load, 1 = store_constant, 2..3 = index
+                std.mem.bytesAsValue(Executable.IndexType, executable.instructions.items[2..]).* = @intCast(index);
+                self.cached_arguments_executable = executable;
+            }
+            var executable = &self.cached_arguments_executable.?;
+            const array = try createArrayFromList(agent, arguments.values);
+            executable.constants.keys()[executable.constants.count() - 1] = Value.from(array);
+            try executable.constants.reIndex();
             var vm = try Vm.init(agent);
             defer vm.deinit();
-            return vm.run(executable);
+            _ = try vm.run(executable.*);
+        }
+
+        pub fn evaluateBody(self: *@This(), agent: *Agent) Agent.Error!Completion {
+            if (self.cached_body_executable == null) {
+                self.cached_body_executable = try generateBytecode(agent, self.ecmascript_code, .{});
+            }
+            const executable = &self.cached_body_executable.?;
+            var vm = try Vm.init(agent);
+            defer vm.deinit();
+            return vm.run(executable.*);
         }
     },
     .tag = .ecmascript_function,
@@ -331,7 +394,7 @@ fn evaluateFunctionBody(
     try functionDeclarationInstantiation(agent, function, arguments_list);
 
     // 2. Return ? Evaluation of FunctionStatementList.
-    return function.fields.generateAndRunBytecode(agent);
+    return function.fields.evaluateBody(agent);
 }
 
 /// 15.5.2 Runtime Semantics: EvaluateGeneratorBody
@@ -1163,60 +1226,8 @@ fn functionDeclarationInstantiation(
     };
     defer if (arguments_object_needed) parameter_bindings.deinit();
 
-    // TODO: 24-26.
-    // NOTE: Ad-hoc implementation of IteratorBindingInitialization for SingleNameBinding and BindingRestElement
-    const environment = if (has_duplicates) null else env;
-    for (formals.items, 0..) |item, i| {
-        switch (item) {
-            .formal_parameter => |formal_parameter| {
-                const name = switch (formal_parameter.binding_element) {
-                    .single_name_binding => |single_name_binding| try String.fromUtf8(agent.gc_allocator, single_name_binding.binding_identifier),
-                    .binding_pattern => return agent.throwException(
-                        .internal_error,
-                        "Binding patterns in function parameters are not supported yet",
-                        .{},
-                    ),
-                };
-                const initializer = formal_parameter.binding_element.single_name_binding.initializer;
-                var value = arguments_list.get(i);
-                const reference = try agent.resolveBinding(name, environment, strict, null);
-                if (initializer != null and value.isUndefined()) {
-                    value = (try generateAndRunBytecode(
-                        agent,
-                        ast.ExpressionStatement{ .expression = initializer.? },
-                        .{},
-                    )).value.?;
-                }
-                if (environment == null)
-                    try reference.putValue(agent, value)
-                else
-                    try reference.initializeReferencedBinding(agent, value);
-            },
-            .function_rest_parameter => |function_rest_parameter| {
-                const name = switch (function_rest_parameter.binding_rest_element) {
-                    .binding_identifier => |binding_identifier| try String.fromUtf8(agent.gc_allocator, binding_identifier),
-                    .binding_pattern => return agent.throwException(
-                        .internal_error,
-                        "Binding patterns in function parameters are not supported yet",
-                        .{},
-                    ),
-                };
-                const reference = try agent.resolveBinding(name, environment, strict, null);
-                const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
-                const rest = arguments_list.values[@min(i, arguments_list.values.len)..];
-                for (rest, 0..) |value, n| {
-                    array.createDataPropertyOrThrow(
-                        PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(n))),
-                        value,
-                    ) catch |err| try noexcept(err);
-                }
-                if (environment == null)
-                    try reference.putValue(agent, Value.from(array))
-                else
-                    try reference.initializeReferencedBinding(agent, Value.from(array));
-            },
-        }
-    }
+    // 24-26.
+    try function.fields.evaluateArgumens(agent, arguments_list, !has_duplicates);
 
     // 27. If hasParameterExpressions is false, then
     const var_env = if (!has_parameter_expressions) blk: {
