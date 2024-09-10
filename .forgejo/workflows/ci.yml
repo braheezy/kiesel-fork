@@ -190,3 +190,45 @@ jobs:
       - name: Run tests
         run: |
           zig build -Denable-intl=false test
+
+  test262:
+    runs-on: meow
+    container:
+      image: ghcr.io/catthehacker/ubuntu:act-22.04
+    env:
+      # Re-generate `tools/test262/results.json` when updating this
+      TEST262_COMMIT: 70cdc562e3b3c207843de485e2ffd72ee73978f2
+    steps:
+      - name: Check out Kiesel
+        uses: https://github.com/actions/checkout@v4
+      - name: Check out test262
+        run: |
+          # NOTE: We can't do this with actions/checkout since it assumes the repo is also on codeberg.org
+          git clone https://github.com/tc39/test262
+          cd test262
+          git checkout $TEST262_COMMIT
+      - name: Install Zig
+        uses: https://github.com/mlugg/setup-zig@v1
+        with:
+          version: master
+      - name: Install Rust
+        uses: https://github.com/dtolnay/rust-toolchain@nightly
+        with:
+          components: "rust-src"
+      - name: Set up Rust cache
+        uses: https://github.com/Swatinem/rust-cache@v2
+      - name: Install Node.js
+        uses: https://github.com/actions/setup-node@v4
+      - name: Install dependencies
+        run: |
+          # NOTE: jq is already installed in the Docker image
+          npm install -g github:CanadaHonk/test262-harness
+      - name: Build Kiesel
+        run: |
+          zig build -Doptimize=ReleaseSafe
+      - name: Run test262
+        run: |
+          ./tools/test262/generate-results.sh ./zig-out/bin/kiesel ./test262 'test/**/*.js' > ./tools/test262/results-new.json
+      - name: Compare results
+        run: |
+          diff -u ./tools/test262/results.json ./tools/test262/results-new.json
