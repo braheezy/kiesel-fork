@@ -118,7 +118,7 @@ pub const ECMAScriptFunction = MakeObject(.{
         cached_body_executable: ?Executable = null,
 
         /// Maybe a hack, but kind of a neat one :^)
-        pub fn evaluateArgumens(
+        pub fn evaluateArguments(
             self: *@This(),
             agent: *Agent,
             arguments: Arguments,
@@ -1236,7 +1236,7 @@ fn functionDeclarationInstantiation(
     defer if (arguments_object_needed) parameter_bindings.deinit();
 
     // 24-26.
-    try function.fields.evaluateArgumens(agent, arguments_list, !has_duplicates);
+    try function.fields.evaluateArguments(agent, arguments_list, !has_duplicates);
 
     // 27. If hasParameterExpressions is false, then
     const var_env = if (!has_parameter_expressions) blk: {
