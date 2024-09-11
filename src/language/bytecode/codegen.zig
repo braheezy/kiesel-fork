@@ -108,15 +108,23 @@ pub fn codegenPrimaryExpression(
     }
 }
 
+// --- Begin Non-Standard ---
+
+const BindingPatternProperty = union(enum) {
+    value: Value,
+    property_name: ast.PropertyName,
+};
+
+const BindingPatternEnvironment = enum {
+    lexical_environment,
+};
+
 fn codegenSingleNameBinding(
     node: ast.SingleNameBinding,
     executable: *Executable,
     ctx: *Context,
-    property: union(enum) {
-        value: Value,
-        property_name: ast.PropertyName,
-    },
-    environment: ?BindingInitializationEnvironment,
+    property: BindingPatternProperty,
+    environment: ?BindingPatternEnvironment,
 ) Executable.Error!void {
     const strict = ctx.contained_in_strict_mode_code;
 
@@ -129,6 +137,40 @@ fn codegenSingleNameBinding(
     try executable.addIndex(ctx.environment_lookup_cache_index);
     ctx.environment_lookup_cache_index += 1;
     try executable.addInstruction(.push_reference);
+
+    try codegenBindingPatternValue(node.initializer, executable, ctx, property);
+
+    // Initialize binding and pop reference
+    try executable.addInstruction(
+        if (environment) |_| .initialize_referenced_binding else .put_value,
+    );
+    try executable.addInstruction(.pop_reference);
+
+    try executable.addInstruction(.store); // Restore RHS
+}
+
+fn codegenBindingPatternAndExpression(
+    node: ast.BindingElement.BindingPatternAndExpression,
+    executable: *Executable,
+    ctx: *Context,
+    property: BindingPatternProperty,
+    environment: ?BindingPatternEnvironment,
+) Executable.Error!void {
+    try executable.addInstruction(.load); // Save RHS
+
+    try codegenBindingPatternValue(node.initializer, executable, ctx, property);
+    try bindingInitialization(node.binding_pattern, executable, ctx, environment);
+
+    try executable.addInstruction(.store); // Restore RHS
+}
+
+fn codegenBindingPatternValue(
+    maybe_initializer: ?ast.Expression,
+    executable: *Executable,
+    ctx: *Context,
+    property: BindingPatternProperty,
+) Executable.Error!void {
+    const strict = ctx.contained_in_strict_mode_code;
 
     // Evaluate `rhs[n]`
     try executable.addInstruction(.load);
@@ -143,7 +185,7 @@ fn codegenSingleNameBinding(
     try executable.addIndex(@intFromBool(strict));
     try executable.addInstruction(.get_value);
 
-    if (node.initializer) |initializer| {
+    if (maybe_initializer) |initializer| {
         try executable.addInstruction(.load); // Save RHS
 
         try executable.addInstruction(.load);
@@ -168,19 +210,9 @@ fn codegenSingleNameBinding(
 
         try end_jump.setTargetHere();
     }
-
-    // Initialize binding and pop reference
-    try executable.addInstruction(
-        if (environment) |_| .initialize_referenced_binding else .put_value,
-    );
-    try executable.addInstruction(.pop_reference);
-
-    try executable.addInstruction(.store); // Restore RHS
 }
 
-const BindingInitializationEnvironment = enum {
-    lexical_environment,
-};
+// --- End Non-Standard ---
 
 /// 8.6.2 Runtime Semantics: BindingInitialization
 /// https://tc39.es/ecma262/#sec-runtime-semantics-bindinginitialization
@@ -188,7 +220,7 @@ fn bindingInitialization(
     node: ast.BindingPattern,
     executable: *Executable,
     ctx: *Context,
-    environment: ?BindingInitializationEnvironment,
+    environment: ?BindingPatternEnvironment,
 ) Executable.Error!void {
     // NOTE: RHS value is the result value
     // NOTE: Nothing about this is spec compliant but it works for the majority of cases :^)
@@ -197,51 +229,44 @@ fn bindingInitialization(
         .object_binding_pattern => |object_binding_pattern| {
             for (object_binding_pattern.properties) |element| switch (element) {
                 .binding_property => |binding_property| switch (binding_property) {
-                    .single_name_binding => |single_name_binding| try codegenSingleNameBinding(
-                        single_name_binding,
-                        executable,
-                        ctx,
-                        .{
-                            .value = Value.from(
-                                try String.fromUtf8(executable.allocator, single_name_binding.binding_identifier),
-                            ),
-                        },
-                        environment,
-                    ),
+                    .single_name_binding => |single_name_binding| {
+                        try codegenSingleNameBinding(
+                            single_name_binding,
+                            executable,
+                            ctx,
+                            .{
+                                .value = Value.from(
+                                    try String.fromUtf8(executable.allocator, single_name_binding.binding_identifier),
+                                ),
+                            },
+                            environment,
+                        );
+                    },
                     .property_name_and_binding_element => |property_name_and_binding_element| {
                         switch (property_name_and_binding_element.binding_element) {
-                            .single_name_binding => |single_name_binding| try codegenSingleNameBinding(
-                                single_name_binding,
-                                executable,
-                                ctx,
-                                .{ .property_name = property_name_and_binding_element.property_name },
-                                environment,
-                            ),
-                            .binding_pattern => |binding_pattern| {
-                                try executable.addInstruction(.load);
-
-                                // Evaluate `rhs[n]`
-                                try executable.addInstruction(.load);
-                                try codegenPropertyName(property_name_and_binding_element.property_name, executable, ctx);
-                                try executable.addInstruction(.load);
-                                try executable.addInstruction(.evaluate_property_access_with_expression_key);
-                                try executable.addIndex(@intFromBool(strict));
-                                try executable.addInstruction(.get_value);
-
-                                try bindingInitialization(
-                                    binding_pattern.binding_pattern,
+                            .single_name_binding => |single_name_binding| {
+                                try codegenSingleNameBinding(
+                                    single_name_binding,
                                     executable,
                                     ctx,
+                                    .{ .property_name = property_name_and_binding_element.property_name },
                                     environment,
                                 );
-
-                                try executable.addInstruction(.store);
+                            },
+                            .binding_pattern_and_expression => |binding_pattern_and_expression| {
+                                try codegenBindingPatternAndExpression(
+                                    binding_pattern_and_expression,
+                                    executable,
+                                    ctx,
+                                    .{ .property_name = property_name_and_binding_element.property_name },
+                                    environment,
+                                );
                             },
                         }
                     },
                 },
                 .binding_rest_property => |binding_rest_property| {
-                    try executable.addInstruction(.load);
+                    try executable.addInstruction(.load); // Save RHS
 
                     // Resolve binding and push reference
                     try executable.addInstructionWithIdentifier(.resolve_binding, binding_rest_property.binding_identifier);
@@ -259,7 +284,7 @@ fn bindingInitialization(
                     );
                     try executable.addInstruction(.pop_reference);
 
-                    try executable.addInstruction(.store);
+                    try executable.addInstruction(.store); // Restore RHS
                 },
             };
         },
@@ -267,37 +292,29 @@ fn bindingInitialization(
             for (array_binding_pattern.elements, 0..) |element, i| switch (element) {
                 .elision => {},
                 .binding_element => |binding_element| switch (binding_element) {
-                    .single_name_binding => |single_name_binding| try codegenSingleNameBinding(
-                        single_name_binding,
-                        executable,
-                        ctx,
-                        .{ .value = Value.from(@as(u53, @intCast(i))) },
-                        environment,
-                    ),
-                    .binding_pattern => |binding_pattern| {
-                        try executable.addInstruction(.load);
-
-                        // Evaluate `rhs[n]`
-                        try executable.addInstruction(.load);
-                        try executable.addInstructionWithConstant(.load_constant, Value.from(@as(u53, @intCast(i))));
-                        try executable.addInstruction(.evaluate_property_access_with_expression_key);
-                        try executable.addIndex(@intFromBool(strict));
-                        try executable.addInstruction(.get_value);
-
-                        try bindingInitialization(
-                            binding_pattern.binding_pattern,
+                    .single_name_binding => |single_name_binding| {
+                        try codegenSingleNameBinding(
+                            single_name_binding,
                             executable,
                             ctx,
+                            .{ .value = Value.from(@as(u53, @intCast(i))) },
                             environment,
                         );
-
-                        try executable.addInstruction(.store);
+                    },
+                    .binding_pattern_and_expression => |binding_pattern_and_expression| {
+                        try codegenBindingPatternAndExpression(
+                            binding_pattern_and_expression,
+                            executable,
+                            ctx,
+                            .{ .value = Value.from(@as(u53, @intCast(i))) },
+                            environment,
+                        );
                     },
                 },
                 // Yes, doing codegen like this is an actual crime.
                 .binding_rest_element => |binding_rest_element| switch (binding_rest_element) {
                     .binding_identifier => |binding_identifier| {
-                        try executable.addInstruction(.load);
+                        try executable.addInstruction(.load); // Save RHS
 
                         // Resolve binding and push reference
                         try executable.addInstructionWithIdentifier(.resolve_binding, binding_identifier);
@@ -327,10 +344,10 @@ fn bindingInitialization(
                         );
                         try executable.addInstruction(.pop_reference);
 
-                        try executable.addInstruction(.store);
+                        try executable.addInstruction(.store); // Restore RHS
                     },
                     .binding_pattern => |binding_pattern| {
-                        try executable.addInstruction(.load);
+                        try executable.addInstruction(.load); // Save RHS
 
                         // Evaluate `rhs.slice(n)`
                         try executable.addInstruction(.load);
@@ -354,7 +371,7 @@ fn bindingInitialization(
                             environment,
                         );
 
-                        try executable.addInstruction(.store);
+                        try executable.addInstruction(.store); // Restore RHS
                     },
                 },
             };

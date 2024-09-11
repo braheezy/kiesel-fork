@@ -1879,7 +1879,7 @@ pub fn acceptBindingElement(self: *Parser) AcceptError!ast.BindingElement {
         else |_|
             null;
         return .{
-            .binding_pattern = .{
+            .binding_pattern_and_expression = .{
                 .binding_pattern = binding_pattern,
                 .initializer = initializer,
             },

@@ -498,9 +498,12 @@ pub fn printBindingElement(node: ast.BindingElement, writer: anytype, indentatio
     try print("BindingElement", writer, indentation);
     switch (node) {
         .single_name_binding => |single_name_binding| try printSingleNameBinding(single_name_binding, writer, indentation + 1),
-        .binding_pattern => |binding_pattern| {
-            try printBindingPattern(binding_pattern.binding_pattern, writer, indentation + 1);
-            if (binding_pattern.initializer) |initializer| try printExpression(initializer, writer, indentation + 1);
+        .binding_pattern_and_expression => |binding_pattern_and_expression| {
+            try printBindingPattern(binding_pattern_and_expression.binding_pattern, writer, indentation + 1);
+            if (binding_pattern_and_expression.initializer) |initializer| {
+                try print("initializer:", writer, indentation + 1);
+                try printExpression(initializer, writer, indentation + 2);
+            }
         },
     }
 }

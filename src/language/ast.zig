@@ -1529,11 +1529,13 @@ pub const BindingProperty = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-BindingElement
 pub const BindingElement = union(enum) {
-    single_name_binding: SingleNameBinding,
-    binding_pattern: struct {
+    pub const BindingPatternAndExpression = struct {
         binding_pattern: BindingPattern,
         initializer: ?Expression,
-    },
+    };
+
+    single_name_binding: SingleNameBinding,
+    binding_pattern_and_expression: BindingPatternAndExpression,
 
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
@@ -1545,7 +1547,7 @@ pub const BindingElement = union(enum) {
         // 1. Return the BoundNames of BindingPattern.
         switch (self) {
             .single_name_binding => |single_name_binding| try single_name_binding.collectBoundNames(bound_names),
-            .binding_pattern => |binding_pattern| try binding_pattern.binding_pattern.collectBoundNames(bound_names),
+            .binding_pattern_and_expression => |binding_pattern_and_expression| try binding_pattern_and_expression.binding_pattern.collectBoundNames(bound_names),
         }
     }
 
@@ -1559,8 +1561,8 @@ pub const BindingElement = union(enum) {
         // SingleNameBinding : BindingIdentifier Initializer
         // 1. Return true.
         return switch (self) {
-            .binding_pattern => |binding_pattern| binding_pattern.binding_pattern.containsExpression(),
             .single_name_binding => |single_name_binding| single_name_binding.initializer != null,
+            .binding_pattern_and_expression => |binding_pattern_and_expression| binding_pattern_and_expression.binding_pattern.containsExpression(),
         };
     }
 
@@ -2456,8 +2458,8 @@ pub const FormalParameters = struct {
                     if (single_name_binding.initializer != null) break;
                     count += 1;
                 },
-                .binding_pattern => |binding_pattern| {
-                    if (binding_pattern.initializer != null) break;
+                .binding_pattern_and_expression => |binding_pattern_and_expression| {
+                    if (binding_pattern_and_expression.initializer != null) break;
                     count += 1;
                 },
             },
