@@ -53,7 +53,8 @@ jobs:
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-mips
       - name: Build kiesel-linux-mips64
         run: |
-          zig build -Dtarget=mips64-linux-musl -Doptimize=ReleaseSafe
+          # TODO: Intl is disabled for now as build.crab doesn't translate the target properly
+          zig build -Dtarget=mips64-linux-musl -Doptimize=ReleaseSafe -Denable-intl=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-mips64
       - name: Build kiesel-linux-powerpc
         run: |
@@ -65,7 +66,8 @@ jobs:
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-powerpc64
       - name: Build kiesel-linux-riscv64
         run: |
-          zig build -Dtarget=riscv64-linux-musl -Doptimize=ReleaseSafe
+          # TODO: Intl is disabled for now as build.crab doesn't translate the target properly
+          zig build -Dtarget=riscv64-linux-musl -Doptimize=ReleaseSafe -Denable-intl=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-riscv64
       - name: Build kiesel-linux-x86
         run: |
@@ -92,7 +94,8 @@ jobs:
           mv zig-out/bin/kiesel zig-out/bin/kiesel-macos-x86_64
       - name: Build kiesel-windows-aarch64.exe
         run: |
-          zig build -Dtarget=aarch64-windows-gnu -Doptimize=ReleaseSafe
+          # TODO: Intl is disabled for now as build.crab doesn't translate the target properly
+          zig build -Dtarget=aarch64-windows-gnu -Doptimize=ReleaseSafe -Denable-intl=false
           mv zig-out/bin/kiesel.exe zig-out/bin/kiesel-windows-aarch64.exe
       - name: Build kiesel-windows-x86.exe
         run: |
