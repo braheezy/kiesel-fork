@@ -124,6 +124,10 @@ pub const ECMAScriptFunction = MakeObject(.{
             arguments: Arguments,
             with_env: bool,
         ) Agent.Error!void {
+            // OPTIMIZATION: If there are no parameters we don't need to kick off codegen only to
+            //               evaluate an empty binding pattern.
+            if (self.formal_parameters.items.len == 0) return;
+
             if (self.cached_arguments_executable == null) {
                 var elements = try std.ArrayList(ast.ArrayBindingPattern.Element).initCapacity(
                     agent.gc_allocator,
@@ -180,6 +184,11 @@ pub const ECMAScriptFunction = MakeObject(.{
         }
 
         pub fn evaluateBody(self: *@This(), agent: *Agent) Agent.Error!Completion {
+            // OPTIMIZATION: If the body is empty we can directly return a normal completion.
+            if (self.ecmascript_code.statement_list.items.len == 0) {
+                return Completion.normal(null);
+            }
+
             if (self.cached_body_executable == null) {
                 self.cached_body_executable = try generateBytecode(agent, self.ecmascript_code, .{});
             }
