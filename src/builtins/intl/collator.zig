@@ -174,7 +174,7 @@ pub const CollatorConstructor = struct {
         const resolved_locale = if (requested_locales.items.len != 0) blk: {
             const resolved_locale_string = try requested_locales.items[0].toString(agent.gc_allocator);
             var it = std.mem.splitSequence(u8, resolved_locale_string, "-x-");
-            break :blk icu4zig.Locale.init(it.next().?) catch unreachable;
+            break :blk icu4zig.Locale.fromString(it.next().?) catch unreachable;
         } else agent.platform.default_locale;
 
         // 25. Set collator.[[Locale]] to r.[[Locale]].
@@ -212,14 +212,14 @@ pub const CollatorConstructor = struct {
 
         // 34. Set collator.[[Sensitivity]] to sensitivity.
         const sensitivity_map = std.StaticStringMap(
-            struct { icu4zig.Collator.Options.Strength, icu4zig.Collator.Options.CaseLevel },
+            struct { icu4zig.Collator.Options.Strength, ?icu4zig.Collator.Options.CaseLevel },
         ).initComptime(&.{
             // See https://docs.rs/icu/latest/icu/collator/enum.Strength.html#variants for the
             // mapping of ECMA-402 sensitivity to ICU4X collator options.
             .{ "base", .{ .primary, .off } },
-            .{ "accent", .{ .secondary, .auto } },
+            .{ "accent", .{ .secondary, null } },
             .{ "case", .{ .primary, .on } },
-            .{ "variant", .{ .tertiary, .auto } },
+            .{ "variant", .{ .tertiary, null } },
         });
         if (maybe_sensitivity) |sensitivity| {
             const strength, const case_level = sensitivity_map.get(sensitivity.data.slice.ascii).?;

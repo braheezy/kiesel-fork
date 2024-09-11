@@ -162,14 +162,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
         })) |icu4zig| {
-            const icu4x = icu4zig.builder.dependency("icu4x", .{
-                .target = target,
-                .optimize = optimize,
-            });
-            if (b.lazyImport(@This(), "icu4zig")) |build_icu4zig| {
-                build_icu4zig.link(exe, icu4x);
-                exe.root_module.addImport("icu4zig", icu4zig.module("icu4zig"));
-            }
+            exe.root_module.addImport("icu4zig", icu4zig.module("icu4zig"));
         }
     }
     exe.root_module.addImport("kiesel", kiesel);
@@ -216,21 +209,6 @@ pub fn build(b: *std.Build) void {
     unit_tests.linkLibrary(libgc.artifact("gc"));
     unit_tests.linkLibrary(libregexp.artifact("regexp"));
     for (imports.items) |import| unit_tests.root_module.addImport(import.name, import.module);
-    if (enable_intl) {
-        if (b.lazyDependency("icu4zig", .{
-            .target = target,
-            .optimize = optimize,
-        })) |icu4zig| {
-            const icu4x = icu4zig.builder.dependency("icu4x", .{
-                .target = target,
-                .optimize = optimize,
-            });
-            if (b.lazyImport(@This(), "icu4zig")) |build_icu4zig| {
-                build_icu4zig.link(unit_tests, icu4x);
-            }
-            unit_tests.root_module.addImport("icu4zig", icu4zig.module("icu4zig"));
-        }
-    }
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
     const test_step = b.step("test", "Run unit tests");

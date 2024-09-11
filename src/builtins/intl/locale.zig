@@ -142,7 +142,7 @@ fn makeLocaleRecord(
     }
     if (end != null) try parts.append(str[end.? + 1 ..]);
     const new_str = try std.mem.join(agent.gc_allocator, "-", parts.items);
-    return icu4zig.Locale.init(new_str) catch unreachable;
+    return icu4zig.Locale.fromString(new_str) catch unreachable;
 }
 
 /// 14.2 Properties of the Intl.Locale Constructor
@@ -228,7 +228,7 @@ pub const LocaleConstructor = struct {
         if (tag_string.indexOf(String.fromLiteral("_"), 0) != null) {
             return agent.throwException(.range_error, "Invalid locale identifier '{}'", .{tag_string});
         }
-        var tag = icu4zig.Locale.init(try tag_string.toUtf8(agent.gc_allocator)) catch {
+        var tag = icu4zig.Locale.fromString(try tag_string.toUtf8(agent.gc_allocator)) catch {
             return agent.throwException(
                 .range_error,
                 "Invalid locale identifier '{}'",

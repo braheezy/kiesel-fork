@@ -229,10 +229,7 @@ pub fn createDateTimeFormat(
     //     a. Let timeZoneIdentifierRecord be GetAvailableNamedTimeZoneIdentifier(timeZone).
     //     b. If timeZoneIdentifierRecord is empty, throw a RangeError exception.
     //     c. Set timeZone to timeZoneIdentifierRecord.[[PrimaryIdentifier]].
-    if (icu4zig.CustomTimeZone.fromOffset(time_zone_string)) |custom_time_zone| {
-        // TODO: Normalize time zone offset string
-        custom_time_zone.deinit();
-    } else |_| if (icu4zig.CustomTimeZone.fromIanaId(data_provider, time_zone_string)) |custom_time_zone| {
+    if (icu4zig.CustomTimeZone.fromIanaId(data_provider, time_zone_string)) |custom_time_zone| {
         time_zone_string = time_zone_id_mapper.normalizeIana(
             agent.gc_allocator,
             time_zone_string,
@@ -240,6 +237,9 @@ pub fn createDateTimeFormat(
             error.OutOfMemory => return error.OutOfMemory,
             error.InvalidId => unreachable,
         };
+        custom_time_zone.deinit();
+    } else |_| if (icu4zig.CustomTimeZone.fromOffset(time_zone_string)) |custom_time_zone| {
+        // TODO: Normalize time zone offset string
         custom_time_zone.deinit();
     } else |_| {
         return agent.throwException(.range_error, "Invalid time zone '{s}'", .{time_zone_string});

@@ -295,26 +295,39 @@ pub const DisplayNamesPrototype = struct {
         defer agent.gc_allocator.free(code_utf8);
         const data_provider = icu4zig.DataProvider.init();
         defer data_provider.deinit();
+        // ICU4X LocaleDisplayNamesFormatter and RegionDisplayNames return an error for at least
+        // the 'und' locale, other engines seem to fall back to 'en' in that case.
+        const fallback_locale = icu4zig.Locale.fromString("en") catch unreachable;
+        defer fallback_locale.deinit();
         const value = switch (display_names.fields.type) {
             .language => blk: {
                 const locale_display_names_formatter = icu4zig.LocaleDisplayNamesFormatter.init(
                     data_provider,
                     display_names.fields.locale,
                     display_names.fields.options,
-                );
+                ) catch icu4zig.LocaleDisplayNamesFormatter.init(
+                    data_provider,
+                    fallback_locale,
+                    display_names.fields.options,
+                ) catch unreachable;
                 defer locale_display_names_formatter.deinit();
-                const locale = icu4zig.Locale.init(code_utf8) catch return agent.throwException(
-                    .range_error,
-                    "Invalid language '{}'",
-                    .{code},
-                );
+                const locale = icu4zig.Locale.fromString(code_utf8) catch {
+                    return agent.throwException(
+                        .range_error,
+                        "Invalid language '{}'",
+                        .{code},
+                    );
+                };
                 break :blk try locale_display_names_formatter.of(agent.gc_allocator, locale);
             },
             .region => blk: {
                 const region_display_names = icu4zig.RegionDisplayNames.init(
                     data_provider,
                     display_names.fields.locale,
-                );
+                ) catch icu4zig.RegionDisplayNames.init(
+                    data_provider,
+                    fallback_locale,
+                ) catch unreachable;
                 defer region_display_names.deinit();
                 break :blk region_display_names.of(agent.gc_allocator, code_utf8) catch |err| switch (err) {
                     error.OutOfMemory => return error.OutOfMemory,
@@ -427,18 +440,17 @@ pub const DisplayNames = MakeObject(.{
                 .calendar => String.fromLiteral("calendar"),
                 .date_time_field => String.fromLiteral("dateTimeField"),
             };
-            const style = switch (self.options.style) {
-                .auto => String.fromLiteral("auto"),
+            const style = switch (self.options.style.?) {
                 .narrow => String.fromLiteral("narrow"),
                 .short => String.fromLiteral("short"),
                 .long => String.fromLiteral("long"),
                 .menu => String.fromLiteral("menu"),
             };
-            const fallback = switch (self.options.fallback) {
+            const fallback = switch (self.options.fallback.?) {
                 .code => String.fromLiteral("code"),
                 .none => String.fromLiteral("none"),
             };
-            const language_display = switch (self.options.language_display) {
+            const language_display = switch (self.options.language_display.?) {
                 .dialect => String.fromLiteral("dialect"),
                 .standard => String.fromLiteral("standard"),
             };

@@ -225,7 +225,7 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
                     .{tag},
                 );
             }
-            const canonicalized_tag = icu4zig.Locale.init(try tag.toUtf8(agent.gc_allocator)) catch {
+            const canonicalized_tag = icu4zig.Locale.fromString(try tag.toUtf8(agent.gc_allocator)) catch {
                 return agent.throwException(
                     .range_error,
                     "Invalid locale identifier '{}'",

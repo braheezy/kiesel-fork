@@ -738,7 +738,7 @@ pub fn main() !u8 {
                 lang[0..index]
             else
                 lang;
-            if (icu4zig.Locale.init(lang_trimmed)) |locale|
+            if (icu4zig.Locale.fromString(lang_trimmed)) |locale|
                 agent.platform.default_locale = locale
             else |_| {}
         } else |_| {}

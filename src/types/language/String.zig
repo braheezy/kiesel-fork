@@ -406,7 +406,7 @@ pub fn toLowerCase(self: String, allocator: std.mem.Allocator) std.mem.Allocator
                 defer data_provider.deinit();
                 const case_mapper = icu4zig.CaseMapper.init(data_provider);
                 defer case_mapper.deinit();
-                const locale = icu4zig.Locale.init(null) catch unreachable;
+                const locale = icu4zig.Locale.und();
                 defer locale.deinit();
                 const utf8_lowercase = try case_mapper.lowercase(allocator, utf8, locale);
                 defer allocator.free(utf8_lowercase);
@@ -441,7 +441,7 @@ pub fn toUpperCase(self: String, allocator: std.mem.Allocator) std.mem.Allocator
                 defer data_provider.deinit();
                 const case_mapper = icu4zig.CaseMapper.init(data_provider);
                 defer case_mapper.deinit();
-                const locale = icu4zig.Locale.init(null) catch unreachable;
+                const locale = icu4zig.Locale.und();
                 defer locale.deinit();
                 const utf8_uppercase = try case_mapper.uppercase(allocator, utf8, locale);
                 defer allocator.free(utf8_uppercase);
