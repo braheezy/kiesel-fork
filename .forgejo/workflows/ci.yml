@@ -178,6 +178,13 @@ jobs:
       - name: Check formatting
         run: |
           zig fmt --check .
+      - name: Check for unused imports
+        run: |
+          git clone https://github.com/tusharsadhwani/zigimports
+          cd zigimports
+          zig build --release=safe
+          cd ..
+          ./zigimports/zig-out/bin/zigimports .
 
   test:
     runs-on: meow
