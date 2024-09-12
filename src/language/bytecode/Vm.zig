@@ -1,4 +1,3 @@
-const builtin = @import("builtin");
 const std = @import("std");
 
 const build_options = @import("build-options");
@@ -1325,40 +1324,26 @@ fn executeYield(_: *Vm, _: Executable) Agent.Error!void {
     @compileError("Should not be used"); // Handled in run()
 }
 
-// TODO: Remove this once the compiler no longer crashes when building for wasm32
-const supports_labeled_switch_loops = switch (builtin.cpu.arch) {
-    .wasm32 => false,
-    else => true,
-};
-
 pub fn run(self: *Vm, executable: Executable) Agent.Error!Completion {
     std.debug.assert(@as(Instruction, @enumFromInt(executable.instructions.getLast())) == .end);
     try self.environment_lookup_cache.resize(executable.environment_lookup_cache_size);
     @memset(self.environment_lookup_cache.items, null);
-    if (supports_labeled_switch_loops) {
-        main: switch (self.fetchInstruction(executable)) {
-            .@"return" => return .{ .type = .@"return", .value = self.result, .target = null },
-            .yield => return yield(self.agent, self.result.?),
-            .end => return Completion.normal(self.result),
-            inline else => |instruction| {
-                try self.executeInstruction(instruction, executable);
-                continue :main self.fetchInstruction(executable);
-            },
-        }
-    } else while (true) {
-        const instruction = self.fetchInstruction(executable);
-        switch (instruction) {
-            .@"return" => return .{ .type = .@"return", .value = self.result, .target = null },
-            .yield => return yield(self.agent, self.result.?),
-            .end => return Completion.normal(self.result),
-            inline else => |comptime_instruction| {
-                try self.executeInstruction(comptime_instruction, executable);
-            },
-        }
+    main: switch (self.fetchInstruction(executable)) {
+        .@"return" => return .{ .type = .@"return", .value = self.result, .target = null },
+        .yield => return yield(self.agent, self.result.?),
+        .end => return Completion.normal(self.result),
+        inline else => |instruction| {
+            try self.executeInstruction(instruction, executable);
+            continue :main self.fetchInstruction(executable);
+        },
     }
 }
 
-fn executeInstruction(self: *Vm, comptime instruction: Instruction, executable: Executable) !void {
+fn executeInstruction(
+    self: *Vm,
+    comptime instruction: Instruction,
+    executable: Executable,
+) Agent.Error!void {
     (switch (instruction) {
         .apply_string_or_numeric_binary_operator => self.executeApplyStringOrNumericBinaryOperator(executable),
         .array_create => self.executeArrayCreate(executable),
