@@ -37,7 +37,6 @@ pub fn generateBytecode(
     defer break_jumps.deinit();
 
     var ctx: codegen.Context = .{
-        .agent = agent,
         .contained_in_strict_mode_code = options.contained_in_strict_mode_code,
         .continue_jumps = continue_jumps,
         .break_jumps = break_jumps,

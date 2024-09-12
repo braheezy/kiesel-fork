@@ -1,11 +1,9 @@
 const std = @import("std");
 
 const ast = @import("../ast.zig");
-const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
 const utils = @import("../../utils.zig");
 
-const Agent = execution.Agent;
 const Executable = @import("Executable.zig");
 const IteratorKind = types.IteratorKind;
 const String = types.String;
@@ -13,7 +11,6 @@ const Value = types.Value;
 const temporaryChange = utils.temporaryChange;
 
 pub const Context = struct {
-    agent: *Agent,
     contained_in_strict_mode_code: bool = false,
     environment_lookup_cache_index: Executable.IndexType = 0,
     continue_jumps: std.ArrayList(Executable.JumpIndex),
