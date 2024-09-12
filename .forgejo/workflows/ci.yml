@@ -46,10 +46,8 @@ jobs:
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-arm
       - name: Build kiesel-linux-mips
         run: |
-          # Building with Intl spits out several thousand of these, and I'm not sure how to
-          # convince Rust or Zig to pick something else:
-          # floating point ABI '-msoft-float' is incompatible with target floating point ABI '-mdouble-float'
-          zig build -Dtarget=mips-linux-musl -Doptimize=ReleaseSafe -Denable-intl=false
+          # TODO: Intl is disabled for now as build.crab doesn't translate the target properly
+          zig build -Dtarget=mips-linux-musleabihf -Doptimize=ReleaseSafe -Denable-intl=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-mips
       - name: Build kiesel-linux-mips64
         run: |
@@ -58,7 +56,8 @@ jobs:
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-mips64
       - name: Build kiesel-linux-powerpc
         run: |
-          zig build -Dtarget=powerpc-linux-musl -Doptimize=ReleaseSafe
+          # TODO: Intl is disabled for now as build.crab doesn't translate the target properly
+          zig build -Dtarget=powerpc-linux-musleabihf -Doptimize=ReleaseSafe -Denable-intl=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-powerpc
       - name: Build kiesel-linux-powerpc64
         run: |
