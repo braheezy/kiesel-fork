@@ -142,12 +142,18 @@ pub fn codeUnitIterator(self: String) CodeUnitIterator {
     return .{ .index = 0, .string = self };
 }
 
-pub fn eql(a: String, b: String) bool {
-    if (a.isEmpty() and b.isEmpty()) return true;
-    if (a.length() != b.length()) return false;
-    var it1 = a.codeUnitIterator();
-    var it2 = b.codeUnitIterator();
-    for (0..a.length()) |_| {
+pub fn eql(self: String, other: String) bool {
+    if (self.data.slice == .ascii and other.data.slice == .ascii) {
+        return std.mem.eql(u8, self.data.slice.ascii, other.data.slice.ascii);
+    }
+    if (self.data.slice == .utf16 and other.data.slice == .utf16) {
+        return std.mem.eql(u16, self.data.slice.utf16, other.data.slice.utf16);
+    }
+    if (self.isEmpty() and other.isEmpty()) return true;
+    if (self.length() != other.length()) return false;
+    var it1 = self.codeUnitIterator();
+    var it2 = other.codeUnitIterator();
+    for (0..self.length()) |_| {
         const c1 = it1.next().?;
         const c2 = it2.next().?;
         if (c1 != c2) return false;
@@ -156,6 +162,12 @@ pub fn eql(a: String, b: String) bool {
 }
 
 pub fn startsWith(self: String, other: String) bool {
+    if (self.data.slice == .ascii and other.data.slice == .ascii) {
+        return std.mem.startsWith(u8, self.data.slice.ascii, other.data.slice.ascii);
+    }
+    if (self.data.slice == .utf16 and other.data.slice == .utf16) {
+        return std.mem.startsWith(u16, self.data.slice.utf16, other.data.slice.utf16);
+    }
     if (other.isEmpty()) return true;
     if (self.length() < other.length()) return false;
     var it1 = self.codeUnitIterator();
