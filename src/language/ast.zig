@@ -275,8 +275,8 @@ pub fn stringValueImpl(
     allocator: std.mem.Allocator,
     text: []const u8,
 ) std.mem.Allocator.Error!String {
-    var result = String.Builder.init(allocator);
-    try result.segments.ensureTotalCapacity(text.len);
+    // NOTE: This allocates the maximum needed capacity upfront
+    var result = try String.Builder.initCapacity(allocator, text.len);
     defer result.deinit();
     var it = std.unicode.Utf8View.initUnchecked(text).iterator();
     while (it.nextCodepoint()) |code_point| {
@@ -288,41 +288,41 @@ pub fn stringValueImpl(
                 }
             } else switch (text[it.i]) {
                 '\\' => {
-                    try result.appendChar('\\');
+                    result.appendCharAssumeCapacity('\\');
                     it.i += 1;
                 },
                 '0' => {
-                    try result.appendChar(0x00);
+                    result.appendCharAssumeCapacity(0x00);
                     it.i += 1;
                 },
                 'b' => {
-                    try result.appendChar(0x08);
+                    result.appendCharAssumeCapacity(0x08);
                     it.i += 1;
                 },
                 'f' => {
-                    try result.appendChar(0x0c);
+                    result.appendCharAssumeCapacity(0x0c);
                     it.i += 1;
                 },
                 'n' => {
-                    try result.appendChar('\n');
+                    result.appendCharAssumeCapacity('\n');
                     it.i += 1;
                 },
                 'r' => {
-                    try result.appendChar('\r');
+                    result.appendCharAssumeCapacity('\r');
                     it.i += 1;
                 },
                 't' => {
-                    try result.appendChar('\t');
+                    result.appendCharAssumeCapacity('\t');
                     it.i += 1;
                 },
                 'v' => {
-                    try result.appendChar(0x0b);
+                    result.appendCharAssumeCapacity(0x0b);
                     it.i += 1;
                 },
                 'x' => {
                     const chars = text[it.i + 1 .. it.i + 3];
                     const parsed = std.fmt.parseInt(u8, chars, 16) catch unreachable;
-                    try result.appendChar(parsed);
+                    result.appendCharAssumeCapacity(parsed);
                     it.i += 3;
                 },
                 'u' => {
@@ -331,7 +331,7 @@ pub fn stringValueImpl(
                         else => text[it.i + 1 .. it.i + 5],
                     };
                     const parsed = std.fmt.parseInt(u21, chars, 16) catch unreachable;
-                    try result.appendCodePoint(parsed);
+                    result.appendCodePointAssumeCapacity(parsed);
                     it.i += switch (text[it.i + 1]) {
                         '{' => chars.len + 3,
                         else => 5,
@@ -339,7 +339,7 @@ pub fn stringValueImpl(
                 },
                 else => {},
             },
-            else => try result.appendCodePoint(code_point),
+            else => result.appendCodePointAssumeCapacity(code_point),
         }
     }
     return result.build();

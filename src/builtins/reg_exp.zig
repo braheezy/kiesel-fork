@@ -1668,15 +1668,15 @@ pub const RegExpPrototype = struct {
         const flags_ = try (try reg_exp.get(PropertyKey.from("flags"))).toString(agent);
 
         // 5. Let result be the string-concatenation of "/", pattern, "/", and flags.
-        var result = String.Builder.init(agent.gc_allocator);
-        defer result.deinit();
-        try result.appendChar('/');
-        try result.appendString(pattern);
-        try result.appendChar('/');
-        try result.appendString(flags_);
+        const result = try String.concat(agent.gc_allocator, &.{
+            String.fromLiteral("/"),
+            pattern,
+            String.fromLiteral("/"),
+            flags_,
+        });
 
         // 6. Return result.
-        return Value.from(try result.build());
+        return Value.from(result);
     }
 
     /// 22.2.6.18 get RegExp.prototype.unicode

@@ -583,9 +583,10 @@ pub fn repeat(
     allocator: std.mem.Allocator,
     n: usize,
 ) std.mem.Allocator.Error!String {
-    var builder = Builder.init(allocator);
+    // NOTE: This allocates the exact needed capacity upfront
+    var builder = try Builder.initCapacity(allocator, n);
     defer builder.deinit();
-    for (0..n) |_| try builder.appendString(self);
+    for (0..n) |_| builder.appendStringAssumeCapacity(self);
     return builder.build();
 }
 
@@ -593,9 +594,10 @@ pub fn concat(
     allocator: std.mem.Allocator,
     strings: []const String,
 ) std.mem.Allocator.Error!String {
-    var builder = Builder.init(allocator);
+    // NOTE: This allocates the exact needed capacity upfront
+    var builder = try Builder.initCapacity(allocator, strings.len);
     defer builder.deinit();
-    for (strings) |string| try builder.appendString(string);
+    for (strings) |string| builder.appendStringAssumeCapacity(string);
     return builder.build();
 }
 

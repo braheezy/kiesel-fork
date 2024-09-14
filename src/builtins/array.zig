@@ -1697,11 +1697,14 @@ pub const ArrayPrototype = struct {
         else
             .{ .string = try separator.toString(agent) };
 
+        // OPTIMIZATION: If the array is empty the result will be an empty string
+        if (len == 0) return Value.from(String.empty);
+
         // 5. Let R be the empty String.
+        // NOTE: This allocates the maximum needed capacity upfront
         if (len > std.math.maxInt(usize)) return error.OutOfMemory;
-        var result = String.Builder.init(agent.gc_allocator);
+        var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((len * 2) - 1));
         defer result.deinit();
-        try result.segments.ensureTotalCapacity(@intCast(len));
 
         // 6. Let k be 0.
         var k: u53 = 0;
@@ -1709,7 +1712,7 @@ pub const ArrayPrototype = struct {
         // 7. Repeat, while k < len,
         while (k < len) : (k += 1) {
             // a. If k > 0, set R to the string-concatenation of R and sep.
-            if (k > 0) try result.appendSegment(sep);
+            if (k > 0) result.appendSegmentAssumeCapacity(sep);
 
             // b. Let element be ? Get(O, ! ToString(𝔽(k))).
             const element = try object.get(PropertyKey.from(k));
@@ -1720,7 +1723,7 @@ pub const ArrayPrototype = struct {
                 const string = try element.toString(agent);
 
                 // ii. Set R to the string-concatenation of R and S.
-                try result.appendString(string);
+                result.appendStringAssumeCapacity(string);
             }
 
             // d. Set k to k + 1.
@@ -2667,15 +2670,18 @@ pub const ArrayPrototype = struct {
         // 2. Let len be ? LengthOfArrayLike(array).
         const len = try array.lengthOfArrayLike();
 
+        // OPTIMIZATION: If the array is empty the result will be an empty string
+        if (len == 0) return Value.from(String.empty);
+
         // 3. Let separator be the implementation-defined list-separator String value appropriate
         //    for the host environment's current locale (such as ", ").
         const separator = String.fromLiteral(", ");
 
         // 4. Let R be the empty String.
+        // NOTE: This allocates the maximum needed capacity upfront
         if (len > std.math.maxInt(usize)) return error.OutOfMemory;
-        var result = String.Builder.init(agent.gc_allocator);
+        var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((len * 2) - 1));
         defer result.deinit();
-        try result.segments.ensureTotalCapacity(@intCast(len));
 
         // 5. Let k be 0.
         var k: u53 = 0;
@@ -2683,7 +2689,7 @@ pub const ArrayPrototype = struct {
         // 6. Repeat, while k < len,
         while (k < len) : (k += 1) {
             // a. If k > 0, set R to the string-concatenation of R and separator.
-            if (k > 0) try result.appendString(separator);
+            if (k > 0) result.appendStringAssumeCapacity(separator);
 
             // b. Let element be ? Get(array, ! ToString(𝔽(k))).
             const element = try array.get(PropertyKey.from(k));
@@ -2697,7 +2703,7 @@ pub const ArrayPrototype = struct {
                 )).toString(agent);
 
                 // ii. Set R to the string-concatenation of R and S.
-                try result.appendString(string);
+                result.appendStringAssumeCapacity(string);
             }
 
             // d. Set k to k + 1.

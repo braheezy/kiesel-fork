@@ -566,8 +566,8 @@ pub const StringConstructor = struct {
     /// https://tc39.es/ecma262/#sec-string.fromcharcode
     fn fromCharCode(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let result be the empty String.
-        var result = types.String.Builder.init(agent.gc_allocator);
-        try result.segments.ensureTotalCapacity(arguments.count());
+        // NOTE: This allocates the exact needed capacity upfront
+        var result = try types.String.Builder.initCapacity(agent.gc_allocator, arguments.count());
         defer result.deinit();
 
         // 2. For each element next of codeUnits, do
@@ -576,7 +576,7 @@ pub const StringConstructor = struct {
             const next_code_unit = try next.toUint16(agent);
 
             // b. Set result to the string-concatenation of result and nextCU.
-            try result.appendCodeUnit(next_code_unit);
+            result.appendCodeUnitAssumeCapacity(next_code_unit);
         }
 
         // 3. Return result.
@@ -587,7 +587,8 @@ pub const StringConstructor = struct {
     /// https://tc39.es/ecma262/#sec-string.fromcharcode
     fn fromCodePoint(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let result be the empty String.
-        var result = types.String.Builder.init(agent.gc_allocator);
+        // NOTE: This allocates the exact needed capacity upfront
+        var result = try types.String.Builder.initCapacity(agent.gc_allocator, arguments.count());
         defer result.deinit();
 
         // 2. For each element next of codePoints, do
@@ -614,7 +615,7 @@ pub const StringConstructor = struct {
             }
 
             // d. Set result to the string-concatenation of result and UTF16EncodeCodePoint(ℝ(nextCP)).
-            try result.appendCodePoint(@intFromFloat(next_code_point.asFloat()));
+            result.appendCodePointAssumeCapacity(@intFromFloat(next_code_point.asFloat()));
         }
 
         // 3. Assert: If codePoints is empty, then result is the empty String.
@@ -912,9 +913,10 @@ pub const StringPrototype = struct {
         const string = try object.toString(agent);
 
         // 3. Let R be S.
-        var result = types.String.Builder.init(agent.gc_allocator);
+        // NOTE: This allocates the exact needed capacity upfront
+        var result = try types.String.Builder.initCapacity(agent.gc_allocator, arguments.count() + 1);
         defer result.deinit();
-        try result.appendString(string);
+        result.appendStringAssumeCapacity(string);
 
         // 4. For each element next of args, do
         for (arguments.values) |next| {
@@ -922,7 +924,7 @@ pub const StringPrototype = struct {
             const next_string = try next.toString(agent);
 
             // b. Set R to the string-concatenation of R and nextString.
-            try result.appendString(next_string);
+            result.appendStringAssumeCapacity(next_string);
         }
 
         // 5. Return R.
@@ -2036,11 +2038,15 @@ pub const StringPrototype = struct {
         // 3. Let strLen be the length of S.
         const str_len = string.length();
 
+        // OPTIMIZATION: If the array is empty the result will be an empty string
+        if (str_len == 0) return Value.from(types.String.empty);
+
         // 4. Let k be 0.
         var k: usize = 0;
 
         // 5. Let result be the empty String.
-        var result = types.String.Builder.init(agent.gc_allocator);
+        // NOTE: This allocates the exact needed capacity upfront
+        var result = try types.String.Builder.initCapacity(agent.gc_allocator, str_len);
         defer result.deinit();
 
         // 6. Repeat, while k < strLen,
@@ -2052,13 +2058,13 @@ pub const StringPrototype = struct {
             if (code_point.is_unpaired_surrogate) {
                 // i. Set result to the string-concatenation of result and 0xFFFD
                 //    (REPLACEMENT CHARACTER).
-                try result.appendCodePoint(std.unicode.replacement_character);
+                result.appendCodePointAssumeCapacity(std.unicode.replacement_character);
             }
             // c. Else,
             else {
                 // i. Set result to the string-concatenation of result and
                 //    UTF16EncodeCodePoint(cp.[[CodePoint]]).
-                try result.appendCodePoint(code_point.code_point);
+                result.appendCodePointAssumeCapacity(code_point.code_point);
             }
 
             // d. Set k to k + cp.[[CodeUnitCount]].

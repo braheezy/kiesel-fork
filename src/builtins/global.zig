@@ -704,7 +704,8 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const string = try string_value.toString(agent);
 
     // 3. Let R be the empty String.
-    var result = String.Builder.init(agent.gc_allocator);
+    // NOTE: This allocates the exact needed capacity upfront
+    var result = try String.Builder.initCapacity(agent.gc_allocator, string.length());
     defer result.deinit();
 
     // 4. Let unescapedSet be the string-concatenation of the ASCII word characters and "@*+-./".
@@ -761,7 +762,7 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         };
 
         // d. Set R to the string-concatenation of R and S.
-        try result.appendSegment(s);
+        result.appendSegmentAssumeCapacity(s);
 
         // e. Set k to k + 1.
     }
