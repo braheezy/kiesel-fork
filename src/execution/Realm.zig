@@ -170,6 +170,12 @@ fn setDefaultGlobalBindings(self: *Realm) Agent.Error!void {
     // 1. Let global be realmRec.[[GlobalObject]].
     const global = self.global_object;
 
+    // Why export a constant when you can do reflection instead!
+    const global_properties_count = @typeInfo(@typeInfo(@TypeOf(globalObjectProperties)).@"fn".return_type.?).array.len;
+    const intrinsics_count = global_properties_count - 4; // globalThis, Infinity, NaN, undefined
+    try global.propertyStorage().hash_map.ensureUnusedCapacity(global_properties_count);
+    try global.propertyStorage().lazy_intrinsics.ensureUnusedCapacity(intrinsics_count);
+
     // 2. For each property of the Global Object specified in clause 19, do
     for (globalObjectProperties(self)) |property| {
         // a. Let name be the String value of the property name.
@@ -192,7 +198,7 @@ fn setDefaultGlobalBindings(self: *Realm) Agent.Error!void {
                     .enumerable = false,
                     .configurable = true,
                 });
-                try global.propertyStorage().lazy_intrinsics.putNoClobber(name, .{
+                global.propertyStorage().lazy_intrinsics.putAssumeCapacityNoClobber(name, .{
                     .realm = self,
                     .lazyIntrinsicFn = lazyIntrinsicFn,
                 });
