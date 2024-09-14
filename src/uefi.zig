@@ -11,6 +11,19 @@ const Value = kiesel.types.Value;
 
 const Editor = @import("zigline").Editor;
 
+pub const std_options: std.Options = .{
+    // The default log function doesn't compile for UEFI, but we don't need logging anyway.
+    // There are log statements in zigline that break debug builds without this.
+    .logFn = struct {
+        fn logFn(
+            comptime _: std.log.Level,
+            comptime _: @TypeOf(.enum_literal),
+            comptime _: []const u8,
+            _: anytype,
+        ) void {}
+    }.logFn,
+};
+
 const WriterContext = struct {
     console_out: *std.os.uefi.protocol.SimpleTextOutput,
     attribute: usize,
