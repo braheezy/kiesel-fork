@@ -55,18 +55,6 @@ export fn lre_realloc(@"opaque": ?*anyopaque, maybe_ptr: ?*anyopaque, size: usiz
     return if (lre_opaque.allocator.alloc(u8, size)) |slice| slice.ptr else |_| null;
 }
 
-comptime {
-    @setEvalBranchQuota(200_000);
-    for (std.meta.declarations(libregexp)) |declaration| {
-        if (std.mem.startsWith(u8, declaration.name, "LRE_FLAG_")) {
-            const flag = @field(libregexp, declaration.name);
-            std.debug.assert(@TypeOf(flag) == c_int);
-            std.debug.assert(flag <= (1 << 8));
-        }
-    }
-}
-const FLAG_HAS_INDICES: c_int = 1 << 9;
-
 pub const ParsedFlags = packed struct(u8) {
     d: bool = false,
     g: bool = false,
@@ -92,7 +80,7 @@ pub const ParsedFlags = packed struct(u8) {
 
     pub fn asLreFlags(self: ParsedFlags) c_int {
         var flags: c_int = 0;
-        if (self.d) flags |= FLAG_HAS_INDICES;
+        if (self.d) flags |= libregexp.LRE_FLAG_INDICES;
         if (self.g) flags |= libregexp.LRE_FLAG_GLOBAL;
         if (self.i) flags |= libregexp.LRE_FLAG_IGNORECASE;
         if (self.m) flags |= libregexp.LRE_FLAG_MULTILINE;
@@ -489,7 +477,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
     }
 
     // 34. If hasIndices is true, then
-    if ((re_flags & FLAG_HAS_INDICES) != 0) {
+    if ((re_flags & libregexp.LRE_FLAG_INDICES) != 0) {
         // a. Let indicesArray be MakeMatchIndicesIndexPairArray(S, indices, groupNames, hasGroups).
         const indices_array = try makeMatchIndicesIndexPairArray(
             agent,
@@ -948,7 +936,7 @@ pub const RegExpPrototype = struct {
         // 1. Let R be the this value.
         // 2. Let cu be the code unit 0x0064 (LATIN SMALL LETTER D).
         // 3. Return ? RegExpHasFlag(R, cu).
-        return regExpHasFlag(agent, this_value, FLAG_HAS_INDICES);
+        return regExpHasFlag(agent, this_value, libregexp.LRE_FLAG_INDICES);
     }
 
     /// 22.2.6.7 get RegExp.prototype.ignoreCase

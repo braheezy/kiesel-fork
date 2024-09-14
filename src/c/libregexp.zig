@@ -9,6 +9,7 @@ else
     libregexp_stub;
 
 const libregexp_stub = struct {
+    pub const LRE_FLAG_INDICES: c_int = 0;
     pub const LRE_FLAG_GLOBAL: c_int = 0;
     pub const LRE_FLAG_IGNORECASE: c_int = 0;
     pub const LRE_FLAG_MULTILINE: c_int = 0;
