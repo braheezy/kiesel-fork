@@ -284,7 +284,7 @@ fn utf8StringValue(
 }
 
 fn unescapeIdentifier(self: *Parser, token: Tokenizer.Token) AcceptError![]const u8 {
-    const identifier = (try utf8StringValue(
+    const string_value = (try utf8StringValue(
         self.allocator,
         token.text,
     )) orelse return error.UnexpectedToken;
@@ -292,27 +292,38 @@ fn unescapeIdentifier(self: *Parser, token: Tokenizer.Token) AcceptError![]const
         // TODO: Handle UnicodeIDStart and UnicodeIDContinue
         const start_chars = "$_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
         const part_chars = start_chars ++ "0123456789";
-        for (identifier, 0..) |c, i| {
+        for (string_value, 0..) |c, i| {
             if (std.mem.indexOfScalar(u8, if (i > 0) part_chars else start_chars, c) == null) {
                 return error.UnexpectedToken;
             }
         }
+        // It is a Syntax Error if the goal symbol of the syntactic grammar is Module and the
+        // StringValue of IdentifierName is "await".
+        if (self.state.in_module and std.mem.eql(u8, string_value, "await")) {
+            try self.emitErrorAt(
+                token.location,
+                "Identifier named 'await' not allowed in modules",
+                .{},
+            );
+        }
+        // It is a Syntax Error if the StringValue of IdentifierName is the StringValue of any
+        // ReservedWord except for yield or await.
         for (reserved_words) |reserved_word| {
-            if (std.mem.eql(u8, identifier, reserved_word)) {
-                if (std.mem.eql(u8, identifier, "yield") or
-                    std.mem.eql(u8, identifier, "yield")) continue;
+            if (std.mem.eql(u8, string_value, reserved_word)) {
+                if (std.mem.eql(u8, string_value, "yield") or
+                    std.mem.eql(u8, string_value, "await")) continue;
                 try self.emitErrorAt(
                     token.location,
                     "Keyword must not contain escaped characters",
                     .{},
                 );
-                return error.UnexpectedToken;
+                break;
             }
         }
     } else {
         std.debug.assert(token.type == .yield or token.type == .@"await");
     }
-    return identifier;
+    return string_value;
 }
 
 fn ensureSimpleParameterList(
@@ -512,7 +523,53 @@ pub fn acceptIdentifierReference(self: *Parser) AcceptError!ast.IdentifierRefere
             } else |_| {}
         }
     }
-    return self.unescapeIdentifier(token);
+    const string_value = try self.unescapeIdentifier(token);
+
+    switch (token.type) {
+        .identifier => {
+            // It is a Syntax Error if this production has a [Yield] parameter and the StringValue
+            // of Identifier is "yield".
+            if (self.state.in_generator_function_body and std.mem.eql(u8, string_value, "yield")) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Identifier reference named 'yield' not allowed in generator functions",
+                    .{},
+                );
+            }
+            // It is a Syntax Error if this production has an [Await] parameter and the StringValue
+            // of Identifier is "await".
+            if (self.state.in_async_function_body and std.mem.eql(u8, string_value, "await")) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Identifier reference named 'await' not allowed in async functions",
+                    .{},
+                );
+            }
+        },
+        .yield => {
+            // It is a Syntax Error if IsStrict(this production) is true.
+            if (self.state.in_strict_mode) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Identifier reference named 'yield' is not allowed in strict mode",
+                    .{},
+                );
+            }
+        },
+        .@"await" => {
+            // It is a Syntax Error if the goal symbol of the syntactic grammar is Module.
+            if (self.state.in_module) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Identifier reference named 'await' not allowed in modules",
+                    .{},
+                );
+            }
+        },
+        else => unreachable,
+    }
+
+    return string_value;
 }
 
 pub fn acceptBindingIdentifier(self: *Parser) AcceptError!ast.Identifier {
@@ -522,21 +579,133 @@ pub fn acceptBindingIdentifier(self: *Parser) AcceptError!ast.Identifier {
     const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .@"await" }));
     const string_value = try self.unescapeIdentifier(token);
 
-    // It is a Syntax Error if IsStrict(this production) is true and the StringValue of Identifier
-    // is either "arguments" or "eval".
-    if (self.state.in_strict_mode) {
-        try self.ensureAllowedIdentifier(.binding_identifier, string_value, token.location);
+    switch (token.type) {
+        .identifier => {
+            // It is a Syntax Error if IsStrict(this production) is true and the StringValue of
+            // Identifier is either "arguments" or "eval".
+            if (self.state.in_strict_mode) {
+                try self.ensureAllowedIdentifier(.binding_identifier, string_value, token.location);
+            }
+            // It is a Syntax Error if this production has a [Yield] parameter and the StringValue
+            // of Identifier is "yield".
+            if (self.state.in_generator_function_body and std.mem.eql(u8, string_value, "yield")) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Binding identifier named 'yield' not allowed in generator functions",
+                    .{},
+                );
+            }
+            // It is a Syntax Error if this production has an [Await] parameter and the StringValue
+            // of Identifier is "await".
+            if (self.state.in_async_function_body and std.mem.eql(u8, string_value, "await")) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Binding identifier named 'await' not allowed in async functions",
+                    .{},
+                );
+            }
+        },
+        .yield => {
+            // It is a Syntax Error if IsStrict(this production) is true.
+            if (self.state.in_strict_mode) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Binding identifier named 'yield' is not allowed in strict mode",
+                    .{},
+                );
+            }
+            // It is a Syntax Error if this production has a [Yield] parameter.
+            if (self.state.in_generator_function_body) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Binding identifier named 'yield' not allowed in generator functions",
+                    .{},
+                );
+            }
+        },
+        .@"await" => {
+            // It is a Syntax Error if the goal symbol of the syntactic grammar is Module.
+            if (self.state.in_module) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Binding identifier named 'await' not allowed in modules",
+                    .{},
+                );
+            }
+            // It is a Syntax Error if this production has an [Await] parameter.
+            if (self.state.in_async_function_body) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Binding identifier named 'await' not allowed in async functions",
+                    .{},
+                );
+            }
+        },
+        else => unreachable,
     }
 
     return string_value;
 }
 
-pub fn acceptLabelIdentifier(self: *Parser) AcceptError!ast.Identifier {
+pub fn acceptLabelIdentifier(self: *Parser, for_labelled_statement: bool) AcceptError!ast.Identifier {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
     const token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .@"await" }));
-    return self.unescapeIdentifier(token);
+
+    // Avoid needless validation if this is not the beginning of a labelled statement, otherwise
+    // we'd have to drop the errors after finding the colon is missing.
+    if (for_labelled_statement and (try self.peekToken()).type != .@":") {
+        return error.UnexpectedToken;
+    }
+
+    const string_value = try self.unescapeIdentifier(token);
+
+    switch (token.type) {
+        .identifier => {
+            // It is a Syntax Error if this production has a [Yield] parameter and the StringValue
+            // of Identifier is "yield".
+            if (self.state.in_generator_function_body and std.mem.eql(u8, string_value, "yield")) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Label named 'yield' not allowed in generator functions",
+                    .{},
+                );
+            }
+            // It is a Syntax Error if this production has an [Await] parameter and the StringValue
+            // of Identifier is "await".
+            if (self.state.in_async_function_body and std.mem.eql(u8, string_value, "await")) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Label named 'await' not allowed in async functions",
+                    .{},
+                );
+            }
+        },
+        .yield => {
+            // It is a Syntax Error if IsStrict(this production) is true.
+            if (self.state.in_strict_mode) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Label named 'yield' is not allowed in strict mode",
+                    .{},
+                );
+            }
+        },
+        .@"await" => {
+            // It is a Syntax Error if the goal symbol of the syntactic grammar is Module.
+            if (self.state.in_module) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Label named 'await' not allowed in modules",
+                    .{},
+                );
+            }
+        },
+        else => unreachable,
+    }
+
+    return string_value;
 }
 
 pub fn acceptPrivateIdentifier(self: *Parser) AcceptError!ast.PrivateIdentifier {
@@ -1920,7 +2089,7 @@ pub fn acceptLabelledStatement(self: *Parser) AcceptError!ast.LabelledStatement 
     const tmp = temporaryChange(&self.state.in_labelled_statement, true);
     defer tmp.restore();
 
-    const label_identifier = try self.acceptLabelIdentifier();
+    const label_identifier = try self.acceptLabelIdentifier(true);
     _ = try self.core.accept(RuleSet.is(.@":"));
     const location = (try self.peekToken()).location;
     const labelled_item: ast.LabelledStatement.LabelledItem = if (self.acceptFunctionDeclaration()) |function_declaration|
@@ -2156,7 +2325,7 @@ pub fn acceptContinueStatement(self: *Parser) AcceptError!ast.ContinueStatement 
     }
 
     if (self.noLineTerminatorHere()) |_| {
-        if (self.acceptLabelIdentifier()) |label| {
+        if (self.acceptLabelIdentifier(false)) |label| {
             try self.acceptOrInsertSemicolon();
 
             if (!self.state.in_labelled_statement) {
@@ -2186,7 +2355,7 @@ pub fn acceptBreakStatement(self: *Parser) AcceptError!ast.BreakStatement {
     const token = try self.core.accept(RuleSet.is(.@"break"));
 
     if (self.noLineTerminatorHere()) |_| {
-        if (self.acceptLabelIdentifier()) |label| {
+        if (self.acceptLabelIdentifier(false)) |label| {
             try self.acceptOrInsertSemicolon();
 
             if (!self.state.in_labelled_statement) {
