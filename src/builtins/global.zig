@@ -533,7 +533,7 @@ fn encode(
     agent: *Agent,
     string: String,
     comptime extra_unescaped: []const u8,
-) std.mem.Allocator.Error!String {
+) Agent.Error!String {
     // 3. Let alwaysUnescaped be the string-concatenation of the ASCII word characters and
     //    "-.!~*'()".
     const always_unescaped = String.ascii_word_characters ++ "-.!~*'()";
@@ -541,14 +541,77 @@ fn encode(
     // 4. Let unescapedSet be the string-concatenation of alwaysUnescaped and extraUnescaped.
     const unescaped_set = always_unescaped ++ extra_unescaped;
 
-    // 1-2., 5-7.
-    var buffer = std.ArrayList(u8).init(agent.gc_allocator);
-    try std.Uri.Component.percentEncode(buffer.writer(), try string.toUtf8(agent.gc_allocator), struct {
-        fn isValidChar(c: u8) bool {
-            return std.mem.indexOfScalar(u8, unescaped_set, c) != null;
+    // OPTIMIZATION: If the string is ASCII we don't have to handle unpaired surrogates.
+    if (string.data.slice == .ascii) {
+        var buffer = std.ArrayList(u8).init(agent.gc_allocator);
+        try std.Uri.Component.percentEncode(buffer.writer(), string.data.slice.ascii, struct {
+            fn isValidChar(c: u8) bool {
+                return std.mem.indexOfScalar(u8, unescaped_set, c) != null;
+            }
+        }.isValidChar);
+        return String.fromAscii(agent.gc_allocator, try buffer.toOwnedSlice());
+    }
+
+    // 1. Let len be the length of string.
+    const len = string.length();
+
+    // 2. Let R be the empty String.
+    var result = String.Builder.init(agent.gc_allocator);
+    defer result.deinit();
+
+    // 5. Let k be 0.
+    var k: usize = 0;
+
+    // 6. Repeat, while k < len,
+    while (k < len) {
+        // a. Let C be the code unit at index k within string.
+        const c = string.codeUnitAt(k);
+
+        // b. If unescapedSet contains C, then
+        if (c <= std.math.maxInt(u8) and
+            std.mem.indexOfScalar(u8, unescaped_set, @intCast(c)) != null)
+        {
+            // i. Set k to k + 1.
+            k += 1;
+
+            // ii. Set R to the string-concatenation of R and C.
+            try result.appendChar(@intCast(c));
         }
-    }.isValidChar);
-    return String.fromAscii(agent.gc_allocator, try buffer.toOwnedSlice());
+        // c. Else,
+        else {
+            // i. Let cp be CodePointAt(string, k).
+            const code_point = string.codePointAt(k);
+
+            // ii. If cp.[[IsUnpairedSurrogate]] is true, throw a URIError exception.
+            if (code_point.is_unpaired_surrogate) {
+                return agent.throwException(.uri_error, "URI contains unpaired surrogate", .{});
+            }
+
+            // iii. Set k to k + cp.[[CodeUnitCount]].
+            k += code_point.code_unit_count;
+
+            // iv. Let Octets be the List of octets resulting by applying the UTF-8 transformation
+            //     to cp.[[CodePoint]].
+            var buf: [4]u8 = undefined;
+            const size = std.unicode.utf8Encode(code_point.code_point, &buf) catch unreachable;
+
+            // v. For each element octet of Octets, do
+            for (buf[0..size]) |byte| {
+                // 1. Let hex be the String representation of octet, formatted as an uppercase
+                //    hexadecimal number.
+                // 2. Set R to the string-concatenation of R, "%", and StringPad(hex, 2, "0", start).
+                try result.appendString(
+                    try String.fromAscii(
+                        agent.gc_allocator,
+                        try std.fmt.allocPrint(agent.gc_allocator, "%{X:0>2}", .{byte}),
+                    ),
+                );
+            }
+        }
+    }
+
+    // 7. Return R.
+    return result.build();
 }
 
 /// 19.2.6.6 Decode ( string, preserveEscapeSet )
