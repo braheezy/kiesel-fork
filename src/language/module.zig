@@ -22,6 +22,8 @@ const moduleNamespaceCreate = builtins.moduleNamespaceCreate;
 const noexcept = utils.noexcept;
 const performPromiseThen = builtins.performPromiseThen;
 
+pub const ExportStarSet = std.AutoHashMap(*const SourceTextModule, void);
+
 /// 16.2.1.4 Abstract Module Records
 /// https://tc39.es/ecma262/#sec-abstract-module-records
 pub const Module = union(enum) {
@@ -40,9 +42,10 @@ pub const Module = union(enum) {
     pub fn getExportedNames(
         self: Module,
         agent: *Agent,
+        export_star_set: ?*ExportStarSet,
     ) std.mem.Allocator.Error![]const []const u8 {
         return switch (self) {
-            inline else => |module| module.getExportedNames(agent),
+            inline else => |module| module.getExportedNames(agent, export_star_set),
         };
     }
 
@@ -302,7 +305,7 @@ fn continueDynamicImport(
 
 /// 16.2.1.7 GetImportedModule ( referrer, specifier )
 /// https://tc39.es/ecma262/#sec-GetImportedModule
-pub fn getImportedModule(referrer: *SourceTextModule, specifier: String) Module {
+pub fn getImportedModule(referrer: *const SourceTextModule, specifier: String) Module {
     // 1. Assert: Exactly one element of referrer.[[LoadedModules]] is a Record whose [[Specifier]]
     //    is specifier, since LoadRequestedModules has completed successfully on referrer prior to
     //    invoking this abstract operation.
@@ -379,7 +382,7 @@ pub fn getModuleNamespace(agent: *Agent, module: Module) std.mem.Allocator.Error
     // 3. If namespace is empty, then
     if (namespace == null) {
         // a. Let exportedNames be module.GetExportedNames().
-        const exported_names = try module.getExportedNames(agent);
+        const exported_names = try module.getExportedNames(agent, null);
         defer agent.gc_allocator.free(exported_names);
 
         // b. Let unambiguousNames be a new empty List.

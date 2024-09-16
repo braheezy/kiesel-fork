@@ -15,17 +15,20 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
+const ExportStarSet = language.ExportStarSet;
 const GraphLoadingState = language.GraphLoadingState;
 const Module = language.Module;
 const Object = types.Object;
 const Parser = @import("Parser.zig");
 const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
 const Realm = execution.Realm;
+const ResolvedBinding = language.ResolvedBinding;
 const ResolvedBindingOrAmbiguous = language.ResolvedBindingOrAmbiguous;
 const SafePointer = types.SafePointer;
 const String = types.String;
 const StringHashMap = types.StringHashMap;
 const Value = types.Value;
+const containsSlice = utils.containsSlice;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const getImportedModule = language.getImportedModule;
 const getModuleNamespace = language.getModuleNamespace;
@@ -66,7 +69,8 @@ local_export_entries: std.ArrayList(ExportEntry),
 /// [[IndirectExportEntries]]
 indirect_export_entries: std.ArrayList(ExportEntry),
 
-// TODO: [[StarExportEntries]]
+/// [[StarExportEntries]]
+star_export_entries: std.ArrayList(ExportEntry),
 
 /// [[HostDefined]]
 host_defined: SafePointer,
@@ -493,7 +497,8 @@ pub fn parse(
     // 7. Let localExportEntries be a new empty List.
     var local_export_entries = std.ArrayList(ExportEntry).init(agent.gc_allocator);
 
-    // TODO: 8-9.
+    // 8. Let starExportEntries be a new empty List.
+    var star_export_entries = std.ArrayList(ExportEntry).init(agent.gc_allocator);
 
     // 9. Let exportEntries be the ExportEntries of body.
     var export_entries = std.ArrayList(ExportEntry).init(agent.gc_allocator);
@@ -550,8 +555,11 @@ pub fn parse(
         }
         // b. Else if ee.[[ImportName]] is all-but-default, then
         else if (export_entry.import_name != null and export_entry.import_name.? == .all_but_default) {
-            // TODO: i. Assert: ee.[[ExportName]] is null.
-            // TODO: ii. Append ee to starExportEntries.
+            // i. Assert: ee.[[ExportName]] is null.
+            std.debug.assert(export_entry.export_name == null);
+
+            // ii. Append ee to starExportEntries.
+            try star_export_entries.append(export_entry);
         }
         // c. Else,
         else {
@@ -593,6 +601,7 @@ pub fn parse(
         .import_entries = import_entries,
         .local_export_entries = local_export_entries,
         .indirect_export_entries = indirect_export_entries,
+        .star_export_entries = star_export_entries,
         .loaded_modules = .init(agent.gc_allocator),
         .dfs_index = null,
         .dfs_ancestor_index = null,
@@ -878,16 +887,34 @@ fn innerModuleEvaluation(
     // 17. Return index.
     return new_index;
 }
+
 /// 16.2.1.6.2 GetExportedNames ( [ exportStarSet ] )
 /// https://tc39.es/ecma262/#sec-getexportednames
 pub fn getExportedNames(
-    self: SourceTextModule,
+    self: *const SourceTextModule,
     agent: *Agent,
+    maybe_export_star_set: ?*ExportStarSet,
 ) std.mem.Allocator.Error![]const []const u8 {
     // 1. Assert: module.[[Status]] is not new.
     std.debug.assert(self.status != .new);
 
-    // TODO: 2-4.
+    // 2. If exportStarSet is not present, set exportStarSet to a new empty List.
+    var new_export_star_set: ExportStarSet = if (maybe_export_star_set == null)
+        .init(agent.gc_allocator)
+    else
+        undefined;
+    var export_star_set = maybe_export_star_set orelse &new_export_star_set;
+    defer if (maybe_export_star_set == null) new_export_star_set.deinit();
+
+    // 3. If exportStarSet contains module, then
+    if (export_star_set.contains(self)) {
+        // a. Assert: We've reached the starting point of an export * circularity.
+        // b. Return a new empty List.
+        return &.{};
+    }
+
+    // 4. Append module to exportStarSet.
+    try export_star_set.putNoClobber(self, {});
 
     // 5. Let exportedNames be a new empty List.
     var exported_names = std.ArrayList([]const u8).init(agent.gc_allocator);
@@ -908,7 +935,32 @@ pub fn getExportedNames(
         try exported_names.append(export_entry.export_name.?);
     }
 
-    // TODO: 8. For each ExportEntry Record e of module.[[StarExportEntries]], do
+    // 8. For each ExportEntry Record e of module.[[StarExportEntries]], do
+    for (self.star_export_entries.items) |export_entry| {
+        // a. Assert: e.[[ModuleRequest]] is not null.
+        std.debug.assert(export_entry.module_request != null);
+
+        // b. Let requestedModule be GetImportedModule(module, e.[[ModuleRequest]]).
+        const requested_module = getImportedModule(
+            self,
+            try String.fromUtf8(agent.gc_allocator, export_entry.module_request.?),
+        );
+
+        // c. Let starNames be requestedModule.GetExportedNames(exportStarSet).
+        const star_names = try requested_module.getExportedNames(agent, export_star_set);
+
+        // d. For each element n of starNames, do
+        for (star_names) |name| {
+            // i. If n is not "default", then
+            if (!std.mem.eql(u8, name, "default")) {
+                // 1. If exportedNames does not contain n, then
+                if (!containsSlice(exported_names.items, name)) {
+                    // a. Append n to exportedNames.
+                    try exported_names.append(name);
+                }
+            }
+        }
+    }
 
     // 9. Return exportedNames.
     return exported_names.toOwnedSlice();
@@ -960,6 +1012,12 @@ pub fn resolveExport(
             if (export_entry.import_name != null and export_entry.import_name.? == .all) {
                 // 1. Assert: module does not provide the direct binding for this export.
                 // 2. Return ResolvedBinding Record { [[Module]]: importedModule, [[BindingName]]: namespace }.
+                return .{
+                    .resolved_binding = .{
+                        .module = imported_module,
+                        .binding_name = .namespace,
+                    },
+                };
             }
             // iv. Else,
             else {
@@ -974,18 +1032,75 @@ pub fn resolveExport(
     if (std.mem.eql(u8, export_name, "default")) {
         // a. Assert: A default export was not explicitly defined by this module.
         // b. Return null.
-        return null;
-
         // c. NOTE: A default export cannot be provided by an export * from "mod" declaration.
+        return null;
     }
 
     // 8. Let starResolution be null.
-    const star_resolution = null;
+    var maybe_star_resolution: ?ResolvedBinding = null;
 
-    // TODO: 9. For each ExportEntry Record e of module.[[StarExportEntries]], do
+    // 9. For each ExportEntry Record e of module.[[StarExportEntries]], do
+    for (self.star_export_entries.items) |export_entry| {
+        // a. Assert: e.[[ModuleRequest]] is not null.
+        std.debug.assert(export_entry.module_request != null);
+
+        // b. Let importedModule be GetImportedModule(module, e.[[ModuleRequest]]).
+        const imported_module = getImportedModule(
+            self,
+            try String.fromUtf8(agent.gc_allocator, export_entry.module_request.?),
+        );
+
+        // c. Let resolution be importedModule.ResolveExport(exportName, resolveSet).
+        const maybe_resolution = try imported_module.resolveExport(agent, export_name);
+
+        // d. If resolution is ambiguous, return ambiguous.
+        if (maybe_resolution != null and maybe_resolution.? == .ambiguous) return .ambiguous;
+
+        // e. If resolution is not null, then
+        if (maybe_resolution != null) {
+            // i. Assert: resolution is a ResolvedBinding Record.
+            const resolution = maybe_resolution.?.resolved_binding;
+
+            // ii. If starResolution is null, then
+            const star_resolution = maybe_star_resolution orelse {
+                // 1. Set starResolution to resolution.
+                maybe_star_resolution = resolution;
+                continue;
+            };
+
+            // iii. Else,
+            // 1. Assert: There is more than one * import that includes the requested name.
+
+            // 2. If resolution.[[Module]] and starResolution.[[Module]] are not the same Module
+            //    Record, return ambiguous.
+            if (!std.meta.eql(resolution.module, star_resolution.module)) {
+                return .ambiguous;
+            }
+
+            // 3. If resolution.[[BindingName]] is not starResolution.[[BindingName]] and either
+            //    resolution.[[BindingName]] or starResolution.[[BindingName]] is namespace, return
+            //    ambiguous.
+            if (std.meta.activeTag(resolution.binding_name) != std.meta.activeTag(star_resolution.binding_name)) {
+                std.debug.assert(resolution.binding_name == .namespace or star_resolution.binding_name == .namespace);
+                return .ambiguous;
+            }
+
+            // 4. If resolution.[[BindingName]] is a String, starResolution.[[BindingName]] is a
+            //    String, and resolution.[[BindingName]] is not starResolution.[[BindingName]], return ambiguous.
+            if (resolution.binding_name == .string and
+                star_resolution.binding_name == .string and
+                !std.mem.eql(u8, resolution.binding_name.string, star_resolution.binding_name.string))
+            {
+                return .ambiguous;
+            }
+        }
+    }
 
     // 10. Return starResolution.
-    return star_resolution;
+    return if (maybe_star_resolution) |resolved_binding|
+        .{ .resolved_binding = resolved_binding }
+    else
+        null;
 }
 
 /// 16.2.1.6.4 InitializeEnvironment ( )
@@ -1047,11 +1162,17 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
             const maybe_resolution = try imported_module.resolveExport(agent, import_name.string);
 
             // ii. If resolution is either null or ambiguous, throw a SyntaxError exception.
-            if (maybe_resolution == null or maybe_resolution.? == .ambiguous) {
+            if (maybe_resolution == null) {
                 return agent.throwException(
                     .syntax_error,
-                    "Cannot resolve export '{s}'",
-                    .{import_name.string},
+                    "No export named '{s}' in module '{s}'",
+                    .{ import_name.string, import_entry.module_request },
+                );
+            } else if (maybe_resolution.? == .ambiguous) {
+                return agent.throwException(
+                    .syntax_error,
+                    "Ambiguous star export '{s}' in module '{s}'",
+                    .{ import_name.string, import_entry.module_request },
                 );
             }
             const resolution = maybe_resolution.?.resolved_binding;
