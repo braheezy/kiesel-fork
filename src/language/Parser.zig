@@ -419,21 +419,19 @@ fn ensureAllowedIdentifier(
 
 /// 5.1.5.8 [no LineTerminator here]
 /// https://tc39.es/ecma262/#sec-no-lineterminator-here
-fn noLineTerminatorHere(self: *Parser) AcceptError!void {
+fn followedByLineTerminator(self: *Parser) bool {
     // Same as peek() but without immediately restoring the state; we need to look at what's
     // between the current and next token.
     const state = self.core.saveState();
     defer self.core.restoreState(state);
-    if (try self.core.nextToken()) |next_token| {
-        const start_offset = state.offset;
-        const end_offset = self.core.tokenizer.offset - next_token.text.len;
-        const whitespace_and_comments = self.core.tokenizer.source[start_offset..end_offset];
 
-        if (containsLineTerminator(whitespace_and_comments)) {
-            try self.emitErrorAt(state.location, "Unexpected newline", .{});
-            return error.UnexpectedToken;
-        }
-    }
+    const next_token = (self.core.nextToken() catch return false) orelse return false;
+
+    const start_offset = state.offset;
+    const end_offset = self.core.tokenizer.offset - next_token.text.len;
+    const whitespace_and_comments = self.core.tokenizer.source[start_offset..end_offset];
+
+    return containsLineTerminator(whitespace_and_comments);
 }
 
 /// 12.10 Automatic Semicolon Insertion
@@ -515,12 +513,12 @@ pub fn acceptIdentifierReference(self: *Parser) AcceptError!ast.IdentifierRefere
     if (self.core.peek() catch null) |next_token| {
         if (next_token.type == .@"=>") return error.UnexpectedToken;
         if (std.mem.eql(u8, token.text, "async")) {
-            if (self.noLineTerminatorHere()) {
+            if (!self.followedByLineTerminator()) {
                 // AsyncFunction{Expression,Declaration}
                 if (next_token.type == .function) return error.UnexpectedToken;
                 // AsyncArrowFunction
                 if (next_token.type == .@"(" or next_token.type == .identifier) return error.UnexpectedToken;
-            } else |_| {}
+            }
         }
     }
     const string_value = try self.unescapeIdentifier(token);
@@ -2324,7 +2322,7 @@ pub fn acceptContinueStatement(self: *Parser) AcceptError!ast.ContinueStatement 
         return error.UnexpectedToken;
     }
 
-    if (self.noLineTerminatorHere()) |_| {
+    if (!self.followedByLineTerminator()) {
         if (self.acceptLabelIdentifier(false)) |label| {
             try self.acceptOrInsertSemicolon();
 
@@ -2339,10 +2337,6 @@ pub fn acceptContinueStatement(self: *Parser) AcceptError!ast.ContinueStatement 
 
             return .{ .label = label };
         } else |_| {}
-    } else |err| switch (err) {
-        // Drop emitted 'unexpected newline' error
-        error.UnexpectedToken => _ = self.diagnostics.errors.pop(),
-        else => {},
     }
     try self.acceptOrInsertSemicolon();
     return .{ .label = null };
@@ -2354,7 +2348,7 @@ pub fn acceptBreakStatement(self: *Parser) AcceptError!ast.BreakStatement {
 
     const token = try self.core.accept(RuleSet.is(.@"break"));
 
-    if (self.noLineTerminatorHere()) |_| {
+    if (!self.followedByLineTerminator())  {
         if (self.acceptLabelIdentifier(false)) |label| {
             try self.acceptOrInsertSemicolon();
 
@@ -2369,10 +2363,6 @@ pub fn acceptBreakStatement(self: *Parser) AcceptError!ast.BreakStatement {
 
             return .{ .label = label };
         } else |_| {}
-    } else |err| switch (err) {
-        // Drop emitted 'unexpected newline' error
-        error.UnexpectedToken => _ = self.diagnostics.errors.pop(),
-        else => {},
     }
     try self.acceptOrInsertSemicolon();
 
@@ -2399,15 +2389,11 @@ pub fn acceptReturnStatement(self: *Parser) AcceptError!ast.ReturnStatement {
         return error.UnexpectedToken;
     }
 
-    if (self.noLineTerminatorHere()) |_| {
+    if (!self.followedByLineTerminator()) {
         if (self.acceptExpression(.{})) |expression| {
             try self.acceptOrInsertSemicolon();
             return .{ .expression = expression };
         } else |_| {}
-    } else |err| switch (err) {
-        // Drop emitted 'unexpected newline' error
-        error.UnexpectedToken => _ = self.diagnostics.errors.pop(),
-        else => {},
     }
     try self.acceptOrInsertSemicolon();
     return .{ .expression = null };
@@ -2505,7 +2491,9 @@ pub fn acceptThrowStatement(self: *Parser) AcceptError!ast.ThrowStatement {
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.throw));
-    try self.noLineTerminatorHere();
+    if (self.followedByLineTerminator()) {
+        try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
+    }
     const expression = try self.acceptExpression(.{});
     try self.acceptOrInsertSemicolon();
     return .{ .expression = expression };
@@ -2733,7 +2721,9 @@ pub fn acceptArrowFunction(self: *Parser) AcceptError!ast.ArrowFunction {
         _ = try self.core.accept(RuleSet.is(.@")"));
     }
     _ = try self.core.accept(RuleSet.is(.@"=>"));
-    try self.noLineTerminatorHere();
+    if (self.followedByLineTerminator()) {
+        try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
+    }
     const function_body: ast.FunctionBody = if (self.core.accept(RuleSet.is(.@"{"))) |_| blk: {
         const function_body = try self.acceptFunctionBody(.normal);
         _ = try self.core.accept(RuleSet.is(.@"}"));
@@ -2962,7 +2952,7 @@ pub fn acceptYieldExpression(self: *Parser) AcceptError!ast.YieldExpression {
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.yield));
-    if (self.noLineTerminatorHere()) |_| {
+    if (!self.followedByLineTerminator()) {
         if (self.acceptExpression(.{})) |expr| {
             const expression = try self.allocator.create(ast.Expression);
             expression.* = expr;
@@ -2970,10 +2960,6 @@ pub fn acceptYieldExpression(self: *Parser) AcceptError!ast.YieldExpression {
         } else |_| {
             return .{ .expression = null };
         }
-    } else |err| switch (err) {
-        // Drop emitted 'unexpected newline' error
-        error.UnexpectedToken => _ = self.diagnostics.errors.pop(),
-        else => {},
     }
     return .{ .expression = null };
 }
@@ -2985,7 +2971,9 @@ fn acceptAsyncGeneratorDeclaration(self: *Parser) AcceptError!ast.AsyncGenerator
     _ = try self.acceptKeyword("async");
     // We need to do this after consuming the 'async' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
-    try self.noLineTerminatorHere();
+    if (self.followedByLineTerminator()) {
+        try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
+    }
     _ = try self.core.accept(RuleSet.is(.function));
     _ = try self.core.accept(RuleSet.is(.@"*"));
     const binding_identifier_location = (try self.peekToken()).location;
@@ -3027,7 +3015,9 @@ pub fn acceptAsyncGeneratorExpression(self: *Parser) AcceptError!ast.AsyncGenera
     _ = try self.acceptKeyword("async");
     // We need to do this after consuming the 'async' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
-    try self.noLineTerminatorHere();
+    if (self.followedByLineTerminator()) {
+        try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
+    }
     _ = try self.core.accept(RuleSet.is(.function));
     _ = try self.core.accept(RuleSet.is(.@"*"));
     const binding_identifier_location = (try self.peekToken()).location;
@@ -3280,7 +3270,9 @@ fn acceptAsyncFunctionDeclaration(self: *Parser) AcceptError!ast.AsyncFunctionDe
     _ = try self.acceptKeyword("async");
     // We need to do this after consuming the 'async' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
-    try self.noLineTerminatorHere();
+    if (self.followedByLineTerminator()) {
+        try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
+    }
     _ = try self.core.accept(RuleSet.is(.function));
     const binding_identifier_location = (try self.peekToken()).location;
     const binding_identifier = self.acceptBindingIdentifier() catch |err| {
@@ -3323,7 +3315,9 @@ pub fn acceptAsyncFunctionExpression(self: *Parser) AcceptError!ast.AsyncFunctio
     _ = try self.acceptKeyword("async");
     // We need to do this after consuming the 'async' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
-    try self.noLineTerminatorHere();
+    if (self.followedByLineTerminator()) {
+        try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
+    }
     _ = try self.core.accept(RuleSet.is(.function));
     const binding_identifier_location = (try self.peekToken()).location;
     const binding_identifier = self.acceptBindingIdentifier() catch null;
@@ -3376,7 +3370,9 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
     _ = try self.acceptKeyword("async");
     // We need to do this after consuming the 'async' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
-    try self.noLineTerminatorHere();
+    if (self.followedByLineTerminator()) {
+        try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
+    }
     var formal_parameters: ast.FormalParameters = undefined;
     const location = (try self.peekToken()).location;
     if (self.acceptBindingIdentifier()) |binding_identifier| {
@@ -3404,7 +3400,9 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
         _ = try self.core.accept(RuleSet.is(.@")"));
     }
     _ = try self.core.accept(RuleSet.is(.@"=>"));
-    try self.noLineTerminatorHere();
+    if (self.followedByLineTerminator()) {
+        try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
+    }
     const function_body: ast.FunctionBody = if (self.core.accept(RuleSet.is(.@"{"))) |_| blk: {
         const function_body = try self.acceptFunctionBody(.@"async");
         _ = try self.core.accept(RuleSet.is(.@"}"));
