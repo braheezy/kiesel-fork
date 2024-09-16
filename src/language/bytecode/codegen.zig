@@ -11,10 +11,34 @@ const Value = types.Value;
 const temporaryChange = utils.temporaryChange;
 
 pub const Context = struct {
-    contained_in_strict_mode_code: bool = false,
-    environment_lookup_cache_index: Executable.IndexType = 0,
+    contained_in_strict_mode_code: bool,
+    environment_lookup_cache_index: Executable.IndexType,
     continue_jumps: std.ArrayList(Executable.JumpIndex),
     break_jumps: std.ArrayList(Executable.JumpIndex),
+    labelled_continue_jumps: std.StringHashMap(*std.ArrayList(Executable.JumpIndex)),
+    labelled_break_jumps: std.StringHashMap(*std.ArrayList(Executable.JumpIndex)),
+    current_label: ?[]const u8,
+
+    pub fn init(allocator: std.mem.Allocator) Context {
+        return .{
+            .contained_in_strict_mode_code = false,
+            .environment_lookup_cache_index = 0,
+            .continue_jumps = .init(allocator),
+            .break_jumps = .init(allocator),
+            .labelled_continue_jumps = .init(allocator),
+            .labelled_break_jumps = .init(allocator),
+            .current_label = null,
+        };
+    }
+
+    pub fn deinit(self: *Context) void {
+        self.continue_jumps.deinit();
+        self.break_jumps.deinit();
+        std.debug.assert(self.labelled_continue_jumps.count() == 0);
+        self.labelled_continue_jumps.deinit();
+        std.debug.assert(self.labelled_break_jumps.count() == 0);
+        self.labelled_break_jumps.deinit();
+    }
 };
 
 /// Due to the lack of basic blocks we have to perform a bit of trickery to make `break` and
@@ -47,6 +71,32 @@ fn interceptContinueAndBreakJumps(
         try executable.addInstruction(.jump);
         const jump_index = try executable.addJumpIndex();
         try ctx.break_jumps.append(jump_index);
+    }
+    var labelled_continue_jumps_it = ctx.labelled_continue_jumps.valueIterator();
+    while (labelled_continue_jumps_it.next()) |value_ptr| {
+        const labelled_continue_jumps = value_ptr.*;
+        if (labelled_continue_jumps.items.len != 0) {
+            while (labelled_continue_jumps.popOrNull()) |jump_index| {
+                try jump_index.setTargetHere();
+            }
+            try @call(.always_inline, codegenFn, args);
+            try executable.addInstruction(.jump);
+            const jump_index = try executable.addJumpIndex();
+            try labelled_continue_jumps.append(jump_index);
+        }
+    }
+    var labelled_break_jumps_it = ctx.labelled_break_jumps.valueIterator();
+    while (labelled_break_jumps_it.next()) |value_ptr| {
+        const labelled_break_jumps = value_ptr.*;
+        if (labelled_break_jumps.items.len != 0) {
+            while (labelled_break_jumps.popOrNull()) |jump_index| {
+                try jump_index.setTargetHere();
+            }
+            try @call(.always_inline, codegenFn, args);
+            try executable.addInstruction(.jump);
+            const jump_index = try executable.addJumpIndex();
+            try labelled_break_jumps.append(jump_index);
+        }
     }
     try skip_jump.setTargetHere();
 }
@@ -2516,6 +2566,16 @@ pub fn codegenDoWhileStatement(
     while (ctx.break_jumps.popOrNull()) |jump_index| {
         try jump_index.setTargetHere();
     }
+    if (ctx.current_label) |label| {
+        const labelled_continue_jumps = ctx.labelled_continue_jumps.get(label).?;
+        while (labelled_continue_jumps.popOrNull()) |jump_index| {
+            try jump_index.setTarget(continue_index);
+        }
+        const labelled_break_jumps = ctx.labelled_break_jumps.get(label).?;
+        while (labelled_break_jumps.popOrNull()) |jump_index| {
+            try jump_index.setTargetHere();
+        }
+    }
 }
 
 /// 14.7.3.2 Runtime Semantics: WhileLoopEvaluation
@@ -2578,6 +2638,16 @@ pub fn codegenWhileStatement(
     }
     while (ctx.break_jumps.popOrNull()) |jump_index| {
         try jump_index.setTargetHere();
+    }
+    if (ctx.current_label) |label| {
+        const labelled_continue_jumps = ctx.labelled_continue_jumps.get(label).?;
+        while (labelled_continue_jumps.popOrNull()) |jump_index| {
+            try jump_index.setTarget(continue_index);
+        }
+        const labelled_break_jumps = ctx.labelled_break_jumps.get(label).?;
+        while (labelled_break_jumps.popOrNull()) |jump_index| {
+            try jump_index.setTargetHere();
+        }
     }
 }
 
@@ -2724,6 +2794,16 @@ pub fn codegenForStatement(
     }
     while (ctx.break_jumps.popOrNull()) |jump_index| {
         try jump_index.setTargetHere();
+    }
+    if (ctx.current_label) |label| {
+        const labelled_continue_jumps = ctx.labelled_continue_jumps.get(label).?;
+        while (labelled_continue_jumps.popOrNull()) |jump_index| {
+            try jump_index.setTarget(continue_index);
+        }
+        const labelled_break_jumps = ctx.labelled_break_jumps.get(label).?;
+        while (labelled_break_jumps.popOrNull()) |jump_index| {
+            try jump_index.setTargetHere();
+        }
     }
 
     if (node.initializer) |initializer| if (initializer == .lexical_declaration) {
@@ -3076,6 +3156,16 @@ fn forInOfBodyEvaluation(
     while (ctx.break_jumps.popOrNull()) |jump_index| {
         try jump_index.setTargetHere();
     }
+    if (ctx.current_label) |label| {
+        const labelled_continue_jumps = ctx.labelled_continue_jumps.get(label).?;
+        while (labelled_continue_jumps.popOrNull()) |jump_index| {
+            try jump_index.setTarget(continue_index);
+        }
+        const labelled_break_jumps = ctx.labelled_break_jumps.get(label).?;
+        while (labelled_break_jumps.popOrNull()) |jump_index| {
+            try jump_index.setTargetHere();
+        }
+    }
 
     // TODO: We should probably also clean this up if something throws beforehand...
     try executable.addInstruction(.pop_iterator);
@@ -3102,14 +3192,13 @@ pub fn codegenContinueStatement(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    // TODO: ContinueStatement : continue LabelIdentifier ;
+    // ContinueStatement : continue LabelIdentifier ;
     if (node.label) |label| {
-        _ = label;
         // 1. Let label be the StringValue of LabelIdentifier.
         // 2. Return Completion Record { [[Type]]: continue, [[Value]]: empty, [[Target]]: label }.
         try executable.addInstruction(.jump);
         const jump_index = try executable.addJumpIndex();
-        try ctx.continue_jumps.append(jump_index);
+        try ctx.labelled_continue_jumps.get(label).?.append(jump_index);
     }
     // ContinueStatement : continue ;
     else {
@@ -3127,14 +3216,13 @@ pub fn codegenBreakStatement(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    // TODO: BreakStatement : break LabelIdentifier ;
+    // BreakStatement : break LabelIdentifier ;
     if (node.label) |label| {
-        _ = label;
         // 1. Let label be the StringValue of LabelIdentifier.
         // 2. Return Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: label }.
         try executable.addInstruction(.jump);
         const jump_index = try executable.addJumpIndex();
-        try ctx.break_jumps.append(jump_index);
+        try ctx.labelled_break_jumps.get(label).?.append(jump_index);
     }
     // BreakStatement : break ;
     else {
@@ -3413,13 +3501,27 @@ pub fn codegenLabelledStatement(
 
     // 14.13.4 Runtime Semantics: LabelledEvaluation
     // https://tc39.es/ecma262/#sec-runtime-semantics-labelledevaluation
-    // TODO: Implement labelled break and continue - for now we simply break to the end of the
-    //       statement, which is completely wrong but at least prevents infinite loops.
-    const break_jumps = try ctx.break_jumps.toOwnedSlice();
-    defer ctx.break_jumps = .fromOwnedSlice(
-        ctx.break_jumps.allocator,
-        break_jumps,
-    );
+
+    const label = node.label_identifier;
+
+    const tmp = temporaryChange(&ctx.current_label, label);
+    defer tmp.restore();
+
+    var labelled_continue_jumps = std.ArrayList(Executable.JumpIndex).init(executable.allocator);
+    defer labelled_continue_jumps.deinit();
+    try ctx.labelled_continue_jumps.putNoClobber(label, &labelled_continue_jumps);
+    defer {
+        const removed = ctx.labelled_continue_jumps.remove(label);
+        std.debug.assert(removed);
+    }
+
+    var labelled_break_jumps = std.ArrayList(Executable.JumpIndex).init(executable.allocator);
+    defer labelled_break_jumps.deinit();
+    try ctx.labelled_break_jumps.putNoClobber(label, &labelled_break_jumps);
+    defer {
+        const removed = ctx.labelled_break_jumps.remove(label);
+        std.debug.assert(removed);
+    }
 
     switch (node.labelled_item) {
         // LabelledItem : FunctionDeclaration
@@ -3435,9 +3537,14 @@ pub fn codegenLabelledStatement(
         },
     }
 
-    while (ctx.break_jumps.popOrNull()) |jump_index| {
+    // Only codegen for iterable statements drains the labelled break/continue jumps, there may be
+    // more from other kinds of statements. This doesn't apply to labelled continue jumps which are
+    // only valid in iterable statements anyway.
+    while (labelled_break_jumps.popOrNull()) |jump_index| {
         try jump_index.setTargetHere();
     }
+    std.debug.assert(labelled_continue_jumps.items.len == 0);
+    std.debug.assert(labelled_break_jumps.items.len == 0);
 }
 
 /// 14.14.1 Runtime Semantics: Evaluation

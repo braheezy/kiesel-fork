@@ -31,16 +31,9 @@ pub fn generateBytecode(
 ) Agent.Error!Executable {
     var executable = Executable.init(agent.gc_allocator);
 
-    var continue_jumps = std.ArrayList(Executable.JumpIndex).init(agent.gc_allocator);
-    defer continue_jumps.deinit();
-    var break_jumps = std.ArrayList(Executable.JumpIndex).init(agent.gc_allocator);
-    defer break_jumps.deinit();
-
-    var ctx: codegen.Context = .{
-        .contained_in_strict_mode_code = options.contained_in_strict_mode_code,
-        .continue_jumps = continue_jumps,
-        .break_jumps = break_jumps,
-    };
+    var ctx = codegen.Context.init(agent.gc_allocator);
+    defer ctx.deinit();
+    ctx.contained_in_strict_mode_code = options.contained_in_strict_mode_code;
 
     const ast_node_name = comptime blk: {
         var it = std.mem.splitBackwardsScalar(u8, @typeName(@TypeOf(ast_node)), '.');
