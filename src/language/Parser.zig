@@ -2159,9 +2159,19 @@ pub fn acceptIfStatement(self: *Parser) AcceptError!ast.IfStatement {
     _ = try self.core.accept(RuleSet.is(.@"("));
     const test_expression = try self.acceptExpression(.{});
     _ = try self.core.accept(RuleSet.is(.@")"));
-    const consequent_statement = try self.acceptStatement();
+    const consequent_statement = if (self.acceptStatement()) |statement|
+        statement
+    else |_| if (self.acceptIfStatementFunctionDeclaration()) |statement|
+        statement
+    else |_|
+        return error.UnexpectedToken;
     const alternate_statement = if (self.core.accept(RuleSet.is(.@"else"))) |_|
-        try self.acceptStatement()
+        if (self.acceptStatement()) |statement|
+            statement
+        else |_| if (self.acceptIfStatementFunctionDeclaration()) |statement|
+            statement
+        else |_|
+            return error.UnexpectedToken
     else |_|
         null;
     return .{
@@ -2169,6 +2179,44 @@ pub fn acceptIfStatement(self: *Parser) AcceptError!ast.IfStatement {
         .consequent_statement = consequent_statement,
         .alternate_statement = alternate_statement,
     };
+}
+
+fn acceptIfStatementFunctionDeclaration(self: *Parser) AcceptError!*ast.Statement {
+    // B.3.3 FunctionDeclarations in IfStatement Statement Clauses
+    // https://tc39.es/ecma262/#sec-functiondeclarations-in-ifstatement-statement-clauses
+    // Source text matched by this production is processed as if each matching occurrence of
+    // FunctionDeclaration[?Yield, ?Await, ~Default] was the sole StatementListItem of a
+    // BlockStatement occupying that position in the source text.
+
+    // TODO: Make this dependent on the `enable-annex-b` build flag
+    if (self.state.in_strict_mode) return error.UnexpectedToken;
+
+    const function_declaration = try self.acceptFunctionDeclaration();
+
+    const declaration = try self.allocator.create(ast.Declaration);
+    errdefer self.allocator.destroy(declaration);
+    declaration.* = .{
+        .hoistable_declaration = .{
+            .function_declaration = function_declaration,
+        },
+    };
+
+    var statement_list_items = std.ArrayList(ast.StatementListItem).init(self.allocator);
+    errdefer statement_list_items.deinit();
+    try statement_list_items.append(.{ .declaration = declaration });
+
+    const statement = try self.allocator.create(ast.Statement);
+    errdefer self.allocator.destroy(statement);
+    statement.* = .{
+        .block_statement = .{
+            .block = .{
+                .statement_list = .{
+                    .items = try statement_list_items.toOwnedSlice(),
+                },
+            },
+        },
+    };
+    return statement;
 }
 
 pub fn acceptIterationStatement(self: *Parser) AcceptError!ast.IterationStatement {
