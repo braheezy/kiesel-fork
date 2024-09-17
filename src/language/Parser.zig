@@ -2114,6 +2114,38 @@ pub fn acceptExpressionStatement(self: *Parser) AcceptError!ast.ExpressionStatem
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    var next_token = try self.core.nextToken() orelse return error.EndOfStream;
+    switch (next_token.type) {
+        // An ExpressionStatement cannot start with a U+007B (LEFT CURLY BRACKET) because that
+        // might make it ambiguous with a Block.
+        .@"{" => return error.UnexpectedToken,
+
+        // An ExpressionStatement cannot start with the function or class keywords because that
+        // would make it ambiguous with a FunctionDeclaration, a GeneratorDeclaration, or a
+        // ClassDeclaration.
+        .function, .class => return error.UnexpectedToken,
+
+        .identifier => {
+            // An ExpressionStatement cannot start with async function because that would make it
+            // ambiguous with an AsyncFunctionDeclaration or a AsyncGeneratorDeclaration.
+            if (std.mem.eql(u8, next_token.text, "async") and !self.followedByLineTerminator()) {
+                next_token = try self.core.nextToken() orelse return error.EndOfStream;
+                if (next_token.type == .function) return error.UnexpectedToken;
+            }
+
+            // An ExpressionStatement cannot start with the two token sequence let [ because that
+            // would make it ambiguous with a let LexicalDeclaration whose first LexicalBinding was
+            // an ArrayBindingPattern.
+            if (std.mem.eql(u8, next_token.text, "let")) {
+                next_token = try self.core.nextToken() orelse return error.EndOfStream;
+                if (next_token.type == .@"[") return error.UnexpectedToken;
+            }
+        },
+
+        else => {},
+    }
+    self.core.restoreState(state);
+
     const expression = try self.acceptExpression(.{});
     try self.acceptOrInsertSemicolon();
     return .{ .expression = expression };
@@ -2348,7 +2380,7 @@ pub fn acceptBreakStatement(self: *Parser) AcceptError!ast.BreakStatement {
 
     const token = try self.core.accept(RuleSet.is(.@"break"));
 
-    if (!self.followedByLineTerminator())  {
+    if (!self.followedByLineTerminator()) {
         if (self.acceptLabelIdentifier(false)) |label| {
             try self.acceptOrInsertSemicolon();
 
