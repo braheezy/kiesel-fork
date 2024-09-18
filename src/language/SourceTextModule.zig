@@ -121,7 +121,7 @@ const Status = enum {
 /// https://tc39.es/ecma262/#importentry-record
 pub const ImportEntry = struct {
     /// [[ModuleRequest]]
-    module_request: []const u8,
+    module_request: String,
 
     /// [[ImportName]]
     import_name: ?union(enum) {
@@ -139,7 +139,7 @@ pub const ExportEntry = struct {
     export_name: ?[]const u8,
 
     /// [[ModuleRequest]]
-    module_request: ?[]const u8,
+    module_request: ?String,
 
     /// [[ImportName]]
     import_name: ?union(enum) {
@@ -941,10 +941,7 @@ pub fn getExportedNames(
         std.debug.assert(export_entry.module_request != null);
 
         // b. Let requestedModule be GetImportedModule(module, e.[[ModuleRequest]]).
-        const requested_module = getImportedModule(
-            self,
-            try String.fromUtf8(agent.gc_allocator, export_entry.module_request.?),
-        );
+        const requested_module = getImportedModule(self, export_entry.module_request.?);
 
         // c. Let starNames be requestedModule.GetExportedNames(exportStarSet).
         const star_names = try requested_module.getExportedNames(agent, export_star_set);
@@ -1003,10 +1000,7 @@ pub fn resolveExport(
             std.debug.assert(export_entry.module_request != null);
 
             // ii. Let importedModule be GetImportedModule(module, e.[[ModuleRequest]]).
-            const imported_module = getImportedModule(
-                self,
-                try String.fromUtf8(agent.gc_allocator, export_entry.module_request.?),
-            );
+            const imported_module = getImportedModule(self, export_entry.module_request.?);
 
             // iii. If e.[[ImportName]] is all, then
             if (export_entry.import_name != null and export_entry.import_name.? == .all) {
@@ -1045,10 +1039,7 @@ pub fn resolveExport(
         std.debug.assert(export_entry.module_request != null);
 
         // b. Let importedModule be GetImportedModule(module, e.[[ModuleRequest]]).
-        const imported_module = getImportedModule(
-            self,
-            try String.fromUtf8(agent.gc_allocator, export_entry.module_request.?),
-        );
+        const imported_module = getImportedModule(self, export_entry.module_request.?);
 
         // c. Let resolution be importedModule.ResolveExport(exportName, resolveSet).
         const maybe_resolution = try imported_module.resolveExport(agent, export_name);
@@ -1129,10 +1120,7 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
     // 7. For each ImportEntry Record in of module.[[ImportEntries]], do
     for (self.import_entries.items) |import_entry| {
         // a. Let importedModule be GetImportedModule(module, in.[[ModuleRequest]]).
-        const imported_module = getImportedModule(
-            self,
-            try String.fromUtf8(agent.gc_allocator, import_entry.module_request),
-        );
+        const imported_module = getImportedModule(self, import_entry.module_request);
 
         const import_name = import_entry.import_name.?;
         const local_name = try String.fromUtf8(agent.gc_allocator, import_entry.local_name);

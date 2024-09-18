@@ -3218,7 +3218,7 @@ pub const Module = struct {
                     // 2. Return ExportEntriesForModule of ExportFromClause with argument module.
                     try export_from.export_from_clause.collectExportEntriesForModule(
                         export_entries,
-                        try (try module.stringValue(allocator)).toUtf8(allocator),
+                        try module.stringValue(allocator),
                     );
                 },
 
@@ -3485,7 +3485,7 @@ pub const ImportClause = union(enum) {
                 //      [[ModuleRequest]]: module, [[ImportName]]: "default", [[LocalName]]: localName
                 //    }.
                 const default_entry: ImportEntry = .{
-                    .module_request = try module.toUtf8(allocator),
+                    .module_request = module,
                     .import_name = .{ .string = "default" },
                     .local_name = local_name,
                 };
@@ -3503,7 +3503,7 @@ pub const ImportClause = union(enum) {
                 //      [[ModuleRequest]]: module, [[ImportName]]: namespace-object, [[LocalName]]: localName
                 //    }.
                 const entry: ImportEntry = .{
-                    .module_request = try module.toUtf8(allocator),
+                    .module_request = module,
                     .import_name = .namespace_object,
                     .local_name = local_name,
                 };
@@ -3536,7 +3536,7 @@ pub const ImportClause = union(enum) {
                     //      [[ModuleRequest]]: module, [[ImportName]]: importName, [[LocalName]]: localName
                     //    }.
                     const entry: ImportEntry = .{
-                        .module_request = try module.toUtf8(allocator),
+                        .module_request = module,
                         .import_name = .{ .string = import_name },
                         .local_name = local_name,
                     };
@@ -3553,7 +3553,7 @@ pub const ImportClause = union(enum) {
                     //      [[ModuleRequest]]: module, [[ImportName]]: localName, [[LocalName]]: localName
                     //    }.
                     const entry: ImportEntry = .{
-                        .module_request = try module.toUtf8(allocator),
+                        .module_request = module,
                         .import_name = .{ .string = local_name },
                         .local_name = local_name,
                     };
@@ -3604,7 +3604,7 @@ pub const ExportFromClause = union(enum) {
     pub fn collectExportEntriesForModule(
         self: ExportFromClause,
         export_entries: *std.ArrayList(ExportEntry),
-        module: ?[]const u8,
+        module: ?String,
     ) std.mem.Allocator.Error!void {
         const allocator = export_entries.allocator;
         switch (self) {
@@ -3660,7 +3660,7 @@ pub const NamedExports = struct {
     pub fn collectExportEntriesForModule(
         self: NamedExports,
         export_entries: *std.ArrayList(ExportEntry),
-        module: ?[]const u8,
+        module: ?String,
     ) std.mem.Allocator.Error!void {
         // ExportsList : ExportsList , ExportSpecifier
         // 1. Let specs1 be the ExportEntriesForModule of ExportsList with argument module.
