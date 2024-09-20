@@ -417,6 +417,36 @@ fn ensureAllowedIdentifier(
     }
 }
 
+fn ensureUniqueLexicallyDeclaredNames(
+    self: *Parser,
+    lexically_declared_names: []const ast.Identifier,
+    var_declared_names: []const ast.Identifier,
+    location: ptk.Location,
+) std.mem.Allocator.Error!void {
+    var seen = std.StringHashMap(void).init(self.allocator);
+    defer seen.deinit();
+
+    var var_names_set = std.StringHashMap(void).init(self.allocator);
+    try var_names_set.ensureUnusedCapacity(@intCast(var_declared_names.len));
+    defer var_names_set.deinit();
+    for (var_declared_names) |name| var_names_set.putAssumeCapacity(name, {});
+
+    for (lexically_declared_names) |name| {
+        if (seen.contains(name)) {
+            try self.emitErrorAt(location, "Duplicate lexical declaration '{s}'", .{name});
+        }
+        try seen.putNoClobber(name, {});
+
+        if (var_names_set.contains(name)) {
+            try self.emitErrorAt(
+                location,
+                "Lexical declaration '{s}' is also var-declared",
+                .{name},
+            );
+        }
+    }
+}
+
 /// 5.1.5.8 [no LineTerminator here]
 /// https://tc39.es/ecma262/#sec-no-lineterminator-here
 fn followedByLineTerminator(self: *Parser) bool {
@@ -1787,9 +1817,29 @@ pub fn acceptBlock(self: *Parser) AcceptError!ast.Block {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    _ = try self.core.accept(RuleSet.is(.@"{"));
-    const block = .{ .statement_list = try self.acceptStatementList(.{}) };
+    const token = try self.core.accept(RuleSet.is(.@"{"));
+    const statement_list = try self.acceptStatementList(.{});
+    const block: ast.Block = .{ .statement_list = statement_list };
     _ = try self.core.accept(RuleSet.is(.@"}"));
+
+    var lexically_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    defer lexically_declared_names.deinit();
+    try statement_list.collectLexicallyDeclaredNames(&lexically_declared_names);
+
+    var var_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    defer var_declared_names.deinit();
+    try statement_list.collectVarDeclaredNames(&var_declared_names);
+
+    // - It is a Syntax Error if the LexicallyDeclaredNames of StatementList contains any duplicate
+    //   entries.
+    // - It is a Syntax Error if any element of the LexicallyDeclaredNames of StatementList also
+    //   occurs in the VarDeclaredNames of StatementList.
+    try self.ensureUniqueLexicallyDeclaredNames(
+        lexically_declared_names.items,
+        var_declared_names.items,
+        token.location,
+    );
+
     return block;
 }
 
@@ -2510,7 +2560,27 @@ pub fn acceptSwitchStatement(self: *Parser) AcceptError!ast.SwitchStatement {
     _ = try self.core.accept(RuleSet.is(.@"("));
     const expression = try self.acceptExpression(.{});
     _ = try self.core.accept(RuleSet.is(.@")"));
+    const case_block_location = (try self.peekToken()).location;
     const case_block = try self.acceptCaseBlock();
+
+    var lexically_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    defer lexically_declared_names.deinit();
+    try case_block.collectLexicallyDeclaredNames(&lexically_declared_names);
+
+    var var_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    defer var_declared_names.deinit();
+    try case_block.collectVarDeclaredNames(&var_declared_names);
+
+    // - It is a Syntax Error if the LexicallyDeclaredNames of CaseBlock contains any duplicate
+    //   entries.
+    // - It is a Syntax Error if any element of the LexicallyDeclaredNames of CaseBlock also occurs
+    //   in the VarDeclaredNames of CaseBlock.
+    try self.ensureUniqueLexicallyDeclaredNames(
+        lexically_declared_names.items,
+        var_declared_names.items,
+        case_block_location,
+    );
+
     return .{ .expression = expression, .case_block = case_block };
 }
 
@@ -2761,13 +2831,34 @@ pub fn acceptFunctionBody(
     defer tmp4.restore();
 
     const statement_list = try self.acceptStatementList(.{ .update_strict_mode = true });
+
     const strict = self.state.in_strict_mode or statement_list.containsDirective("use strict");
-    return .{
+    const function_body: ast.FunctionBody = .{
         .type = @"type",
         .statement_list = statement_list,
         .strict = strict,
         .arguments_object_needed = self.state.arguments_object_needed,
     };
+
+    var lexically_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    defer lexically_declared_names.deinit();
+    try function_body.collectLexicallyDeclaredNames(&lexically_declared_names);
+
+    var var_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    defer var_declared_names.deinit();
+    try function_body.collectVarDeclaredNames(&var_declared_names);
+
+    // - It is a Syntax Error if the LexicallyDeclaredNames of FunctionStatementList contains any
+    //   duplicate entries.
+    // - It is a Syntax Error if any element of the LexicallyDeclaredNames of FunctionStatementList
+    //   also occurs in the VarDeclaredNames of FunctionStatementList.
+    try self.ensureUniqueLexicallyDeclaredNames(
+        lexically_declared_names.items,
+        var_declared_names.items,
+        state.location,
+    );
+
+    return function_body;
 }
 
 pub fn acceptArrowFunction(self: *Parser) AcceptError!ast.ArrowFunction {
@@ -3244,9 +3335,7 @@ fn acceptClassElement(self: *Parser) AcceptError!ast.ClassElement {
         } else |_| if (self.acceptFieldDefinition()) |field_definition| {
             _ = try self.acceptOrInsertSemicolon();
             return .{ .static_field_definition = field_definition };
-        } else |_| if (self.core.accept(RuleSet.is(.@"{"))) |_| {
-            const class_static_block = .{ .statement_list = try self.acceptStatementList(.{}) };
-            _ = try self.core.accept(RuleSet.is(.@"}"));
+        } else |_| if (self.acceptClassStaticBlock()) |class_static_block| {
             return .{ .class_static_block = class_static_block };
         } else |_| return error.UnexpectedToken;
     } else |_| if (self.acceptMethodDefinition(null)) |*method_definition| {
@@ -3290,6 +3379,37 @@ fn acceptClassElementName(self: *Parser) AcceptError!ast.ClassElementName {
         }
         return .{ .private_identifier = private_identifier };
     } else |_| return error.UnexpectedToken;
+}
+
+fn acceptClassStaticBlock(self: *Parser) AcceptError!ast.ClassStaticBlock {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const token = try self.core.accept(RuleSet.is(.@"{"));
+    const statement_list = try self.acceptStatementList(.{});
+    const class_static_block: ast.ClassStaticBlock = .{ .statement_list = statement_list };
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+
+    var lexically_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    defer lexically_declared_names.deinit();
+    try class_static_block.collectLexicallyDeclaredNames(&lexically_declared_names);
+
+    var var_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    defer var_declared_names.deinit();
+    try class_static_block.collectVarDeclaredNames(&var_declared_names);
+
+    // - It is a Syntax Error if the LexicallyDeclaredNames of ClassStaticBlockStatementList
+    //   contains any duplicate entries.
+    // - It is a Syntax Error if any element of the LexicallyDeclaredNames of
+    //   ClassStaticBlockStatementList also occurs in the VarDeclaredNames of
+    //   ClassStaticBlockStatementList.
+    try self.ensureUniqueLexicallyDeclaredNames(
+        lexically_declared_names.items,
+        var_declared_names.items,
+        token.location,
+    );
+
+    return class_static_block;
 }
 
 fn acceptRegularExpressionLiteral(self: *Parser) AcceptError!ast.RegularExpressionLiteral {
@@ -3535,7 +3655,27 @@ pub fn acceptScript(self: *Parser) AcceptError!ast.Script {
 
     _ = self.core.accept(RuleSet.is(.hashbang_comment)) catch {};
     const statement_list = try self.acceptStatementList(.{ .update_strict_mode = true });
-    return .{ .statement_list = statement_list };
+    const script: ast.Script = .{ .statement_list = statement_list };
+
+    var lexically_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    defer lexically_declared_names.deinit();
+    try script.collectLexicallyDeclaredNames(&lexically_declared_names);
+
+    var var_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    defer var_declared_names.deinit();
+    try script.collectVarDeclaredNames(&var_declared_names);
+
+    // - It is a Syntax Error if the LexicallyDeclaredNames of ScriptBody contains any duplicate
+    //   entries.
+    // - It is a Syntax Error if any element of the LexicallyDeclaredNames of ScriptBody also
+    //   occurs in the VarDeclaredNames of ScriptBody.
+    try self.ensureUniqueLexicallyDeclaredNames(
+        lexically_declared_names.items,
+        var_declared_names.items,
+        state.location,
+    );
+
+    return script;
 }
 
 pub fn acceptModule(self: *Parser) AcceptError!ast.Module {
@@ -3551,7 +3691,27 @@ pub fn acceptModule(self: *Parser) AcceptError!ast.Module {
 
     _ = self.core.accept(RuleSet.is(.hashbang_comment)) catch {};
     const module_item_list = try self.acceptModuleItemList();
-    return .{ .module_item_list = module_item_list };
+    const module: ast.Module = .{ .module_item_list = module_item_list };
+
+    var lexically_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    defer lexically_declared_names.deinit();
+    try module_item_list.collectLexicallyDeclaredNames(&lexically_declared_names);
+
+    var var_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    defer var_declared_names.deinit();
+    try module_item_list.collectVarDeclaredNames(&var_declared_names);
+
+    // - It is a Syntax Error if the LexicallyDeclaredNames of ModuleItemList contains any
+    //   duplicate entries.
+    // - It is a Syntax Error if any element of the LexicallyDeclaredNames of ModuleItemList also
+    //   occurs in the VarDeclaredNames of ModuleItemList.
+    try self.ensureUniqueLexicallyDeclaredNames(
+        lexically_declared_names.items,
+        var_declared_names.items,
+        state.location,
+    );
+
+    return module;
 }
 
 pub fn acceptModuleItemList(self: *Parser) AcceptError!ast.ModuleItemList {
