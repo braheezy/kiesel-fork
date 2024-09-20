@@ -729,6 +729,8 @@ pub fn acceptPrimaryExpression(self: *Parser) AcceptError!ast.PrimaryExpression 
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const error_count = self.diagnostics.errors.items.len;
+
     const next_token = try self.peekToken();
     return switch (next_token.type) {
         .this => blk: {
@@ -749,12 +751,15 @@ pub fn acceptPrimaryExpression(self: *Parser) AcceptError!ast.PrimaryExpression 
             error.UnexpectedToken,
         .@"(" => if (self.acceptArrowFunction()) |arrow_function|
             .{ .arrow_function = arrow_function }
-        else |_| if (self.acceptParenthesizedExpression()) |parenthesized_expression| blk: {
-            // If parsing the arrow function failed and this succeeded, we may have emitted an
-            // 'invalid binding identifier' error, e.g. for `"use strict"; (eval)`
-            _ = self.diagnostics.errors.popOrNull();
-            break :blk .{ .parenthesized_expression = parenthesized_expression };
-        } else |_| error.UnexpectedToken,
+        else |_| blk: {
+            // If parsing the arrow function failed we may have emitted an 'invalid binding
+            // identifier' error, e.g. for `"use strict"; (eval)` - get rid of those
+            while (self.diagnostics.errors.items.len > error_count) _ = self.diagnostics.errors.pop();
+            break :blk if (self.acceptParenthesizedExpression()) |parenthesized_expression|
+                .{ .parenthesized_expression = parenthesized_expression }
+            else |_|
+                error.UnexpectedToken;
+        },
         .function => if (self.acceptFunctionExpression()) |function_expression|
             .{ .function_expression = function_expression }
         else |_| if (self.acceptGeneratorExpression()) |generator_expression|
