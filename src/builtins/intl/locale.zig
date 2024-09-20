@@ -42,9 +42,8 @@ const UnicodeExtensions = struct {
 fn updateLanguageId(agent: *Agent, tag: icu4zig.Locale, options: Object) Agent.Error!icu4zig.Locale {
     var new_tag = tag.clone();
 
-    // 1. Let languageId be the longest prefix of tag matched by the unicode_language_id Unicode
-    //    locale nonterminal.
-    // 2. Let language be ? GetOption(options, "language", string, empty, GetLocaleLanguage(languageId)).
+    // 1. Let baseName be GetLocaleBaseName(tag).
+    // 2. Let language be ? GetOption(options, "language", string, empty, GetLocaleLanguage(baseName)).
     const maybe_language = try getOption(options, "language", .string, null, null);
 
     // 3. If language cannot be matched by the unicode_language_subtag Unicode locale nonterminal,
@@ -55,7 +54,7 @@ fn updateLanguageId(agent: *Agent, tag: icu4zig.Locale, options: Object) Agent.E
         };
     }
 
-    // 4. Let script be ? GetOption(options, "script", string, empty, GetLocaleScript(languageId)).
+    // 4. Let script be ? GetOption(options, "script", string, empty, GetLocaleScript(baseName)).
     const maybe_script = try getOption(options, "script", .string, null, null);
 
     // 5. If script is not undefined, then
@@ -67,7 +66,7 @@ fn updateLanguageId(agent: *Agent, tag: icu4zig.Locale, options: Object) Agent.E
         };
     }
 
-    // 6. Let region be ? GetOption(options, "region", string, empty, GetLocaleRegion(languageId)).
+    // 6. Let region be ? GetOption(options, "region", string, empty, GetLocaleRegion(baseName)).
     const maybe_region = try getOption(options, "region", .string, null, null);
 
     // 7. If region is not undefined, then
@@ -79,10 +78,10 @@ fn updateLanguageId(agent: *Agent, tag: icu4zig.Locale, options: Object) Agent.E
         };
     }
 
-    // 8-13.
+    // 8-14.
     // NOTE: These are done as part of step 3.a., 5.a., and 7.a.
 
-    // 14. Return newTag.
+    // 15. Return newTag.
     return new_tag;
 }
 
@@ -483,8 +482,7 @@ pub const LocalePrototype = struct {
         // 2. Perform ? RequireInternalSlot(loc, [[InitializedLocale]]).
         const locale = try this_value.requireInternalSlot(agent, Locale);
 
-        // 3. Let locale be loc.[[Locale]].
-        // 4. Return the longest prefix of locale matched by the unicode_language_id Unicode locale nonterminal.
+        // 3. Return GetLocaleBaseName(loc.[[Locale]]).
         return Value.from(
             try String.fromAscii(
                 agent.gc_allocator,
