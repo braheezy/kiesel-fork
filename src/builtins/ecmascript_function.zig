@@ -1039,8 +1039,10 @@ fn functionDeclarationInstantiation(
     defer var_declarations.deinit();
     try code.collectVarScopedDeclarations(&var_declarations);
 
-    // TODO: 11. Let lexicalNames be the LexicallyDeclaredNames of code.
-    const lexical_names = &[_][]const u8{};
+    // 11. Let lexicalNames be the LexicallyDeclaredNames of code.
+    var lexical_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
+    defer lexical_names.deinit();
+    try code.collectLexicallyDeclaredNames(&lexical_names);
 
     // 12. Let functionNames be a new empty List.
     var function_names = StringHashMap(void).init(agent.gc_allocator);
@@ -1098,7 +1100,7 @@ fn functionDeclarationInstantiation(
     else if (!has_parameter_expressions) {
         // a. If functionNames contains "arguments" or lexicalNames contains "arguments", then
         if (function_names.contains(String.fromLiteral("arguments")) or
-            containsSlice(lexical_names, "arguments"))
+            containsSlice(lexical_names.items, "arguments"))
         {
             // i. Set argumentsObjectNeeded to false.
             arguments_object_needed = false;

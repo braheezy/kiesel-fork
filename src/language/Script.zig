@@ -140,14 +140,41 @@ pub fn evaluate(self: *Script) Agent.Error!Value {
 /// 16.1.7 GlobalDeclarationInstantiation ( script, env )
 /// https://tc39.es/ecma262/#sec-globaldeclarationinstantiation
 fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *GlobalEnvironment) Agent.Error!void {
-    // TODO: 1. Let lexNames be the LexicallyDeclaredNames of script.
+    // 1. Let lexNames be the LexicallyDeclaredNames of script.
+    var lexical_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
+    defer lexical_names.deinit();
+    try script.collectLexicallyDeclaredNames(&lexical_names);
 
     // 2. Let varNames be the VarDeclaredNames of script.
     var var_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);
     defer var_names.deinit();
     try script.collectVarDeclaredNames(&var_names);
 
-    // TODO: 3. For each element name of lexNames, do
+    // 3. For each element name of lexNames, do
+    for (lexical_names.items) |name_utf8| {
+        const name = try String.fromUtf8(agent.gc_allocator, name_utf8);
+
+        // a. If env.HasVarDeclaration(name) is true, throw a SyntaxError exception.
+        if (env.hasVarDeclaration(name)) {
+            return agent.throwException(
+                .syntax_error,
+                "Global environment already has a var declaration '{}'",
+                .{name},
+            );
+        }
+
+        // b. If env.HasLexicalDeclaration(name) is true, throw a SyntaxError exception.
+        if (env.hasLexicalDeclaration(name)) {
+            return agent.throwException(
+                .syntax_error,
+                "Global environment already has a lexical declaration '{}'",
+                .{name},
+            );
+        }
+
+        // TODO: c. Let hasRestrictedGlobal be ? env.HasRestrictedGlobalProperty(name).
+        // TODO: d. If hasRestrictedGlobal is true, throw a SyntaxError exception.
+    }
 
     // 4. For each element name of varNames, do
     for (var_names.items) |name_utf8| {
