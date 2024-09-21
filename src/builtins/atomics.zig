@@ -740,39 +740,25 @@ pub const Atomics = struct {
         return atomicReadModifyWrite(agent, typed_array, index, value, .Or);
     }
 
-    /// 1 Atomics.pause ([ iterationNumber ])
+    /// 1 Atomics.pause ( [ N ] )
     /// https://tc39.es/proposal-atomics-microwait/#Atomics.pause
     fn pause(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const iteration_number = arguments.get(0);
-        // 1. If iterationNumber is not undefined, then
-        if (!iteration_number.isUndefined()) {
-            // a. If iterationNumber is not an integral Number, throw a TypeError exception.
-            if (!iteration_number.isNumber() or !iteration_number.asNumber().isIntegral()) {
-                return agent.throwException(
-                    .type_error,
-                    "{} is not an integral number",
-                    .{iteration_number},
-                );
-            }
+        const n = arguments.get(0);
 
-            // b. If ℝ(iterationNumber) < 0, throw a RangeError exception.
-            if (iteration_number.asNumber().asFloat() < 0) {
-                return agent.throwException(
-                    .range_error,
-                    "{} is not a positive number",
-                    .{iteration_number},
-                );
-            }
+        // 1. If N is neither undefined nor an integral Number, throw a TypeError exception.
+        if (!n.isUndefined() and !(n.isNumber() and n.asNumber().isIntegral())) {
+            return agent.throwException(.type_error, "{} is not an integral number", .{n});
         }
 
-        // 2. If the execution environment of the ECMAScript implementation supports a signal that
-        // the current executing code is in a spin-wait loop, send that signal. An ECMAScript
-        // implementation may send that signal multiple times, determined by iterationNumber when
-        // not undefined. The number of times the signal is sent for an integral Number N is at
-        // most the number of times it is sent for N + 1.
-        const iterations = if (!iteration_number.isUndefined())
+        // 2. If the execution environment of the ECMAScript implementation supports signaling to
+        //    the operating system or CPU that the current executing code is in a spin-wait loop,
+        //    such as executing a pause CPU instruction, send that signal. When N is not undefined,
+        //    it determines the number of times that signal is sent. The number of times the signal
+        //    is sent for an integral Number N is less than or equal to the number times it is sent
+        //    for N + 1 if both N and N + 1 have the same sign.
+        const iterations = if (!n.isUndefined() and n.asNumber().asFloat() >= 1)
             // Use u16 here to avoid freezing for large numbers (like MAX_SAFE_INTEGER).
-            std.math.lossyCast(u16, iteration_number.asNumber().asFloat())
+            std.math.lossyCast(u16, n.asNumber().asFloat())
         else
             1;
         for (0..iterations) |_| {

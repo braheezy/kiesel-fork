@@ -4687,7 +4687,7 @@
   "test/built-ins/Atomics/pause/descriptor.js": "PASS",
   "test/built-ins/Atomics/pause/length.js": "PASS",
   "test/built-ins/Atomics/pause/name.js": "PASS",
-  "test/built-ins/Atomics/pause/negative-iterationnumber-throws.js": "PASS",
+  "test/built-ins/Atomics/pause/negative-iterationnumber-throws.js": "FAIL",
   "test/built-ins/Atomics/pause/non-integral-iterationnumber-throws.js": "PASS",
   "test/built-ins/Atomics/pause/not-a-constructor.js": "PASS",
   "test/built-ins/Atomics/pause/returns-undefined.js": "PASS",
