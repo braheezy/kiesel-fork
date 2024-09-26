@@ -346,62 +346,48 @@ pub fn applyStringOrNumericBinaryOperator(
     }
 
     // 6. If lNum is a BigInt, then
-    if (l_num == .big_int) switch (operator) {
+    return if (l_num == .big_int) switch (operator) {
         // a. If opText is **, return ? BigInt::exponentiate(lNum, rNum).
-        .@"**" => return Value.from(try l_num.big_int.exponentiate(agent, r_num.big_int)),
+        .@"**" => Value.from(try l_num.big_int.exponentiate(agent, r_num.big_int)),
 
         // b. If opText is /, return ? BigInt::divide(lNum, rNum).
-        .@"/" => return Value.from(try l_num.big_int.divide(agent, r_num.big_int)),
+        .@"/" => Value.from(try l_num.big_int.divide(agent, r_num.big_int)),
 
         // c. If opText is %, return ? BigInt::remainder(lNum, rNum).
-        .@"%" => return Value.from(try l_num.big_int.remainder(agent, r_num.big_int)),
+        .@"%" => Value.from(try l_num.big_int.remainder(agent, r_num.big_int)),
 
         // d. If opText is >>>, return ? BigInt::unsignedRightShift(lNum, rNum).
-        .@">>>" => return Value.from(try l_num.big_int.unsignedRightShift(agent, r_num.big_int)),
+        .@">>>" => Value.from(try l_num.big_int.unsignedRightShift(agent, r_num.big_int)),
 
-        else => {},
+        // e. Let operation be the abstract operation associated with opText in the following table:
+        .@"*" => Value.from(try l_num.big_int.multiply(agent, r_num.big_int)),
+        .@"+" => Value.from(try l_num.big_int.add(agent, r_num.big_int)),
+        .@"-" => Value.from(try l_num.big_int.subtract(agent, r_num.big_int)),
+        .@"<<" => Value.from(try l_num.big_int.leftShift(agent, r_num.big_int)),
+        .@">>" => Value.from(try l_num.big_int.signedRightShift(agent, r_num.big_int)),
+        .@"&" => Value.from(try l_num.big_int.bitwiseAND(agent, r_num.big_int)),
+        .@"^" => Value.from(try l_num.big_int.bitwiseXOR(agent, r_num.big_int)),
+        .@"|" => Value.from(try l_num.big_int.bitwiseOR(agent, r_num.big_int)),
+    }
+    // 7. Else,
+    else switch (operator) {
+        // a. Assert: lNum is a Number.
+        // b. Let operation be the abstract operation associated with opText in the following table:
+        .@"**" => Value.from(l_num.number.exponentiate(r_num.number)),
+        .@"*" => Value.from(l_num.number.multiply(r_num.number)),
+        .@"/" => Value.from(l_num.number.divide(r_num.number)),
+        .@"%" => Value.from(l_num.number.remainder(r_num.number)),
+        .@"+" => Value.from(l_num.number.add(r_num.number)),
+        .@"-" => Value.from(l_num.number.subtract(r_num.number)),
+        .@"<<" => Value.from(l_num.number.leftShift(r_num.number)),
+        .@">>" => Value.from(l_num.number.signedRightShift(r_num.number)),
+        .@">>>" => Value.from(l_num.number.unsignedRightShift(r_num.number)),
+        .@"&" => Value.from(l_num.number.bitwiseAND(r_num.number)),
+        .@"^" => Value.from(l_num.number.bitwiseXOR(r_num.number)),
+        .@"|" => Value.from(l_num.number.bitwiseOR(r_num.number)),
     };
 
-    // 7. Let operation be the abstract operation associated with opText and Type(lNum) in the following table:
     // 8. Return operation(lNum, rNum).
-    switch (operator) {
-        .@"**" => return Value.from(l_num.number.exponentiate(r_num.number)),
-        .@"*" => switch (l_num) {
-            .number => return Value.from(l_num.number.multiply(r_num.number)),
-            .big_int => return Value.from(try l_num.big_int.multiply(agent, r_num.big_int)),
-        },
-        .@"/" => return Value.from(l_num.number.divide(r_num.number)),
-        .@"%" => return Value.from(l_num.number.remainder(r_num.number)),
-        .@"+" => switch (l_num) {
-            .number => return Value.from(l_num.number.add(r_num.number)),
-            .big_int => return Value.from(try l_num.big_int.add(agent, r_num.big_int)),
-        },
-        .@"-" => switch (l_num) {
-            .number => return Value.from(l_num.number.subtract(r_num.number)),
-            .big_int => return Value.from(try l_num.big_int.subtract(agent, r_num.big_int)),
-        },
-        .@"<<" => switch (l_num) {
-            .number => return Value.from(l_num.number.leftShift(r_num.number)),
-            .big_int => return Value.from(try l_num.big_int.leftShift(agent, r_num.big_int)),
-        },
-        .@">>" => switch (l_num) {
-            .number => return Value.from(l_num.number.signedRightShift(r_num.number)),
-            .big_int => return Value.from(try l_num.big_int.signedRightShift(agent, r_num.big_int)),
-        },
-        .@">>>" => return Value.from(l_num.number.unsignedRightShift(r_num.number)),
-        .@"&" => switch (l_num) {
-            .number => return Value.from(l_num.number.bitwiseAND(r_num.number)),
-            .big_int => return Value.from(try l_num.big_int.bitwiseAND(agent, r_num.big_int)),
-        },
-        .@"^" => switch (l_num) {
-            .number => return Value.from(l_num.number.bitwiseXOR(r_num.number)),
-            .big_int => return Value.from(try l_num.big_int.bitwiseXOR(agent, r_num.big_int)),
-        },
-        .@"|" => switch (l_num) {
-            .number => return Value.from(l_num.number.bitwiseOR(r_num.number)),
-            .big_int => return Value.from(try l_num.big_int.bitwiseOR(agent, r_num.big_int)),
-        },
-    }
 }
 
 /// 14.2.3 BlockDeclarationInstantiation ( code, env )
