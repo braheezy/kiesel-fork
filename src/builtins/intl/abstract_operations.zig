@@ -159,8 +159,8 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
     // 2. Let seen be a new empty List.
     var seen = LocaleList.init(agent.gc_allocator);
 
-    // 3. If Type(locales) is String or Type(locales) is Object and locales has an
-    //    [[InitializedLocale]] internal slot, then
+    // 3. If locales is a String or locales is an Object and locales has an [[InitializedLocale]]
+    //    internal slot, then
     const object = if (locales.isString() or
         (locales.isObject() and locales.asObject().is(builtins.Intl.Locale)))
     blk: {
@@ -192,7 +192,8 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
             // i. Let kValue be ? Get(O, Pk).
             const k_value = try object.get(property_key);
 
-            // ii. If Type(kValue) is not String or Object, throw a TypeError exception.
+            // ii. If kValue is not a String and kValue is not an Object, throw a TypeError
+            //     exception.
             if (!k_value.isString() and !k_value.isObject()) {
                 return agent.throwException(
                     .type_error,
@@ -201,7 +202,8 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
                 );
             }
 
-            // iii. If Type(kValue) is Object and kValue has an [[InitializedLocale]] internal slot, then
+            // iii. If kValue is an Object and kValue has an [[InitializedLocale]] internal slot,
+            //      then
             const tag = if (k_value.isObject() and k_value.asObject().is(builtins.Intl.Locale)) blk: {
                 // 1. Let tag be kValue.[[Locale]].
                 break :blk try String.fromAscii(
