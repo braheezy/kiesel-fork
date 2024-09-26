@@ -3250,12 +3250,12 @@ pub fn codegenReturnStatement(
 
         // TODO: 3. If GetGeneratorKind() is async, set exprValue to ? Await(exprValue).
 
-        // 4. Return Completion Record { [[Type]]: return, [[Value]]: exprValue, [[Target]]: empty }.
+        // 4. Return ReturnCompletion(exprValue).
         try executable.addInstruction(.@"return");
     }
     // ReturnStatement : return ;
     else {
-        // 1. Return Completion Record { [[Type]]: return, [[Value]]: undefined, [[Target]]: empty }.
+        // 1. Return ReturnCompletion(undefined).
         try executable.addInstructionWithConstant(.store_constant, .undefined);
         try executable.addInstruction(.@"return");
     }

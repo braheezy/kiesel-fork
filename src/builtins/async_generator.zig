@@ -146,10 +146,8 @@ pub const AsyncGeneratorPrototype = struct {
 
         const generator = generator_value.asObject().as(AsyncGenerator);
 
-        // 5. Let completion be Completion Record {
-        //      [[Type]]: return, [[Value]]: value, [[Target]]: empty
-        //    }.
-        const completion: Completion = .{ .type = .@"return", .value = value, .target = null };
+        // 5. Let completion be ReturnCompletion(value).
+        const completion = Completion.@"return"(value);
 
         // 6. Perform AsyncGeneratorEnqueue(generator, completion, promiseCapability).
         try asyncGeneratorEnqueue(generator, completion, promise_capability);
@@ -548,8 +546,8 @@ pub fn asyncGeneratorUnwrapYieldResumption(agent: *Agent, resumption_value: Comp
     };
 
     // 4. Assert: awaited is a normal completion.
-    // 5. Return Completion Record { [[Type]]: return, [[Value]]: awaited.[[Value]], [[Target]]: empty }.
-    return .{ .type = .@"return", .value = awaited_value, .target = null };
+    // 5. Return ReturnCompletion(awaited.[[Value]]).
+    return Completion.@"return"(awaited_value);
 }
 
 /// 27.6.3.8 AsyncGeneratorYield ( value )

@@ -434,8 +434,8 @@ fn evaluateGeneratorBody(
     // 5. Perform GeneratorStart(G, FunctionBody).
     generatorStart(agent, generator.as(builtins.Generator), function);
 
-    // 6. Return Completion Record { [[Type]]: return, [[Value]]: G, [[Target]]: empty }.
-    return .{ .type = .@"return", .value = Value.from(generator), .target = null };
+    // 6. Return ReturnCompletion(G).
+    return Completion.@"return"(Value.from(generator));
 }
 
 /// 15.6.2 Runtime Semantics: EvaluateAsyncGeneratorBody
@@ -469,8 +469,8 @@ fn evaluateAsyncGeneratorBody(
     // 5. Perform AsyncGeneratorStart(generator, FunctionBody).
     asyncGeneratorStart(agent, generator.as(builtins.AsyncGenerator), function);
 
-    // 6. Return Completion Record { [[Type]]: return, [[Value]]: generator, [[Target]]: empty }.
-    return .{ .type = .@"return", .value = Value.from(generator), .target = null };
+    // 6. Return ReturnCompletion(generator).
+    return Completion.@"return"(Value.from(generator));
 }
 
 /// 15.8.4 Runtime Semantics: EvaluateAsyncFunctionBody
@@ -509,8 +509,8 @@ fn evaluateAsyncFunctionBody(
     //     a. Perform AsyncFunctionStart(promiseCapability, FunctionBody).
     try asyncFunctionStart(agent, promise_capability, function);
 
-    // 5. Return Completion Record { [[Type]]: return, [[Value]]: promiseCapability.[[Promise]], [[Target]]: empty }.
-    return .{ .type = .@"return", .value = Value.from(promise_capability.promise), .target = null };
+    // 5. Return ReturnCompletion(promiseCapability.[[Promise]]).
+    return Completion.@"return"(Value.from(promise_capability.promise));
 }
 
 /// 10.2.2 [[Construct]] ( argumentsList, newTarget )
