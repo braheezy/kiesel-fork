@@ -686,12 +686,7 @@ pub const StringConstructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-string-prototype-object
 pub const StringPrototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return String.create(realm.agent, .{
-            .fields = .{
-                .string_data = .empty,
-            },
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
-        });
+        return stringCreate(realm.agent, .empty, try realm.intrinsics.@"%Object.prototype%"());
     }
 
     pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
