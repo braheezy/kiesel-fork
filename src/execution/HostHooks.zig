@@ -10,7 +10,7 @@ const language = @import("../language.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
-const Cell = @import("../builtins/finalization_registry.zig").Cell;
+const Cell = builtins.finalization_registry.Cell;
 const ImportedModulePayload = language.ImportedModulePayload;
 const ImportedModuleReferrer = language.ImportedModuleReferrer;
 const Job = @import("job.zig").Job;

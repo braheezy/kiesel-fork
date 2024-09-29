@@ -54,7 +54,7 @@ pub fn createRegExpStringIterator(
 
 /// 22.2.9.2 The %RegExpStringIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%regexpstringiteratorprototype%-object
-pub const RegExpStringIteratorPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),

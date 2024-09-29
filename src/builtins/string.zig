@@ -424,12 +424,12 @@ fn ownPropertyKeys(object: Object) std.mem.Allocator.Error!std.ArrayList(Propert
 pub fn stringCreate(
     agent: *Agent,
     value: types.String,
-    prototype: Object,
+    prototype_: Object,
 ) std.mem.Allocator.Error!Object {
     // 1. Let S be MakeBasicObject(« [[Prototype]], [[Extensible]], [[StringData]] »).
     const string = try String.create(agent, .{
         // 2. Set S.[[Prototype]] to prototype.
-        .prototype = prototype,
+        .prototype = prototype_,
 
         .fields = .{
             // 3. Set S.[[StringData]] to value.
@@ -503,9 +503,9 @@ fn stringGetOwnProperty(
 
 /// 22.1.2 Properties of the String Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-string-constructor
-pub const StringConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "String",
             .realm = realm,
@@ -530,7 +530,7 @@ pub const StringConstructor = struct {
 
     /// 22.1.1.1 String ( value )
     /// https://tc39.es/ecma262/#sec-string-constructor-string-value
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const value = arguments.get(0);
 
         const s: types.String = blk: {
@@ -684,7 +684,7 @@ pub const StringConstructor = struct {
 
 /// 22.1.3 Properties of the String Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-string-prototype-object
-pub const StringPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return stringCreate(realm.agent, .empty, try realm.intrinsics.@"%Object.prototype%"());
     }

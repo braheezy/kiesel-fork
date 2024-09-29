@@ -1090,9 +1090,9 @@ fn proxyInternalMethods(target_is_callable: bool, target_is_constructor: bool) O
 
 /// 28.2.2 Properties of the Proxy Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-proxy-constructor
-pub const ProxyConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 2,
             .name = "Proxy",
             .realm = realm,
@@ -1106,7 +1106,7 @@ pub const ProxyConstructor = struct {
 
     /// 28.2.1.1 Proxy ( target, handler )
     /// https://tc39.es/ecma262/#sec-proxy-target-handler
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const target = arguments.get(0);
         const handler = arguments.get(1);
 

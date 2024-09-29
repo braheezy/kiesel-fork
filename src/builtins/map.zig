@@ -80,9 +80,9 @@ pub fn addEntriesFromIterable(
 
 /// 24.1.2 Properties of the Map Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-map-constructor
-pub const MapConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "Map",
             .realm = realm,
@@ -106,7 +106,7 @@ pub const MapConstructor = struct {
 
     /// 24.1.1.1 Map ( [ iterable ] )
     /// https://tc39.es/ecma262/#sec-map-iterable
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const iterable = arguments.get(0);
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
@@ -179,7 +179,7 @@ pub const MapConstructor = struct {
 
 /// 24.1.3 Properties of the Map Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-map-prototype-object
-pub const MapPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),

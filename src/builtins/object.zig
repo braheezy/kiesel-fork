@@ -6,7 +6,6 @@ const std = @import("std");
 const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
-const immutable_prototype = @import("immutable_prototype.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
@@ -33,9 +32,9 @@ const sameValue = types.sameValue;
 
 /// 20.1.2 Properties of the Object Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-object-constructor
-pub const ObjectConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object_ {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "Object",
             .realm = realm,
@@ -80,7 +79,7 @@ pub const ObjectConstructor = struct {
 
     /// 20.1.1.1 Object ( [ value ] )
     /// https://tc39.es/ecma262/#sec-object-value
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object_) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object_) Agent.Error!Value {
         const realm = agent.currentRealm();
         const value = arguments.get(0);
 
@@ -643,14 +642,14 @@ pub const ObjectConstructor = struct {
     /// https://tc39.es/ecma262/#sec-object.seal
     fn setPrototypeOf(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const object = arguments.get(0);
-        const prototype = arguments.get(1);
+        const prototype_ = arguments.get(1);
 
         // 1. Set O to ? RequireObjectCoercible(O).
         _ = try object.requireObjectCoercible(agent);
 
         // 2. If proto is not an Object and proto is not null, throw a TypeError exception.
-        if (!prototype.isObject() and !prototype.isNull()) {
-            return agent.throwException(.type_error, "{} is not an Object or null", .{prototype});
+        if (!prototype_.isObject() and !prototype_.isNull()) {
+            return agent.throwException(.type_error, "{} is not an Object or null", .{prototype_});
         }
 
         // 3. If O is not an Object, return O.
@@ -659,7 +658,7 @@ pub const ObjectConstructor = struct {
         // 4. Let status be ? O.[[SetPrototypeOf]](proto).
         const status = try object.asObject().internalMethods().setPrototypeOf(
             object.asObject(),
-            if (prototype.isObject()) prototype.asObject() else null,
+            if (prototype_.isObject()) prototype_.asObject() else null,
         );
 
         // 5. If status is false, throw a TypeError exception.
@@ -688,12 +687,12 @@ pub const ObjectConstructor = struct {
 
 /// 20.1.3 Properties of the Object Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-object-prototype-object
-pub const ObjectPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object_ {
         return Object.create(realm.agent, .{
             .prototype = null,
             .internal_methods = &.{
-                .setPrototypeOf = immutable_prototype.setPrototypeOf,
+                .setPrototypeOf = builtins.immutable_prototype.setPrototypeOf,
             },
         });
     }
@@ -752,18 +751,18 @@ pub const ObjectPrototype = struct {
         // 2. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
 
-        var prototype: ?Object_ = value.asObject();
+        var prototype_: ?Object_ = value.asObject();
 
         // 3. Repeat,
         while (true) {
             // a. Set V to ? V.[[GetPrototypeOf]]().
-            prototype = try prototype.?.internalMethods().getPrototypeOf(prototype.?);
+            prototype_ = try prototype_.?.internalMethods().getPrototypeOf(prototype_.?);
 
             // b. If V is null, return false.
-            if (prototype == null) return Value.from(false);
+            if (prototype_ == null) return Value.from(false);
 
             // c. If SameValue(O, V) is true, return true.
-            if (object.sameValue(prototype.?)) return Value.from(true);
+            if (object.sameValue(prototype_.?)) return Value.from(true);
         }
     }
 
@@ -885,13 +884,13 @@ pub const ObjectPrototype = struct {
     /// 20.1.3.8.2 set Object.prototype.__proto__
     /// https://tc39.es/ecma262/#sec-set-object.prototype.__proto__
     fn @"set __proto__"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const prototype = arguments.get(0);
+        const prototype_ = arguments.get(0);
 
         // 1. Let O be ? RequireObjectCoercible(this value).
         const object = try this_value.requireObjectCoercible(agent);
 
         // 2. If proto is not an Object and proto is not null, return undefined.
-        if (!prototype.isObject() and !prototype.isNull()) return .undefined;
+        if (!prototype_.isObject() and !prototype_.isNull()) return .undefined;
 
         // 3. If O is not an Object, return undefined.
         if (!object.isObject()) return .undefined;
@@ -899,7 +898,7 @@ pub const ObjectPrototype = struct {
         // 4. Let status be ? O.[[SetPrototypeOf]](proto).
         const status = try object.asObject().internalMethods().setPrototypeOf(
             object.asObject(),
-            if (prototype.isObject()) prototype.asObject() else null,
+            if (prototype_.isObject()) prototype_.asObject() else null,
         );
 
         // 5. If status is false, throw a TypeError exception.

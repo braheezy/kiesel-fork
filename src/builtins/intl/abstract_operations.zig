@@ -162,7 +162,7 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
     // 3. If locales is a String or locales is an Object and locales has an [[InitializedLocale]]
     //    internal slot, then
     const object = if (locales.isString() or
-        (locales.isObject() and locales.asObject().is(builtins.Intl.Locale)))
+        (locales.isObject() and locales.asObject().is(builtins.intl.Locale)))
     blk: {
         // a. Let O be CreateArrayFromList(« locales »).
         break :blk try createArrayFromList(agent, &.{locales});
@@ -204,11 +204,11 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
 
             // iii. If kValue is an Object and kValue has an [[InitializedLocale]] internal slot,
             //      then
-            const tag = if (k_value.isObject() and k_value.asObject().is(builtins.Intl.Locale)) blk: {
+            const tag = if (k_value.isObject() and k_value.asObject().is(builtins.intl.Locale)) blk: {
                 // 1. Let tag be kValue.[[Locale]].
                 break :blk try String.fromAscii(
                     agent.gc_allocator,
-                    try k_value.asObject().as(builtins.Intl.Locale).fields.locale.toString(agent.gc_allocator),
+                    try k_value.asObject().as(builtins.intl.Locale).fields.locale.toString(agent.gc_allocator),
                 );
             }
             // iv. Else,

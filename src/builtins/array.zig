@@ -125,12 +125,12 @@ pub fn arrayCreate(agent: *Agent, length: u64, maybe_prototype: ?Object) Agent.E
     }
 
     // 2. If proto is not present, set proto to %Array.prototype%.
-    const prototype = maybe_prototype orelse try realm.intrinsics.@"%Array.prototype%"();
+    const prototype_ = maybe_prototype orelse try realm.intrinsics.@"%Array.prototype%"();
 
     // 3. Let A be MakeBasicObject(« [[Prototype]], [[Extensible]] »).
     const array = try Array.create(agent, .{
         // 4. Set A.[[Prototype]] to proto.
-        .prototype = prototype,
+        .prototype = prototype_,
 
         // 5. Set A.[[DefineOwnProperty]] as specified in 10.4.2.1.
         .internal_methods = &.{
@@ -162,47 +162,47 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: u64) Ag
     if (!is_array) return arrayCreate(agent, length, null);
 
     // 3. Let C be ? Get(originalArray, "constructor").
-    var constructor = try original_array.get(PropertyKey.from("constructor"));
+    var constructor_ = try original_array.get(PropertyKey.from("constructor"));
 
     // 4. If IsConstructor(C) is true, then
-    if (constructor.isConstructor()) {
+    if (constructor_.isConstructor()) {
         // a. Let thisRealm be the current Realm Record.
         const this_realm = agent.currentRealm();
 
         // b. Let realmC be ? GetFunctionRealm(C).
-        const constructor_realm = try constructor.asObject().getFunctionRealm();
+        const constructor_realm = try constructor_.asObject().getFunctionRealm();
 
         // c. If thisRealm and realmC are not the same Realm Record, then
         if (this_realm != constructor_realm) {
             // i. If SameValue(C, realmC.[[Intrinsics]].[[%Array%]]) is true, set C to undefined.
-            if (constructor.asObject().sameValue(try constructor_realm.intrinsics.@"%Array%"())) {
-                constructor = .undefined;
+            if (constructor_.asObject().sameValue(try constructor_realm.intrinsics.@"%Array%"())) {
+                constructor_ = .undefined;
             }
         }
     }
 
     // 5. If C is an Object, then
-    if (constructor.isObject()) {
+    if (constructor_.isObject()) {
         // a. Set C to ? Get(C, %Symbol.species%).
-        constructor = try constructor.get(
+        constructor_ = try constructor_.get(
             agent,
             PropertyKey.from(agent.well_known_symbols.@"%Symbol.species%"),
         );
 
         // b. If C is null, set C to undefined.
-        if (constructor.isNull()) constructor = .undefined;
+        if (constructor_.isNull()) constructor_ = .undefined;
     }
 
     // 6. If C is undefined, return ? ArrayCreate(length).
-    if (constructor.isUndefined()) return arrayCreate(agent, length, null);
+    if (constructor_.isUndefined()) return arrayCreate(agent, length, null);
 
     // 7. If IsConstructor(C) is false, throw a TypeError exception.
-    if (!constructor.isConstructor()) {
-        return agent.throwException(.type_error, "{} is not a constructor", .{constructor});
+    if (!constructor_.isConstructor()) {
+        return agent.throwException(.type_error, "{} is not a constructor", .{constructor_});
     }
 
     // 8. Return ? Construct(C, « 𝔽(length) »).
-    return constructor.asObject().construct(&.{Value.from(@as(u32, @intCast(length)))}, null);
+    return constructor_.asObject().construct(&.{Value.from(@as(u32, @intCast(length)))}, null);
 }
 
 /// 10.4.2.4 ArraySetLength ( A, Desc )
@@ -368,9 +368,9 @@ pub fn arraySetLength(
 
 /// 23.1.2 Properties of the Array Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-array-constructor
-pub const ArrayConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "Array",
             .realm = realm,
@@ -396,12 +396,12 @@ pub const ArrayConstructor = struct {
 
     /// 23.1.1.1 Array ( ...values )
     /// https://tc39.es/ecma262/#sec-array
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         // 1. If NewTarget is undefined, let newTarget be the active function object; else let newTarget be NewTarget.
         const new_target_ = new_target orelse agent.activeFunctionObject();
 
         // 2. Let proto be ? GetPrototypeFromConstructor(newTarget, "%Array.prototype%").
-        const prototype = try getPrototypeFromConstructor(new_target_, "%Array.prototype%");
+        const prototype_ = try getPrototypeFromConstructor(new_target_, "%Array.prototype%");
 
         // 3. Let numberOfArgs be the number of elements in values.
         const number_of_args = arguments.count();
@@ -409,7 +409,7 @@ pub const ArrayConstructor = struct {
         // 4. If numberOfArgs = 0, then
         if (number_of_args == 0) {
             // a. Return ! ArrayCreate(0, proto).
-            return Value.from(arrayCreate(agent, 0, prototype) catch |err| try noexcept(err));
+            return Value.from(arrayCreate(agent, 0, prototype_) catch |err| try noexcept(err));
         }
         // 5. Else if numberOfArgs = 1, then
         else if (number_of_args == 1) {
@@ -417,7 +417,7 @@ pub const ArrayConstructor = struct {
             const len = arguments.get(0);
 
             // b. Let array be ! ArrayCreate(0, proto).
-            const array = arrayCreate(agent, 0, prototype) catch |err| try noexcept(err);
+            const array = arrayCreate(agent, 0, prototype_) catch |err| try noexcept(err);
 
             var int_len: u32 = undefined;
 
@@ -459,7 +459,7 @@ pub const ArrayConstructor = struct {
             std.debug.assert(number_of_args >= 2);
 
             // b. Let array be ? ArrayCreate(numberOfArgs, proto).
-            const array = try arrayCreate(agent, number_of_args, prototype);
+            const array = try arrayCreate(agent, number_of_args, prototype_);
 
             // c. Let k be 0.
             // d. Repeat, while k < numberOfArgs,
@@ -706,7 +706,7 @@ pub const ArrayConstructor = struct {
 
 /// 23.1.3 Properties of the Array Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-array-prototype-object
-pub const ArrayPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return arrayCreate(
             realm.agent,

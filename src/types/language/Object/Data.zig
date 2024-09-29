@@ -7,7 +7,7 @@ const types = @import("../../../types.zig");
 
 const Agent = execution.Agent;
 const InternalMethods = @import("InternalMethods.zig");
-const Object = @import("../Object.zig");
+const Object = types.Object;
 const PrivateElement = types.PrivateElement;
 const PrivateNameArrayHashMap = types.PrivateNameArrayHashMap;
 const PropertyStorage = @import("PropertyStorage.zig");

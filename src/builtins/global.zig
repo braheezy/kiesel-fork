@@ -16,7 +16,7 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const performEval = @import("eval.zig").performEval;
+const performEval = builtins.performEval;
 
 const module = @This();
 
@@ -287,25 +287,23 @@ fn GlobalFunction(comptime options: struct { name: []const u8, length: u32 }) ty
     };
 }
 
-pub const global_functions = struct {
-    pub const Eval = GlobalFunction(.{ .name = "eval", .length = 1 });
-    pub const IsFinite = GlobalFunction(.{ .name = "isFinite", .length = 1 });
-    pub const IsNaN = GlobalFunction(.{ .name = "isNaN", .length = 1 });
-    pub const ParseFloat = GlobalFunction(.{ .name = "parseFloat", .length = 1 });
-    pub const ParseInt = GlobalFunction(.{ .name = "parseInt", .length = 2 });
-    pub const DecodeURI = GlobalFunction(.{ .name = "decodeURI", .length = 1 });
-    pub const DecodeURIComponent = GlobalFunction(.{ .name = "decodeURIComponent", .length = 1 });
-    pub const EncodeURI = GlobalFunction(.{ .name = "encodeURI", .length = 1 });
-    pub const EncodeURIComponent = GlobalFunction(.{ .name = "encodeURIComponent", .length = 1 });
-    pub const Escape = if (build_options.enable_annex_b)
-        GlobalFunction(.{ .name = "escape", .length = 1 })
-    else
-        @compileError("Annex B is not enabled");
-    pub const Unescape = if (build_options.enable_annex_b)
-        GlobalFunction(.{ .name = "unescape", .length = 1 })
-    else
-        @compileError("Annex B is not enabled");
-};
+pub const eval_function = GlobalFunction(.{ .name = "eval", .length = 1 });
+pub const is_finite_function = GlobalFunction(.{ .name = "isFinite", .length = 1 });
+pub const is_nan_function = GlobalFunction(.{ .name = "isNaN", .length = 1 });
+pub const parse_float_function = GlobalFunction(.{ .name = "parseFloat", .length = 1 });
+pub const parse_int_function = GlobalFunction(.{ .name = "parseInt", .length = 2 });
+pub const decode_uri_function = GlobalFunction(.{ .name = "decodeURI", .length = 1 });
+pub const decode_uri_component_function = GlobalFunction(.{ .name = "decodeURIComponent", .length = 1 });
+pub const encode_uri_function = GlobalFunction(.{ .name = "encodeURI", .length = 1 });
+pub const encode_uri_component_function = GlobalFunction(.{ .name = "encodeURIComponent", .length = 1 });
+pub const escape_function = if (build_options.enable_annex_b)
+    GlobalFunction(.{ .name = "escape", .length = 1 })
+else
+    @compileError("Annex B is not enabled");
+pub const unescape_function = if (build_options.enable_annex_b)
+    GlobalFunction(.{ .name = "unescape", .length = 1 })
+else
+    @compileError("Annex B is not enabled");
 
 /// 19.2.1 eval ( x )
 /// https://tc39.es/ecma262/#sec-eval-x

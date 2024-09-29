@@ -47,7 +47,7 @@ pub fn createArrayIterator(
 
 /// 23.1.5.2 The %ArrayIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%arrayiteratorprototype%-object
-pub const ArrayIteratorPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),

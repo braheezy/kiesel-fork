@@ -32,9 +32,9 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 10.2 Properties of the Intl.Collator Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-the-intl-collator-constructor
-pub const CollatorConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "Collator",
             .realm = realm,
@@ -55,7 +55,7 @@ pub const CollatorConstructor = struct {
 
     /// 10.1.1 Intl.Collator ( [ locales [ , options ] ] )
     /// https://tc39.es/ecma402/#sec-intl.collator
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const locales = arguments.get(0);
         const options_value = arguments.get(1);
 
@@ -250,7 +250,7 @@ pub const CollatorConstructor = struct {
 
 /// 10.3 Properties of the Intl.Collator Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-the-intl-collator-prototype-object
-pub const CollatorPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),

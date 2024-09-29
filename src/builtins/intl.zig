@@ -31,31 +31,32 @@ comptime {
     if (!build_options.enable_intl) @compileError("Intl is not enabled");
 }
 
-pub const Intl = struct {
-    pub const Collator = @import("./intl/collator.zig").Collator;
-    pub const CollatorConstructor = @import("./intl/collator.zig").CollatorConstructor;
-    pub const CollatorPrototype = @import("./intl/collator.zig").CollatorPrototype;
-    pub const DateTimeFormat = @import("./intl/date_time_format.zig").DateTimeFormat;
-    pub const DateTimeFormatConstructor = @import("./intl/date_time_format.zig").DateTimeFormatConstructor;
-    pub const DateTimeFormatPrototype = @import("./intl/date_time_format.zig").DateTimeFormatPrototype;
-    pub const DisplayNames = @import("./intl/display_names.zig").DisplayNames;
-    pub const DisplayNamesConstructor = @import("./intl/display_names.zig").DisplayNamesConstructor;
-    pub const DisplayNamesPrototype = @import("./intl/display_names.zig").DisplayNamesPrototype;
-    pub const ListFormat = @import("./intl/list_format.zig").ListFormat;
-    pub const ListFormatConstructor = @import("./intl/list_format.zig").ListFormatConstructor;
-    pub const ListFormatPrototype = @import("./intl/list_format.zig").ListFormatPrototype;
-    pub const Locale = @import("./intl/locale.zig").Locale;
-    pub const LocaleConstructor = @import("./intl/locale.zig").LocaleConstructor;
-    pub const LocalePrototype = @import("./intl/locale.zig").LocalePrototype;
-    pub const PluralRules = @import("./intl/plural_rules.zig").PluralRules;
-    pub const PluralRulesConstructor = @import("./intl/plural_rules.zig").PluralRulesConstructor;
-    pub const PluralRulesPrototype = @import("./intl/plural_rules.zig").PluralRulesPrototype;
-    pub const Segmenter = @import("./intl/segmenter.zig").Segmenter;
-    pub const SegmenterConstructor = @import("./intl/segmenter.zig").SegmenterConstructor;
-    pub const SegmenterPrototype = @import("./intl/segmenter.zig").SegmenterPrototype;
-    pub const IntlSegmentsPrototype = @import("./intl/segmenter.zig").IntlSegmentsPrototype;
-    pub const IntlSegmentIteratorPrototype = @import("./intl/segmenter.zig").IntlSegmentIteratorPrototype;
+pub const collator = @import("./intl/collator.zig");
+pub const date_time_format = @import("./intl/date_time_format.zig");
+pub const display_names = @import("./intl/display_names.zig");
+pub const list_format = @import("./intl/list_format.zig");
+pub const locale = @import("./intl/locale.zig");
+pub const plural_rules = @import("./intl/plural_rules.zig");
+pub const segment_iterator = @import("./intl/segment_iterator.zig");
+pub const segmenter = @import("./intl/segmenter.zig");
+pub const segments = @import("./intl/segments.zig");
 
+pub const Collator = collator.Collator;
+pub const DateTimeFormat = date_time_format.DateTimeFormat;
+pub const DisplayNames = display_names.DisplayNames;
+pub const ListFormat = list_format.ListFormat;
+pub const Locale = locale.Locale;
+pub const PluralRules = plural_rules.PluralRules;
+pub const SegmentIterator = segment_iterator.SegmentIterator;
+pub const Segmenter = segmenter.Segmenter;
+pub const Segments = segments.Segments;
+
+pub const createSegmentDataObject = segment_iterator.createSegmentDataObject;
+pub const createSegmentIterator = segment_iterator.createSegmentIterator;
+pub const createSegmentsObject = segments.createSegmentsObject;
+pub const findBoundary = segmenter.findBoundary;
+
+pub const namespace = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
@@ -151,11 +152,11 @@ pub const Intl = struct {
         // 2. Return CreateArrayFromList(ll).
         return Value.from(
             try createArrayFromListMapToValue(agent, icu4zig.Locale, locale_list.items, struct {
-                fn mapFn(agent_: *Agent, locale: icu4zig.Locale) std.mem.Allocator.Error!Value {
+                fn mapFn(agent_: *Agent, locale_: icu4zig.Locale) std.mem.Allocator.Error!Value {
                     return Value.from(
                         try String.fromAscii(
                             agent_.gc_allocator,
-                            try locale.toString(agent_.gc_allocator),
+                            try locale_.toString(agent_.gc_allocator),
                         ),
                     );
                 }

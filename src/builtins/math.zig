@@ -21,7 +21,7 @@ const getIterator = types.getIterator;
 
 /// 21.3.1 Value Properties of the Math Object
 /// https://tc39.es/ecma262/#sec-value-properties-of-the-math-object
-pub const Math = struct {
+pub const namespace = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),

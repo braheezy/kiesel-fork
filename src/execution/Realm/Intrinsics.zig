@@ -4,11 +4,12 @@
 const std = @import("std");
 
 const builtins = @import("../../builtins.zig");
+const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
 
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
-const Realm = @import("../Realm.zig");
+const Realm = execution.Realm;
 
 const Intrinsics = @This();
 
@@ -178,16 +179,16 @@ fn lazyIntrinsic(
 }
 
 pub fn @"%AggregateError%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%AggregateError%", builtins.AggregateErrorConstructor);
+    return self.lazyIntrinsic("%AggregateError%", builtins.aggregate_error.constructor);
 }
 pub fn @"%AggregateError.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%AggregateError.prototype%", builtins.AggregateErrorPrototype);
+    return self.lazyIntrinsic("%AggregateError.prototype%", builtins.aggregate_error.prototype);
 }
 pub fn @"%Array%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Array%", builtins.ArrayConstructor);
+    return self.lazyIntrinsic("%Array%", builtins.array.constructor);
 }
 pub fn @"%Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Array.prototype%", builtins.ArrayPrototype);
+    return self.lazyIntrinsic("%Array.prototype%", builtins.array.prototype);
 }
 pub fn @"%Array.prototype.toString%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
     const intrinsic = &self.lazy_intrinsics.@"%Array.prototype.toString%";
@@ -208,250 +209,250 @@ pub fn @"%Array.prototype.values%"(self: *Intrinsics) std.mem.Allocator.Error!Ob
     return intrinsic.*;
 }
 pub fn @"%ArrayBuffer%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%ArrayBuffer%", builtins.ArrayBufferConstructor);
+    return self.lazyIntrinsic("%ArrayBuffer%", builtins.array_buffer.constructor);
 }
 pub fn @"%ArrayBuffer.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%ArrayBuffer.prototype%", builtins.ArrayBufferPrototype);
+    return self.lazyIntrinsic("%ArrayBuffer.prototype%", builtins.array_buffer.prototype);
 }
 pub fn @"%ArrayIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%ArrayIteratorPrototype%", builtins.ArrayIteratorPrototype);
+    return self.lazyIntrinsic("%ArrayIteratorPrototype%", builtins.array_iterator.prototype);
 }
 pub fn @"%AsyncFromSyncIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%AsyncFromSyncIteratorPrototype%", builtins.AsyncFromSyncIteratorPrototype);
+    return self.lazyIntrinsic("%AsyncFromSyncIteratorPrototype%", builtins.async_from_sync_iterator.prototype);
 }
 pub fn @"%AsyncFunction%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%AsyncFunction%", builtins.AsyncFunctionConstructor);
+    return self.lazyIntrinsic("%AsyncFunction%", builtins.async_function.constructor);
 }
 pub fn @"%AsyncFunction.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%AsyncFunction.prototype%", builtins.AsyncFunctionPrototype);
+    return self.lazyIntrinsic("%AsyncFunction.prototype%", builtins.async_function.prototype);
 }
 pub fn @"%AsyncGeneratorFunction%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%AsyncGeneratorFunction%", builtins.AsyncGeneratorFunctionConstructor);
+    return self.lazyIntrinsic("%AsyncGeneratorFunction%", builtins.async_generator_function.constructor);
 }
 pub fn @"%AsyncGeneratorFunction.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%AsyncGeneratorFunction.prototype%", builtins.AsyncGeneratorFunctionPrototype);
+    return self.lazyIntrinsic("%AsyncGeneratorFunction.prototype%", builtins.async_generator_function.prototype);
 }
 pub fn @"%AsyncGeneratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%AsyncGeneratorPrototype%", builtins.AsyncGeneratorPrototype);
+    return self.lazyIntrinsic("%AsyncGeneratorPrototype%", builtins.async_generator.prototype);
 }
 pub fn @"%AsyncIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%AsyncIteratorPrototype%", builtins.AsyncIteratorPrototype);
+    return self.lazyIntrinsic("%AsyncIteratorPrototype%", builtins.async_iterator.prototype);
 }
 pub fn @"%Atomics%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Atomics%", builtins.Atomics);
+    return self.lazyIntrinsic("%Atomics%", builtins.atomics.namespace);
 }
 pub fn @"%BigInt%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%BigInt%", builtins.BigIntConstructor);
+    return self.lazyIntrinsic("%BigInt%", builtins.big_int.constructor);
 }
 pub fn @"%BigInt.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%BigInt.prototype%", builtins.BigIntPrototype);
+    return self.lazyIntrinsic("%BigInt.prototype%", builtins.big_int.prototype);
 }
 pub fn @"%BigInt64Array%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%BigInt64Array%", builtins.BigInt64ArrayConstructor);
+    return self.lazyIntrinsic("%BigInt64Array%", builtins.typed_array.big_int64_array.constructor);
 }
 pub fn @"%BigInt64Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%BigInt64Array.prototype%", builtins.BigInt64ArrayPrototype);
+    return self.lazyIntrinsic("%BigInt64Array.prototype%", builtins.typed_array.big_int64_array.prototype);
 }
 pub fn @"%BigUint64Array%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%BigUint64Array%", builtins.BigUint64ArrayConstructor);
+    return self.lazyIntrinsic("%BigUint64Array%", builtins.typed_array.big_uint64_array.constructor);
 }
 pub fn @"%BigUint64Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%BigUint64Array.prototype%", builtins.BigUint64ArrayPrototype);
+    return self.lazyIntrinsic("%BigUint64Array.prototype%", builtins.typed_array.big_uint64_array.prototype);
 }
 pub fn @"%Boolean%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Boolean%", builtins.BooleanConstructor);
+    return self.lazyIntrinsic("%Boolean%", builtins.boolean.constructor);
 }
 pub fn @"%Boolean.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Boolean.prototype%", builtins.BooleanPrototype);
+    return self.lazyIntrinsic("%Boolean.prototype%", builtins.boolean.prototype);
 }
 pub fn @"%DataView%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%DataView%", builtins.DataViewConstructor);
+    return self.lazyIntrinsic("%DataView%", builtins.data_view.constructor);
 }
 pub fn @"%DataView.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%DataView.prototype%", builtins.DataViewPrototype);
+    return self.lazyIntrinsic("%DataView.prototype%", builtins.data_view.prototype);
 }
 pub fn @"%Date%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Date%", builtins.DateConstructor);
+    return self.lazyIntrinsic("%Date%", builtins.date.constructor);
 }
 pub fn @"%Date.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Date.prototype%", builtins.DatePrototype);
+    return self.lazyIntrinsic("%Date.prototype%", builtins.date.prototype);
 }
 pub fn @"%decodeURI%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%decodeURI%", builtins.global_functions.DecodeURI);
+    return self.lazyIntrinsic("%decodeURI%", builtins.global.decode_uri_function);
 }
 pub fn @"%decodeURIComponent%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%decodeURIComponent%", builtins.global_functions.DecodeURIComponent);
+    return self.lazyIntrinsic("%decodeURIComponent%", builtins.global.decode_uri_component_function);
 }
 pub fn @"%encodeURI%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%encodeURI%", builtins.global_functions.EncodeURI);
+    return self.lazyIntrinsic("%encodeURI%", builtins.global.encode_uri_function);
 }
 pub fn @"%encodeURIComponent%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%encodeURIComponent%", builtins.global_functions.EncodeURIComponent);
+    return self.lazyIntrinsic("%encodeURIComponent%", builtins.global.encode_uri_component_function);
 }
 pub fn @"%Error%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Error%", builtins.ErrorConstructor);
+    return self.lazyIntrinsic("%Error%", builtins.@"error".constructor);
 }
 pub fn @"%Error.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Error.prototype%", builtins.ErrorPrototype);
+    return self.lazyIntrinsic("%Error.prototype%", builtins.@"error".prototype);
 }
 pub fn @"%escape%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%escape%", builtins.global_functions.Escape);
+    return self.lazyIntrinsic("%escape%", builtins.global.escape_function);
 }
 pub fn @"%eval%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%eval%", builtins.global_functions.Eval);
+    return self.lazyIntrinsic("%eval%", builtins.global.eval_function);
 }
 pub fn @"%EvalError%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%EvalError%", builtins.EvalErrorConstructor);
+    return self.lazyIntrinsic("%EvalError%", builtins.@"error".eval_error.constructor);
 }
 pub fn @"%EvalError.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%EvalError.prototype%", builtins.EvalErrorPrototype);
+    return self.lazyIntrinsic("%EvalError.prototype%", builtins.@"error".eval_error.prototype);
 }
 pub fn @"%FinalizationRegistry%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%FinalizationRegistry%", builtins.FinalizationRegistryConstructor);
+    return self.lazyIntrinsic("%FinalizationRegistry%", builtins.finalization_registry.constructor);
 }
 pub fn @"%FinalizationRegistry.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%FinalizationRegistry.prototype%", builtins.FinalizationRegistryPrototype);
+    return self.lazyIntrinsic("%FinalizationRegistry.prototype%", builtins.finalization_registry.prototype);
 }
 pub fn @"%Float16Array%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Float16Array%", builtins.Float16ArrayConstructor);
+    return self.lazyIntrinsic("%Float16Array%", builtins.typed_array.float16_array.constructor);
 }
 pub fn @"%Float16Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Float16Array.prototype%", builtins.Float16ArrayPrototype);
+    return self.lazyIntrinsic("%Float16Array.prototype%", builtins.typed_array.float16_array.prototype);
 }
 pub fn @"%Float32Array%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Float32Array%", builtins.Float32ArrayConstructor);
+    return self.lazyIntrinsic("%Float32Array%", builtins.typed_array.float32_array.constructor);
 }
 pub fn @"%Float32Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Float32Array.prototype%", builtins.Float32ArrayPrototype);
+    return self.lazyIntrinsic("%Float32Array.prototype%", builtins.typed_array.float32_array.prototype);
 }
 pub fn @"%Float64Array%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Float64Array%", builtins.Float64ArrayConstructor);
+    return self.lazyIntrinsic("%Float64Array%", builtins.typed_array.float64_array.constructor);
 }
 pub fn @"%Float64Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Float64Array.prototype%", builtins.Float64ArrayPrototype);
+    return self.lazyIntrinsic("%Float64Array.prototype%", builtins.typed_array.float64_array.prototype);
 }
 pub fn @"%ForInIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%ForInIteratorPrototype%", builtins.ForInIteratorPrototype);
+    return self.lazyIntrinsic("%ForInIteratorPrototype%", builtins.for_in_iterator.prototype);
 }
 pub fn @"%Function%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Function%", builtins.FunctionConstructor);
+    return self.lazyIntrinsic("%Function%", builtins.function.constructor);
 }
 pub fn @"%Function.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Function.prototype%", builtins.FunctionPrototype);
+    return self.lazyIntrinsic("%Function.prototype%", builtins.function.prototype);
 }
 pub fn @"%GeneratorFunction%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%GeneratorFunction%", builtins.GeneratorFunctionConstructor);
+    return self.lazyIntrinsic("%GeneratorFunction%", builtins.generator_function.constructor);
 }
 pub fn @"%GeneratorFunction.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%GeneratorFunction.prototype%", builtins.GeneratorFunctionPrototype);
+    return self.lazyIntrinsic("%GeneratorFunction.prototype%", builtins.generator_function.prototype);
 }
 pub fn @"%GeneratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%GeneratorPrototype%", builtins.GeneratorPrototype);
+    return self.lazyIntrinsic("%GeneratorPrototype%", builtins.generator.prototype);
 }
 pub fn @"%Int8Array%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Int8Array%", builtins.Int8ArrayConstructor);
+    return self.lazyIntrinsic("%Int8Array%", builtins.typed_array.int8_array.constructor);
 }
 pub fn @"%Int8Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Int8Array.prototype%", builtins.Int8ArrayPrototype);
+    return self.lazyIntrinsic("%Int8Array.prototype%", builtins.typed_array.int8_array.prototype);
 }
 pub fn @"%Int16Array%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Int16Array%", builtins.Int16ArrayConstructor);
+    return self.lazyIntrinsic("%Int16Array%", builtins.typed_array.int16_array.constructor);
 }
 pub fn @"%Int16Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Int16Array.prototype%", builtins.Int16ArrayPrototype);
+    return self.lazyIntrinsic("%Int16Array.prototype%", builtins.typed_array.int16_array.prototype);
 }
 pub fn @"%Int32Array%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Int32Array%", builtins.Int32ArrayConstructor);
+    return self.lazyIntrinsic("%Int32Array%", builtins.typed_array.int32_array.constructor);
 }
 pub fn @"%Int32Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Int32Array.prototype%", builtins.Int32ArrayPrototype);
+    return self.lazyIntrinsic("%Int32Array.prototype%", builtins.typed_array.int32_array.prototype);
 }
 pub fn @"%Intl%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Intl%", builtins.Intl);
+    return self.lazyIntrinsic("%Intl%", builtins.intl.namespace);
 }
 pub fn @"%Intl.Collator%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Intl.Collator%", builtins.Intl.CollatorConstructor);
+    return self.lazyIntrinsic("%Intl.Collator%", builtins.intl.collator.constructor);
 }
 pub fn @"%Intl.Collator.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Intl.Collator.prototype%", builtins.Intl.CollatorPrototype);
+    return self.lazyIntrinsic("%Intl.Collator.prototype%", builtins.intl.collator.prototype);
 }
 pub fn @"%Intl.DateTimeFormat%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Intl.DateTimeFormat%", builtins.Intl.DateTimeFormatConstructor);
+    return self.lazyIntrinsic("%Intl.DateTimeFormat%", builtins.intl.date_time_format.constructor);
 }
 pub fn @"%Intl.DateTimeFormat.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Intl.DateTimeFormat.prototype%", builtins.Intl.DateTimeFormatPrototype);
+    return self.lazyIntrinsic("%Intl.DateTimeFormat.prototype%", builtins.intl.date_time_format.prototype);
 }
 pub fn @"%Intl.DisplayNames%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Intl.DisplayNames%", builtins.Intl.DisplayNamesConstructor);
+    return self.lazyIntrinsic("%Intl.DisplayNames%", builtins.intl.display_names.constructor);
 }
 pub fn @"%Intl.DisplayNames.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Intl.DisplayNames.prototype%", builtins.Intl.DisplayNamesPrototype);
+    return self.lazyIntrinsic("%Intl.DisplayNames.prototype%", builtins.intl.display_names.prototype);
 }
 pub fn @"%Intl.ListFormat%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Intl.ListFormat%", builtins.Intl.ListFormatConstructor);
+    return self.lazyIntrinsic("%Intl.ListFormat%", builtins.intl.list_format.constructor);
 }
 pub fn @"%Intl.ListFormat.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Intl.ListFormat.prototype%", builtins.Intl.ListFormatPrototype);
+    return self.lazyIntrinsic("%Intl.ListFormat.prototype%", builtins.intl.list_format.prototype);
 }
 pub fn @"%Intl.Locale%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Intl.Locale%", builtins.Intl.LocaleConstructor);
+    return self.lazyIntrinsic("%Intl.Locale%", builtins.intl.locale.constructor);
 }
 pub fn @"%Intl.Locale.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Intl.Locale.prototype%", builtins.Intl.LocalePrototype);
+    return self.lazyIntrinsic("%Intl.Locale.prototype%", builtins.intl.locale.prototype);
 }
 pub fn @"%Intl.PluralRules%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Intl.PluralRules%", builtins.Intl.PluralRulesConstructor);
+    return self.lazyIntrinsic("%Intl.PluralRules%", builtins.intl.plural_rules.constructor);
 }
 pub fn @"%Intl.PluralRules.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Intl.PluralRules.prototype%", builtins.Intl.PluralRulesPrototype);
+    return self.lazyIntrinsic("%Intl.PluralRules.prototype%", builtins.intl.plural_rules.prototype);
 }
 pub fn @"%Intl.Segmenter%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Intl.Segmenter%", builtins.Intl.SegmenterConstructor);
+    return self.lazyIntrinsic("%Intl.Segmenter%", builtins.intl.segmenter.constructor);
 }
 pub fn @"%Intl.Segmenter.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Intl.Segmenter.prototype%", builtins.Intl.SegmenterPrototype);
+    return self.lazyIntrinsic("%Intl.Segmenter.prototype%", builtins.intl.segmenter.prototype);
 }
 pub fn @"%IntlSegmentsPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%IntlSegmentsPrototype%", builtins.Intl.IntlSegmentsPrototype);
+    return self.lazyIntrinsic("%IntlSegmentsPrototype%", builtins.intl.segments.prototype);
 }
 pub fn @"%IntlSegmentIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%IntlSegmentIteratorPrototype%", builtins.Intl.IntlSegmentIteratorPrototype);
+    return self.lazyIntrinsic("%IntlSegmentIteratorPrototype%", builtins.intl.segment_iterator.prototype);
 }
 pub fn @"%isFinite%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%isFinite%", builtins.global_functions.IsFinite);
+    return self.lazyIntrinsic("%isFinite%", builtins.global.is_finite_function);
 }
 pub fn @"%isNaN%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%isNaN%", builtins.global_functions.IsNaN);
+    return self.lazyIntrinsic("%isNaN%", builtins.global.is_nan_function);
 }
 pub fn @"%IteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%IteratorPrototype%", builtins.IteratorPrototype);
+    return self.lazyIntrinsic("%IteratorPrototype%", builtins.iterator.prototype);
 }
 pub fn @"%JSON%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%JSON%", builtins.JSON);
+    return self.lazyIntrinsic("%JSON%", builtins.json.namespace);
 }
 pub fn @"%Map%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Map%", builtins.MapConstructor);
+    return self.lazyIntrinsic("%Map%", builtins.map.constructor);
 }
 pub fn @"%Map.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Map.prototype%", builtins.MapPrototype);
+    return self.lazyIntrinsic("%Map.prototype%", builtins.map.prototype);
 }
 pub fn @"%MapIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%MapIteratorPrototype%", builtins.MapIteratorPrototype);
+    return self.lazyIntrinsic("%MapIteratorPrototype%", builtins.map_iterator.prototype);
 }
 pub fn @"%Math%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Math%", builtins.Math);
+    return self.lazyIntrinsic("%Math%", builtins.math.namespace);
 }
 pub fn @"%Number%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Number%", builtins.NumberConstructor);
+    return self.lazyIntrinsic("%Number%", builtins.number.constructor);
 }
 pub fn @"%Number.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Number.prototype%", builtins.NumberPrototype);
+    return self.lazyIntrinsic("%Number.prototype%", builtins.number.prototype);
 }
 pub fn @"%Object%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Object%", builtins.ObjectConstructor);
+    return self.lazyIntrinsic("%Object%", builtins.object.constructor);
 }
 pub fn @"%Object.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Object.prototype%", builtins.ObjectPrototype);
+    return self.lazyIntrinsic("%Object.prototype%", builtins.object.prototype);
 }
 pub fn @"%Object.prototype.toString%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
     const intrinsic = &self.lazy_intrinsics.@"%Object.prototype.toString%";
@@ -463,143 +464,143 @@ pub fn @"%Object.prototype.toString%"(self: *Intrinsics) std.mem.Allocator.Error
     return intrinsic.*;
 }
 pub fn @"%parseFloat%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%parseFloat%", builtins.global_functions.ParseFloat);
+    return self.lazyIntrinsic("%parseFloat%", builtins.global.parse_float_function);
 }
 pub fn @"%parseInt%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%parseInt%", builtins.global_functions.ParseInt);
+    return self.lazyIntrinsic("%parseInt%", builtins.global.parse_int_function);
 }
 pub fn @"%Promise%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Promise%", builtins.PromiseConstructor);
+    return self.lazyIntrinsic("%Promise%", builtins.promise.constructor);
 }
 pub fn @"%Promise.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Promise.prototype%", builtins.PromisePrototype);
+    return self.lazyIntrinsic("%Promise.prototype%", builtins.promise.prototype);
 }
 pub fn @"%Proxy%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Proxy%", builtins.ProxyConstructor);
+    return self.lazyIntrinsic("%Proxy%", builtins.proxy.constructor);
 }
 pub fn @"%RangeError%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%RangeError%", builtins.RangeErrorConstructor);
+    return self.lazyIntrinsic("%RangeError%", builtins.@"error".range_error.constructor);
 }
 pub fn @"%RangeError.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%RangeError.prototype%", builtins.RangeErrorPrototype);
+    return self.lazyIntrinsic("%RangeError.prototype%", builtins.@"error".range_error.prototype);
 }
 pub fn @"%ReferenceError%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%ReferenceError%", builtins.ReferenceErrorConstructor);
+    return self.lazyIntrinsic("%ReferenceError%", builtins.@"error".reference_error.constructor);
 }
 pub fn @"%ReferenceError.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%ReferenceError.prototype%", builtins.ReferenceErrorPrototype);
+    return self.lazyIntrinsic("%ReferenceError.prototype%", builtins.@"error".reference_error.prototype);
 }
 pub fn @"%Reflect%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Reflect%", builtins.Reflect);
+    return self.lazyIntrinsic("%Reflect%", builtins.reflect.namespace);
 }
 pub fn @"%RegExp%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%RegExp%", builtins.RegExpConstructor);
+    return self.lazyIntrinsic("%RegExp%", builtins.reg_exp.constructor);
 }
 pub fn @"%RegExp.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%RegExp.prototype%", builtins.RegExpPrototype);
+    return self.lazyIntrinsic("%RegExp.prototype%", builtins.reg_exp.prototype);
 }
 pub fn @"%RegExpStringIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%RegExpStringIteratorPrototype%", builtins.RegExpStringIteratorPrototype);
+    return self.lazyIntrinsic("%RegExpStringIteratorPrototype%", builtins.reg_exp_string_iterator.prototype);
 }
 pub fn @"%Set%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Set%", builtins.SetConstructor);
+    return self.lazyIntrinsic("%Set%", builtins.set.constructor);
 }
 pub fn @"%Set.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Set.prototype%", builtins.SetPrototype);
+    return self.lazyIntrinsic("%Set.prototype%", builtins.set.prototype);
 }
 pub fn @"%SetIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%SetIteratorPrototype%", builtins.SetIteratorPrototype);
+    return self.lazyIntrinsic("%SetIteratorPrototype%", builtins.set_iterator.prototype);
 }
 pub fn @"%SharedArrayBuffer%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%SharedArrayBuffer%", builtins.SharedArrayBufferConstructor);
+    return self.lazyIntrinsic("%SharedArrayBuffer%", builtins.shared_array_buffer.constructor);
 }
 pub fn @"%SharedArrayBuffer.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%SharedArrayBuffer.prototype%", builtins.SharedArrayBufferPrototype);
+    return self.lazyIntrinsic("%SharedArrayBuffer.prototype%", builtins.shared_array_buffer.prototype);
 }
 pub fn @"%String%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%String%", builtins.StringConstructor);
+    return self.lazyIntrinsic("%String%", builtins.string.constructor);
 }
 pub fn @"%String.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%String.prototype%", builtins.StringPrototype);
+    return self.lazyIntrinsic("%String.prototype%", builtins.string.prototype);
 }
 pub fn @"%StringIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%StringIteratorPrototype%", builtins.StringIteratorPrototype);
+    return self.lazyIntrinsic("%StringIteratorPrototype%", builtins.string_iterator.prototype);
 }
 pub fn @"%Symbol%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Symbol%", builtins.SymbolConstructor);
+    return self.lazyIntrinsic("%Symbol%", builtins.symbol.constructor);
 }
 pub fn @"%Symbol.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Symbol.prototype%", builtins.SymbolPrototype);
+    return self.lazyIntrinsic("%Symbol.prototype%", builtins.symbol.prototype);
 }
 pub fn @"%SyntaxError%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%SyntaxError%", builtins.SyntaxErrorConstructor);
+    return self.lazyIntrinsic("%SyntaxError%", builtins.@"error".syntax_error.constructor);
 }
 pub fn @"%SyntaxError.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%SyntaxError.prototype%", builtins.SyntaxErrorPrototype);
+    return self.lazyIntrinsic("%SyntaxError.prototype%", builtins.@"error".syntax_error.prototype);
 }
 pub fn @"%ThrowTypeError%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%ThrowTypeError%", builtins.ThrowTypeError);
+    return self.lazyIntrinsic("%ThrowTypeError%", builtins.throw_type_error.function);
 }
 pub fn @"%TypedArray%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%TypedArray%", builtins.TypedArrayConstructor);
+    return self.lazyIntrinsic("%TypedArray%", builtins.typed_array.constructor);
 }
 pub fn @"%TypedArray.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%TypedArray.prototype%", builtins.TypedArrayPrototype);
+    return self.lazyIntrinsic("%TypedArray.prototype%", builtins.typed_array.prototype);
 }
 pub fn @"%TypeError%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%TypeError%", builtins.TypeErrorConstructor);
+    return self.lazyIntrinsic("%TypeError%", builtins.@"error".type_error.constructor);
 }
 pub fn @"%TypeError.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%TypeError.prototype%", builtins.TypeErrorPrototype);
+    return self.lazyIntrinsic("%TypeError.prototype%", builtins.@"error".type_error.prototype);
 }
 pub fn @"%Uint8Array%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Uint8Array%", builtins.Uint8ArrayConstructor);
+    return self.lazyIntrinsic("%Uint8Array%", builtins.typed_array.uint8_array.constructor);
 }
 pub fn @"%Uint8Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Uint8Array.prototype%", builtins.Uint8ArrayPrototype);
+    return self.lazyIntrinsic("%Uint8Array.prototype%", builtins.typed_array.uint8_array.prototype);
 }
 pub fn @"%Uint8ClampedArray%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Uint8ClampedArray%", builtins.Uint8ClampedArrayConstructor);
+    return self.lazyIntrinsic("%Uint8ClampedArray%", builtins.typed_array.uint8_clamped_array.constructor);
 }
 pub fn @"%Uint8ClampedArray.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Uint8ClampedArray.prototype%", builtins.Uint8ClampedArrayPrototype);
+    return self.lazyIntrinsic("%Uint8ClampedArray.prototype%", builtins.typed_array.uint8_clamped_array.prototype);
 }
 pub fn @"%Uint16Array%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Uint16Array%", builtins.Uint16ArrayConstructor);
+    return self.lazyIntrinsic("%Uint16Array%", builtins.typed_array.uint16_array.constructor);
 }
 pub fn @"%Uint16Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Uint16Array.prototype%", builtins.Uint16ArrayPrototype);
+    return self.lazyIntrinsic("%Uint16Array.prototype%", builtins.typed_array.uint16_array.prototype);
 }
 pub fn @"%Uint32Array%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Uint32Array%", builtins.Uint32ArrayConstructor);
+    return self.lazyIntrinsic("%Uint32Array%", builtins.typed_array.uint32_array.constructor);
 }
 pub fn @"%Uint32Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%Uint32Array.prototype%", builtins.Uint32ArrayPrototype);
+    return self.lazyIntrinsic("%Uint32Array.prototype%", builtins.typed_array.uint32_array.prototype);
 }
 pub fn @"%unescape%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%unescape%", builtins.global_functions.Unescape);
+    return self.lazyIntrinsic("%unescape%", builtins.global.unescape_function);
 }
 pub fn @"%URIError%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%URIError%", builtins.URIErrorConstructor);
+    return self.lazyIntrinsic("%URIError%", builtins.@"error".uri_error.constructor);
 }
 pub fn @"%URIError.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%URIError.prototype%", builtins.URIErrorPrototype);
+    return self.lazyIntrinsic("%URIError.prototype%", builtins.@"error".uri_error.prototype);
 }
 pub fn @"%WeakMap%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%WeakMap%", builtins.WeakMapConstructor);
+    return self.lazyIntrinsic("%WeakMap%", builtins.weak_map.constructor);
 }
 pub fn @"%WeakMap.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%WeakMap.prototype%", builtins.WeakMapPrototype);
+    return self.lazyIntrinsic("%WeakMap.prototype%", builtins.weak_map.prototype);
 }
 pub fn @"%WeakRef%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%WeakRef%", builtins.WeakRefConstructor);
+    return self.lazyIntrinsic("%WeakRef%", builtins.weak_ref.constructor);
 }
 pub fn @"%WeakRef.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%WeakRef.prototype%", builtins.WeakRefPrototype);
+    return self.lazyIntrinsic("%WeakRef.prototype%", builtins.weak_ref.prototype);
 }
 pub fn @"%WeakSet%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%WeakSet%", builtins.WeakSetConstructor);
+    return self.lazyIntrinsic("%WeakSet%", builtins.weak_set.constructor);
 }
 pub fn @"%WeakSet.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%WeakSet.prototype%", builtins.WeakSetPrototype);
+    return self.lazyIntrinsic("%WeakSet.prototype%", builtins.weak_set.prototype);
 }

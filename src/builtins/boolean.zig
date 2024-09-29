@@ -22,9 +22,9 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 20.3.2 Properties of the Boolean Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-boolean-constructor
-pub const BooleanConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "Boolean",
             .realm = realm,
@@ -45,7 +45,7 @@ pub const BooleanConstructor = struct {
 
     /// 20.3.1.1 Boolean ( value )
     /// https://tc39.es/ecma262/#sec-boolean-constructor-boolean-value
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const value = arguments.get(0);
 
         // 1. Let b be ToBoolean(value).
@@ -73,7 +73,7 @@ pub const BooleanConstructor = struct {
 
 /// 20.3.3 Properties of the Boolean Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-boolean-prototype-object
-pub const BooleanPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return Boolean.create(realm.agent, .{
             .fields = .{

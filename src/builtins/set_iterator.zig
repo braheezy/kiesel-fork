@@ -45,7 +45,7 @@ pub fn createSetIterator(
 
 /// 24.2.5.2 The %SetIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%setiteratorprototype%-object
-pub const SetIteratorPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),

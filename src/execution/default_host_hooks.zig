@@ -6,7 +6,7 @@ const language = @import("../language.zig");
 const types = @import("../types.zig");
 
 const Agent = execution.Agent;
-const Cell = @import("../builtins/finalization_registry.zig").Cell;
+const Cell = builtins.finalization_registry.Cell;
 const HostHooks = execution.HostHooks;
 const ImportedModulePayload = language.ImportedModulePayload;
 const ImportedModuleReferrer = language.ImportedModuleReferrer;
@@ -18,7 +18,7 @@ const SafePointer = types.SafePointer;
 const SourceTextModule = language.SourceTextModule;
 const String = types.String;
 const Value = types.Value;
-const cleanupFinalizationRegistry = @import("../builtins/finalization_registry.zig").cleanupFinalizationRegistry;
+const cleanupFinalizationRegistry = builtins.cleanupFinalizationRegistry;
 const finishLoadingImportedModule = language.finishLoadingImportedModule;
 
 /// 7.3.29 HostEnsureCanAddPrivateElement ( O )

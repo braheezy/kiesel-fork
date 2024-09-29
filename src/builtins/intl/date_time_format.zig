@@ -471,9 +471,9 @@ pub fn createDateTimeFormat(
 
 /// 11.2 Properties of the Intl.DateTimeFormat Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-datetimeformat-constructor
-pub const DateTimeFormatConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "DateTimeFormat",
             .realm = realm,
@@ -494,7 +494,7 @@ pub const DateTimeFormatConstructor = struct {
 
     /// 11.1.1 Intl.DateTimeFormat ( [ locales [ , options ] ] )
     /// https://tc39.es/ecma402/#sec-intl.datetimeformat
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const locales = arguments.get(0);
         const options = arguments.get(1);
 
@@ -523,7 +523,7 @@ pub const DateTimeFormatConstructor = struct {
 
 /// 11.3 Properties of the Intl.DateTimeFormat Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-datetimeformat-prototype-object
-pub const DateTimeFormatPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),

@@ -22,9 +22,9 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 /// 21.2.2 Properties of the BigInt Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-bigint-constructor
-pub const BigIntConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "BigInt",
             .realm = realm,
@@ -48,7 +48,7 @@ pub const BigIntConstructor = struct {
 
     /// 21.2.1.1 BigInt ( value )
     /// https://tc39.es/ecma262/#sec-bigint-constructor-number-value
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const value = arguments.get(0);
 
         // 1. If NewTarget is not undefined, throw a TypeError exception.
@@ -128,7 +128,7 @@ fn numberToBigInt(agent: *Agent, number: Number) Agent.Error!types.BigInt {
 
 /// 21.2.3 Properties of the BigInt Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-bigint-prototype-object
-pub const BigIntPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),

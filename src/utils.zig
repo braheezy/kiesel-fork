@@ -9,7 +9,7 @@ pub const float16 = @import("utils/float16.zig");
 const types = @import("types.zig");
 
 const Agent = execution.Agent;
-const Behaviour = builtins.Behaviour;
+const Behaviour = builtins.builtin_function.Behaviour;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const PropertyDescriptor = types.PropertyDescriptor;

@@ -707,9 +707,9 @@ pub fn toDateString(
 
 /// 21.4.3 Properties of the Date Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-date-constructor
-pub const DateConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 7,
             .name = "Date",
             .realm = realm,
@@ -734,7 +734,7 @@ pub const DateConstructor = struct {
 
     /// 21.4.2.1 Date ( ...values )
     /// https://tc39.es/ecma262/#sec-date
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         // 1. If NewTarget is undefined, then
         if (new_target == null) {
             // a. Let now be the time value (UTC) identifying the current time.
@@ -893,7 +893,7 @@ pub const DateConstructor = struct {
 
 /// 21.4.4 Properties of the Date Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-date-prototype-object
-pub const DatePrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),

@@ -25,7 +25,7 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 /// 27.5.1 The %GeneratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-properties-of-generator-prototype
-pub const GeneratorPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),

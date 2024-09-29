@@ -13,11 +13,11 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const BigInt = types.BigInt;
 const Object = types.Object;
-const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
+const PromiseCapability = builtins.promise.PromiseCapability;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
-const TypedArrayWithBufferWitness = builtins.TypedArrayWithBufferWitness;
+const TypedArrayWithBufferWitness = builtins.typed_array.TypedArrayWithBufferWitness;
 const Value = types.Value;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
@@ -261,7 +261,7 @@ fn doWait(
     // TODO: 17. Perform EnterCriticalSection(WL).
 
     // 18. Let elementType be TypedArrayElementType(typedArray).
-    const w = inline for (builtins.typed_array_element_types) |entry| {
+    const w = inline for (builtins.typed_array.element_types) |entry| {
         const name, const @"type" = entry;
         if (!@"type".isUnclampedIntegerElementType()) continue;
         if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
@@ -383,7 +383,7 @@ fn atomicReadModifyWrite(
     const buffer = typed_array.fields.viewed_array_buffer;
 
     // 6. Let elementType be TypedArrayElementType(typedArray).
-    inline for (builtins.typed_array_element_types) |entry| {
+    inline for (builtins.typed_array.element_types) |entry| {
         const name, const @"type" = entry;
         if (!@"type".isUnclampedIntegerElementType()) continue;
         // Bypass 'expected 32-bit integer type or smaller; found 64-bit integer type' for @atomicRmw()
@@ -412,7 +412,7 @@ fn atomicReadModifyWrite(
     } else unreachable;
 }
 
-pub const Atomics = struct {
+pub const namespace = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
@@ -524,7 +524,7 @@ pub const Atomics = struct {
         // 8. Let elementSize be TypedArrayElementSize(typedArray).
         // 9. Let isLittleEndian be the value of the [[LittleEndian]] field of the surrounding agent's Agent Record.
         const is_little_endian = agent.little_endian;
-        inline for (builtins.typed_array_element_types) |entry| {
+        inline for (builtins.typed_array.element_types) |entry| {
             const name, const @"type" = entry;
             if (!@"type".isUnclampedIntegerElementType()) continue;
             // Bypass 'expected 32-bit integer type or smaller; found 64-bit integer type' for @cmpxchgStrong()
@@ -652,7 +652,7 @@ pub const Atomics = struct {
         const buffer = typed_array.fields.viewed_array_buffer;
 
         // 4. Let elementType be TypedArrayElementType(typedArray).
-        inline for (builtins.typed_array_element_types) |entry| {
+        inline for (builtins.typed_array.element_types) |entry| {
             const name, const @"type" = entry;
             if (!@"type".isUnclampedIntegerElementType()) continue;
             if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {
@@ -799,7 +799,7 @@ pub const Atomics = struct {
         const buffer = typed_array.fields.viewed_array_buffer;
 
         // 6. Let elementType be TypedArrayElementType(typedArray).
-        inline for (builtins.typed_array_element_types) |entry| {
+        inline for (builtins.typed_array.element_types) |entry| {
             const name, const @"type" = entry;
             if (!@"type".isUnclampedIntegerElementType()) continue;
             if (std.mem.eql(u8, typed_array.fields.typed_array_name, name)) {

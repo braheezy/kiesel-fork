@@ -2,21 +2,21 @@ const std = @import("std");
 
 const libregexp = @import("../c/libregexp.zig").libregexp;
 
+const builtins = @import("../builtins.zig");
 const language = @import("../language.zig");
-const reg_exp = @import("../builtins/reg_exp.zig");
-const tokenizer = @import("tokenizer.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
-const line_terminators = tokenizer.line_terminators;
 
 const BigInt = types.BigInt;
 const ExportEntry = language.ExportEntry;
 const ImportEntry = language.ImportEntry;
+const LreOpaque = builtins.reg_exp.LreOpaque;
+const ParsedFlags = builtins.reg_exp.ParsedFlags;
 const String = types.String;
 const StringArrayHashMap = types.StringArrayHashMap;
 const Value = types.Value;
 const containsSlice = utils.containsSlice;
-const escapeSequenceMatcher = tokenizer.escapeSequenceMatcher;
+const escapeSequenceMatcher = language.tokenizer.escapeSequenceMatcher;
 
 const AnalyzeQuery = enum {
     is_reference,
@@ -283,7 +283,7 @@ pub fn stringValueImpl(
     var it = std.unicode.Utf8View.initUnchecked(text).iterator();
     while (it.nextCodepoint()) |code_point| {
         switch (code_point) {
-            '\\' => for (line_terminators) |line_terminator| {
+            '\\' => for (language.tokenizer.line_terminators) |line_terminator| {
                 if (std.mem.startsWith(u8, text[it.i..], line_terminator)) {
                     it.i += line_terminator.len;
                     break;
@@ -448,7 +448,7 @@ pub const RegularExpressionLiteral = struct {
         // 1. Let flags be the FlagText of literal.
         // 2. If flags contains any code points other than d, g, i, m, s, u, v, or y, or if flags
         //    contains any code point more than once, return false.
-        const parsed_flags = reg_exp.ParsedFlags.from(self.flags) orelse return .invalid_flags;
+        const parsed_flags = ParsedFlags.from(self.flags) orelse return .invalid_flags;
 
         // 3. If flags contains u, let u be true; else let u be false.
         // 4. If flags contains v, let v be true; else let v be false.
@@ -465,7 +465,7 @@ pub const RegularExpressionLiteral = struct {
         // NOTE: Despite passing in the buffer length below, this needs to be null-terminated.
         const buf = try allocator.dupeZ(u8, self.pattern);
         defer allocator.free(buf);
-        var @"opaque": reg_exp.LreOpaque = .{ .allocator = allocator };
+        var @"opaque": LreOpaque = .{ .allocator = allocator };
         // TODO: Plumb the resulting bytecode into the created RegExp object somehow.
         _ = libregexp.lre_compile(
             &re_bytecode_len,

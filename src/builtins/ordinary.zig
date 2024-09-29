@@ -18,7 +18,7 @@ const sameValue = types.sameValue;
 const module = @This();
 
 // Only export these in a namespace so it's clear what they are.
-pub const ordinary_internal_methods = struct {
+pub const internal_methods = struct {
     pub const getPrototypeOf = module.getPrototypeOf;
     pub const setPrototypeOf = module.setPrototypeOf;
     pub const isExtensible = module.isExtensible;

@@ -13,7 +13,7 @@ const Arguments = types.Arguments;
 const Iterator = types.Iterator;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
+const PromiseCapability = builtins.promise.PromiseCapability;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
@@ -61,7 +61,7 @@ pub fn createAsyncFromSyncIterator(
 
 /// 27.1.4.2 The %AsyncFromSyncIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%-object
-pub const AsyncFromSyncIteratorPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%AsyncIteratorPrototype%"(),

@@ -32,9 +32,9 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 12.2 Properties of the Intl.DisplayNames Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-displaynames-constructor
-pub const DisplayNamesConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 2,
             .name = "DisplayNames",
             .realm = realm,
@@ -55,7 +55,7 @@ pub const DisplayNamesConstructor = struct {
 
     /// 12.1.1 Intl.DisplayNames ( locales, options )
     /// https://tc39.es/ecma402/#sec-Intl.DisplayNames
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const locales = arguments.get(0);
         const options_value = arguments.get(1);
 
@@ -245,7 +245,7 @@ pub const DisplayNamesConstructor = struct {
 
 /// 12.3 Properties of the Intl.DisplayNames Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-displaynames-prototype-object
-pub const DisplayNamesPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),

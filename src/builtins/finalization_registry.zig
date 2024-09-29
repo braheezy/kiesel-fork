@@ -26,9 +26,9 @@ const sameValue = types.sameValue;
 
 /// 26.2.1 The FinalizationRegistry Constructor
 /// https://tc39.es/ecma262/#sec-finalization-registry-constructor
-pub const FinalizationRegistryConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "FinalizationRegistry",
             .realm = realm,
@@ -49,7 +49,7 @@ pub const FinalizationRegistryConstructor = struct {
 
     /// 26.2.1.1 FinalizationRegistry ( cleanupCallback )
     /// https://tc39.es/ecma262/#sec-finalization-registry-cleanup-callback
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const cleanup_callback = arguments.get(0);
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
@@ -95,7 +95,7 @@ pub const FinalizationRegistryConstructor = struct {
 
 /// 26.2.3 Properties of the FinalizationRegistry Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-finalization-registry-prototype-object
-pub const FinalizationRegistryPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),

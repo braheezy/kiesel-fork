@@ -146,9 +146,9 @@ fn makeLocaleRecord(
 
 /// 14.2 Properties of the Intl.Locale Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-constructor
-pub const LocaleConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "Locale",
             .realm = realm,
@@ -169,7 +169,7 @@ pub const LocaleConstructor = struct {
 
     /// 14.1.1 Intl.Locale ( tag [ , options ] )
     /// https://tc39.es/ecma402/#sec-Intl.Locale
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const tag_value = arguments.get(0);
         const options_value = arguments.get(1);
 
@@ -361,7 +361,7 @@ pub const LocaleConstructor = struct {
 
 /// 14.3 Properties of the Intl.Locale Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-prototype-object
-pub const LocalePrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),

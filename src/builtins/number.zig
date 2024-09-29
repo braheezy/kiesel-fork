@@ -24,9 +24,9 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 21.1.2 Properties of the Number Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-number-constructor
-pub const NumberConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "Number",
             .realm = realm,
@@ -136,7 +136,7 @@ pub const NumberConstructor = struct {
 
     /// 21.1.1.1 Number ( value )
     /// https://tc39.es/ecma262/#sec-number-constructor-number-value
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const value = arguments.get(0);
 
         const n = blk: {
@@ -241,7 +241,7 @@ pub const NumberConstructor = struct {
 
 /// 21.1.3 Properties of the Number Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-number-prototype-object
-pub const NumberPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return Number.create(realm.agent, .{
             .fields = .{

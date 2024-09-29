@@ -17,21 +17,17 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
-const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
-const getIterator = types.getIterator;
 const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
-const module = @This();
-
 /// 20.5.2 Properties of the Error Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-error-constructor
-pub const ErrorConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "Error",
             .realm = realm,
@@ -52,7 +48,7 @@ pub const ErrorConstructor = struct {
 
     /// 20.5.1.1 Error ( message [ , options ] )
     /// https://tc39.es/ecma262/#sec-error-message
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const message = arguments.get(0);
         const options = arguments.get(1);
 
@@ -101,7 +97,7 @@ pub const ErrorConstructor = struct {
 ///
 /// NOTE: Ignoring non-string values matches SpiderMonkey, V8 only remembers the original name and
 ///       message and doesn't act on property changes.
-fn internalSet(
+pub fn internalSet(
     object: Object,
     property_key: PropertyKey,
     value: Value,
@@ -119,7 +115,7 @@ fn internalSet(
 
 /// 20.5.3 Properties of the Error Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-error-prototype-object
-pub const ErrorPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
@@ -209,46 +205,58 @@ pub const Error = MakeObject(.{
 
 /// 20.5.5.1 EvalError
 /// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-evalerror
-pub const EvalError = MakeNativeError();
-pub const EvalErrorConstructor = MakeNativeErrorConstructor("EvalError");
-pub const EvalErrorPrototype = MakeNativeErrorPrototype("EvalError");
+pub const eval_error = struct {
+    pub const constructor = MakeNativeErrorConstructor("EvalError");
+    pub const prototype = MakeNativeErrorPrototype("EvalError");
+    pub const EvalError = MakeNativeError("EvalError");
+};
 
 /// 20.5.5.2 RangeError
 /// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-rangeerror
-pub const RangeError = MakeNativeError();
-pub const RangeErrorConstructor = MakeNativeErrorConstructor("RangeError");
-pub const RangeErrorPrototype = MakeNativeErrorPrototype("RangeError");
+pub const range_error = struct {
+    pub const constructor = MakeNativeErrorConstructor("RangeError");
+    pub const prototype = MakeNativeErrorPrototype("RangeError");
+    pub const RangeError = MakeNativeError("RangeError");
+};
 
 /// 20.5.5.3 ReferenceError
 /// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-referenceerror
-pub const ReferenceError = MakeNativeError();
-pub const ReferenceErrorConstructor = MakeNativeErrorConstructor("ReferenceError");
-pub const ReferenceErrorPrototype = MakeNativeErrorPrototype("ReferenceError");
+pub const reference_error = struct {
+    pub const constructor = MakeNativeErrorConstructor("ReferenceError");
+    pub const prototype = MakeNativeErrorPrototype("ReferenceError");
+    pub const ReferenceError = MakeNativeError("ReferenceError");
+};
 
 /// 20.5.5.4 SyntaxError
 /// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-syntaxerror
-pub const SyntaxError = MakeNativeError();
-pub const SyntaxErrorConstructor = MakeNativeErrorConstructor("SyntaxError");
-pub const SyntaxErrorPrototype = MakeNativeErrorPrototype("SyntaxError");
+pub const syntax_error = struct {
+    pub const constructor = MakeNativeErrorConstructor("SyntaxError");
+    pub const prototype = MakeNativeErrorPrototype("SyntaxError");
+    pub const SyntaxError = MakeNativeError("SyntaxError");
+};
 
 /// 20.5.5.5 TypeError
 /// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-typeerror
-pub const TypeError = MakeNativeError();
-pub const TypeErrorConstructor = MakeNativeErrorConstructor("TypeError");
-pub const TypeErrorPrototype = MakeNativeErrorPrototype("TypeError");
+pub const type_error = struct {
+    pub const constructor = MakeNativeErrorConstructor("TypeError");
+    pub const prototype = MakeNativeErrorPrototype("TypeError");
+    pub const TypeError = MakeNativeError("TypeError");
+};
 
 /// 20.5.5.6 URIError
 /// https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard-urierror
-pub const URIError = MakeNativeError();
-pub const URIErrorConstructor = MakeNativeErrorConstructor("URIError");
-pub const URIErrorPrototype = MakeNativeErrorPrototype("URIError");
+pub const uri_error = struct {
+    pub const constructor = MakeNativeErrorConstructor("URIError");
+    pub const prototype = MakeNativeErrorPrototype("URIError");
+    pub const URIError = MakeNativeError("URIError");
+};
 
 /// 20.5.6.2 Properties of the NativeError Constructors
 /// https://tc39.es/ecma262/#sec-properties-of-the-nativeerror-constructors
 fn MakeNativeErrorConstructor(comptime name: []const u8) type {
     return struct {
         pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-            return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+            return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
                 .length = 1,
                 .name = name,
                 .realm = realm,
@@ -271,11 +279,19 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
 
         /// 20.5.6.1.1 NativeError ( message [ , options ] )
         /// https://tc39.es/ecma262/#sec-nativeerror
-        fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+        fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
             const message = arguments.get(0);
             const options = arguments.get(1);
 
-            const T = @field(module, name);
+            const namespace = std.StaticStringMap(type).initComptime(.{
+                .{ "EvalError", eval_error },
+                .{ "RangeError", range_error },
+                .{ "ReferenceError", reference_error },
+                .{ "SyntaxError", syntax_error },
+                .{ "TypeError", type_error },
+                .{ "URIError", uri_error },
+            }).get(name).?;
+            const T = @field(namespace, name);
 
             // 1. If NewTarget is undefined, let newTarget be the active function object; else let
             //    newTarget be NewTarget.
@@ -363,7 +379,7 @@ fn MakeNativeErrorPrototype(comptime name: []const u8) type {
 
 /// 20.5.6.4 Properties of NativeError Instances
 /// https://tc39.es/ecma262/#sec-properties-of-nativeerror-instances
-fn MakeNativeError() type {
+fn MakeNativeError(comptime _: []const u8) type {
     return MakeObject(.{
         // NOTE: This shares a tag with the plain Error objects as it is identified by the same
         //       internal slot in the spec and thus subtypes are not distinguishable. For this
@@ -373,145 +389,9 @@ fn MakeNativeError() type {
     });
 }
 
-/// 20.5.7.1 The AggregateError Constructor
-/// https://tc39.es/ecma262/#sec-aggregate-error-constructor
-pub const AggregateErrorConstructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
-            .length = 2,
-            .name = "AggregateError",
-            .realm = realm,
-            .prototype = try realm.intrinsics.@"%Error%"(),
-        });
-    }
-
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
-        // 20.5.7.2.1 AggregateError.prototype
-        // https://tc39.es/ecma262/#sec-aggregate-error.prototype
-        try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
-            .value = Value.from(try realm.intrinsics.@"%AggregateError.prototype%"()),
-            .writable = false,
-            .enumerable = false,
-            .configurable = false,
-        });
-    }
-
-    /// 20.5.7.1.1 AggregateError ( errors, message [ , options ] )
-    /// https://tc39.es/ecma262/#sec-aggregate-error
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
-        const errors = arguments.get(0);
-        const message = arguments.get(1);
-        const options = arguments.get(2);
-
-        // 1. If NewTarget is undefined, let newTarget be the active function object; else let
-        //    newTarget be NewTarget.
-        const new_target_ = new_target orelse agent.activeFunctionObject();
-
-        // 2. Let O be ? OrdinaryCreateFromConstructor(newTarget, "%AggregateError.prototype%", « [[ErrorData]] »).
-        const object = try ordinaryCreateFromConstructor(
-            AggregateError,
-            agent,
-            new_target_,
-            "%AggregateError.prototype%",
-            .{
-                // Non-standard
-                .error_data = .{ .name = String.fromLiteral("AggregateError"), .message = .empty },
-            },
-        );
-
-        // Non-standard
-        object.data.internal_methods = try Object.InternalMethods.create(agent.gc_allocator, object.data.internal_methods, &.{ .set = internalSet });
-
-        // 3. If message is not undefined, then
-        if (!message.isUndefined()) {
-            // a. Let msg be ? ToString(message).
-            const msg = try message.toString(agent);
-
-            // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "message", msg).
-            object.createNonEnumerableDataPropertyOrThrow(
-                PropertyKey.from("message"),
-                Value.from(msg),
-            ) catch |err| try noexcept(err);
-
-            object.as(Error).fields.error_data.message = msg;
-        }
-
-        // 4. Perform ? InstallErrorCause(O, options).
-        try installErrorCause(agent, object, options);
-
-        // 5. Let errorsList be ? IteratorToList(? GetIterator(errors, sync)).
-        var iterator = try getIterator(agent, errors, .sync);
-        const errors_list = try iterator.toList();
-        defer agent.gc_allocator.free(errors_list);
-
-        // 6. Perform ! DefinePropertyOrThrow(O, "errors", PropertyDescriptor {
-        //      [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
-        //      [[Value]]: CreateArrayFromList(errorsList)
-        //    }).
-        object.definePropertyOrThrow(
-            PropertyKey.from("errors"),
-            .{
-                .configurable = true,
-                .enumerable = false,
-                .writable = true,
-                .value = Value.from(try createArrayFromList(agent, errors_list)),
-            },
-        ) catch |err| try noexcept(err);
-
-        // 7. Return O.
-        return Value.from(object);
-    }
-};
-
-/// 20.5.7.3 Properties of the AggregateError Prototype Object
-/// https://tc39.es/ecma262/#sec-properties-of-the-aggregate-error-prototype-objects
-pub const AggregateErrorPrototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return builtins.Object.create(realm.agent, .{
-            .prototype = try realm.intrinsics.@"%Error.prototype%"(),
-        });
-    }
-
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
-        // 20.5.7.3.1 AggregateError.prototype.constructor
-        // https://tc39.es/ecma262/#sec-aggregate-error.prototype.constructor
-        try defineBuiltinProperty(
-            object,
-            "constructor",
-            Value.from(try realm.intrinsics.@"%AggregateError%"()),
-        );
-
-        // 20.5.7.3.2 AggregateError.prototype.message
-        // https://tc39.es/ecma262/#sec-aggregate-error.prototype.message
-        try defineBuiltinProperty(
-            object,
-            "message",
-            Value.from(""),
-        );
-
-        // 20.5.7.3.3 AggregateError.prototype.name
-        // https://tc39.es/ecma262/#sec-aggregate-error.prototype.name
-        try defineBuiltinProperty(
-            object,
-            "name",
-            Value.from("AggregateError"),
-        );
-    }
-};
-
-/// 20.5.7.4 Properties of AggregateError Instances
-/// https://tc39.es/ecma262/#sec-properties-of-aggregate-error-instances
-pub const AggregateError = MakeObject(.{
-    // NOTE: This shares a tag with the plain Error objects as it is identified by the same
-    //       internal slot in the spec and thus subtypes are not distinguishable. For this
-    //       reason the Fields type must be identical for Object.as() casts to work.
-    .Fields = Error.Fields,
-    .tag = .@"error",
-});
-
 /// 20.5.8.1 InstallErrorCause ( O, options )
 /// https://tc39.es/ecma262/#sec-installerrorcause
-fn installErrorCause(agent: *Agent, object: Object, options: Value) Agent.Error!void {
+pub fn installErrorCause(agent: *Agent, object: Object, options: Value) Agent.Error!void {
     // 1. If options is an Object and ? HasProperty(options, "cause") is true, then
     if (options.isObject() and try options.asObject().hasProperty(PropertyKey.from("cause"))) {
         // a. Let cause be ? Get(options, "cause").

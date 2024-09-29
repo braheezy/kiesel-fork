@@ -5,20 +5,19 @@ const std = @import("std");
 
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
-const typed_array = @import("../builtins/typed_array.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
-const ArrayBufferLike = @import("../builtins/array_buffer.zig").ArrayBufferLike;
+const ArrayBufferLike = builtins.array_buffer.ArrayBufferLike;
 const BigInt = types.BigInt;
+const ElementType = builtins.typed_array.ElementType;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const Order = @import("../builtins/array_buffer.zig").Order;
+const Order = builtins.array_buffer.Order;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
-const TypedArrayElementType = typed_array.TypedArrayElementType;
 const Value = types.Value;
 const arrayBufferByteLength = builtins.arrayBufferByteLength;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -152,7 +151,7 @@ fn getViewValue(
     view_value: Value,
     request_index: Value,
     is_little_endian_value: Value,
-    comptime @"type": TypedArrayElementType,
+    comptime @"type": ElementType,
 ) Agent.Error!Value {
     // 1. Perform ? RequireInternalSlot(view, [[DataView]]).
     // 2. Assert: view has a [[ViewedArrayBuffer]] internal slot.
@@ -219,7 +218,7 @@ fn setViewValue(
     view_value: Value,
     request_index: Value,
     is_little_endian_value: Value,
-    comptime @"type": TypedArrayElementType,
+    comptime @"type": ElementType,
     value: Value,
 ) Agent.Error!Value {
     // 1. Perform ? RequireInternalSlot(view, [[DataView]]).
@@ -289,9 +288,9 @@ fn setViewValue(
 
 /// 25.3.3 Properties of the DataView Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-dataview-constructor
-pub const DataViewConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "DataView",
             .realm = realm,
@@ -312,7 +311,7 @@ pub const DataViewConstructor = struct {
 
     /// 25.3.2.1 DataView ( buffer [ , byteOffset [ , byteLength ] ] )
     /// https://tc39.es/ecma262/#sec-dataview-buffer-byteoffset-bytelength
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const buffer_value = arguments.get(0);
         const byte_offset = arguments.get(1);
         const byte_length = arguments.get(2);
@@ -458,7 +457,7 @@ pub const DataViewConstructor = struct {
 
 /// 25.3.4 Properties of the DataView Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-dataview-prototype-object
-pub const DataViewPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),

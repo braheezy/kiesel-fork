@@ -33,9 +33,9 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 13.2 Properties of the Intl.ListFormat Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-constructor
-pub const ListFormatConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "ListFormat",
             .realm = realm,
@@ -56,7 +56,7 @@ pub const ListFormatConstructor = struct {
 
     /// 13.1.1 Intl.ListFormat ( [ locales [ , options ] ] )
     /// https://tc39.es/ecma402/#sec-Intl.ListFormat
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const locales = arguments.get(0);
         const options_value = arguments.get(1);
 
@@ -172,7 +172,7 @@ pub const ListFormatConstructor = struct {
 
 /// 13.3 Properties of the Intl.ListFormat Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-prototype-object
-pub const ListFormatPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),

@@ -24,9 +24,9 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 26.1.2 Properties of the WeakRef Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-weak-ref-constructor
-pub const WeakRefConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "WeakRef",
             .realm = realm,
@@ -47,7 +47,7 @@ pub const WeakRefConstructor = struct {
 
     /// 26.1.1.1 WeakRef ( target )
     /// https://tc39.es/ecma262/#sec-weak-ref-target
-    fn constructor(agent: *Agent, arguments: Arguments, maybe_new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, maybe_new_target: ?Object) Agent.Error!Value {
         const target = arguments.get(0);
 
         const new_target = maybe_new_target orelse {
@@ -104,7 +104,7 @@ pub const WeakRefConstructor = struct {
 
 /// 26.1.3 Properties of the WeakRef Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-weak-ref-prototype-object
-pub const WeakRefPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),

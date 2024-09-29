@@ -22,7 +22,7 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 /// 22.1.5.1 The %StringIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%stringiteratorprototype%-object
-pub const StringIteratorPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),

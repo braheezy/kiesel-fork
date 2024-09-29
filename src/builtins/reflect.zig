@@ -19,7 +19,7 @@ const createArrayFromListMapToValue = types.createArrayFromListMapToValue;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 
-pub const Reflect = struct {
+pub const namespace = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),

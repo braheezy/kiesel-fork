@@ -18,7 +18,7 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
-const addEntriesFromIterable = @import("map.zig").addEntriesFromIterable;
+const addEntriesFromIterable = builtins.addEntriesFromIterable;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinFunction = utils.defineBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
@@ -26,9 +26,9 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 /// 24.3.2 Properties of the WeakMap Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-weakmap-constructor
-pub const WeakMapConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "WeakMap",
             .realm = realm,
@@ -49,7 +49,7 @@ pub const WeakMapConstructor = struct {
 
     /// 24.3.1.1 WeakMap ( [ iterable ] )
     /// https://tc39.es/ecma262/#sec-weakmap-iterable
-    fn constructor(agent: *Agent, arguments: Arguments, maybe_new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, maybe_new_target: ?Object) Agent.Error!Value {
         const iterable = arguments.get(0);
 
         const new_target = maybe_new_target orelse {
@@ -97,7 +97,7 @@ pub const WeakMapConstructor = struct {
 
 /// 24.3.3 Properties of the WeakMap Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-weakmap-prototype-object
-pub const WeakMapPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),

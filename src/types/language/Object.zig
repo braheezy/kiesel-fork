@@ -12,7 +12,7 @@ const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
-const ClassConstructorFields = builtins.ClassConstructorFields;
+const ClassConstructorFields = builtins.builtin_function.ClassConstructorFields;
 const ClassFieldDefinition = types.ClassFieldDefinition;
 const PreferredType = Value.PreferredType;
 const PrivateElement = types.PrivateElement;

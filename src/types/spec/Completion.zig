@@ -3,7 +3,9 @@
 
 const std = @import("std");
 
-const Value = @import("../language.zig").Value;
+const types = @import("../../types.zig");
+
+const Value = types.Value;
 
 const Completion = @This();
 

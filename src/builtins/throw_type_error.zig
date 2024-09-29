@@ -17,9 +17,9 @@ const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 
-pub const ThrowTypeError = struct {
+pub const function = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .function = function }, .{
+        return createBuiltinFunction(realm.agent, .{ .function = impl }, .{
             .length = 0,
             .name = "",
             .realm = realm,
@@ -51,7 +51,7 @@ pub const ThrowTypeError = struct {
         });
     }
 
-    fn function(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
+    fn impl(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         // 1. Throw a TypeError exception.
         return agent.throwException(.type_error, "Forbidden property access", .{});
     }

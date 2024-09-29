@@ -645,9 +645,9 @@ fn makeMatchIndicesIndexPairArray(
 
 /// 22.2.5 Properties of the RegExp Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-regexp-constructor
-pub const RegExpConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 2,
             .name = "RegExp",
             .realm = realm,
@@ -670,7 +670,7 @@ pub const RegExpConstructor = struct {
 
     /// 22.2.4.1 RegExp ( pattern, flags )
     /// https://tc39.es/ecma262/#sec-regexp-pattern-flags
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const pattern = arguments.get(0);
         const flags = arguments.get(1);
 
@@ -758,7 +758,7 @@ pub const RegExpConstructor = struct {
 
 /// 22.2.6 Properties of the RegExp Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-regexp-prototype-object
-pub const RegExpPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
@@ -1051,13 +1051,13 @@ pub const RegExpPrototype = struct {
         const string = try string_value.toString(agent);
 
         // 4. Let C be ? SpeciesConstructor(R, %RegExp%).
-        const constructor = try reg_exp.speciesConstructor(try realm.intrinsics.@"%RegExp%"());
+        const constructor_ = try reg_exp.speciesConstructor(try realm.intrinsics.@"%RegExp%"());
 
         // 5. Let flags be ? ToString(? Get(R, "flags")).
         const flags_ = try (try reg_exp.get(PropertyKey.from("flags"))).toString(agent);
 
         // 6. Let matcher be ? Construct(C, « R, flags »).
-        const matcher = try constructor.construct(&.{ Value.from(reg_exp), Value.from(flags_) }, null);
+        const matcher = try constructor_.construct(&.{ Value.from(reg_exp), Value.from(flags_) }, null);
 
         // 7. Let lastIndex be ? ToLength(? Get(R, "lastIndex")).
         const last_index = try (try reg_exp.get(PropertyKey.from("lastIndex"))).toLength(agent);
@@ -1447,7 +1447,7 @@ pub const RegExpPrototype = struct {
         const string = try string_value.toString(agent);
 
         // 4. Let C be ? SpeciesConstructor(rx, %RegExp%).
-        const constructor = try reg_exp.speciesConstructor(try realm.intrinsics.@"%RegExp%"());
+        const constructor_ = try reg_exp.speciesConstructor(try realm.intrinsics.@"%RegExp%"());
 
         // 5. Let flags be ? ToString(? Get(rx, "flags")).
         const flags_ = try (try reg_exp.get(PropertyKey.from("flags"))).toString(agent);
@@ -1465,7 +1465,7 @@ pub const RegExpPrototype = struct {
             try String.concat(agent.gc_allocator, &.{ flags_, String.fromLiteral("y") });
 
         // 10. Let splitter be ? Construct(C, « rx, newFlags »).
-        const splitter = try constructor.construct(
+        const splitter = try constructor_.construct(
             &.{ Value.from(reg_exp), Value.from(new_flags) },
             null,
         );

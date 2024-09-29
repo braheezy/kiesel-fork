@@ -5,7 +5,6 @@ const std = @import("std");
 
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
-const immutable_prototype = @import("immutable_prototype.zig");
 const language = @import("../language.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
@@ -29,7 +28,7 @@ const ordinaryGetOwnProperty = builtins.ordinaryGetOwnProperty;
 const ordinaryHasProperty = builtins.ordinaryHasProperty;
 const ordinaryOwnPropertyKeys = builtins.ordinaryOwnPropertyKeys;
 const sameValue = types.sameValue;
-const setImmutablePrototype = immutable_prototype.setImmutablePrototype;
+const setImmutablePrototype = builtins.setImmutablePrototype;
 
 /// 10.4.6.1 [[GetPrototypeOf]] ( )
 /// https://tc39.es/ecma262/#sec-module-namespace-exotic-objects-getprototypeof

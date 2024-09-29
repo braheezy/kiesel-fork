@@ -154,9 +154,9 @@ fn setDataSize(set_data: SetData) usize {
 
 /// 24.2.3 Properties of the Set Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-set-constructor
-pub const SetConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "Set",
             .realm = realm,
@@ -179,7 +179,7 @@ pub const SetConstructor = struct {
 
     /// 24.2.2.1 Set ( [ iterable ] )
     /// https://tc39.es/ecma262/#sec-set-iterable
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const iterable = arguments.get(0);
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
@@ -237,7 +237,7 @@ pub const SetConstructor = struct {
 
 /// 24.2.4 Properties of the Set Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-set-prototype-object
-pub const SetPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),

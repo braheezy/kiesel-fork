@@ -5,19 +5,18 @@ const std = @import("std");
 
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
-const typed_array = @import("../builtins/typed_array.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const DataBlock = types.DataBlock;
+const ElementType = builtins.typed_array.ElementType;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
-const TypedArrayElementType = typed_array.TypedArrayElementType;
 const Value = types.Value;
 const copyDataBlockBytes = types.copyDataBlockBytes;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -61,7 +60,7 @@ pub const Order = enum {
 /// https://tc39.es/ecma262/#sec-allocatearraybuffer
 pub fn allocateArrayBuffer(
     agent: *Agent,
-    constructor: Object,
+    constructor_: Object,
     byte_length: u64,
     max_byte_length: ?u53,
 ) Agent.Error!Object {
@@ -91,7 +90,7 @@ pub fn allocateArrayBuffer(
     const object = try ordinaryCreateFromConstructor(
         ArrayBuffer,
         agent,
-        constructor,
+        constructor_,
         "%ArrayBuffer.prototype%",
         .{ .array_buffer_data = undefined },
     );
@@ -333,7 +332,7 @@ pub fn isFixedLengthArrayBuffer(array_buffer: anytype) bool {
 /// 25.1.3.14 RawBytesToNumeric ( type, rawBytes, isLittleEndian )
 /// https://tc39.es/ecma262/#sec-rawbytestonumeric
 pub fn rawBytesToNumeric(
-    comptime @"type": TypedArrayElementType,
+    comptime @"type": ElementType,
     raw_bytes: []const u8,
     is_little_endian: bool,
 ) @"type".T {
@@ -355,7 +354,7 @@ pub fn rawBytesToNumeric(
 pub fn getRawBytesFromSharedBlock(
     block: *const DataBlock,
     byte_index: u53,
-    comptime @"type": TypedArrayElementType,
+    comptime @"type": ElementType,
     is_typed_array: bool,
     order: Order,
 ) [@sizeOf(@"type".T)]u8 {
@@ -374,7 +373,7 @@ pub fn getValueFromBuffer(
     agent: *Agent,
     array_buffer: ArrayBufferLike,
     byte_index: u53,
-    comptime @"type": TypedArrayElementType,
+    comptime @"type": ElementType,
     is_typed_array: bool,
     order: Order,
     maybe_is_little_endian: ?bool,
@@ -422,7 +421,7 @@ pub fn getValueFromBuffer(
 /// https://tc39.es/proposal-float16array/#sec-numerictorawbytes
 pub fn numericToRawBytes(
     agent: *Agent,
-    comptime @"type": TypedArrayElementType,
+    comptime @"type": ElementType,
     value: Value,
     is_little_endian: bool,
 ) std.mem.Allocator.Error![@sizeOf(@"type".T)]u8 {
@@ -503,7 +502,7 @@ pub fn setValueInBuffer(
     agent: *Agent,
     array_buffer: ArrayBufferLike,
     byte_index: u53,
-    comptime @"type": TypedArrayElementType,
+    comptime @"type": ElementType,
     value: Value,
     is_typed_array: bool,
     order: Order,
@@ -554,7 +553,7 @@ pub fn getModifySetValueInBuffer(
     agent: *Agent,
     array_buffer: ArrayBufferLike,
     byte_index: u53,
-    comptime @"type": TypedArrayElementType,
+    comptime @"type": ElementType,
     value: Value,
     comptime op: std.builtin.AtomicRmwOp,
 ) std.mem.Allocator.Error!@"type".T {
@@ -613,9 +612,9 @@ pub fn getModifySetValueInBuffer(
 
 /// 25.1.5 Properties of the ArrayBuffer Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-constructor
-pub const ArrayBufferConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "ArrayBuffer",
             .realm = realm,
@@ -639,7 +638,7 @@ pub const ArrayBufferConstructor = struct {
 
     /// 25.1.4.1 ArrayBuffer ( length [ , options ] )
     /// https://tc39.es/ecma262/#sec-arraybuffer-length
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const length = arguments.get(0);
         const options = arguments.get(1);
 
@@ -692,7 +691,7 @@ pub const ArrayBufferConstructor = struct {
 
 /// 25.1.6 Properties of the ArrayBuffer Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-prototype-object
-pub const ArrayBufferPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
@@ -915,10 +914,10 @@ pub const ArrayBufferPrototype = struct {
         const new_len: u53 = @intFromFloat(@max(final_f64 - first_f64, 0));
 
         // 15. Let ctor be ? SpeciesConstructor(O, %ArrayBuffer%).
-        const constructor = try object.object().speciesConstructor(try realm.intrinsics.@"%ArrayBuffer%"());
+        const constructor_ = try object.object().speciesConstructor(try realm.intrinsics.@"%ArrayBuffer%"());
 
         // 16. Let new be ? Construct(ctor, « 𝔽(newLen) »).
-        const new_object = try constructor.construct(&.{Value.from(new_len)}, null);
+        const new_object = try constructor_.construct(&.{Value.from(new_len)}, null);
 
         // 17. Perform ? RequireInternalSlot(new, [[ArrayBufferData]]).
         // 18. If IsSharedArrayBuffer(new) is true, throw a TypeError exception.

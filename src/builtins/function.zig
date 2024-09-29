@@ -13,7 +13,7 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const BuiltinFunction = builtins.BuiltinFunction;
-const ClassConstructorFields = builtins.ClassConstructorFields;
+const ClassConstructorFields = builtins.builtin_function.ClassConstructorFields;
 const Diagnostics = language.Diagnostics;
 const ECMAScriptFunction = builtins.ECMAScriptFunction;
 const Object = types.Object;
@@ -46,9 +46,9 @@ fn GrammarSymbol(comptime T: type) type {
 
 /// 20.2.2 Properties of the Function Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-constructor
-pub const FunctionConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "Function",
             .realm = realm,
@@ -69,7 +69,7 @@ pub const FunctionConstructor = struct {
 
     /// 20.2.1.1 Function ( ...parameterArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-function-p1-p2-pn-body
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const parameter_args = arguments.values[0..arguments.count() -| 1];
         const maybe_body_arg = arguments.getOrNull(arguments.count() -| 1);
 
@@ -95,7 +95,7 @@ pub const FunctionConstructor = struct {
 /// https://tc39.es/ecma262/#sec-createdynamicfunction
 pub fn createDynamicFunction(
     agent: *Agent,
-    constructor: Object,
+    constructor_: Object,
     maybe_new_target: ?Object,
     comptime kind: enum {
         normal,
@@ -109,7 +109,7 @@ pub fn createDynamicFunction(
     const realm = agent.currentRealm();
 
     // 1. If newTarget is undefined, set newTarget to constructor.
-    const new_target = maybe_new_target orelse constructor;
+    const new_target = maybe_new_target orelse constructor_;
 
     comptime var prefix: []const u8 = undefined;
     comptime var fallback_prototype: []const u8 = undefined;
@@ -399,7 +399,7 @@ pub fn createDynamicFunction(
         // 30. If kind is generator, then
         .generator => {
             // a. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
-            const prototype = try ordinaryObjectCreate(
+            const prototype_ = try ordinaryObjectCreate(
                 agent,
                 try realm.intrinsics.@"%GeneratorPrototype%"(),
             );
@@ -408,7 +408,7 @@ pub fn createDynamicFunction(
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
             function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
-                .value = Value.from(prototype),
+                .value = Value.from(prototype_),
                 .writable = true,
                 .enumerable = false,
                 .configurable = false,
@@ -418,7 +418,7 @@ pub fn createDynamicFunction(
         // 31. Else if kind is async-generator, then
         .async_generator => {
             // a. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
-            const prototype = try ordinaryObjectCreate(
+            const prototype_ = try ordinaryObjectCreate(
                 agent,
                 try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
             );
@@ -427,7 +427,7 @@ pub fn createDynamicFunction(
             //      [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: false
             //    }).
             function.definePropertyOrThrow(PropertyKey.from("prototype"), .{
-                .value = Value.from(prototype),
+                .value = Value.from(prototype_),
                 .writable = true,
                 .enumerable = false,
                 .configurable = false,
@@ -451,7 +451,7 @@ pub fn createDynamicFunction(
 
 /// 20.2.3 Properties of the Function Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-prototype-object
-pub const FunctionPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return createBuiltinFunction(realm.agent, .{ .function = function }, .{
             .length = 0,

@@ -11,7 +11,7 @@ const types = @import("../../types.zig");
 const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
-const ClassConstructorFields = builtins.ClassConstructorFields;
+const ClassConstructorFields = builtins.builtin_function.ClassConstructorFields;
 const Completion = types.Completion;
 const Environment = execution.Environment;
 const Executable = @import("Executable.zig");
@@ -34,7 +34,7 @@ const directEval = runtime.directEval;
 const evaluateCall = runtime.evaluateCall;
 const evaluateCallGetThisValue = runtime.evaluateCallGetThisValue;
 const evaluateNew = runtime.evaluateNew;
-const getArrayLength = @import("../../builtins/array.zig").getArrayLength;
+const getArrayLength = builtins.array.getArrayLength;
 const getIterator = types.getIterator;
 const getSuperConstructor = runtime.getSuperConstructor;
 const getTemplateObject = runtime.getTemplateObject;

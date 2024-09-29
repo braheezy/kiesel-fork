@@ -6,7 +6,7 @@ const std = @import("std");
 const icu4zig = @import("icu4zig");
 
 const build_options = @import("build-options");
-const tokenizer = @import("../../language/tokenizer.zig");
+const language = @import("../../language.zig");
 
 fn utf8IsAscii(utf8: []const u8) bool {
     return for (utf8) |c| {
@@ -20,7 +20,7 @@ const String = @This();
 pub const ascii_word_characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_";
 
 /// The definition of white space is the union of WhiteSpace and LineTerminator.
-pub const whitespace = tokenizer.whitespace ++ tokenizer.line_terminators;
+pub const whitespace = language.tokenizer.whitespace ++ language.tokenizer.line_terminators;
 
 pub const empty = fromLiteral("");
 

@@ -24,9 +24,9 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 /// 20.4.2 Properties of the Symbol Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-symbol-constructor
-pub const SymbolConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "Symbol",
             .realm = realm,
@@ -170,7 +170,7 @@ pub const SymbolConstructor = struct {
 
     /// 20.4.1.1 Symbol ( [ description ] )
     /// https://tc39.es/ecma262/#sec-symbol-description
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const description = arguments.get(0);
 
         // 1. If NewTarget is not undefined, throw a TypeError exception.
@@ -232,7 +232,7 @@ pub const SymbolConstructor = struct {
 
 /// 20.4.3 Properties of the Symbol Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-symbol-prototype-object
-pub const SymbolPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),

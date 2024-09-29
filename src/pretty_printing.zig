@@ -10,11 +10,11 @@ const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const String = types.String;
 const Value = types.Value;
-const getArrayLength = @import("builtins/array.zig").getArrayLength;
+const getArrayLength = builtins.array.getArrayLength;
 const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferWitnessRecord;
 const ordinaryOwnPropertyKeys = builtins.ordinaryOwnPropertyKeys;
 const typedArrayLength = builtins.typedArrayLength;
-const weakRefDeref = @import("builtins/weak_ref.zig").weakRefDeref;
+const weakRefDeref = builtins.weakRefDeref;
 
 const State = struct {
     seen_objects: std.AutoHashMap(*allowzero Object.Data, usize),
@@ -503,7 +503,7 @@ fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytyp
             try writer.writeAll("[");
             try tty_config.setColor(writer, .reset);
             try writer.writeAll(" ");
-            inline for (builtins.typed_array_element_types) |entry| {
+            inline for (builtins.typed_array.element_types) |entry| {
                 const name, const @"type" = entry;
                 if (std.mem.eql(u8, typed_array_name, name)) {
                     const element_size = @"type".elementSize();
@@ -591,7 +591,7 @@ fn prettyPrintWeakSet(weak_set: *const builtins.WeakSet, writer: anytype) !void 
 }
 
 fn prettyPrintIntlCollator(
-    intl_collator: *const builtins.Intl.Collator,
+    intl_collator: *const builtins.intl.Collator,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
     const agent = intl_collator.data.agent;
@@ -618,7 +618,7 @@ fn prettyPrintIntlCollator(
     try tty_config.setColor(writer, .reset);
 }
 fn prettyPrintIntlDateTimeFormat(
-    intl_date_time_format: *const builtins.Intl.DateTimeFormat,
+    intl_date_time_format: *const builtins.intl.DateTimeFormat,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
     const agent = intl_date_time_format.data.agent;
@@ -648,7 +648,7 @@ fn prettyPrintIntlDateTimeFormat(
 }
 
 fn prettyPrintIntlDisplayNames(
-    intl_display_names: *const builtins.Intl.DisplayNames,
+    intl_display_names: *const builtins.intl.DisplayNames,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
     const agent = intl_display_names.data.agent;
@@ -682,7 +682,7 @@ fn prettyPrintIntlDisplayNames(
 }
 
 fn prettyPrintIntlListFormat(
-    intl_list_format: *const builtins.Intl.ListFormat,
+    intl_list_format: *const builtins.intl.ListFormat,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
     const agent = intl_list_format.data.agent;
@@ -705,7 +705,7 @@ fn prettyPrintIntlListFormat(
 }
 
 fn prettyPrintIntlLocale(
-    intl_locale: *const builtins.Intl.Locale,
+    intl_locale: *const builtins.intl.Locale,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
     const agent = intl_locale.data.agent;
@@ -724,7 +724,7 @@ fn prettyPrintIntlLocale(
 }
 
 fn prettyPrintIntlPluralRules(
-    intl_plural_rules: *const builtins.Intl.PluralRules,
+    intl_plural_rules: *const builtins.intl.PluralRules,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
     const agent = intl_plural_rules.data.agent;
@@ -746,7 +746,7 @@ fn prettyPrintIntlPluralRules(
 }
 
 fn prettyPrintIntlSegmenter(
-    intl_segmenter: *const builtins.Intl.Segmenter,
+    intl_segmenter: *const builtins.intl.Segmenter,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
     const agent = intl_segmenter.data.agent;
@@ -934,13 +934,13 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.WeakRef, prettyPrintWeakRef },
             .{ builtins.WeakSet, prettyPrintWeakSet },
         } ++ if (build_options.enable_intl) .{
-            .{ builtins.Intl.Collator, prettyPrintIntlCollator },
-            .{ builtins.Intl.DateTimeFormat, prettyPrintIntlDateTimeFormat },
-            .{ builtins.Intl.DisplayNames, prettyPrintIntlDisplayNames },
-            .{ builtins.Intl.ListFormat, prettyPrintIntlListFormat },
-            .{ builtins.Intl.Locale, prettyPrintIntlLocale },
-            .{ builtins.Intl.PluralRules, prettyPrintIntlPluralRules },
-            .{ builtins.Intl.Segmenter, prettyPrintIntlSegmenter },
+            .{ builtins.intl.Collator, prettyPrintIntlCollator },
+            .{ builtins.intl.DateTimeFormat, prettyPrintIntlDateTimeFormat },
+            .{ builtins.intl.DisplayNames, prettyPrintIntlDisplayNames },
+            .{ builtins.intl.ListFormat, prettyPrintIntlListFormat },
+            .{ builtins.intl.Locale, prettyPrintIntlLocale },
+            .{ builtins.intl.PluralRules, prettyPrintIntlPluralRules },
+            .{ builtins.intl.Segmenter, prettyPrintIntlSegmenter },
         } else .{}) |entry| {
             const T, const prettyPrintFn = entry;
             if (object.is(T)) return prettyPrintFn(object.as(T), writer);

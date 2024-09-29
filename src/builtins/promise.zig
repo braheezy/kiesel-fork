@@ -305,10 +305,10 @@ pub fn fulfillPromise(
 
 /// 27.2.1.5 NewPromiseCapability ( C )
 /// https://tc39.es/ecma262/#sec-newpromisecapability
-pub fn newPromiseCapability(agent: *Agent, constructor: Value) Agent.Error!PromiseCapability {
+pub fn newPromiseCapability(agent: *Agent, constructor_: Value) Agent.Error!PromiseCapability {
     // 1. If IsConstructor(C) is false, throw a TypeError exception.
-    if (!constructor.isConstructor()) {
-        return agent.throwException(.type_error, "{} is not a constructor", .{constructor});
+    if (!constructor_.isConstructor()) {
+        return agent.throwException(.type_error, "{} is not a constructor", .{constructor_});
     }
 
     // 2. NOTE: C is assumed to be a constructor function that supports the parameter conventions
@@ -377,7 +377,7 @@ pub fn newPromiseCapability(agent: *Agent, constructor: Value) Agent.Error!Promi
     const resolving_functions = &additional_fields.resolving_functions;
 
     // 6. Let promise be ? Construct(C, « executor »).
-    const promise = try constructor.asObject().construct(&.{Value.from(executor)}, null);
+    const promise = try constructor_.asObject().construct(&.{Value.from(executor)}, null);
 
     // 7. If IsCallable(resolvingFunctions.[[Resolve]]) is false, throw a TypeError exception.
     if (!resolving_functions.resolve.isCallable()) {
@@ -459,18 +459,18 @@ pub fn triggerPromiseReactions(
 
 /// 27.2.4.7.1 PromiseResolve ( C, x )
 /// https://tc39.es/ecma262/#sec-promise-resolve
-pub fn promiseResolve(agent: *Agent, constructor: Object, x: Value) Agent.Error!Object {
+pub fn promiseResolve(agent: *Agent, constructor_: Object, x: Value) Agent.Error!Object {
     // 1. If IsPromise(x) is true, then
     if (x.isPromise()) {
         // a. Let xConstructor be ? Get(x, "constructor").
         const x_constructor = try x.asObject().get(PropertyKey.from("constructor"));
 
         // b. If SameValue(xConstructor, C) is true, return x.
-        if (sameValue(x_constructor, Value.from(constructor))) return x.asObject();
+        if (sameValue(x_constructor, Value.from(constructor_))) return x.asObject();
     }
 
     // 2. Let promiseCapability be ? NewPromiseCapability(C).
-    const promise_capability = try newPromiseCapability(agent, Value.from(constructor));
+    const promise_capability = try newPromiseCapability(agent, Value.from(constructor_));
 
     // 3. Perform ? Call(promiseCapability.[[Resolve]], undefined, « x »).
     _ = try Value.from(promise_capability.resolve).callAssumeCallable(.undefined, &.{x});
@@ -700,7 +700,7 @@ const RemainingElements = struct {
 fn performPromiseAll(
     agent: *Agent,
     iterator: *Iterator,
-    constructor: Object,
+    constructor_: Object,
     result_capability: PromiseCapability,
     promise_resolve: Object,
 ) Agent.Error!Value {
@@ -744,7 +744,7 @@ fn performPromiseAll(
 
         // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
-            Value.from(constructor),
+            Value.from(constructor_),
             &.{next},
         );
 
@@ -868,7 +868,7 @@ fn performPromiseAll(
 fn performPromiseAllSettled(
     agent: *Agent,
     iterator: *Iterator,
-    constructor: Object,
+    constructor_: Object,
     result_capability: PromiseCapability,
     promise_resolve: Object,
 ) Agent.Error!Value {
@@ -912,7 +912,7 @@ fn performPromiseAllSettled(
 
         // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
-            Value.from(constructor),
+            Value.from(constructor_),
             &.{next},
         );
 
@@ -1170,7 +1170,7 @@ fn performPromiseAllSettled(
 fn performPromiseAny(
     agent: *Agent,
     iterator: *Iterator,
-    constructor: Object,
+    constructor_: Object,
     result_capability: PromiseCapability,
     promise_resolve: Object,
 ) Agent.Error!Value {
@@ -1227,7 +1227,7 @@ fn performPromiseAny(
 
         // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
-            Value.from(constructor),
+            Value.from(constructor_),
             &.{next},
         );
 
@@ -1367,7 +1367,7 @@ fn performPromiseAny(
 fn performPromiseRace(
     agent: *Agent,
     iterator: *Iterator,
-    constructor: Object,
+    constructor_: Object,
     result_capability: PromiseCapability,
     promise_resolve: Object,
 ) Agent.Error!Value {
@@ -1382,7 +1382,7 @@ fn performPromiseRace(
 
         // c. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
-            Value.from(constructor),
+            Value.from(constructor_),
             &.{next},
         );
 
@@ -1508,9 +1508,9 @@ pub fn performPromiseThen(
 
 /// 27.2.4 Properties of the Promise Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-constructor
-pub const PromiseConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "Promise",
             .realm = realm,
@@ -1541,7 +1541,7 @@ pub const PromiseConstructor = struct {
 
     /// 27.2.3.1 Promise ( executor )
     /// https://tc39.es/ecma262/#sec-promise-executor
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const executor = arguments.get(0);
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
@@ -1926,7 +1926,7 @@ pub const PromiseConstructor = struct {
 
 /// 27.2.5 Properties of the Promise Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-prototype-object
-pub const PromisePrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
@@ -1983,10 +1983,10 @@ pub const PromisePrototype = struct {
         }
 
         // 3. Let C be ? SpeciesConstructor(promise, %Promise%).
-        const constructor = try promise.asObject().speciesConstructor(try realm.intrinsics.@"%Promise%"());
+        const constructor_ = try promise.asObject().speciesConstructor(try realm.intrinsics.@"%Promise%"());
 
         // 4. Assert: IsConstructor(C) is true.
-        std.debug.assert(Value.from(constructor).isConstructor());
+        std.debug.assert(Value.from(constructor_).isConstructor());
 
         var then_finally: Value = undefined;
         var catch_finally: Value = undefined;
@@ -2006,7 +2006,7 @@ pub const PromisePrototype = struct {
                 constructor: Object,
             };
             const captures = try agent.gc_allocator.create(Captures);
-            captures.* = .{ .on_finally = on_finally, .constructor = constructor };
+            captures.* = .{ .on_finally = on_finally, .constructor = constructor_ };
 
             // a. Let thenFinallyClosure be a new Abstract Closure with parameters (value) that
             //    captures onFinally and C and performs the following steps when called:
@@ -2015,14 +2015,14 @@ pub const PromisePrototype = struct {
                     const function = agent_.activeFunctionObject();
                     const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
                     const on_finally_ = captures_.on_finally;
-                    const constructor_ = captures_.constructor;
+                    const constructor__ = captures_.constructor;
                     const value = arguments_.get(0);
 
                     // i. Let result be ? Call(onFinally, undefined).
                     const result = try on_finally_.callAssumeCallableNoArgs(.undefined);
 
                     // ii. Let p be ? PromiseResolve(C, result).
-                    const new_promise = try promiseResolve(agent_, constructor_, result);
+                    const new_promise = try promiseResolve(agent_, constructor__, result);
 
                     const value_capture = try agent_.gc_allocator.create(Value);
                     value_capture.* = value;
@@ -2073,14 +2073,14 @@ pub const PromisePrototype = struct {
                     const function = agent_.activeFunctionObject();
                     const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
                     const on_finally_ = captures_.on_finally;
-                    const constructor_ = captures_.constructor;
+                    const constructor__ = captures_.constructor;
                     const reason = arguments_.get(0);
 
                     // i. Let result be ? Call(onFinally, undefined).
                     const result = try on_finally_.callAssumeCallableNoArgs(.undefined);
 
                     // ii. Let p be ? PromiseResolve(C, result).
-                    const new_promise = try promiseResolve(agent_, constructor_, result);
+                    const new_promise = try promiseResolve(agent_, constructor__, result);
 
                     const reason_capture = try agent_.gc_allocator.create(Value);
                     reason_capture.* = reason;
@@ -2146,12 +2146,12 @@ pub const PromisePrototype = struct {
         }
 
         // 3. Let C be ? SpeciesConstructor(promise, %Promise%).
-        const constructor = try promise.asObject().speciesConstructor(
+        const constructor_ = try promise.asObject().speciesConstructor(
             try realm.intrinsics.@"%Promise%"(),
         );
 
         // 4. Let resultCapability be ? NewPromiseCapability(C).
-        const result_capability = try newPromiseCapability(agent, Value.from(constructor));
+        const result_capability = try newPromiseCapability(agent, Value.from(constructor_));
 
         // 5. Return PerformPromiseThen(promise, onFulfilled, onRejected, resultCapability).
         return Value.from(

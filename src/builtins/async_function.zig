@@ -12,7 +12,7 @@ const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const ExecutionContext = execution.ExecutionContext;
 const Object = types.Object;
-const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
+const PromiseCapability = builtins.promise.PromiseCapability;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
@@ -25,9 +25,9 @@ const promiseResolve = builtins.promiseResolve;
 
 /// 27.7.2 Properties of the AsyncFunction Constructor
 /// https://tc39.es/ecma262/#sec-async-function-constructor-properties
-pub const AsyncFunctionConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "AsyncFunction",
             .realm = realm,
@@ -48,7 +48,7 @@ pub const AsyncFunctionConstructor = struct {
 
     /// 27.7.1.1 AsyncFunction ( ...parameterArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-async-function-constructor-arguments
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const parameter_args = arguments.values[0..arguments.count() -| 1];
         const maybe_body_arg = arguments.getOrNull(arguments.count() -| 1);
 
@@ -72,7 +72,7 @@ pub const AsyncFunctionConstructor = struct {
 
 /// 27.7.3 Properties of the AsyncFunction Prototype Object
 /// https://tc39.es/ecma262/#sec-async-function-prototype-properties
-pub const AsyncFunctionPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),

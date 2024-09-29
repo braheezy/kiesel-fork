@@ -14,7 +14,7 @@ const Completion = types.Completion;
 const ExecutionContext = execution.ExecutionContext;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
-const PromiseCapability = @import("../builtins/promise.zig").PromiseCapability;
+const PromiseCapability = builtins.promise.PromiseCapability;
 const PropertyDescriptor = types.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
@@ -30,7 +30,7 @@ const promiseResolve = builtins.promiseResolve;
 
 /// 27.6.1 The %AsyncGeneratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgenerator-prototype
-pub const AsyncGeneratorPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%AsyncIteratorPrototype%"(),

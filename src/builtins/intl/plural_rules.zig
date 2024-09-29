@@ -33,9 +33,9 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 /// 16.2 Properties of the Intl.PluralRules Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-constructor
-pub const PluralRulesConstructor = struct {
+pub const constructor = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
-        return createBuiltinFunction(realm.agent, .{ .constructor = constructor }, .{
+        return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "PluralRules",
             .realm = realm,
@@ -56,7 +56,7 @@ pub const PluralRulesConstructor = struct {
 
     /// 16.1.1 Intl.PluralRules ( [ locales [ , options ] ] )
     /// https://tc39.es/ecma402/#sec-intl.pluralrules
-    fn constructor(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
         const locales = arguments.get(0);
         const options_value = arguments.get(1);
 
@@ -144,7 +144,7 @@ pub const PluralRulesConstructor = struct {
 
 /// 16.3 Properties of the Intl.PluralRules Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-prototype-object
-pub const PluralRulesPrototype = struct {
+pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
