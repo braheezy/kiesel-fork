@@ -3786,11 +3786,20 @@ pub const ImportDeclaration = struct {
 
 /// https://tc39.es/ecma262/#prod-ImportClause
 pub const ImportClause = union(enum) {
+    pub const ImportedDefaultBindingAndNamespaceImport = struct {
+        imported_default_binding: Identifier,
+        namespace_import: Identifier,
+    };
+    pub const ImportedDefaultBindingAndNamedImports = struct {
+        imported_default_binding: Identifier,
+        named_imports: ImportsList,
+    };
+
     imported_default_binding: Identifier,
     namespace_import: Identifier,
     named_imports: ImportsList,
-    // TODO: ImportedDefaultBinding , NameSpaceImport
-    // TODO: ImportedDefaultBinding , NamedImports
+    imported_default_binding_and_namespace_import: ImportedDefaultBindingAndNamespaceImport,
+    imported_default_binding_and_named_imports: ImportedDefaultBindingAndNamedImports,
 
     /// 8.2.1 Static Semantics: BoundNames
     /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
@@ -3810,6 +3819,14 @@ pub const ImportClause = union(enum) {
             .imported_default_binding => |imported_default_binding| try bound_names.append(imported_default_binding),
             .namespace_import => |namespace_import| try bound_names.append(namespace_import),
             .named_imports => |named_imports| try named_imports.collectBoundNames(bound_names),
+            .imported_default_binding_and_namespace_import => |x| {
+                try bound_names.append(x.imported_default_binding);
+                try bound_names.append(x.namespace_import);
+            },
+            .imported_default_binding_and_named_imports => |x| {
+                try bound_names.append(x.imported_default_binding);
+                try x.named_imports.collectBoundNames(bound_names);
+            },
         }
     }
 
@@ -3822,9 +3839,6 @@ pub const ImportClause = union(enum) {
     ) std.mem.Allocator.Error!void {
         const allocator = import_entries.allocator;
         switch (self) {
-            // TODO: ImportClause : ImportedDefaultBinding , NameSpaceImport
-            // TODO: ImportClause : ImportedDefaultBinding , NamedImports
-
             // ImportedDefaultBinding : ImportedBinding
             .imported_default_binding => |imported_binding| {
                 // 1. Let localName be the sole element of the BoundNames of ImportedBinding.
@@ -3910,6 +3924,40 @@ pub const ImportClause = union(enum) {
                     // 3. Return « entry ».
                     try import_entries.append(entry);
                 }
+            },
+
+            // ImportClause : ImportedDefaultBinding , NameSpaceImport
+            .imported_default_binding_and_namespace_import => |x| {
+                // 1. Let entries1 be the ImportEntriesForModule of ImportedDefaultBinding with argument module.
+                // 2. Let entries2 be the ImportEntriesForModule of NameSpaceImport with argument module.
+                // 3. Return the list-concatenation of entries1 and entries2.
+                try collectImportEntriesForModule(
+                    .{ .imported_default_binding = x.imported_default_binding },
+                    import_entries,
+                    module,
+                );
+                try collectImportEntriesForModule(
+                    .{ .namespace_import = x.namespace_import },
+                    import_entries,
+                    module,
+                );
+            },
+
+            // ImportClause : ImportedDefaultBinding , NamedImports
+            .imported_default_binding_and_named_imports => |x| {
+                // 1. Let entries1 be the ImportEntriesForModule of ImportedDefaultBinding with argument module.
+                // 2. Let entries2 be the ImportEntriesForModule of NamedImports with argument module.
+                // 3. Return the list-concatenation of entries1 and entries2.
+                try collectImportEntriesForModule(
+                    .{ .imported_default_binding = x.imported_default_binding },
+                    import_entries,
+                    module,
+                );
+                try collectImportEntriesForModule(
+                    .{ .named_imports = x.named_imports },
+                    import_entries,
+                    module,
+                );
             },
         }
     }

@@ -3786,12 +3786,31 @@ pub fn acceptImportClause(self: *Parser) AcceptError!ast.ImportClause {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    if (self.acceptBindingIdentifier()) |imported_binding|
-        return .{ .imported_default_binding = imported_binding }
-    else |_| if (self.acceptNameSpaceImport()) |imported_binding|
-        return .{ .namespace_import = imported_binding }
-    else |_| if (self.acceptImportsList()) |imports_list|
-        return .{ .named_imports = imports_list }
+    if (self.acceptBindingIdentifier()) |imported_default_binding| {
+        if (self.core.accept(RuleSet.is(.@","))) |_| {
+            if (self.acceptNameSpaceImport()) |namespace_import|
+                return .{
+                    .imported_default_binding_and_namespace_import = .{
+                        .imported_default_binding = imported_default_binding,
+                        .namespace_import = namespace_import,
+                    },
+                }
+            else |_| if (self.acceptImportsList()) |named_imports|
+                return .{
+                    .imported_default_binding_and_named_imports = .{
+                        .imported_default_binding = imported_default_binding,
+                        .named_imports = named_imports,
+                    },
+                }
+            else |_|
+                return error.UnexpectedToken;
+        } else |_| {
+            return .{ .imported_default_binding = imported_default_binding };
+        }
+    } else |_| if (self.acceptNameSpaceImport()) |namespace_import|
+        return .{ .namespace_import = namespace_import }
+    else |_| if (self.acceptImportsList()) |named_imports|
+        return .{ .named_imports = named_imports }
     else |_|
         return error.UnexpectedToken;
 }

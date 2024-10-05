@@ -940,15 +940,25 @@ pub fn printImportDeclaration(node: ast.ImportDeclaration, writer: anytype, inde
 pub fn printImportClause(node: ast.ImportClause, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
     try print("ImportClause", writer, indentation);
     switch (node) {
-        .imported_default_binding => |imported_binding| {
-            try print(imported_binding, writer, indentation + 1);
+        .imported_default_binding => |imported_default_binding| {
+            try print(imported_default_binding, writer, indentation + 1);
         },
-        .namespace_import => |imported_binding| {
+        .namespace_import => |namespace_import| {
             try printIndentation(writer, indentation + 1);
             try writer.writeAll("* as ");
-            try print(imported_binding, writer, 0);
+            try print(namespace_import, writer, 0);
         },
-        .named_imports => |imports_list| try printImportsList(imports_list, writer, indentation + 1),
+        .named_imports => |named_imports| try printImportsList(named_imports, writer, indentation + 1),
+        .imported_default_binding_and_namespace_import => |x| {
+            try print(x.imported_default_binding, writer, indentation + 1);
+            try printIndentation(writer, indentation + 1);
+            try writer.writeAll("* as ");
+            try print(x.namespace_import, writer, 0);
+        },
+        .imported_default_binding_and_named_imports => |x| {
+            try print(x.imported_default_binding, writer, indentation + 1);
+            try printImportsList(x.named_imports, writer, indentation + 1);
+        },
     }
 }
 
