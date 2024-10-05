@@ -2900,10 +2900,10 @@ pub fn acceptArrowFunction(self: *Parser) AcceptError!ast.ArrowFunction {
         formal_parameters = try self.acceptFormalParameters();
         _ = try self.core.accept(RuleSet.is(.@")"));
     }
-    _ = try self.core.accept(RuleSet.is(.@"=>"));
     if (self.followedByLineTerminator()) {
         try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
     }
+    _ = try self.core.accept(RuleSet.is(.@"=>"));
     const function_body: ast.FunctionBody = if (self.core.accept(RuleSet.is(.@"{"))) |_| blk: {
         const function_body = try self.acceptFunctionBody(.normal);
         _ = try self.core.accept(RuleSet.is(.@"}"));
