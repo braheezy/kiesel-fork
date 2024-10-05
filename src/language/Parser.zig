@@ -26,6 +26,7 @@ state: struct {
     in_breakable_statement: bool = false,
     in_class_body: bool = false,
     in_class_constructor: bool = false,
+    in_default_export: bool = false,
     in_formal_parameters: bool = false,
     in_function_body: bool = false,
     in_generator_function_body: bool = false,
@@ -2734,8 +2735,9 @@ pub fn acceptFunctionDeclaration(self: *Parser) AcceptError!ast.FunctionDeclarat
     // We need to do this after consuming the 'function' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     const binding_identifier_location = (try self.peekToken()).location;
-    const binding_identifier = self.acceptBindingIdentifier() catch |err| {
+    const binding_identifier = self.acceptBindingIdentifier() catch |err| blk: {
         if (self.core.peek() catch null) |next_token| if (next_token.type == .@"(") {
+            if (self.state.in_default_export) break :blk null;
             try self.emitError("Function declaration must have a binding identifier", .{});
         };
         return err;
@@ -2747,7 +2749,9 @@ pub fn acceptFunctionDeclaration(self: *Parser) AcceptError!ast.FunctionDeclarat
     const function_body = try self.acceptFunctionBody(.normal);
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
-        try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier, binding_identifier_location);
+        if (binding_identifier != null) {
+            try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier.?, binding_identifier_location);
+        }
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
@@ -3051,7 +3055,8 @@ fn acceptGeneratorDeclaration(self: *Parser) AcceptError!ast.GeneratorDeclaratio
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     _ = try self.core.accept(RuleSet.is(.@"*"));
     const binding_identifier_location = (try self.peekToken()).location;
-    const binding_identifier = self.acceptBindingIdentifier() catch |err| {
+    const binding_identifier = self.acceptBindingIdentifier() catch |err| blk: {
+        if (self.state.in_default_export) break :blk null;
         try self.emitError("Generator declaration must have a binding identifier", .{});
         return err;
     };
@@ -3062,7 +3067,9 @@ fn acceptGeneratorDeclaration(self: *Parser) AcceptError!ast.GeneratorDeclaratio
     const function_body = try self.acceptFunctionBody(.generator);
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
-        try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier, binding_identifier_location);
+        if (binding_identifier != null) {
+            try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier.?, binding_identifier_location);
+        }
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
@@ -3153,7 +3160,8 @@ fn acceptAsyncGeneratorDeclaration(self: *Parser) AcceptError!ast.AsyncGenerator
     _ = try self.core.accept(RuleSet.is(.function));
     _ = try self.core.accept(RuleSet.is(.@"*"));
     const binding_identifier_location = (try self.peekToken()).location;
-    const binding_identifier = self.acceptBindingIdentifier() catch |err| {
+    const binding_identifier = self.acceptBindingIdentifier() catch |err| blk: {
+        if (self.state.in_default_export) break :blk null;
         try self.emitError("Async generator declaration must have a binding identifier", .{});
         return err;
     };
@@ -3164,7 +3172,9 @@ fn acceptAsyncGeneratorDeclaration(self: *Parser) AcceptError!ast.AsyncGenerator
     const function_body = try self.acceptFunctionBody(.async_generator);
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
-        try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier, binding_identifier_location);
+        if (binding_identifier != null) {
+            try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier.?, binding_identifier_location);
+        }
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
@@ -3239,11 +3249,14 @@ fn acceptClassDeclaration(self: *Parser) AcceptError!ast.ClassDeclaration {
     // We need to do this after consuming the 'class' token to skip preceeding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "class".len);
     const binding_identifier_location = (try self.peekToken()).location;
-    const binding_identifier = self.acceptBindingIdentifier() catch |err| {
+    const binding_identifier = self.acceptBindingIdentifier() catch |err| blk: {
+        if (self.state.in_default_export) break :blk null;
         try self.emitError("Class declaration must have a binding identifier", .{});
         return err;
     };
-    try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier, binding_identifier_location);
+    if (binding_identifier != null) {
+        try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier.?, binding_identifier_location);
+    }
     const class_tail = try self.acceptClassTail();
     const end_offset = self.core.tokenizer.offset;
     const source_text = try self.allocator.dupe(
@@ -3480,8 +3493,9 @@ fn acceptAsyncFunctionDeclaration(self: *Parser) AcceptError!ast.AsyncFunctionDe
     }
     _ = try self.core.accept(RuleSet.is(.function));
     const binding_identifier_location = (try self.peekToken()).location;
-    const binding_identifier = self.acceptBindingIdentifier() catch |err| {
+    const binding_identifier = self.acceptBindingIdentifier() catch |err| blk: {
         if (self.core.peek() catch null) |next_token| if (next_token.type == .@"(") {
+            if (self.state.in_default_export) break :blk null;
             try self.emitError("Async function declaration must have a binding identifier", .{});
         };
         return err;
@@ -3493,7 +3507,9 @@ fn acceptAsyncFunctionDeclaration(self: *Parser) AcceptError!ast.AsyncFunctionDe
     const function_body = try self.acceptFunctionBody(.@"async");
     _ = try self.core.accept(RuleSet.is(.@"}"));
     if (function_body.strict) {
-        try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier, binding_identifier_location);
+        if (binding_identifier != null) {
+            try self.ensureAllowedIdentifier(.binding_identifier, binding_identifier.?, binding_identifier_location);
+        }
         try self.ensureUniqueParameterNames(.strict, formal_parameters, open_parenthesis_token.location);
         try self.ensureAllowedParameterNames(formal_parameters, open_parenthesis_token.location);
     }
@@ -3838,6 +3854,8 @@ pub fn acceptExportDeclaration(self: *Parser) AcceptError!ast.ExportDeclaration 
     else |_| if (self.acceptDeclaration()) |declaration|
         return .{ .declaration = declaration }
     else |_| if (self.core.accept(RuleSet.is(.default))) |_| {
+        const tmp = temporaryChange(&self.state.in_default_export, true);
+        defer tmp.restore();
         if (self.acceptHoistableDeclaration()) |hoistable_declaration|
             return .{ .default_hoistable_declaration = hoistable_declaration }
         else |_| if (self.acceptClassDeclaration()) |class_declaration|
