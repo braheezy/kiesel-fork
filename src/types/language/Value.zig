@@ -1631,16 +1631,23 @@ pub fn stringToNumber(
     // 1. Let literal be ParseText(str, StringNumericLiteral).
     // 2. If literal is a List of errors, return NaN.
     // 3. Return the StringNumericValue of literal.
-    // TODO: Implement the proper string parsing grammar!
     const trimmed_string = try (try string.trim(allocator, .@"start+end")).toUtf8(allocator);
     if (trimmed_string.len == 0) return Number.from(0);
     if (std.mem.eql(u8, trimmed_string, "-Infinity")) return Number.from(-std.math.inf(f64));
     if (std.mem.eql(u8, trimmed_string, "+Infinity")) return Number.from(std.math.inf(f64));
     if (std.mem.eql(u8, trimmed_string, "Infinity")) return Number.from(std.math.inf(f64));
+    if (
     // Don't pass other strings starting with "inf" to `std.fmt.parseFloat()`
-    if (std.ascii.startsWithIgnoreCase(trimmed_string, "inf")) return Number.from(std.math.nan(f64));
+    std.ascii.startsWithIgnoreCase(trimmed_string, "inf")
+    // Don't pass strings with sign and base to `std.fmt.parseInt()`
+    or (std.mem.indexOfAny(u8, trimmed_string, "+-") == 0 and
+        (std.ascii.startsWithIgnoreCase(trimmed_string[1..], "0b") or
+        std.ascii.startsWithIgnoreCase(trimmed_string[1..], "0o") or
+        std.ascii.startsWithIgnoreCase(trimmed_string[1..], "0x")))
     // Don't pass strings containing underscores to `std.fmt.parseInt()`
-    if (std.mem.indexOfScalar(u8, trimmed_string, '_') != null) return Number.from(std.math.nan(f64));
+    or std.mem.indexOfScalar(u8, trimmed_string, '_') != null) {
+        return Number.from(std.math.nan(f64));
+    }
     if (std.fmt.parseFloat(f64, trimmed_string)) |float|
         return Number.from(float)
     else |_| if (std.fmt.parseInt(i32, trimmed_string, 0)) |int|
