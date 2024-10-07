@@ -370,7 +370,7 @@ pub fn createDateTimeFormat(
 
     // 38. Set dateTimeFormat.[[DateStyle]] to dateStyle.
     const date_style_map = std.StaticStringMap(
-        icu4zig.ZonedDateTimeFormatter.DateLength,
+        DateTimeFormat.Fields.DateStyle,
     ).initComptime(&.{
         .{ "full", .full },
         .{ "long", .long },
@@ -399,7 +399,7 @@ pub fn createDateTimeFormat(
 
     // 40. Set dateTimeFormat.[[TimeStyle]] to timeStyle.
     const time_style_map = std.StaticStringMap(
-        icu4zig.ZonedDateTimeFormatter.TimeLength,
+        DateTimeFormat.Fields.TimeStyle,
     ).initComptime(&.{
         .{ "full", .full },
         .{ "long", .long },
@@ -698,6 +698,19 @@ pub const prototype = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-datetimeformat-instances
 pub const DateTimeFormat = MakeObject(.{
     .Fields = struct {
+        pub const DateStyle = enum {
+            full,
+            long,
+            medium,
+            short,
+        };
+        pub const TimeStyle = enum {
+            full,
+            long,
+            medium,
+            short,
+        };
+
         /// [[Locale]]
         locale: icu4zig.Locale,
 
@@ -713,10 +726,10 @@ pub const DateTimeFormat = MakeObject(.{
         // TODO: [[HourCycle]]
 
         /// [[DateStyle]]
-        date_style: ?icu4zig.ZonedDateTimeFormatter.DateLength,
+        date_style: ?DateStyle,
 
         /// [[TimeStyle]]
-        time_style: ?icu4zig.ZonedDateTimeFormatter.TimeLength,
+        time_style: ?TimeStyle,
 
         /// [[BoundFormat]]
         bound_format: ?Object,
@@ -806,11 +819,24 @@ fn formatDateTimeImpl(
     ) catch unreachable;
     defer time_zone.deinit();
 
+    // Approximation, ICU4X API doesn't match ECMA-402
+    const date_style = date_time_format.fields.date_style orelse .short;
+    const time_style = date_time_format.fields.time_style orelse .short;
+    const date_time_length: icu4zig.ZonedDateTimeFormatter.DateTimeLength = if (@intFromEnum(date_style) >= @intFromEnum(time_style))
+        switch (date_style) {
+            .full, .long => .long,
+            .medium => .medium,
+            .short => .short,
+        }
+    else switch (time_style) {
+        .full, .long => .long,
+        .medium => .medium,
+        .short => .short,
+    };
     const zoned_date_time_formatter = try icu4zig.ZonedDateTimeFormatter.init(
         data_provider,
         date_time_format.fields.locale,
-        date_time_format.fields.date_style orelse .short,
-        date_time_format.fields.time_style orelse .short,
+        date_time_length,
     );
     const result = try zoned_date_time_formatter.format(
         allocator,
