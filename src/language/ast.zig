@@ -490,6 +490,17 @@ pub const TemplateLiteral = struct {
         text: []const u8,
         expression: Expression,
 
+        /// Text span without head/middle/tail components.
+        fn templateValueChars(self: Span) []const u8 {
+            std.debug.assert(self.text[0] == '`' or self.text[0] == '}');
+            if (self.text[self.text.len - 1] == '`') {
+                return self.text[1 .. self.text.len - 1];
+            } else {
+                std.debug.assert(std.mem.endsWith(u8, self.text, "${"));
+                return self.text[1 .. self.text.len - 2];
+            }
+        }
+
         /// 12.9.6.1 Static Semantics: TV
         /// https://tc39.es/ecma262/#sec-static-semantics-tv
         pub fn templateValue(
@@ -497,10 +508,14 @@ pub const TemplateLiteral = struct {
             allocator: std.mem.Allocator,
         ) std.mem.Allocator.Error!String {
             std.debug.assert(self.text[0] == '`' or self.text[0] == '}');
-            return if (self.text[self.text.len - 1] == '`')
-                stringValueImpl(allocator, self.text[1 .. self.text.len - 1])
-            else
-                stringValueImpl(allocator, self.text[1 .. self.text.len - 2]);
+            const text = self.templateValueChars();
+            if (std.mem.indexOf(u8, text, "\r") == null) {
+                return stringValueImpl(allocator, text);
+            }
+            const cloned = try std.mem.replaceOwned(u8, allocator, text, "\r\n", "\n");
+            defer allocator.free(cloned);
+            _ = std.mem.replace(u8, cloned, "\r", "\n", cloned);
+            return stringValueImpl(allocator, cloned);
         }
 
         /// 12.9.6.2 Static Semantics: TRV
@@ -509,11 +524,15 @@ pub const TemplateLiteral = struct {
             self: Span,
             allocator: std.mem.Allocator,
         ) std.mem.Allocator.Error!String {
-            std.debug.assert(self.text[0] == '`' or self.text[0] == '}');
-            return if (self.text[self.text.len - 1] == '`')
-                String.fromUtf8(allocator, self.text[1 .. self.text.len - 1])
-            else
-                String.fromUtf8(allocator, self.text[1 .. self.text.len - 2]);
+            const text = self.templateValueChars();
+            if (std.mem.indexOf(u8, text, "\r") == null) {
+                return String.fromUtf8(allocator, text);
+            }
+            const cloned = try std.mem.replaceOwned(u8, allocator, text, "\r\n", "\n");
+            _ = std.mem.replace(u8, cloned, "\r", "\n", cloned);
+            // FIXME: Not knowing whether fromUtf8() will take ownership of the string is awkward
+            //        and prevents us from freeing it
+            return String.fromUtf8(allocator, cloned);
         }
 
         /// 13.2.8.3 Static Semantics: TemplateString ( templateToken, raw )
