@@ -290,14 +290,6 @@ fn unescapeIdentifier(self: *Parser, token: Tokenizer.Token) AcceptError![]const
         token.text,
     )) orelse return error.UnexpectedToken;
     if (token.type == .identifier) {
-        // TODO: Handle UnicodeIDStart and UnicodeIDContinue
-        const start_chars = "$_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        const part_chars = start_chars ++ "0123456789";
-        for (string_value, 0..) |c, i| {
-            if (std.mem.indexOfScalar(u8, if (i > 0) part_chars else start_chars, c) == null) {
-                return error.UnexpectedToken;
-            }
-        }
         // It is a Syntax Error if the goal symbol of the syntactic grammar is Module and the
         // StringValue of IdentifierName is "await".
         if (self.state.in_module and std.mem.eql(u8, string_value, "await")) {

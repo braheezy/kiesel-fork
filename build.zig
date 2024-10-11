@@ -85,6 +85,7 @@ pub fn build(b: *std.Build) void {
     });
     const parser_toolkit = b.dependency("parser_toolkit", .{});
     const stackinfo = b.dependency("stackinfo", .{ .target = target });
+    const unicode_id = b.dependency("unicode_id", .{});
     const zigline = b.dependency("zigline", .{});
 
     var imports = std.ArrayList(std.Build.Module.Import).init(b.allocator);
@@ -105,6 +106,10 @@ pub fn build(b: *std.Build) void {
         .{
             .module = stackinfo.module("stackinfo"),
             .name = "stackinfo",
+        },
+        .{
+            .module = unicode_id.module("unicode-id"),
+            .name = "unicode-id",
         },
     }) catch @panic("OOM");
     if (enable_intl) {

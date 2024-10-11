@@ -44,6 +44,10 @@
             .url = "https://codeberg.org/linusg/zig-stackinfo/archive/9d02cd3077250fe7b0cbaef9eafd5c7e40c84b89.tar.gz",
             .hash = "12207b3a0abfdf208a6f456d31f3f03054dda60db0d8e88065aee202a3195f8b00e0",
         },
+        .unicode_id = .{
+            .url = "https://codeberg.org/injuly/unicode-id/archive/10e8dfae849b3e550529de663f71ae8e49e5bde8.tar.gz",
+            .hash = "1220d21683f2d62b7488ca640c79cd3004cef4b7a369c8193882aec78ddb196410de",
+        },
         .zigline = .{
             .url = "https://github.com/alimpfard/zigline/archive/143afe33f43a433b829fb4619039d21ed2345d9a.tar.gz",
             .hash = "1220f323c3f027438a8dd69c113d3eebb88e6b13c779243ad15eaf7d4105eb45ea03",

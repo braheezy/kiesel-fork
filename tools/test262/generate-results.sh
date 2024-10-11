@@ -1,7 +1,7 @@
 #!/bin/sh
 
 if [ "$#" -ne 3 ]; then
-  echo "usage: run.sh /path/to/kiesel /path/to/test262 'test/**/*.js'"
+  echo "usage: generate-results.sh /path/to/kiesel /path/to/test262 'test/**/*.js'"
   exit 1
 fi
 

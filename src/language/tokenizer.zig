@@ -1,5 +1,6 @@
 const ptk = @import("ptk");
 const std = @import("std");
+const unicode_id = @import("unicode-id");
 
 const literals = @import("literals.zig");
 const parseNumericLiteral = literals.parseNumericLiteral;
@@ -364,22 +365,66 @@ fn identifierMatcher(str: []const u8) ?usize {
     return len;
 }
 
-fn identifierNameMatcher(str: []const u8) ?usize {
-    // TODO: Handle UnicodeIDStart and UnicodeIDContinue
-    const start_chars = "$_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    const part_chars = start_chars ++ "0123456789";
-    var i: usize = 0;
-    while (i < str.len) {
-        if (escapeSequenceMatcher(str[i..])) |len| {
-            if (str[i + 1] != 'u') return i;
-            i += len;
-        } else if (std.mem.indexOfScalar(u8, if (i > 0) part_chars else start_chars, str[i]) == null) {
-            return i;
+fn canCodePointStartId(code_point: u21) bool {
+    return code_point == '$' or code_point == '_' or unicode_id.canStartId(code_point);
+}
+
+fn canCodePointContinueId(code_point: u21) bool {
+    return code_point == '$' or unicode_id.canContinueId(code_point);
+}
+
+/// Advance the iterator by one or more code points,
+/// and check if the code point(s) form a valid identifier start.
+///
+/// https://tc39.es/ecma262/#prod-IdentifierStartChar
+fn matchIdentifierStartChar(it: *std.unicode.Utf8Iterator) bool {
+    if (parseUnicodeEscapeSequence(it.bytes[it.i..])) |parsed| {
+        if (canCodePointStartId(parsed.code_point)) {
+            it.i += parsed.len;
+            return true;
         } else {
-            i += 1;
+            return false;
         }
     }
-    return str.len;
+
+    const code_point = it.nextCodepoint() orelse return false;
+    return canCodePointStartId(code_point);
+}
+
+/// Advance the iterator by one or more code points,
+/// and check if the code point(s) form a valid identifier part.
+///
+/// https://tc39.es/ecma262/#prod-IdentifierPartChar
+fn matchIdentifierPartChar(it: *std.unicode.Utf8Iterator) bool {
+    if (parseUnicodeEscapeSequence(it.bytes[it.i..])) |parsed| {
+        if (canCodePointContinueId(parsed.code_point)) {
+            it.i += parsed.len;
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    const code_point = it.nextCodepoint() orelse return false;
+    return canCodePointContinueId(code_point);
+}
+
+fn identifierNameMatcher(str: []const u8) ?usize {
+    const utf8_view = std.unicode.Utf8View.init(str) catch return null;
+    var it = utf8_view.iterator();
+
+    if (!matchIdentifierStartChar(&it)) {
+        return null;
+    }
+
+    while (it.i < str.len) {
+        const valid_len = it.i;
+        if (!matchIdentifierPartChar(&it)) {
+            return valid_len;
+        }
+    }
+
+    return it.i;
 }
 
 /// 12.7.2 Keywords and Reserved Words
@@ -454,6 +499,30 @@ fn templateTailMatcher(str: []const u8) ?usize {
     }
 }
 
+/// Parse a unicode escape sequence, and return the parsed code point and its length in bytes.
+fn parseUnicodeEscapeSequence(str: []const u8) ?struct { code_point: u21, len: usize } {
+    if (str.len < 3 or !std.mem.startsWith(u8, str, "\\u"))
+        return null;
+
+    if (str[2] == '{') {
+        const len = std.mem.indexOfScalar(u8, str[3..], '}') orelse return null;
+        if (len < 1 or len > 6) return null;
+        for (str[3..][0..len]) |ch| {
+            if (!std.ascii.isHex(ch)) return null;
+        }
+        const code_point = std.fmt.parseInt(u24, str[3..][0..len], 16) catch unreachable;
+        if (code_point > 0x10FFFF) return null;
+        return .{ .code_point = @intCast(code_point), .len = len + 4 };
+    } else {
+        if (str.len < 6) return null;
+        for (str[2..6]) |ch| {
+            if (!std.ascii.isHex(ch)) return null;
+        }
+        const code_point = std.fmt.parseInt(u16, str[2..6], 16) catch unreachable;
+        return .{ .code_point = code_point, .len = 6 };
+    }
+}
+
 pub fn escapeSequenceMatcher(str: []const u8) ?usize {
     if (str.len < 2 or str[0] != '\\') return null;
     switch (str[1]) {
@@ -465,32 +534,60 @@ pub fn escapeSequenceMatcher(str: []const u8) ?usize {
                 return null;
         },
         'u' => {
-            if (str.len < 3) return null;
-            switch (str[2]) {
-                // \u{X} - \u{XXXXXX}
-                '{' => {
-                    var i: usize = 3;
-                    while (i < str.len) : (i += 1) {
-                        if (str[i] == '}') break;
-                        if (!std.ascii.isHex(str[i])) return null;
-                    }
-                    if (i < 4 or i > 9) return null;
-                    const code_point = std.fmt.parseInt(u24, str[3..i], 16) catch unreachable;
-                    if (code_point > 0x10FFFF) return null;
-                    return i + 1;
-                },
-                // \uXXXX
-                else => if (str.len >= 6 and
-                    std.ascii.isHex(str[2]) and
-                    std.ascii.isHex(str[3]) and
-                    std.ascii.isHex(str[4]) and
-                    std.ascii.isHex(str[5]))
-                    return 6
-                else
-                    return null,
-            }
+            // \uXXXX or \u{X} - \u{XXXXXX}
+            const parsed = parseUnicodeEscapeSequence(str) orelse return null;
+            return parsed.len;
         },
         else => return 2,
+    }
+}
+
+test identifierMatcher {
+    const greek_id = "μήλα";
+    const greek_input = greek_id ++ " = 1";
+    try std.testing.expectEqual(greek_id.len, identifierMatcher(greek_input));
+
+    const kw = "const";
+    try std.testing.expectEqual(null, identifierMatcher(kw));
+}
+
+test identifierNameMatcher {
+    const valid = [_][]const u8{
+        "foo",
+        "bar",
+        "_underscore",
+        "$dollar",
+        "n1umber",
+        "a__b_",
+        "a__b1",
+        "संस्कृत",
+        "μήλα",
+        "$$$",
+        "\\u{105}test",
+        "_\\u{65}_",
+        "_‍",
+    };
+
+    const invalid = [_][]const u8{
+        "1number",
+        "123",
+        "1_",
+        "!bang",
+        "#sharp",
+        "😃",
+        "\\u{95}_escaped_code_point_is_invalid",
+    };
+
+    const greek_id = "μήλα";
+    const greek_input = greek_id ++ " = 1";
+    try std.testing.expectEqual(greek_id.len, identifierNameMatcher(greek_input));
+
+    for (valid) |input| {
+        try std.testing.expectEqual(input.len, identifierNameMatcher(input));
+    }
+
+    for (invalid) |input| {
+        try std.testing.expectEqual(null, identifierNameMatcher(input));
     }
 }
 
