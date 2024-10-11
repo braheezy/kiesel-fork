@@ -2,6 +2,7 @@
 
 > ⚡ A JavaScript engine written in Zig
 
+[![test262](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Ff.sakamoto.pl%2Flinus%2Fkiesel%2Fpercentage.txt&query=%24&suffix=%25&label=test262&color=%23e9d44d)](https://test262.fyi/#|kiesel)
 [![justforfunnoreally.dev badge](https://img.shields.io/badge/justforfunnoreally-dev-9ff)](https://justforfunnoreally.dev)
 [![License](https://img.shields.io/badge/License-MIT-d63e97)](https://codeberg.org/kiesel-js/kiesel/src/branch/main/LICENSE)
 [![Build](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fcodeberg.org%2Fapi%2Fv1%2Frepos%2Fkiesel-js%2Fkiesel%2Fcommits%2Fmain%2Fstatus&query=statuses%5B0%5D.status&label=Build&labelColor=gray&color=blue)](https://codeberg.org/kiesel-js/kiesel/actions?workflow=build.yml)
