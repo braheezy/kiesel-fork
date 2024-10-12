@@ -48,6 +48,10 @@ date when making changes to the engine:
 ./tools/test262/generate-results.sh /path/to/zig-out/bin/kiesel /path/to/test262 'test/**/*.js' > ./tools/test262/results.json
 ```
 
-This should be done atomically for each individual commit. Make sure your copy
-of test262 is in sync with `TEST262_COMMIT` in
-[`ci.yml`](../.forgejo/workflows/ci.yml).
+Important notes:
+
+- This should be done atomically for each individual commit
+- Make sure your copy of test262 is in sync with `TEST262_COMMIT` in
+  [`ci.yml`](../.forgejo/workflows/ci.yml)
+- Use a `ReleaseSafe` build for good performance while ensuring that triggering
+  undefined behavior consistently causes tests to fail via safety checks
