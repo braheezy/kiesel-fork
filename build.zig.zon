@@ -6,6 +6,10 @@
             .url = "https://github.com/ikskuh/any-pointer/archive/15f40d9feddbb2b063b8817e3f248189558acf31.tar.gz",
             .hash = "12200da24a57da99d213b012c3af926202c8535517f502caef7238d0e952e2dd1808",
         },
+        .args = .{
+            .url = "https://github.com/ikskuh/zig-args/archive/0abdd6947a70e6d8cc83b66228cea614aa856206.tar.gz",
+            .hash = "1220411a8c46d95bbf3b6e2059854bcb3c5159d428814099df5294232b9980517e9c",
+        },
         .icu4zig = .{
             .url = "https://codeberg.org/linusg/icu4zig/archive/ef5cc1afd51dc9bf4bcfffe655fa184d7ec4ddbd.tar.gz",
             .hash = "1220579da2ef5267aca4082ae41d02d303314f6c1acbd5cb3e6eba00e3dd6e1ee0df",
@@ -36,11 +40,7 @@
             .url = "https://github.com/ikskuh/parser-toolkit/archive/6aafc4cd8f82e053b35a4b96dd7255164a487f77.tar.gz",
             .hash = "122020dcea6890882c8abe90b9e3ecf1af54b8a60ce1295c4e92d40fffcae3158e7d",
         },
-        .zig_args = .{
-            .url = "https://github.com/ikskuh/zig-args/archive/0abdd6947a70e6d8cc83b66228cea614aa856206.tar.gz",
-            .hash = "1220411a8c46d95bbf3b6e2059854bcb3c5159d428814099df5294232b9980517e9c",
-        },
-        .zig_stackinfo = .{
+        .stackinfo = .{
             .url = "https://codeberg.org/linusg/zig-stackinfo/archive/9d02cd3077250fe7b0cbaef9eafd5c7e40c84b89.tar.gz",
             .hash = "12207b3a0abfdf208a6f456d31f3f03054dda60db0d8e88065aee202a3195f8b00e0",
         },

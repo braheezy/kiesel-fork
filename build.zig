@@ -68,6 +68,7 @@ pub fn build(b: *std.Build) void {
     options.addOption(std.SemanticVersion, "version", version);
 
     const any_pointer = b.dependency("any_pointer", .{});
+    const args = b.dependency("args", .{});
     const libgc = b.dependency("libgc", .{
         .target = target,
         .optimize = optimize,
@@ -83,8 +84,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     const parser_toolkit = b.dependency("parser_toolkit", .{});
-    const zig_args = b.dependency("zig_args", .{});
-    const zig_stackinfo = b.dependency("zig_stackinfo", .{ .target = target });
+    const stackinfo = b.dependency("stackinfo", .{ .target = target });
     const zigline = b.dependency("zigline", .{});
 
     var imports = std.ArrayList(std.Build.Module.Import).init(b.allocator);
@@ -103,7 +103,7 @@ pub fn build(b: *std.Build) void {
             .name = "ptk",
         },
         .{
-            .module = zig_stackinfo.module("stackinfo"),
+            .module = stackinfo.module("stackinfo"),
             .name = "stackinfo",
         },
     }) catch @panic("OOM");
@@ -171,7 +171,7 @@ pub fn build(b: *std.Build) void {
         kiesel_runtime.module("kiesel-runtime").addImport("kiesel", kiesel);
         exe.root_module.addImport("kiesel-runtime", kiesel_runtime.module("kiesel-runtime"));
     }
-    exe.root_module.addImport("args", zig_args.module("args"));
+    exe.root_module.addImport("args", args.module("args"));
     exe.root_module.addImport("zigline", zigline.module("zigline"));
     if (optimize != .Debug) exe.root_module.strip = true;
 
@@ -194,8 +194,8 @@ pub fn build(b: *std.Build) void {
     };
     run_cmd.step.dependOn(b.getInstallStep());
 
-    if (b.args) |args| {
-        run_cmd.addArgs(args);
+    if (b.args) |args_| {
+        run_cmd.addArgs(args_);
     }
 
     const run_step = b.step("run", "Run the app");
