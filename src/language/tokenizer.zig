@@ -236,6 +236,15 @@ const patterns = .{
 
 pub const Tokenizer = ptk.Tokenizer(TokenType, &patterns);
 
+/// Validate the input as UTF-8, and create a new tokenizer.
+pub fn initValidateUtf8(source: []const u8, file_name: ?[]const u8) error{InvalidUtf8}!Tokenizer {
+    if (std.unicode.utf8ValidateSlice(source)) {
+        return Tokenizer.init(source, file_name);
+    }
+
+    return error.InvalidUtf8;
+}
+
 // FIXME: ptk should provide tokenizer state to matchers
 pub var state: struct {
     tokenizer: *Tokenizer = undefined,
@@ -410,7 +419,7 @@ fn matchIdentifierPartChar(it: *std.unicode.Utf8Iterator) bool {
 }
 
 fn identifierNameMatcher(str: []const u8) ?usize {
-    const utf8_view = std.unicode.Utf8View.init(str) catch return null;
+    const utf8_view = std.unicode.Utf8View.initUnchecked(str);
     var it = utf8_view.iterator();
 
     if (!matchIdentifierStartChar(&it)) {

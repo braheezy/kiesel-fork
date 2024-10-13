@@ -527,7 +527,7 @@ fn repl(allocator: std.mem.Allocator, realm: *Realm, options: struct {
             const line = self.editor.getBufferedLine() catch return;
             defer self.editor.allocator.free(line);
 
-            var tokenizer = kiesel.language.tokenizer.Tokenizer.init(line, null);
+            var tokenizer = kiesel.language.tokenizer.initValidateUtf8(line, null) catch return;
             const change = kiesel.utils.temporaryChange(
                 &kiesel.language.tokenizer.state,
                 .{

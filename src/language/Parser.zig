@@ -9,6 +9,7 @@ const utils = @import("../utils.zig");
 
 const TemporaryChange = utils.TemporaryChange;
 const Tokenizer = tokenizer_.Tokenizer;
+const initValidateUtf8 = tokenizer_.initValidateUtf8;
 const containsLineTerminator = tokenizer_.containsLineTerminator;
 const parseNumericLiteral = literals.parseNumericLiteral;
 const parseRegularExpressionLiteral = literals.parseRegularExpressionLiteral;
@@ -213,7 +214,15 @@ pub fn parseNode(
     source_text: []const u8,
     ctx: ParseContext,
 ) Error!T {
-    var tokenizer = Tokenizer.init(source_text, ctx.file_name);
+    var tokenizer = initValidateUtf8(source_text, ctx.file_name) catch {
+        try ctx.diagnostics.emit(
+            .{ .source = ctx.file_name, .line = 1, .column = 1 },
+            .@"error",
+            "invalid UTF-8 source code",
+            .{},
+        );
+        return error.ParseError;
+    };
     const core = ParserCore.init(&tokenizer);
     var parser: Parser = .{
         .allocator = allocator,
