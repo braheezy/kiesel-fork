@@ -1833,8 +1833,8 @@ pub const constructor = struct {
         return Value.from(try promiseResolve(agent, constructor_.asObject(), resolution));
     }
 
-    /// 1 Promise.try ( callback, ...args )
-    /// https://tc39.es/proposal-promise-try/#sec-promise.try
+    /// 27.2.4.8 Promise.try ( callback, ...args )
+    /// https://tc39.es/ecma262/#sec-promise.try
     fn @"try"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback = arguments.get(0);
         const args = if (arguments.count() <= 1) &[_]Value{} else arguments.values[1..];
@@ -1877,7 +1877,7 @@ pub const constructor = struct {
         return Value.from(promise_capability.promise);
     }
 
-    /// 27.2.4.8 Promise.withResolvers ( )
+    /// 27.2.4.9 Promise.withResolvers ( )
     /// https://tc39.es/ecma262/#sec-promise.withResolvers
     fn withResolvers(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -1916,7 +1916,7 @@ pub const constructor = struct {
         return Value.from(object);
     }
 
-    /// 27.2.4.9 get Promise [ %Symbol.species% ]
+    /// 27.2.4.10 get Promise [ %Symbol.species% ]
     /// https://tc39.es/ecma262/#sec-get-promise-%symbol.species%
     fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
