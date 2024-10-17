@@ -3573,7 +3573,9 @@ pub fn acceptAsyncFunctionExpression(self: *Parser) AcceptError!ast.AsyncFunctio
 }
 
 pub fn acceptAwaitExpression(self: *Parser) AcceptError!ast.AwaitExpression {
-    if (!(self.state.in_async_function_body or self.state.in_module)) return error.UnexpectedToken;
+    if (!self.state.in_async_function_body and !(self.state.in_module and !self.state.in_function_body)) {
+        return error.UnexpectedToken;
+    }
 
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
