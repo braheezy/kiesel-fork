@@ -359,18 +359,25 @@ pub fn link(self: *SourceTextModule, agent: *Agent) Agent.Error!void {
 
 /// 16.2.1.5.2.1 InnerModuleLinking ( module, stack, index )
 /// https://tc39.es/ecma262/#sec-InnerModuleLinking
-fn innerModuleLinking(agent: *Agent, module: Module, stack: *std.ArrayList(*SourceTextModule), index: usize) Agent.Error!usize {
+fn innerModuleLinking(
+    agent: *Agent,
+    abstract_module: Module,
+    stack: *std.ArrayList(*SourceTextModule),
+    index: usize,
+) Agent.Error!usize {
     // 1. If module is not a Cyclic Module Record, then
-    if (module != .source_text_module) {
+    if (abstract_module != .source_text_module) {
         // a. Perform ? module.Link().
-        try module.link(agent);
+        try abstract_module.link(agent);
 
         // b. Return index.
         return index;
     }
 
+    const module = abstract_module.source_text_module;
+
     // 2. If module.[[Status]] is one of linking, linked, evaluating-async, or evaluated, then
-    if (switch (module.source_text_module.status) {
+    if (switch (module.status) {
         .linking, .linked, .evaluating_async, .evaluated => true,
         else => false,
     }) {
@@ -379,69 +386,69 @@ fn innerModuleLinking(agent: *Agent, module: Module, stack: *std.ArrayList(*Sour
     }
 
     // 3. Assert: module.[[Status]] is unlinked.
-    std.debug.assert(module.source_text_module.status == .unlinked);
+    std.debug.assert(module.status == .unlinked);
 
     // 4. Set module.[[Status]] to linking.
-    module.source_text_module.status = .linking;
+    module.status = .linking;
 
     // 5. Set module.[[DFSIndex]] to index.
-    module.source_text_module.dfs_index = index;
+    module.dfs_index = index;
 
     // 6. Set module.[[DFSAncestorIndex]] to index.
-    module.source_text_module.dfs_ancestor_index = index;
+    module.dfs_ancestor_index = index;
 
     // 7. Set index to index + 1.
     var new_index = index + 1;
 
     // 8. Append module to stack.
-    try stack.append(module.source_text_module);
+    try stack.append(module);
 
     // 9. For each String required of module.[[RequestedModules]], do
-    for (module.source_text_module.requested_modules.items) |required| {
+    for (module.requested_modules.items) |required| {
         // a. Let requiredModule be GetImportedModule(module, required).
-        const required_module = getImportedModule(module.source_text_module, required);
+        const abstract_required_module = getImportedModule(module, required);
 
         // b. Set index to ? InnerModuleLinking(requiredModule, stack, index).
-        new_index = try innerModuleLinking(agent, required_module, stack, new_index);
+        new_index = try innerModuleLinking(agent, abstract_required_module, stack, new_index);
 
         // c. If requiredModule is a Cyclic Module Record, then
-        if (required_module == .source_text_module) {
+        if (abstract_required_module == .source_text_module) {
+            const required_module = abstract_required_module.source_text_module;
+
             // i. Assert: requiredModule.[[Status]] is one of linking, linked, evaluating-async, or
             //    evaluated.
-            std.debug.assert(switch (required_module.source_text_module.status) {
+            std.debug.assert(switch (required_module.status) {
                 .linking, .linked, .evaluating_async, .evaluated => true,
                 else => false,
             });
 
             // ii. Assert: requiredModule.[[Status]] is linking if and only if stack contains
             //     requiredModule.
-            std.debug.assert(if (std.mem.indexOfScalar(*SourceTextModule, stack.items, required_module.source_text_module) != null)
-                required_module.source_text_module.status == .linking
-            else
-                required_module.source_text_module.status != .linking);
+            std.debug.assert((required_module.status == .linking) ==
+                (std.mem.indexOfScalar(*SourceTextModule, stack.items, required_module) != null));
 
             // iii. If requiredModule.[[Status]] is linking, then
-            if (required_module.source_text_module.status == .linking) {
+            if (required_module.status == .linking) {
                 // 1. Set module.[[DFSAncestorIndex]] to min(module.[[DFSAncestorIndex]],
                 //    requiredModule.[[DFSAncestorIndex]]).
-                module.source_text_module.dfs_ancestor_index = @min(
-                    module.source_text_module.dfs_ancestor_index.?,
-                    required_module.source_text_module.dfs_ancestor_index.?,
+                module.dfs_ancestor_index = @min(
+                    module.dfs_ancestor_index.?,
+                    required_module.dfs_ancestor_index.?,
                 );
             }
         }
     }
 
     // 10. Perform ? module.InitializeEnvironment().
-    try module.source_text_module.initializeEnvironment();
+    try module.initializeEnvironment();
 
     // 11. Assert: module occurs exactly once in stack.
 
     // 12. Assert: module.[[DFSAncestorIndex]] ≤ module.[[DFSIndex]].
-    std.debug.assert(module.source_text_module.dfs_ancestor_index.? <= module.source_text_module.dfs_index.?);
+    std.debug.assert(module.dfs_ancestor_index.? <= module.dfs_index.?);
 
     // 13. If module.[[DFSAncestorIndex]] = module.[[DFSIndex]], then
-    if (module.source_text_module.dfs_ancestor_index.? == module.source_text_module.dfs_index.?) {
+    if (module.dfs_ancestor_index.? == module.dfs_index.?) {
         // a. Let done be false.
         // b. Repeat, while done is false,
         while (true) {
@@ -454,7 +461,7 @@ fn innerModuleLinking(agent: *Agent, module: Module, stack: *std.ArrayList(*Sour
             required_module.status = .linked;
 
             // v. If requiredModule and module are the same Module Record, set done to true.
-            if (required_module == module.source_text_module) break;
+            if (required_module == module) break;
         }
     }
 
@@ -723,14 +730,14 @@ pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!
 /// https://tc39.es/ecma262/#sec-innermoduleevaluation
 fn innerModuleEvaluation(
     agent: *Agent,
-    module: Module,
+    abstract_module: Module,
     stack: *std.ArrayList(*SourceTextModule),
     index: usize,
 ) Agent.Error!usize {
     // 1. If module is not a Cyclic Module Record, then
-    if (module != .source_text_module) {
+    if (abstract_module != .source_text_module) {
         // a. Let promise be ! module.Evaluate().
-        const promise = module.evaluate(agent) catch |err| try noexcept(err);
+        const promise = abstract_module.evaluate(agent) catch |err| try noexcept(err);
 
         // b. Assert: promise.[[PromiseState]] is not pending.
         std.debug.assert(promise.fields.promise_state != .pending);
@@ -746,95 +753,101 @@ fn innerModuleEvaluation(
         return index;
     }
 
+    const module = abstract_module.source_text_module;
+
     // 2. If module.[[Status]] is either evaluating-async or evaluated, then
-    if (switch (module.source_text_module.status) {
+    if (switch (module.status) {
         .evaluating_async, .evaluated => true,
         else => false,
     }) {
         // a. If module.[[EvaluationError]] is empty, return index.
-        if (module.source_text_module.evaluation_error == null) return index;
+        if (module.evaluation_error == null) return index;
 
         // b. Otherwise, return ? module.[[EvaluationError]].
-        agent.exception = module.source_text_module.evaluation_error.?;
+        agent.exception = module.evaluation_error.?;
         return error.ExceptionThrown;
     }
 
     // 3. If module.[[Status]] is evaluating, return index.
-    if (module.source_text_module.status == .evaluating) return index;
+    if (module.status == .evaluating) return index;
 
     // 4. Assert: module.[[Status]] is linked.
-    std.debug.assert(module.source_text_module.status == .linked);
+    std.debug.assert(module.status == .linked);
 
     // 5. Set module.[[Status]] to evaluating.
-    module.source_text_module.status = .evaluating;
+    module.status = .evaluating;
 
     // 6. Set module.[[DFSIndex]] to index.
-    module.source_text_module.dfs_index = index;
+    module.dfs_index = index;
 
     // 7. Set module.[[DFSAncestorIndex]] to index.
-    module.source_text_module.dfs_ancestor_index = index;
+    module.dfs_ancestor_index = index;
 
     // 8. Set module.[[PendingAsyncDependencies]] to 0.
-    module.source_text_module.pending_async_dependencies = 0;
+    module.pending_async_dependencies = 0;
 
     // 9. Set index to index + 1.
     var new_index = index + 1;
 
     // 10. Append module to stack.
-    try stack.append(module.source_text_module);
+    try stack.append(module);
 
     // 11. For each String required of module.[[RequestedModules]], do
-    for (module.source_text_module.requested_modules.items) |required| {
+    for (module.requested_modules.items) |required| {
         // a. Let requiredModule be GetImportedModule(module, required).
-        var required_module = getImportedModule(module.source_text_module, required);
+        const abstract_required_module = getImportedModule(module, required);
 
         // b. Set index to ? InnerModuleEvaluation(requiredModule, stack, index).
-        new_index = try innerModuleEvaluation(agent, required_module, stack, new_index);
+        new_index = try innerModuleEvaluation(agent, abstract_required_module, stack, new_index);
 
         // c. If requiredModule is a Cyclic Module Record, then
-        if (required_module == .source_text_module) {
+        if (abstract_required_module == .source_text_module) {
+            var required_module = abstract_required_module.source_text_module;
+
             // i. Assert: requiredModule.[[Status]] is one of evaluating, evaluating-async, or
             //    evaluated.
+            std.debug.assert(switch (required_module.status) {
+                .evaluating, .evaluating_async, .evaluated => true,
+                else => false,
+            });
 
             // ii. Assert: requiredModule.[[Status]] is evaluating if and only if stack contains
             //     requiredModule.
-            std.debug.assert(if (std.mem.indexOfScalar(*SourceTextModule, stack.items, required_module.source_text_module) != null)
-                required_module.source_text_module.status == .evaluating
-            else
-                required_module.source_text_module.status != .evaluating);
+            std.debug.assert((required_module.status == .evaluating) ==
+                (std.mem.indexOfScalar(*SourceTextModule, stack.items, required_module) != null));
 
             // iii. If requiredModule.[[Status]] is evaluating, then
-            if (required_module.source_text_module.status == .evaluating) {
+            if (required_module.status == .evaluating) {
                 // 1. Set module.[[DFSAncestorIndex]] to min(module.[[DFSAncestorIndex]],
                 //    requiredModule.[[DFSAncestorIndex]]).
-                module.source_text_module.dfs_ancestor_index = @min(
-                    module.source_text_module.dfs_ancestor_index.?,
-                    required_module.source_text_module.dfs_ancestor_index.?,
+                module.dfs_ancestor_index = @min(
+                    module.dfs_ancestor_index.?,
+                    required_module.dfs_ancestor_index.?,
                 );
             }
             // iv. Else,
             else {
                 // 1. Set requiredModule to requiredModule.[[CycleRoot]].
-                required_module = .{ .source_text_module = required_module.source_text_module.cycle_root.? };
+                required_module = required_module.cycle_root.?;
 
                 // 2. Assert: requiredModule.[[Status]] is either evaluating-async or evaluated.
-                std.debug.assert(switch (required_module.source_text_module.status) {
+                std.debug.assert(switch (required_module.status) {
                     .evaluating_async, .evaluated => true,
                     else => false,
                 });
 
                 // 3. If requiredModule.[[EvaluationError]] is not empty, return
                 //    ? requiredModule.[[EvaluationError]].
-                if (required_module.source_text_module.evaluation_error) |evaluation_error| {
+                if (required_module.evaluation_error) |evaluation_error| {
                     agent.exception = evaluation_error;
                     return error.ExceptionThrown;
                 }
             }
 
             // v. If requiredModule.[[AsyncEvaluation]] is true, then
-            if (required_module.source_text_module.async_evaluation) {
+            if (required_module.async_evaluation) {
                 // 1. Set module.[[PendingAsyncDependencies]] to module.[[PendingAsyncDependencies]] + 1.
-                module.source_text_module.pending_async_dependencies.? += 1;
+                module.pending_async_dependencies.? += 1;
 
                 // TODO: 2. Append module to requiredModule.[[AsyncParentModules]].
             }
@@ -842,28 +855,30 @@ fn innerModuleEvaluation(
     }
 
     // 12. If module.[[PendingAsyncDependencies]] > 0 or module.[[HasTLA]] is true, then
-    if (module.source_text_module.pending_async_dependencies.? > 0 or module.source_text_module.has_tla) {
+    if (module.pending_async_dependencies.? > 0 or module.has_tla) {
         // a. Assert: module.[[AsyncEvaluation]] is false and was never previously set to true.
+        std.debug.assert(!module.async_evaluation);
+
         // b. Set module.[[AsyncEvaluation]] to true.
         // c. NOTE: The order in which module records have their [[AsyncEvaluation]] fields
         //    transition to true is significant. (See 16.2.1.5.3.4.)
-        module.source_text_module.async_evaluation = true;
+        module.async_evaluation = true;
 
         // TODO: d. If module.[[PendingAsyncDependencies]] = 0, perform ExecuteAsyncModule(module).
     }
     // 13. Else,
     else {
         // a. Perform ? module.ExecuteModule().
-        try module.source_text_module.executeModule(null);
+        try module.executeModule(null);
     }
 
     // 14. Assert: module occurs exactly once in stack.
 
     // 15. Assert: module.[[DFSAncestorIndex]] ≤ module.[[DFSIndex]].
-    std.debug.assert(module.source_text_module.dfs_ancestor_index.? <= module.source_text_module.dfs_index.?);
+    std.debug.assert(module.dfs_ancestor_index.? <= module.dfs_index.?);
 
     // 16. If module.[[DFSAncestorIndex]] = module.[[DFSIndex]], then
-    if (module.source_text_module.dfs_ancestor_index == module.source_text_module.dfs_index) {
+    if (module.dfs_ancestor_index == module.dfs_index) {
         // a. Let done be false.
         // b. Repeat, while done is false,
         while (true) {
@@ -877,10 +892,10 @@ fn innerModuleEvaluation(
             required_module.status = if (!required_module.async_evaluation) .evaluated else .evaluating_async;
 
             // vii. Set requiredModule.[[CycleRoot]] to module.
-            required_module.cycle_root = module.source_text_module;
+            required_module.cycle_root = module;
 
             // vi. If requiredModule and module are the same Module Record, set done to true.
-            if (required_module == module.source_text_module) break;
+            if (required_module == module) break;
         }
     }
 
