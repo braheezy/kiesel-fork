@@ -3,7 +3,9 @@
 
 const std = @import("std");
 
+const ast = @import("../language/ast.zig");
 const builtins = @import("../builtins.zig");
+const bytecode = @import("../language/bytecode.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
@@ -19,6 +21,7 @@ const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createDynamicFunction = builtins.createDynamicFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
+const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const noexcept = utils.noexcept;
 const performPromiseThen = builtins.performPromiseThen;
 const promiseResolve = builtins.promiseResolve;
@@ -120,17 +123,27 @@ pub fn asyncFunctionStart(
     const async_context = running_context.*;
 
     // 4. Perform AsyncBlockStart(promiseCapability, asyncFunctionBody, asyncContext).
-    try asyncBlockStart(agent, promise_capability, async_function, async_context);
+    try asyncBlockStart(
+        agent,
+        promise_capability,
+        .{ .ecmascript_function = async_function },
+        async_context,
+    );
 
     // 5. Return unused.
 }
+
+const ECMAScriptFunctionOrModule = union(enum) {
+    ecmascript_function: *builtins.ECMAScriptFunction,
+    module: ast.Module,
+};
 
 /// 27.7.5.2 AsyncBlockStart ( promiseCapability, asyncBody, asyncContext )
 /// https://tc39.es/ecma262/#sec-asyncblockstart
 pub fn asyncBlockStart(
     agent: *Agent,
     promise_capability: PromiseCapability,
-    async_function: *builtins.ECMAScriptFunction,
+    async_body: ECMAScriptFunctionOrModule,
     async_context: ExecutionContext,
 ) std.mem.Allocator.Error!void {
     // 1. Let runningContext be the running execution context.
@@ -142,12 +155,15 @@ pub fn asyncBlockStart(
         fn func(
             agent_: *Agent,
             promise_capability_: PromiseCapability,
-            async_function_: *builtins.ECMAScriptFunction,
+            async_body_: ECMAScriptFunctionOrModule,
         ) std.mem.Allocator.Error!void {
             // a. Let acAsyncContext be the running execution context.
 
             // b. Let result be Completion(Evaluation of asyncBody).
-            const result = async_function_.fields.evaluateBody(agent_);
+            const result = switch (async_body_) {
+                .ecmascript_function => |ecmascript_function| ecmascript_function.fields.evaluateBody(agent_),
+                .module => |module| generateAndRunBytecode(agent_, module, .{}),
+            };
 
             // c. Assert: If we return here, the async function either threw an exception or
             //    performed an implicit or explicit return; all awaiting is done.
@@ -199,7 +215,7 @@ pub fn asyncBlockStart(
 
     // 5. Resume the suspended evaluation of asyncContext. Let result be the value returned by the
     //    resumed computation.
-    const result = closure(agent, promise_capability, async_function);
+    const result = closure(agent, promise_capability, async_body);
 
     // 6. Assert: When we return here, asyncContext has already been removed from the execution
     //    context stack and runningContext is the currently running execution context.
