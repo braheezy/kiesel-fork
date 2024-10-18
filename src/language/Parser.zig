@@ -3137,7 +3137,8 @@ pub fn acceptYieldExpression(self: *Parser) AcceptError!ast.YieldExpression {
 
     _ = try self.core.accept(RuleSet.is(.yield));
     if (!self.followedByLineTerminator()) {
-        if (self.acceptExpression(.{})) |expr| {
+        const ctx: AcceptContext = .{ .precedence = getPrecedence(.yield) + 1 };
+        if (self.acceptExpression(ctx)) |expr| {
             const expression = try self.allocator.create(ast.Expression);
             expression.* = expr;
             return .{ .expression = expression };
@@ -3583,7 +3584,8 @@ pub fn acceptAwaitExpression(self: *Parser) AcceptError!ast.AwaitExpression {
     _ = try self.core.accept(RuleSet.is(.@"await"));
     const expression = try self.allocator.create(ast.Expression);
     errdefer self.allocator.destroy(expression);
-    expression.* = try self.acceptExpression(.{});
+    const ctx: AcceptContext = .{ .precedence = getPrecedence(.@"await") + 1 };
+    expression.* = try self.acceptExpression(ctx);
     return .{ .expression = expression };
 }
 
