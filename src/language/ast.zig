@@ -19,6 +19,7 @@ const containsSlice = utils.containsSlice;
 const escapeSequenceMatcher = language.tokenizer.escapeSequenceMatcher;
 
 const AnalyzeQuery = enum {
+    is_await_expression,
     is_reference,
     is_string_literal,
 };
@@ -73,7 +74,7 @@ pub const ParenthesizedExpression = struct {
 
     pub fn analyze(self: ParenthesizedExpression, query: AnalyzeQuery) bool {
         return switch (query) {
-            .is_reference => self.expression.analyze(query),
+            .is_await_expression, .is_reference => self.expression.analyze(query),
             .is_string_literal => false,
         };
     }
@@ -108,6 +109,10 @@ pub const PrimaryExpression = union(enum) {
 
     pub fn analyze(self: PrimaryExpression, query: AnalyzeQuery) bool {
         return switch (query) {
+            .is_await_expression => switch (self) {
+                .parenthesized_expression => |parenthesized_expression| parenthesized_expression.analyze(query),
+                else => false,
+            },
             .is_reference => switch (self) {
                 .identifier_reference => true,
                 .parenthesized_expression => |parenthesized_expression| parenthesized_expression.analyze(query),
@@ -196,7 +201,9 @@ pub const Literal = union(enum) {
 
     pub fn analyze(self: Literal, query: AnalyzeQuery) bool {
         return switch (query) {
-            .is_reference => false,
+            .is_await_expression,
+            .is_reference,
+            => false,
             .is_string_literal => self == .string,
         };
     }
@@ -787,6 +794,11 @@ pub const Expression = union(enum) {
 
     pub fn analyze(self: Expression, query: AnalyzeQuery) bool {
         return switch (query) {
+            .is_await_expression => switch (self) {
+                .await_expression => true,
+                .primary_expression => |primary_expression| primary_expression.analyze(query),
+                else => false,
+            },
             .is_reference => switch (self) {
                 .primary_expression => |primary_expression| primary_expression.analyze(query),
                 .member_expression,
@@ -822,11 +834,10 @@ pub const Statement = union(enum) {
 
     pub fn analyze(self: Statement, query: AnalyzeQuery) bool {
         return switch (query) {
-            .is_reference => switch (self) {
-                .expression_statement => |expression_statement| expression_statement.analyze(query),
-                else => false,
-            },
-            .is_string_literal => switch (self) {
+            .is_await_expression,
+            .is_reference,
+            .is_string_literal,
+            => switch (self) {
                 .expression_statement => |expression_statement| expression_statement.analyze(query),
                 else => false,
             },
@@ -922,8 +933,10 @@ pub const Declaration = union(enum) {
 
     pub fn analyze(_: Declaration, query: AnalyzeQuery) bool {
         return switch (query) {
-            .is_reference => false,
-            .is_string_literal => false,
+            .is_await_expression,
+            .is_reference,
+            .is_string_literal,
+            => false,
         };
     }
 
@@ -3292,6 +3305,17 @@ pub const Script = struct {
 /// https://tc39.es/ecma262/#prod-Module
 pub const Module = struct {
     module_item_list: ModuleItemList,
+
+    pub fn hasTla(self: Module) bool {
+        return for (self.module_item_list.items) |module_item| {
+            switch (module_item) {
+                .statement_list_item => |statement_list_item| {
+                    if (statement_list_item.analyze(.is_await_expression)) break true;
+                },
+                else => {},
+            }
+        } else false;
+    }
 
     /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations

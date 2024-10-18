@@ -38772,7 +38772,7 @@
   "test/language/module-code/top-level-await/await-expr-reject-throws.js": "PASS",
   "test/language/module-code/top-level-await/await-expr-resolution.js": "PASS",
   "test/language/module-code/top-level-await/await-void-expr.js": "PASS",
-  "test/language/module-code/top-level-await/dfs-invariant.js": "PASS",
+  "test/language/module-code/top-level-await/dfs-invariant.js": "FAIL",
   "test/language/module-code/top-level-await/dynamic-import-rejection.js": "PASS",
   "test/language/module-code/top-level-await/dynamic-import-resolution.js": "PASS",
   "test/language/module-code/top-level-await/early-errors-await-not-simple-assignment-target.js": "PASS",

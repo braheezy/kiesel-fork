@@ -13,6 +13,7 @@ const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
+const Arguments = types.Arguments;
 const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
 const ExportStarSet = language.ExportStarSet;
@@ -28,7 +29,9 @@ const SafePointer = types.SafePointer;
 const String = types.String;
 const StringHashMap = types.StringHashMap;
 const Value = types.Value;
+const asyncBlockStart = builtins.asyncBlockStart;
 const containsSlice = utils.containsSlice;
+const createBuiltinFunction = builtins.createBuiltinFunction;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const getImportedModule = language.getImportedModule;
 const getModuleNamespace = language.getModuleNamespace;
@@ -39,6 +42,7 @@ const instantiateOrdinaryFunctionObject = language.instantiateOrdinaryFunctionOb
 const newModuleEnvironment = execution.newModuleEnvironment;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
+const performPromiseThen = builtins.performPromiseThen;
 
 const SourceTextModule = @This();
 
@@ -104,6 +108,9 @@ async_evaluation: bool,
 
 /// [[TopLevelCapability]]
 top_level_capability: ?PromiseCapability,
+
+/// [[AsyncParentModules]]
+async_parent_modules: std.ArrayList(*SourceTextModule),
 
 /// [[PendingAsyncDependencies]]
 pending_async_dependencies: ?usize,
@@ -575,8 +582,8 @@ pub fn parse(
         }
     }
 
-    // TODO: 11. Let async be body Contains await.
-    const @"async" = false;
+    // 11. Let async be body Contains await.
+    const @"async" = body.hasTla();
 
     // 12. Return Source Text Module Record {
     //       [[Realm]]: realm, [[Environment]]: empty, [[Namespace]]: empty, [[CycleRoot]]: empty,
@@ -597,6 +604,7 @@ pub fn parse(
         .has_tla = @"async",
         .async_evaluation = false,
         .top_level_capability = null,
+        .async_parent_modules = .init(agent.gc_allocator),
         .pending_async_dependencies = null,
         .status = .new,
         .evaluation_error = null,
@@ -721,6 +729,9 @@ pub fn evaluate(self: *SourceTextModule, agent: *Agent) std.mem.Allocator.Error!
         // d. Assert: stack is empty.
         std.debug.assert(stack.items.len == 0);
     }
+
+    // Ensures the promise returned by an async module is resolved
+    agent.drainJobQueue();
 
     // 11. Return capability.[[Promise]].
     return capability.promise.as(builtins.Promise);
@@ -849,7 +860,8 @@ fn innerModuleEvaluation(
                 // 1. Set module.[[PendingAsyncDependencies]] to module.[[PendingAsyncDependencies]] + 1.
                 module.pending_async_dependencies.? += 1;
 
-                // TODO: 2. Append module to requiredModule.[[AsyncParentModules]].
+                // 2. Append module to requiredModule.[[AsyncParentModules]].
+                try required_module.async_parent_modules.append(module);
             }
         }
     }
@@ -864,7 +876,10 @@ fn innerModuleEvaluation(
         //    transition to true is significant. (See 16.2.1.5.3.4.)
         module.async_evaluation = true;
 
-        // TODO: d. If module.[[PendingAsyncDependencies]] = 0, perform ExecuteAsyncModule(module).
+        // d. If module.[[PendingAsyncDependencies]] = 0, perform ExecuteAsyncModule(module).
+        if (module.pending_async_dependencies.? == 0) {
+            try executeAsyncModule(agent, module);
+        }
     }
     // 13. Else,
     else {
@@ -901,6 +916,306 @@ fn innerModuleEvaluation(
 
     // 17. Return index.
     return new_index;
+}
+
+/// 16.2.1.5.3.2 ExecuteAsyncModule ( module )
+/// https://tc39.es/ecma262/#sec-execute-async-module
+fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocator.Error!void {
+    const realm = agent.currentRealm();
+
+    // 1. Assert: module.[[Status]] is either evaluating or evaluating-async.
+    std.debug.assert(module.status == .evaluating or module.status == .evaluating_async);
+
+    // 2. Assert: module.[[HasTLA]] is true.
+    std.debug.assert(module.has_tla);
+
+    // 3. Let capability be ! NewPromiseCapability(%Promise%).
+    const capability = newPromiseCapability(
+        agent,
+        Value.from(try realm.intrinsics.@"%Promise%"()),
+    ) catch |err| try noexcept(err);
+
+    const Captures = struct {
+        module: *SourceTextModule,
+    };
+    const captures = try agent.gc_allocator.create(Captures);
+    captures.* = .{ .module = module };
+
+    // 4. Let fulfilledClosure be a new Abstract Closure with no parameters that captures module
+    //    and performs the following steps when called:
+    const fulfilled_closure = struct {
+        fn func(agent_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
+            const function = agent_.activeFunctionObject();
+            const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+            const module_ = captures_.module;
+
+            // a. Perform AsyncModuleExecutionFulfilled(module).
+            try asyncModuleExecutionFulfilled(agent_, module_);
+
+            // b. Return undefined.
+            return .undefined;
+        }
+    }.func;
+
+    // 5. Let onFulfilled be CreateBuiltinFunction(fulfilledClosure, 0, "", « »).
+    const on_fulfilled = try createBuiltinFunction(agent, .{ .function = fulfilled_closure }, .{
+        .length = 0,
+        .name = "",
+        .additional_fields = .make(*Captures, captures),
+    });
+
+    // 6. Let rejectedClosure be a new Abstract Closure with parameters (error) that captures
+    //    module and performs the following steps when called:
+    const rejected_closure = struct {
+        fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
+            const function = agent_.activeFunctionObject();
+            const captures_ = function.as(builtins.BuiltinFunction).fields.additional_fields.cast(*Captures);
+            const module_ = captures_.module;
+            const @"error" = arguments.get(0);
+
+            // a. Perform AsyncModuleExecutionRejected(module, error).
+            try asyncModuleExecutionRejected(module_, @"error");
+
+            // b. Return undefined.
+            return .undefined;
+        }
+    }.func;
+
+    // 7. Let onRejected be CreateBuiltinFunction(rejectedClosure, 0, "", « »).
+    const on_rejected = try createBuiltinFunction(agent, .{ .function = rejected_closure }, .{
+        .length = 0,
+        .name = "",
+        .additional_fields = .make(*Captures, captures),
+    });
+
+    // 8. Perform PerformPromiseThen(capability.[[Promise]], onFulfilled, onRejected).
+    _ = try performPromiseThen(
+        agent,
+        capability.promise.as(builtins.Promise),
+        Value.from(on_fulfilled),
+        Value.from(on_rejected),
+        null,
+    );
+
+    // 9. Perform ! module.ExecuteModule(capability).
+    module.executeModule(capability) catch |err| try noexcept(err);
+
+    // 10. Return unused.
+}
+
+/// 16.2.1.5.3.3 GatherAvailableAncestors ( module, execList )
+/// https://tc39.es/ecma262/#sec-gather-available-ancestors
+fn gatherAvailableAncestors(
+    module: *SourceTextModule,
+    exec_list: *std.ArrayList(*SourceTextModule),
+) std.mem.Allocator.Error!void {
+    // 1. For each Cyclic Module Record m of module.[[AsyncParentModules]], do
+    for (module.async_parent_modules.items) |m| {
+        // a. If execList does not contain m and m.[[CycleRoot]].[[EvaluationError]] is empty, then
+        if (std.mem.indexOfScalar(*SourceTextModule, exec_list.items, m) == null and
+            m.cycle_root.?.evaluation_error == null)
+        {
+            // i. Assert: m.[[Status]] is evaluating-async.
+            std.debug.assert(m.status == .evaluating_async);
+
+            // ii. Assert: m.[[EvaluationError]] is empty.
+            std.debug.assert(m.evaluation_error == null);
+
+            // iii. Assert: m.[[AsyncEvaluation]] is true.
+            std.debug.assert(m.async_evaluation == true);
+
+            // iv. Assert: m.[[PendingAsyncDependencies]] > 0.
+            std.debug.assert(m.pending_async_dependencies.? > 0);
+
+            // v. Set m.[[PendingAsyncDependencies]] to m.[[PendingAsyncDependencies]] - 1.
+            m.pending_async_dependencies.? -= 1;
+
+            // vi. If m.[[PendingAsyncDependencies]] = 0, then
+            if (m.pending_async_dependencies.? == 0) {
+                // 1. Append m to execList.
+                try exec_list.append(m);
+
+                // 2. If m.[[HasTLA]] is false, perform GatherAvailableAncestors(m, execList).
+                if (!m.has_tla) {
+                    try gatherAvailableAncestors(m, exec_list);
+                }
+            }
+        }
+    }
+
+    // 2. Return unused.
+}
+
+/// 16.2.1.5.3.4 AsyncModuleExecutionFulfilled ( module )
+/// https://tc39.es/ecma262/#sec-async-module-execution-fulfilled
+fn asyncModuleExecutionFulfilled(
+    agent: *Agent,
+    module: *SourceTextModule,
+) std.mem.Allocator.Error!void {
+    // 1. If module.[[Status]] is evaluated, then
+    if (module.status == .evaluated) {
+        // a. Assert: module.[[EvaluationError]] is not empty.
+        std.debug.assert(module.evaluation_error != null);
+
+        // b. Return unused.
+        return;
+    }
+
+    // 2. Assert: module.[[Status]] is evaluating-async.
+    std.debug.assert(module.status == .evaluating_async);
+
+    // 3. Assert: module.[[AsyncEvaluation]] is true.
+    std.debug.assert(module.async_evaluation == true);
+
+    // 4. Assert: module.[[EvaluationError]] is empty.
+    std.debug.assert(module.evaluation_error == null);
+
+    // 5. Set module.[[AsyncEvaluation]] to false.
+    module.async_evaluation = false;
+
+    // 6. Set module.[[Status]] to evaluated.
+    module.status = .evaluated;
+
+    // 7. If module.[[TopLevelCapability]] is not empty, then
+    if (module.top_level_capability) |top_level_capability| {
+        // a. Assert: module.[[CycleRoot]] and module are the same Module Record.
+        std.debug.assert(module.cycle_root == module);
+
+        // b. Perform ! Call(module.[[TopLevelCapability]].[[Resolve]], undefined, « undefined »).
+        _ = Value.from(top_level_capability.resolve).callAssumeCallable(
+            .undefined,
+            &.{.undefined},
+        ) catch |err| try noexcept(err);
+    }
+
+    // 8. Let execList be a new empty List.
+    var exec_list = std.ArrayList(*SourceTextModule).init(agent.gc_allocator);
+    defer exec_list.deinit();
+
+    // 9. Perform GatherAvailableAncestors(module, execList).
+    try gatherAvailableAncestors(module, &exec_list);
+
+    // 10. Let sortedExecList be a List whose elements are the elements of execList, in the order
+    //     in which they had their [[AsyncEvaluation]] fields set to true in InnerModuleEvaluation.
+    // TODO: Implement https://github.com/tc39/ecma262/pull/3353 which does this in a nicer way.
+
+    // 11. Assert: All elements of sortedExecList have their [[AsyncEvaluation]] field set to true,
+    //     [[PendingAsyncDependencies]] field set to 0, and [[EvaluationError]] field set to empty.
+    for (exec_list.items) |m| {
+        std.debug.assert(m.async_evaluation == true);
+        std.debug.assert(m.pending_async_dependencies == 0);
+        std.debug.assert(m.evaluation_error == null);
+    }
+
+    // 12. For each Cyclic Module Record m of sortedExecList, do
+    for (exec_list.items) |m| {
+        // a. If m.[[Status]] is evaluated, then
+        if (m.status == .evaluated) {
+            // i. Assert: m.[[EvaluationError]] is not empty.
+            std.debug.assert(m.evaluation_error != null);
+        }
+        // b. Else if m.[[HasTLA]] is true, then
+        else if (m.has_tla) {
+            // i. Perform ExecuteAsyncModule(m).
+            try executeAsyncModule(agent, m);
+        }
+        // c. Else,
+        else {
+            // i. Let result be m.ExecuteModule().
+            const result = m.executeModule(null);
+
+            // ii. If result is an abrupt completion, then
+            _ = result catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+
+                error.ExceptionThrown => {
+                    const exception = agent.clearException();
+
+                    // 1. Perform AsyncModuleExecutionRejected(m, result.[[Value]]).
+                    try asyncModuleExecutionRejected(m, exception);
+                },
+            };
+            // iii. Else,
+
+            // 1. Set m.[[AsyncEvaluation]] to false.
+            m.async_evaluation = false;
+
+            // 2. Set m.[[Status]] to evaluated.
+            m.status = .evaluated;
+
+            // 3. If m.[[TopLevelCapability]] is not empty, then
+            if (m.top_level_capability) |top_level_capability| {
+                // a. Assert: m.[[CycleRoot]] and m are the same Module Record.
+                std.debug.assert(m.cycle_root == m);
+
+                // b. Perform ! Call(m.[[TopLevelCapability]].[[Resolve]], undefined, « undefined »).
+                _ = Value.from(top_level_capability.resolve).callAssumeCallable(
+                    .undefined,
+                    &.{.undefined},
+                ) catch |err| try noexcept(err);
+            }
+        }
+    }
+
+    // 13. Return unused.
+}
+
+/// 16.2.1.5.3.5 AsyncModuleExecutionRejected ( module, error )
+/// https://tc39.es/ecma262/#sec-async-module-execution-rejected
+fn asyncModuleExecutionRejected(
+    module: *SourceTextModule,
+    @"error": Value,
+) std.mem.Allocator.Error!void {
+    // 1. If module.[[Status]] is evaluated, then
+    if (module.status == .evaluated) {
+        // a. Assert: module.[[EvaluationError]] is not empty.
+        std.debug.assert(module.evaluation_error != null);
+
+        // b. Return unused.
+        return;
+    }
+
+    // 2. Assert: module.[[Status]] is evaluating-async.
+    std.debug.assert(module.status == .evaluating_async);
+
+    // 3. Assert: module.[[AsyncEvaluation]] is true.
+    std.debug.assert(module.async_evaluation == true);
+
+    // 4. Assert: module.[[EvaluationError]] is empty.
+    std.debug.assert(module.evaluation_error == null);
+
+    // 5. Set module.[[EvaluationError]] to ThrowCompletion(error).
+    module.evaluation_error = @"error";
+
+    // 6. Set module.[[Status]] to evaluated.
+    module.status = .evaluated;
+
+    // 7. Set module.[[AsyncEvaluation]] to false.
+    // 8. NOTE: module.[[AsyncEvaluation]] is set to false for symmetry with
+    //    AsyncModuleExecutionFulfilled. In InnerModuleEvaluation, the value of a module's
+    //    [[AsyncEvaluation]] internal slot is unused when its [[EvaluationError]] internal slot is
+    //    not empty.
+    module.async_evaluation = false;
+
+    // 9. For each Cyclic Module Record m of module.[[AsyncParentModules]], do
+    for (module.async_parent_modules.items) |m| {
+        // a. Perform AsyncModuleExecutionRejected(m, error).
+        try asyncModuleExecutionRejected(m, @"error");
+    }
+
+    // 10. If module.[[TopLevelCapability]] is not empty, then
+    if (module.top_level_capability) |top_level_capability| {
+        // a. Assert: module.[[CycleRoot]] and module are the same Module Record.
+        std.debug.assert(module.cycle_root == module);
+
+        // b. Perform ! Call(module.[[TopLevelCapability]].[[Reject]], undefined, « error »).
+        _ = Value.from(top_level_capability.reject).callAssumeCallable(
+            .undefined,
+            &.{@"error"},
+        ) catch |err| try noexcept(err);
+    }
+
+    // 11. Return unused.
 }
 
 /// 16.2.1.6.2 GetExportedNames ( [ exportStarSet ] )
@@ -1401,7 +1716,13 @@ pub fn executeModule(self: *SourceTextModule, capability: ?PromiseCapability) Ag
         // 1. Assert: capability is a PromiseCapability Record.
         std.debug.assert(capability != null);
 
-        // TODO: b. Perform AsyncBlockStart(capability, module.[[ECMAScriptCode]], moduleContext).
+        // b. Perform AsyncBlockStart(capability, module.[[ECMAScriptCode]], moduleContext).
+        try asyncBlockStart(
+            agent,
+            capability.?,
+            .{ .module = self.ecmascript_code },
+            module_context,
+        );
     }
 
     // 11. Return unused.

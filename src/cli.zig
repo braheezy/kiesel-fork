@@ -428,6 +428,7 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                 .fulfilled => {
                     module.link(agent) catch |err| break :blk err;
                     promise = module.evaluate(agent) catch |err| break :blk err;
+                    std.debug.assert(agent.queued_jobs.items.len == 0);
                     switch (promise.fields.promise_state) {
                         .pending => unreachable,
                         .rejected => {
