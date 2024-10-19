@@ -437,7 +437,7 @@ fn ensureUniqueLexicallyDeclaredNames(
         if (seen.contains(name)) {
             try self.emitErrorAt(location, "Duplicate lexical declaration '{s}'", .{name});
         }
-        try seen.putNoClobber(name, {});
+        try seen.put(name, {});
 
         if (var_names_set.contains(name)) {
             try self.emitErrorAt(
