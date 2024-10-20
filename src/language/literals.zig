@@ -27,7 +27,7 @@ pub fn parseNumericLiteral(
     var production: ast.NumericLiteral.Production = .regular;
     var @"type": ast.NumericLiteral.Type = .number;
     var state_before_separator: ?@TypeOf(state) = null;
-    for (str, 0..) |c, i| switch (c) {
+    const i = for (str, 0..) |c, i| switch (c) {
         '0', '1' => {
             if (system == .decimal and production == .regular and state == .integer_digit and i > 0 and str[0] == '0') {
                 system = .octal;
@@ -121,30 +121,18 @@ pub fn parseNumericLiteral(
                     // Starting fraction period followed by another period, not actually a numeric
                     // literal (happens in spead expressions)
                     return error.InvalidNumericLiteral;
-                } else switch (consume) {
+                } else {
                     // Start of a member expression, terminate the literal
-                    .partial => return .{
-                        .text = str[0..i],
-                        .system = system,
-                        .production = production,
-                        .type = @"type",
-                    },
-                    .complete => return error.InvalidNumericLiteral,
+                    break i;
                 }
             },
             else => return error.InvalidNumericLiteral,
         },
         '+', '-' => switch (state) {
             .exponent_indicator => state = .exponent_sign,
-            else => switch (consume) {
-                // If we've not encountered an exponent sign these are binary operators.
-                .partial => return .{
-                    .text = str[0..i],
-                    .system = system,
-                    .production = production,
-                    .type = @"type",
-                },
-                .complete => return error.InvalidNumericLiteral,
+            else => {
+                // Binary operators, terminate the literal
+                break i;
             },
         },
         'n' => switch (state) {
@@ -155,33 +143,18 @@ pub fn parseNumericLiteral(
             },
             else => return error.InvalidNumericLiteral,
         },
-        else => switch (consume) {
-            .partial => {
-                // Special case: fraction_period is allowed as an end state, but not on its own
-                // This avoids '.' on its own being tokenized as .numeric
-                if (state == .fraction_period and i == 1) return error.InvalidNumericLiteral;
+        else => break i,
+    } else str.len;
 
-                return switch (state) {
-                    .integer_digit, .fraction_period, .fraction_digit, .exponent_digit, .big_int_suffix => .{
-                        .text = str[0..i],
-                        .system = system,
-                        .production = production,
-                        .type = @"type",
-                    },
-                    else => error.InvalidNumericLiteral,
-                };
-            },
-            .complete => return error.InvalidNumericLiteral,
-        },
-    };
+    if (consume == .complete and i != str.len) return error.InvalidNumericLiteral;
 
     // Special case: fraction_period is allowed as an end state, but not on its own
-    if (state == .fraction_period and str.len == 1) return error.InvalidNumericLiteral;
+    if (state == .fraction_period and i == 1) return error.InvalidNumericLiteral;
 
     return switch (state) {
         // Valid end states after exhausting the input string
         .integer_digit, .fraction_period, .fraction_digit, .exponent_digit, .big_int_suffix => .{
-            .text = str,
+            .text = str[0..i],
             .system = system,
             .production = production,
             .type = @"type",
