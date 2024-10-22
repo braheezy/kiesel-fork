@@ -1379,7 +1379,7 @@ pub fn ordinaryHasInstance(self: Value, object_value: Value) Agent.Error!bool {
     }
 }
 
-/// 7.3.35 AddValueToKeyedGroup ( groups, key, value )
+/// 7.3.34 AddValueToKeyedGroup ( groups, key, value )
 /// https://tc39.es/ecma262/#sec-add-value-to-keyed-group
 fn addValueToKeyedGroup(
     agent: *Agent,
@@ -1415,7 +1415,7 @@ fn GroupByContainer(comptime key_coercion: KeyCoercion) type {
     };
 }
 
-/// 7.3.36 GroupBy ( items, callback, keyCoercion )
+/// 7.3.35 GroupBy ( items, callback, keyCoercion )
 /// https://tc39.es/ecma262/#sec-groupby
 pub fn groupBy(
     self: Value,
@@ -1494,6 +1494,54 @@ pub fn groupBy(
 
         // j. Set k to k + 1.
     }
+}
+
+/// 7.3.36 SetterThatIgnoresPrototypeProperties ( thisValue, home, p, v )
+/// https://tc39.es/ecma262/#sec-SetterThatIgnoresPrototypeProperties
+pub fn setterThatIgnoresPrototypeProperties(
+    self: Value,
+    agent: *Agent,
+    home: Object,
+    property_key: PropertyKey,
+    value: Value,
+) Agent.Error!void {
+    // 1. If thisValue is not an Object, then
+    if (!self.isObject()) {
+        // a. Throw a TypeError exception.
+        return agent.throwException(.type_error, "{} is not an Object", .{self});
+    }
+    const this_value = self.asObject();
+
+    // 2. If SameValue(thisValue, home) is true, then
+    if (this_value.sameValue(home)) {
+        // a. NOTE: Throwing here emulates assignment to a non-writable data property on the home
+        //    object in strict mode code.
+        // b. Throw a TypeError exception.
+        return agent.throwException(
+            .type_error,
+            "Cannot set property '{}' on object",
+            .{property_key},
+        );
+    }
+
+    // 3. Let desc be ? thisValue.[[GetOwnProperty]](p).
+    const property_descriptor = try this_value.internalMethods().getOwnProperty(
+        this_value,
+        property_key,
+    );
+
+    // 4. If desc is undefined, then
+    if (property_descriptor == null) {
+        // a. Perform ? CreateDataPropertyOrThrow(thisValue, p, v).
+        try this_value.createDataPropertyOrThrow(property_key, value);
+    }
+    // 5. Else,
+    else {
+        // a. Perform ? Set(thisValue, p, v, true).
+        try this_value.set(property_key, value, .throw);
+    }
+
+    // 6. Return unused.
 }
 
 /// 9.13 CanBeHeldWeakly ( v )

@@ -25,7 +25,7 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
-            .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),
+            .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
         });
     }
 
@@ -47,7 +47,7 @@ pub const prototype = struct {
     fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return ? GeneratorResume(this value, empty, "%StringIteratorPrototype%").
         // NOTE: In the absence of generators this implements one loop iteration of the
-        //       CreateArrayIterator closure. State is kept track of through the ArrayIterator
+        //       CreateStringIterator closure. State is kept track of through the ArrayIterator
         //       instance instead of as local variables. This should not be observable.
 
         // 1. Let state be ? GeneratorValidate(generator, generatorBrand).

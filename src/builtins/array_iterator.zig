@@ -50,7 +50,7 @@ pub fn createArrayIterator(
 pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
         return builtins.Object.create(realm.agent, .{
-            .prototype = try realm.intrinsics.@"%IteratorPrototype%"(),
+            .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
         });
     }
 

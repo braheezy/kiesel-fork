@@ -100,7 +100,9 @@ lazy_intrinsics: struct {
     @"%IntlSegmentIteratorPrototype%": Object = null_intrinsic,
     @"%isFinite%": Object = null_intrinsic,
     @"%isNaN%": Object = null_intrinsic,
-    @"%IteratorPrototype%": Object = null_intrinsic,
+    @"%Iterator%": Object = null_intrinsic,
+    @"%IteratorHelperPrototype%": Object = null_intrinsic,
+    @"%Iterator.prototype%": Object = null_intrinsic,
     @"%JSON%": Object = null_intrinsic,
     @"%Map%": Object = null_intrinsic,
     @"%Map.prototype%": Object = null_intrinsic,
@@ -158,6 +160,7 @@ lazy_intrinsics: struct {
     @"%WeakRef.prototype%": Object = null_intrinsic,
     @"%WeakSet%": Object = null_intrinsic,
     @"%WeakSet.prototype%": Object = null_intrinsic,
+    @"%WrapForValidIteratorPrototype%": Object = null_intrinsic,
 } = .{},
 
 fn lazyIntrinsic(
@@ -424,8 +427,14 @@ pub fn @"%isFinite%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
 pub fn @"%isNaN%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
     return self.lazyIntrinsic("%isNaN%", builtins.global.is_nan_function);
 }
-pub fn @"%IteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
-    return self.lazyIntrinsic("%IteratorPrototype%", builtins.iterator.prototype);
+pub fn @"%Iterator%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
+    return self.lazyIntrinsic("%Iterator%", builtins.iterator.constructor);
+}
+pub fn @"%IteratorHelperPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
+    return self.lazyIntrinsic("%IteratorHelperPrototype%", builtins.iterator_helper.prototype);
+}
+pub fn @"%Iterator.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
+    return self.lazyIntrinsic("%Iterator.prototype%", builtins.iterator.prototype);
 }
 pub fn @"%JSON%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
     return self.lazyIntrinsic("%JSON%", builtins.json.namespace);
@@ -603,4 +612,7 @@ pub fn @"%WeakSet%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
 }
 pub fn @"%WeakSet.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
     return self.lazyIntrinsic("%WeakSet.prototype%", builtins.weak_set.prototype);
+}
+pub fn @"%WrapForValidIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!Object {
+    return self.lazyIntrinsic("%WrapForValidIteratorPrototype%", builtins.wrap_for_valid_iterator.prototype);
 }

@@ -227,6 +227,41 @@ fn prettyPrintGenerator(
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintIterator(
+    _: *const builtins.Iterator,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("Iterator()");
+    try tty_config.setColor(writer, .reset);
+}
+
+fn prettyPrintIteratorHelper(
+    iterator_helper: *const builtins.IteratorHelper,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("%IteratorHelper%(");
+    try tty_config.setColor(writer, .reset);
+    switch (iterator_helper.fields) {
+        .state => |state_| {
+            try writer.print("{pretty}", .{Value.from(state_.underlying_iterator.iterator)});
+        },
+        .completed => {
+            try tty_config.setColor(writer, .dim);
+            try writer.writeAll("<completed>");
+            try tty_config.setColor(writer, .reset);
+        },
+    }
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintMap(
     map: *const builtins.Map,
     writer: anytype,
@@ -590,6 +625,21 @@ fn prettyPrintWeakSet(weak_set: *const builtins.WeakSet, writer: anytype) !void 
     try tty_config.setColor(writer, .reset);
 }
 
+fn prettyPrintWrapForValidIterator(
+    wrap_for_valid_iterator: *const builtins.WrapForValidIterator,
+    writer: anytype,
+) PrettyPrintError(@TypeOf(writer))!void {
+    const tty_config = state.tty_config;
+
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll("%WrapForValidIterator%(");
+    try tty_config.setColor(writer, .reset);
+    try writer.print("{pretty}", .{Value.from(wrap_for_valid_iterator.fields.iterated.iterator)});
+    try tty_config.setColor(writer, .white);
+    try writer.writeAll(")");
+    try tty_config.setColor(writer, .reset);
+}
+
 fn prettyPrintIntlCollator(
     intl_collator: *const builtins.intl.Collator,
     writer: anytype,
@@ -916,6 +966,8 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.Error, prettyPrintError },
             .{ builtins.FinalizationRegistry, prettyPrintFinalizationRegistry },
             .{ builtins.Generator, prettyPrintGenerator },
+            .{ builtins.Iterator, prettyPrintIterator },
+            .{ builtins.IteratorHelper, prettyPrintIteratorHelper },
             .{ builtins.Map, prettyPrintMap },
             .{ builtins.MapIterator, prettyPrintMapIterator },
             .{ builtins.Number, prettyPrintPrimitiveWrapper },
@@ -933,6 +985,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             .{ builtins.WeakMap, prettyPrintWeakMap },
             .{ builtins.WeakRef, prettyPrintWeakRef },
             .{ builtins.WeakSet, prettyPrintWeakSet },
+            .{ builtins.WrapForValidIterator, prettyPrintWrapForValidIterator },
         } ++ if (build_options.enable_intl) .{
             .{ builtins.intl.Collator, prettyPrintIntlCollator },
             .{ builtins.intl.DateTimeFormat, prettyPrintIntlDateTimeFormat },

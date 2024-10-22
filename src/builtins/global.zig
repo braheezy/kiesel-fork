@@ -28,7 +28,7 @@ const GlobalObjectProperty = struct {
     },
 };
 
-const num_properties = 58 +
+const num_properties = 59 +
     (if (build_options.enable_annex_b) 2 else 0) +
     (if (build_options.enable_intl) 1 else 0);
 
@@ -162,6 +162,8 @@ pub fn globalObjectProperties(realm: *Realm) [num_properties]GlobalObjectPropert
         // 19.3.18 Int32Array ( . . . )
         // https://tc39.es/ecma262/#sec-int32array
         .{ "Int32Array", .{ .lazy_intrinsic = Realm.Intrinsics.@"%Int32Array%" } },
+
+        .{ "Iterator", .{ .lazy_intrinsic = Realm.Intrinsics.@"%Iterator%" } },
 
         // 19.3.19 Map ( . . . )
         // https://tc39.es/ecma262/#sec-map

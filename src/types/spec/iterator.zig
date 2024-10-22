@@ -28,7 +28,7 @@ pub const Iterator = struct {
     /// [[Done]]
     done: bool,
 
-    /// 7.4.4 IteratorNext ( iteratorRecord [ , value ] )
+    /// 7.4.6 IteratorNext ( iteratorRecord [ , value ] )
     /// https://tc39.es/ecma262/#sec-iteratornext
     pub fn next(self: *Iterator, value_: ?Value) Agent.Error!Object {
         const agent = self.iterator.agent();
@@ -67,21 +67,21 @@ pub const Iterator = struct {
         return result.asObject();
     }
 
-    /// 7.4.5 IteratorComplete ( iteratorResult )
+    /// 7.4.7 IteratorComplete ( iteratorResult )
     /// https://tc39.es/ecma262/#sec-iteratorcomplete
     pub fn complete(iterator_result: Object) Agent.Error!bool {
         // 1. Return ToBoolean(? Get(iteratorResult, "done")).
         return (try iterator_result.get(PropertyKey.from("done"))).toBoolean();
     }
 
-    /// 7.4.6 IteratorValue ( iteratorResult )
+    /// 7.4.8 IteratorValue ( iteratorResult )
     /// https://tc39.es/ecma262/#sec-iteratorvalue
     pub fn value(iterator_result: Object) Agent.Error!Value {
         // Return ? Get(iteratorResult, "value").
         return iterator_result.get(PropertyKey.from("value"));
     }
 
-    /// 7.4.7 IteratorStep ( iteratorRecord )
+    /// 7.4.9 IteratorStep ( iteratorRecord )
     /// https://tc39.es/ecma262/#sec-iteratorstep
     pub fn step(self: *Iterator) Agent.Error!?Object {
         // 1. Let result be ? IteratorNext(iteratorRecord).
@@ -111,7 +111,7 @@ pub const Iterator = struct {
         return result;
     }
 
-    /// 7.4.8 IteratorStepValue ( iteratorRecord )
+    /// 7.4.10 IteratorStepValue ( iteratorRecord )
     /// https://tc39.es/ecma262/#sec-iteratorstepvalue
     pub fn stepValue(self: *Iterator) Agent.Error!?Value {
         // 1. Let result be ? IteratorStep(iteratorRecord).
@@ -136,7 +136,7 @@ pub const Iterator = struct {
         return value_;
     }
 
-    /// 7.4.9 IteratorClose ( iteratorRecord, completion )
+    /// 7.4.11 IteratorClose ( iteratorRecord, completion )
     /// https://tc39.es/ecma262/#sec-iteratorclose
     pub fn close(self: Iterator, completion: anytype) @TypeOf(completion) {
         const agent = self.iterator.agent();
@@ -181,7 +181,7 @@ pub const Iterator = struct {
         return completion;
     }
 
-    /// 7.4.14 IteratorToList ( iteratorRecord )
+    /// 7.4.16 IteratorToList ( iteratorRecord )
     /// https://tc39.es/ecma262/#sec-iteratortolist
     pub fn toList(self: *Iterator) Agent.Error![]const Value {
         const agent = self.iterator.agent();
@@ -203,8 +203,25 @@ pub const Iterator = struct {
     }
 };
 
-/// 7.4.2 GetIteratorFromMethod ( obj, method )
-/// https://tc39.es/ecma262/#sec-normalcompletion
+/// 7.4.2 GetIteratorDirect ( obj )
+/// https://tc39.es/ecma262/#sec-getiteratordirect
+pub fn getIteratorDirect(object: Object) Agent.Error!Iterator {
+    // 1. Let nextMethod be ? Get(obj, "next").
+    const next_method = try object.get(PropertyKey.from("next"));
+
+    // 2. Let iteratorRecord be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: nextMethod, [[Done]]: false }.
+    const iterator: Iterator = .{
+        .iterator = object,
+        .next_method = next_method,
+        .done = false,
+    };
+
+    // 3. Return iteratorRecord.
+    return iterator;
+}
+
+/// 7.4.3 GetIteratorFromMethod ( obj, method )
+/// https://tc39.es/ecma262/#sec-getiteratorfrommethod
 pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: Object) Agent.Error!Iterator {
     // 1. Let iterator be ? Call(method, obj).
     const iterator = try Value.from(method).callNoArgs(agent, object);
@@ -214,25 +231,13 @@ pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: Object) Agent
         return agent.throwException(.type_error, "{} is not an Object", .{iterator});
     }
 
-    // 3. Let nextMethod be ? Get(iterator, "next").
-    const next_method = try iterator.get(agent, PropertyKey.from("next"));
-
-    // 4. Let iteratorRecord be the Iterator Record {
-    //      [[Iterator]]: iterator, [[NextMethod]]: nextMethod, [[Done]]: false
-    //    }.
-    const iterator_record: Iterator = .{
-        .iterator = iterator.asObject(),
-        .next_method = next_method,
-        .done = false,
-    };
-
-    // 5. Return iteratorRecord.
-    return iterator_record;
+    // 3. Return ? GetIteratorDirect(iterator).
+    return getIteratorDirect(iterator.asObject());
 }
 
 pub const IteratorKind = enum { sync, @"async" };
 
-/// 7.4.3 GetIterator ( obj, kind )
+/// 7.4.4 GetIterator ( obj, kind )
 /// https://tc39.es/ecma262/#sec-getiterator
 pub fn getIterator(
     agent: *Agent,
@@ -291,7 +296,61 @@ pub fn getIterator(
     return getIteratorFromMethod(agent, object, method.?);
 }
 
-/// 7.4.12 CreateIteratorResultObject ( value, done )
+/// 7.4.5 GetIteratorFlattenable ( obj, primitiveHandling )
+/// https://tc39.es/ecma262/#sec-getiteratorflattenable
+pub fn getIteratorFlattenable(
+    agent: *Agent,
+    object: Value,
+    primitive_handling: enum {
+        iterate_string_primitives,
+        reject_primitives,
+    },
+) Agent.Error!Iterator {
+    // 1. If obj is not an Object, then
+    if (!object.isObject()) {
+        switch (primitive_handling) {
+            // a. If primitiveHandling is reject-primitives, throw a TypeError exception.
+            .reject_primitives => {
+                return agent.throwException(.type_error, "{} is not an Object", .{object});
+            },
+
+            // b. Assert: primitiveHandling is iterate-string-primitives.
+            .iterate_string_primitives => {
+                // c. If obj is not a String, throw a TypeError exception.
+                if (!object.isString()) {
+                    return agent.throwException(.type_error, "{} is not a string", .{object});
+                }
+            },
+        }
+    }
+
+    // 2. Let method be ? GetMethod(obj, %Symbol.iterator%).
+    const method = try object.getMethod(
+        agent,
+        PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
+    );
+
+    // 3. If method is undefined, then
+    const iterator = if (method == null) blk: {
+        // a. Let iterator be obj.
+        break :blk object;
+    }
+    // 4. Else,
+    else blk: {
+        // a. Let iterator be ? Call(method, obj).
+        break :blk try Value.from(method.?).callAssumeCallable(object, &.{});
+    };
+
+    // 5. If iterator is not an Object, throw a TypeError exception.
+    if (!iterator.isObject()) {
+        return agent.throwException(.type_error, "{} is not an Object", .{iterator});
+    }
+
+    // 6. Return ? GetIteratorDirect(iterator).
+    return getIteratorDirect(iterator.asObject());
+}
+
+/// 7.4.14 CreateIteratorResultObject ( value, done )
 /// https://tc39.es/ecma262/#sec-createiterresultobject
 pub fn createIteratorResultObject(
     agent: *Agent,

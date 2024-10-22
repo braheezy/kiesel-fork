@@ -19,6 +19,8 @@ pub const createByteDataBlock = data_block.createByteDataBlock;
 pub const createIteratorResultObject = iterator.createIteratorResultObject;
 pub const createSharedByteDataBlock = data_block.createSharedByteDataBlock;
 pub const getIterator = iterator.getIterator;
+pub const getIteratorDirect = iterator.getIteratorDirect;
+pub const getIteratorFlattenable = iterator.getIteratorFlattenable;
 pub const getIteratorFromMethod = iterator.getIteratorFromMethod;
 pub const data_block_max_byte_length = data_block.data_block_max_byte_length;
 

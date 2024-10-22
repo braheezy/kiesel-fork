@@ -52,6 +52,8 @@ pub const Tag = enum(u32) {
     finalization_registry,
     for_in_iterator,
     generator,
+    iterator,
+    iterator_helper,
     map,
     map_iterator,
     number,
@@ -69,6 +71,7 @@ pub const Tag = enum(u32) {
     weak_map,
     weak_ref,
     weak_set,
+    wrap_for_valid_iterator,
 
     // ECMA-402
     intl_collator,

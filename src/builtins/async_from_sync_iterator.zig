@@ -1,4 +1,4 @@
-//! 27.1.4 Async-from-Sync Iterator Objects
+//! 27.1.6 Async-from-Sync Iterator Objects
 //! https://tc39.es/ecma262/#sec-async-from-sync-iterator-objects
 
 const std = @import("std");
@@ -59,7 +59,7 @@ pub fn createAsyncFromSyncIterator(
     return iterator;
 }
 
-/// 27.1.4.2 The %AsyncFromSyncIteratorPrototype% Object
+/// 27.1.6.2 The %AsyncFromSyncIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%-object
 pub const prototype = struct {
     pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
@@ -279,7 +279,7 @@ pub const prototype = struct {
     }
 };
 
-/// 27.1.4.3 Properties of Async-from-Sync Iterator Instances
+/// 27.1.6.3 Properties of Async-from-Sync Iterator Instances
 /// https://tc39.es/ecma262/#sec-properties-of-async-from-sync-iterator-instances
 pub const AsyncFromSyncIterator = MakeObject(.{
     .Fields = struct {
@@ -288,7 +288,7 @@ pub const AsyncFromSyncIterator = MakeObject(.{
     },
 });
 
-/// 27.1.4.4 AsyncFromSyncIteratorContinuation ( result, promiseCapability )
+/// 27.1.6.4 AsyncFromSyncIteratorContinuation ( result, promiseCapability )
 /// https://tc39.es/ecma262/#sec-asyncfromsynciteratorcontinuation
 fn asyncFromSyncIteratorContinuation(
     agent: *Agent,
