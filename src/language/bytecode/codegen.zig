@@ -183,7 +183,6 @@ fn codegenSingleNameBinding(
     try executable.addIndex(@intFromBool(strict));
     try executable.addIndex(ctx.environment_lookup_cache_index);
     ctx.environment_lookup_cache_index += 1;
-    try executable.addInstruction(.push_reference);
 
     try codegenBindingPatternValue(node.initializer, executable, ctx, property);
 
@@ -191,7 +190,6 @@ fn codegenSingleNameBinding(
     try executable.addInstruction(
         if (environment) |_| .initialize_referenced_binding else .put_value,
     );
-    try executable.addInstruction(.pop_reference);
 
     try executable.addInstruction(.store); // Restore RHS
 }
@@ -320,7 +318,6 @@ fn bindingInitialization(
                     try executable.addIndex(@intFromBool(strict));
                     try executable.addIndex(ctx.environment_lookup_cache_index);
                     ctx.environment_lookup_cache_index += 1;
-                    try executable.addInstruction(.push_reference);
 
                     // TODO: Implement this
                     try executable.addInstruction(.object_create);
@@ -329,7 +326,6 @@ fn bindingInitialization(
                     try executable.addInstruction(
                         if (environment) |_| .initialize_referenced_binding else .put_value,
                     );
-                    try executable.addInstruction(.pop_reference);
 
                     try executable.addInstruction(.store); // Restore RHS
                 },
@@ -368,17 +364,15 @@ fn bindingInitialization(
                         try executable.addIndex(@intFromBool(strict));
                         try executable.addIndex(ctx.environment_lookup_cache_index);
                         ctx.environment_lookup_cache_index += 1;
-                        try executable.addInstruction(.push_reference);
 
                         // Evaluate `rhs.slice(n)`
                         try executable.addInstruction(.load);
                         try executable.addInstructionWithIdentifier(.evaluate_property_access_with_identifier_key, "slice");
                         try executable.addIndex(@intFromBool(strict));
-                        try executable.addInstruction(.push_reference);
+                        try executable.addInstruction(.dup_reference);
                         try executable.addInstruction(.get_value);
                         try executable.addInstruction(.load);
                         try executable.addInstruction(.load_this_value_for_evaluate_call);
-                        try executable.addInstruction(.pop_reference);
                         try executable.addInstructionWithConstant(.load_constant, Value.from(@as(u53, @intCast(i))));
                         try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
                         try executable.addInstruction(.evaluate_call);
@@ -388,7 +382,6 @@ fn bindingInitialization(
                         try executable.addInstruction(
                             if (environment) |_| .initialize_referenced_binding else .put_value,
                         );
-                        try executable.addInstruction(.pop_reference);
 
                         try executable.addInstruction(.store); // Restore RHS
                     },
@@ -399,11 +392,10 @@ fn bindingInitialization(
                         try executable.addInstruction(.load);
                         try executable.addInstructionWithIdentifier(.evaluate_property_access_with_identifier_key, "slice");
                         try executable.addIndex(@intFromBool(strict));
-                        try executable.addInstruction(.push_reference);
+                        try executable.addInstruction(.dup_reference);
                         try executable.addInstruction(.get_value);
                         try executable.addInstruction(.load);
                         try executable.addInstruction(.load_this_value_for_evaluate_call);
-                        try executable.addInstruction(.pop_reference);
                         try executable.addInstructionWithConstant(.load_constant, Value.from(@as(u53, @intCast(i))));
                         try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
                         try executable.addInstruction(.evaluate_call);
@@ -887,14 +879,17 @@ pub fn codegenCallExpression(
     // 3. Let arguments be the Arguments of expr.
     // 4. Let ref be ? Evaluation of memberExpr.
     try codegenExpression(node.expression.*, executable, ctx);
-
-    try executable.addInstruction(.push_reference);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference);
 
     // 5. Let func be ? GetValue(ref).
     if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
     try executable.addInstruction(.load);
 
-    try executable.addInstruction(.load_this_value_for_evaluate_call);
+    if (node.expression.analyze(.is_reference)) {
+        try executable.addInstruction(.load_this_value_for_evaluate_call);
+    } else {
+        try executable.addInstructionWithConstant(.load_constant, .undefined);
+    }
 
     try codegenArguments(node.arguments, executable, ctx);
 
@@ -911,9 +906,6 @@ pub fn codegenCallExpression(
         try executable.addInstruction(.evaluate_call_direct_eval);
         try executable.addIndex(node.arguments.len);
         try executable.addIndex(@intFromBool(strict));
-
-        // TODO: We should probably also clean this up if something throws beforehand...
-        try executable.addInstruction(.pop_reference);
         return;
     }
 
@@ -923,9 +915,6 @@ pub fn codegenCallExpression(
     // 9. Return ? EvaluateCall(func, ref, arguments, tailCall).
     try executable.addInstruction(.evaluate_call);
     try executable.addIndex(node.arguments.len);
-
-    // TODO: We should probably also clean this up if something throws beforehand...
-    try executable.addInstruction(.pop_reference);
 }
 
 /// 13.3.7.1 Runtime Semantics: Evaluation
@@ -1075,8 +1064,7 @@ pub fn codegenOptionalExpression(
 ) Executable.Error!void {
     // 1. Let baseReference be ? Evaluation of OptionalExpression.
     try codegenExpression(node.expression.*, executable, ctx);
-
-    if (node.property == .arguments) try executable.addInstruction(.push_reference);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference);
 
     // 2. Let baseValue be ? GetValue(baseReference).
     if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
@@ -1094,6 +1082,7 @@ pub fn codegenOptionalExpression(
     // a. Return undefined.
     try consequent_jump.setTargetHere();
     try executable.addInstruction(.store); // Drop baseValue from the stack
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.pop_reference);
     try executable.addInstructionWithConstant(.store_constant, .undefined);
     try executable.addInstruction(.jump);
     const end_jump = try executable.addJumpIndex();
@@ -1104,7 +1093,11 @@ pub fn codegenOptionalExpression(
     switch (node.property) {
         // OptionalChain : ?. Arguments
         .arguments => |arguments| {
-            try executable.addInstruction(.load_this_value_for_evaluate_call);
+            if (node.expression.analyze(.is_reference)) {
+                try executable.addInstruction(.load_this_value_for_evaluate_call);
+            } else {
+                try executable.addInstructionWithConstant(.load_constant, .undefined);
+            }
 
             try codegenArguments(arguments, executable, ctx);
 
@@ -1114,9 +1107,6 @@ pub fn codegenOptionalExpression(
             // 3. Return ? EvaluateCall(baseValue, baseReference, Arguments, tailCall).
             try executable.addInstruction(.evaluate_call);
             try executable.addIndex(arguments.len);
-
-            // TODO: We should probably also clean this up if something throws beforehand...
-            try executable.addInstruction(.pop_reference);
         },
 
         // OptionalChain : ?. [ Expression ]
@@ -1156,6 +1146,11 @@ pub fn codegenOptionalExpression(
         },
     }
 
+    // Since we don't know whether a reference will have been pushed to the stack or not we can't
+    // let the caller add an unconditional get_value, therefore analyze(.is_reference) returns
+    // false for optional_expression and we do it here instead.
+    if (node.property != .arguments) try executable.addInstruction(.get_value);
+
     try end_jump.setTargetHere();
 }
 
@@ -1184,8 +1179,7 @@ pub fn codegenTaggedTemplate(
 
     // 1. Let tagRef be ? Evaluation of MemberExpression.
     try codegenExpression(node.expression.*, executable, ctx);
-
-    try executable.addInstruction(.push_reference);
+    if (node.expression.analyze(.is_reference)) try executable.addInstruction(.dup_reference);
 
     // 2. Let tagFunc be ? GetValue(tagRef).
     if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
@@ -1194,7 +1188,11 @@ pub fn codegenTaggedTemplate(
     // TODO: 3. Let thisCall be this MemberExpression.
     // TODO: 4. Let tailCall be IsInTailPosition(thisCall).
 
-    try executable.addInstruction(.load_this_value_for_evaluate_call);
+    if (node.expression.analyze(.is_reference)) {
+        try executable.addInstruction(.load_this_value_for_evaluate_call);
+    } else {
+        try executable.addInstructionWithConstant(.load_constant, .undefined);
+    }
 
     // 13.3.8.1 Runtime Semantics: ArgumentListEvaluation
     // https://tc39.es/ecma262/#sec-runtime-semantics-argumentlistevaluation
@@ -1250,9 +1248,6 @@ pub fn codegenTaggedTemplate(
     try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
     try executable.addInstruction(.evaluate_call);
     try executable.addIndex(@divFloor(node.template_literal.spans.len, 2) + 1);
-
-    // TODO: We should probably also clean this up if something throws beforehand...
-    try executable.addInstruction(.pop_reference);
 }
 
 /// 13.3.12.1 Runtime Semantics: Evaluation
@@ -1290,14 +1285,16 @@ pub fn codegenUpdateExpression(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
+    std.debug.assert(node.expression.analyze(.is_reference));
+
     // UpdateExpression : LeftHandSideExpression ++
     if (node.type == .postfix and node.operator == .@"++") {
         // 1. Let lhs be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.expression.*, executable, ctx);
-        try executable.addInstruction(.push_reference);
+        try executable.addInstruction(.dup_reference);
 
         // 2. Let oldValue be ? ToNumeric(? GetValue(lhs)).
-        if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.get_value);
         try executable.addInstruction(.to_numeric);
 
         try executable.addInstruction(.load);
@@ -1311,7 +1308,6 @@ pub fn codegenUpdateExpression(
 
         // 5. Perform ? PutValue(lhs, newValue).
         try executable.addInstruction(.put_value);
-        try executable.addInstruction(.pop_reference);
 
         // 6. Return oldValue.
         try executable.addInstruction(.store);
@@ -1320,10 +1316,10 @@ pub fn codegenUpdateExpression(
     else if (node.type == .postfix and node.operator == .@"--") {
         // 1. Let lhs be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.expression.*, executable, ctx);
-        try executable.addInstruction(.push_reference);
+        try executable.addInstruction(.dup_reference);
 
         // 2. Let oldValue be ? ToNumeric(? GetValue(lhs)).
-        if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.get_value);
         try executable.addInstruction(.to_numeric);
 
         try executable.addInstruction(.load);
@@ -1337,7 +1333,6 @@ pub fn codegenUpdateExpression(
 
         // 5. Perform ? PutValue(lhs, newValue).
         try executable.addInstruction(.put_value);
-        try executable.addInstruction(.pop_reference);
 
         // 6. Return oldValue.
         try executable.addInstruction(.store);
@@ -1346,10 +1341,10 @@ pub fn codegenUpdateExpression(
     else if (node.type == .prefix and node.operator == .@"++") {
         // 1. Let expr be ? Evaluation of UnaryExpression.
         try codegenExpression(node.expression.*, executable, ctx);
-        try executable.addInstruction(.push_reference);
+        try executable.addInstruction(.dup_reference);
 
         // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
-        if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.get_value);
         try executable.addInstruction(.to_numeric);
 
         // 3. If oldValue is a Number, then
@@ -1361,7 +1356,6 @@ pub fn codegenUpdateExpression(
 
         // 5. Perform ? PutValue(expr, newValue).
         try executable.addInstruction(.put_value);
-        try executable.addInstruction(.pop_reference);
 
         // 6. Return newValue.
     }
@@ -1369,10 +1363,10 @@ pub fn codegenUpdateExpression(
     else if (node.type == .prefix and node.operator == .@"--") {
         // 1. Let expr be ? Evaluation of UnaryExpression.
         try codegenExpression(node.expression.*, executable, ctx);
-        try executable.addInstruction(.push_reference);
+        try executable.addInstruction(.dup_reference);
 
         // 2. Let oldValue be ? ToNumeric(? GetValue(expr)).
-        if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.get_value);
         try executable.addInstruction(.to_numeric);
 
         // 3. If oldValue is a Number, then
@@ -1384,7 +1378,6 @@ pub fn codegenUpdateExpression(
 
         // 5. Perform ? PutValue(expr, newValue).
         try executable.addInstruction(.put_value);
-        try executable.addInstruction(.pop_reference);
 
         // 6. Return newValue.
     } else unreachable;
@@ -1778,7 +1771,6 @@ pub fn codegenAssignmentExpression(
         if (node.lhs_expression.* != .binding_pattern_for_assignment_expression) {
             // a. Let lRef be ? Evaluation of LeftHandSideExpression.
             try codegenExpression(node.lhs_expression.*, executable, ctx);
-            try executable.addInstruction(.push_reference);
 
             // TODO: b. If IsAnonymousFunctionDefinition(AssignmentExpression) and IsIdentifierRef of
             //          LeftHandSideExpression are both true, then
@@ -1798,7 +1790,6 @@ pub fn codegenAssignmentExpression(
             // d. Perform ? PutValue(lRef, rVal).
             // e. Return rVal.
             try executable.addInstruction(.put_value);
-            try executable.addInstruction(.pop_reference);
             return;
         }
 
@@ -1820,12 +1811,14 @@ pub fn codegenAssignmentExpression(
     }
     // AssignmentExpression : LeftHandSideExpression AssignmentOperator AssignmentExpression
     else if (node.operator != .@"&&=" and node.operator != .@"||=" and node.operator != .@"??=") {
+        std.debug.assert(node.lhs_expression.analyze(.is_reference));
+
         // 1. Let lRef be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.lhs_expression.*, executable, ctx);
-        try executable.addInstruction(.push_reference);
+        try executable.addInstruction(.dup_reference);
 
         // 2. Let lVal be ? GetValue(lRef).
-        if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.get_value);
         try executable.addInstruction(.load);
 
         // 3. Let rRef be ? Evaluation of AssignmentExpression.
@@ -1861,16 +1854,17 @@ pub fn codegenAssignmentExpression(
         // 8. Perform ? PutValue(lRef, r).
         // 9. Return r.
         try executable.addInstruction(.put_value);
-        try executable.addInstruction(.pop_reference);
     }
     // AssignmentExpression : LeftHandSideExpression &&= AssignmentExpression
     else if (node.operator == .@"&&=") {
+        std.debug.assert(node.lhs_expression.analyze(.is_reference));
+
         // 1. Let lRef be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.lhs_expression.*, executable, ctx);
-        try executable.addInstruction(.push_reference);
+        try executable.addInstruction(.dup_reference);
 
         // 2. Let lVal be ? GetValue(lRef).
-        if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.get_value);
         try executable.addInstruction(.load);
 
         // 3. If ToBoolean(lVal) is false, return lVal.
@@ -1904,18 +1898,20 @@ pub fn codegenAssignmentExpression(
 
         try alternate_jump.setTargetHere();
         try executable.addInstruction(.store); // Restore lVal as the result value
+        try executable.addInstruction(.pop_reference); // Drop lRef
 
         try end_jump.setTargetHere();
-        try executable.addInstruction(.pop_reference);
     }
     // AssignmentExpression : LeftHandSideExpression ||= AssignmentExpression
     else if (node.operator == .@"||=") {
+        std.debug.assert(node.lhs_expression.analyze(.is_reference));
+
         // 1. Let lRef be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.lhs_expression.*, executable, ctx);
-        try executable.addInstruction(.push_reference);
+        try executable.addInstruction(.dup_reference);
 
         // 2. Let lVal be ? GetValue(lRef).
-        if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+        try executable.addInstruction(.get_value);
 
         // 3. If ToBoolean(lVal) is true, return lVal.
         try executable.addInstruction(.jump_conditional);
@@ -1943,19 +1939,24 @@ pub fn codegenAssignmentExpression(
         // 7. Return rVal.
         try executable.addInstruction(.put_value);
 
-        try consequent_jump.setTargetHere();
+        try executable.addInstruction(.jump);
+        const end_jump = try executable.addJumpIndex();
 
-        try executable.addInstruction(.pop_reference);
+        try consequent_jump.setTargetHere();
+        try executable.addInstruction(.pop_reference); // Drop lRef
+
+        try end_jump.setTargetHere();
     }
     // AssignmentExpression : LeftHandSideExpression ??= AssignmentExpression
     else if (node.operator == .@"??=") {
+        std.debug.assert(node.lhs_expression.analyze(.is_reference));
+
         // 1. Let lRef be ? Evaluation of LeftHandSideExpression.
         try codegenExpression(node.lhs_expression.*, executable, ctx);
-        try executable.addInstruction(.push_reference);
+        try executable.addInstruction(.dup_reference);
 
         // 2. Let lVal be ? GetValue(lRef).
-        if (node.lhs_expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
-
+        try executable.addInstruction(.get_value);
         try executable.addInstruction(.load);
 
         // 3. If lVal is neither undefined nor null, return lVal.
@@ -1994,9 +1995,9 @@ pub fn codegenAssignmentExpression(
 
         try alternate_jump.setTargetHere();
         try executable.addInstruction(.store); // Restore lVal as the result value
+        try executable.addInstruction(.pop_reference); // Drop lRef
 
         try end_jump.setTargetHere();
-        try executable.addInstruction(.pop_reference);
     } else unreachable;
 }
 
@@ -2283,7 +2284,6 @@ pub fn codegenLexicalBinding(
                 try executable.addIndex(@intFromBool(strict));
                 try executable.addIndex(ctx.environment_lookup_cache_index);
                 ctx.environment_lookup_cache_index += 1;
-                try executable.addInstruction(.push_reference);
 
                 // TODO: 3. If IsAnonymousFunctionDefinition(Initializer) is true, then
                 if (false) {
@@ -2300,7 +2300,6 @@ pub fn codegenLexicalBinding(
 
                 // 5. Perform ! InitializeReferencedBinding(lhs, value).
                 try executable.addInstruction(.initialize_referenced_binding);
-                try executable.addInstruction(.pop_reference);
 
                 // 6. Return empty.
                 try executable.addInstruction(.store);
@@ -2318,12 +2317,10 @@ pub fn codegenLexicalBinding(
                 try executable.addIndex(@intFromBool(strict));
                 try executable.addIndex(ctx.environment_lookup_cache_index);
                 ctx.environment_lookup_cache_index += 1;
-                try executable.addInstruction(.push_reference);
 
                 // 2. Perform ! InitializeReferencedBinding(lhs, undefined).
                 try executable.addInstructionWithConstant(.store_constant, .undefined);
                 try executable.addInstruction(.initialize_referenced_binding);
-                try executable.addInstruction(.pop_reference);
 
                 // 3. Return empty.
                 try executable.addInstruction(.store);
@@ -2404,7 +2401,6 @@ pub fn codegenVariableDeclaration(
                 try executable.addIndex(@intFromBool(strict));
                 try executable.addIndex(ctx.environment_lookup_cache_index);
                 ctx.environment_lookup_cache_index += 1;
-                try executable.addInstruction(.push_reference);
 
                 // TODO: 3. If IsAnonymousFunctionDefinition(Initializer) is true, then
                 // 4. Else,
@@ -2419,7 +2415,6 @@ pub fn codegenVariableDeclaration(
 
                 // 5. Perform ? PutValue(lhs, value).
                 try executable.addInstruction(.put_value);
-                try executable.addInstruction(.pop_reference);
 
                 // 6. Return empty.
                 try executable.addInstruction(.store);
@@ -3076,9 +3071,7 @@ fn forInOfBodyEvaluation(
             //     a. Let status be lhsRef.
             // 3. Else,
             //     a. Let status be Completion(PutValue(lhsRef.[[Value]], nextValue)).
-            try executable.addInstruction(.push_reference);
             try executable.addInstruction(.put_value);
-            try executable.addInstruction(.pop_reference);
         }
     }
     // h. Else,
@@ -3144,11 +3137,9 @@ fn forInOfBodyEvaluation(
             try executable.addIndex(@intFromBool(strict));
             try executable.addIndex(ctx.environment_lookup_cache_index);
             ctx.environment_lookup_cache_index += 1;
-            try executable.addInstruction(.push_reference);
 
             // 4. Let status be Completion(InitializeReferencedBinding(lhsRef, nextValue)).
             try executable.addInstruction(.initialize_referenced_binding);
-            try executable.addInstruction(.pop_reference);
         }
     }
 

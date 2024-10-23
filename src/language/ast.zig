@@ -804,7 +804,8 @@ pub const Expression = union(enum) {
             .await_expression => query == .is_await_expression,
             .member_expression,
             .super_property,
-            .optional_expression,
+            // NOTE: optional_expression is omitted here on purpose, see the comment at the end of
+            //       codegenOptionalExpression()
             => query == .is_reference,
             .primary_expression => |primary_expression| primary_expression.analyze(query),
             else => false,

@@ -192,31 +192,24 @@ pub fn evaluateNew(agent: *Agent, constructor: Value, arguments: []const Value) 
 
 /// 13.3.6.2 EvaluateCall ( func, ref, arguments, tailPosition )
 /// https://tc39.es/ecma262/#sec-evaluatecall
-pub fn evaluateCallGetThisValue(maybe_reference: ?Reference) Value {
+pub fn evaluateCallGetThisValue(reference: Reference) Value {
     // 1. If ref is a Reference Record, then
-    if (maybe_reference) |reference| {
-        // a. If IsPropertyReference(ref) is true, then
-        if (reference.isPropertyReference()) {
-            // i. Let thisValue be GetThisValue(ref).
-            return reference.getThisValue();
-        }
-        // b. Else,
-        else {
-            // i. Let refEnv be ref.[[Base]].
-            // ii. Assert: refEnv is an Environment Record.
-            const reference_environment = reference.base.environment;
-
-            // iii. Let thisValue be refEnv.WithBaseObject().
-            return if (reference_environment.withBaseObject()) |object|
-                Value.from(object)
-            else
-                .undefined;
-        }
+    // a. If IsPropertyReference(ref) is true, then
+    if (reference.isPropertyReference()) {
+        // i. Let thisValue be GetThisValue(ref).
+        return reference.getThisValue();
     }
-    // 2. Else,
+    // b. Else,
     else {
-        // a. Let thisValue be undefined.
-        return .undefined;
+        // i. Let refEnv be ref.[[Base]].
+        // ii. Assert: refEnv is an Environment Record.
+        const reference_environment = reference.base.environment;
+
+        // iii. Let thisValue be refEnv.WithBaseObject().
+        return if (reference_environment.withBaseObject()) |object|
+            Value.from(object)
+        else
+            .undefined;
     }
 }
 

@@ -34,6 +34,8 @@ pub const Instruction = enum(u8) {
     decrement,
     /// Apply the delete operation to the evaluated expression and set it as the result value.
     delete,
+    /// Duplicate the last reference on the stack.
+    dup_reference,
     /// Store EvaluateCall() as the result value.
     /// This instruction has the number of argument values that need to be popped from the stack
     /// (last to first) as an argument, the values on the stack afterwards are the this value and
@@ -147,8 +149,6 @@ pub const Instruction = enum(u8) {
     push_exception_jump_target,
     /// Push the last evaluated iterator, if any.
     push_iterator,
-    /// Push the last evaluated reference, if any.
-    push_reference,
     /// Call PutValue() with the last reference on the reference stack and the result value.
     put_value,
     /// Store RegExpCreate() as the result value.
