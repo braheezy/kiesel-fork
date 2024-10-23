@@ -36341,7 +36341,7 @@
   "test/language/expressions/optional-chaining/early-errors-tail-position-op-template-string.js": "PASS",
   "test/language/expressions/optional-chaining/early-errors-tail-position-optchain-template-string-esi.js": "FAIL",
   "test/language/expressions/optional-chaining/early-errors-tail-position-optchain-template-string.js": "FAIL",
-  "test/language/expressions/optional-chaining/eval-optional-call.js": "FAIL",
+  "test/language/expressions/optional-chaining/eval-optional-call.js": "PASS",
   "test/language/expressions/optional-chaining/iteration-statement-do.js": "PASS",
   "test/language/expressions/optional-chaining/iteration-statement-for-await-of.js": "PASS",
   "test/language/expressions/optional-chaining/iteration-statement-for-in.js": "PASS",

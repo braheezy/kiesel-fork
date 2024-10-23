@@ -39,6 +39,8 @@ pub const Instruction = enum(u8) {
     /// (last to first) as an argument, the values on the stack afterwards are the this value and
     /// lastly the function to call.
     evaluate_call,
+    /// Store EvaluateCall() as the result value, possibly invoking direct eval.
+    evaluate_call_direct_eval,
     /// Store evaluation of a import() call as the result value.
     evaluate_import_call,
     /// Store EvaluateNew() as the result value.
@@ -192,7 +194,7 @@ pub const Instruction = enum(u8) {
     pub fn argumentCount(self: Instruction) u2 {
         return switch (self) {
             .resolve_binding => 3,
-            .evaluate_call,
+            .evaluate_call_direct_eval,
             .evaluate_property_access_with_identifier_key,
             .jump_conditional,
             .object_define_method,
@@ -204,6 +206,7 @@ pub const Instruction = enum(u8) {
             .block_declaration_instantiation,
             .class_definition_evaluation,
             .create_catch_binding,
+            .evaluate_call,
             .evaluate_new,
             .evaluate_property_access_with_expression_key,
             .evaluate_super_call,

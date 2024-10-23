@@ -383,7 +383,6 @@ fn bindingInitialization(
                         try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
                         try executable.addInstruction(.evaluate_call);
                         try executable.addIndex(1); // One arg
-                        try executable.addIndex(@intFromBool(strict));
 
                         // Initialize binding and pop reference
                         try executable.addInstruction(
@@ -409,7 +408,6 @@ fn bindingInitialization(
                         try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
                         try executable.addInstruction(.evaluate_call);
                         try executable.addIndex(1); // One arg
-                        try executable.addIndex(@intFromBool(strict));
 
                         try bindingInitialization(
                             binding_pattern,
@@ -881,29 +879,50 @@ pub fn codegenCallExpression(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
-    // CallExpression : CallExpression Arguments
-    // 1. Let ref be ? Evaluation of CallExpression.
+    // CallExpression : CoverCallExpressionAndAsyncArrowHead
+    // (also handles the simplified 'CallExpression : CallExpression Arguments')
+
+    // 1. Let expr be the CallMemberExpression that is covered by CoverCallExpressionAndAsyncArrowHead.
+    // 2. Let memberExpr be the MemberExpression of expr.
+    // 3. Let arguments be the Arguments of expr.
+    // 4. Let ref be ? Evaluation of memberExpr.
     try codegenExpression(node.expression.*, executable, ctx);
 
     try executable.addInstruction(.push_reference);
 
-    // 2. Let func be ? GetValue(ref).
+    // 5. Let func be ? GetValue(ref).
     if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
     try executable.addInstruction(.load);
-
-    // TODO: 3. Let thisCall be this CallExpression.
-    // TODO: 4. Let tailCall be IsInTailPosition(thisCall).
 
     try executable.addInstruction(.load_this_value_for_evaluate_call);
 
     try codegenArguments(node.arguments, executable, ctx);
 
-    const strict = ctx.contained_in_strict_mode_code;
+    // 6. If ref is a Reference Record, IsPropertyReference(ref) is false, and
+    //    ref.[[ReferencedName]] is "eval", then
+    if (node.expression.* == .primary_expression and
+        node.expression.primary_expression == .identifier_reference and
+        std.mem.eql(u8, node.expression.primary_expression.identifier_reference, "eval"))
+    {
+        const strict = ctx.contained_in_strict_mode_code;
 
-    // 5. Return ? EvaluateCall(func, ref, Arguments, tailCall).
+        // This handles the SameValue(func, %eval%) check and then conditionally invokes
+        // PerformEval or EvaluateCall.
+        try executable.addInstruction(.evaluate_call_direct_eval);
+        try executable.addIndex(node.arguments.len);
+        try executable.addIndex(@intFromBool(strict));
+
+        // TODO: We should probably also clean this up if something throws beforehand...
+        try executable.addInstruction(.pop_reference);
+        return;
+    }
+
+    // TODO: 7. Let thisCall be this CallExpression.
+    // TODO: 8. Let tailCall be IsInTailPosition(thisCall).
+
+    // 9. Return ? EvaluateCall(func, ref, arguments, tailCall).
     try executable.addInstruction(.evaluate_call);
     try executable.addIndex(node.arguments.len);
-    try executable.addIndex(@intFromBool(strict));
 
     // TODO: We should probably also clean this up if something throws beforehand...
     try executable.addInstruction(.pop_reference);
@@ -1095,8 +1114,6 @@ pub fn codegenOptionalExpression(
             // 3. Return ? EvaluateCall(baseValue, baseReference, Arguments, tailCall).
             try executable.addInstruction(.evaluate_call);
             try executable.addIndex(arguments.len);
-            const strict = ctx.contained_in_strict_mode_code;
-            try executable.addIndex(@intFromBool(strict));
 
             // TODO: We should probably also clean this up if something throws beforehand...
             try executable.addInstruction(.pop_reference);
@@ -1233,8 +1250,6 @@ pub fn codegenTaggedTemplate(
     try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
     try executable.addInstruction(.evaluate_call);
     try executable.addIndex(@divFloor(node.template_literal.spans.len, 2) + 1);
-    const strict = ctx.contained_in_strict_mode_code;
-    try executable.addIndex(@intFromBool(strict));
 
     // TODO: We should probably also clean this up if something throws beforehand...
     try executable.addInstruction(.pop_reference);
@@ -2992,7 +3007,6 @@ fn forInOfBodyEvaluation(
     try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
     try executable.addInstruction(.evaluate_call);
     try executable.addIndex(0); // No arguments
-    try executable.addIndex(0); // Strictness doesn't matter here
 
     // b. If iteratorKind is async, set nextResult to ? Await(nextResult).
     if (iterator_kind == .@"async") try executable.addInstruction(.@"await");

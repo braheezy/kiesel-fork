@@ -170,6 +170,10 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
             },
             .evaluate_call => {
                 const argument_count = iterator.instruction_args[0].?;
+                try writer.print("(argument_count: {})", .{argument_count});
+            },
+            .evaluate_call_direct_eval => {
+                const argument_count = iterator.instruction_args[0].?;
                 const strict = iterator.instruction_args[1].? == 1;
                 try writer.print("(argument_count: {}, strict: {})", .{ argument_count, strict });
             },

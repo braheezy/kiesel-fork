@@ -434,7 +434,20 @@ fn executeDelete(self: *Vm, _: Executable) Agent.Error!void {
 }
 
 fn executeEvaluateCall(self: *Vm, executable: Executable) Agent.Error!void {
-    const maybe_reference = self.reference_stack.getLastOrNull() orelse null;
+    const argument_count = self.fetchIndex(executable);
+    const arguments = try self.getArguments(argument_count);
+    const this_value = self.stack.pop();
+    const function = self.stack.pop();
+
+    self.result = try evaluateCall(
+        self.agent,
+        function,
+        this_value,
+        arguments,
+    );
+}
+
+fn executeEvaluateCallDirectEval(self: *Vm, executable: Executable) Agent.Error!void {
     const argument_count = self.fetchIndex(executable);
     const strict = self.fetchIndex(executable) == 1;
     const arguments = try self.getArguments(argument_count);
@@ -444,20 +457,10 @@ fn executeEvaluateCall(self: *Vm, executable: Executable) Agent.Error!void {
     const realm = self.agent.currentRealm();
     const eval = try realm.intrinsics.@"%eval%"();
 
-    // 6. If ref is a Reference Record, IsPropertyReference(ref) is false, and
-    //    ref.[[ReferencedName]] is "eval", then
-    if (maybe_reference) |reference| {
-        if (!reference.isPropertyReference() and
-            reference.referenced_name == .value and
-            reference.referenced_name.value.isString() and
-            reference.referenced_name.value.asString().eql(String.fromLiteral("eval")) and
-
-            // a. If SameValue(func, %eval%) is true, then
-            function.asObject().sameValue(eval))
-        {
-            self.result = try directEval(self.agent, arguments, strict);
-            return;
-        }
+    // a. If SameValue(func, %eval%) is true, then
+    if (function.sameValue(Value.from(eval))) {
+        self.result = try directEval(self.agent, arguments, strict);
+        return;
     }
 
     self.result = try evaluateCall(
@@ -1334,6 +1337,7 @@ fn executeInstruction(
         .decrement => self.executeDecrement(executable),
         .delete => self.executeDelete(executable),
         .evaluate_call => self.executeEvaluateCall(executable),
+        .evaluate_call_direct_eval => self.executeEvaluateCallDirectEval(executable),
         .evaluate_import_call => self.executeEvaluateImportCall(executable),
         .evaluate_new => self.executeEvaluateNew(executable),
         .evaluate_property_access_with_expression_key => self.executeEvaluatePropertyAccessWithExpressionKey(executable),
