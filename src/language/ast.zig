@@ -20,6 +20,7 @@ const escapeSequenceMatcher = language.tokenizer.escapeSequenceMatcher;
 
 const AnalyzeQuery = enum {
     is_await_expression,
+    is_identifier_reference,
     is_reference,
     is_string_literal,
 };
@@ -74,7 +75,10 @@ pub const ParenthesizedExpression = struct {
 
     pub fn analyze(self: ParenthesizedExpression, query: AnalyzeQuery) bool {
         return switch (query) {
-            .is_await_expression, .is_reference => self.expression.analyze(query),
+            .is_await_expression,
+            .is_identifier_reference,
+            .is_reference,
+            => self.expression.analyze(query),
             .is_string_literal => false,
         };
     }
@@ -113,7 +117,9 @@ pub const PrimaryExpression = union(enum) {
                 .parenthesized_expression => |parenthesized_expression| parenthesized_expression.analyze(query),
                 else => false,
             },
-            .is_reference => switch (self) {
+            .is_identifier_reference,
+            .is_reference,
+            => switch (self) {
                 .identifier_reference => true,
                 .parenthesized_expression => |parenthesized_expression| parenthesized_expression.analyze(query),
                 else => false,
@@ -202,6 +208,7 @@ pub const Literal = union(enum) {
     pub fn analyze(self: Literal, query: AnalyzeQuery) bool {
         return switch (query) {
             .is_await_expression,
+            .is_identifier_reference,
             .is_reference,
             => false,
             .is_string_literal => self == .string,
@@ -793,24 +800,14 @@ pub const Expression = union(enum) {
     }
 
     pub fn analyze(self: Expression, query: AnalyzeQuery) bool {
-        return switch (query) {
-            .is_await_expression => switch (self) {
-                .await_expression => true,
-                .primary_expression => |primary_expression| primary_expression.analyze(query),
-                else => false,
-            },
-            .is_reference => switch (self) {
-                .primary_expression => |primary_expression| primary_expression.analyze(query),
-                .member_expression,
-                .super_property,
-                .optional_expression,
-                => true,
-                else => false,
-            },
-            .is_string_literal => switch (self) {
-                .primary_expression => |primary_expression| primary_expression.analyze(query),
-                else => false,
-            },
+        return switch (self) {
+            .await_expression => query == .is_await_expression,
+            .member_expression,
+            .super_property,
+            .optional_expression,
+            => query == .is_reference,
+            .primary_expression => |primary_expression| primary_expression.analyze(query),
+            else => false,
         };
     }
 };
@@ -835,6 +832,7 @@ pub const Statement = union(enum) {
     pub fn analyze(self: Statement, query: AnalyzeQuery) bool {
         return switch (query) {
             .is_await_expression,
+            .is_identifier_reference,
             .is_reference,
             .is_string_literal,
             => switch (self) {
@@ -934,6 +932,7 @@ pub const Declaration = union(enum) {
     pub fn analyze(_: Declaration, query: AnalyzeQuery) bool {
         return switch (query) {
             .is_await_expression,
+            .is_identifier_reference,
             .is_reference,
             .is_string_literal,
             => false,

@@ -180,6 +180,8 @@ pub const Instruction = enum(u8) {
     to_string,
     /// Apply the typeof operation to the evaluated expression and set it as the result value.
     typeof,
+    /// Apply the typeof operation to an identifier and set it as the result value.
+    typeof_identifier,
     /// Store Number::unaryMinus() / BigInt::unaryMinus() as the result value.
     unary_minus,
     /// Store Yield() as the result value.
@@ -194,6 +196,7 @@ pub const Instruction = enum(u8) {
             .evaluate_property_access_with_identifier_key,
             .jump_conditional,
             .object_define_method,
+            .typeof_identifier,
             => 2,
             .apply_string_or_numeric_binary_operator,
             .array_set_length,
@@ -241,6 +244,7 @@ pub const Instruction = enum(u8) {
             .make_private_reference,
             .resolve_binding,
             .resolve_private_identifier,
+            .typeof_identifier,
             => true,
             else => false,
         };

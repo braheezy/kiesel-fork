@@ -1422,9 +1422,22 @@ pub fn codegenUnaryExpression(
 
         // UnaryExpression : typeof UnaryExpression
         .typeof => {
-            // NOTE: get_value is intentionally omitted here, typeof needs to do it conditionally.
-            try codegenExpression(node.expression.*, executable, ctx);
-            try executable.addInstruction(.typeof);
+            if (node.expression.analyze(.is_identifier_reference)) {
+                var primary_expression = node.expression.primary_expression;
+                while (primary_expression == .parenthesized_expression) {
+                    primary_expression = primary_expression.parenthesized_expression.expression.primary_expression;
+                }
+                try executable.addInstructionWithIdentifier(
+                    .typeof_identifier,
+                    primary_expression.identifier_reference,
+                );
+                const strict = ctx.contained_in_strict_mode_code;
+                try executable.addIndex(@intFromBool(strict));
+            } else {
+                try codegenExpression(node.expression.*, executable, ctx);
+                if (node.expression.analyze(.is_reference)) try executable.addInstruction(.get_value);
+                try executable.addInstruction(.typeof);
+            }
         },
 
         // UnaryExpression : + UnaryExpression

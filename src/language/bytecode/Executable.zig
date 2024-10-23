@@ -185,7 +185,7 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
                 const strict = iterator.instruction_args[0].? == 1;
                 try writer.print("(strict: {})", .{strict});
             },
-            .evaluate_property_access_with_identifier_key => {
+            .evaluate_property_access_with_identifier_key, .typeof_identifier => {
                 const identifier_index = iterator.instruction_args[0].?;
                 const strict = iterator.instruction_args[1].? == 1;
                 const identifier = self.identifiers.unmanaged.entries.get(identifier_index).key;

@@ -466,6 +466,51 @@ pub fn asObject(self: Value) Object {
     return self.impl.asObject();
 }
 
+/// Return a string according to the 'typeof' operator semantics.
+pub fn typeof(self: Value) String {
+    // Excerpt from https://tc39.es/ecma262/#sec-typeof-operator-runtime-semantics-evaluation
+    return switch (self.type()) {
+        // 4. If val is undefined, return "undefined".
+        .undefined => String.fromLiteral("undefined"),
+
+        // 5. If val is null, return "object".
+        .null => String.fromLiteral("object"),
+
+        // 6. If val is a String, return "string".
+        .string => String.fromLiteral("string"),
+
+        // 7. If val is a Symbol, return "symbol".
+        .symbol => String.fromLiteral("symbol"),
+
+        // 8. If val is a Boolean, return "boolean".
+        .boolean => String.fromLiteral("boolean"),
+
+        // 9. If val is a Number, return "number".
+        .number => String.fromLiteral("number"),
+
+        // 10. If val is a BigInt, return "bigint".
+        .big_int => String.fromLiteral("bigint"),
+
+        // 11. Assert: val is an Object.
+        .object => blk: {
+            // B.3.6.3 Changes to the typeof Operator
+            // https://tc39.es/ecma262/#sec-IsHTMLDDA-internal-slot-typeof
+            if (build_options.enable_annex_b) {
+                // 12. If val has an [[IsHTMLDDA]] internal slot, return "undefined".
+                if (self.asObject().isHTMLDDA()) break :blk String.fromLiteral("undefined");
+            } else {
+                // 12. NOTE: This step is replaced in section B.3.6.3.
+            }
+
+            // 13. If val has a [[Call]] internal slot, return "function".
+            if (self.asObject().internalMethods().call) |_| break :blk String.fromLiteral("function");
+
+            // 14. Return "object".
+            break :blk String.fromLiteral("object");
+        },
+    };
+}
+
 /// 6.2.6.5 ToPropertyDescriptor ( Obj )
 /// https://tc39.es/ecma262/#sec-topropertydescriptor
 pub fn toPropertyDescriptor(self: Value, agent: *Agent) Agent.Error!PropertyDescriptor {
