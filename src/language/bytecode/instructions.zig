@@ -34,6 +34,8 @@ pub const Instruction = enum(u8) {
     decrement,
     /// Apply the delete operation to the evaluated expression and set it as the result value.
     delete,
+    /// Duplicate the last iterator on the stack.
+    dup_iterator,
     /// Duplicate the last reference on the stack.
     dup_reference,
     /// Store EvaluateCall() as the result value.
@@ -147,8 +149,6 @@ pub const Instruction = enum(u8) {
     push_lexical_environment,
     /// Push a jump target for uncaught exceptions
     push_exception_jump_target,
-    /// Push the last evaluated iterator, if any.
-    push_iterator,
     /// Call PutValue() with the last reference on the reference stack and the result value.
     put_value,
     /// Store RegExpCreate() as the result value.

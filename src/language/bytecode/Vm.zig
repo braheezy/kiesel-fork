@@ -68,7 +68,6 @@ function_arguments: std.ArrayList(Value),
 environment_lookup_cache: std.ArrayList(?Environment.LookupCacheEntry),
 result: ?Value = null,
 exception: ?Value = null,
-iterator: ?Iterator = null,
 
 pub fn init(agent: *Agent) std.mem.Allocator.Error!Vm {
     const stack = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 32);
@@ -200,7 +199,7 @@ fn executeArraySpreadValue(self: *Vm, _: Executable) Agent.Error!void {
 
     // From ArrayAccumulation:
     // 3. Let iteratorRecord be ? GetIterator(spreadObj, sync).
-    const iterator = &self.iterator_stack.items[self.iterator_stack.items.len - 1];
+    var iterator = self.iterator_stack.pop();
 
     // 4. Repeat,
     //     a. Let next be ? IteratorStepValue(iteratorRecord).
@@ -341,7 +340,12 @@ fn executeCreateObjectPropertyIterator(self: *Vm, _: Executable) Agent.Error!voi
     const next_method = iterator.get(PropertyKey.from("next")) catch |err| try noexcept(err);
 
     // e. Return the Iterator Record { [[Iterator]]: iterator, [[NextMethod]]: nextMethod, [[Done]]: false }.
-    self.iterator = .{ .iterator = iterator, .next_method = next_method, .done = false };
+    const iterator_: Iterator = .{
+        .iterator = iterator,
+        .next_method = next_method,
+        .done = false,
+    };
+    try self.iterator_stack.append(iterator_);
 }
 
 fn executeCreateWithEnvironment(self: *Vm, _: Executable) Agent.Error!void {
@@ -430,6 +434,11 @@ fn executeDelete(self: *Vm, _: Executable) Agent.Error!void {
         // c. Return ? base.DeleteBinding(ref.[[ReferencedName]]).
         self.result = Value.from(try base.deleteBinding(reference.referenced_name.value.asString()));
     }
+}
+
+fn executeDupIterator(self: *Vm, _: Executable) Agent.Error!void {
+    const iterator = self.iterator_stack.getLast();
+    try self.iterator_stack.append(iterator);
 }
 
 fn executeDupReference(self: *Vm, _: Executable) Agent.Error!void {
@@ -678,7 +687,8 @@ fn executeForDeclarationBindingInstantiation(self: *Vm, executable: Executable) 
 
 fn executeGetIterator(self: *Vm, executable: Executable) Agent.Error!void {
     const iterator_kind: IteratorKind = @enumFromInt((self.fetchIndex(executable)));
-    self.iterator = try getIterator(self.agent, self.result.?, iterator_kind);
+    const iterator = try getIterator(self.agent, self.result.?, iterator_kind);
+    try self.iterator_stack.append(iterator);
 }
 
 fn executeGetNewTarget(self: *Vm, _: Executable) Agent.Error!void {
@@ -969,7 +979,7 @@ fn executeLoadConstant(self: *Vm, executable: Executable) Agent.Error!void {
 }
 
 fn executeLoadIteratorNextArgs(self: *Vm, _: Executable) Agent.Error!void {
-    const iterator = self.iterator_stack.getLast();
+    const iterator = self.iterator_stack.pop();
     try self.stack.append(iterator.next_method);
     try self.stack.append(Value.from(iterator.iterator));
 }
@@ -1144,10 +1154,6 @@ fn executePushLexicalEnvironment(self: *Vm, _: Executable) Agent.Error!void {
 fn executePushExceptionJumpTarget(self: *Vm, executable: Executable) Agent.Error!void {
     const jump_target = self.fetchIndex(executable);
     try self.exception_jump_target_stack.append(jump_target);
-}
-
-fn executePushIterator(self: *Vm, _: Executable) Agent.Error!void {
-    try self.iterator_stack.append(self.iterator.?);
 }
 
 fn executePutValue(self: *Vm, _: Executable) Agent.Error!void {
@@ -1339,6 +1345,7 @@ fn executeInstruction(
         .create_with_environment => self.executeCreateWithEnvironment(executable),
         .decrement => self.executeDecrement(executable),
         .delete => self.executeDelete(executable),
+        .dup_iterator => self.executeDupIterator(executable),
         .dup_reference => self.executeDupReference(executable),
         .evaluate_call => self.executeEvaluateCall(executable),
         .evaluate_call_direct_eval => self.executeEvaluateCallDirectEval(executable),
@@ -1392,7 +1399,6 @@ fn executeInstruction(
         .pop_reference => self.executePopReference(executable),
         .push_lexical_environment => self.executePushLexicalEnvironment(executable),
         .push_exception_jump_target => self.executePushExceptionJumpTarget(executable),
-        .push_iterator => self.executePushIterator(executable),
         .put_value => self.executePutValue(executable),
         .reg_exp_create => self.executeRegExpCreate(executable),
         .resolve_binding => self.executeResolveBinding(executable),

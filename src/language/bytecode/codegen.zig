@@ -504,9 +504,7 @@ pub fn codegenArrayLiteral(
                 try executable.addIndex(@intFromEnum(IteratorKind.sync));
 
                 // 4.
-                try executable.addInstruction(.push_iterator);
                 try executable.addInstruction(.array_spread_value);
-                try executable.addInstruction(.pop_iterator);
                 try executable.addInstruction(.load);
             },
         }
@@ -2964,11 +2962,6 @@ fn forInOfBodyEvaluation(
         continue_jumps,
     );
 
-    // NOTE: The iterator is created by forInOfHeadEvaluation() and needs to be pushed onto the
-    //       stack. If this isn't applicable a break completion jump to the end of this function
-    //       is emitted.
-    try executable.addInstruction(.push_iterator);
-
     // 1. If iteratorKind is not present, set iteratorKind to sync.
     // NOTE: This is always passed in at the call site.
 
@@ -2998,6 +2991,7 @@ fn forInOfBodyEvaluation(
     const start_index = executable.instructions.items.len;
 
     // a. Let nextResult be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
+    try executable.addInstruction(.dup_iterator);
     try executable.addInstruction(.load_iterator_next_args);
     try executable.addInstructionWithConstant(.load_constant, .undefined); // No spread args
     try executable.addInstruction(.evaluate_call);
