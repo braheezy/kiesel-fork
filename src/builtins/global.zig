@@ -163,93 +163,95 @@ pub fn globalObjectProperties(realm: *Realm) [num_properties]GlobalObjectPropert
         // https://tc39.es/ecma262/#sec-int32array
         .{ "Int32Array", .{ .lazy_intrinsic = Realm.Intrinsics.@"%Int32Array%" } },
 
+        // 19.3.19 Iterator ( . . . )
+        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-iterator
         .{ "Iterator", .{ .lazy_intrinsic = Realm.Intrinsics.@"%Iterator%" } },
 
-        // 19.3.19 Map ( . . . )
+        // 19.3.20 Map ( . . . )
         // https://tc39.es/ecma262/#sec-map
         .{ "Map", .{ .lazy_intrinsic = Realm.Intrinsics.@"%Map%" } },
 
-        // 19.3.20 Number ( . . . )
+        // 19.3.21 Number ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-number
         .{ "Number", .{ .lazy_intrinsic = Realm.Intrinsics.@"%Number%" } },
 
-        // 19.3.21 Object ( . . . )
+        // 19.3.22 Object ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-object
         .{ "Object", .{ .lazy_intrinsic = Realm.Intrinsics.@"%Object%" } },
 
-        // 19.3.22 Promise ( . . . )
+        // 19.3.23 Promise ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-promise
         .{ "Promise", .{ .lazy_intrinsic = Realm.Intrinsics.@"%Promise%" } },
 
-        // 19.3.23 Proxy ( . . . )
+        // 19.3.24 Proxy ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-proxy
         .{ "Proxy", .{ .lazy_intrinsic = Realm.Intrinsics.@"%Proxy%" } },
 
-        // 19.3.24 RangeError ( . . . )
+        // 19.3.25 RangeError ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-rangeerror
         .{ "RangeError", .{ .lazy_intrinsic = Realm.Intrinsics.@"%RangeError%" } },
 
-        // 19.3.25 ReferenceError ( . . . )
+        // 19.3.26 ReferenceError ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-referenceerror
         .{ "ReferenceError", .{ .lazy_intrinsic = Realm.Intrinsics.@"%ReferenceError%" } },
 
-        // 19.3.26 RegExp ( . . . )
+        // 19.3.27 RegExp ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-regexp
         .{ "RegExp", .{ .lazy_intrinsic = Realm.Intrinsics.@"%RegExp%" } },
 
-        // 19.3.27 Set ( . . . )
+        // 19.3.28 Set ( . . . )
         // https://tc39.es/ecma262/#sec-set
         .{ "Set", .{ .lazy_intrinsic = Realm.Intrinsics.@"%Set%" } },
 
-        // 19.3.28 SharedArrayBuffer ( . . . )
+        // 19.3.29 SharedArrayBuffer ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-sharedarraybuffer
         .{ "SharedArrayBuffer", .{ .lazy_intrinsic = Realm.Intrinsics.@"%SharedArrayBuffer%" } },
 
-        // 19.3.29 String ( . . . )
+        // 19.3.30 String ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-string
         .{ "String", .{ .lazy_intrinsic = Realm.Intrinsics.@"%String%" } },
 
-        // 19.3.30 Symbol ( . . . )
+        // 19.3.31 Symbol ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-symbol
         .{ "Symbol", .{ .lazy_intrinsic = Realm.Intrinsics.@"%Symbol%" } },
 
-        // 19.3.31 SyntaxError ( . . . )
+        // 19.3.32 SyntaxError ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-syntaxerror
         .{ "SyntaxError", .{ .lazy_intrinsic = Realm.Intrinsics.@"%SyntaxError%" } },
 
-        // 19.3.32 TypeError ( . . . )
+        // 19.3.33 TypeError ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-typeerror
         .{ "TypeError", .{ .lazy_intrinsic = Realm.Intrinsics.@"%TypeError%" } },
 
-        // 19.3.33 Uint8Array ( . . . )
+        // 19.3.34 Uint8Array ( . . . )
         // https://tc39.es/ecma262/#sec-uint8array
         .{ "Uint8Array", .{ .lazy_intrinsic = Realm.Intrinsics.@"%Uint8Array%" } },
 
-        // 19.3.34 Uint8ClampedArray ( . . . )
+        // 19.3.35 Uint8ClampedArray ( . . . )
         // https://tc39.es/ecma262/#sec-uint8clampedarray
         .{ "Uint8ClampedArray", .{ .lazy_intrinsic = Realm.Intrinsics.@"%Uint8ClampedArray%" } },
 
-        // 19.3.35 Uint16Array ( . . . )
+        // 19.3.36 Uint16Array ( . . . )
         // https://tc39.es/ecma262/#sec-uint16array
         .{ "Uint16Array", .{ .lazy_intrinsic = Realm.Intrinsics.@"%Uint16Array%" } },
 
-        // 19.3.36 Uint32Array ( . . . )
+        // 19.3.37 Uint32Array ( . . . )
         // https://tc39.es/ecma262/#sec-uint32array
         .{ "Uint32Array", .{ .lazy_intrinsic = Realm.Intrinsics.@"%Uint32Array%" } },
 
-        // 19.3.37 URIError ( . . . )
+        // 19.3.38 URIError ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-urierror
         .{ "URIError", .{ .lazy_intrinsic = Realm.Intrinsics.@"%URIError%" } },
 
-        // 19.3.38 WeakMap ( . . . )
+        // 19.3.39 WeakMap ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-weakmap
         .{ "WeakMap", .{ .lazy_intrinsic = Realm.Intrinsics.@"%WeakMap%" } },
 
-        // 19.3.39 WeakRef ( . . . )
+        // 19.3.40 WeakRef ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-weakref
         .{ "WeakRef", .{ .lazy_intrinsic = Realm.Intrinsics.@"%WeakRef%" } },
 
-        // 19.3.40 WeakSet ( . . . )
+        // 19.3.41 WeakSet ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-weakset
         .{ "WeakSet", .{ .lazy_intrinsic = Realm.Intrinsics.@"%WeakSet%" } },
 
