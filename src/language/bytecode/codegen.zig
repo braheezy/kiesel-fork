@@ -943,7 +943,7 @@ pub fn codegenSuperProperty(
             //    immediately after this step. However, in the case of super[b] = c, it will not be
             //    performed until after evaluation of c.
 
-            // 7. Return ? MakeSuperPropertyReference(actualThis, propertyNameValue, strict).
+            // 7. Return MakeSuperPropertyReference(actualThis, propertyNameValue, strict).
             try executable.addInstruction(.make_super_property_reference);
             try executable.addIndex(@intFromBool(strict));
         },
@@ -963,7 +963,7 @@ pub fn codegenSuperProperty(
             // 4. Let strict be IsStrict(this SuperProperty).
             const strict = ctx.contained_in_strict_mode_code;
 
-            // 5. Return ? MakeSuperPropertyReference(actualThis, propertyKey, strict).
+            // 5. Return MakeSuperPropertyReference(actualThis, propertyKey, strict).
             try executable.addInstruction(.make_super_property_reference);
             try executable.addIndex(@intFromBool(strict));
         },

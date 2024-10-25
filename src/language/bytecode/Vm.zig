@@ -1045,7 +1045,7 @@ fn executeMakeSuperPropertyReference(self: *Vm, executable: Executable) Agent.Er
     // 2. Assert: env.HasSuperBinding() is true.
     std.debug.assert(env.hasSuperBinding());
 
-    // 3. Let baseValue be ? env.GetSuperBase().
+    // 3. Let baseValue be env.GetSuperBase().
     const base_value = try env.getSuperBase();
 
     // 4. Return the Reference Record {

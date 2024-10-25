@@ -168,7 +168,7 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn getSuperBase(self: Environment) Agent.Error!Value {
+    pub fn getSuperBase(self: Environment) std.mem.Allocator.Error!Value {
         return switch (self) {
             .function_environment => |env| env.getSuperBase(),
             else => unreachable,

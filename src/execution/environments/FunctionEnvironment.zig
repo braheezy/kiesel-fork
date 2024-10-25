@@ -5,14 +5,14 @@ const std = @import("std");
 
 const builtins = @import("../../builtins.zig");
 const environments = @import("../environments.zig");
-const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
+const utils = @import("../../utils.zig");
 
-const Agent = execution.Agent;
 const DeclarativeEnvironment = environments.DeclarativeEnvironment;
 const ECMAScriptFunction = builtins.ECMAScriptFunction;
 const Object = types.Object;
 const Value = types.Value;
+const noexcept = utils.noexcept;
 
 const FunctionEnvironment = @This();
 
@@ -104,16 +104,18 @@ pub fn getThisBinding(self: FunctionEnvironment) error{ExceptionThrown}!Value {
 
 /// 9.1.1.3.5 GetSuperBase ( )
 /// https://tc39.es/ecma262/#sec-getsuperbase
-pub fn getSuperBase(self: FunctionEnvironment) Agent.Error!Value {
+pub fn getSuperBase(self: FunctionEnvironment) std.mem.Allocator.Error!Value {
     // 1. Let home be envRec.[[FunctionObject]].[[HomeObject]].
     const home = self.function_object.fields.home_object;
 
     // 2. If home is undefined, return undefined.
     if (home == null) return .undefined;
 
-    // 3. Assert: home is an Object.
-    // 4. Return ? home.[[GetPrototypeOf]]().
-    return if (try home.?.internalMethods().getPrototypeOf(home.?)) |prototype|
+    // 3. Assert: home is an ordinary object.
+    // 4. Return ! home.[[GetPrototypeOf]]().
+    return if (home.?.internalMethods().getPrototypeOf(
+        home.?,
+    ) catch |err| try noexcept(err)) |prototype|
         Value.from(prototype)
     else
         .null;
