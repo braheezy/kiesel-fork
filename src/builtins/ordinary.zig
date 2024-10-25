@@ -337,9 +337,11 @@ fn validateAndApplyPropertyDescriptor(
             // i. If Desc has a [[Writable]] field and Desc.[[Writable]] is true, return false.
             if (descriptor.writable) |writable| if (writable) return false;
 
-            // ii. If Desc has a [[Value]] field and SameValue(Desc.[[Value]], current.[[Value]])
-            //     is false, return false.
-            if (descriptor.value) |value| if (!sameValue(value, current.value.?)) return false;
+            // ii. NOTE: SameValue returns true for NaN values which may be distinguishable by
+            //     other means. Returning here ensures that any existing property of O remains unmodified.
+            // iii. If Desc has a [[Value]] field, return SameValue(Desc.[[Value]],
+            //      current.[[Value]]).
+            if (descriptor.value) |value| return sameValue(value, current.value.?);
         }
     }
 
