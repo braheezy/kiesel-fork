@@ -102,10 +102,10 @@ jobs:
         run: |
           zig build -Dtarget=x86_64-windows-gnu -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel.exe zig-out/bin/kiesel-windows-x86_64.exe
-      - name: Build for UEFI
-        run: |
-          zig build -Dtarget=x86_64-uefi-gnu -Doptimize=ReleaseSafe -Denable-intl=false -Denable-libgc=false -Denable-libregexp=false
-          rm -rf zig-out/EFI # Not uploading this one :^)
+      # - name: Build for UEFI
+      #   run: |
+      #     zig build -Dtarget=x86_64-uefi-gnu -Doptimize=ReleaseSafe -Denable-intl=false -Denable-libgc=false -Denable-libregexp=false
+      #     rm -rf zig-out/EFI # Not uploading this one :^)
       - name: Upload binaries and update version.txt
         if: ${{ github.ref_name == 'main' }}
         run: |
