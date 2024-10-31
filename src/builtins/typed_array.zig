@@ -765,7 +765,7 @@ pub const constructor = struct {
             return Value.from(target_object);
         }
 
-        // 7. NOTE: source is not an Iterable so assume it is already an array-like object.
+        // 7. NOTE: source is not an iterable object, so assume it is already an array-like object.
 
         // 8. Let arrayLike be ! ToObject(source).
         const array_like = source.toObject(agent) catch |err| try noexcept(err);
@@ -3875,8 +3875,8 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
                         }
                         // 4. Else,
                         else {
-                            // a. NOTE: firstArgument is not an Iterable so assume it is already an
-                            //    array-like object.
+                            // a. NOTE: firstArgument is not an iterable object, so assume it is
+                            //    already an array-like object.
                             // b. Perform ? InitializeTypedArrayFromArrayLike(O, firstArgument).
                             try initializeTypedArrayFromArrayLike(
                                 agent,

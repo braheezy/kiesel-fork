@@ -588,7 +588,7 @@ pub const constructor = struct {
             }
         }
 
-        // 6. NOTE: items is not an Iterable so assume it is an array-like object.
+        // 6. NOTE: items is not iterable so assume it is an array-like object.
         // 7. Let arrayLike be ! ToObject(items).
         const array_like = items.toObject(agent) catch |err| try noexcept(err);
 
