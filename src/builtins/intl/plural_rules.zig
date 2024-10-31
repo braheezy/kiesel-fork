@@ -210,7 +210,8 @@ pub const prototype = struct {
         );
 
         // 4. Let pluralCategories be a List of Strings containing all possible results of
-        //    PluralRuleSelect for the selected locale pr.[[Locale]].
+        //    PluralRuleSelect for the selected locale pr.[[Locale]], sorted according to the
+        //    following order: "zero", "one", "two", "few", "many", "other".
         const plural_categories = blk: {
             const data_provider = icu4zig.DataProvider.init();
             defer data_provider.deinit();
