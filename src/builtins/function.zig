@@ -398,7 +398,7 @@ pub fn createDynamicFunction(
     switch (kind) {
         // 30. If kind is generator, then
         .generator => {
-            // a. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
+            // a. Let prototype be OrdinaryObjectCreate(%GeneratorPrototype%).
             const prototype_ = try ordinaryObjectCreate(
                 agent,
                 try realm.intrinsics.@"%GeneratorPrototype%"(),
@@ -417,7 +417,7 @@ pub fn createDynamicFunction(
 
         // 31. Else if kind is async-generator, then
         .async_generator => {
-            // a. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
+            // a. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
             const prototype_ = try ordinaryObjectCreate(
                 agent,
                 try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),

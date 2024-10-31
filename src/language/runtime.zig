@@ -942,7 +942,7 @@ pub fn methodDefinitionEvaluation(
             // 7. Perform SetFunctionName(closure, propKey).
             try setFunctionName(closure, property_key_or_private_name, null);
 
-            // 8. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
+            // 8. Let prototype be OrdinaryObjectCreate(%GeneratorPrototype%).
             const prototype = try ordinaryObjectCreate(
                 agent,
                 try realm.intrinsics.@"%GeneratorPrototype%"(),
@@ -1000,7 +1000,7 @@ pub fn methodDefinitionEvaluation(
             // 7. Perform SetFunctionName(closure, propKey).
             try setFunctionName(closure, property_key_or_private_name, null);
 
-            // 8. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
+            // 8. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
             const prototype = try ordinaryObjectCreate(
                 agent,
                 try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
@@ -1098,7 +1098,7 @@ pub fn instantiateGeneratorFunctionObject(
         // 4. Perform SetFunctionName(F, name).
         try setFunctionName(function, PropertyKey.from(name), null);
 
-        // 5. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
+        // 5. Let prototype be OrdinaryObjectCreate(%GeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
             agent,
             try realm.intrinsics.@"%GeneratorPrototype%"(),
@@ -1140,7 +1140,7 @@ pub fn instantiateGeneratorFunctionObject(
         // 3. Perform SetFunctionName(F, "default").
         try setFunctionName(function, PropertyKey.from("default"), null);
 
-        // 4. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
+        // 4. Let prototype be OrdinaryObjectCreate(%GeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
             agent,
             try realm.intrinsics.@"%GeneratorPrototype%"(),
@@ -1209,7 +1209,7 @@ pub fn instantiateGeneratorFunctionExpression(
         // 9. Perform SetFunctionName(closure, name).
         try setFunctionName(closure, PropertyKey.from(name), null);
 
-        // 10. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
+        // 10. Let prototype be OrdinaryObjectCreate(%GeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
             agent,
             try realm.intrinsics.@"%GeneratorPrototype%"(),
@@ -1264,7 +1264,7 @@ pub fn instantiateGeneratorFunctionExpression(
         // 6. Perform SetFunctionName(closure, name).
         try setFunctionName(closure, PropertyKey.from(name), null);
 
-        // 7. Let prototype be OrdinaryObjectCreate(%GeneratorFunction.prototype.prototype%).
+        // 7. Let prototype be OrdinaryObjectCreate(%GeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
             agent,
             try realm.intrinsics.@"%GeneratorPrototype%"(),
@@ -1319,7 +1319,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         // 4. Perform SetFunctionName(F, name).
         try setFunctionName(function, PropertyKey.from(name), null);
 
-        // 5. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
+        // 5. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
             agent,
             try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
@@ -1360,7 +1360,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         // 3. Perform SetFunctionName(F, "default").
         try setFunctionName(function, PropertyKey.from("default"), null);
 
-        // 4. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
+        // 4. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
             agent,
             try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
@@ -1429,7 +1429,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         // 9. Perform SetFunctionName(closure, name).
         try setFunctionName(closure, PropertyKey.from(name), null);
 
-        // 10. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
+        // 10. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
             agent,
             try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
@@ -1484,7 +1484,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         // 6. Perform SetFunctionName(closure, name).
         try setFunctionName(closure, PropertyKey.from(name), null);
 
-        // 7. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorFunction.prototype.prototype%).
+        // 7. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
         const prototype = try ordinaryObjectCreate(
             agent,
             try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),

@@ -415,7 +415,7 @@ fn evaluateGeneratorBody(
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
     try functionDeclarationInstantiation(agent, function, arguments_list);
 
-    // 2. Let G be ? OrdinaryCreateFromConstructor(functionObject, "%GeneratorFunction.prototype.prototype%",
+    // 2. Let G be ? OrdinaryCreateFromConstructor(functionObject, "%GeneratorPrototype%",
     //    « [[GeneratorState]], [[GeneratorContext]], [[GeneratorBrand]] »).
     const generator = try ordinaryCreateFromConstructor(
         builtins.Generator,
@@ -449,8 +449,9 @@ fn evaluateAsyncGeneratorBody(
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
     try functionDeclarationInstantiation(agent, function, arguments_list);
 
-    // 2. Let generator be ? OrdinaryCreateFromConstructor(functionObject, "%AsyncGeneratorFunction.prototype.prototype%",
-    //    « [[AsyncGeneratorState]], [[AsyncGeneratorContext]], [[AsyncGeneratorQueue]], [[GeneratorBrand]] »).
+    // 2. Let generator be ? OrdinaryCreateFromConstructor(functionObject,
+    //    "%AsyncGeneratorPrototype%", « [[AsyncGeneratorState]], [[AsyncGeneratorContext]],
+    //    [[AsyncGeneratorQueue]], [[GeneratorBrand]] »).
     const generator = try ordinaryCreateFromConstructor(
         builtins.AsyncGenerator,
         agent,
