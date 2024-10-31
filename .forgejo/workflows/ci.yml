@@ -177,11 +177,9 @@ jobs:
           zig fmt --check .
       - name: Check for unused imports
         run: |
-          git clone https://github.com/tusharsadhwani/zigimports
-          cd zigimports
-          zig build --release=safe
-          cd ..
-          ./zigimports/zig-out/bin/zigimports .
+          curl -o zigimports https://github.com/tusharsadhwani/zigimports/releases/download/v0.1.0/zigimports-$(uname -m)-linux
+          chmod +x zigimports
+          ./zigimports .
 
   test:
     runs-on: meow
