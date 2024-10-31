@@ -132,7 +132,7 @@ pub fn globalObjectProperties(realm: *Realm) [num_properties]GlobalObjectPropert
         .{ "EvalError", .{ .lazy_intrinsic = Realm.Intrinsics.@"%EvalError%" } },
 
         // 19.3.12 FinalizationRegistry ( . . . )
-        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-finnalization-registry
+        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-finalization-registry
         .{ "FinalizationRegistry", .{ .lazy_intrinsic = Realm.Intrinsics.@"%FinalizationRegistry%" } },
 
         // 2.1 Float16Array ( . . . )
