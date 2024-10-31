@@ -320,17 +320,16 @@ pub fn resolvePlural(plural_rules_object: *const PluralRules, n: Number) struct 
         return .{ .plural_category = .other };
     }
 
-    // 2. Let locale be pluralRules.[[Locale]].
+    // TODO: 2. Let res be FormatNumericToString(pluralRules, ℝ(n)).
+    // TODO: 3. Let s be res.[[FormattedString]].
+
+    // 4. Let locale be pluralRules.[[Locale]].
     const locale = plural_rules_object.fields.locale;
 
-    // 3. Let type be pluralRules.[[Type]].
+    // 5. Let type be pluralRules.[[Type]].
     const @"type" = plural_rules_object.fields.type;
 
-    // TODO: 4. Let res be FormatNumericToString(pluralRules, ℝ(n)).
-    // TODO: 5. Let s be res.[[FormattedString]].
-
-    // 6. Let operands be GetOperands(s).
-    // 7. Let p be PluralRuleSelect(locale, type, n, operands).
+    // 6. Let p be PluralRuleSelect(locale, type, s).
     const data_provider = icu4zig.DataProvider.init();
     defer data_provider.deinit();
     const plural_rules = icu4zig.PluralRules.init(data_provider, locale, switch (@"type") {
@@ -343,6 +342,6 @@ pub fn resolvePlural(plural_rules_object: *const PluralRules, n: Number) struct 
         .f64 => |value| .{ .f64 = value },
     }) catch unreachable;
 
-    // 8. Return the Record { [[PluralCategory]]: p, [[FormattedString]]: s }.
+    // 7. Return the Record { [[PluralCategory]]: p, [[FormattedString]]: s }.
     return .{ .plural_category = plural_category };
 }
