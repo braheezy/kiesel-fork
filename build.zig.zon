@@ -41,8 +41,8 @@
             .hash = "122020dcea6890882c8abe90b9e3ecf1af54b8a60ce1295c4e92d40fffcae3158e7d",
         },
         .stackinfo = .{
-            .url = "https://codeberg.org/linusg/zig-stackinfo/archive/9d02cd3077250fe7b0cbaef9eafd5c7e40c84b89.tar.gz",
-            .hash = "12207b3a0abfdf208a6f456d31f3f03054dda60db0d8e88065aee202a3195f8b00e0",
+            .url = "https://codeberg.org/linusg/zig-stackinfo/archive/ce87f2e0190e6dc6f3266519783b76eec4923f26.tar.gz",
+            .hash = "122011adf14a4d9690f521665bb3623ef6a063fc409ef6dbea9eafe0442b2e500d1c",
         },
         .unicode_id = .{
             .url = "https://codeberg.org/injuly/unicode-id/archive/10e8dfae849b3e550529de663f71ae8e49e5bde8.tar.gz",
