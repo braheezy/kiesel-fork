@@ -23,8 +23,8 @@
             .lazy = true,
         },
         .libgc = .{
-            .url = "https://github.com/ivmai/bdwgc/archive/57ccbcc8a0514c001fb5e37ee3aab1ebc890672d.tar.gz",
-            .hash = "1220d2af5a9270ad31857b2dc69a911427d3ee89826966cee19cae42f481494d8496",
+            .url = "https://github.com/ivmai/bdwgc/archive/462a6cd30b5d295d03b248a2aba331dcf67c8048.tar.gz",
+            .hash = "12208859e00e65129fd29c0142fed9a532e6083f63b62f82746e809c71a8224ec30d",
         },
         .libregexp = .{
             .url = "https://codeberg.org/linusg/zig-build-libregexp/archive/acd500652463001898de28e08c4587f7076419a2.tar.gz",
