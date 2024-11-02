@@ -229,20 +229,24 @@ pub fn createDateTimeFormat(
     //     a. Let timeZoneIdentifierRecord be GetAvailableNamedTimeZoneIdentifier(timeZone).
     //     b. If timeZoneIdentifierRecord is empty, throw a RangeError exception.
     //     c. Set timeZone to timeZoneIdentifierRecord.[[PrimaryIdentifier]].
-    if (icu4zig.CustomTimeZone.fromIanaId(data_provider, time_zone_string)) |custom_time_zone| {
-        time_zone_string = time_zone_id_mapper.normalizeIana(
-            agent.gc_allocator,
-            time_zone_string,
-        ) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.InvalidId => unreachable,
-        };
-        custom_time_zone.deinit();
-    } else |_| if (icu4zig.CustomTimeZone.fromOffset(time_zone_string)) |custom_time_zone| {
+    var time_zone_info = icu4zig.TimeZoneInfo.unknown();
+    defer time_zone_info.deinit();
+    if (time_zone_info.setOffsetStr(time_zone_string)) |_| {
         // TODO: Normalize time zone offset string
-        custom_time_zone.deinit();
-    } else |_| {
-        return agent.throwException(.range_error, "Invalid time zone '{s}'", .{time_zone_string});
+    } else |_| if (time_zone_id_mapper.normalizeIana(
+        agent.gc_allocator,
+        time_zone_string,
+    )) |normalized| {
+        time_zone_string = normalized;
+    } else |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.InvalidId => {
+            return agent.throwException(
+                .range_error,
+                "Invalid time zone '{s}'",
+                .{time_zone_string},
+            );
+        },
     }
 
     // 31. Set dateTimeFormat.[[TimeZone]] to timeZone.
@@ -796,6 +800,9 @@ fn formatDateTimeImpl(
     const data_provider = icu4zig.DataProvider.init();
     defer data_provider.deinit();
 
+    const time_zone_id_mapper = icu4zig.TimeZoneIdMapper.init(data_provider);
+    defer time_zone_id_mapper.deinit();
+
     const calendar = icu4zig.Calendar.init(data_provider, date_time_format.fields.calendar);
     defer calendar.deinit();
 
@@ -811,13 +818,17 @@ fn formatDateTimeImpl(
     );
     defer date_time.deinit();
 
-    const time_zone = icu4zig.CustomTimeZone.fromIanaId(
-        data_provider,
+    var time_zone_info = icu4zig.TimeZoneInfo.unknown();
+    defer time_zone_info.deinit();
+    // TODO: We should probably set this according to the actual date, omitting it results in
+    //       DateTimeZoneInfoMissingFieldsError so we hardcode standard time for now.
+    time_zone_info.setStandardTime();
+    time_zone_info.setOffsetStr(
         date_time_format.fields.time_zone.data.slice.ascii,
-    ) catch icu4zig.CustomTimeZone.fromOffset(
+    ) catch time_zone_info.setIanaTimeZoneId(
+        time_zone_id_mapper,
         date_time_format.fields.time_zone.data.slice.ascii,
-    ) catch unreachable;
-    defer time_zone.deinit();
+    );
 
     // Approximation, ICU4X API doesn't match ECMA-402
     const date_style = date_time_format.fields.date_style orelse .short;
@@ -841,7 +852,7 @@ fn formatDateTimeImpl(
     const result = try zoned_date_time_formatter.format(
         allocator,
         date_time,
-        time_zone,
+        time_zone_info,
     );
 
     return result;

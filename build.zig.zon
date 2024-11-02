@@ -11,8 +11,8 @@
             .hash = "1220411a8c46d95bbf3b6e2059854bcb3c5159d428814099df5294232b9980517e9c",
         },
         .icu4zig = .{
-            .url = "https://codeberg.org/linusg/icu4zig/archive/ef5cc1afd51dc9bf4bcfffe655fa184d7ec4ddbd.tar.gz",
-            .hash = "1220579da2ef5267aca4082ae41d02d303314f6c1acbd5cb3e6eba00e3dd6e1ee0df",
+            .url = "https://codeberg.org/linusg/icu4zig/archive/943b4fed73bb5a9eb747f52421afde5737ec9d04.tar.gz",
+            .hash = "122012b29da3cfbe48e169dffb134d9a6e334e80e530930cc8deec72a7d2dea068e8",
             .lazy = true,
         },
         .kiesel_runtime = .{
