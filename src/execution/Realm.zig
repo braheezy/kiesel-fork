@@ -179,8 +179,8 @@ fn setDefaultGlobalBindings(self: *Realm) Agent.Error!void {
     // 2. For each property of the Global Object specified in clause 19, do
     for (globalObjectProperties(self)) |property| {
         // a. Let name be the String value of the property name.
-        const name = property[0];
-        const property_key = PropertyKey.from(try String.fromAscii(self.agent.gc_allocator, name));
+        const name = try String.fromAscii(self.agent.gc_allocator, property[0]);
+        const property_key = PropertyKey.from(name);
 
         // b. Let desc be the fully populated data Property Descriptor for the property, containing
         //    the specified attributes for the property. For properties listed in 19.2, 19.3, or

@@ -8,6 +8,7 @@ const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
+const StringHashMap = types.StringHashMap;
 const Symbol = types.Symbol;
 const Value = types.Value;
 
@@ -96,7 +97,7 @@ const LazyIntrinsic = struct {
 
 // TODO: Shapes, linear storage for arrays, etc. Gotta start somewhere :^)
 hash_map: PropertyKeyArrayHashMap(Entry),
-lazy_intrinsics: std.StringHashMap(LazyIntrinsic),
+lazy_intrinsics: StringHashMap(LazyIntrinsic),
 
 pub fn init(allocator: std.mem.Allocator) PropertyStorage {
     return .{
@@ -110,9 +111,8 @@ pub fn has(self: PropertyStorage, property_key: PropertyKey) bool {
 }
 
 pub fn get(self: PropertyStorage, property_key: PropertyKey) ?PropertyDescriptor {
-    if (property_key == .string and property_key.string.data.slice == .ascii) {
-        const name = property_key.string.data.slice.ascii;
-        std.debug.assert(!self.lazy_intrinsics.contains(name));
+    if (property_key == .string) {
+        std.debug.assert(!self.lazy_intrinsics.contains(property_key.string));
     }
     if (self.hash_map.get(property_key)) |entry| {
         return entry.toPropertyDescriptor();
@@ -125,12 +125,11 @@ pub fn getCreateIntrinsicIfNeeded(
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!?PropertyDescriptor {
     if (self.hash_map.getPtr(property_key)) |entry| {
-        if (property_key == .string and property_key.string.data.slice == .ascii) {
-            const name = property_key.string.data.slice.ascii;
-            if (self.lazy_intrinsics.get(name)) |lazy_intrinsic| {
+        if (property_key == .string) {
+            if (self.lazy_intrinsics.get(property_key.string)) |lazy_intrinsic| {
                 const object = try lazy_intrinsic.lazyIntrinsicFn(&lazy_intrinsic.realm.intrinsics);
                 entry.data.value = Value.from(object);
-                _ = self.lazy_intrinsics.remove(name);
+                _ = self.lazy_intrinsics.remove(property_key.string);
             }
         }
         return entry.toPropertyDescriptor();
@@ -145,18 +144,16 @@ pub fn set(
 ) std.mem.Allocator.Error!void {
     const entry = Entry.fromPropertyDescriptor(property_descriptor);
     try self.hash_map.put(property_key, entry);
-    if (property_key == .string and property_key.string.data.slice == .ascii) {
-        const name = property_key.string.data.slice.ascii;
-        _ = self.lazy_intrinsics.remove(name);
+    if (property_key == .string) {
+        _ = self.lazy_intrinsics.remove(property_key.string);
     }
 }
 
 pub fn remove(self: *PropertyStorage, property_key: PropertyKey) void {
     const removed = self.hash_map.orderedRemove(property_key);
     std.debug.assert(removed);
-    if (property_key == .string and property_key.string.data.slice == .ascii) {
-        const name = property_key.string.data.slice.ascii;
-        _ = self.lazy_intrinsics.remove(name);
+    if (property_key == .string) {
+        _ = self.lazy_intrinsics.remove(property_key.string);
     }
 }
 
