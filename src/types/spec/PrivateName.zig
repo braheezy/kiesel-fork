@@ -38,5 +38,5 @@ pub fn PrivateNameArrayHashMap(comptime V: type) type {
         pub fn eql(_: @This(), a: PrivateName, b: PrivateName, _: usize) bool {
             return a.eql(b);
         }
-    }, false);
+    }, true);
 }

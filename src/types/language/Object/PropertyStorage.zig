@@ -180,5 +180,5 @@ pub fn PropertyKeyArrayHashMap(comptime V: type) type {
         pub fn eql(self: @This(), a: PropertyKey, b: PropertyKey, _: usize) bool {
             return PropertyKeyArrayHashMapContext.eql(self, a, b);
         }
-    }, false);
+    }, true);
 }

@@ -622,7 +622,7 @@ pub fn StringArrayHashMap(comptime V: type) type {
         pub fn eql(_: @This(), a: String, b: String, _: usize) bool {
             return a.eql(b);
         }
-    }, false);
+    }, true);
 }
 
 test "format" {

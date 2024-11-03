@@ -2295,7 +2295,7 @@ pub fn ValueArrayHashMap(comptime V: type, comptime eqlFn: fn (Value, Value) boo
         pub fn eql(_: @This(), a: Value, b: Value, _: usize) bool {
             return eqlFn(a, b);
         }
-    }, false);
+    }, true);
 }
 
 test format {
