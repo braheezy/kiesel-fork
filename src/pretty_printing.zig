@@ -824,21 +824,13 @@ fn prettyPrintPrimitiveWrapper(
     const tty_config = state.tty_config;
 
     const T = std.meta.Child(@TypeOf(object));
-    const name = blk: {
-        if (T == builtins.BigInt) break :blk "BigInt";
-        if (T == builtins.Boolean) break :blk "Boolean";
-        if (T == builtins.Number) break :blk "Number";
-        if (T == builtins.String) break :blk "String";
-        if (T == builtins.Symbol) break :blk "Symbol";
-        @panic("Unhandled object type in prettyPrintPrimitiveWrapper()");
-    };
-    const value = blk: {
-        if (T == builtins.BigInt) break :blk Value.from(object.fields.big_int_data);
-        if (T == builtins.Boolean) break :blk Value.from(object.fields.boolean_data);
-        if (T == builtins.Number) break :blk Value.from(object.fields.number_data);
-        if (T == builtins.String) break :blk Value.from(object.fields.string_data);
-        if (T == builtins.Symbol) break :blk Value.from(object.fields.symbol_data);
-        @panic("Unhandled object type in prettyPrintPrimitiveWrapper()");
+    const name, const value = switch (T) {
+        builtins.BigInt => .{ "BigInt", Value.from(object.fields.big_int_data) },
+        builtins.Boolean => .{ "Boolean", Value.from(object.fields.boolean_data) },
+        builtins.Number => .{ "Number", Value.from(object.fields.number_data) },
+        builtins.String => .{ "String", Value.from(object.fields.string_data) },
+        builtins.Symbol => .{ "Symbol", Value.from(object.fields.symbol_data) },
+        else => @panic("Unhandled object type in prettyPrintPrimitiveWrapper()"),
     };
 
     try tty_config.setColor(writer, .white);
