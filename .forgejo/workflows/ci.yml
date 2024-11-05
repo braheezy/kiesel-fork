@@ -52,7 +52,7 @@ jobs:
       - name: Build kiesel-linux-mips64
         run: |
           # TODO: Intl is disabled for now as build.crab doesn't translate the target properly
-          zig build -Dtarget=mips64-linux-musl -Doptimize=ReleaseSafe -Denable-intl=false
+          zig build -Dtarget=mips64-linux-muslabi64 -Doptimize=ReleaseSafe -Denable-intl=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-mips64
       - name: Build kiesel-linux-powerpc
         run: |
