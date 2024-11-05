@@ -25,7 +25,7 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// 26.1.2 Properties of the WeakRef Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-weak-ref-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "WeakRef",
@@ -34,7 +34,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 26.1.2.1 WeakRef.prototype
         // https://tc39.es/ecma262/#sec-weak-ref.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -47,7 +47,7 @@ pub const constructor = struct {
 
     /// 26.1.1.1 WeakRef ( target )
     /// https://tc39.es/ecma262/#sec-weak-ref-target
-    fn impl(agent: *Agent, arguments: Arguments, maybe_new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, maybe_new_target: ?*Object) Agent.Error!Value {
         const target = arguments.get(0);
 
         const new_target = maybe_new_target orelse {
@@ -105,13 +105,13 @@ pub const constructor = struct {
 /// 26.1.3 Properties of the WeakRef Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-weak-ref-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "deref", deref, 0, realm);
 
         // 26.1.3.1 WeakRef.prototype.constructor

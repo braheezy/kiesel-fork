@@ -8,14 +8,14 @@ allocator: std.mem.Allocator,
 segments: std.ArrayList(Segment),
 
 pub const Segment = union(enum) {
-    string: String,
+    string: *const String,
     char: u8,
     code_unit: u16,
     code_point: u21,
 
     pub fn isAscii(self: Segment) bool {
         return switch (self) {
-            .string => |string| string.data.slice == .ascii,
+            .string => |string| string.slice == .ascii,
             .char => true,
             .code_unit => |code_unit| code_unit <= 0x7F,
             .code_point => |code_point| code_point <= 0x7F,
@@ -51,11 +51,11 @@ pub fn appendSegmentAssumeCapacity(self: *Builder, segment: Segment) void {
     self.segments.appendAssumeCapacity(segment);
 }
 
-pub fn appendString(self: *Builder, string: String) std.mem.Allocator.Error!void {
+pub fn appendString(self: *Builder, string: *const String) std.mem.Allocator.Error!void {
     try self.segments.append(.{ .string = string });
 }
 
-pub fn appendStringAssumeCapacity(self: *Builder, string: String) void {
+pub fn appendStringAssumeCapacity(self: *Builder, string: *const String) void {
     self.segments.appendAssumeCapacity(.{ .string = string });
 }
 
@@ -83,14 +83,14 @@ pub fn appendCodePointAssumeCapacity(self: *Builder, code_point: u21) void {
     self.segments.appendAssumeCapacity(.{ .code_point = code_point });
 }
 
-pub fn build(self: Builder) std.mem.Allocator.Error!String {
+pub fn build(self: Builder) std.mem.Allocator.Error!*const String {
     const is_ascii = for (self.segments.items) |segment| {
         if (!segment.isAscii()) break false;
     } else true;
     if (is_ascii) {
         var result = std.ArrayList(u8).init(self.allocator);
         for (self.segments.items) |segment| switch (segment) {
-            .string => |string| switch (string.data.slice) {
+            .string => |string| switch (string.slice) {
                 .ascii => |ascii| try result.appendSlice(ascii),
                 .utf16 => unreachable,
             },
@@ -102,7 +102,7 @@ pub fn build(self: Builder) std.mem.Allocator.Error!String {
     } else {
         var result = std.ArrayList(u16).init(self.allocator);
         for (self.segments.items) |segment| switch (segment) {
-            .string => |string| switch (string.data.slice) {
+            .string => |string| switch (string.slice) {
                 .ascii => |ascii| for (ascii) |c| try result.append(c),
                 .utf16 => |utf16| try result.appendSlice(utf16),
             },

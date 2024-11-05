@@ -27,7 +27,7 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// 24.4.2 Properties of the WeakSet Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-weakset-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "WeakSet",
@@ -36,7 +36,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 24.4.2.1 WeakSet.prototype
         // https://tc39.es/ecma262/#sec-weakset.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -49,7 +49,7 @@ pub const constructor = struct {
 
     /// 24.4.1.1 WeakSet ( [ iterable ] )
     /// https://tc39.es/ecma262/#sec-weak-ref-target
-    fn impl(agent: *Agent, arguments: Arguments, maybe_new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, maybe_new_target: ?*Object) Agent.Error!Value {
         const iterable = arguments.get(0);
 
         const new_target = maybe_new_target orelse {
@@ -111,13 +111,13 @@ pub const constructor = struct {
 /// 24.4.3 Properties of the WeakSet Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-weakset-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "add", add, 1, realm);
         try defineBuiltinFunction(object, "delete", delete, 1, realm);
         try defineBuiltinFunction(object, "has", has, 1, realm);

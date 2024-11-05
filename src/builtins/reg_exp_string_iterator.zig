@@ -27,11 +27,11 @@ const regExpExec = builtins.regExpExec;
 /// https://tc39.es/ecma262/#sec-createregexpstringiterator
 pub fn createRegExpStringIterator(
     agent: *Agent,
-    reg_exp: Object,
-    string: String,
+    reg_exp: *Object,
+    string: *const String,
     global: bool,
     full_unicode: bool,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. Let closure be a new Abstract Closure with no parameters that captures R, S, global, and
@@ -55,13 +55,13 @@ pub fn createRegExpStringIterator(
 /// 22.2.9.2 The %RegExpStringIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%regexpstringiteratorprototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 0, realm);
 
         // 22.2.9.2.2 %RegExpStringIteratorPrototype% [ %Symbol.toStringTag% ]
@@ -143,8 +143,8 @@ pub const prototype = struct {
 pub const RegExpStringIterator = MakeObject(.{
     .Fields = union(enum) {
         state: struct {
-            reg_exp: Object,
-            string: String,
+            reg_exp: *Object,
+            string: *const String,
             global: bool,
             full_unicode: bool,
         },

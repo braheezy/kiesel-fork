@@ -12,7 +12,7 @@ const PrivateName = @This();
 /// As symbols already have uniqueness via pointers, as well as a description string, private
 /// names can easily be implemented using symbols.
 /// This should be considered an implementation detail and not relied upon for anything else.
-symbol: Symbol,
+symbol: *const Symbol,
 
 pub fn format(
     self: PrivateName,
@@ -22,17 +22,17 @@ pub fn format(
 ) @TypeOf(writer).Error!void {
     _ = fmt;
     _ = options;
-    try writer.print("{}", .{self.symbol.data.description.?});
+    try writer.print("{}", .{self.symbol.description.?});
 }
 
 pub fn eql(a: PrivateName, b: PrivateName) bool {
-    return a.symbol.sameValue(b.symbol);
+    return a.symbol == b.symbol;
 }
 
 pub fn PrivateNameArrayHashMap(comptime V: type) type {
     return std.ArrayHashMap(PrivateName, V, struct {
         pub fn hash(_: @This(), key: PrivateName) u32 {
-            return std.array_hash_map.getAutoHashFn(*Symbol.Data, void)({}, key.symbol.data);
+            return std.array_hash_map.getAutoHashFn(*const Symbol, void)({}, key.symbol);
         }
 
         pub fn eql(_: @This(), a: PrivateName, b: PrivateName, _: usize) bool {

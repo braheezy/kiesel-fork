@@ -27,7 +27,7 @@ pub fn createMapIterator(
     agent: *Agent,
     map_value: Value,
     comptime kind: Object.PropertyKind,
-) Agent.Error!Object {
+) Agent.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. Perform ? RequireInternalSlot(map, [[MapData]]).
@@ -46,13 +46,13 @@ pub fn createMapIterator(
 /// 24.1.5.2 The %MapIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%mapiteratorprototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 0, realm);
 
         // 23.1.5.2.2 %ArrayIteratorPrototype% [ %Symbol.toStringTag% ]

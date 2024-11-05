@@ -7,7 +7,7 @@ const Object = types.Object;
 const SafePointer = types.SafePointer;
 
 /// [[Callback]]
-callback: Object,
+callback: *Object,
 
 /// [[HostDefined]]
 host_defined: SafePointer,

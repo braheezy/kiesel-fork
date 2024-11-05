@@ -25,7 +25,7 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// 21.1.2 Properties of the Number Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-number-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "Number",
@@ -34,7 +34,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 21.1.2.1 Number.EPSILON
         // https://tc39.es/ecma262/#sec-number.epsilon
         try defineBuiltinProperty(object, "EPSILON", PropertyDescriptor{
@@ -136,7 +136,7 @@ pub const constructor = struct {
 
     /// 21.1.1.1 Number ( value )
     /// https://tc39.es/ecma262/#sec-number-constructor-number-value
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const value = arguments.get(0);
 
         const n = blk: {
@@ -242,7 +242,7 @@ pub const constructor = struct {
 /// 21.1.3 Properties of the Number Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-number-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return Number.create(realm.agent, .{
             .fields = .{
                 .number_data = types.Number.from(0),
@@ -251,7 +251,7 @@ pub const prototype = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "toExponential", toExponential, 1, realm);
         try defineBuiltinFunction(object, "toFixed", toFixed, 1, realm);
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);

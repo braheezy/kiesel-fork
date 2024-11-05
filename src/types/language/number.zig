@@ -593,7 +593,7 @@ pub const Number = union(enum) {
         self: Number,
         allocator: std.mem.Allocator,
         radix: u8,
-    ) std.mem.Allocator.Error!String {
+    ) std.mem.Allocator.Error!*const String {
         // 1. If x is NaN, return "NaN".
         if (self.isNan()) return String.fromLiteral("NaN");
 

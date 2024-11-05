@@ -31,12 +31,12 @@ const Agent = @This();
 gc_allocator: std.mem.Allocator,
 options: Options,
 pre_allocated: struct {
-    zero: BigInt,
-    one: BigInt,
+    zero: *const BigInt,
+    one: *const BigInt,
 },
 exception: ?Value = null,
 well_known_symbols: WellKnownSymbols,
-global_symbol_registry: StringHashMap(Symbol),
+global_symbol_registry: StringHashMap(*const Symbol),
 host_hooks: HostHooks,
 execution_context_stack: std.ArrayList(ExecutionContext),
 queued_jobs: std.ArrayList(QueuedJob),
@@ -91,8 +91,8 @@ pub fn init(gc_allocator: std.mem.Allocator, options: Options) std.mem.Allocator
 }
 
 pub fn deinit(self: *Agent) void {
-    self.pre_allocated.zero.deinit(self.gc_allocator);
-    self.pre_allocated.one.deinit(self.gc_allocator);
+    @constCast(self.pre_allocated.zero).deinit(self.gc_allocator);
+    @constCast(self.pre_allocated.one).deinit(self.gc_allocator);
     self.well_known_symbols.deinit(self.gc_allocator);
     self.global_symbol_registry.deinit();
     self.execution_context_stack.deinit();
@@ -154,7 +154,7 @@ pub fn createException(
     comptime exception_type: ExceptionType,
     comptime fmt: []const u8,
     args: anytype,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = self.currentRealm();
     const constructor = try @field(
         Realm.Intrinsics,
@@ -213,7 +213,7 @@ pub fn currentRealm(self: Agent) *Realm {
 }
 
 /// https://tc39.es/ecma262/#active-function-object
-pub fn activeFunctionObject(self: Agent) Object {
+pub fn activeFunctionObject(self: Agent) *Object {
     // The value of the Function component of the running execution context is also called the
     // active function object.
     return self.runningExecutionContext().function.?;
@@ -240,7 +240,7 @@ pub fn getActiveScriptOrModule(self: Agent) ?ExecutionContext.ScriptOrModule {
 /// https://tc39.es/ecma262/#sec-resolvebinding
 pub fn resolveBinding(
     self: *Agent,
-    name: String,
+    name: *const String,
     maybe_env: ?Environment,
     strict: bool,
     maybe_lookup_cache_entry: ?*?Environment.LookupCacheEntry,
@@ -298,7 +298,7 @@ pub fn resolveThisBinding(self: *Agent) Error!Value {
 
 /// 9.4.5 GetNewTarget ( )
 /// https://tc39.es/ecma262/#sec-getnewtarget
-pub fn getNewTarget(self: *Agent) ?Object {
+pub fn getNewTarget(self: *Agent) ?*Object {
     // 1. Let envRec be GetThisEnvironment().
     const env = self.getThisEnvironment();
 
@@ -311,7 +311,7 @@ pub fn getNewTarget(self: *Agent) ?Object {
 
 /// 9.4.6 GetGlobalObject ( )
 /// https://tc39.es/ecma262/#sec-getglobalobject
-pub fn getGlobalObject(self: Agent) Object {
+pub fn getGlobalObject(self: Agent) *Object {
     // 1. Let currentRealm be the current Realm Record.
     const current_realm = self.currentRealm();
 
@@ -329,5 +329,5 @@ test "well_known_symbols" {
     var agent = try init(std.testing.allocator, .{});
     defer agent.deinit();
     const unscopables = agent.well_known_symbols.@"%Symbol.unscopables%";
-    try std.testing.expectEqualStrings(unscopables.data.description.?.data.slice.ascii, "Symbol.unscopables");
+    try std.testing.expectEqualStrings(unscopables.description.?.slice.ascii, "Symbol.unscopables");
 }

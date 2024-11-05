@@ -28,9 +28,9 @@ const typedArrayLength = builtins.typedArrayLength;
 /// https://tc39.es/ecma262/#sec-createarrayiterator
 pub fn createArrayIterator(
     agent: *Agent,
-    array: Object,
+    array: *Object,
     comptime kind: Object.PropertyKind,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. Let closure be a new Abstract Closure with no parameters that captures kind and array and
@@ -48,13 +48,13 @@ pub fn createArrayIterator(
 /// 23.1.5.2 The %ArrayIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%arrayiteratorprototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 0, realm);
 
         // 23.1.5.2.2 %ArrayIteratorPrototype% [ %Symbol.toStringTag% ]
@@ -161,7 +161,7 @@ pub const prototype = struct {
 pub const ArrayIterator = MakeObject(.{
     .Fields = union(enum) {
         state: struct {
-            array: Object,
+            array: *Object,
             kind: Object.PropertyKind,
             index: u53,
         },

@@ -278,7 +278,7 @@ fn utf8StringValue(
     text: []const u8,
 ) std.mem.Allocator.Error!?[]const u8 {
     const string = try ast.stringValueImpl(allocator, text);
-    return switch (string.data.slice) {
+    return switch (string.slice) {
         .ascii => |ascii| ascii,
         .utf16 => |utf16| std.unicode.utf16LeToUtf8Alloc(
             allocator,

@@ -34,7 +34,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// 16.2 Properties of the Intl.PluralRules Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "PluralRules",
@@ -43,7 +43,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 16.2.1 Intl.PluralRules.prototype
         // https://tc39.es/ecma402/#sec-intl.pluralrules.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -56,7 +56,7 @@ pub const constructor = struct {
 
     /// 16.1.1 Intl.PluralRules ( [ locales [ , options ] ] )
     /// https://tc39.es/ecma402/#sec-intl.pluralrules
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const locales = arguments.get(0);
         const options_value = arguments.get(1);
 
@@ -133,7 +133,7 @@ pub const constructor = struct {
             .{ "cardinal", .cardinal },
             .{ "ordinal", .ordinal },
         });
-        plural_rules.as(PluralRules).fields.type = type_map.get(type_.data.slice.ascii).?;
+        plural_rules.as(PluralRules).fields.type = type_map.get(type_.slice.ascii).?;
 
         // TODO: 12. Perform ? SetNumberFormatDigitOptions(pluralRules, options, 0, 3, "standard").
 
@@ -145,13 +145,13 @@ pub const constructor = struct {
 /// 16.3 Properties of the Intl.PluralRules Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-pluralrules-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "select", select, 1, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
@@ -291,7 +291,7 @@ pub const PluralRules = MakeObject(.{
         type: Type,
 
         pub const ResolvedOptions = struct {
-            type: String,
+            type: *const String,
         };
 
         pub fn resolvedOptions(self: @This()) ResolvedOptions {

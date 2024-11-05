@@ -26,13 +26,13 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 /// 27.5.1 The %GeneratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-properties-of-generator-prototype
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 1, realm);
         try defineBuiltinFunction(object, "return", @"return", 1, realm);
         try defineBuiltinFunction(object, "throw", throw, 1, realm);
@@ -115,7 +115,7 @@ pub const Generator = MakeObject(.{
 
         // Non-standard
         evaluation_state: struct {
-            closure: *const fn (*Agent, *builtins.ECMAScriptFunction) Agent.Error!Object,
+            closure: *const fn (*Agent, *builtins.ECMAScriptFunction) Agent.Error!*Object,
             generator_function: *builtins.ECMAScriptFunction,
             suspension_result: ?Value = null,
         },
@@ -145,7 +145,7 @@ pub fn generatorStart(
         fn func(
             agent_: *Agent,
             generator_function_: *builtins.ECMAScriptFunction,
-        ) Agent.Error!Object {
+        ) Agent.Error!*Object {
             // a. Let acGenContext be the running execution context.
             const closure_generator_context = agent_.runningExecutionContext();
 
@@ -241,7 +241,7 @@ pub fn generatorValidate(agent: *Agent, generator_value: Value) Agent.Error!Gene
 
 /// 27.5.3.3 GeneratorResume ( generator, value, generatorBrand )
 /// https://tc39.es/ecma262/#sec-generatorresume
-pub fn generatorResume(agent: *Agent, generator_value: Value, value: Value) Agent.Error!Object {
+pub fn generatorResume(agent: *Agent, generator_value: Value, value: Value) Agent.Error!*Object {
     // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
     const state = try generatorValidate(agent, generator_value);
 
@@ -295,7 +295,7 @@ pub fn generatorResumeAbrupt(
     agent: *Agent,
     generator_value: Value,
     abrupt_completion: Completion,
-) Agent.Error!Object {
+) Agent.Error!*Object {
     // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
     var state = try generatorValidate(agent, generator_value);
 
@@ -393,7 +393,7 @@ pub fn getGeneratorKind(agent: *Agent) GeneratorKind {
 
 /// 27.5.3.6 GeneratorYield ( iteratorResult )
 /// https://tc39.es/ecma262/#sec-generatoryield
-pub fn generatorYield(agent: *Agent, iterator_result: Object) Agent.Error!Completion {
+pub fn generatorYield(agent: *Agent, iterator_result: *Object) Agent.Error!Completion {
     // 1. Let genContext be the running execution context.
     const generator_context = agent.runningExecutionContext();
 

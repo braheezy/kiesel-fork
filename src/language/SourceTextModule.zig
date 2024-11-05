@@ -53,7 +53,7 @@ realm: *Realm,
 environment: ?Environment,
 
 /// [[Namespace]]
-namespace: ?Object,
+namespace: ?*Object,
 
 /// [[ECMAScriptCode]]
 ecmascript_code: ast.Module,
@@ -62,7 +62,7 @@ ecmascript_code: ast.Module,
 context: ?ExecutionContext,
 
 /// [[ImportMeta]]
-import_meta: ?Object,
+import_meta: ?*Object,
 
 /// [[ImportEntries]]
 import_entries: std.ArrayList(ImportEntry),
@@ -92,7 +92,7 @@ dfs_index: ?usize,
 dfs_ancestor_index: ?usize,
 
 /// [[RequestedModules]]
-requested_modules: std.ArrayList(String),
+requested_modules: std.ArrayList(*const String),
 
 /// [[LoadedModules]]
 loaded_modules: StringHashMap(Module),
@@ -128,7 +128,7 @@ const Status = enum {
 /// https://tc39.es/ecma262/#importentry-record
 pub const ImportEntry = struct {
     /// [[ModuleRequest]]
-    module_request: String,
+    module_request: *const String,
 
     /// [[ImportName]]
     import_name: ?union(enum) {
@@ -146,7 +146,7 @@ pub const ExportEntry = struct {
     export_name: ?[]const u8,
 
     /// [[ModuleRequest]]
-    module_request: ?String,
+    module_request: ?*const String,
 
     /// [[ImportName]]
     import_name: ?union(enum) {
@@ -491,7 +491,7 @@ pub fn parse(
     const body = try Parser.parse(ast.Module, agent.gc_allocator, source_text, ctx);
 
     // 3. Let requestedModules be the ModuleRequests of body.
-    var requested_modules = std.ArrayList(String).init(agent.gc_allocator);
+    var requested_modules = std.ArrayList(*const String).init(agent.gc_allocator);
     {
         const tmp = try body.moduleRequests(agent.gc_allocator);
         defer agent.gc_allocator.free(tmp);

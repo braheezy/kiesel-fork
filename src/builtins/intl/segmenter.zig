@@ -34,7 +34,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// 18.2 Properties of the Intl.Segmenter Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-segmenter-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "Segmenter",
@@ -43,7 +43,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 18.2.1 Intl.Segmenter.prototype
         // https://tc39.es/ecma402/#sec-intl.segmenter.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -56,7 +56,7 @@ pub const constructor = struct {
 
     /// 18.1.1 Intl.Segmenter ( [ locales [ , options ] ] )
     /// https://tc39.es/ecma402/#sec-intl.segmenter
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const locales = arguments.get(0);
         const options_value = arguments.get(1);
 
@@ -130,7 +130,7 @@ pub const constructor = struct {
             .{ "word", .word },
             .{ "sentence", .sentence },
         });
-        segmenter.as(Segmenter).fields.segmenter_granularity = granularity_map.get(granularity.data.slice.ascii).?;
+        segmenter.as(Segmenter).fields.segmenter_granularity = granularity_map.get(granularity.slice.ascii).?;
 
         // 13. Return segmenter.
         return Value.from(segmenter);
@@ -140,13 +140,13 @@ pub const constructor = struct {
 /// 18.3 Properties of the Intl.Segmenter Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-segmenter-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "segment", segment, 1, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
@@ -229,7 +229,7 @@ pub const prototype = struct {
 pub const Segmenter = MakeObject(.{
     .Fields = struct {
         pub const ResolvedOptions = struct {
-            granularity: String,
+            granularity: *const String,
         };
 
         pub const SegmenterGranularity = enum {
@@ -275,22 +275,22 @@ const AnySegmenter = union(enum) {
         }
     };
 
-    fn segment(self: AnySegmenter, string: String) BreakIterator {
+    fn segment(self: AnySegmenter, string: *const String) BreakIterator {
         return switch (self) {
             .grapheme => |segmenter| .{
-                .grapheme = segmenter.segment(switch (string.data.slice) {
+                .grapheme = segmenter.segment(switch (string.slice) {
                     .ascii => |utf8| .{ .utf8 = utf8 },
                     .utf16 => |utf16| .{ .utf16 = utf16 },
                 }),
             },
             .word => |segmenter| .{
-                .word = segmenter.segment(switch (string.data.slice) {
+                .word = segmenter.segment(switch (string.slice) {
                     .ascii => |utf8| .{ .utf8 = utf8 },
                     .utf16 => |utf16| .{ .utf16 = utf16 },
                 }),
             },
             .sentence => |segmenter| .{
-                .sentence = segmenter.segment(switch (string.data.slice) {
+                .sentence = segmenter.segment(switch (string.slice) {
                     .ascii => |utf8| .{ .utf8 = utf8 },
                     .utf16 => |utf16| .{ .utf16 = utf16 },
                 }),
@@ -316,7 +316,7 @@ const Boundary = struct {
 /// https://tc39.es/ecma402/#sec-findboundary
 pub fn findBoundary(
     segmenter: *builtins.intl.Segmenter,
-    string: String,
+    string: *const String,
     start_index: usize,
     direction: enum { before, after },
 ) Boundary {
@@ -356,7 +356,7 @@ pub fn findBoundary(
 }
 
 fn findBoundaryBefore(
-    string: String,
+    string: *const String,
     start_index: usize,
     granularity: builtins.intl.Segmenter.Fields.SegmenterGranularity,
 ) ?Boundary {
@@ -385,7 +385,7 @@ fn findBoundaryBefore(
 }
 
 fn findBoundaryAfter(
-    string: String,
+    string: *const String,
     start_index: usize,
     granularity: builtins.intl.Segmenter.Fields.SegmenterGranularity,
 ) ?Boundary {

@@ -36,17 +36,17 @@ const sameValue = types.sameValue;
 /// https://tc39.es/ecma262/#sec-promisecapability-records
 pub const PromiseCapability = struct {
     /// [[Promise]]
-    promise: Object,
+    promise: *Object,
 
     /// [[Resolve]]
-    resolve: Object,
+    resolve: *Object,
 
     /// [[Reject]]
-    reject: Object,
+    reject: *Object,
 
     /// 27.2.1.1.1 IfAbruptRejectPromise ( value, capability )
     /// https://tc39.es/ecma262/#sec-ifabruptrejectpromise
-    pub fn rejectPromise(self: @This(), agent: *Agent, err: Agent.Error) Agent.Error!Object {
+    pub fn rejectPromise(self: @This(), agent: *Agent, err: Agent.Error) Agent.Error!*Object {
         // 1. Assert: value is a Completion Record.
         switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
@@ -83,8 +83,8 @@ const PromiseReaction = struct {
 };
 
 const ResolvingFunctions = struct {
-    resolve: Object,
-    reject: Object,
+    resolve: *Object,
+    reject: *Object,
 };
 
 /// 27.2.1.3 CreateResolvingFunctions ( promise )
@@ -130,7 +130,7 @@ pub fn createResolvingFunctions(
             already_resolved_.value = true;
 
             // 7. If SameValue(resolution, promise) is true, then
-            if (sameValue(resolution, Value.from(promise_.object()))) {
+            if (sameValue(resolution, Value.from(&promise_.object))) {
                 // a. Let selfResolutionError be a newly created TypeError object.
                 const self_resolution_error = try agent_.createException(
                     .type_error,
@@ -459,7 +459,7 @@ pub fn triggerPromiseReactions(
 
 /// 27.2.4.7.1 PromiseResolve ( C, x )
 /// https://tc39.es/ecma262/#sec-promise-resolve
-pub fn promiseResolve(agent: *Agent, constructor_: Object, x: Value) Agent.Error!Object {
+pub fn promiseResolve(agent: *Agent, constructor_: *Object, x: Value) Agent.Error!*Object {
     // 1. If IsPromise(x) is true, then
     if (x.isPromise()) {
         // a. Let xConstructor be ? Get(x, "constructor").
@@ -599,13 +599,13 @@ pub fn newPromiseReactionJob(
 pub fn newPromiseResolveThenableJob(
     agent: *Agent,
     promise_to_resolve: *Promise,
-    thenable: Object,
+    thenable: *Object,
     then: JobCallback,
 ) std.mem.Allocator.Error!struct { job: Job, realm: *Realm } {
     const Captures = struct {
         agent: *Agent,
         promise_to_resolve: *Promise,
-        thenable: Object,
+        thenable: *Object,
         then: JobCallback,
     };
     const captures = try agent.gc_allocator.create(Captures);
@@ -678,7 +678,7 @@ pub fn newPromiseResolveThenableJob(
 }
 
 /// 27.2.4.1.1 GetPromiseResolve ( promiseConstructor )
-fn getPromiseResolve(agent: *Agent, promise_constructor: Object) Agent.Error!Object {
+fn getPromiseResolve(agent: *Agent, promise_constructor: *Object) Agent.Error!*Object {
     // 1. Let promiseResolve be ? Get(promiseConstructor, "resolve").
     const promise_resolve = try promise_constructor.get(PropertyKey.from("resolve"));
 
@@ -700,9 +700,9 @@ const RemainingElements = struct {
 fn performPromiseAll(
     agent: *Agent,
     iterator: *Iterator,
-    constructor_: Object,
+    constructor_: *Object,
     result_capability: PromiseCapability,
-    promise_resolve: Object,
+    promise_resolve: *Object,
 ) Agent.Error!Value {
     // 1. Let values be a new empty List.
     var values = try agent.gc_allocator.create(std.ArrayList(Value));
@@ -868,9 +868,9 @@ fn performPromiseAll(
 fn performPromiseAllSettled(
     agent: *Agent,
     iterator: *Iterator,
-    constructor_: Object,
+    constructor_: *Object,
     result_capability: PromiseCapability,
-    promise_resolve: Object,
+    promise_resolve: *Object,
 ) Agent.Error!Value {
     // 1. Let values be a new empty List.
     var values = try agent.gc_allocator.create(std.ArrayList(Value));
@@ -1170,9 +1170,9 @@ fn performPromiseAllSettled(
 fn performPromiseAny(
     agent: *Agent,
     iterator: *Iterator,
-    constructor_: Object,
+    constructor_: *Object,
     result_capability: PromiseCapability,
-    promise_resolve: Object,
+    promise_resolve: *Object,
 ) Agent.Error!Value {
     // 1. Let errors be a new empty List.
     var errors = try agent.gc_allocator.create(std.ArrayList(Value));
@@ -1367,9 +1367,9 @@ fn performPromiseAny(
 fn performPromiseRace(
     agent: *Agent,
     iterator: *Iterator,
-    constructor_: Object,
+    constructor_: *Object,
     result_capability: PromiseCapability,
-    promise_resolve: Object,
+    promise_resolve: *Object,
 ) Agent.Error!Value {
     // 1. Repeat,
     while (true) {
@@ -1404,7 +1404,7 @@ pub fn performPromiseThen(
     on_fulfilled: Value,
     on_rejected: Value,
     result_capability: ?PromiseCapability,
-) std.mem.Allocator.Error!?Object {
+) std.mem.Allocator.Error!?*Object {
     // 1. Assert: IsPromise(promise) is true.
     // 2. If resultCapability is not present, then
     //     a. Set resultCapability to undefined.
@@ -1509,7 +1509,7 @@ pub fn performPromiseThen(
 /// 27.2.4 Properties of the Promise Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "Promise",
@@ -1518,7 +1518,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "all", all, 1, realm);
         try defineBuiltinFunction(object, "allSettled", allSettled, 1, realm);
         try defineBuiltinFunction(object, "any", any, 1, realm);
@@ -1541,7 +1541,7 @@ pub const constructor = struct {
 
     /// 27.2.3.1 Promise ( executor )
     /// https://tc39.es/ecma262/#sec-promise-executor
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const executor = arguments.get(0);
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
@@ -1927,13 +1927,13 @@ pub const constructor = struct {
 /// 27.2.5 Properties of the Promise Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "catch", @"catch", 1, realm);
         try defineBuiltinFunction(object, "finally", finally, 1, realm);
         try defineBuiltinFunction(object, "then", then, 2, realm);
@@ -2003,7 +2003,7 @@ pub const prototype = struct {
         else {
             const Captures = struct {
                 on_finally: Value,
-                constructor: Object,
+                constructor: *Object,
             };
             const captures = try agent.gc_allocator.create(Captures);
             captures.* = .{ .on_finally = on_finally, .constructor = constructor_ };

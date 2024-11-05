@@ -18,8 +18,8 @@ pub const PropertyKey = union(enum) {
     /// https://tc39.es/ecma262/#integer-index
     pub const IntegerIndex = u53;
 
-    string: String,
-    symbol: Symbol,
+    string: *const String,
+    symbol: *const Symbol,
 
     // OPTIMIZATION: If the string is known to be an integer index, store it as a number.
     integer_index: IntegerIndex,
@@ -34,22 +34,25 @@ pub const PropertyKey = union(enum) {
             } else |_| {
                 return .{ .string = String.fromLiteral(value) };
             }
-        } else if (T == String) {
-            // FIXME: This should use CanonicalNumericIndexString to reject numeric strings that
-            //        are not canonical.
-            if (value.data.slice == .utf16) return .{ .string = value };
-            if (std.fmt.parseUnsigned(IntegerIndex, value.data.slice.ascii, 10)) |integer_index| {
-                return .{ .integer_index = integer_index };
-            } else |_| {
-                return .{ .string = value };
+        } else if (@typeInfo(T) == .pointer) {
+            switch (@typeInfo(T).pointer.child) {
+                String => {
+                    // FIXME: This should use CanonicalNumericIndexString to reject numeric strings that
+                    //        are not canonical.
+                    if (value.slice == .utf16) return .{ .string = value };
+                    if (std.fmt.parseUnsigned(IntegerIndex, value.slice.ascii, 10)) |integer_index| {
+                        return .{ .integer_index = integer_index };
+                    } else |_| {
+                        return .{ .string = value };
+                    }
+                },
+                Symbol => return .{ .symbol = value },
+                else => {},
             }
-        } else if (T == Symbol) {
-            return .{ .symbol = value };
         } else if (T == IntegerIndex or @typeInfo(T) == .comptime_int) {
             return .{ .integer_index = @as(IntegerIndex, value) };
-        } else {
-            @compileError("PropertyKey.from() called with incompatible type " ++ @typeName(T));
         }
+        @compileError("PropertyKey.from() called with incompatible type " ++ @typeName(T));
     }
 
     /// An array index is an integer index n such that CanonicalNumericIndexString(n) returns an
@@ -58,15 +61,14 @@ pub const PropertyKey = union(enum) {
         return self == .integer_index and self.integer_index <= (std.math.maxInt(u32) - 1);
     }
 
-    fn eqlStringAndIntegerIndex(string: String, index: IntegerIndex) bool {
+    fn eqlStringAndIntegerIndex(string: *const String, index: IntegerIndex) bool {
         const len = comptime std.fmt.count("{d}", .{std.math.maxInt(IntegerIndex)});
         var buf: [len]u8 = undefined;
-        const index_string: String = blk: {
-            const slice: String.Data.Slice = .{
+        const index_string: *const String = blk: {
+            const slice: String.Slice = .{
                 .ascii = std.fmt.bufPrint(&buf, "{d}", .{index}) catch unreachable,
             };
-            const data: *const String.Data = &.{ .slice = slice, .hash = undefined };
-            break :blk .{ .data = @constCast(data) };
+            break :blk &.{ .slice = slice, .hash = undefined };
         };
         return string.eql(index_string);
     }
@@ -81,7 +83,7 @@ pub const PropertyKey = union(enum) {
             },
             .symbol => |a_symbol| switch (b) {
                 .string => false,
-                .symbol => |b_symbol| a_symbol.data == b_symbol.data,
+                .symbol => |b_symbol| a_symbol == b_symbol,
                 .integer_index => false,
             },
             .integer_index => |a_integer_index| switch (b) {
@@ -114,8 +116,8 @@ pub const PropertyKey = union(enum) {
     /// Non-standard helper to convert a `PropertyKey` to a `[]const u8` or `Symbol` (i.e. bypassing
     /// the integer index optimization).
     pub fn toStringOrSymbol(self: PropertyKey, agent: *Agent) std.mem.Allocator.Error!union(enum) {
-        string: String,
-        symbol: Symbol,
+        string: *const String,
+        symbol: *const Symbol,
     } {
         return switch (self) {
             .string => |string| .{ .string = string },

@@ -31,13 +31,13 @@ const promiseResolve = builtins.promiseResolve;
 /// 27.6.1 The %AsyncGeneratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgenerator-prototype
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%AsyncIteratorPrototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 1, realm);
         try defineBuiltinFunction(object, "return", @"return", 1, realm);
         try defineBuiltinFunction(object, "throw", throw, 1, realm);

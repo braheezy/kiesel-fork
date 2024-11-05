@@ -36,11 +36,11 @@ pub const StringPadPlacement = enum { start, end };
 /// https://tc39.es/ecma262/#sec-stringpad
 pub fn stringPad(
     agent: *Agent,
-    string: types.String,
+    string: *const types.String,
     max_length: usize,
-    fill_string: types.String,
+    fill_string: *const types.String,
     placement: StringPadPlacement,
-) Agent.Error!types.String {
+) Agent.Error!*const types.String {
     // 1. Let stringLength be the length of S.
     const string_length = string.length();
 
@@ -88,13 +88,13 @@ pub fn stringPad(
 /// https://tc39.es/ecma262/#sec-getsubstitution
 pub fn getSubstitution(
     agent: *Agent,
-    matched: types.String,
-    str: types.String,
+    matched: *const types.String,
+    str: *const types.String,
     position: usize,
-    captures: []const ?types.String,
-    named_captures: ?Object,
-    replacement_template: types.String,
-) Agent.Error!types.String {
+    captures: []const ?*const types.String,
+    named_captures: ?*Object,
+    replacement_template: *const types.String,
+) Agent.Error!*const types.String {
     // 1. Let stringLength be the length of str.
     const string_length = str.length();
 
@@ -181,7 +181,7 @@ pub fn getSubstitution(
                 agent.gc_allocator,
                 1,
                 1 + digit_count,
-            )).data.slice.ascii;
+            )).slice.ascii;
 
             // iii. Let index be ℝ(StringToNumber(digits)).
             var index = std.fmt.parseInt(usize, digits, 10) catch unreachable;
@@ -212,7 +212,7 @@ pub fn getSubstitution(
             const ref = try template_reminder.substring(agent.gc_allocator, 0, 1 + digit_count);
 
             // viii. If 1 ≤ index ≤ captureLen, then
-            const ref_replacement: types.String = if (index >= 1 and index <= capture_len) blk_ref_replacement: {
+            const ref_replacement: *const types.String = if (index >= 1 and index <= capture_len) blk_ref_replacement: {
                 // 1. Let capture be captures[index - 1].
                 const capture = captures[index - 1];
 
@@ -272,7 +272,7 @@ pub fn getSubstitution(
                 //     a. Let refReplacement be the empty String.
                 // 6. Else,
                 //     a. Let refReplacement be ? ToString(capture).
-                const ref_replacement: types.String = if (capture.isUndefined())
+                const ref_replacement: *const types.String = if (capture.isUndefined())
                     .empty
                 else
                     try capture.toString(agent);
@@ -312,7 +312,7 @@ pub fn getSubstitution(
 /// 10.4.3.1 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-getownproperty-p
 fn getOwnProperty(
-    object: Object,
+    object: *Object,
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!?PropertyDescriptor {
     // 1. Let desc be OrdinaryGetOwnProperty(S, P).
@@ -328,7 +328,7 @@ fn getOwnProperty(
 /// 10.4.3.2 [[DefineOwnProperty]] ( P, Desc )
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-defineownproperty-p-desc
 fn defineOwnProperty(
-    object: Object,
+    object: *Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
 ) std.mem.Allocator.Error!bool {
@@ -340,7 +340,7 @@ fn defineOwnProperty(
     // 2. If stringDesc is not undefined, then
     if (maybe_string_property_descriptor) |string_property_descriptor| {
         // a. Let extensible be S.[[Extensible]].
-        const extensible = string.data.extensible;
+        const extensible = string.object.extensible;
 
         // b. Return IsCompatiblePropertyDescriptor(extensible, Desc, stringDesc).
         return isCompatiblePropertyDescriptor(
@@ -360,9 +360,9 @@ fn defineOwnProperty(
 
 /// 10.4.3.3 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-ownpropertykeys
-fn ownPropertyKeys(object: Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
-    const agent = object.agent();
-    const property_storage_hash_map = &object.propertyStorage().hash_map;
+fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
+    const agent = object.agent;
+    const property_storage_hash_map = &object.property_storage.hash_map;
 
     // 2. Let str be O.[[StringData]].
     // 3. Assert: str is a String.
@@ -423,9 +423,9 @@ fn ownPropertyKeys(object: Object) std.mem.Allocator.Error!std.ArrayList(Propert
 /// https://tc39.es/ecma262/#sec-stringcreate
 pub fn stringCreate(
     agent: *Agent,
-    value: types.String,
-    prototype_: Object,
-) std.mem.Allocator.Error!Object {
+    value: *const types.String,
+    prototype_: *Object,
+) std.mem.Allocator.Error!*Object {
     // 1. Let S be MakeBasicObject(« [[Prototype]], [[Extensible]], [[StringData]] »).
     const string = try String.create(agent, .{
         // 2. Set S.[[Prototype]] to prototype.
@@ -471,7 +471,7 @@ fn stringGetOwnProperty(
     string: *const String,
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!?PropertyDescriptor {
-    const agent = string.data.agent;
+    const agent = string.object.agent;
 
     // 1. If P is not a String, return undefined.
     // 2. Let index be CanonicalNumericIndexString(P).
@@ -504,7 +504,7 @@ fn stringGetOwnProperty(
 /// 22.1.2 Properties of the String Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-string-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "String",
@@ -513,7 +513,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "fromCharCode", fromCharCode, 1, realm);
         try defineBuiltinFunction(object, "fromCodePoint", fromCodePoint, 1, realm);
         try defineBuiltinFunction(object, "raw", raw, 1, realm);
@@ -530,10 +530,10 @@ pub const constructor = struct {
 
     /// 22.1.1.1 String ( value )
     /// https://tc39.es/ecma262/#sec-string-constructor-string-value
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const value = arguments.get(0);
 
-        const s: types.String = blk: {
+        const s: *const types.String = blk: {
             // 1. If value is not present, then
             if (arguments.count() == 0) {
                 // a. Let s be the empty String.
@@ -685,11 +685,11 @@ pub const constructor = struct {
 /// 22.1.3 Properties of the String Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-string-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return stringCreate(realm.agent, .empty, try realm.intrinsics.@"%Object.prototype%"());
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinFunction(object, "charAt", charAt, 1, realm);
         try defineBuiltinFunction(object, "charCodeAt", charCodeAt, 1, realm);
@@ -751,19 +751,19 @@ pub const prototype = struct {
 
             // B.2.2.15 String.prototype.trimLeft ( )
             // https://tc39.es/ecma262/#String.prototype.trimleft
-            const @"%String.prototype.trimStart%" = object.propertyStorage().get(PropertyKey.from("trimStart")).?;
+            const @"%String.prototype.trimStart%" = object.property_storage.get(PropertyKey.from("trimStart")).?;
             try defineBuiltinProperty(object, "trimLeft", @"%String.prototype.trimStart%");
 
             // B.2.2.16 String.prototype.trimRight ( )
             // https://tc39.es/ecma262/#String.prototype.trimright
-            const @"%String.prototype.trimEnd%" = object.propertyStorage().get(PropertyKey.from("trimEnd")).?;
+            const @"%String.prototype.trimEnd%" = object.property_storage.get(PropertyKey.from("trimEnd")).?;
             try defineBuiltinProperty(object, "trimRight", @"%String.prototype.trimEnd%");
         }
     }
 
     /// 22.1.3.35.1 ThisStringValue ( value )
     /// https://tc39.es/ecma262/#sec-thisstringvalue
-    fn thisStringValue(agent: *Agent, value: Value) error{ExceptionThrown}!types.String {
+    fn thisStringValue(agent: *Agent, value: Value) error{ExceptionThrown}!*const types.String {
         // 1. If value is a String, return value.
         if (value.isString()) return value.asString();
 
@@ -1138,18 +1138,18 @@ pub const prototype = struct {
         // 3. Let thatValue be ? ToString(that).
         const that_value = try that.toString(agent);
 
-        const order = if (string.data.slice == .ascii and that_value.data.slice == .ascii) blk: {
-            break :blk std.mem.order(u8, string.data.slice.ascii, that_value.data.slice.ascii);
-        } else if (string.data.slice == .utf16 and that_value.data.slice == .utf16) blk: {
-            break :blk std.mem.order(u16, string.data.slice.utf16, that_value.data.slice.utf16);
-        } else if (string.data.slice == .ascii and that_value.data.slice == .utf16) blk: {
+        const order = if (string.slice == .ascii and that_value.slice == .ascii) blk: {
+            break :blk std.mem.order(u8, string.slice.ascii, that_value.slice.ascii);
+        } else if (string.slice == .utf16 and that_value.slice == .utf16) blk: {
+            break :blk std.mem.order(u16, string.slice.utf16, that_value.slice.utf16);
+        } else if (string.slice == .ascii and that_value.slice == .utf16) blk: {
             const string_utf16 = try string.toUtf16(agent.gc_allocator);
             defer agent.gc_allocator.free(string_utf16);
-            break :blk std.mem.order(u16, string_utf16, that_value.data.slice.utf16);
-        } else if (string.data.slice == .utf16 and that_value.data.slice == .ascii) blk: {
+            break :blk std.mem.order(u16, string_utf16, that_value.slice.utf16);
+        } else if (string.slice == .utf16 and that_value.slice == .ascii) blk: {
             const that_value_utf16 = try that_value.toUtf16(agent.gc_allocator);
             defer agent.gc_allocator.free(that_value_utf16);
-            break :blk std.mem.order(u16, string.data.slice.utf16, that_value_utf16);
+            break :blk std.mem.order(u16, string.slice.utf16, that_value_utf16);
         } else unreachable;
         return switch (order) {
             .lt => Value.from(-1),
@@ -1291,7 +1291,7 @@ pub const prototype = struct {
         max_length: Value,
         fill_string_value: Value,
         placement: StringPadPlacement,
-    ) Agent.Error!types.String {
+    ) Agent.Error!*const types.String {
         // 1. Let S be ? ToString(O).
         const string = try object.toString(agent);
 
@@ -1544,7 +1544,7 @@ pub const prototype = struct {
         var end_of_last_match: usize = 0;
 
         // 13. Let result be the empty String.
-        var result: types.String = .empty;
+        var result: *const types.String = .empty;
 
         // 14. For each element p of matchPositions, do
         for (match_positions.items) |position| {
@@ -1807,7 +1807,7 @@ pub const prototype = struct {
         }
 
         // 11. Let substrings be a new empty List.
-        var substrings = std.ArrayList(types.String).init(agent.gc_allocator);
+        var substrings = std.ArrayList(*const types.String).init(agent.gc_allocator);
         defer substrings.deinit();
 
         // 12. Let i be 0.
@@ -1827,8 +1827,8 @@ pub const prototype = struct {
             // c. If the number of elements in substrings is lim, return CreateArrayFromList(substrings).
             if (substrings.items.len == limit) {
                 return Value.from(
-                    try createArrayFromListMapToValue(agent, types.String, substrings.items, struct {
-                        fn mapFn(_: *Agent, string_: types.String) std.mem.Allocator.Error!Value {
+                    try createArrayFromListMapToValue(agent, *const types.String, substrings.items, struct {
+                        fn mapFn(_: *Agent, string_: *const types.String) std.mem.Allocator.Error!Value {
                             return Value.from(string_);
                         }
                     }.mapFn),
@@ -1850,8 +1850,8 @@ pub const prototype = struct {
 
         // 17. Return CreateArrayFromList(substrings).
         return Value.from(
-            try createArrayFromListMapToValue(agent, types.String, substrings.items, struct {
-                fn mapFn(_: *Agent, string_: types.String) std.mem.Allocator.Error!Value {
+            try createArrayFromListMapToValue(agent, *const types.String, substrings.items, struct {
+                fn mapFn(_: *Agent, string_: *const types.String) std.mem.Allocator.Error!Value {
                     return Value.from(string_);
                 }
             }.mapFn),
@@ -2084,7 +2084,7 @@ pub const prototype = struct {
         agent: *Agent,
         string_value: Value,
         where: enum { start, end, @"start+end" },
-    ) Agent.Error!types.String {
+    ) Agent.Error!*const types.String {
         // 1. Let str be ? RequireObjectCoercible(string).
         const str = try string_value.requireObjectCoercible(agent);
 
@@ -2225,7 +2225,7 @@ pub const prototype = struct {
         string_value: Value,
         tag: []const u8,
         attribute: ?struct { name: []const u8, value: Value },
-    ) Agent.Error!types.String {
+    ) Agent.Error!*const types.String {
         // 1. Let str be ? RequireObjectCoercible(string).
         _ = try string_value.requireObjectCoercible(agent);
 
@@ -2411,7 +2411,7 @@ pub const prototype = struct {
 pub const String = MakeObject(.{
     .Fields = struct {
         /// [[StringData]]
-        string_data: types.String,
+        string_data: *const types.String,
     },
     .tag = .string,
 });

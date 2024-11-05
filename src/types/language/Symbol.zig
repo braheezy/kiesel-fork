@@ -11,30 +11,29 @@ const String = types.String;
 
 const Symbol = @This();
 
-pub const Data = struct {
-    /// Flag to mark this symbol as a private name.
-    is_private: bool = false,
+/// Flag to mark this symbol as a private name.
+is_private: bool = false,
 
-    /// [[Description]]
-    description: ?String,
-};
+/// [[Description]]
+description: ?*const String,
 
-data: *Data,
-
-pub fn init(allocator: std.mem.Allocator, description: ?String) std.mem.Allocator.Error!Symbol {
-    const data = try allocator.create(Data);
-    data.* = .{ .description = description };
-    return .{ .data = data };
+pub fn init(
+    allocator: std.mem.Allocator,
+    description: ?*const String,
+) std.mem.Allocator.Error!*Symbol {
+    const symbol = try allocator.create(Symbol);
+    symbol.* = .{ .description = description };
+    return symbol;
 }
 
 /// For tests not using the GC allocator.
-pub fn deinit(self: Symbol, allocator: std.mem.Allocator) void {
+pub fn deinit(self: *const Symbol, allocator: std.mem.Allocator) void {
     // TODO: To deinit the description string we need to know if it was dynamically allocated.
-    allocator.destroy(self.data);
+    allocator.destroy(self);
 }
 
 pub fn format(
-    self: Symbol,
+    self: *const Symbol,
     comptime fmt: []const u8,
     options: std.fmt.FormatOptions,
     writer: anytype,
@@ -42,24 +41,19 @@ pub fn format(
     _ = fmt;
     _ = options;
     try writer.writeAll("Symbol(");
-    if (self.data.description) |description| {
+    if (self.description) |description| {
         try writer.print("\"{}\"", .{description});
     }
     try writer.writeAll(")");
 }
 
-/// Shortcut for the SameValue AO applied on two symbols (i.e. id equality)
-pub fn sameValue(self: Symbol, other: Symbol) bool {
-    return self.data == other.data;
-}
-
 /// 20.4.3.3.1 SymbolDescriptiveString ( sym )
 /// https://tc39.es/ecma262/#sec-symboldescriptivestring
-pub fn descriptiveString(self: Symbol, agent: *Agent) std.mem.Allocator.Error!String {
+pub fn descriptiveString(self: *const Symbol, agent: *Agent) std.mem.Allocator.Error!*const String {
     // 1. Let desc be sym's [[Description]] value.
     // 2. If desc is undefined, set desc to the empty String.
     // 3. Assert: desc is a String.
-    const description: String = self.data.description orelse .empty;
+    const description: *const String = self.description orelse .empty;
 
     // 4. Return the string-concatenation of "Symbol(", desc, and ")".
     return String.concat(
@@ -68,16 +62,16 @@ pub fn descriptiveString(self: Symbol, agent: *Agent) std.mem.Allocator.Error!St
     );
 }
 
-test "format" {
-    var test_cases = [_]struct { Data, []const u8 }{
+test format {
+    const test_cases = [_]struct { Symbol, []const u8 }{
         .{ .{ .description = null }, "Symbol()" },
         .{ .{ .description = .empty }, "Symbol(\"\")" },
         .{ .{ .description = String.fromLiteral("foo") }, "Symbol(\"foo\")" },
     };
-    for (&test_cases) |*test_case| {
-        const symbol: Symbol = .{ .data = &test_case[0] };
+    for (test_cases) |test_case| {
+        const symbol, const expected = test_case;
         const string = try std.fmt.allocPrint(std.testing.allocator, "{}", .{symbol});
         defer std.testing.allocator.free(string);
-        try std.testing.expectEqualStrings(test_case[1], string);
+        try std.testing.expectEqualStrings(expected, string);
     }
 }

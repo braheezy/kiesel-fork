@@ -15,7 +15,7 @@ const Value = types.Value;
 const ObjectEnvironment = @This();
 
 /// [[BindingObject]]
-binding_object: Object,
+binding_object: *Object,
 
 /// [[IsWithEnvironment]]
 is_with_environment: bool,
@@ -25,8 +25,8 @@ outer_env: ?Environment,
 
 /// 9.1.1.2.1 HasBinding ( N )
 /// https://tc39.es/ecma262/#sec-object-environment-records-hasbinding-n
-pub fn hasBinding(self: ObjectEnvironment, name: String) Agent.Error!bool {
-    const agent = self.binding_object.agent();
+pub fn hasBinding(self: ObjectEnvironment, name: *const String) Agent.Error!bool {
+    const agent = self.binding_object.agent;
     const property_key = PropertyKey.from(name);
 
     // 1. Let bindingObject be envRec.[[BindingObject]].
@@ -62,7 +62,7 @@ pub fn hasBinding(self: ObjectEnvironment, name: String) Agent.Error!bool {
 pub fn createMutableBinding(
     self: ObjectEnvironment,
     _: *Agent,
-    name: String,
+    name: *const String,
     deletable: bool,
 ) Agent.Error!void {
     const property_key = PropertyKey.from(name);
@@ -83,7 +83,7 @@ pub fn createMutableBinding(
 
 /// 9.1.1.2.3 CreateImmutableBinding ( N, S )
 /// https://tc39.es/ecma262/#sec-object-environment-records-createimmutablebinding-n-s
-pub fn createImmutableBinding(_: ObjectEnvironment, _: *Agent, _: String, _: bool) noreturn {
+pub fn createImmutableBinding(_: ObjectEnvironment, _: *Agent, _: *const String, _: bool) noreturn {
     // The CreateImmutableBinding concrete method of an Object Environment Record is never used
     // within this specification.
     @panic("ObjectEnvironment.createImmutableBinding() must not be called");
@@ -94,7 +94,7 @@ pub fn createImmutableBinding(_: ObjectEnvironment, _: *Agent, _: String, _: boo
 pub fn initializeBinding(
     self: ObjectEnvironment,
     agent: *Agent,
-    name: String,
+    name: *const String,
     value: Value,
 ) Agent.Error!void {
     // 1. Perform ? envRec.SetMutableBinding(N, V, false).
@@ -108,7 +108,7 @@ pub fn initializeBinding(
 pub fn setMutableBinding(
     self: ObjectEnvironment,
     agent: *Agent,
-    name: String,
+    name: *const String,
     value: Value,
     strict: bool,
 ) Agent.Error!void {
@@ -134,7 +134,7 @@ pub fn setMutableBinding(
 pub fn getBindingValue(
     self: ObjectEnvironment,
     agent: *Agent,
-    name: String,
+    name: *const String,
     strict: bool,
 ) Agent.Error!Value {
     const property_key = PropertyKey.from(name);
@@ -156,12 +156,12 @@ pub fn getBindingValue(
 
 /// 9.1.1.2.7 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-object-environment-records-deletebinding-n
-pub fn deleteBinding(self: ObjectEnvironment, name: String) Agent.Error!bool {
+pub fn deleteBinding(self: ObjectEnvironment, name: *const String) Agent.Error!bool {
     const property_key = PropertyKey.from(name);
 
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Return ? bindingObject.[[Delete]](N).
-    return self.binding_object.internalMethods().delete(self.binding_object, property_key);
+    return self.binding_object.internal_methods.delete(self.binding_object, property_key);
 }
 
 /// 9.1.1.2.8 HasThisBinding ( )
@@ -180,7 +180,7 @@ pub fn hasSuperBinding(_: ObjectEnvironment) bool {
 
 /// 9.1.1.2.10 WithBaseObject ( )
 /// https://tc39.es/ecma262/#sec-object-environment-records-withbaseobject
-pub fn withBaseObject(self: ObjectEnvironment) ?Object {
+pub fn withBaseObject(self: ObjectEnvironment) ?*Object {
     // 1. If envRec.[[IsWithEnvironment]] is true, return envRec.[[BindingObject]].
     if (self.is_with_environment) return self.binding_object;
 

@@ -32,7 +32,7 @@ this_binding_status: ThisBindingStatus,
 function_object: *ECMAScriptFunction,
 
 /// [[NewTarget]]
-new_target: ?Object,
+new_target: ?*Object,
 
 // NOTE: This is how we implement the spec's inheritance of function environments.
 declarative_environment: *DeclarativeEnvironment,
@@ -40,7 +40,7 @@ declarative_environment: *DeclarativeEnvironment,
 /// 9.1.1.3.1 BindThisValue ( V )
 /// https://tc39.es/ecma262/#sec-bindthisvalue
 pub fn bindThisValue(self: *FunctionEnvironment, value: Value) error{ExceptionThrown}!Value {
-    const agent = self.function_object.object().agent();
+    const agent = self.function_object.object.agent;
 
     // 1. Assert: envRec.[[ThisBindingStatus]] is not lexical.
     std.debug.assert(self.this_binding_status != .lexical);
@@ -84,7 +84,7 @@ pub fn hasSuperBinding(self: FunctionEnvironment) bool {
 /// 9.1.1.3.4 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-function-environment-records-getthisbinding
 pub fn getThisBinding(self: FunctionEnvironment) error{ExceptionThrown}!Value {
-    const agent = self.function_object.object().agent();
+    const agent = self.function_object.object.agent;
 
     // 1. Assert: envRec.[[ThisBindingStatus]] is not lexical.
     std.debug.assert(self.this_binding_status != .lexical);
@@ -113,7 +113,7 @@ pub fn getSuperBase(self: FunctionEnvironment) std.mem.Allocator.Error!Value {
 
     // 3. Assert: home is an ordinary object.
     // 4. Return ! home.[[GetPrototypeOf]]().
-    return if (home.?.internalMethods().getPrototypeOf(
+    return if (home.?.internal_methods.getPrototypeOf(
         home.?,
     ) catch |err| try noexcept(err)) |prototype|
         Value.from(prototype)

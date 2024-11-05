@@ -94,7 +94,7 @@ pub const ParsedFlags = packed struct(u8) {
 
 /// 22.2.3.1 RegExpCreate ( P, F )
 /// https://tc39.es/ecma262/#sec-regexpcreate
-pub fn regExpCreate(agent: *Agent, pattern: Value, flags: Value) Agent.Error!Object {
+pub fn regExpCreate(agent: *Agent, pattern: Value, flags: Value) Agent.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. Let obj be ! RegExpAlloc(%RegExp%).
@@ -109,7 +109,7 @@ pub fn regExpCreate(agent: *Agent, pattern: Value, flags: Value) Agent.Error!Obj
 
 /// 22.2.3.2 RegExpAlloc ( newTarget )
 /// https://tc39.es/ecma262/#sec-regexpalloc
-pub fn regExpAlloc(agent: *Agent, new_target: Object) Agent.Error!Object {
+pub fn regExpAlloc(agent: *Agent, new_target: *Object) Agent.Error!*Object {
     // 1. Let obj be ? OrdinaryCreateFromConstructor(newTarget, "%RegExp.prototype%",
     //    « [[OriginalSource]], [[OriginalFlags]], [[RegExpRecord]], [[RegExpMatcher]] »).
     const object = try ordinaryCreateFromConstructor(
@@ -141,17 +141,17 @@ pub fn regExpAlloc(agent: *Agent, new_target: Object) Agent.Error!Object {
 /// https://tc39.es/ecma262/#sec-regexpinitialize
 pub fn regExpInitialize(
     agent: *Agent,
-    object: Object,
+    object: *Object,
     pattern: Value,
     flags: Value,
-) Agent.Error!Object {
+) Agent.Error!*Object {
     // 1. If pattern is undefined, let P be the empty String.
     // 2. Else, let P be ? ToString(pattern).
-    const p: String = if (pattern.isUndefined()) .empty else try pattern.toString(agent);
+    const p: *const String = if (pattern.isUndefined()) .empty else try pattern.toString(agent);
 
     // 3. If flags is undefined, let F be the empty String.
     // 4. Else, let F be ? ToString(flags).
-    const f: String = if (flags.isUndefined()) .empty else try flags.toString(agent);
+    const f: *const String = if (flags.isUndefined()) .empty else try flags.toString(agent);
 
     // 5. If F contains any code unit other than "d", "g", "i", "m", "s", "u", "v", or "y", or if F
     //    contains any code unit more than once, throw a SyntaxError exception.
@@ -217,7 +217,7 @@ pub fn regExpInitialize(
 
 /// 22.2.7.1 RegExpExec ( R, S )
 /// https://tc39.es/ecma262/#sec-regexpexec
-pub fn regExpExec(agent: *Agent, reg_exp: Object, string: String) Agent.Error!?Object {
+pub fn regExpExec(agent: *Agent, reg_exp: *Object, string: *const String) Agent.Error!?*Object {
     // 1. Let exec be ? Get(R, "exec").
     const exec = try reg_exp.get(PropertyKey.from("exec"));
 
@@ -261,14 +261,14 @@ fn getMatch(captures_list: CapturesList, string: []const u8, shift: bool, i: usi
 
 /// 22.2.7.2 RegExpBuiltinExec ( R, S )
 /// https://tc39.es/ecma262/#sec-regexpbuiltinexec
-pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.Error!?Object {
+pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String) Agent.Error!?*Object {
     // 1. Let length be the length of S.
     const length = string.length();
 
     // 2. Let lastIndex be ℝ(? ToLength(? Get(R, "lastIndex"))).
     var last_index = std.math.lossyCast(
         usize,
-        try (try reg_exp.object().get(PropertyKey.from("lastIndex"))).toLength(agent),
+        try (try reg_exp.object.get(PropertyKey.from("lastIndex"))).toLength(agent),
     );
 
     const re_bytecode = reg_exp.fields.re_bytecode;
@@ -294,8 +294,8 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
     }
 
     // 8-13.
-    const shift = string.data.slice == .utf16;
-    const buf, const buf_len = switch (string.data.slice) {
+    const shift = string.slice == .utf16;
+    const buf, const buf_len = switch (string.slice) {
         .ascii => |ascii| .{ ascii, ascii.len },
         .utf16 => |utf16| .{ std.mem.sliceAsBytes(utf16), utf16.len },
     };
@@ -307,7 +307,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
         @intCast(last_index),
         @intCast(buf_len),
         // 0 = 8 bit chars, 1 = 16 bit chars, 2 = 16 bit chars, UTF-16 (set internally via the u flag)
-        switch (string.data.slice) {
+        switch (string.slice) {
             .ascii => 0,
             .utf16 => 1,
         },
@@ -317,7 +317,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
     if (result < 0) return error.OutOfMemory;
     if (result == 0) {
         if (last_index > length or (re_flags & (libregexp.LRE_FLAG_GLOBAL | libregexp.LRE_FLAG_STICKY)) != 0) {
-            try reg_exp.object().set(
+            try reg_exp.object.set(
                 PropertyKey.from("lastIndex"),
                 Value.from(0),
                 .throw,
@@ -335,7 +335,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
     // 16. If global is true or sticky is true, then
     if ((re_flags & (libregexp.LRE_FLAG_GLOBAL | libregexp.LRE_FLAG_STICKY)) != 0) {
         // a. Perform ? Set(R, "lastIndex", 𝔽(e), true).
-        try reg_exp.object().set(
+        try reg_exp.object.set(
             PropertyKey.from("lastIndex"),
             Value.from(@as(u53, @intCast(end_index))),
             .throw,
@@ -500,7 +500,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: String) Agent.
 
 /// 22.2.7.3 AdvanceStringIndex ( S, index, unicode )
 /// https://tc39.es/ecma262/#sec-advancestringindex
-pub fn advanceStringIndex(string: String, index: u53, unicode: bool) u53 {
+pub fn advanceStringIndex(string: *const String, index: u53, unicode: bool) u53 {
     // 1. Assert: index ≤ 2**53 - 1.
 
     // 2. If unicode is false, return index + 1.
@@ -531,7 +531,7 @@ const Match = struct {
 
 /// 22.2.7.6 GetMatchString ( S, match )
 /// https://tc39.es/ecma262/#sec-getmatchstring
-fn getMatchString(agent: *Agent, string: String, match: Match) std.mem.Allocator.Error!String {
+fn getMatchString(agent: *Agent, string: *const String, match: Match) std.mem.Allocator.Error!*const String {
     // 1. Assert: match.[[StartIndex]] ≤ match.[[EndIndex]] ≤ the length of S.
     std.debug.assert(match.start_index <= match.end_index);
     std.debug.assert(match.end_index <= string.length());
@@ -542,7 +542,7 @@ fn getMatchString(agent: *Agent, string: String, match: Match) std.mem.Allocator
 
 /// 22.2.7.7 GetMatchIndexPair ( S, match )
 /// https://tc39.es/ecma262/#sec-getmatchindexpair
-fn getMatchIndexPair(agent: *Agent, string: String, match: Match) std.mem.Allocator.Error!Object {
+fn getMatchIndexPair(agent: *Agent, string: *const String, match: Match) std.mem.Allocator.Error!*Object {
     // 1. Assert: match.[[StartIndex]] ≤ match.[[EndIndex]] ≤ the length of S.
     std.debug.assert(match.start_index <= match.end_index);
     std.debug.assert(match.end_index <= string.length());
@@ -561,11 +561,11 @@ fn getMatchIndexPair(agent: *Agent, string: String, match: Match) std.mem.Alloca
 /// https://tc39.es/ecma262/#sec-makematchindicesindexpairarray
 fn makeMatchIndicesIndexPairArray(
     agent: *Agent,
-    string: String,
+    string: *const String,
     indices: []const ?Match,
     group_names: []const ?[]const u8,
     has_groups: bool,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     // 1. Let n be the number of elements in indices.
     const n = indices.len;
 
@@ -646,7 +646,7 @@ fn makeMatchIndicesIndexPairArray(
 /// 22.2.5 Properties of the RegExp Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-regexp-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 2,
             .name = "RegExp",
@@ -655,7 +655,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 22.2.5.1 RegExp.prototype
@@ -670,14 +670,14 @@ pub const constructor = struct {
 
     /// 22.2.4.1 RegExp ( pattern, flags )
     /// https://tc39.es/ecma262/#sec-regexp-pattern-flags
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const pattern = arguments.get(0);
         const flags = arguments.get(1);
 
         // 1. Let patternIsRegExp be ? IsRegExp(pattern).
         const pattern_is_regexp = try pattern.isRegExp();
 
-        var constructor_: Object = undefined;
+        var constructor_: *Object = undefined;
 
         // 2. If NewTarget is undefined, then
         if (new_target == null) {
@@ -759,13 +759,13 @@ pub const constructor = struct {
 /// 22.2.6 Properties of the RegExp Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-regexp-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "dotAll", dotAll, null, realm);
         try defineBuiltinFunction(object, "exec", exec, 1, realm);
         try defineBuiltinAccessor(object, "flags", flags, null, realm);
@@ -904,7 +904,7 @@ pub const prototype = struct {
             const realm = agent.currentRealm();
 
             // a. If SameValue(R, %RegExp.prototype%) is true, return undefined.
-            if (reg_exp.sameValue(try realm.intrinsics.@"%RegExp.prototype%"())) {
+            if (reg_exp == try realm.intrinsics.@"%RegExp.prototype%"()) {
                 return .undefined;
             }
 
@@ -1130,7 +1130,7 @@ pub const prototype = struct {
         }
 
         // 10. Let results be a new empty List.
-        var results = std.ArrayList(Object).init(agent.gc_allocator);
+        var results = std.ArrayList(*Object).init(agent.gc_allocator);
         defer results.deinit();
 
         // 11. Let done be false.
@@ -1211,7 +1211,7 @@ pub const prototype = struct {
             );
 
             // g. Let captures be a new empty List.
-            var captures = try std.ArrayList(?String).initCapacity(
+            var captures = try std.ArrayList(?*const String).initCapacity(
                 agent.gc_allocator,
                 @intCast(n_captures),
             );
@@ -1222,7 +1222,7 @@ pub const prototype = struct {
 
             // i. Repeat, while n ≤ nCaptures,
             while (n <= n_captures) : (n += 1) {
-                var capture_n_string: ?String = null;
+                var capture_n_string: ?*const String = null;
 
                 // i. Let capN be ? Get(result, ! ToString(𝔽(n))).
                 var capture_n = try result.get(PropertyKey.from(n));
@@ -1279,7 +1279,7 @@ pub const prototype = struct {
             // l. Else,
             else blk: {
                 // i. If namedCaptures is not undefined, then
-                const named_captures_object: ?Object = if (!named_captures.isUndefined()) blk_obj: {
+                const named_captures_object: ?*Object = if (!named_captures.isUndefined()) blk_obj: {
                     // 1. Set namedCaptures to ? ToObject(namedCaptures).
                     break :blk_obj try named_captures.toObject(agent);
                 } else null;
@@ -1389,7 +1389,7 @@ pub const prototype = struct {
             const realm = agent.currentRealm();
 
             // a. If SameValue(R, %RegExp.prototype%) is true, return "(?:)".
-            if (reg_exp.sameValue(try realm.intrinsics.@"%RegExp.prototype%"())) {
+            if (reg_exp == try realm.intrinsics.@"%RegExp.prototype%"()) {
                 return Value.from("(?:)");
             }
 
@@ -1413,9 +1413,9 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-escaperegexppattern
     fn escapeRegExpPattern(
         allocator: std.mem.Allocator,
-        pattern: String,
+        pattern: *const String,
         _: c_int,
-    ) std.mem.Allocator.Error!String {
+    ) std.mem.Allocator.Error!*const String {
         // TODO: 1-4.
         // 5. The code points / or any LineTerminator occurring in the pattern shall be escaped in
         //    S as necessary to ensure that the string-concatenation of "/", S, "/", and F can be
@@ -1725,7 +1725,7 @@ pub const prototype = struct {
         }
 
         // 5. Return ? RegExpInitialize(O, P, F).
-        return Value.from(try regExpInitialize(agent, reg_exp.object(), p, f));
+        return Value.from(try regExpInitialize(agent, &reg_exp.object, p, f));
     }
 };
 
@@ -1734,10 +1734,10 @@ pub const prototype = struct {
 pub const RegExp = MakeObject(.{
     .Fields = struct {
         /// [[OriginalSource]]
-        original_source: String,
+        original_source: *const String,
 
         /// [[OriginalFlags]]
-        original_flags: String,
+        original_flags: *const String,
 
         /// [[RegExpRecord]]
         re_bytecode: []const u8,

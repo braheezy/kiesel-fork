@@ -27,7 +27,7 @@ const sameValue = types.sameValue;
 /// 26.2.1 The FinalizationRegistry Constructor
 /// https://tc39.es/ecma262/#sec-finalization-registry-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "FinalizationRegistry",
@@ -36,7 +36,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 26.2.2.1 FinalizationRegistry.prototype
         // https://tc39.es/ecma262/#sec-finalization-registry.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -49,7 +49,7 @@ pub const constructor = struct {
 
     /// 26.2.1.1 FinalizationRegistry ( cleanupCallback )
     /// https://tc39.es/ecma262/#sec-finalization-registry-cleanup-callback
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const cleanup_callback = arguments.get(0);
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
@@ -96,13 +96,13 @@ pub const constructor = struct {
 /// 26.2.3 Properties of the FinalizationRegistry Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-finalization-registry-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "register", register, 2, realm);
         try defineBuiltinFunction(object, "unregister", unregister, 1, realm);
 
@@ -195,7 +195,7 @@ pub const prototype = struct {
                     // NOTE: The weak ref target is managed by libgc.
 
                     // ii. Optionally, perform HostEnqueueFinalizationRegistryCleanupJob(fg).
-                    const finalizer_agent = finalizer_cell.finalization_registry.object().agent();
+                    const finalizer_agent = finalizer_cell.finalization_registry.object.agent;
                     finalizer_agent.host_hooks.hostEnqueueFinalizationRegistryCleanupJob(finalizer_agent, finalizer_cell) catch {
                         // We are not required to run finalizers, so we can ignore OOMs.
                     };
@@ -268,7 +268,7 @@ pub const prototype = struct {
 /// 9.12 CleanupFinalizationRegistry ( finalizationRegistry )
 /// https://tc39.es/ecma262/#sec-cleanup-finalization-registry
 pub fn cleanupFinalizationRegistry(cell: *Cell) Agent.Error!void {
-    const agent = cell.finalization_registry.data.agent;
+    const agent = cell.finalization_registry.object.agent;
 
     // 1. Assert: finalizationRegistry has [[Cells]] and [[CleanupCallback]] internal slots.
     const finalization_registry = cell.finalization_registry;

@@ -38,12 +38,12 @@ const systemTimeZoneIdentifier = builtins.systemTimeZoneIdentifier;
 /// https://tc39.es/ecma402/#sec-createdatetimeformat
 pub fn createDateTimeFormat(
     agent: *Agent,
-    new_target: Object,
+    new_target: *Object,
     locales: Value,
     options_value: Value,
     required: enum { date, time, any },
     defaults: enum { date, time, all },
-) Agent.Error!Object {
+) Agent.Error!*Object {
     const data_provider = icu4zig.DataProvider.init();
     defer data_provider.deinit();
     const time_zone_id_mapper = icu4zig.TimeZoneIdMapper.init(data_provider);
@@ -196,7 +196,7 @@ pub fn createDateTimeFormat(
         .{ "persian", .persian },
         .{ "roc", .roc },
     });
-    date_time_format.as(DateTimeFormat).fields.calendar = calendar_map.get(resolved.calendar.data.slice.ascii) orelse .gregorian;
+    date_time_format.as(DateTimeFormat).fields.calendar = calendar_map.get(resolved.calendar.slice.ascii) orelse .gregorian;
 
     // 21. Set dateTimeFormat.[[NumberingSystem]] to r.[[nu]].
     date_time_format.as(DateTimeFormat).fields.numbering_system = resolved.numbering_system;
@@ -382,7 +382,7 @@ pub fn createDateTimeFormat(
         .{ "short", .short },
     });
     date_time_format.as(DateTimeFormat).fields.date_style = if (date_style) |s|
-        date_style_map.get(s.data.slice.ascii).?
+        date_style_map.get(s.slice.ascii).?
     else
         null;
 
@@ -411,7 +411,7 @@ pub fn createDateTimeFormat(
         .{ "short", .short },
     });
     date_time_format.as(DateTimeFormat).fields.time_style = if (time_style) |s|
-        time_style_map.get(s.data.slice.ascii).?
+        time_style_map.get(s.slice.ascii).?
     else
         null;
 
@@ -476,7 +476,7 @@ pub fn createDateTimeFormat(
 /// 11.2 Properties of the Intl.DateTimeFormat Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-datetimeformat-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "DateTimeFormat",
@@ -485,7 +485,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 11.2.1 Intl.DateTimeFormat.prototype
         // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -498,7 +498,7 @@ pub const constructor = struct {
 
     /// 11.1.1 Intl.DateTimeFormat ( [ locales [ , options ] ] )
     /// https://tc39.es/ecma402/#sec-intl.datetimeformat
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const locales = arguments.get(0);
         const options = arguments.get(1);
 
@@ -528,13 +528,13 @@ pub const constructor = struct {
 /// 11.3 Properties of the Intl.DateTimeFormat Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-datetimeformat-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "format", format, null, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
@@ -722,10 +722,10 @@ pub const DateTimeFormat = MakeObject(.{
         calendar: icu4zig.Calendar.Kind,
 
         /// [[NumberingSystem]]
-        numbering_system: String,
+        numbering_system: *const String,
 
         /// [[TimeZone]]
-        time_zone: String,
+        time_zone: *const String,
 
         // TODO: [[HourCycle]]
 
@@ -736,14 +736,14 @@ pub const DateTimeFormat = MakeObject(.{
         time_style: ?TimeStyle,
 
         /// [[BoundFormat]]
-        bound_format: ?Object,
+        bound_format: ?*Object,
 
         pub const ResolvedOptions = struct {
-            calendar: String,
-            numbering_system: String,
-            time_zone: String,
-            date_style: ?String,
-            time_style: ?String,
+            calendar: *const String,
+            numbering_system: *const String,
+            time_zone: *const String,
+            date_style: ?*const String,
+            time_style: ?*const String,
         };
 
         pub fn resolvedOptions(self: @This()) ResolvedOptions {
@@ -824,10 +824,10 @@ fn formatDateTimeImpl(
     //       DateTimeZoneInfoMissingFieldsError so we hardcode standard time for now.
     time_zone_info.setStandardTime();
     time_zone_info.setOffsetStr(
-        date_time_format.fields.time_zone.data.slice.ascii,
+        date_time_format.fields.time_zone.slice.ascii,
     ) catch time_zone_info.setIanaTimeZoneId(
         time_zone_id_mapper,
-        date_time_format.fields.time_zone.data.slice.ascii,
+        date_time_format.fields.time_zone.slice.ascii,
     );
 
     // Approximation, ICU4X API doesn't match ECMA-402

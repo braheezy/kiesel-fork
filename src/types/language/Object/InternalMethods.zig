@@ -18,54 +18,54 @@ const InternalMethods = @This();
 
 /// [[GetPrototypeOf]]
 getPrototypeOf: *const fn (
-    object: Object,
-) Agent.Error!?Object = builtins.ordinary.internal_methods.getPrototypeOf,
+    object: *Object,
+) Agent.Error!?*Object = builtins.ordinary.internal_methods.getPrototypeOf,
 
 /// [[SetPrototypeOf]]
 setPrototypeOf: *const fn (
-    object: Object,
-    prototype: ?Object,
+    object: *Object,
+    prototype: ?*Object,
 ) Agent.Error!bool = builtins.ordinary.internal_methods.setPrototypeOf,
 
 /// [[IsExtensible]]
 isExtensible: *const fn (
-    object: Object,
+    object: *Object,
 ) Agent.Error!bool = builtins.ordinary.internal_methods.isExtensible,
 
 /// [[PreventExtensions]]
 preventExtensions: *const fn (
-    object: Object,
+    object: *Object,
 ) Agent.Error!bool = builtins.ordinary.internal_methods.preventExtensions,
 
 /// [[GetOwnProperty]]
 getOwnProperty: *const fn (
-    object: Object,
+    object: *Object,
     property_key: PropertyKey,
 ) Agent.Error!?PropertyDescriptor = builtins.ordinary.internal_methods.getOwnProperty,
 
 /// [[DefineOwnProperty]]
 defineOwnProperty: *const fn (
-    object: Object,
+    object: *Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
 ) Agent.Error!bool = builtins.ordinary.internal_methods.defineOwnProperty,
 
 /// [[HasProperty]]
 hasProperty: *const fn (
-    object: Object,
+    object: *Object,
     property_key: PropertyKey,
 ) Agent.Error!bool = builtins.ordinary.internal_methods.hasProperty,
 
 /// [[Get]]
 get: *const fn (
-    object: Object,
+    object: *Object,
     property_key: PropertyKey,
     receiver: Value,
 ) Agent.Error!Value = builtins.ordinary.internal_methods.get,
 
 /// [[Set]]
 set: *const fn (
-    object: Object,
+    object: *Object,
     property_key: PropertyKey,
     value: Value,
     receiver: Value,
@@ -73,28 +73,28 @@ set: *const fn (
 
 /// [[Delete]]
 delete: *const fn (
-    object: Object,
+    object: *Object,
     property_key: PropertyKey,
 ) Agent.Error!bool = builtins.ordinary.internal_methods.delete,
 
 // [[OwnPropertyKeys]]
 ownPropertyKeys: *const fn (
-    object: Object,
+    object: *Object,
 ) Agent.Error!std.ArrayList(PropertyKey) = builtins.ordinary.internal_methods.ownPropertyKeys,
 
 // [[Call]]
 call: ?*const fn (
-    object: Object,
+    object: *Object,
     this_value: Value,
     arguments: Arguments,
 ) Agent.Error!Value = null,
 
 // [[Construct]]
 construct: ?*const fn (
-    object: Object,
+    object: *Object,
     arguments: Arguments,
-    new_target: Object,
-) Agent.Error!Object = null,
+    new_target: *Object,
+) Agent.Error!*Object = null,
 
 pub fn create(
     allocator: std.mem.Allocator,

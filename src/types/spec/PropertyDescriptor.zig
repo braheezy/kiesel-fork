@@ -24,10 +24,10 @@ value: ?Value = null,
 writable: ?bool = null,
 
 /// [[Get]]
-get: ??Object = null,
+get: ??*Object = null,
 
 /// [[Set]]
-set: ??Object = null,
+set: ??*Object = null,
 
 /// [[Enumerable]]
 enumerable: ?bool = null,
@@ -70,7 +70,7 @@ pub fn isGenericDescriptor(self: PropertyDescriptor) bool {
 pub fn fromPropertyDescriptor(
     self: PropertyDescriptor,
     agent: *Agent,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. If Desc is undefined, return undefined.

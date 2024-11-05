@@ -23,7 +23,7 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// 20.3.2 Properties of the Boolean Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-boolean-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "Boolean",
@@ -32,7 +32,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 20.3.2.1 Boolean.prototype
         // https://tc39.es/ecma262/#sec-boolean.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -45,7 +45,7 @@ pub const constructor = struct {
 
     /// 20.3.1.1 Boolean ( value )
     /// https://tc39.es/ecma262/#sec-boolean-constructor-boolean-value
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const value = arguments.get(0);
 
         // 1. Let b be ToBoolean(value).
@@ -74,7 +74,7 @@ pub const constructor = struct {
 /// 20.3.3 Properties of the Boolean Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-boolean-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return Boolean.create(realm.agent, .{
             .fields = .{
                 .boolean_data = false,
@@ -83,7 +83,7 @@ pub const prototype = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
 

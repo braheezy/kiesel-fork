@@ -95,7 +95,7 @@ pub const ECMAScriptFunction = MakeObject(.{
         strict: bool,
 
         /// [[HomeObject]]
-        home_object: ?Object,
+        home_object: ?*Object,
 
         /// [[SourceText]]
         source_text: []const u8,
@@ -201,8 +201,8 @@ pub const ECMAScriptFunction = MakeObject(.{
 
 /// 10.2.1 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-ecmascript-function-objects-call-thisargument-argumentslist
-fn call(object: Object, this_argument: Value, arguments_list: Arguments) Agent.Error!Value {
-    const agent = object.agent();
+fn call(object: *Object, this_argument: Value, arguments_list: Arguments) Agent.Error!Value {
+    const agent = object.agent;
     const function = object.as(ECMAScriptFunction);
 
     try agent.checkStackOverflow();
@@ -256,7 +256,7 @@ fn call(object: Object, this_argument: Value, arguments_list: Arguments) Agent.E
 fn prepareForOrdinaryCall(
     agent: *Agent,
     function: *ECMAScriptFunction,
-    new_target: ?Object,
+    new_target: ?*Object,
 ) std.mem.Allocator.Error!*ExecutionContext {
     // 1. Let callerContext be the running execution context.
     // NOTE: This is only used to suspend the context, which we don't do yet.
@@ -267,7 +267,7 @@ fn prepareForOrdinaryCall(
     // 2. Let calleeContext be a new ECMAScript code execution context.
     const callee_context: ExecutionContext = .{
         // 3. Set the Function of calleeContext to F.
-        .function = function.object(),
+        .function = &function.object,
 
         // 4. Let calleeRealm be F.[[Realm]].
         // 5. Set the Realm of calleeContext to calleeRealm.
@@ -420,7 +420,7 @@ fn evaluateGeneratorBody(
     const generator = try ordinaryCreateFromConstructor(
         builtins.Generator,
         agent,
-        function.object(),
+        &function.object,
         "%GeneratorPrototype%",
         .{
             // 3. Set G.[[GeneratorBrand]] to empty.
@@ -455,7 +455,7 @@ fn evaluateAsyncGeneratorBody(
     const generator = try ordinaryCreateFromConstructor(
         builtins.AsyncGenerator,
         agent,
-        function.object(),
+        &function.object,
         "%AsyncGeneratorPrototype%",
         .{
             // 3. Set generator.[[GeneratorBrand]] to empty.
@@ -516,12 +516,8 @@ fn evaluateAsyncFunctionBody(
 
 /// 10.2.2 [[Construct]] ( argumentsList, newTarget )
 /// https://tc39.es/ecma262/#sec-ecmascript-function-objects-construct-argumentslist-newtarget
-fn construct(
-    object: Object,
-    arguments_list: Arguments,
-    new_target: Object,
-) Agent.Error!Object {
-    const agent = object.agent();
+fn construct(object: *Object, arguments_list: Arguments, new_target: *Object) Agent.Error!*Object {
+    const agent = object.agent;
     const function = object.as(ECMAScriptFunction);
 
     try agent.checkStackOverflow();
@@ -532,7 +528,7 @@ fn construct(
     // 2. Let kind be F.[[ConstructorKind]].
     const kind = function.fields.constructor_kind;
 
-    var this_argument: Object = undefined;
+    var this_argument: *Object = undefined;
 
     // 3. If kind is base, then
     if (kind == .base) {
@@ -558,7 +554,7 @@ fn construct(
         try ordinaryCallBindThis(agent, function, callee_context, Value.from(this_argument));
 
         // b. Let initializeResult be Completion(InitializeInstanceElements(thisArgument, F)).
-        const initialize_result = this_argument.initializeInstanceElements(function.object());
+        const initialize_result = this_argument.initializeInstanceElements(&function.object);
 
         // c. If initializeResult is an abrupt completion, then
         initialize_result catch |err| {
@@ -620,14 +616,14 @@ fn construct(
 /// https://tc39.es/ecma262/#sec-ordinaryfunctioncreate
 pub fn ordinaryFunctionCreate(
     agent: *Agent,
-    function_prototype: Object,
+    function_prototype: *Object,
     source_text: []const u8,
     parameter_list: ast.FormalParameters,
     body: ast.FunctionBody,
     this_mode: enum { lexical_this, non_lexical_this },
     env: Environment,
     private_env: ?*PrivateEnvironment,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     // 7. Let Strict be IsStrict(Body).
     const strict = body.strict;
 
@@ -705,7 +701,7 @@ pub fn ordinaryFunctionCreate(
 /// 10.2.4 AddRestrictedFunctionProperties ( F, realm )
 /// https://tc39.es/ecma262/#sec-addrestrictedfunctionproperties
 pub fn addRestrictedFunctionProperties(
-    function: Object,
+    function: *Object,
     realm: *Realm,
 ) std.mem.Allocator.Error!void {
     // 1. Assert: realm.[[Intrinsics]].[[%ThrowTypeError%]] exists and has been initialized.
@@ -741,13 +737,13 @@ pub fn addRestrictedFunctionProperties(
 /// 10.2.5 MakeConstructor ( F [ , writablePrototype [ , prototype ] ] )
 /// https://tc39.es/ecma262/#sec-makeconstructor
 pub fn makeConstructor(
-    function: Object,
+    function: *Object,
     args: struct {
         writable_prototype: bool = true,
-        prototype: ?Object = null,
+        prototype: ?*Object = null,
     },
 ) std.mem.Allocator.Error!void {
-    const agent = function.agent();
+    const agent = function.agent;
     const realm = agent.currentRealm();
 
     // 1. If F is an ECMAScript function object, then
@@ -757,16 +753,16 @@ pub fn makeConstructor(
 
         // b. Assert: F is an extensible object that does not have a "prototype" own property.
         std.debug.assert(
-            function.extensible().* and !function.propertyStorage().has(PropertyKey.from("prototype")),
+            function.extensible and !function.property_storage.has(PropertyKey.from("prototype")),
         );
 
         // c. Set F.[[Construct]] to the definition specified in 10.2.2.
-        function.data.internal_methods = try Object.InternalMethods.create(agent.gc_allocator, function.data.internal_methods, &.{ .construct = construct });
+        function.internal_methods = try Object.InternalMethods.create(agent.gc_allocator, function.internal_methods, &.{ .construct = construct });
     }
     // 2. Else,
     else {
         // a. Set F.[[Construct]] to the definition specified in 10.3.2.
-        function.data.internal_methods = try Object.InternalMethods.create(agent.gc_allocator, function.data.internal_methods, &.{ .construct = builtin_function.construct });
+        function.internal_methods = try Object.InternalMethods.create(agent.gc_allocator, function.internal_methods, &.{ .construct = builtin_function.construct });
     }
 
     // 3. Set F.[[ConstructorKind]] to base.
@@ -826,10 +822,7 @@ pub fn makeClassConstructor(function: *ECMAScriptFunction) void {
 
 /// 10.2.7 MakeMethod ( F, homeObject )
 /// https://tc39.es/ecma262/#sec-makemethod
-pub fn makeMethod(
-    function: *ECMAScriptFunction,
-    home_object: Object,
-) void {
+pub fn makeMethod(function: *ECMAScriptFunction, home_object: *Object) void {
     // 1. Set F.[[HomeObject]] to homeObject.
     function.fields.home_object = home_object;
 
@@ -839,9 +832,9 @@ pub fn makeMethod(
 /// 10.2.8 DefineMethodProperty ( homeObject, key, closure, enumerable )
 /// https://tc39.es/ecma262/#sec-definemethodproperty
 pub fn defineMethodProperty(
-    home_object: Object,
+    home_object: *Object,
     key: PropertyKeyOrPrivateName,
-    closure: Object,
+    closure: *Object,
     enumerable: bool,
 ) Agent.Error!?PrivateMethodDefinition {
     // 1. Assert: homeObject is an ordinary, extensible object.
@@ -883,26 +876,26 @@ pub fn defineMethodProperty(
 /// 10.2.9 SetFunctionName ( F, name [ , prefix ] )
 /// https://tc39.es/ecma262/#sec-setfunctionname
 pub fn setFunctionName(
-    function: Object,
+    function: *Object,
     key: anytype,
     prefix: ?[]const u8,
 ) std.mem.Allocator.Error!void {
     comptime std.debug.assert(@TypeOf(key) == PropertyKey or @TypeOf(key) == PropertyKeyOrPrivateName);
-    const agent = function.agent();
+    const agent = function.agent;
 
     // 1. Assert: F is an extensible object that does not have a "name" own property.
     std.debug.assert(
-        function.extensible().* and !function.propertyStorage().has(PropertyKey.from("name")),
+        function.extensible and !function.property_storage.has(PropertyKey.from("name")),
     );
 
-    var name: String = switch (if (@TypeOf(key) == PropertyKey) PropertyKeyOrPrivateName{ .property_key = key } else key) {
+    var name: *const String = switch (if (@TypeOf(key) == PropertyKey) PropertyKeyOrPrivateName{ .property_key = key } else key) {
         .property_key => |property_key| switch (try property_key.toStringOrSymbol(agent)) {
             .string => |string| string,
 
             // 2. If name is a Symbol, then
             .symbol => |symbol| blk: {
                 // a. Let description be name's [[Description]] value.
-                const description = symbol.data.description;
+                const description = symbol.description;
 
                 // b. If description is undefined, set name to the empty String.
                 if (description == null) break :blk .empty;
@@ -917,7 +910,7 @@ pub fn setFunctionName(
         // 3. Else if name is a Private Name, then
         .private_name => |private_name| blk: {
             // a. Set name to name.[[Description]].
-            break :blk private_name.symbol.data.description.?;
+            break :blk private_name.symbol.description.?;
         },
     };
 
@@ -962,7 +955,7 @@ pub fn setFunctionName(
 
 /// 10.2.10 SetFunctionLength ( F, length )
 /// https://tc39.es/ecma262/#sec-setfunctionlength
-pub fn setFunctionLength(function: Object, length: f64) std.mem.Allocator.Error!void {
+pub fn setFunctionLength(function: *Object, length: f64) std.mem.Allocator.Error!void {
     std.debug.assert(
         std.math.isPositiveInf(length) or
             (std.math.isFinite(length) and std.math.trunc(length) == length and length >= 0),
@@ -970,7 +963,7 @@ pub fn setFunctionLength(function: Object, length: f64) std.mem.Allocator.Error!
 
     // 1. Assert: F is an extensible object that does not have a "length" own property.
     std.debug.assert(
-        function.extensible().* and !function.propertyStorage().has(PropertyKey.from("length")),
+        function.extensible and !function.property_storage.has(PropertyKey.from("length")),
     );
 
     // 2. Perform ! DefinePropertyOrThrow(F, "length", PropertyDescriptor {
@@ -1188,7 +1181,7 @@ fn functionDeclarationInstantiation(
             // ii. Let ao be CreateMappedArgumentsObject(func, formals, argumentsList, env).
             break :ao_blk try createMappedArgumentsObject(
                 agent,
-                function.object(),
+                &function.object,
                 formals,
                 arguments_list.values,
                 env,

@@ -489,7 +489,7 @@ pub fn timeClip(time: f64) f64 {
 
 /// 21.4.1.32 Date Time String Format
 /// https://tc39.es/ecma262/#sec-date-time-string-format
-pub fn parseDateTimeString(string: String) f64 {
+pub fn parseDateTimeString(string: *const String) f64 {
     const invalid = std.math.nan(f64);
     // Yes, this is abuse of the std.fmt.Parser :)
     // TODO: Handle short forms (missing month/date/seconds/milliseconds), and probably rewrite
@@ -517,7 +517,7 @@ pub fn parseDateTimeString(string: String) f64 {
         }
     };
     var parser: std.fmt.Parser = .{
-        .buf = switch (string.data.slice) {
+        .buf = switch (string.slice) {
             .ascii => |ascii| ascii,
             .utf16 => return invalid,
         },
@@ -708,7 +708,7 @@ pub fn toDateString(
 /// 21.4.3 Properties of the Date Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-date-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 7,
             .name = "Date",
@@ -717,7 +717,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "now", now, 0, realm);
         try defineBuiltinFunction(object, "parse", parse, 1, realm);
         try defineBuiltinFunction(object, "UTC", UTC, 7, realm);
@@ -734,7 +734,7 @@ pub const constructor = struct {
 
     /// 21.4.2.1 Date ( ...values )
     /// https://tc39.es/ecma262/#sec-date
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         // 1. If NewTarget is undefined, then
         if (new_target == null) {
             // a. Let now be the time value (UTC) identifying the current time.
@@ -894,13 +894,13 @@ pub const constructor = struct {
 /// 21.4.4 Properties of the Date Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-date-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "getDate", getDate, 0, realm);
         try defineBuiltinFunction(object, "getDay", getDay, 0, realm);
         try defineBuiltinFunction(object, "getFullYear", getFullYear, 0, realm);
@@ -964,7 +964,7 @@ pub const prototype = struct {
 
             // B.2.3.3 Date.prototype.toGMTString ( )
             // https://tc39.es/ecma262/#sec-date.prototype.togmtstring
-            const @"%Date.prototype.toUTCString%" = object.propertyStorage().get(PropertyKey.from("toUTCString")).?;
+            const @"%Date.prototype.toUTCString%" = object.property_storage.get(PropertyKey.from("toUTCString")).?;
             try defineBuiltinProperty(object, "toGMTString", @"%Date.prototype.toUTCString%");
         }
     }

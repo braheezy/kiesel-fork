@@ -34,7 +34,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// 13.2 Properties of the Intl.ListFormat Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "ListFormat",
@@ -43,7 +43,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 13.2.1 Intl.ListFormat.prototype
         // https://tc39.es/ecma402/#sec-Intl.ListFormat.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -56,7 +56,7 @@ pub const constructor = struct {
 
     /// 13.1.1 Intl.ListFormat ( [ locales [ , options ] ] )
     /// https://tc39.es/ecma402/#sec-Intl.ListFormat
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const locales = arguments.get(0);
         const options_value = arguments.get(1);
 
@@ -135,7 +135,7 @@ pub const constructor = struct {
             .{ "disjunction", .disjunction },
             .{ "unit", .unit },
         });
-        list_format.as(ListFormat).fields.type = type_map.get(type_.data.slice.ascii).?;
+        list_format.as(ListFormat).fields.type = type_map.get(type_.slice.ascii).?;
 
         // 12. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow" »,
         //     "long").
@@ -159,7 +159,7 @@ pub const constructor = struct {
             .{ "short", .short },
             .{ "narrow", .narrow },
         });
-        list_format.as(ListFormat).fields.style = style_map.get(style.data.slice.ascii).?;
+        list_format.as(ListFormat).fields.style = style_map.get(style.slice.ascii).?;
 
         // TODO: 14. Let resolvedLocaleData be r.[[LocaleData]].
         // TODO: 15. Let dataLocaleTypes be resolvedLocaleData.[[<type>]].
@@ -173,13 +173,13 @@ pub const constructor = struct {
 /// 13.3 Properties of the Intl.ListFormat Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-listformat-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "format", format, 1, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
@@ -286,8 +286,8 @@ pub const ListFormat = MakeObject(.{
         style: Style,
 
         pub const ResolvedOptions = struct {
-            type: String,
-            style: String,
+            type: *const String,
+            style: *const String,
         };
 
         pub fn resolvedOptions(self: @This()) ResolvedOptions {
@@ -316,7 +316,7 @@ fn formatList(
     allocator: std.mem.Allocator,
     list_format: *const ListFormat,
     list: []const []const u8,
-) std.mem.Allocator.Error!String {
+) std.mem.Allocator.Error!*const String {
     const data_provider = icu4zig.DataProvider.init();
     defer data_provider.deinit();
     const list_formatter = icu4zig.ListFormatter.init(

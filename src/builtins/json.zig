@@ -71,9 +71,9 @@ fn convertJsonValue(agent: *Agent, value: std.json.Value) std.mem.Allocator.Erro
 /// https://tc39.es/ecma262/#sec-internalizejsonproperty
 fn internalizeJSONProperty(
     agent: *Agent,
-    holder: Object,
+    holder: *Object,
     name: PropertyKey,
-    reviver: Object,
+    reviver: *Object,
 ) Agent.Error!Value {
     // 1. Let val be ? Get(holder, name).
     const value = try holder.get(name);
@@ -107,7 +107,7 @@ fn internalizeJSONProperty(
                 // 3. If newElement is undefined, then
                 if (new_element.isUndefined()) {
                     // a. Perform ? val.[[Delete]](prop).
-                    _ = try value.asObject().internalMethods().delete(value.asObject(), property_key);
+                    _ = try value.asObject().internal_methods.delete(value.asObject(), property_key);
                 }
                 // 4. Else,
                 else {
@@ -139,7 +139,7 @@ fn internalizeJSONProperty(
                 // 2. If newElement is undefined, then
                 if (new_element.isUndefined()) {
                     // a. Perform ? val.[[Delete]](P).
-                    _ = try value.asObject().internalMethods().delete(value.asObject(), property_key);
+                    _ = try value.asObject().internal_methods.delete(value.asObject(), property_key);
                 }
                 // 3. Else,
                 else {
@@ -160,22 +160,22 @@ fn internalizeJSONProperty(
 /// 25.5.2.1 JSON Serialization Record
 /// https://tc39.es/ecma262/#sec-json-serialization-record
 const JSONSerialization = struct {
-    pub const Stack = std.AutoHashMap(Object, void);
+    pub const Stack = std.AutoHashMap(*Object, void);
 
     /// [[ReplacerFunction]]
-    replacer_function: ?Object,
+    replacer_function: ?*Object,
 
     /// [[PropertyList]]
     property_list: ?PropertyKeyArrayHashMap(void),
 
     /// [[Gap]]
-    gap: String,
+    gap: *const String,
 
     /// [[Stack]]
     stack: Stack,
 
     /// [[Indent]]
-    indent: String,
+    indent: *const String,
 };
 
 /// 25.5.2.2 SerializeJSONProperty ( state, key, holder )
@@ -184,8 +184,8 @@ fn serializeJSONProperty(
     agent: *Agent,
     state: *JSONSerialization,
     key: PropertyKey,
-    holder: Object,
-) Agent.Error!?String {
+    holder: *Object,
+) Agent.Error!?*const String {
     // 1. Let value be ? Get(holder, key).
     var value = try holder.get(key);
 
@@ -278,7 +278,7 @@ fn serializeJSONProperty(
 
 /// 25.5.2.3 QuoteJSONString ( value )
 /// https://tc39.es/ecma262/#sec-quotejsonstring
-fn quoteJSONString(agent: *Agent, value: String) std.mem.Allocator.Error!String {
+fn quoteJSONString(agent: *Agent, value: *const String) std.mem.Allocator.Error!*const String {
     // 1. Let product be the String value consisting solely of the code unit 0x0022 (QUOTATION MARK).
     var product = std.ArrayList(u8).init(agent.gc_allocator);
     try product.append('"');
@@ -346,8 +346,8 @@ fn unicodeEscape(agent: *Agent, c: u16) std.mem.Allocator.Error![]const u8 {
 fn serializeJSONObject(
     agent: *Agent,
     state: *JSONSerialization,
-    value: Object,
-) error{ OutOfMemory, ExceptionThrown }!String {
+    value: *Object,
+) error{ OutOfMemory, ExceptionThrown }!*const String {
     // 1. If state.[[Stack]] contains value, throw a TypeError exception because the structure is
     //    cyclical.
     if (state.stack.contains(value)) {
@@ -479,8 +479,8 @@ fn serializeJSONObject(
 fn serializeJSONArray(
     agent: *Agent,
     state: *JSONSerialization,
-    value: Object,
-) error{ OutOfMemory, ExceptionThrown }!String {
+    value: *Object,
+) error{ OutOfMemory, ExceptionThrown }!*const String {
     // 1. If state.[[Stack]] contains value, throw a TypeError exception because the structure is
     //    cyclical.
     if (state.stack.contains(value)) {
@@ -591,13 +591,13 @@ fn serializeJSONArray(
 }
 
 pub const namespace = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 25.5.3 JSON [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-json-%symbol.tostringtag%
         try defineBuiltinProperty(object, "%Symbol.toStringTag%", PropertyDescriptor{
@@ -688,14 +688,14 @@ pub const namespace = struct {
         defer stack.deinit();
 
         // 2. Let indent be the empty String.
-        const indent: String = .empty;
+        const indent: *const String = .empty;
 
         // 3. Let PropertyList be undefined.
         var property_list: ?PropertyKeyArrayHashMap(void) = null;
         defer if (property_list) |*p| p.deinit();
 
         // 4. Let ReplacerFunction be undefined.
-        var replacer_function: ?Object = null;
+        var replacer_function: ?*Object = null;
 
         // 5. If replacer is an Object, then
         if (replacer.isObject()) {
@@ -779,7 +779,7 @@ pub const namespace = struct {
         }
 
         // 7. If space is a Number, then
-        const gap: String = if (space.isNumber()) blk: {
+        const gap: *const String = if (space.isNumber()) blk: {
             // a. Let spaceMV be ! ToIntegerOrInfinity(space).
             // b. Set spaceMV to min(10, spaceMV).
             const space_mv = @min(10, space.toIntegerOrInfinity(agent) catch unreachable);

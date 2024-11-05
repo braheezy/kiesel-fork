@@ -34,8 +34,8 @@ const ordinaryObjectCreate = ordinary.ordinaryObjectCreate;
 const sameValueZero = types.sameValueZero;
 
 // Non-standard helper to get the length property of an array
-pub fn getArrayLength(array: Object) u32 {
-    const property_descriptor = array.propertyStorage().get(PropertyKey.from("length")).?;
+pub fn getArrayLength(array: *const Object) u32 {
+    const property_descriptor = array.property_storage.get(PropertyKey.from("length")).?;
     const value = property_descriptor.value.?;
     return @intFromFloat(value.asNumber().asFloat());
 }
@@ -43,11 +43,11 @@ pub fn getArrayLength(array: Object) u32 {
 /// 10.4.2.1 [[DefineOwnProperty]] ( P, Desc )
 /// https://tc39.es/ecma262/#sec-array-exotic-objects-defineownproperty-p-desc
 fn defineOwnProperty(
-    array: Object,
+    array: *Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
 ) Agent.Error!bool {
-    const agent = array.agent();
+    const agent = array.agent;
 
     // 1. If P is "length", then
     if (property_key == .string and property_key.string.eql(String.fromLiteral("length"))) {
@@ -116,7 +116,7 @@ fn defineOwnProperty(
 
 /// 10.4.2.2 ArrayCreate ( length [ , proto ] )
 /// https://tc39.es/ecma262/#sec-arraycreate
-pub fn arrayCreate(agent: *Agent, length: u64, maybe_prototype: ?Object) Agent.Error!Object {
+pub fn arrayCreate(agent: *Agent, length: u64, maybe_prototype: ?*Object) Agent.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. If length > 2**32 - 1, throw a RangeError exception.
@@ -154,7 +154,7 @@ pub fn arrayCreate(agent: *Agent, length: u64, maybe_prototype: ?Object) Agent.E
 
 /// 10.4.2.3 ArraySpeciesCreate ( originalArray, length )
 /// https://tc39.es/ecma262/#sec-arrayspeciescreate
-pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: u64) Agent.Error!Object {
+pub fn arraySpeciesCreate(agent: *Agent, original_array: *Object, length: u64) Agent.Error!*Object {
     // 1. Let isArray be ? IsArray(originalArray).
     const is_array = try Value.from(original_array).isArray();
 
@@ -175,7 +175,7 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: u64) Ag
         // c. If thisRealm and realmC are not the same Realm Record, then
         if (this_realm != constructor_realm) {
             // i. If SameValue(C, realmC.[[Intrinsics]].[[%Array%]]) is true, set C to undefined.
-            if (constructor_.asObject().sameValue(try constructor_realm.intrinsics.@"%Array%"())) {
+            if (constructor_.asObject() == try constructor_realm.intrinsics.@"%Array%"()) {
                 constructor_ = .undefined;
             }
         }
@@ -209,7 +209,7 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: Object, length: u64) Ag
 /// https://tc39.es/ecma262/#sec-arraysetlength
 pub fn arraySetLength(
     agent: *Agent,
-    array: Object,
+    array: *Object,
     property_descriptor: PropertyDescriptor,
 ) Agent.Error!bool {
     // 1. If Desc does not have a [[Value]] field, then
@@ -299,7 +299,7 @@ pub fn arraySetLength(
     //       otherwise we loop through indices in reverse order and bail out if no property exists.
     var maybe_indices = if (old_len >= 1_000_000) blk: {
         var indices = std.ArrayList(u32).init(agent.gc_allocator);
-        for (array.propertyStorage().hash_map.keys()) |property_key| {
+        for (array.property_storage.hash_map.keys()) |property_key| {
             if (property_key.isArrayIndex() and property_key.integer_index >= new_len) {
                 try indices.append(@as(u32, @intCast(property_key.integer_index)));
             }
@@ -319,10 +319,10 @@ pub fn arraySetLength(
             std.math.sub(u32, index.?, 1) catch null;
     }) {
         const property_key = PropertyKey.from(@as(u53, index.?));
-        if (maybe_indices == null and !array.propertyStorage().has(property_key)) continue;
+        if (maybe_indices == null and !array.property_storage.has(property_key)) continue;
 
         // a. Let deleteSucceeded be ! A.[[Delete]](P).
-        const delete_succeeded = array.internalMethods().delete(
+        const delete_succeeded = array.internal_methods.delete(
             array,
             property_key,
         ) catch |err| try noexcept(err);
@@ -369,7 +369,7 @@ pub fn arraySetLength(
 /// 23.1.2 Properties of the Array Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-array-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "Array",
@@ -378,7 +378,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "from", from, 1, realm);
         try defineBuiltinFunction(object, "isArray", isArray, 1, realm);
         try defineBuiltinFunction(object, "of", of, 0, realm);
@@ -396,7 +396,7 @@ pub const constructor = struct {
 
     /// 23.1.1.1 Array ( ...values )
     /// https://tc39.es/ecma262/#sec-array
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         // 1. If NewTarget is undefined, let newTarget be the active function object; else let newTarget be NewTarget.
         const new_target_ = new_target orelse agent.activeFunctionObject();
 
@@ -707,7 +707,7 @@ pub const constructor = struct {
 /// 23.1.3 Properties of the Array Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-array-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return arrayCreate(
             realm.agent,
             0,
@@ -715,7 +715,7 @@ pub const prototype = struct {
         ) catch |err| try noexcept(err);
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinFunction(object, "concat", concat, 1, realm);
         try defineBuiltinFunction(object, "copyWithin", copyWithin, 2, realm);
@@ -767,7 +767,7 @@ pub const prototype = struct {
         // https://tc39.es/ecma262/#sec-array.prototype-%symbol.iterator%
         // NOTE: We can't use the intrinsic getter for this while creating the underlying prototype
         //       object, as it hasn't been finalized yet.
-        const @"%Array.prototype.values%" = object.propertyStorage().get(PropertyKey.from("values")).?;
+        const @"%Array.prototype.values%" = object.property_storage.get(PropertyKey.from("values")).?;
         try defineBuiltinProperty(object, "%Symbol.iterator%", @"%Array.prototype.values%");
 
         // 23.1.3.41 Array.prototype [ %Symbol.unscopables% ]
@@ -1382,12 +1382,12 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-flattenintoarray
     fn flattenIntoArray(
         agent: *Agent,
-        target: Object,
-        source: Object,
+        target: *Object,
+        source: *Object,
         source_len: u53,
         start: f64,
         depth: f64,
-        mapper_function: ?Object,
+        mapper_function: ?*Object,
         this_arg: ?Value,
     ) Agent.Error!f64 {
         // 1. Assert: If mapperFunction is present, then IsCallable(mapperFunction) is true,
@@ -2432,7 +2432,7 @@ pub const prototype = struct {
         // 4. Let SortCompare be a new Abstract Closure with parameters (x, y) that captures
         //    comparator and performs the following steps when called:
         const sortCompare = struct {
-            fn func(agent_: *Agent, x: Value, y: Value, comparator_: ?Object) Agent.Error!std.math.Order {
+            fn func(agent_: *Agent, x: Value, y: Value, comparator_: ?*Object) Agent.Error!std.math.Order {
                 // a. Return ? CompareArrayElements(x, y, comparator).
                 return compareArrayElements(agent_, x, y, comparator_);
             }
@@ -2772,7 +2772,7 @@ pub const prototype = struct {
         // 5. Let SortCompare be a new Abstract Closure with parameters (x, y) that captures
         //    comparator and performs the following steps when called:
         const sortCompare = struct {
-            fn func(agent_: *Agent, x: Value, y: Value, comparator_: ?Object) Agent.Error!std.math.Order {
+            fn func(agent_: *Agent, x: Value, y: Value, comparator_: ?*Object) Agent.Error!std.math.Order {
                 // a. Return ? CompareArrayElements(x, y, comparator).
                 return compareArrayElements(agent_, x, y, comparator_);
             }
@@ -3091,13 +3091,13 @@ pub const prototype = struct {
 /// 23.1.3.12.1 FindViaPredicate ( O, len, direction, predicate, thisArg )
 /// https://tc39.es/ecma262/#sec-findviapredicate
 pub fn findViaPredicate(
-    object: Object,
+    object: *Object,
     len: u53,
     comptime direction: enum { ascending, descending },
     predicate: Value,
     this_arg: Value,
 ) Agent.Error!struct { index: Value, value: Value } {
-    const agent = object.agent();
+    const agent = object.agent;
 
     // 1. If IsCallable(predicate) is false, throw a TypeError exception.
     if (!predicate.isCallable()) {
@@ -3145,9 +3145,9 @@ const SortCompare = struct {
         agent: *Agent,
         x: Value,
         y: Value,
-        comparator: ?Object,
+        comparator: ?*Object,
     ) Agent.Error!std.math.Order,
-    comparator: ?Object,
+    comparator: ?*Object,
 };
 
 /// Custom insertion sort implementation, `std.mem` doesn't have fallible sorting functions
@@ -3172,7 +3172,7 @@ fn insertionSort(agent: *Agent, items: []Value, sort_compare: SortCompare) Agent
 /// https://tc39.es/ecma262/#sec-sortindexedproperties
 pub fn sortIndexedProperties(
     agent: *Agent,
-    object: Object,
+    object: *Object,
     len: u53,
     sort_compare: SortCompare,
     comptime holes: enum { skip_holes, read_through_holes },
@@ -3229,7 +3229,7 @@ pub fn compareArrayElements(
     agent: *Agent,
     x: Value,
     y: Value,
-    maybe_comparator: ?Object,
+    maybe_comparator: ?*Object,
 ) Agent.Error!std.math.Order {
     // 1. If x and y are both undefined, return +0𝔽.
     if (x.isUndefined() and y.isUndefined()) return .eq;

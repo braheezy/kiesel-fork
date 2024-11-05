@@ -24,10 +24,10 @@ declarative_environment: *DeclarativeEnvironment,
 
 pub const IndirectBinding = struct {
     module: *SourceTextModule,
-    binding_name: String,
+    binding_name: *const String,
 };
 
-pub fn hasBinding(self: ModuleEnvironment, name: String) bool {
+pub fn hasBinding(self: ModuleEnvironment, name: *const String) bool {
     // Handled via DeclarativeEnvironment in the spec but with a vague "has a binding", so we need
     // to override the implementation and check the indirect bindings as well.
     return self.indirect_bindings.contains(name) or self.declarative_environment.bindings.contains(name);
@@ -38,7 +38,7 @@ pub fn hasBinding(self: ModuleEnvironment, name: String) bool {
 pub fn getBindingValue(
     self: ModuleEnvironment,
     agent: *Agent,
-    name: String,
+    name: *const String,
     strict: bool,
 ) error{ ExceptionThrown, OutOfMemory }!Value {
     // 1. Assert: S is true.
@@ -82,7 +82,7 @@ pub fn getBindingValue(
 
 /// 9.1.1.5.2 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-module-environment-records-deletebinding-n
-pub fn deleteBinding(_: *ModuleEnvironment, _: String) bool {
+pub fn deleteBinding(_: *ModuleEnvironment, _: *const String) bool {
     // The DeleteBinding concrete method of a Module Environment Record is never used within this
     // specification.
     unreachable;
@@ -106,9 +106,9 @@ pub fn getThisBinding(_: ModuleEnvironment) Value {
 /// https://tc39.es/ecma262/#sec-createimportbinding
 pub fn createImportBinding(
     self: *ModuleEnvironment,
-    name: String,
+    name: *const String,
     module: *SourceTextModule,
-    binding_name: String,
+    binding_name: *const String,
 ) std.mem.Allocator.Error!void {
     // 1. Assert: envRec does not already have a binding for N.
     // 2. Assert: When M.[[Environment]] is instantiated, it will have a direct binding for N2.

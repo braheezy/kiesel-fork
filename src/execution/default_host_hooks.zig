@@ -23,14 +23,14 @@ const finishLoadingImportedModule = language.finishLoadingImportedModule;
 
 /// 7.3.29 HostEnsureCanAddPrivateElement ( O )
 /// https://tc39.es/ecma262/#sec-hostensurecanaddprivateelement
-pub fn hostEnsureCanAddPrivateElement(_: *Agent, _: Object) Agent.Error!void {
+pub fn hostEnsureCanAddPrivateElement(_: *Agent, _: *Object) Agent.Error!void {
     // The default implementation of HostEnsureCanAddPrivateElement is to return
     // NormalCompletion(unused).
 }
 
 /// 9.5.2 HostMakeJobCallback ( callback )
 /// https://tc39.es/ecma262/#sec-hostmakejobcallback
-pub fn hostMakeJobCallback(callback: Object) JobCallback {
+pub fn hostMakeJobCallback(callback: *Object) JobCallback {
     // 1. Return the JobCallback Record { [[Callback]]: callback, [[HostDefined]]: empty }.
     return .{ .callback = callback, .host_defined = .null_pointer };
 }
@@ -103,7 +103,7 @@ pub fn hostGetImportMetaProperties(
 
 /// 13.3.12.1.2 HostFinalizeImportMeta ( importMeta, moduleRecord )
 /// https://tc39.es/ecma262/#sec-hostfinalizeimportmeta
-pub fn hostFinalizeImportMeta(_: Object, _: *SourceTextModule) void {
+pub fn hostFinalizeImportMeta(_: *Object, _: *SourceTextModule) void {
     // The default implementation of HostFinalizeImportMeta is to return unused.
 }
 
@@ -112,7 +112,7 @@ pub fn hostFinalizeImportMeta(_: Object, _: *SourceTextModule) void {
 pub fn hostLoadImportedModule(
     agent: *Agent,
     referrer: ImportedModuleReferrer,
-    specifier: String,
+    specifier: *const String,
     _: SafePointer,
     payload: ImportedModulePayload,
 ) std.mem.Allocator.Error!void {
@@ -124,8 +124,8 @@ pub fn hostLoadImportedModule(
 /// https://tc39.es/ecma262/#sec-hostensurecancompilestrings
 pub fn hostEnsureCanCompileStrings(
     _: *Realm,
-    _: []const String,
-    _: String,
+    _: []const *const String,
+    _: *const String,
     _: bool,
 ) error{}!void {
     // The default implementation of HostEnsureCanCompileStrings is to return NormalCompletion(unused).
@@ -133,7 +133,7 @@ pub fn hostEnsureCanCompileStrings(
 
 /// 20.2.5 HostHasSourceTextAvailable ( func )
 /// https://tc39.es/ecma262/#sec-hosthassourcetextavailable
-pub fn hostHasSourceTextAvailable(_: Object) bool {
+pub fn hostHasSourceTextAvailable(_: *Object) bool {
     // The default implementation of HostHasSourceTextAvailable is to return true.
     return true;
 }

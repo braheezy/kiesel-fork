@@ -8,9 +8,9 @@ const Value = types.Value;
 
 pub const PrivateElement = union(enum) {
     field: Value,
-    method: Object,
+    method: *Object,
     accessor: struct {
-        get: ?Object,
-        set: ?Object,
+        get: ?*Object,
+        set: ?*Object,
     },
 };

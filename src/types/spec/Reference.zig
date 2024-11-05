@@ -116,7 +116,7 @@ pub fn getValue(self: Reference, agent: *Agent) Agent.Error!Value {
         };
 
         // d. Return ? baseObj.[[Get]](V.[[ReferencedName]], GetThisValue(V)).
-        return base_object.internalMethods().get(
+        return base_object.internal_methods.get(
             base_object,
             property_key,
             self.getThisValue(),
@@ -180,7 +180,7 @@ pub fn putValue(self: Reference, agent: *Agent, value: Value) Agent.Error!void {
         };
 
         // d. Let succeeded be ? baseObj.[[Set]](V.[[ReferencedName]], W, GetThisValue(V)).
-        const succeeded = try base_object.internalMethods().set(
+        const succeeded = try base_object.internal_methods.set(
             base_object,
             property_key,
             value,

@@ -44,7 +44,7 @@ pub const PreferredType = enum { string, number };
 
 pub const Numeric = union(enum) {
     number: Number,
-    big_int: BigInt,
+    big_int: *const BigInt,
 
     pub fn sameType(x: Numeric, y: Numeric) bool {
         return std.meta.activeTag(x) == std.meta.activeTag(y);
@@ -89,12 +89,12 @@ const TaggedUnionImpl = union(enum) {
     undefined,
     null,
     boolean: bool,
-    string: String,
-    symbol: Symbol,
+    string: *const String,
+    symbol: *const Symbol,
     number_i32: i32,
     number_f64: f64,
-    big_int: BigInt,
-    object: Object,
+    big_int: *const BigInt,
+    object: *Object,
 
     pub inline fn from(value: anytype) TaggedUnionImpl {
         const T = @TypeOf(value);
@@ -113,17 +113,16 @@ const TaggedUnionImpl = union(enum) {
                 .i32 => |x| .{ .number_i32 = x },
                 .f64 => |x| .{ .number_f64 = x },
             };
-        } else if (T == BigInt) {
-            return .{ .big_int = value };
-        } else if (T == Object) {
-            return .{ .object = value };
-        } else if (T == String) {
-            return .{ .string = value };
-        } else if (T == Symbol) {
-            return .{ .symbol = value };
-        } else {
-            @compileError("from() called with incompatible type " ++ @typeName(T));
+        } else if (@typeInfo(T) == .pointer) {
+            switch (@typeInfo(T).pointer.child) {
+                BigInt => return .{ .big_int = value },
+                Object => return .{ .object = value },
+                String => return .{ .string = value },
+                Symbol => return .{ .symbol = value },
+                else => {},
+            }
         }
+        @compileError("from() called with incompatible type " ++ @typeName(T));
     }
 
     pub fn @"type"(self: TaggedUnionImpl) Type {
@@ -143,11 +142,11 @@ const TaggedUnionImpl = union(enum) {
         return self.boolean;
     }
 
-    pub fn asString(self: TaggedUnionImpl) String {
+    pub fn asString(self: TaggedUnionImpl) *const String {
         return self.string;
     }
 
-    pub fn asSymbol(self: TaggedUnionImpl) Symbol {
+    pub fn asSymbol(self: TaggedUnionImpl) *const Symbol {
         return self.symbol;
     }
 
@@ -159,11 +158,11 @@ const TaggedUnionImpl = union(enum) {
         };
     }
 
-    pub fn asBigInt(self: TaggedUnionImpl) BigInt {
+    pub fn asBigInt(self: TaggedUnionImpl) *const BigInt {
         return self.big_int;
     }
 
-    pub fn asObject(self: TaggedUnionImpl) Object {
+    pub fn asObject(self: TaggedUnionImpl) *Object {
         return self.object;
     }
 };
@@ -210,13 +209,13 @@ const NanBoxingImpl = enum(u64) {
             .null,
             => void,
             .boolean => bool,
-            .string => *String.Data,
+            .string => *const String,
             .symbol_or_big_int => switch (sign_bit) {
-                0 => *Symbol.Data,
-                1 => *std.math.big.int.Managed,
+                0 => *const Symbol,
+                1 => *const BigInt,
             },
             .number_i32 => i32,
-            .object => *allowzero Object.Data,
+            .object => *Object,
         };
     }
 
@@ -274,7 +273,7 @@ const NanBoxingImpl = enum(u64) {
             return if (value) .boolean_true else .boolean_false;
         } else if (isZigString(T)) {
             const string = String.fromLiteral(value);
-            return init(.string, 0, string.data);
+            return init(.string, 0, string);
         } else if (is_number or T == Number) {
             const number = if (T == Number) value else Number.from(value);
             switch (number) {
@@ -284,17 +283,16 @@ const NanBoxingImpl = enum(u64) {
                     return if (std.math.isNan(x)) .number_nan else init(.number_f64, 0, x);
                 },
             }
-        } else if (T == BigInt) {
-            return init(.symbol_or_big_int, 1, value.managed);
-        } else if (T == Object) {
-            return init(.object, 0, value.data);
-        } else if (T == String) {
-            return init(.string, 0, value.data);
-        } else if (T == Symbol) {
-            return init(.symbol_or_big_int, 0, value.data);
-        } else {
-            @compileError("from() called with incompatible type " ++ @typeName(T));
+        } else if (@typeInfo(T) == .pointer) {
+            switch (@typeInfo(T).pointer.child) {
+                BigInt => return init(.symbol_or_big_int, 1, value),
+                Object => return init(.object, 0, value),
+                String => return init(.string, 0, value),
+                Symbol => return init(.symbol_or_big_int, 0, value),
+                else => {},
+            }
         }
+        @compileError("from() called with incompatible type " ++ @typeName(T));
     }
 
     pub fn @"type"(self: NanBoxingImpl) Type {
@@ -332,20 +330,20 @@ const NanBoxingImpl = enum(u64) {
         };
     }
 
-    pub fn asString(self: NanBoxingImpl) String {
-        return .{ .data = self.getPayload(.string, 0) };
+    pub fn asString(self: NanBoxingImpl) *const String {
+        return self.getPayload(.string, 0);
     }
 
-    pub fn asSymbol(self: NanBoxingImpl) Symbol {
-        return .{ .data = self.getPayload(.symbol_or_big_int, 0) };
+    pub fn asSymbol(self: NanBoxingImpl) *const Symbol {
+        return self.getPayload(.symbol_or_big_int, 0);
     }
 
-    pub fn asBigInt(self: NanBoxingImpl) BigInt {
-        return .{ .managed = self.getPayload(.symbol_or_big_int, 1) };
+    pub fn asBigInt(self: NanBoxingImpl) *const BigInt {
+        return self.getPayload(.symbol_or_big_int, 1);
     }
 
-    pub fn asObject(self: NanBoxingImpl) Object {
-        return .{ .data = self.getPayload(.object, 0) };
+    pub fn asObject(self: NanBoxingImpl) *Object {
+        return self.getPayload(.object, 0);
     }
 };
 
@@ -430,7 +428,7 @@ pub fn isString(self: Value) bool {
     return self.impl.type() == .string;
 }
 
-pub fn asString(self: Value) String {
+pub fn asString(self: Value) *const String {
     return self.impl.asString();
 }
 
@@ -438,7 +436,7 @@ pub fn isSymbol(self: Value) bool {
     return self.impl.type() == .symbol;
 }
 
-pub fn asSymbol(self: Value) Symbol {
+pub fn asSymbol(self: Value) *const Symbol {
     return self.impl.asSymbol();
 }
 
@@ -454,7 +452,7 @@ pub fn isBigInt(self: Value) bool {
     return self.impl.type() == .big_int;
 }
 
-pub fn asBigInt(self: Value) BigInt {
+pub fn asBigInt(self: Value) *const BigInt {
     return self.impl.asBigInt();
 }
 
@@ -462,12 +460,12 @@ pub fn isObject(self: Value) bool {
     return self.impl.type() == .object;
 }
 
-pub fn asObject(self: Value) Object {
+pub fn asObject(self: Value) *Object {
     return self.impl.asObject();
 }
 
 /// Return a string according to the 'typeof' operator semantics.
-pub fn typeof(self: Value) String {
+pub fn typeof(self: Value) *const String {
     // Excerpt from https://tc39.es/ecma262/#sec-typeof-operator-runtime-semantics-evaluation
     return switch (self.type()) {
         // 4. If val is undefined, return "undefined".
@@ -497,13 +495,13 @@ pub fn typeof(self: Value) String {
             // https://tc39.es/ecma262/#sec-IsHTMLDDA-internal-slot-typeof
             if (build_options.enable_annex_b) {
                 // 12. If val has an [[IsHTMLDDA]] internal slot, return "undefined".
-                if (self.asObject().isHTMLDDA()) break :blk String.fromLiteral("undefined");
+                if (self.asObject().is_htmldda) break :blk String.fromLiteral("undefined");
             } else {
                 // 12. NOTE: This step is replaced in section B.3.6.3.
             }
 
             // 13. If val has a [[Call]] internal slot, return "function".
-            if (self.asObject().internalMethods().call) |_| break :blk String.fromLiteral("function");
+            if (self.asObject().internal_methods.call) |_| break :blk String.fromLiteral("function");
 
             // 14. Return "object".
             break :blk String.fromLiteral("object");
@@ -585,7 +583,7 @@ pub fn toPropertyDescriptor(self: Value, agent: *Agent) Agent.Error!PropertyDesc
         }
 
         // c. Set desc.[[Get]] to getter.
-        descriptor.get = if (!getter.isUndefined()) getter.asObject() else @as(?Object, null);
+        descriptor.get = if (!getter.isUndefined()) getter.asObject() else @as(?*Object, null);
     }
 
     // 13. Let hasSet be ? HasProperty(Obj, "set").
@@ -603,7 +601,7 @@ pub fn toPropertyDescriptor(self: Value, agent: *Agent) Agent.Error!PropertyDesc
         }
 
         // c. Set desc.[[Set]] to setter.
-        descriptor.set = if (!setter.isUndefined()) setter.asObject() else @as(?Object, null);
+        descriptor.set = if (!setter.isUndefined()) setter.asObject() else @as(?*Object, null);
     }
 
     // 15. If desc has a [[Get]] field or desc has a [[Set]] field, then
@@ -706,7 +704,7 @@ pub fn toBoolean(self: Value) bool {
     if (build_options.enable_annex_b) {
         // 3. If argument is an Object and argument has an [[IsHTMLDDA]] internal slot, return
         //    false.
-        if (self.isObject() and self.asObject().isHTMLDDA()) return false;
+        if (self.isObject() and self.asObject().is_htmldda) return false;
     } else {
         // 3. NOTE: This step is replaced in section B.3.6.1.
     }
@@ -943,7 +941,7 @@ pub fn toUint8Clamp(self: Value, agent: *Agent) Agent.Error!u8 {
 
 /// 7.1.13 ToBigInt ( argument )
 /// https://tc39.es/ecma262/#sec-tobigint
-pub fn toBigInt(self: Value, agent: *Agent) Agent.Error!BigInt {
+pub fn toBigInt(self: Value, agent: *Agent) Agent.Error!*const BigInt {
     // 1. Let prim be ? ToPrimitive(argument, number).
     const primitive = try self.toPrimitive(agent, .number);
 
@@ -990,7 +988,7 @@ pub fn toBigInt64(self: Value, agent: *Agent) Agent.Error!i64 {
     // 2. Let int64bit be ℝ(n) modulo 2**64.
     // 3. If int64bit ≥ 2**63, return ℤ(int64bit - 2**64); otherwise return ℤ(int64bit).
     var int64bit = try std.math.big.int.Managed.init(agent.gc_allocator);
-    try int64bit.truncate(n.managed, .signed, 64);
+    try int64bit.truncate(&n.managed, .signed, 64);
     return int64bit.to(i64) catch unreachable;
 }
 
@@ -1003,13 +1001,13 @@ pub fn toBigUint64(self: Value, agent: *Agent) Agent.Error!u64 {
     // 2. Let int64bit be ℝ(n) modulo 2**64.
     // 3. Return ℤ(int64bit).
     var int64bit = try std.math.big.int.Managed.init(agent.gc_allocator);
-    try int64bit.truncate(n.managed, .unsigned, 64);
+    try int64bit.truncate(&n.managed, .unsigned, 64);
     return int64bit.to(u64) catch unreachable;
 }
 
 /// 7.1.17 ToString ( argument )
 /// https://tc39.es/ecma262/#sec-tostring
-pub fn toString(self: Value, agent: *Agent) Agent.Error!String {
+pub fn toString(self: Value, agent: *Agent) Agent.Error!*const String {
     return switch (self.type()) {
         // 1. If argument is a String, return argument.
         .string => self.asString(),
@@ -1056,7 +1054,7 @@ pub fn toString(self: Value, agent: *Agent) Agent.Error!String {
 
 /// 7.1.18 ToObject ( argument )
 /// https://tc39.es/ecma262/#sec-toobject
-pub fn toObject(self: Value, agent: *Agent) Agent.Error!Object {
+pub fn toObject(self: Value, agent: *Agent) Agent.Error!*Object {
     const realm = agent.currentRealm();
     return switch (self.type()) {
         .undefined => agent.throwException(.type_error, "Cannot convert undefined to Object", .{}),
@@ -1185,7 +1183,7 @@ pub fn isCallable(self: Value) bool {
     if (!self.isObject()) return false;
 
     // 2. If argument has a [[Call]] internal method, return true.
-    if (self.asObject().internalMethods().call != null) return true;
+    if (self.asObject().internal_methods.call != null) return true;
 
     // 3. Return false.
     return false;
@@ -1198,7 +1196,7 @@ pub fn isConstructor(self: Value) bool {
     if (!self.isObject()) return false;
 
     // 2. If argument has a [[Construct]] internal method, return true.
-    if (self.asObject().internalMethods().construct != null) return true;
+    if (self.asObject().internal_methods.construct != null) return true;
 
     // 3. Return false.
     return false;
@@ -1210,9 +1208,11 @@ pub fn isRegExp(self: Value) Agent.Error!bool {
     // 1. If argument is not an Object, return false.
     if (!self.isObject()) return false;
 
+    const agent = self.asObject().agent;
+
     // 2. Let matcher be ? Get(argument, %Symbol.match%).
     const matcher = try self.asObject().get(
-        PropertyKey.from(self.asObject().agent().well_known_symbols.@"%Symbol.match%"),
+        PropertyKey.from(agent.well_known_symbols.@"%Symbol.match%"),
     );
 
     // 3. If matcher is not undefined, return ToBoolean(matcher).
@@ -1232,12 +1232,12 @@ pub fn get(self: Value, agent: *Agent, property_key: PropertyKey) Agent.Error!Va
     const object = try self.toObject(agent);
 
     // 2. Return ? O.[[Get]](P, V).
-    return object.internalMethods().get(object, property_key, self);
+    return object.internal_methods.get(object, property_key, self);
 }
 
 /// 7.3.10 GetMethod ( V, P )
 /// https://tc39.es/ecma262/#sec-getmethod
-pub fn getMethod(self: Value, agent: *Agent, property_key: PropertyKey) Agent.Error!?Object {
+pub fn getMethod(self: Value, agent: *Agent, property_key: PropertyKey) Agent.Error!?*Object {
     // 1. Let func be ? GetV(V, P).
     const function = try self.get(agent, property_key);
 
@@ -1270,7 +1270,7 @@ pub fn call(
     }
 
     // 3. Return ? F.[[Call]](V, argumentsList).
-    return self.asObject().internalMethods().call.?(
+    return self.asObject().internal_methods.call.?(
         self.asObject(),
         this_value,
         Arguments.from(arguments_list),
@@ -1282,7 +1282,7 @@ pub fn callNoArgs(self: Value, agent: *Agent, this_value: Value) Agent.Error!Val
 }
 
 pub fn callAssumeCallable(self: Value, this_value: Value, arguments_list: []const Value) Agent.Error!Value {
-    return self.asObject().internalMethods().call.?(
+    return self.asObject().internal_methods.call.?(
         self.asObject(),
         this_value,
         Arguments.from(arguments_list),
@@ -1387,7 +1387,7 @@ pub fn ordinaryHasInstance(self: Value, object_value: Value) Agent.Error!bool {
     // 1. If IsCallable(C) is false, return false.
     if (!self.isCallable()) return false;
 
-    const agent = self.asObject().agent();
+    const agent = self.asObject().agent;
 
     // 2. If C has a [[BoundTargetFunction]] internal slot, then
     if (self.asObject().is(builtins.BoundFunction)) {
@@ -1409,18 +1409,18 @@ pub fn ordinaryHasInstance(self: Value, object_value: Value) Agent.Error!bool {
         return agent.throwException(.type_error, "'prototype' property must be an object", .{});
     }
 
-    var object: ?Object = object_value.asObject();
+    var object: ?*Object = object_value.asObject();
 
     // 6. Repeat,
     while (true) {
         // a. Set O to ? O.[[GetPrototypeOf]]().
-        object = try object.?.internalMethods().getPrototypeOf(object.?);
+        object = try object.?.internal_methods.getPrototypeOf(object.?);
 
         // b. If O is null, return false.
         if (object == null) return false;
 
         // c. If SameValue(P, O) is true, return true.
-        if (prototype.asObject().sameValue(object.?)) return true;
+        if (prototype.asObject() == object.?) return true;
     }
 }
 
@@ -1546,7 +1546,7 @@ pub fn groupBy(
 pub fn setterThatIgnoresPrototypeProperties(
     self: Value,
     agent: *Agent,
-    home: Object,
+    home: *Object,
     property_key: PropertyKey,
     value: Value,
 ) Agent.Error!void {
@@ -1558,7 +1558,7 @@ pub fn setterThatIgnoresPrototypeProperties(
     const this_value = self.asObject();
 
     // 2. If SameValue(thisValue, home) is true, then
-    if (this_value.sameValue(home)) {
+    if (this_value == home) {
         // a. NOTE: Throwing here emulates assignment to a non-writable data property on the home
         //    object in strict mode code.
         // b. Throw a TypeError exception.
@@ -1570,7 +1570,7 @@ pub fn setterThatIgnoresPrototypeProperties(
     }
 
     // 3. Let desc be ? thisValue.[[GetOwnProperty]](p).
-    const property_descriptor = try this_value.internalMethods().getOwnProperty(
+    const property_descriptor = try this_value.internal_methods.getOwnProperty(
         this_value,
         property_key,
     );
@@ -1695,7 +1695,7 @@ pub fn isPromise(self: Value) bool {
 }
 
 /// Non-standard helper to get the right prototype for a primitive value, if applicable.
-pub fn synthesizePrototype(self: Value, agent: *Agent) std.mem.Allocator.Error!?Object {
+pub fn synthesizePrototype(self: Value, agent: *Agent) std.mem.Allocator.Error!?*Object {
     const realm = agent.currentRealm();
 
     return switch (self.type()) {
@@ -1711,7 +1711,7 @@ pub fn synthesizePrototype(self: Value, agent: *Agent) std.mem.Allocator.Error!?
 
 /// Non-standard helper to turn a symbol value into a private name.
 pub fn toPrivateName(self: Value) ?PrivateName {
-    if (!self.isSymbol() or !self.asSymbol().data.is_private) return null;
+    if (!self.isSymbol() or !self.asSymbol().is_private) return null;
     return .{ .symbol = self.asSymbol() };
 }
 
@@ -1719,7 +1719,7 @@ pub fn toPrivateName(self: Value) ?PrivateName {
 /// https://tc39.es/ecma262/#sec-stringtonumber
 pub fn stringToNumber(
     allocator: std.mem.Allocator,
-    string: String,
+    string: *const String,
 ) std.mem.Allocator.Error!Number {
     // 1. Let literal be ParseText(str, StringNumericLiteral).
     // 2. If literal is a List of errors, return NaN.
@@ -1753,8 +1753,8 @@ pub fn stringToNumber(
 /// https://tc39.es/ecma262/#sec-stringtobigint
 pub fn stringToBigInt(
     allocator: std.mem.Allocator,
-    string: String,
-) std.mem.Allocator.Error!?BigInt {
+    string: *const String,
+) std.mem.Allocator.Error!?*const BigInt {
     // 1. Let literal be ParseText(str, StringIntegerLiteral).
     // 2. If literal is a List of errors, return undefined.
     // 3. Let mv be the MV of literal.
@@ -1864,8 +1864,8 @@ pub fn sameValueNonNumber(x: Value, y: Value) bool {
 
         // 6. NOTE: All other ECMAScript language values are compared by identity.
         // 7. If x is y, return true; otherwise, return false.
-        .symbol => x.asSymbol().sameValue(y.asSymbol()),
-        .object => x.asObject().sameValue(y.asObject()),
+        .symbol => x.asSymbol() == y.asSymbol(),
+        .object => x.asObject() == y.asObject(),
 
         .number => unreachable,
     };
@@ -2013,11 +2013,11 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) Agent.Error!bool {
         // 4. Perform the following steps:
         // a. If x is an Object, x has an [[IsHTMLDDA]] internal slot, and y is either undefined or
         //    null, return true.
-        if (x.isObject() and x.asObject().isHTMLDDA() and (y.isUndefined() or y.isNull())) return true;
+        if (x.isObject() and x.asObject().is_htmldda and (y.isUndefined() or y.isNull())) return true;
 
         // b. If x is either undefined or null, y is an Object, and y has an [[IsHTMLDDA]] internal
         //    slot, return true.
-        if ((x.isUndefined() or x.isNull()) and y.isObject() and y.asObject().isHTMLDDA()) return true;
+        if ((x.isUndefined() or x.isNull()) and y.isObject() and y.asObject().is_htmldda) return true;
     } else {
         // 4. NOTE: This step is replaced in section B.3.6.2.
     }
@@ -2120,7 +2120,10 @@ pub fn isStrictlyEqual(x: Value, y: Value) bool {
 
 /// 7.3.17 CreateArrayFromList ( elements )
 /// https://tc39.es/ecma262/#sec-createarrayfromlist
-pub fn createArrayFromList(agent: *Agent, elements: []const Value) std.mem.Allocator.Error!Object {
+pub fn createArrayFromList(
+    agent: *Agent,
+    elements: []const Value,
+) std.mem.Allocator.Error!*Object {
     // 1. Let array be ! ArrayCreate(0).
     const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
 
@@ -2144,7 +2147,7 @@ pub fn createArrayFromListMapToValue(
     comptime T: type,
     elements: []const T,
     mapFn: fn (*Agent, T) std.mem.Allocator.Error!Value,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     // 1. Let array be ! ArrayCreate(0).
     const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
 
@@ -2168,7 +2171,7 @@ pub fn createArrayFromListMapToValue(
 
 /// 9.2.12 CoerceOptionsToObject ( options )
 /// https://tc39.es/ecma402/#sec-coerceoptionstoobject
-pub fn coerceOptionsToObject(self: Value, agent: *Agent) Agent.Error!Object {
+pub fn coerceOptionsToObject(self: Value, agent: *Agent) Agent.Error!*Object {
     // 1. If options is undefined, then
     if (self.isUndefined()) {
         // a. Return OrdinaryObjectCreate(null).
@@ -2182,7 +2185,7 @@ pub fn coerceOptionsToObject(self: Value, agent: *Agent) Agent.Error!Object {
 /// 9.2.13 GetOption ( options, property, type, values, default )
 /// https://tc39.es/ecma402/#sec-getoption
 pub fn getOption(
-    options: Object,
+    options: *Object,
     comptime property: []const u8,
     comptime type_: enum {
         boolean,
@@ -2193,7 +2196,7 @@ pub fn getOption(
             return switch (self) {
                 .boolean => bool,
                 .number => Number,
-                .string => String,
+                .string => *const String,
             };
         }
     },
@@ -2204,7 +2207,7 @@ pub fn getOption(
         @compileError("Invalid value for default parameter");
     }
 
-    const agent = options.agent();
+    const agent = options.agent;
 
     // 1. Let value be ? Get(options, property).
     const value = try options.get(PropertyKey.from(property));
@@ -2279,14 +2282,14 @@ pub fn ValueArrayHashMap(comptime V: type, comptime eqlFn: fn (Value, Value) boo
             const value_hash = switch (key.type()) {
                 .undefined, .null => 0,
                 .boolean => std.array_hash_map.getAutoHashFn(bool, void)({}, key.asBoolean()),
-                .string => @as(u32, @truncate(key.asString().data.hash)),
-                .symbol => std.array_hash_map.getAutoHashStratFn(Symbol, void, .Shallow)({}, key.asSymbol()),
+                .string => @as(u32, @truncate(key.asString().hash)),
+                .symbol => std.array_hash_map.getAutoHashStratFn(*const Symbol, void, .Shallow)({}, key.asSymbol()),
                 .number => switch (key.asNumber()) {
                     .i32 => |n| std.array_hash_map.getAutoHashFn(i32, void)({}, n),
                     .f64 => |n| std.array_hash_map.getAutoHashFn(i64, void)({}, @bitCast(n)),
                 },
-                .big_int => std.array_hash_map.getAutoHashStratFn(BigInt, void, .Shallow)({}, key.asBigInt()),
-                .object => std.array_hash_map.getAutoHashStratFn(Object, void, .Shallow)({}, key.asObject()),
+                .big_int => std.array_hash_map.getAutoHashStratFn(*const BigInt, void, .Shallow)({}, key.asBigInt()),
+                .object => std.array_hash_map.getAutoHashStratFn(*Object, void, .Shallow)({}, key.asObject()),
             };
             const tag: u32 = @intFromEnum(key.type());
             return tag ^ value_hash;
@@ -2302,8 +2305,8 @@ test format {
     const gc = @import("../../gc.zig");
     var agent = try Agent.init(gc.allocator(), .{});
     defer agent.deinit();
-    var symbol_data_without_description: Symbol.Data = .{ .description = null };
-    var symbol_data_with_description: Symbol.Data = .{ .description = String.fromLiteral("foo") };
+    const symbol_without_description: Symbol = .{ .description = null };
+    const symbol_with_description: Symbol = .{ .description = String.fromLiteral("foo") };
     var managed = try std.math.big.int.Managed.initSet(std.testing.allocator, 123);
     defer managed.deinit();
     const object = try builtins.Object.create(&agent, .{
@@ -2315,8 +2318,8 @@ test format {
         .{ from(true), "true" },
         .{ from(false), "false" },
         .{ from("foo"), "\"foo\"" },
-        .{ from(Symbol{ .data = &symbol_data_without_description }), "Symbol()" },
-        .{ from(Symbol{ .data = &symbol_data_with_description }), "Symbol(\"foo\")" },
+        .{ from(&symbol_without_description), "Symbol()" },
+        .{ from(&symbol_with_description), "Symbol(\"foo\")" },
         .{ from(try BigInt.from(gc.allocator(), managed)), "123n" },
         .{ from(object), "[object Object]" },
     };
@@ -2346,9 +2349,9 @@ test from {
     const inf = std.math.inf(f64);
     try std.testing.expectEqual(from(true).asBoolean(), true);
     try std.testing.expectEqual(from(false).asBoolean(), false);
-    try std.testing.expectEqual(from("").asString().data.slice.ascii, "");
-    try std.testing.expectEqual(from("foo").asString().data.slice.ascii, "foo");
-    try std.testing.expectEqual(from("123").asString().data.slice.ascii, "123");
+    try std.testing.expectEqual(from("").asString().slice.ascii, "");
+    try std.testing.expectEqual(from("foo").asString().slice.ascii, "foo");
+    try std.testing.expectEqual(from("123").asString().slice.ascii, "123");
     try std.testing.expectEqual(from(0).asNumber().i32, 0);
     try std.testing.expectEqual(from(0.0).asNumber().i32, 0);
     try std.testing.expectEqual(from(123).asNumber().i32, 123);

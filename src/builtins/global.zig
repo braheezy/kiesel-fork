@@ -24,7 +24,7 @@ const GlobalObjectProperty = struct {
     []const u8,
     union(enum) {
         property_descriptor: PropertyDescriptor,
-        lazy_intrinsic: *const fn (*Realm.Intrinsics) std.mem.Allocator.Error!Object,
+        lazy_intrinsic: *const fn (*Realm.Intrinsics) std.mem.Allocator.Error!*Object,
     },
 };
 
@@ -280,14 +280,14 @@ pub fn globalObjectProperties(realm: *Realm) [num_properties]GlobalObjectPropert
 
 fn GlobalFunction(comptime options: struct { name: []const u8, length: u32 }) type {
     return struct {
-        pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+        pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
             return createBuiltinFunction(realm.agent, .{ .function = @field(module, options.name) }, .{
                 .length = options.length,
                 .name = options.name,
                 .realm = realm,
             });
         }
-        pub fn init(_: *Realm, _: Object) std.mem.Allocator.Error!void {}
+        pub fn init(_: *Realm, _: *Object) std.mem.Allocator.Error!void {}
     };
 }
 
@@ -533,9 +533,9 @@ fn encodeURIComponent(agent: *Agent, _: Value, arguments: Arguments) Agent.Error
 /// https://tc39.es/ecma262/#sec-encode
 fn encode(
     agent: *Agent,
-    string: String,
+    string: *const String,
     comptime extra_unescaped: []const u8,
-) Agent.Error!String {
+) Agent.Error!*const String {
     // 3. Let alwaysUnescaped be the string-concatenation of the ASCII word characters and
     //    "-.!~*'()".
     const always_unescaped = String.ascii_word_characters ++ "-.!~*'()";
@@ -544,9 +544,9 @@ fn encode(
     const unescaped_set = always_unescaped ++ extra_unescaped;
 
     // OPTIMIZATION: If the string is ASCII we don't have to handle unpaired surrogates.
-    if (string.data.slice == .ascii) {
+    if (string.slice == .ascii) {
         var buffer = std.ArrayList(u8).init(agent.gc_allocator);
-        try std.Uri.Component.percentEncode(buffer.writer(), string.data.slice.ascii, struct {
+        try std.Uri.Component.percentEncode(buffer.writer(), string.slice.ascii, struct {
             fn isValidChar(c: u8) bool {
                 return std.mem.indexOfScalar(u8, unescaped_set, c) != null;
             }
@@ -618,7 +618,11 @@ fn encode(
 
 /// 19.2.6.6 Decode ( string, preserveEscapeSet )
 /// https://tc39.es/ecma262/#sec-decode
-fn decode(agent: *Agent, string: String, comptime preserve_escape_set: []const u8) Agent.Error!String {
+fn decode(
+    agent: *Agent,
+    string: *const String,
+    comptime preserve_escape_set: []const u8,
+) Agent.Error!*const String {
     const input = try string.toUtf16(agent.gc_allocator);
 
     // 1. Let len be the length of string.

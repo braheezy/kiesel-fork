@@ -20,8 +20,8 @@ const PropertyStorage = @This();
 /// be large on the stack :^)
 const Entry = union(enum) {
     accessor: struct {
-        get: ?*Object.Data,
-        set: ?*Object.Data,
+        get: ?*Object,
+        set: ?*Object,
         attributes: Attributes,
     },
     data: struct {
@@ -39,8 +39,8 @@ const Entry = union(enum) {
         if (property_descriptor.isAccessorDescriptor()) {
             return .{
                 .accessor = .{
-                    .get = if (property_descriptor.get.?) |object| object.data else null,
-                    .set = if (property_descriptor.set.?) |object| object.data else null,
+                    .get = if (property_descriptor.get.?) |object| object else null,
+                    .set = if (property_descriptor.set.?) |object| object else null,
                     .attributes = .{
                         .writable = false,
                         .enumerable = property_descriptor.enumerable.?,
@@ -65,8 +65,8 @@ const Entry = union(enum) {
     fn toPropertyDescriptor(self: Entry) PropertyDescriptor {
         return switch (self) {
             .accessor => |accessor| .{
-                .get = if (accessor.get) |data| .{ .data = data } else @as(?Object, null),
-                .set = if (accessor.set) |data| .{ .data = data } else @as(?Object, null),
+                .get = if (accessor.get) |object| object else @as(?*Object, null),
+                .set = if (accessor.set) |object| object else @as(?*Object, null),
                 .enumerable = accessor.attributes.enumerable,
                 .configurable = accessor.attributes.configurable,
             },
@@ -92,7 +92,7 @@ comptime {
 
 const LazyIntrinsic = struct {
     realm: *Realm,
-    lazyIntrinsicFn: *const fn (*Realm.Intrinsics) std.mem.Allocator.Error!Object,
+    lazyIntrinsicFn: *const fn (*Realm.Intrinsics) std.mem.Allocator.Error!*Object,
 };
 
 // TODO: Shapes, linear storage for arrays, etc. Gotta start somewhere :^)
@@ -160,8 +160,8 @@ pub fn remove(self: *PropertyStorage, property_key: PropertyKey) void {
 pub const PropertyKeyArrayHashMapContext = struct {
     pub fn hash(_: anytype, property_key: PropertyKey) u64 {
         return switch (property_key) {
-            .string => |string| string.data.hash,
-            .symbol => |symbol| std.hash_map.getAutoHashFn(*Symbol.Data, void)({}, symbol.data),
+            .string => |string| string.hash,
+            .symbol => |symbol| std.hash_map.getAutoHashFn(*const Symbol, void)({}, symbol),
             .integer_index => |integer_index| std.hash_map.getAutoHashFn(PropertyKey.IntegerIndex, void)({}, integer_index),
         };
     }

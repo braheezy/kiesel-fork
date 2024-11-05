@@ -34,13 +34,13 @@ agent: *Agent,
 intrinsics: Intrinsics,
 
 /// [[GlobalObject]]
-global_object: Object,
+global_object: *Object,
 
 /// [[GlobalEnv]]
 global_env: *GlobalEnvironment,
 
 /// [[TemplateMap]]
-template_map: std.AutoHashMap(*ast.TemplateLiteral, Object),
+template_map: std.AutoHashMap(*ast.TemplateLiteral, *Object),
 
 /// [[LoadedModules]]
 loaded_modules: StringHashMap(Module),
@@ -56,8 +56,8 @@ rng: std.Random.DefaultPrng,
 pub fn initializeHostDefinedRealm(
     agent: *Agent,
     args: struct {
-        global_object: ?Object = null,
-        this_value: ?Object = null,
+        global_object: ?*Object = null,
+        this_value: ?*Object = null,
     },
 ) Agent.Error!void {
     // 1. Let realm be a new Realm Record.
@@ -173,8 +173,8 @@ fn setDefaultGlobalBindings(self: *Realm) Agent.Error!void {
     // Why export a constant when you can do reflection instead!
     const global_properties_count = @typeInfo(@typeInfo(@TypeOf(globalObjectProperties)).@"fn".return_type.?).array.len;
     const intrinsics_count = global_properties_count - 4; // globalThis, Infinity, NaN, undefined
-    try global.propertyStorage().hash_map.ensureUnusedCapacity(global_properties_count);
-    try global.propertyStorage().lazy_intrinsics.ensureUnusedCapacity(intrinsics_count);
+    try global.property_storage.hash_map.ensureUnusedCapacity(global_properties_count);
+    try global.property_storage.lazy_intrinsics.ensureUnusedCapacity(intrinsics_count);
 
     // 2. For each property of the Global Object specified in clause 19, do
     for (globalObjectProperties(self)) |property| {
@@ -198,7 +198,7 @@ fn setDefaultGlobalBindings(self: *Realm) Agent.Error!void {
                     .enumerable = false,
                     .configurable = true,
                 });
-                global.propertyStorage().lazy_intrinsics.putAssumeCapacityNoClobber(name, .{
+                global.property_storage.lazy_intrinsics.putAssumeCapacityNoClobber(name, .{
                     .realm = self,
                     .lazyIntrinsicFn = lazyIntrinsicFn,
                 });

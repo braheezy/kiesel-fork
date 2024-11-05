@@ -32,7 +32,7 @@ pub fn matchUnicodeLocaleIdentifierType(str: []const u8) bool {
     return true;
 }
 
-pub fn calendarToBcp47(calendar_kind: icu4zig.Calendar.Kind) String {
+pub fn calendarToBcp47(calendar_kind: icu4zig.Calendar.Kind) *const String {
     // See: https://www.unicode.org/repos/cldr/tags/latest/common/bcp47/calendar.xml
     return switch (calendar_kind) {
         .buddhist => String.fromLiteral("buddhist"),
@@ -58,7 +58,7 @@ pub fn calendarToBcp47(calendar_kind: icu4zig.Calendar.Kind) String {
 
 /// 6.9.1 AvailableCalendars ( )
 /// https://tc39.es/ecma402/#sec-availablecalendars
-pub inline fn availableCalendars() []const String {
+pub inline fn availableCalendars() []const *const String {
     // The implementation-defined abstract operation AvailableCalendars takes no arguments and
     // returns a List of Strings. The returned List is sorted according to lexicographic code unit
     // order, and contains unique calendar types in canonical form (6.9) identifying the calendars
@@ -68,16 +68,16 @@ pub inline fn availableCalendars() []const String {
     // NOTE: For now we only include the canonical BCP 47 language tags, so this isn't spec compliant.
     comptime {
         const calendar_kinds = std.enums.values(icu4zig.Calendar.Kind);
-        var result: [calendar_kinds.len - 1]String = undefined;
+        var result: [calendar_kinds.len - 1]*const String = undefined;
         var i = 0;
         for (calendar_kinds) |calendar_kind| {
             if (calendar_kind == .japanese_extended) continue;
             result[i] = calendarToBcp47(calendar_kind);
             i += 1;
         }
-        std.mem.sortUnstable(String, &result, {}, struct {
-            fn lessThanFn(_: void, lhs: String, rhs: String) bool {
-                return std.mem.lessThan(u8, lhs.data.slice.ascii, rhs.data.slice.ascii);
+        std.mem.sortUnstable(*const String, &result, {}, struct {
+            fn lessThanFn(_: void, lhs: *const String, rhs: *const String) bool {
+                return std.mem.lessThan(u8, lhs.slice.ascii, rhs.slice.ascii);
             }
         }.lessThanFn);
         const final = result; // Load bearing const assignment
@@ -87,7 +87,7 @@ pub inline fn availableCalendars() []const String {
 
 /// 6.6.3 AvailableCanonicalUnits ( )
 /// https://tc39.es/ecma402/#sec-availablecanonicalunits
-pub fn availableCanonicalUnits() []const String {
+pub fn availableCanonicalUnits() []const *const String {
     // The abstract operation AvailableCanonicalUnits takes no arguments and returns a List of
     // Strings. The returned List is sorted according to lexicographic code unit order, and
     // consists of the unique values of simple unit identifiers listed in every row of Table 2,
@@ -113,7 +113,7 @@ pub fn availableCanonicalUnits() []const String {
 
 /// 6.7.1 AvailableCanonicalNumberingSystems ( )
 /// https://tc39.es/ecma402/#sec-availablecanonicalnumberingsystems
-pub fn availableCanonicalNumberingSystems() []const String {
+pub fn availableCanonicalNumberingSystems() []const *const String {
     // The implementation-defined abstract operation AvailableCanonicalNumberingSystems takes no
     // arguments and returns a List of Strings. The returned List is sorted according to
     // lexicographic code unit order, and contains unique canonical numbering systems identifiers
@@ -252,7 +252,7 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
 
 /// 9.2.9 GetOptionsObject ( options )
 /// https://tc39.es/ecma402/#sec-getoptionsobject
-pub fn getOptionsObject(agent: *Agent, options: Value) Agent.Error!Object {
+pub fn getOptionsObject(agent: *Agent, options: Value) Agent.Error!*Object {
     // 1. If options is undefined, then
     if (options.isUndefined()) {
         // a. Return OrdinaryObjectCreate(null).
@@ -310,7 +310,7 @@ pub fn defaultNumberOption(
 /// https://tc39.es/ecma402/#sec-getnumberoption
 pub fn getNumberOption(
     agent: *Agent,
-    options: Object,
+    options: *Object,
     comptime property: []const u8,
     minimum: i32,
     maximum: i32,

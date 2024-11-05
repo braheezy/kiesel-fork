@@ -21,7 +21,7 @@ const defineBuiltinFunction = utils.defineBuiltinFunction;
 
 /// 14.7.5.10.1 CreateForInIterator ( object )
 /// https://tc39.es/ecma262/#sec-createforiniterator
-pub fn createForInIterator(agent: *Agent, object: Object) std.mem.Allocator.Error!Object {
+pub fn createForInIterator(agent: *Agent, object: *Object) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. let iterator be OrdinaryObjectCreate(%ForInIteratorPrototype%, « [[Object]],
@@ -50,13 +50,13 @@ pub fn createForInIterator(agent: *Agent, object: Object) std.mem.Allocator.Erro
 /// 14.7.5.10.2 The %ForInIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%foriniteratorprototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 0, realm);
     }
 
@@ -82,7 +82,7 @@ pub const prototype = struct {
             // a. If O.[[ObjectWasVisited]] is false, then
             if (!for_in_iterator.fields.state.object_was_visited) {
                 // i. Let keys be ? object.[[OwnPropertyKeys]]().
-                const keys = try object.internalMethods().ownPropertyKeys(object);
+                const keys = try object.internal_methods.ownPropertyKeys(object);
                 defer keys.deinit();
 
                 // ii. For each element key of keys, do
@@ -107,7 +107,7 @@ pub const prototype = struct {
                 // iii. If O.[[VisitedKeys]] does not contain r, then
                 if (!for_in_iterator.fields.state.visited_keys.contains(remaining_key)) {
                     // 1. Let desc be ? object.[[GetOwnProperty]](r).
-                    const descriptor = try object.internalMethods().getOwnProperty(object, remaining_key);
+                    const descriptor = try object.internal_methods.getOwnProperty(object, remaining_key);
 
                     // 2. If desc is not undefined, then
                     if (descriptor != null) {
@@ -129,7 +129,7 @@ pub const prototype = struct {
             }
 
             // c. Set object to ? object.[[GetPrototypeOf]]().
-            object = (try object.internalMethods().getPrototypeOf(object)) orelse {
+            object = (try object.internal_methods.getPrototypeOf(object)) orelse {
                 // f. If object is null, return CreateIteratorResultObject(undefined, true).
                 for_in_iterator.fields = .completed;
                 return Value.from(try createIteratorResultObject(agent, .undefined, true));
@@ -150,7 +150,7 @@ pub const ForInIterator = MakeObject(.{
     .Fields = union(enum) {
         state: struct {
             /// [[Object]]
-            object: Object,
+            object: *Object,
 
             /// [[ObjectWasVisited]]
             object_was_visited: bool,

@@ -163,10 +163,10 @@ pub const element_types = [_]struct { []const u8, ElementType }{
 /// 10.4.5.1 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-typedarray-getownproperty
 fn getOwnProperty(
-    object: Object,
+    object: *Object,
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!?PropertyDescriptor {
-    const agent = object.agent();
+    const agent = object.agent;
 
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
@@ -194,7 +194,7 @@ fn getOwnProperty(
 
 /// 10.4.5.2 [[HasProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-typedarray-hasproperty
-fn hasProperty(object: Object, property_key: PropertyKey) Agent.Error!bool {
+fn hasProperty(object: *Object, property_key: PropertyKey) Agent.Error!bool {
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
     //     b. If numericIndex is not undefined, return IsValidIntegerIndex(O, numericIndex).
@@ -211,11 +211,11 @@ fn hasProperty(object: Object, property_key: PropertyKey) Agent.Error!bool {
 /// 10.4.5.3 [[DefineOwnProperty]] ( P, Desc )
 /// https://tc39.es/ecma262/#sec-typedarray-defineownproperty
 fn defineOwnProperty(
-    object: Object,
+    object: *Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
 ) Agent.Error!bool {
-    const agent = object.agent();
+    const agent = object.agent;
 
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
@@ -258,8 +258,8 @@ fn defineOwnProperty(
 
 /// 10.4.5.4 [[Get]] ( P, Receiver )
 /// https://tc39.es/ecma262/#sec-typedarray-get
-fn get(object: Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value {
-    const agent = object.agent();
+fn get(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value {
+    const agent = object.agent;
 
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
@@ -275,8 +275,8 @@ fn get(object: Object, property_key: PropertyKey, receiver: Value) Agent.Error!V
 
 /// 10.4.5.5 [[Set]] ( P, V, Receiver )
 /// https://tc39.es/ecma262/#sec-typedarray-set
-fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value) Agent.Error!bool {
-    const agent = object.agent();
+fn set(object: *Object, property_key: PropertyKey, value: Value, receiver: Value) Agent.Error!bool {
+    const agent = object.agent;
 
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
@@ -285,7 +285,7 @@ fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value)
         const numeric_index: f64 = @floatFromInt(property_key.integer_index);
 
         // i. If SameValue(O, Receiver) is true, then
-        if (receiver.isObject() and object.sameValue(receiver.asObject())) {
+        if (receiver.isObject() and object == receiver.asObject()) {
             // 1. Perform ? TypedArraySetElement(O, numericIndex, V).
             try typedArraySetElement(agent, object.as(TypedArray), numeric_index, value);
 
@@ -303,7 +303,7 @@ fn set(object: Object, property_key: PropertyKey, value: Value, receiver: Value)
 
 /// 10.4.5.6 [[Delete]] ( P )
 /// https://tc39.es/ecma262/#sec-typedarray-delete
-fn delete(object: Object, property_key: PropertyKey) std.mem.Allocator.Error!bool {
+fn delete(object: *Object, property_key: PropertyKey) std.mem.Allocator.Error!bool {
     // 1. If P is a String, then
     //     a. Let numericIndex be CanonicalNumericIndexString(P).
     //     b. If numericIndex is not undefined, then
@@ -320,9 +320,9 @@ fn delete(object: Object, property_key: PropertyKey) std.mem.Allocator.Error!boo
 
 /// 10.4.5.7 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-typedarray-ownpropertykeys
-fn ownPropertyKeys(object: Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
-    const agent = object.agent();
-    const property_storage_hash_map = &object.propertyStorage().hash_map;
+fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
+    const agent = object.agent;
+    const property_storage_hash_map = &object.property_storage.hash_map;
 
     // 1. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(O, seq-cst).
     const ta = makeTypedArrayWithBufferWitnessRecord(object.as(TypedArray), .seq_cst);
@@ -640,7 +640,7 @@ fn typedArraySetElement(agent: *Agent, typed_array: *const TypedArray, index: f6
 /// 23.2.2 Properties of the %TypedArray% Intrinsic Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-%typedarray%-intrinsic-object
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "TypedArray",
@@ -649,7 +649,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "from", from, 1, realm);
         try defineBuiltinFunction(object, "of", of, 0, realm);
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
@@ -666,7 +666,7 @@ pub const constructor = struct {
 
     /// 23.2.1.1 %TypedArray% ( )
     /// https://tc39.es/ecma262/#sec-%typedarray%
-    fn impl(agent: *Agent, _: Arguments, _: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, _: Arguments, _: ?*Object) Agent.Error!Value {
         // 1. Throw a TypeError exception.
         return agent.throwException(
             .type_error,
@@ -865,13 +865,13 @@ pub const constructor = struct {
 /// 23.2.3 Properties of the %TypedArray% Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-%typedarrayprototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "at", at, 1, realm);
         try defineBuiltinAccessor(object, "buffer", buffer, null, realm);
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
@@ -922,7 +922,7 @@ pub const prototype = struct {
 
         // 23.2.3.37 %TypedArray%.prototype [ %Symbol.iterator% ] ( )
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype-%symbol.iterator%
-        const @"%TypedArray.prototype.values%" = object.propertyStorage().get(PropertyKey.from("values")).?;
+        const @"%TypedArray.prototype.values%" = object.property_storage.get(PropertyKey.from("values")).?;
         try defineBuiltinProperty(object, "%Symbol.iterator%", @"%TypedArray.prototype.values%");
     }
 
@@ -1198,9 +1198,9 @@ pub const prototype = struct {
     fn entries(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? ValidateTypedArray(O, seq-cst).
-        const object = @constCast(
+        const object = &@constCast(
             (try validateTypedArray(agent, this_value, .seq_cst)).object,
-        ).object();
+        ).object;
 
         // 3. Return CreateArrayIterator(O, key+value).
         return Value.from(try createArrayIterator(agent, object, .@"key+value"));
@@ -1725,9 +1725,9 @@ pub const prototype = struct {
     fn keys(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? ValidateTypedArray(O, seq-cst).
-        const object = @constCast(
+        const object = &@constCast(
             (try validateTypedArray(agent, this_value, .seq_cst)).object,
-        ).object();
+        ).object;
 
         // 3. Return CreateArrayIterator(O, key).
         return Value.from(try createArrayIterator(agent, object, .key));
@@ -2184,7 +2184,7 @@ pub const prototype = struct {
             target_buffer.shared_array_buffer.fields.array_buffer_data.items.ptr;
 
         // 19. If SameValue(srcBuffer, targetBuffer) is true or sameSharedArrayBuffer is true, then
-        var src_byte_index = if (src_buffer.object().sameValue(target_buffer.object()) or same_shared_array_buffer) blk: {
+        var src_byte_index = if (src_buffer.object() == target_buffer.object() or same_shared_array_buffer) blk: {
             // a. Let srcByteLength be TypedArrayByteLength(srcRecord).
             const src_byte_length = typedArrayByteLength(src_ta);
 
@@ -2625,7 +2625,7 @@ pub const prototype = struct {
         // 6. Let SortCompare be a new Abstract Closure with parameters (x, y) that captures
         //    comparator and performs the following steps when called:
         const sortCompare = struct {
-            fn func(agent_: *Agent, x: Value, y: Value, comparator_: ?Object) Agent.Error!std.math.Order {
+            fn func(agent_: *Agent, x: Value, y: Value, comparator_: ?*Object) Agent.Error!std.math.Order {
                 // a. Return ? CompareTypedArrayElements(x, y, comparator).
                 return compareTypedArrayElements(agent_, x, y, comparator_);
             }
@@ -2841,7 +2841,7 @@ pub const prototype = struct {
             const property_key = PropertyKey.from(k);
 
             // c. Let fromValue be ! Get(O, from).
-            const from_value = @constCast(typed_array).object().get(from) catch |err| try noexcept(err);
+            const from_value = @constCast(typed_array).object.get(from) catch |err| try noexcept(err);
 
             // d. Perform ! Set(A, Pk, fromValue, true).
             new_typed_array.set(property_key, from_value, .throw) catch |err| try noexcept(err);
@@ -2885,7 +2885,7 @@ pub const prototype = struct {
         // 7. Let SortCompare be a new Abstract Closure with parameters (x, y) that captures
         //    comparator and performs the following steps when called:
         const sortCompare = struct {
-            fn func(agent_: *Agent, x: Value, y: Value, comparator_: ?Object) Agent.Error!std.math.Order {
+            fn func(agent_: *Agent, x: Value, y: Value, comparator_: ?*Object) Agent.Error!std.math.Order {
                 // a. Return ? CompareTypedArrayElements(x, y, comparator).
                 return compareTypedArrayElements(agent_, x, y, comparator_);
             }
@@ -2927,9 +2927,9 @@ pub const prototype = struct {
     fn values(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let O be the this value.
         // 2. Perform ? ValidateTypedArray(O, seq-cst).
-        const object = @constCast(
+        const object = &@constCast(
             (try validateTypedArray(agent, this_value, .seq_cst)).object,
-        ).object();
+        ).object;
 
         // 3. Return CreateArrayIterator(O, value).
         return Value.from(try createArrayIterator(agent, object, .value));
@@ -2996,7 +2996,7 @@ pub const prototype = struct {
             const from_value = if (k == actual_index)
                 numeric_value
             else
-                @constCast(typed_array).object().get(property_key) catch |err| try noexcept(err);
+                @constCast(typed_array).object.get(property_key) catch |err| try noexcept(err);
 
             // d. Perform ! Set(A, Pk, fromValue, true).
             new_typed_array.set(property_key, from_value, .throw) catch |err| try noexcept(err);
@@ -3034,7 +3034,7 @@ fn typedArraySpeciesCreate(
     agent: *Agent,
     exemplar: *const TypedArray,
     argument_list: []const Value,
-) Agent.Error!Object {
+) Agent.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. Let defaultConstructor be the intrinsic object associated with the constructor name
@@ -3047,7 +3047,7 @@ fn typedArraySpeciesCreate(
     } else unreachable;
 
     // 2. Let constructor be ? SpeciesConstructor(exemplar, defaultConstructor).
-    const constructor_ = try @constCast(exemplar).object().speciesConstructor(default_constructor);
+    const constructor_ = try @constCast(exemplar).object.speciesConstructor(default_constructor);
 
     // 3. Let result be ? TypedArrayCreateFromConstructor(constructor, argumentList).
     const result = try typedArrayCreateFromConstructor(agent, constructor_, argument_list);
@@ -3072,9 +3072,9 @@ fn typedArraySpeciesCreate(
 /// https://tc39.es/ecma262/#sec-typedarraycreatefromconstructor
 fn typedArrayCreateFromConstructor(
     agent: *Agent,
-    constructor_: Object,
+    constructor_: *Object,
     argument_list: []const Value,
-) Agent.Error!Object {
+) Agent.Error!*Object {
     // 1. Let newTypedArray be ? Construct(constructor, argumentList).
     const new_typed_array = try constructor_.construct(argument_list, null);
 
@@ -3111,7 +3111,7 @@ fn typedArrayCreateSameType(
     agent: *Agent,
     exemplar: *const TypedArray,
     argument_list: []const Value,
-) Agent.Error!Object {
+) Agent.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. Let constructor be the intrinsic object associated with the constructor name
@@ -3187,7 +3187,7 @@ pub fn compareTypedArrayElements(
     agent: *Agent,
     x: Value,
     y: Value,
-    maybe_comparator: ?Object,
+    maybe_comparator: ?*Object,
 ) Agent.Error!std.math.Order {
     // 1. Assert: x is a Number and y is a Number, or x is a BigInt and y is a BigInt.
     std.debug.assert((x.isNumber() and y.isNumber()) or (x.isBigInt() and y.isBigInt()));
@@ -3243,10 +3243,10 @@ pub fn compareTypedArrayElements(
 pub fn allocateTypedArray(
     agent: *Agent,
     comptime constructor_name: []const u8,
-    new_target: Object,
+    new_target: *Object,
     comptime default_prototype: []const u8,
     length: ?u53,
-) Agent.Error!Object {
+) Agent.Error!*Object {
     // 1. Let proto be ? GetPrototypeFromConstructor(newTarget, defaultProto).
     const prototype_ = try getPrototypeFromConstructor(new_target, default_prototype);
 
@@ -3632,7 +3632,7 @@ fn initializeTypedArrayFromList(
         // NOTE: The caller retains ownership over `values`, so we're not doing this.
 
         // d. Perform ? Set(O, Pk, kValue, true).
-        try typed_array.object().set(property_key, k_value, .throw);
+        try typed_array.object.set(property_key, k_value, .throw);
 
         // e. Set k to k + 1.
     }
@@ -3646,7 +3646,7 @@ fn initializeTypedArrayFromList(
 fn initializeTypedArrayFromArrayLike(
     agent: *Agent,
     typed_array: *TypedArray,
-    array_like: Object,
+    array_like: *Object,
 ) Agent.Error!void {
     // 1. Let len be ? LengthOfArrayLike(arrayLike).
     const len = try array_like.lengthOfArrayLike();
@@ -3666,7 +3666,7 @@ fn initializeTypedArrayFromArrayLike(
         const k_value = try array_like.get(property_key);
 
         // c. Perform ? Set(O, Pk, kValue, true).
-        try typed_array.object().set(property_key, k_value, .throw);
+        try typed_array.object.set(property_key, k_value, .throw);
 
         // d. Set k to k + 1.
     }
@@ -3724,7 +3724,7 @@ fn allocateTypedArrayBuffer(
 /// https://tc39.es/ecma262/#sec-properties-of-the-typedarray-constructors
 fn MakeTypedArrayConstructor(comptime name: []const u8) type {
     return struct {
-        pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+        pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
             return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
                 .length = 3,
                 .name = name,
@@ -3733,7 +3733,7 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
             });
         }
 
-        pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+        pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
             const prototypeFn = @field(Realm.Intrinsics, "%" ++ name ++ ".prototype%");
 
             // 23.2.6.1 TypedArray.BYTES_PER_ELEMENT
@@ -3760,7 +3760,7 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
 
         /// 23.2.5.1 TypedArray ( ...args )
         /// https://tc39.es/ecma262/#sec-typedarray
-        fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+        fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
             // 1. If NewTarget is undefined, throw a TypeError exception.
             if (new_target == null) {
                 return agent.throwException(
@@ -3915,13 +3915,13 @@ fn MakeTypedArrayConstructor(comptime name: []const u8) type {
 /// https://tc39.es/ecma262/#sec-properties-of-typedarray-prototype-objects
 fn MakeTypedArrayPrototype(comptime name: []const u8) type {
     return struct {
-        pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+        pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
             return builtins.Object.create(realm.agent, .{
                 .prototype = try realm.intrinsics.@"%TypedArray.prototype%"(),
             });
         }
 
-        pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+        pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
             // 23.2.7.1 TypedArray.prototype.BYTES_PER_ELEMENT
             // https://tc39.es/ecma262/#sec-typedarray.prototype.bytes_per_element
             try defineBuiltinProperty(object, "BYTES_PER_ELEMENT", PropertyDescriptor{

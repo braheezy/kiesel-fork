@@ -29,8 +29,8 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 pub fn createSegmentIterator(
     agent: *Agent,
     segmenter: *builtins.intl.Segmenter,
-    string: String,
-) std.mem.Allocator.Error!Object {
+    string: *const String,
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. Let internalSlotsList be « [[IteratingSegmenter]], [[IteratedString]], [[IteratedStringNextSegmentCodeUnitIndex]] ».
@@ -56,13 +56,13 @@ pub fn createSegmentIterator(
 /// 18.6.2 The %IntlSegmentIteratorPrototype% Object
 /// https://tc39.es/ecma402/#sec-%intlsegmentiteratorprototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Iterator.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 0, realm);
 
         // 18.6.2.2 %IntlSegmentIteratorPrototype% [ %Symbol.toStringTag% ]
@@ -126,7 +126,7 @@ pub const prototype = struct {
 pub const SegmentIterator = MakeObject(.{
     .Fields = struct {
         iterating_segmenter: *builtins.intl.Segmenter,
-        iterated_string: String,
+        iterated_string: *const String,
         iterated_string_next_segment_code_unit_index: usize,
     },
     .tag = .intl_segment_iterator,
@@ -137,11 +137,11 @@ pub const SegmentIterator = MakeObject(.{
 pub fn createSegmentDataObject(
     agent: *Agent,
     segmenter: *builtins.intl.Segmenter,
-    string: String,
+    string: *const String,
     start_index: usize,
     end_index: usize,
     is_word_like: bool,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. Let len be the length of string.

@@ -21,7 +21,7 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 /// 27.4.2 Properties of the AsyncGeneratorFunction Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgeneratorfunction
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "AsyncGeneratorFunction",
@@ -30,7 +30,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 27.4.2.1 AsyncGeneratorFunction.prototype
         // https://tc39.es/ecma262/#sec-asyncgeneratorfunction-prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -43,7 +43,7 @@ pub const constructor = struct {
 
     /// 27.4.1.1 AsyncGeneratorFunction ( ...parameterArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-asyncgeneratorfunction
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const parameter_args = arguments.values[0..arguments.count() -| 1];
         const maybe_body_arg = arguments.getOrNull(arguments.count() -| 1);
 
@@ -68,13 +68,13 @@ pub const constructor = struct {
 /// 27.4.3 Properties of the AsyncGeneratorFunction Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgeneratorfunction-prototype
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Function.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 27.4.3.1 AsyncGeneratorFunction.prototype.constructor
         // https://tc39.es/ecma262/#sec-asyncgeneratorfunction-prototype-constructor
         try defineBuiltinProperty(object, "constructor", PropertyDescriptor{

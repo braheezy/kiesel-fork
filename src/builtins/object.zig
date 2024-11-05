@@ -12,7 +12,6 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
-const Object_ = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
@@ -33,7 +32,7 @@ const sameValue = types.sameValue;
 /// 20.1.2 Properties of the Object Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-object-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object_ {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*types.Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "Object",
@@ -42,7 +41,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object_) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *types.Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "assign", assign, 2, realm);
         try defineBuiltinFunction(object, "create", create_, 2, realm);
         try defineBuiltinFunction(object, "defineProperties", defineProperties, 2, realm);
@@ -79,12 +78,12 @@ pub const constructor = struct {
 
     /// 20.1.1.1 Object ( [ value ] )
     /// https://tc39.es/ecma262/#sec-object-value
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object_) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*types.Object) Agent.Error!Value {
         const realm = agent.currentRealm();
         const value = arguments.get(0);
 
         // 1. If NewTarget is neither undefined nor the active function object, then
-        if (new_target != null and !new_target.?.sameValue(agent.activeFunctionObject())) {
+        if (new_target != null and new_target.? != agent.activeFunctionObject()) {
             // a. Return ? OrdinaryCreateFromConstructor(NewTarget, "%Object.prototype%").
             return Value.from(try ordinaryCreateFromConstructor(
                 Object,
@@ -127,13 +126,13 @@ pub const constructor = struct {
                 const from = next_source.toObject(agent) catch |err| try noexcept(err);
 
                 // ii. Let keys be ? from.[[OwnPropertyKeys]]().
-                const keys_ = try from.internalMethods().ownPropertyKeys(from);
+                const keys_ = try from.internal_methods.ownPropertyKeys(from);
                 defer keys_.deinit();
 
                 // iii. For each element nextKey of keys, do
                 for (keys_.items) |next_key| {
                     // 1. Let desc be ? from.[[GetOwnProperty]](nextKey).
-                    const descriptor = try from.internalMethods().getOwnProperty(from, next_key);
+                    const descriptor = try from.internal_methods.getOwnProperty(from, next_key);
 
                     // 2. If desc is not undefined and desc.[[Enumerable]] is true, then
                     if (descriptor != null and descriptor.?.enumerable == true) {
@@ -197,14 +196,14 @@ pub const constructor = struct {
     /// https://tc39.es/ecma262/#sec-objectdefineproperties
     fn objectDefineProperties(
         agent: *Agent,
-        object: Object_,
+        object: *types.Object,
         properties: Value,
-    ) Agent.Error!Object_ {
+    ) Agent.Error!*types.Object {
         // 1. Let props be ? ToObject(Properties).
         const props = try properties.toObject(agent);
 
         // 2. Let keys be ? props.[[OwnPropertyKeys]]().
-        const keys_ = try props.internalMethods().ownPropertyKeys(props);
+        const keys_ = try props.internal_methods.ownPropertyKeys(props);
         defer keys_.deinit();
 
         const Property = struct {
@@ -219,7 +218,7 @@ pub const constructor = struct {
         // 4. For each element nextKey of keys, do
         for (keys_.items) |next_key| {
             // a. Let propDesc be ? props.[[GetOwnProperty]](nextKey).
-            const maybe_property_descriptor = try props.internalMethods().getOwnProperty(props, next_key);
+            const maybe_property_descriptor = try props.internal_methods.getOwnProperty(props, next_key);
 
             // b. If propDesc is not undefined and propDesc.[[Enumerable]] is true, then
             if (maybe_property_descriptor) |property_descriptor| if (property_descriptor.enumerable == true) {
@@ -320,7 +319,7 @@ pub const constructor = struct {
         );
 
         const Captures = struct {
-            object: types.Object,
+            object: *types.Object,
         };
         const captures = try agent.gc_allocator.create(Captures);
         captures.* = .{ .object = object };
@@ -370,7 +369,7 @@ pub const constructor = struct {
         const property_key = try property.toPropertyKey(agent);
 
         // 3. Let desc be ? obj.[[GetOwnProperty]](key).
-        const maybe_descriptor = try obj.internalMethods().getOwnProperty(obj, property_key);
+        const maybe_descriptor = try obj.internal_methods.getOwnProperty(obj, property_key);
 
         // 4. Return FromPropertyDescriptor(desc).
         if (maybe_descriptor) |descriptor|
@@ -389,7 +388,7 @@ pub const constructor = struct {
         const obj = try object.toObject(agent);
 
         // 2. Let ownKeys be ? obj.[[OwnPropertyKeys]]().
-        const own_keys = try obj.internalMethods().ownPropertyKeys(obj);
+        const own_keys = try obj.internal_methods.ownPropertyKeys(obj);
         defer own_keys.deinit();
 
         // 3. Let descriptors be OrdinaryObjectCreate(%Object.prototype%).
@@ -401,7 +400,7 @@ pub const constructor = struct {
         // 4. For each element key of ownKeys, do
         for (own_keys.items) |key| {
             // a. Let desc be ? obj.[[GetOwnProperty]](key).
-            if (try obj.internalMethods().getOwnProperty(obj, key)) |property_descriptor| {
+            if (try obj.internal_methods.getOwnProperty(obj, key)) |property_descriptor| {
                 // b. Let descriptor be FromPropertyDescriptor(desc).
                 const descriptor = try property_descriptor.fromPropertyDescriptor(agent);
 
@@ -462,7 +461,7 @@ pub const constructor = struct {
         const obj = try object.toObject(agent);
 
         // 2. Let keys be ? obj.[[OwnPropertyKeys]]().
-        const keys_ = try obj.internalMethods().ownPropertyKeys(obj);
+        const keys_ = try obj.internal_methods.ownPropertyKeys(obj);
 
         // 3. Let nameList be a new empty List.
         var name_list = std.ArrayList(PropertyKey).init(agent.gc_allocator);
@@ -492,7 +491,7 @@ pub const constructor = struct {
         const obj = try object.toObject(agent);
 
         // 2. Return ? obj.[[GetPrototypeOf]]().
-        return Value.from(try obj.internalMethods().getPrototypeOf(obj) orelse return .null);
+        return Value.from(try obj.internal_methods.getPrototypeOf(obj) orelse return .null);
     }
 
     /// 20.1.2.13 Object.groupBy ( items, callback )
@@ -611,7 +610,7 @@ pub const constructor = struct {
         if (!object.isObject()) return object;
 
         // 2. Let status be ? O.[[PreventExtensions]]().
-        const status = try object.asObject().internalMethods().preventExtensions(object.asObject());
+        const status = try object.asObject().internal_methods.preventExtensions(object.asObject());
 
         // 3. If status is false, throw a TypeError exception.
         if (!status) return agent.throwException(.type_error, "Could not prevent extensions", .{});
@@ -656,7 +655,7 @@ pub const constructor = struct {
         if (!object.isObject()) return object;
 
         // 4. Let status be ? O.[[SetPrototypeOf]](proto).
-        const status = try object.asObject().internalMethods().setPrototypeOf(
+        const status = try object.asObject().internal_methods.setPrototypeOf(
             object.asObject(),
             if (prototype_.isObject()) prototype_.asObject() else null,
         );
@@ -688,7 +687,7 @@ pub const constructor = struct {
 /// 20.1.3 Properties of the Object Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-object-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object_ {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*types.Object {
         return Object.create(realm.agent, .{
             .prototype = null,
             .internal_methods = &.{
@@ -697,7 +696,7 @@ pub const prototype = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object_) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *types.Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "hasOwnProperty", hasOwnProperty, 1, realm);
         try defineBuiltinFunction(object, "isPrototypeOf", isPrototypeOf, 1, realm);
         try defineBuiltinFunction(object, "propertyIsEnumerable", propertyIsEnumerable, 1, realm);
@@ -751,18 +750,18 @@ pub const prototype = struct {
         // 2. Let O be ? ToObject(this value).
         const object = try this_value.toObject(agent);
 
-        var prototype_: ?Object_ = value.asObject();
+        var prototype_: ?*types.Object = value.asObject();
 
         // 3. Repeat,
         while (true) {
             // a. Set V to ? V.[[GetPrototypeOf]]().
-            prototype_ = try prototype_.?.internalMethods().getPrototypeOf(prototype_.?);
+            prototype_ = try prototype_.?.internal_methods.getPrototypeOf(prototype_.?);
 
             // b. If V is null, return false.
             if (prototype_ == null) return Value.from(false);
 
             // c. If SameValue(O, V) is true, return true.
-            if (object.sameValue(prototype_.?)) return Value.from(true);
+            if (object == prototype_.?) return Value.from(true);
         }
     }
 
@@ -782,7 +781,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 3. Let desc be ? O.[[GetOwnProperty]](P).
-        const property_descriptor = try object.internalMethods().getOwnProperty(object, property_key);
+        const property_descriptor = try object.internal_methods.getOwnProperty(object, property_key);
 
         // 4. If desc is undefined, return false.
         if (property_descriptor == null) return Value.from(false);
@@ -824,7 +823,7 @@ pub const prototype = struct {
         else if (object.is(builtins.Arguments))
             String.fromLiteral("Arguments")
         // 7. Else if O has a [[Call]] internal method, let builtinTag be "Function".
-        else if (object.internalMethods().call) |_|
+        else if (object.internal_methods.call) |_|
             String.fromLiteral("Function")
         // 8. Else if O has an [[ErrorData]] internal slot, let builtinTag be "Error".
         else if (object.is(builtins.Error))
@@ -878,7 +877,7 @@ pub const prototype = struct {
         const object = try this_value.toObject(agent);
 
         // 2. Return ? O.[[GetPrototypeOf]]().
-        return Value.from(try object.internalMethods().getPrototypeOf(object) orelse return .null);
+        return Value.from(try object.internal_methods.getPrototypeOf(object) orelse return .null);
     }
 
     /// 20.1.3.8.2 set Object.prototype.__proto__
@@ -896,7 +895,7 @@ pub const prototype = struct {
         if (!object.isObject()) return .undefined;
 
         // 4. Let status be ? O.[[SetPrototypeOf]](proto).
-        const status = try object.asObject().internalMethods().setPrototypeOf(
+        const status = try object.asObject().internal_methods.setPrototypeOf(
             object.asObject(),
             if (prototype_.isObject()) prototype_.asObject() else null,
         );
@@ -991,7 +990,7 @@ pub const prototype = struct {
         while (true) {
             // a. Let desc be ? O.[[GetOwnProperty]](key).
             // b. If desc is not undefined, then
-            if (try object.internalMethods().getOwnProperty(
+            if (try object.internal_methods.getOwnProperty(
                 object,
                 property_key,
             )) |property_descriptor| {
@@ -1005,7 +1004,7 @@ pub const prototype = struct {
             }
 
             // c. Set O to ? O.[[GetPrototypeOf]]().
-            object = try object.internalMethods().getPrototypeOf(object) orelse {
+            object = try object.internal_methods.getPrototypeOf(object) orelse {
                 // d. If O is null, return undefined.
                 return .undefined;
             };
@@ -1027,7 +1026,7 @@ pub const prototype = struct {
         while (true) {
             // a. Let desc be ? O.[[GetOwnProperty]](key).
             // b. If desc is not undefined, then
-            if (try object.internalMethods().getOwnProperty(
+            if (try object.internal_methods.getOwnProperty(
                 object,
                 property_key,
             )) |property_descriptor| {
@@ -1041,7 +1040,7 @@ pub const prototype = struct {
             }
 
             // c. Set O to ? O.[[GetPrototypeOf]]().
-            object = try object.internalMethods().getPrototypeOf(object) orelse {
+            object = try object.internal_methods.getPrototypeOf(object) orelse {
                 // d. If O is null, return undefined.
                 return .undefined;
             };

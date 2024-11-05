@@ -110,7 +110,7 @@ fn fetchConstant(self: *Vm, executable: Executable) Value {
     return executable.constants.unmanaged.entries.get(index).key;
 }
 
-fn fetchIdentifier(self: *Vm, executable: Executable) String {
+fn fetchIdentifier(self: *Vm, executable: Executable) *const String {
     const index = self.fetchIndex(executable);
     return executable.identifiers.unmanaged.entries.get(index).key;
 }
@@ -132,7 +132,7 @@ fn getArgumentSpreadIndices(self: *Vm) std.mem.Allocator.Error![]const usize {
     const len = getArrayLength(array);
     var argument_spread_indices = try std.ArrayList(usize).initCapacity(self.agent.gc_allocator, len);
     for (0..len) |i| {
-        const argument_spread_index = array.propertyStorage().get(
+        const argument_spread_index = array.property_storage.get(
             PropertyKey.from(@as(u53, @intCast(i))),
         ).?.value.?.asNumber().i32;
         argument_spread_indices.appendAssumeCapacity(@intCast(argument_spread_index));
@@ -415,7 +415,7 @@ fn executeDelete(self: *Vm, _: Executable) Agent.Error!void {
         };
 
         // e. Let deleteStatus be ? baseObj.[[Delete]](ref.[[ReferencedName]]).
-        const delete_status = try base_obj.internalMethods().delete(base_obj, property_key);
+        const delete_status = try base_obj.internal_methods.delete(base_obj, property_key);
 
         // f. If deleteStatus is false and ref.[[Strict]] is true, throw a TypeError exception.
         if (!delete_status and reference.strict) {
@@ -628,7 +628,7 @@ fn executeEvaluateSuperCall(self: *Vm, executable: Executable) Agent.Error!void 
 
     // 9. Let F be thisER.[[FunctionObject]].
     // 10. Assert: F is an ECMAScript function object.
-    const constructor = this_environment.function_environment.function_object.object();
+    const constructor = &this_environment.function_environment.function_object.object;
 
     // 11. Perform ? InitializeInstanceElements(result, F).
     try result.initializeInstanceElements(constructor);
@@ -1112,7 +1112,7 @@ fn executeObjectSetPrototype(self: *Vm, _: Executable) Agent.Error!void {
     if (property_value.isObject() or property_value.isNull()) {
         // i. Perform ! object.[[SetPrototypeOf]](propValue).
         const prototype = if (property_value.isObject()) property_value.asObject() else null;
-        _ = object.internalMethods().setPrototypeOf(
+        _ = object.internal_methods.setPrototypeOf(
             object,
             prototype,
         ) catch |err| try noexcept(err);
@@ -1195,7 +1195,7 @@ fn executeResolvePrivateIdentifier(self: *Vm, executable: Executable) Agent.Erro
     const private_name = private_environment.names.get(
         try private_identifier.toUtf8(self.agent.gc_allocator),
     ).?;
-    std.debug.assert(private_name.symbol.data.is_private);
+    std.debug.assert(private_name.symbol.is_private);
     self.result = Value.from(private_name.symbol);
 }
 

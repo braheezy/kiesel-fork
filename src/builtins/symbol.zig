@@ -25,7 +25,7 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 /// 20.4.2 Properties of the Symbol Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-symbol-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "Symbol",
@@ -34,7 +34,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         const agent = realm.agent;
 
         // 20.4.2.1 Symbol.asyncIterator
@@ -170,7 +170,7 @@ pub const constructor = struct {
 
     /// 20.4.1.1 Symbol ( [ description ] )
     /// https://tc39.es/ecma262/#sec-symbol-description
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const description = arguments.get(0);
 
         // 1. If NewTarget is not undefined, throw a TypeError exception.
@@ -233,13 +233,13 @@ pub const constructor = struct {
 /// 20.4.3 Properties of the Symbol Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-symbol-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "description", description, null, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
@@ -269,7 +269,7 @@ pub const prototype = struct {
 
     /// 20.4.3.4.1 ThisSymbolValue ( value )
     /// https://tc39.es/ecma262/#sec-thissymbolvalue
-    fn thisSymbolValue(agent: *Agent, value: Value) error{ExceptionThrown}!types.Symbol {
+    fn thisSymbolValue(agent: *Agent, value: Value) error{ExceptionThrown}!*const types.Symbol {
         // 1. If value is a Symbol, return value.
         if (value.isSymbol()) return value.asSymbol();
 
@@ -299,7 +299,7 @@ pub const prototype = struct {
         const symbol = try thisSymbolValue(agent, this_value);
 
         // 3. Return sym.[[Description]].
-        return Value.from(symbol.data.description orelse return .undefined);
+        return Value.from(symbol.description orelse return .undefined);
     }
 
     /// 20.4.3.3 Symbol.prototype.toString ( )
@@ -333,19 +333,19 @@ pub const prototype = struct {
 pub const Symbol = MakeObject(.{
     .Fields = struct {
         /// [[SymbolData]]
-        symbol_data: types.Symbol,
+        symbol_data: *const types.Symbol,
     },
     .tag = .symbol,
 });
 
 /// 20.4.5.1 KeyForSymbol ( sym )
 /// https://tc39.es/ecma262/#sec-keyforsymbol
-pub fn keyForSymbol(agent: *Agent, symbol: types.Symbol) ?String {
+pub fn keyForSymbol(agent: *Agent, symbol: *const types.Symbol) ?*const String {
     // 1. For each element e of the GlobalSymbolRegistry List, do
     var it = agent.global_symbol_registry.iterator();
     while (it.next()) |entry| {
         // a. If SameValue(e.[[Symbol]], sym) is true, return e.[[Key]].
-        if (entry.value_ptr.sameValue(symbol)) return entry.key_ptr.*;
+        if (entry.value_ptr.* == symbol) return entry.key_ptr.*;
     }
 
     // 2. Assert: GlobalSymbolRegistry does not currently contain an entry for sym.

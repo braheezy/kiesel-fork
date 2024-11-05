@@ -23,7 +23,7 @@ const defineBuiltinProperty = utils.defineBuiltinProperty;
 /// 21.2.2 Properties of the BigInt Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-bigint-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "BigInt",
@@ -32,7 +32,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "asIntN", asIntN, 2, realm);
         try defineBuiltinFunction(object, "asUintN", asUintN, 2, realm);
 
@@ -48,7 +48,7 @@ pub const constructor = struct {
 
     /// 21.2.1.1 BigInt ( value )
     /// https://tc39.es/ecma262/#sec-bigint-constructor-number-value
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const value = arguments.get(0);
 
         // 1. If NewTarget is not undefined, throw a TypeError exception.
@@ -81,7 +81,7 @@ pub const constructor = struct {
         // 3. Let mod be ℝ(bigint) modulo 2**bits.
         // 4. If mod ≥ 2**(bits - 1), return ℤ(mod - 2**bits); otherwise, return ℤ(mod).
         const result = try types.BigInt.from(agent.gc_allocator, 0);
-        try result.managed.truncate(big_int.managed, .signed, @intCast(bits));
+        try result.managed.truncate(&big_int.managed, .signed, @intCast(bits));
         return Value.from(result);
     }
 
@@ -99,14 +99,14 @@ pub const constructor = struct {
 
         // 3. Return ℤ(ℝ(bigint) modulo 2**bits).
         const result = try types.BigInt.from(agent.gc_allocator, 0);
-        try result.managed.truncate(big_int.managed, .unsigned, @intCast(bits));
+        try result.managed.truncate(&big_int.managed, .unsigned, @intCast(bits));
         return Value.from(result);
     }
 };
 
 /// 21.2.1.1.1 NumberToBigInt ( number )
 /// https://tc39.es/ecma262/#sec-numbertobigint
-fn numberToBigInt(agent: *Agent, number: Number) Agent.Error!types.BigInt {
+fn numberToBigInt(agent: *Agent, number: Number) Agent.Error!*const types.BigInt {
     // 1. If number is not an integral Number, throw a RangeError exception.
     if (!number.isIntegral()) {
         return agent.throwException(
@@ -119,7 +119,7 @@ fn numberToBigInt(agent: *Agent, number: Number) Agent.Error!types.BigInt {
     // 2. Return ℤ(ℝ(number)).
     const string = try number.toString(agent.gc_allocator, 10);
     const big_int = try types.BigInt.from(agent.gc_allocator, 0);
-    big_int.managed.setString(10, string.data.slice.ascii) catch |err| switch (err) {
+    big_int.managed.setString(10, string.slice.ascii) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
         error.InvalidBase, error.InvalidCharacter => unreachable,
     };
@@ -129,13 +129,13 @@ fn numberToBigInt(agent: *Agent, number: Number) Agent.Error!types.BigInt {
 /// 21.2.3 Properties of the BigInt Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-bigint-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "toLocaleString", toLocaleString, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);
         try defineBuiltinFunction(object, "valueOf", valueOf, 0, realm);
@@ -160,7 +160,7 @@ pub const prototype = struct {
 
     /// 21.2.3.4.1 ThisBigIntValue ( value )
     /// https://tc39.es/ecma262/#sec-thisbigintvalue
-    fn thisBigIntValue(agent: *Agent, value: Value) error{ExceptionThrown}!types.BigInt {
+    fn thisBigIntValue(agent: *Agent, value: Value) error{ExceptionThrown}!*const types.BigInt {
         // 1. If value is a BigInt, return value.
         if (value.isBigInt()) return value.asBigInt();
 
@@ -220,7 +220,7 @@ pub const prototype = struct {
 pub const BigInt = MakeObject(.{
     .Fields = struct {
         /// [[BigIntData]]
-        big_int_data: types.BigInt,
+        big_int_data: *const types.BigInt,
     },
     .tag = .big_int,
 });

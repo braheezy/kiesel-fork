@@ -19,7 +19,7 @@ pub const ScriptOrModule = union(enum) {
 };
 
 /// Function
-function: ?Object,
+function: ?*Object,
 
 /// Realm
 realm: *Realm,

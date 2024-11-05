@@ -32,10 +32,10 @@ const sameValue = types.sameValue;
 /// https://tc39.es/ecma262/#sec-add-entries-from-iterable
 pub fn addEntriesFromIterable(
     agent: *Agent,
-    target: Object,
+    target: *Object,
     iterable: Value,
-    adder: Object,
-) Agent.Error!Object {
+    adder: *Object,
+) Agent.Error!*Object {
     // 1. Let iteratorRecord be ? GetIterator(iterable, sync).
     var iterator = try getIterator(agent, iterable, .sync);
 
@@ -53,25 +53,25 @@ pub fn addEntriesFromIterable(
             );
 
             // ii. Return ? IteratorClose(iteratorRecord, error).
-            return iterator.close(@as(Agent.Error!Object, @"error"));
+            return iterator.close(@as(Agent.Error!*Object, @"error"));
         }
 
         // d. Let k be Completion(Get(next, "0")).
         const k = next.asObject().get(PropertyKey.from(0)) catch |err| {
             // e. IfAbruptCloseIterator(k, iteratorRecord).
-            return iterator.close(@as(Agent.Error!Object, err));
+            return iterator.close(@as(Agent.Error!*Object, err));
         };
 
         // f. Let v be Completion(Get(next, "1")).
         const v = next.asObject().get(PropertyKey.from(1)) catch |err| {
             // h. IfAbruptCloseIterator(v, iteratorRecord).
-            return iterator.close(@as(Agent.Error!Object, err));
+            return iterator.close(@as(Agent.Error!*Object, err));
         };
 
         // h. Let status be Completion(Call(adder, target, « k, v »)).
         _ = Value.from(adder).callAssumeCallable(Value.from(target), &.{ k, v }) catch |err| {
             // i. IfAbruptCloseIterator(status, iteratorRecord).
-            return iterator.close(@as(Agent.Error!Object, err));
+            return iterator.close(@as(Agent.Error!*Object, err));
         };
     }
 
@@ -81,7 +81,7 @@ pub fn addEntriesFromIterable(
 /// 24.1.2 Properties of the Map Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-map-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "Map",
@@ -90,7 +90,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "groupBy", groupBy, 2, realm);
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
@@ -106,7 +106,7 @@ pub const constructor = struct {
 
     /// 24.1.1.1 Map ( [ iterable ] )
     /// https://tc39.es/ecma262/#sec-map-iterable
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const iterable = arguments.get(0);
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
@@ -180,13 +180,13 @@ pub const constructor = struct {
 /// 24.1.3 Properties of the Map Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-map-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "clear", clear, 0, realm);
         try defineBuiltinFunction(object, "delete", delete, 1, realm);
         try defineBuiltinFunction(object, "entries", entries, 0, realm);
@@ -208,7 +208,7 @@ pub const prototype = struct {
 
         // 24.1.3.12 Map.prototype [ %Symbol.iterator% ] ( )
         // https://tc39.es/ecma262/#sec-map.prototype-%symbol.iterator%
-        const @"%Map.prototype.entries%" = object.propertyStorage().get(PropertyKey.from("entries")).?;
+        const @"%Map.prototype.entries%" = object.property_storage.get(PropertyKey.from("entries")).?;
         try defineBuiltinProperty(object, "%Symbol.iterator%", @"%Map.prototype.entries%");
 
         // 24.1.3.13 Map.prototype [ %Symbol.toStringTag% ]
@@ -317,7 +317,7 @@ pub const prototype = struct {
                 // i. Perform ? Call(callback, thisArg, « e.[[Value]], e.[[Key]], M »).
                 _ = try callback.callAssumeCallable(
                     this_arg,
-                    &.{ value, key, Value.from(map.object()) },
+                    &.{ value, key, Value.from(&map.object) },
                 );
 
                 // ii. NOTE: The number of elements in entries may have increased during execution
@@ -407,7 +407,7 @@ pub const prototype = struct {
         }
 
         // 7. Return M.
-        return Value.from(map.object());
+        return Value.from(&map.object);
     }
 
     /// 24.1.3.10 get Map.prototype.size

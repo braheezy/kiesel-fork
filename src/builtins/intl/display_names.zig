@@ -33,7 +33,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// 12.2 Properties of the Intl.DisplayNames Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-displaynames-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 2,
             .name = "DisplayNames",
@@ -42,7 +42,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 12.2.1 Intl.DisplayNames.prototype
         // https://tc39.es/ecma402/#sec-Intl.DisplayNames.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -55,7 +55,7 @@ pub const constructor = struct {
 
     /// 12.1.1 Intl.DisplayNames ( locales, options )
     /// https://tc39.es/ecma402/#sec-Intl.DisplayNames
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const locales = arguments.get(0);
         const options_value = arguments.get(1);
 
@@ -141,7 +141,7 @@ pub const constructor = struct {
             .{ "short", .short },
             .{ "long", .long },
         });
-        display_names.as(DisplayNames).fields.options.style = style_map.get(style.data.slice.ascii).?;
+        display_names.as(DisplayNames).fields.options.style = style_map.get(style.slice.ascii).?;
 
         // 12. Let type be ? GetOption(options, "type", string, « "language", "region", "script",
         //     "currency", "calendar", "dateTimeField" », undefined).
@@ -176,7 +176,7 @@ pub const constructor = struct {
             .{ "calendar", .calendar },
             .{ "dateTimeField", .date_time_field },
         });
-        display_names.as(DisplayNames).fields.type = type_map.get(@"type".?.data.slice.ascii).?;
+        display_names.as(DisplayNames).fields.type = type_map.get(@"type".?.slice.ascii).?;
 
         // 15. Let fallback be ? GetOption(options, "fallback", string, « "code", "none" », "code").
         const fallback = try getOption(
@@ -197,7 +197,7 @@ pub const constructor = struct {
             .{ "code", .code },
             .{ "none", .none },
         });
-        display_names.as(DisplayNames).fields.options.fallback = fallback_map.get(fallback.data.slice.ascii).?;
+        display_names.as(DisplayNames).fields.options.fallback = fallback_map.get(fallback.slice.ascii).?;
 
         // 17. Set displayNames.[[Locale]] to r.[[Locale]].
         display_names.as(DisplayNames).fields.locale = resolved_locale;
@@ -232,7 +232,7 @@ pub const constructor = struct {
             .{ "dialect", .dialect },
             .{ "standard", .standard },
         });
-        display_names.as(DisplayNames).fields.options.language_display = language_display_map.get(language_display.data.slice.ascii).?;
+        display_names.as(DisplayNames).fields.options.language_display = language_display_map.get(language_display.slice.ascii).?;
 
         // 25. Let styleFields be typeFields.[[<style>]].
         // 26. Assert: styleFields is a Record (see 12.2.3).
@@ -246,13 +246,13 @@ pub const constructor = struct {
 /// 12.3 Properties of the Intl.DisplayNames Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-displaynames-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "of", of, 1, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
@@ -425,10 +425,10 @@ pub const DisplayNames = MakeObject(.{
         options: icu4zig.LocaleDisplayNamesFormatter.Options,
 
         pub const ResolvedOptions = struct {
-            style: String,
-            type: String,
-            fallback: String,
-            language_display: String,
+            style: *const String,
+            type: *const String,
+            fallback: *const String,
+            language_display: *const String,
         };
 
         pub fn resolvedOptions(self: @This()) ResolvedOptions {

@@ -27,57 +27,49 @@ pub const empty = fromLiteral("");
 pub const Builder = @import("String/Builder.zig");
 pub const CodeUnitIterator = @import("String/CodeUnitIterator.zig");
 
-pub const Data = struct {
-    pub const Slice = union(enum) {
-        ascii: []const u8,
-        utf16: []const u16,
+pub const Slice = union(enum) {
+    ascii: []const u8,
+    utf16: []const u16,
 
-        fn hash(self: @This()) u64 {
-            return std.hash.Wyhash.hash(0, switch (self) {
-                .ascii => |ascii| ascii,
-                .utf16 => |utf16| std.mem.sliceAsBytes(utf16),
-            });
-        }
-    };
-
-    slice: Slice,
-    hash: u64,
+    fn hash(self: @This()) u64 {
+        return std.hash.Wyhash.hash(0, switch (self) {
+            .ascii => |ascii| ascii,
+            .utf16 => |utf16| std.mem.sliceAsBytes(utf16),
+        });
+    }
 };
 
-data: *Data,
+slice: Slice,
+hash: u64,
 
 pub fn format(
-    self: String,
+    self: *const String,
     comptime fmt: []const u8,
     options: std.fmt.FormatOptions,
     writer: anytype,
 ) @TypeOf(writer).Error!void {
     _ = fmt;
     _ = options;
-    switch (self.data.slice) {
+    switch (self.slice) {
         .ascii => |ascii| try writer.writeAll(ascii),
         .utf16 => |utf16| try writer.print("{}", .{std.unicode.fmtUtf16Le(utf16)}),
     }
 }
 
-pub fn fromLiteral(comptime utf8: []const u8) String {
+pub fn fromLiteral(comptime utf8: []const u8) *const String {
     @setEvalBranchQuota(10_000);
-    const data: *const Data = comptime data: {
-        const slice: Data.Slice = if (utf8IsAscii(utf8)) blk: {
-            break :blk .{ .ascii = utf8 };
-        } else blk: {
-            const utf16 = std.unicode.utf8ToUtf16LeStringLiteral(utf8);
-            break :blk .{ .utf16 = utf16 };
-        };
-        break :data &.{ .slice = slice, .hash = slice.hash() };
+    const slice: Slice = comptime if (utf8IsAscii(utf8)) blk: {
+        break :blk .{ .ascii = utf8 };
+    } else blk: {
+        const utf16 = std.unicode.utf8ToUtf16LeStringLiteral(utf8);
+        break :blk .{ .utf16 = utf16 };
     };
-    // Once we actually use the mutable pointer for something (e.g. storing a computed hash) we'll
-    // have to record that this one *is not* and make sure that data is available at comptime.
-    return .{ .data = @constCast(data) };
+    const string: *const String = comptime &.{ .slice = slice, .hash = slice.hash() };
+    return string;
 }
 
-pub fn fromUtf8(allocator: std.mem.Allocator, utf8: []const u8) std.mem.Allocator.Error!String {
-    const slice: Data.Slice = if (utf8IsAscii(utf8)) blk: {
+pub fn fromUtf8(allocator: std.mem.Allocator, utf8: []const u8) std.mem.Allocator.Error!*const String {
+    const slice: Slice = if (utf8IsAscii(utf8)) blk: {
         break :blk .{ .ascii = utf8 };
     } else blk: {
         const utf16 = std.unicode.utf8ToUtf16LeAlloc(allocator, utf8) catch |err| switch (err) {
@@ -86,38 +78,38 @@ pub fn fromUtf8(allocator: std.mem.Allocator, utf8: []const u8) std.mem.Allocato
         };
         break :blk .{ .utf16 = utf16 };
     };
-    const data = try allocator.create(Data);
-    data.* = .{ .slice = slice, .hash = slice.hash() };
-    return .{ .data = data };
+    const string = try allocator.create(String);
+    string.* = .{ .slice = slice, .hash = slice.hash() };
+    return string;
 }
 
-pub fn fromAscii(allocator: std.mem.Allocator, ascii: []const u8) std.mem.Allocator.Error!String {
-    const slice: Data.Slice = .{ .ascii = ascii };
-    const data = try allocator.create(Data);
-    data.* = .{ .slice = slice, .hash = slice.hash() };
-    return .{ .data = data };
+pub fn fromAscii(allocator: std.mem.Allocator, ascii: []const u8) std.mem.Allocator.Error!*const String {
+    const slice: Slice = .{ .ascii = ascii };
+    const string = try allocator.create(String);
+    string.* = .{ .slice = slice, .hash = slice.hash() };
+    return string;
 }
 
-pub fn fromUtf16(allocator: std.mem.Allocator, utf16: []const u16) std.mem.Allocator.Error!String {
-    const slice: Data.Slice = .{ .utf16 = utf16 };
-    const data = try allocator.create(Data);
-    data.* = .{ .slice = slice, .hash = slice.hash() };
-    return .{ .data = data };
+pub fn fromUtf16(allocator: std.mem.Allocator, utf16: []const u16) std.mem.Allocator.Error!*const String {
+    const slice: Slice = .{ .utf16 = utf16 };
+    const string = try allocator.create(String);
+    string.* = .{ .slice = slice, .hash = slice.hash() };
+    return string;
 }
 
-pub fn isEmpty(self: String) bool {
+pub fn isEmpty(self: *const String) bool {
     return self.length() == 0;
 }
 
-pub fn length(self: String) usize {
-    return switch (self.data.slice) {
+pub fn length(self: *const String) usize {
+    return switch (self.slice) {
         .ascii => |ascii| ascii.len,
         .utf16 => |utf16| utf16.len,
     };
 }
 
-pub fn toUtf8(self: String, allocator: std.mem.Allocator) std.mem.Allocator.Error![]const u8 {
-    return switch (self.data.slice) {
+pub fn toUtf8(self: *const String, allocator: std.mem.Allocator) std.mem.Allocator.Error![]const u8 {
+    return switch (self.slice) {
         .ascii => |ascii| allocator.dupe(u8, ascii),
         .utf16 => |utf16| std.fmt.allocPrint(
             allocator,
@@ -127,8 +119,8 @@ pub fn toUtf8(self: String, allocator: std.mem.Allocator) std.mem.Allocator.Erro
     };
 }
 
-pub fn toUtf16(self: String, allocator: std.mem.Allocator) std.mem.Allocator.Error![]const u16 {
-    return switch (self.data.slice) {
+pub fn toUtf16(self: *const String, allocator: std.mem.Allocator) std.mem.Allocator.Error![]const u16 {
+    return switch (self.slice) {
         .ascii => |ascii| blk: {
             const utf16 = try allocator.alloc(u16, ascii.len);
             for (ascii, 0..) |c, i| utf16[i] = c;
@@ -138,16 +130,16 @@ pub fn toUtf16(self: String, allocator: std.mem.Allocator) std.mem.Allocator.Err
     };
 }
 
-pub fn codeUnitIterator(self: String) CodeUnitIterator {
+pub fn codeUnitIterator(self: *const String) CodeUnitIterator {
     return .{ .index = 0, .string = self };
 }
 
-pub fn eql(self: String, other: String) bool {
-    if (self.data.slice == .ascii and other.data.slice == .ascii) {
-        return std.mem.eql(u8, self.data.slice.ascii, other.data.slice.ascii);
+pub fn eql(self: *const String, other: *const String) bool {
+    if (self.slice == .ascii and other.slice == .ascii) {
+        return std.mem.eql(u8, self.slice.ascii, other.slice.ascii);
     }
-    if (self.data.slice == .utf16 and other.data.slice == .utf16) {
-        return std.mem.eql(u16, self.data.slice.utf16, other.data.slice.utf16);
+    if (self.slice == .utf16 and other.slice == .utf16) {
+        return std.mem.eql(u16, self.slice.utf16, other.slice.utf16);
     }
     if (self.isEmpty() and other.isEmpty()) return true;
     if (self.length() != other.length()) return false;
@@ -161,12 +153,12 @@ pub fn eql(self: String, other: String) bool {
     return true;
 }
 
-pub fn startsWith(self: String, other: String) bool {
-    if (self.data.slice == .ascii and other.data.slice == .ascii) {
-        return std.mem.startsWith(u8, self.data.slice.ascii, other.data.slice.ascii);
+pub fn startsWith(self: *const String, other: *const String) bool {
+    if (self.slice == .ascii and other.slice == .ascii) {
+        return std.mem.startsWith(u8, self.slice.ascii, other.slice.ascii);
     }
-    if (self.data.slice == .utf16 and other.data.slice == .utf16) {
-        return std.mem.startsWith(u16, self.data.slice.utf16, other.data.slice.utf16);
+    if (self.slice == .utf16 and other.slice == .utf16) {
+        return std.mem.startsWith(u16, self.slice.utf16, other.slice.utf16);
     }
     if (other.isEmpty()) return true;
     if (self.length() < other.length()) return false;
@@ -182,16 +174,16 @@ pub fn startsWith(self: String, other: String) bool {
 
 /// https://tc39.es/ecma262/#substring
 pub fn substring(
-    self: String,
+    self: *const String,
     allocator: std.mem.Allocator,
     inclusive_start: usize,
     exclusive_end: ?usize,
-) std.mem.Allocator.Error!String {
+) std.mem.Allocator.Error!*const String {
     if (inclusive_start == 0 and (exclusive_end == null or exclusive_end == self.length())) {
         return self;
     }
     if (self.isEmpty() or inclusive_start == self.length() or exclusive_end == 0) return empty;
-    switch (self.data.slice) {
+    switch (self.slice) {
         .ascii => |ascii| {
             const ascii_substring = ascii[inclusive_start .. exclusive_end orelse self.length()];
             return fromAscii(allocator, try allocator.dupe(u8, ascii_substring));
@@ -216,7 +208,7 @@ pub fn substring(
 
 /// 6.1.4.1 StringIndexOf ( string, searchValue, fromIndex )
 /// https://tc39.es/ecma262/#sec-stringindexof
-pub fn indexOf(self: String, search_value: String, from_index: usize) ?usize {
+pub fn indexOf(self: *const String, search_value: *const String, from_index: usize) ?usize {
     // 1. Let len be the length of string.
     const len = self.length();
     const search_len = search_value.length();
@@ -230,21 +222,21 @@ pub fn indexOf(self: String, search_value: String, from_index: usize) ?usize {
     //     b. If candidate is searchValue, return i.
     // 5. Return not-found.
     if (from_index >= len or search_len > len) return null;
-    if (self.data.slice == .ascii and search_value.data.slice == .ascii) {
+    if (self.slice == .ascii and search_value.slice == .ascii) {
         return if (std.mem.indexOf(
             u8,
-            self.data.slice.ascii[from_index..],
-            search_value.data.slice.ascii,
+            self.slice.ascii[from_index..],
+            search_value.slice.ascii,
         )) |index|
             index + from_index
         else
             null;
     }
-    if (self.data.slice == .utf16 and search_value.data.slice == .utf16) {
+    if (self.slice == .utf16 and search_value.slice == .utf16) {
         return if (std.mem.indexOf(
             u16,
-            self.data.slice.utf16[from_index..],
-            search_value.data.slice.utf16,
+            self.slice.utf16[from_index..],
+            search_value.slice.utf16,
         )) |index|
             index + from_index
         else
@@ -263,7 +255,7 @@ pub fn indexOf(self: String, search_value: String, from_index: usize) ?usize {
 
 /// 6.1.4.2 StringLastIndexOf ( string, searchValue, fromIndex )
 /// https://tc39.es/ecma262/#sec-stringlastindexof
-pub fn lastIndexOf(self: String, search_value: String, from_index: usize) ?usize {
+pub fn lastIndexOf(self: *const String, search_value: *const String, from_index: usize) ?usize {
     // 1. Let len be the length of string.
     const len = self.length();
 
@@ -277,23 +269,23 @@ pub fn lastIndexOf(self: String, search_value: String, from_index: usize) ?usize
     // 5. Return not-found.
     if (search_value.isEmpty() and from_index <= len) return from_index;
     if (from_index >= len or search_len > len) return null;
-    if (self.data.slice == .ascii and search_value.data.slice == .ascii) {
+    if (self.slice == .ascii and search_value.slice == .ascii) {
         const end = std.math.clamp(from_index + search_len, 0, len);
         return if (std.mem.lastIndexOf(
             u8,
-            self.data.slice.ascii[0..end],
-            search_value.data.slice.ascii,
+            self.slice.ascii[0..end],
+            search_value.slice.ascii,
         )) |index|
             index
         else
             null;
     }
-    if (self.data.slice == .utf16 and search_value.data.slice == .utf16) {
+    if (self.slice == .utf16 and search_value.slice == .utf16) {
         const end = std.math.clamp(from_index + search_len, 0, len);
         return if (std.mem.lastIndexOf(
             u16,
-            self.data.slice.utf16[0..end],
-            search_value.data.slice.utf16,
+            self.slice.utf16[0..end],
+            search_value.slice.utf16,
         )) |index|
             index
         else
@@ -310,8 +302,8 @@ pub fn lastIndexOf(self: String, search_value: String, from_index: usize) ?usize
 
 /// 7.2.8 Static Semantics: IsStringWellFormedUnicode ( string )
 /// https://tc39.es/ecma262/#sec-isstringwellformedunicode
-pub fn isWellFormedUnicode(self: String) bool {
-    if (self.data.slice == .ascii) return true;
+pub fn isWellFormedUnicode(self: *const String) bool {
+    if (self.slice == .ascii) return true;
 
     // 1. Let len be the length of string.
     const len = self.length();
@@ -343,14 +335,14 @@ const CodePoint = struct {
 
 /// 11.1.4 Static Semantics: CodePointAt ( string, position )
 /// https://tc39.es/ecma262/#sec-codepointat
-pub fn codePointAt(self: String, position: usize) CodePoint {
+pub fn codePointAt(self: *const String, position: usize) CodePoint {
     // 1. Let size be the length of string.
     const size = self.length();
 
     // 2. Assert: position ≥ 0 and position < size.
     std.debug.assert(position >= 0 and position < size);
 
-    switch (self.data.slice) {
+    switch (self.slice) {
         .ascii => |ascii| {
             return .{ .code_point = ascii[position], .code_unit_count = 1, .is_unpaired_surrogate = false };
         },
@@ -391,16 +383,16 @@ pub fn codePointAt(self: String, position: usize) CodePoint {
     }
 }
 
-pub fn codeUnitAt(self: String, index: usize) u16 {
-    return switch (self.data.slice) {
+pub fn codeUnitAt(self: *const String, index: usize) u16 {
+    return switch (self.slice) {
         .ascii => |ascii| ascii[index],
         .utf16 => |utf16| utf16[index],
     };
 }
 
-pub fn toLowerCase(self: String, allocator: std.mem.Allocator) std.mem.Allocator.Error!String {
+pub fn toLowerCase(self: *const String, allocator: std.mem.Allocator) std.mem.Allocator.Error!*const String {
     if (self.isEmpty()) return empty;
-    switch (self.data.slice) {
+    switch (self.slice) {
         .ascii => |ascii| {
             const output = try allocator.alloc(u8, ascii.len);
             for (ascii, 0..) |c, i| {
@@ -433,9 +425,9 @@ pub fn toLowerCase(self: String, allocator: std.mem.Allocator) std.mem.Allocator
     }
 }
 
-pub fn toUpperCase(self: String, allocator: std.mem.Allocator) std.mem.Allocator.Error!String {
+pub fn toUpperCase(self: *const String, allocator: std.mem.Allocator) std.mem.Allocator.Error!*const String {
     if (self.isEmpty()) return empty;
-    switch (self.data.slice) {
+    switch (self.slice) {
         .ascii => |ascii| {
             const output = try allocator.alloc(u8, ascii.len);
             for (ascii, 0..) |c, i| {
@@ -469,10 +461,10 @@ pub fn toUpperCase(self: String, allocator: std.mem.Allocator) std.mem.Allocator
 }
 
 pub fn trim(
-    self: String,
+    self: *const String,
     allocator: std.mem.Allocator,
     where: enum { start, end, @"start+end" },
-) std.mem.Allocator.Error!String {
+) std.mem.Allocator.Error!*const String {
     const whitespace_code_units = comptime blk: {
         var code_units: [whitespace.len]u21 = undefined;
         for (whitespace, 0..) |utf8, i| {
@@ -540,13 +532,13 @@ pub fn trim(
 }
 
 pub fn replace(
-    self: String,
+    self: *const String,
     allocator: std.mem.Allocator,
     needle: []const u8,
     replacement: []const u8,
-) std.mem.Allocator.Error!String {
+) std.mem.Allocator.Error!*const String {
     // For now this only deals with simple ASCII replacements.
-    switch (self.data.slice) {
+    switch (self.slice) {
         .ascii => |ascii| {
             const output = try std.mem.replaceOwned(
                 u8,
@@ -579,10 +571,10 @@ pub fn replace(
 }
 
 pub fn repeat(
-    self: String,
+    self: *const String,
     allocator: std.mem.Allocator,
     n: usize,
-) std.mem.Allocator.Error!String {
+) std.mem.Allocator.Error!*const String {
     // NOTE: This allocates the exact needed capacity upfront
     var builder = try Builder.initCapacity(allocator, n);
     defer builder.deinit();
@@ -592,8 +584,8 @@ pub fn repeat(
 
 pub fn concat(
     allocator: std.mem.Allocator,
-    strings: []const String,
-) std.mem.Allocator.Error!String {
+    strings: []const *const String,
+) std.mem.Allocator.Error!*const String {
     // NOTE: This allocates the exact needed capacity upfront
     var builder = try Builder.initCapacity(allocator, strings.len);
     defer builder.deinit();
@@ -602,31 +594,31 @@ pub fn concat(
 }
 
 pub fn StringHashMap(comptime V: type) type {
-    return std.HashMap(String, V, struct {
-        pub fn hash(_: @This(), key: String) u64 {
-            return key.data.hash;
+    return std.HashMap(*const String, V, struct {
+        pub fn hash(_: @This(), key: *const String) u64 {
+            return key.hash;
         }
 
-        pub fn eql(_: @This(), a: String, b: String) bool {
+        pub fn eql(_: @This(), a: *const String, b: *const String) bool {
             return a.eql(b);
         }
     }, std.hash_map.default_max_load_percentage);
 }
 
 pub fn StringArrayHashMap(comptime V: type) type {
-    return std.ArrayHashMap(String, V, struct {
-        pub fn hash(_: @This(), key: String) u32 {
-            return @truncate(key.data.hash);
+    return std.ArrayHashMap(*const String, V, struct {
+        pub fn hash(_: @This(), key: *const String) u32 {
+            return @truncate(key.hash);
         }
 
-        pub fn eql(_: @This(), a: String, b: String, _: usize) bool {
+        pub fn eql(_: @This(), a: *const String, b: *const String, _: usize) bool {
             return a.eql(b);
         }
     }, true);
 }
 
-test "format" {
-    const test_cases = [_]struct { String, []const u8 }{
+test format {
+    const test_cases = [_]struct { *const String, []const u8 }{
         .{ empty, "" },
         .{ fromLiteral("foo"), "foo" },
         .{ fromLiteral("123"), "123" },

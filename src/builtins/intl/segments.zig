@@ -26,8 +26,8 @@ const ordinaryObjectCreateWithType = builtins.ordinaryObjectCreateWithType;
 pub fn createSegmentsObject(
     agent: *Agent,
     segmenter: *builtins.intl.Segmenter,
-    string: String,
-) std.mem.Allocator.Error!Object {
+    string: *const String,
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. Let internalSlotsList be « [[SegmentsSegmenter]], [[SegmentsString]] ».
@@ -52,13 +52,13 @@ pub fn createSegmentsObject(
 /// 18.5.2 The %IntlSegmentsPrototype% Object
 /// https://tc39.es/ecma402/#sec-%intlsegmentsprototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "containing", containing, 1, realm);
         try defineBuiltinFunction(object, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
     }
@@ -135,7 +135,7 @@ pub const Segments = MakeObject(.{
         segments_segmenter: *builtins.intl.Segmenter,
 
         /// [[SegmentsString]]
-        segments_string: String,
+        segments_string: *const String,
     },
     .tag = .intl_segments,
 });

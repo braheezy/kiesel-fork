@@ -236,7 +236,7 @@ fn doWait(
     _ = block;
 
     var promise_capability: PromiseCapability = undefined;
-    var result_object: Object = undefined;
+    var result_object: *Object = undefined;
 
     // 15. If mode is sync, then
     if (mode == .sync) {
@@ -413,13 +413,13 @@ fn atomicReadModifyWrite(
 }
 
 pub const namespace = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "add", add, 3, realm);
         try defineBuiltinFunction(object, "and", @"and", 3, realm);
         try defineBuiltinFunction(object, "compareExchange", compareExchange, 4, realm);

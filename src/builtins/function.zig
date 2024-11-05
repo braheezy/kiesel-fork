@@ -47,7 +47,7 @@ fn GrammarSymbol(comptime T: type) type {
 /// 20.2.2 Properties of the Function Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "Function",
@@ -56,7 +56,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 20.2.2.1 Function.prototype
         // https://tc39.es/ecma262/#sec-function.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -69,7 +69,7 @@ pub const constructor = struct {
 
     /// 20.2.1.1 Function ( ...parameterArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-function-p1-p2-pn-body
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const parameter_args = arguments.values[0..arguments.count() -| 1];
         const maybe_body_arg = arguments.getOrNull(arguments.count() -| 1);
 
@@ -95,8 +95,8 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-createdynamicfunction
 pub fn createDynamicFunction(
     agent: *Agent,
-    constructor_: Object,
-    maybe_new_target: ?Object,
+    constructor_: *Object,
+    maybe_new_target: ?*Object,
     comptime kind: enum {
         normal,
         generator,
@@ -105,7 +105,7 @@ pub fn createDynamicFunction(
     },
     parameter_args: []const Value,
     body_arg: Value,
-) Agent.Error!Object {
+) Agent.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. If newTarget is undefined, set newTarget to constructor.
@@ -250,7 +250,7 @@ pub fn createDynamicFunction(
     const arg_count = parameter_args.len;
 
     // 7. Let parameterStrings be a new empty List.
-    var parameter_strings = try std.ArrayList(String).initCapacity(
+    var parameter_strings = try std.ArrayList(*const String).initCapacity(
         agent.gc_allocator,
         parameter_args.len,
     );
@@ -452,7 +452,7 @@ pub fn createDynamicFunction(
 /// 20.2.3 Properties of the Function Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-function-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .function = function }, .{
             .length = 0,
             .name = "",
@@ -461,7 +461,7 @@ pub const prototype = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "apply", apply, 2, realm);
         try defineBuiltinFunction(object, "bind", bind, 1, realm);
         try defineBuiltinFunction(object, "call", call, 1, realm);
@@ -638,7 +638,7 @@ pub const prototype = struct {
         //    func.[[InitialName]].
         if (func.isObject() and func.asObject().is(BuiltinFunction)) {
             const builtin_function = func.asObject().as(BuiltinFunction);
-            const name: String = builtin_function.fields.initial_name orelse .empty;
+            const name: *const String = builtin_function.fields.initial_name orelse .empty;
             const source_text = try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "function {}() {{ [native code] }}",

@@ -57,13 +57,13 @@ pub const createSegmentsObject = segments.createSegmentsObject;
 pub const findBoundary = segmenter.findBoundary;
 
 pub const namespace = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "getCanonicalLocales", getCanonicalLocales, 1, realm);
         try defineBuiltinFunction(object, "supportedValuesOf", supportedValuesOf, 1, realm);
 
@@ -170,7 +170,7 @@ pub const namespace = struct {
         // 1. Let key be ? ToString(key).
         const key = try arguments.get(0).toString(agent);
 
-        var list: []const String = &.{};
+        var list: []const *const String = &.{};
 
         // 2. If key is "calendar", then
         if (key.eql(String.fromLiteral("calendar"))) {
@@ -212,8 +212,8 @@ pub const namespace = struct {
 
         // 9. Return CreateArrayFromList( list ).
         return Value.from(
-            try createArrayFromListMapToValue(agent, String, list, struct {
-                fn mapFn(_: *Agent, string: String) std.mem.Allocator.Error!Value {
+            try createArrayFromListMapToValue(agent, *const String, list, struct {
+                fn mapFn(_: *Agent, string: *const String) std.mem.Allocator.Error!Value {
                     return Value.from(string);
                 }
             }.mapFn),

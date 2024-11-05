@@ -289,7 +289,7 @@ fn setViewValue(
 /// 25.3.3 Properties of the DataView Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-dataview-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "DataView",
@@ -298,7 +298,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 25.3.3.1 DataView.prototype
         // https://tc39.es/ecma262/#sec-dataview.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -311,7 +311,7 @@ pub const constructor = struct {
 
     /// 25.3.2.1 DataView ( buffer [ , byteOffset [ , byteLength ] ] )
     /// https://tc39.es/ecma262/#sec-dataview-buffer-byteoffset-bytelength
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const buffer_value = arguments.get(0);
         const byte_offset = arguments.get(1);
         const byte_length = arguments.get(2);
@@ -458,13 +458,13 @@ pub const constructor = struct {
 /// 25.3.4 Properties of the DataView Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-dataview-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "buffer", buffer, null, realm);
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinAccessor(object, "byteOffset", byteOffset, null, realm);

@@ -30,7 +30,7 @@ pub const Binding = struct {
 
 /// 9.1.1.1.1 HasBinding ( N )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-hasbinding-n
-pub fn hasBinding(self: DeclarativeEnvironment, name: String) bool {
+pub fn hasBinding(self: DeclarativeEnvironment, name: *const String) bool {
     // 1. If envRec has a binding for N, return true.
     // 2. Return false.
     return self.bindings.contains(name);
@@ -41,7 +41,7 @@ pub fn hasBinding(self: DeclarativeEnvironment, name: String) bool {
 pub fn createMutableBinding(
     self: *DeclarativeEnvironment,
     _: *Agent,
-    name: String,
+    name: *const String,
     deletable: bool,
 ) std.mem.Allocator.Error!void {
     // 1. Assert: envRec does not already have a binding for N.
@@ -63,7 +63,7 @@ pub fn createMutableBinding(
 pub fn createImmutableBinding(
     self: *DeclarativeEnvironment,
     _: *Agent,
-    name: String,
+    name: *const String,
     strict: bool,
 ) std.mem.Allocator.Error!void {
     // 1. Assert: envRec does not already have a binding for N.
@@ -84,7 +84,7 @@ pub fn createImmutableBinding(
 pub fn initializeBinding(
     self: DeclarativeEnvironment,
     _: *Agent,
-    name: String,
+    name: *const String,
     value: Value,
 ) void {
     var binding = self.bindings.getPtr(name).?;
@@ -104,7 +104,7 @@ pub fn initializeBinding(
 pub fn setMutableBinding(
     self: *DeclarativeEnvironment,
     agent: *Agent,
-    name: String,
+    name: *const String,
     value: Value,
     strict: bool,
 ) Agent.Error!void {
@@ -168,7 +168,7 @@ pub fn setMutableBinding(
 pub fn getBindingValue(
     self: DeclarativeEnvironment,
     agent: *Agent,
-    name: String,
+    name: *const String,
     _: bool,
 ) error{ExceptionThrown}!Value {
     // 1. Assert: envRec has a binding for N.
@@ -185,7 +185,7 @@ pub fn getBindingValue(
 
 /// 9.1.1.1.7 DeleteBinding ( N )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-deletebinding-n
-pub fn deleteBinding(self: *DeclarativeEnvironment, name: String) bool {
+pub fn deleteBinding(self: *DeclarativeEnvironment, name: *const String) bool {
     // 1. Assert: envRec has a binding for N.
     const binding = self.bindings.get(name).?;
 
@@ -215,7 +215,7 @@ pub fn hasSuperBinding(_: DeclarativeEnvironment) bool {
 
 /// 9.1.1.1.10 WithBaseObject ( )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-withbaseobject
-pub fn withBaseObject(_: DeclarativeEnvironment) ?Object {
+pub fn withBaseObject(_: DeclarativeEnvironment) ?*Object {
     // 1. Return undefined.
     return null;
 }

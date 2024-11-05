@@ -29,17 +29,21 @@ const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 
 const UnicodeExtensions = struct {
-    ca: ?String = null,
-    co: ?String = null,
-    hc: ?String = null,
-    kf: ?String = null,
-    kn: ?String = null,
-    nu: ?String = null,
+    ca: ?*const String = null,
+    co: ?*const String = null,
+    hc: ?*const String = null,
+    kf: ?*const String = null,
+    kn: ?*const String = null,
+    nu: ?*const String = null,
 };
 
 /// 14.1.2 UpdateLanguageId ( tag, options )
 /// https://tc39.es/ecma402/#sec-updatelanguageid
-fn updateLanguageId(agent: *Agent, tag: icu4zig.Locale, options: Object) Agent.Error!icu4zig.Locale {
+fn updateLanguageId(
+    agent: *Agent,
+    tag: icu4zig.Locale,
+    options: *Object,
+) Agent.Error!icu4zig.Locale {
     var new_tag = tag.clone();
 
     // 1. Let baseName be GetLocaleBaseName(tag).
@@ -136,7 +140,7 @@ fn makeLocaleRecord(
     inline for (comptime std.meta.fieldNames(UnicodeExtensions)) |field_name| {
         if (@field(options, field_name)) |new_value| {
             try parts.append(field_name);
-            try parts.append(new_value.data.slice.ascii); // All extensions have been validated and should be ASCII at this point
+            try parts.append(new_value.slice.ascii); // All extensions have been validated and should be ASCII at this point
         }
     }
     if (end != null) try parts.append(str[end.? + 1 ..]);
@@ -147,7 +151,7 @@ fn makeLocaleRecord(
 /// 14.2 Properties of the Intl.Locale Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "Locale",
@@ -156,7 +160,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 14.2.1 Intl.Locale.prototype
         // https://tc39.es/ecma402/#sec-Intl.Locale.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -169,7 +173,7 @@ pub const constructor = struct {
 
     /// 14.1.1 Intl.Locale ( tag [ , options ] )
     /// https://tc39.es/ecma402/#sec-Intl.Locale
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const tag_value = arguments.get(0);
         const options_value = arguments.get(1);
 
@@ -362,13 +366,13 @@ pub const constructor = struct {
 /// 14.3 Properties of the Intl.Locale Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "maximize", maximize, 0, realm);
         try defineBuiltinFunction(object, "minimize", minimize, 0, realm);
         try defineBuiltinFunction(object, "toString", toString, 0, realm);

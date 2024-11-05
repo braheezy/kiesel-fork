@@ -25,7 +25,6 @@ const createArrayFromList = types.createArrayFromList;
 const noexcept = utils.noexcept;
 const validateNonRevokedProxy = builtins.validateNonRevokedProxy;
 
-pub const Data = @import("Object/Data.zig");
 pub const InternalMethods = @import("Object/InternalMethods.zig");
 pub const PropertyKey = @import("Object/PropertyKey.zig").PropertyKey;
 pub const PropertyStorage = @import("Object/PropertyStorage.zig");
@@ -101,11 +100,26 @@ pub const PropertyKind = enum {
     @"key+value",
 };
 
-// Uses `allowzero` to store lazy intrinsics as `.{ .data = @ptrFromInt(0) }` initially
-data: *allowzero Data,
+tag: Object.Tag,
+
+/// [[Prototype]]
+prototype: ?*Object,
+
+/// [[Extensible]]
+extensible: bool,
+
+/// [[PrivateElements]]
+private_elements: PrivateNameArrayHashMap(PrivateElement),
+
+/// [[IsHTMLDDA]]
+is_htmldda: if (build_options.enable_annex_b) bool else void,
+
+agent: *Agent,
+internal_methods: *const InternalMethods,
+property_storage: PropertyStorage,
 
 pub fn format(
-    self: Object,
+    self: *const Object,
     comptime fmt: []const u8,
     options: std.fmt.FormatOptions,
     writer: anytype,
@@ -117,56 +131,20 @@ pub fn format(
     try writer.writeAll("[object Object]");
 }
 
-pub fn is(self: Object, comptime T: type) bool {
+pub fn is(self: *const Object, comptime T: type) bool {
     comptime std.debug.assert(T.tag != .unset);
-    return T.tag == self.data.tag;
+    return self.tag == T.tag;
 }
 
-pub fn as(self: Object, comptime T: type) *T {
+pub fn as(self: *const Object, comptime T: type) *T {
     std.debug.assert(self.is(T));
     // Casting alignment is safe because we allocate objects as *T
-    return @alignCast(@fieldParentPtr("data", @as(*Data, @ptrCast(self.data))));
-}
-
-// Helper functions so we don't have to say 'data' all the time
-
-pub fn prototype(self: Object) *?Object {
-    return &self.data.prototype;
-}
-
-pub fn extensible(self: Object) *bool {
-    return &self.data.extensible;
-}
-
-pub fn privateElements(self: Object) *PrivateNameArrayHashMap(PrivateElement) {
-    return &self.data.private_elements;
-}
-
-pub fn isHTMLDDA(self: Object) bool {
-    comptime if (!build_options.enable_annex_b) @compileError("Annex B is not enabled");
-    return self.data.is_htmldda;
-}
-
-pub fn agent(self: Object) *Agent {
-    return self.data.agent;
-}
-
-pub fn internalMethods(self: Object) *const InternalMethods {
-    return self.data.internal_methods;
-}
-
-pub fn propertyStorage(self: Object) *PropertyStorage {
-    return &self.data.property_storage;
-}
-
-/// Shortcut for the SameValue AO applied on two objects (i.e. pointer equality)
-pub fn sameValue(self: Object, other: Object) bool {
-    return self.data == other.data;
+    return @constCast(@alignCast(@fieldParentPtr("object", self)));
 }
 
 /// 7.1.1.1 OrdinaryToPrimitive ( O, hint )
 /// https://tc39.es/ecma262/#sec-ordinarytoprimitive
-pub fn ordinaryToPrimitive(self: Object, hint: PreferredType) Agent.Error!Value {
+pub fn ordinaryToPrimitive(self: *Object, hint: PreferredType) Agent.Error!Value {
     const method_names = switch (hint) {
         // 1. If hint is string, then
         //     a. Let methodNames be « "toString", "valueOf" ».
@@ -192,7 +170,7 @@ pub fn ordinaryToPrimitive(self: Object, hint: PreferredType) Agent.Error!Value 
     }
 
     // 4. Throw a TypeError exception.
-    return self.agent().throwException(
+    return self.agent.throwException(
         .type_error,
         "Could not convert object to {s}",
         .{@tagName(hint)},
@@ -201,39 +179,39 @@ pub fn ordinaryToPrimitive(self: Object, hint: PreferredType) Agent.Error!Value 
 
 /// 7.2.5 IsExtensible ( O )
 /// https://tc39.es/ecma262/#sec-isextensible-o
-pub fn isExtensible(self: Object) Agent.Error!bool {
+pub fn isExtensible(self: *Object) Agent.Error!bool {
     // 1. Return ? O.[[IsExtensible]]().
-    return self.internalMethods().isExtensible(self);
+    return self.internal_methods.isExtensible(self);
 }
 
 /// 7.3.2 Get ( O, P )
 /// https://tc39.es/ecma262/#sec-get-o-p
-pub fn get(self: Object, property_key: PropertyKey) Agent.Error!Value {
+pub fn get(self: *Object, property_key: PropertyKey) Agent.Error!Value {
     // 1. Return ? O.[[Get]](P, O).
-    return self.internalMethods().get(self, property_key, Value.from(self));
+    return self.internal_methods.get(self, property_key, Value.from(self));
 }
 
 /// 7.3.4 Set ( O, P, V, Throw )
 /// https://tc39.es/ecma262/#sec-set-o-p-v-throw
 pub fn set(
-    self: Object,
+    self: *Object,
     property_key: PropertyKey,
     value: Value,
     throw: enum { throw, ignore },
 ) Agent.Error!void {
     // 1. Let success be ? O.[[Set]](P, V, O).
-    const success = try self.internalMethods().set(self, property_key, value, Value.from(self));
+    const success = try self.internal_methods.set(self, property_key, value, Value.from(self));
 
     // 2. If success is false and Throw is true, throw a TypeError exception.
     if (!success and throw == .throw)
-        return self.agent().throwException(.type_error, "Could not set property", .{});
+        return self.agent.throwException(.type_error, "Could not set property", .{});
 
     // 3. Return unused.
 }
 
 /// 7.3.5 CreateDataProperty ( O, P, V )
 /// https://tc39.es/ecma262/#sec-createdataproperty
-pub fn createDataProperty(self: Object, property_key: PropertyKey, value: Value) Agent.Error!bool {
+pub fn createDataProperty(self: *Object, property_key: PropertyKey, value: Value) Agent.Error!bool {
     // 1. Let newDesc be the PropertyDescriptor {
     //      [[Value]]: V, [[Writable]]: true, [[Enumerable]]: true, [[Configurable]]: true
     //    }.
@@ -245,13 +223,13 @@ pub fn createDataProperty(self: Object, property_key: PropertyKey, value: Value)
     };
 
     // 2. Return ? O.[[DefineOwnProperty]](P, newDesc).
-    return self.internalMethods().defineOwnProperty(self, property_key, new_descriptor);
+    return self.internal_methods.defineOwnProperty(self, property_key, new_descriptor);
 }
 
 /// 7.3.6 CreateDataPropertyOrThrow ( O, P, V )
 /// https://tc39.es/ecma262/#sec-createdatapropertyorthrow
 pub fn createDataPropertyOrThrow(
-    self: Object,
+    self: *Object,
     property_key: PropertyKey,
     value: Value,
 ) Agent.Error!void {
@@ -260,7 +238,7 @@ pub fn createDataPropertyOrThrow(
 
     // 2. If success is false, throw a TypeError exception.
     if (!success)
-        return self.agent().throwException(.type_error, "Could not create data property", .{});
+        return self.agent.throwException(.type_error, "Could not create data property", .{});
 
     // 3. Return unused.
 }
@@ -268,13 +246,13 @@ pub fn createDataPropertyOrThrow(
 /// 7.3.7 CreateNonEnumerableDataPropertyOrThrow ( O, P, V )
 /// https://tc39.es/ecma262/#sec-createnonenumerabledatapropertyorthrow
 pub fn createNonEnumerableDataPropertyOrThrow(
-    self: Object,
+    self: *Object,
     property_key: PropertyKey,
     value: Value,
 ) Agent.Error!void {
     // 1. Assert: O is an ordinary, extensible object with no non-configurable properties.
-    std.debug.assert(self.extensible().* and blk: {
-        for (self.propertyStorage().hash_map.values()) |entry| {
+    std.debug.assert(self.extensible and blk: {
+        for (self.property_storage.hash_map.values()) |entry| {
             switch (entry) {
                 inline else => |x| if (!x.attributes.configurable) break :blk false,
             }
@@ -301,12 +279,12 @@ pub fn createNonEnumerableDataPropertyOrThrow(
 /// 7.3.8 DefinePropertyOrThrow ( O, P, desc )
 /// https://tc39.es/ecma262/#sec-definepropertyorthrow
 pub fn definePropertyOrThrow(
-    self: Object,
+    self: *Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
 ) Agent.Error!void {
     // 1. Let success be ? O.[[DefineOwnProperty]](P, desc).
-    const success = try self.internalMethods().defineOwnProperty(
+    const success = try self.internal_methods.defineOwnProperty(
         self,
         property_key,
         property_descriptor,
@@ -314,36 +292,36 @@ pub fn definePropertyOrThrow(
 
     // 2. If success is false, throw a TypeError exception.
     if (!success)
-        return self.agent().throwException(.type_error, "Could not define property", .{});
+        return self.agent.throwException(.type_error, "Could not define property", .{});
 
     // 3. Return unused.
 }
 
 /// 7.3.9 DeletePropertyOrThrow ( O, P )
 /// https://tc39.es/ecma262/#sec-deletepropertyorthrow
-pub fn deletePropertyOrThrow(self: Object, property_key: PropertyKey) Agent.Error!void {
+pub fn deletePropertyOrThrow(self: *Object, property_key: PropertyKey) Agent.Error!void {
     // 1. Let success be ? O.[[Delete]](P).
-    const success = try self.internalMethods().delete(self, property_key);
+    const success = try self.internal_methods.delete(self, property_key);
 
     // 2. If success is false, throw a TypeError exception.
     if (!success)
-        return self.agent().throwException(.type_error, "Could not delete property", .{});
+        return self.agent.throwException(.type_error, "Could not delete property", .{});
 
     // 3. Return unused.
 }
 
 /// 7.3.11 HasProperty ( O, P )
 /// https://tc39.es/ecma262/#sec-hasproperty
-pub fn hasProperty(self: Object, property_key: PropertyKey) Agent.Error!bool {
+pub fn hasProperty(self: *Object, property_key: PropertyKey) Agent.Error!bool {
     // 1. Return ? O.[[HasProperty]](P).
-    return self.internalMethods().hasProperty(self, property_key);
+    return self.internal_methods.hasProperty(self, property_key);
 }
 
 /// 7.3.12 HasOwnProperty ( O, P )
 /// https://tc39.es/ecma262/#sec-hasownproperty
-pub fn hasOwnProperty(self: Object, property_key: PropertyKey) Agent.Error!bool {
+pub fn hasOwnProperty(self: *Object, property_key: PropertyKey) Agent.Error!bool {
     // 1. Let desc be ? O.[[GetOwnProperty]](P).
-    const descriptor = try self.internalMethods().getOwnProperty(self, property_key);
+    const descriptor = try self.internal_methods.getOwnProperty(self, property_key);
 
     // 2. If desc is undefined, return false.
     // 3. Return true.
@@ -353,10 +331,10 @@ pub fn hasOwnProperty(self: Object, property_key: PropertyKey) Agent.Error!bool 
 /// 7.3.14 Construct ( F [ , argumentsList [ , newTarget ] ] )
 /// https://tc39.es/ecma262/#sec-construct
 pub fn construct(
-    self: Object,
+    self: *Object,
     arguments_list: []const Value,
-    new_target: ?Object,
-) Agent.Error!Object {
+    new_target: ?*Object,
+) Agent.Error!*Object {
     // 1. If newTarget is not present, set newTarget to F.
     const new_target_ = new_target orelse self;
 
@@ -364,24 +342,24 @@ pub fn construct(
     // NOTE: This is done via the NoArgs variant of the function.
 
     // 3. Return ? F.[[Construct]](argumentsList, newTarget).
-    return self.internalMethods().construct.?(self, Arguments.from(arguments_list), new_target_);
+    return self.internal_methods.construct.?(self, Arguments.from(arguments_list), new_target_);
 }
 
-pub fn constructNoArgs(self: Object) Agent.Error!Object {
+pub fn constructNoArgs(self: *Object) Agent.Error!*Object {
     return self.construct(&.{}, null);
 }
 
 /// 7.3.15 SetIntegrityLevel ( O, level )
 /// https://tc39.es/ecma262/#sec-setintegritylevel
-pub fn setIntegrityLevel(self: Object, level: IntegrityLevel) Agent.Error!bool {
+pub fn setIntegrityLevel(self: *Object, level: IntegrityLevel) Agent.Error!bool {
     // 1. Let status be ? O.[[PreventExtensions]]().
-    const status = try self.internalMethods().preventExtensions(self);
+    const status = try self.internal_methods.preventExtensions(self);
 
     // 2. If status is false, return false.
     if (!status) return false;
 
     // 3. Let keys be ? O.[[OwnPropertyKeys]]().
-    const keys = try self.internalMethods().ownPropertyKeys(self);
+    const keys = try self.internal_methods.ownPropertyKeys(self);
     defer keys.deinit();
 
     switch (level) {
@@ -401,7 +379,7 @@ pub fn setIntegrityLevel(self: Object, level: IntegrityLevel) Agent.Error!bool {
             // b. For each element k of keys, do
             for (keys.items) |property_key| {
                 // i. Let currentDesc be ? O.[[GetOwnProperty]](k).
-                const maybe_current_descriptor = try self.internalMethods().getOwnProperty(
+                const maybe_current_descriptor = try self.internal_methods.getOwnProperty(
                     self,
                     property_key,
                 );
@@ -436,7 +414,7 @@ pub fn setIntegrityLevel(self: Object, level: IntegrityLevel) Agent.Error!bool {
 
 /// 7.3.16 TestIntegrityLevel ( O, level )
 /// https://tc39.es/ecma262/#sec-testintegritylevel
-pub fn testIntegrityLevel(self: Object, level: IntegrityLevel) Agent.Error!bool {
+pub fn testIntegrityLevel(self: *Object, level: IntegrityLevel) Agent.Error!bool {
     // 1. Let extensible be ? IsExtensible(O).
     const extensible_ = try self.isExtensible();
 
@@ -445,13 +423,13 @@ pub fn testIntegrityLevel(self: Object, level: IntegrityLevel) Agent.Error!bool 
     if (extensible_) return false;
 
     // 4. Let keys be ? O.[[OwnPropertyKeys]]().
-    const keys = try self.internalMethods().ownPropertyKeys(self);
+    const keys = try self.internal_methods.ownPropertyKeys(self);
     defer keys.deinit();
 
     // 5. For each element k of keys, do
     for (keys.items) |property_key| {
         // a. Let currentDesc be ? O.[[GetOwnProperty]](k).
-        const maybe_current_descriptor = try self.internalMethods().getOwnProperty(
+        const maybe_current_descriptor = try self.internal_methods.getOwnProperty(
             self,
             property_key,
         );
@@ -475,14 +453,14 @@ pub fn testIntegrityLevel(self: Object, level: IntegrityLevel) Agent.Error!bool 
 
 /// 7.3.18 LengthOfArrayLike ( obj )
 /// https://tc39.es/ecma262/#sec-lengthofarraylike
-pub fn lengthOfArrayLike(self: Object) Agent.Error!u53 {
+pub fn lengthOfArrayLike(self: *Object) Agent.Error!u53 {
     // 1. Return ℝ(? ToLength(? Get(obj, "length"))).
-    return (try self.get(PropertyKey.from("length"))).toLength(self.agent());
+    return (try self.get(PropertyKey.from("length"))).toLength(self.agent);
 }
 
 /// 7.3.22 SpeciesConstructor ( O, defaultConstructor )
 /// https://tc39.es/ecma262/#sec-speciesconstructor
-pub fn speciesConstructor(self: Object, default_constructor: Object) Agent.Error!Object {
+pub fn speciesConstructor(self: *Object, default_constructor: *Object) Agent.Error!*Object {
     // 1. Let C be ? Get(O, "constructor").
     const constructor = try self.get(PropertyKey.from("constructor"));
 
@@ -491,12 +469,12 @@ pub fn speciesConstructor(self: Object, default_constructor: Object) Agent.Error
 
     // 3. If C is not an Object, throw a TypeError exception.
     if (!constructor.isObject()) {
-        return self.agent().throwException(.type_error, "{} is not an Object", .{constructor});
+        return self.agent.throwException(.type_error, "{} is not an Object", .{constructor});
     }
 
     // 4. Let S be ? Get(C, %Symbol.species%).
     const species = try constructor.asObject().get(
-        PropertyKey.from(self.agent().well_known_symbols.@"%Symbol.species%"),
+        PropertyKey.from(self.agent.well_known_symbols.@"%Symbol.species%"),
     );
 
     // 5. If S is either undefined or null, return defaultConstructor.
@@ -506,7 +484,7 @@ pub fn speciesConstructor(self: Object, default_constructor: Object) Agent.Error
     if (species.isConstructor()) return species.asObject();
 
     // 7. Throw a TypeError exception.
-    return self.agent().throwException(
+    return self.agent.throwException(
         .type_error,
         "Object's [Symbol.species] property must be a constructor",
         .{},
@@ -516,29 +494,29 @@ pub fn speciesConstructor(self: Object, default_constructor: Object) Agent.Error
 /// 7.3.23 EnumerableOwnProperties ( O, kind )
 /// https://tc39.es/ecma262/#sec-enumerableownproperties
 pub fn enumerableOwnProperties(
-    self: Object,
+    self: *Object,
     comptime kind: PropertyKind,
 ) Agent.Error!std.ArrayList(Value) {
     // 1. Let ownKeys be ? O.[[OwnPropertyKeys]]().
-    const own_keys = try self.internalMethods().ownPropertyKeys(self);
+    const own_keys = try self.internal_methods.ownPropertyKeys(self);
     defer own_keys.deinit();
 
     // 2. Let results be a new empty List.
-    var results = std.ArrayList(Value).init(self.agent().gc_allocator);
+    var results = std.ArrayList(Value).init(self.agent.gc_allocator);
 
     // 3. For each element key of ownKeys, do
     for (own_keys.items) |key| {
         // a. If key is a String, then
         if (key == .string or key == .integer_index) {
             // i. Let desc be ? O.[[GetOwnProperty]](key).
-            const descriptor = try self.internalMethods().getOwnProperty(self, key);
+            const descriptor = try self.internal_methods.getOwnProperty(self, key);
 
             // ii. If desc is not undefined and desc.[[Enumerable]] is true, then
             if (descriptor != null and descriptor.?.enumerable == true) {
                 // 1. If kind is key, then
                 if (kind == .key) {
                     // a. Append key to results.
-                    try results.append(try key.toValue(self.agent()));
+                    try results.append(try key.toValue(self.agent));
                 }
                 // 2. Else,
                 else {
@@ -557,8 +535,8 @@ pub fn enumerableOwnProperties(
 
                         // ii. Let entry be CreateArrayFromList(« key, value »).
                         const entry = Value.from(try createArrayFromList(
-                            self.agent(),
-                            &.{ try key.toValue(self.agent()), value },
+                            self.agent,
+                            &.{ try key.toValue(self.agent), value },
                         ));
 
                         // iii. Append entry to results.
@@ -575,9 +553,9 @@ pub fn enumerableOwnProperties(
 
 /// 7.3.24 GetFunctionRealm ( obj )
 /// https://tc39.es/ecma262/#sec-getfunctionrealm
-pub fn getFunctionRealm(self: Object) error{ExceptionThrown}!*Realm {
+pub fn getFunctionRealm(self: *const Object) error{ExceptionThrown}!*Realm {
     // 1. If obj has a [[Realm]] internal slot, then
-    if (self.internalMethods().call != null) {
+    if (self.internal_methods.call != null) {
         // a. Return obj.[[Realm]].
         if (self.is(builtins.BuiltinFunction)) {
             return self.as(builtins.BuiltinFunction).fields.realm;
@@ -610,7 +588,7 @@ pub fn getFunctionRealm(self: Object) error{ExceptionThrown}!*Realm {
     }
 
     // 4. Return the current Realm Record.
-    return self.agent().currentRealm();
+    return self.agent.currentRealm();
 }
 
 /// 7.3.25 CopyDataProperties ( target, source, excludedItems )
@@ -624,10 +602,10 @@ pub fn copyDataProperties(
     if (source.isUndefined() or source.isNull()) return;
 
     // 2. Let from be ! ToObject(source).
-    const from = source.toObject(self.agent()) catch |err| try noexcept(err);
+    const from = source.toObject(self.agent) catch |err| try noexcept(err);
 
     // 3. Let keys be ? from.[[OwnPropertyKeys]]().
-    const keys = try from.internalMethods().ownPropertyKeys(from);
+    const keys = try from.internal_methods.ownPropertyKeys(from);
     defer keys.deinit();
 
     // 4. For each element nextKey of keys, do
@@ -645,7 +623,7 @@ pub fn copyDataProperties(
         // c. If excluded is false, then
         if (!excluded) {
             // i. Let desc be ? from.[[GetOwnProperty]](nextKey).
-            const descriptor = try from.internalMethods().getOwnProperty(from, next_key);
+            const descriptor = try from.internal_methods.getOwnProperty(from, next_key);
 
             // ii. If desc is not undefined and desc.[[Enumerable]] is true, then
             if (descriptor != null and descriptor.?.enumerable == true) {
@@ -666,11 +644,11 @@ pub fn copyDataProperties(
 
 /// 7.3.26 PrivateElementFind ( O, P )
 /// https://tc39.es/ecma262/#sec-privateelementfind
-pub fn privateElementFind(self: Object, private_name: PrivateName) ?*PrivateElement {
+pub fn privateElementFind(self: *const Object, private_name: PrivateName) ?*PrivateElement {
     // 1. If O.[[PrivateElements]] contains a PrivateElement pe such that pe.[[Key]] is P, then
     //     a. Return pe.
     // 2. Return empty.
-    return self.privateElements().getPtr(private_name);
+    return self.private_elements.getPtr(private_name);
 }
 
 /// 7.3.27 PrivateFieldAdd ( O, P, value )
@@ -678,14 +656,14 @@ pub fn privateElementFind(self: Object, private_name: PrivateName) ?*PrivateElem
 pub fn privateFieldAdd(self: *Object, private_name: PrivateName, value: Value) Agent.Error!void {
     // 1. If the host is a web browser, then
     //     a. Perform ? HostEnsureCanAddPrivateElement(O).
-    try self.agent().host_hooks.hostEnsureCanAddPrivateElement(self.agent(), self.*);
+    try self.agent.host_hooks.hostEnsureCanAddPrivateElement(self.agent, self);
 
     // 2. Let entry be PrivateElementFind(O, P).
     const entry = self.privateElementFind(private_name);
 
     // 3. If entry is not empty, throw a TypeError exception.
     if (entry != null) {
-        return self.agent().throwException(
+        return self.agent.throwException(
             .type_error,
             "Private element '#{}' already exists",
             .{private_name},
@@ -693,7 +671,7 @@ pub fn privateFieldAdd(self: *Object, private_name: PrivateName, value: Value) A
     }
 
     // 4. Append PrivateElement { [[Key]]: P, [[Kind]]: field, [[Value]]: value } to O.[[PrivateElements]].
-    try self.privateElements().putNoClobber(private_name, .{ .field = value });
+    try self.private_elements.putNoClobber(private_name, .{ .field = value });
 
     // 5. Return unused.
 }
@@ -710,14 +688,14 @@ pub fn privateMethodOrAccessorAdd(
 
     // 2. If the host is a web browser, then
     //     a. Perform ? HostEnsureCanAddPrivateElement(O).
-    try self.agent().host_hooks.hostEnsureCanAddPrivateElement(self.agent(), self.*);
+    try self.agent.host_hooks.hostEnsureCanAddPrivateElement(self.agent, self);
 
     // 3. Let entry be PrivateElementFind(O, method.[[Key]]).
     const entry = self.privateElementFind(private_name);
 
     // 4. If entry is not empty, throw a TypeError exception.
     if (entry != null) {
-        return self.agent().throwException(
+        return self.agent.throwException(
             .type_error,
             "Private element '#{}' already exists",
             .{private_name},
@@ -725,18 +703,18 @@ pub fn privateMethodOrAccessorAdd(
     }
 
     // 5. Append method to O.[[PrivateElements]].
-    try self.privateElements().putNoClobber(private_name, method);
+    try self.private_elements.putNoClobber(private_name, method);
 
     // 6. Return unused.
 }
 
 /// 7.3.30 PrivateGet ( O, P )
 /// https://tc39.es/ecma262/#sec-privateget
-pub fn privateGet(self: Object, private_name: PrivateName) Agent.Error!Value {
+pub fn privateGet(self: *Object, private_name: PrivateName) Agent.Error!Value {
     // 1. Let entry be PrivateElementFind(O, P).
     const entry = self.privateElementFind(private_name) orelse {
         // 2. If entry is empty, throw a TypeError exception.
-        return self.agent().throwException(
+        return self.agent.throwException(
             .type_error,
             "Private element '#{}' doesn't exist",
             .{private_name},
@@ -754,7 +732,7 @@ pub fn privateGet(self: Object, private_name: PrivateName) Agent.Error!Value {
             // 5. If entry.[[Get]] is undefined, throw a TypeError exception.
             // 6. Let getter be entry.[[Get]].
             const getter = get_and_set.get orelse {
-                return self.agent().throwException(
+                return self.agent.throwException(
                     .type_error,
                     "Private element '#{}' has not getter",
                     .{private_name},
@@ -773,7 +751,7 @@ pub fn privateSet(self: *Object, private_name: PrivateName, value: Value) Agent.
     // 1. Let entry be PrivateElementFind(O, P).
     const entry = self.privateElementFind(private_name) orelse {
         // 2. If entry is empty, throw a TypeError exception.
-        return self.agent().throwException(
+        return self.agent.throwException(
             .type_error,
             "Private element '#{}' doesn't exist",
             .{private_name},
@@ -790,7 +768,7 @@ pub fn privateSet(self: *Object, private_name: PrivateName, value: Value) Agent.
         // 4. Else if entry.[[Kind]] is method, then
         .method => {
             // a. Throw a TypeError exception.
-            return self.agent().throwException(
+            return self.agent.throwException(
                 .type_error,
                 "Private element '#{}' is a method and cannot be set",
                 .{private_name},
@@ -803,7 +781,7 @@ pub fn privateSet(self: *Object, private_name: PrivateName, value: Value) Agent.
             // c. Let setter be entry.[[Set]].
             // b. If entry.[[Set]] is undefined, throw a TypeError exception.
             const setter = get_and_set.set orelse {
-                return self.agent().throwException(
+                return self.agent.throwException(
                     .type_error,
                     "Private element '#{}' has not setter",
                     .{private_name},
@@ -811,7 +789,7 @@ pub fn privateSet(self: *Object, private_name: PrivateName, value: Value) Agent.
             };
 
             // d. Perform ? Call(setter, O, « value »).
-            _ = try Value.from(setter).callAssumeCallable(Value.from(self.*), &.{value});
+            _ = try Value.from(setter).callAssumeCallable(Value.from(self), &.{value});
         },
     }
 
@@ -827,7 +805,7 @@ pub fn defineField(self: *Object, field: ClassFieldDefinition) Agent.Error!void 
     // 3. If initializer is not empty, then
     const init_value: Value = if (field.initializer) |initializer| blk: {
         // a. Let initValue be ? Call(initializer, receiver).
-        break :blk try Value.from(initializer.object()).callAssumeCallableNoArgs(Value.from(self.*));
+        break :blk try Value.from(&initializer.object).callAssumeCallableNoArgs(Value.from(self));
     }
     // 4. Else,
     else blk: {
@@ -854,7 +832,7 @@ pub fn defineField(self: *Object, field: ClassFieldDefinition) Agent.Error!void 
 
 /// 7.3.33 InitializeInstanceElements ( O, constructor )
 /// https://tc39.es/ecma262/#sec-initializeinstanceelements
-pub fn initializeInstanceElements(self: *Object, constructor: Object) Agent.Error!void {
+pub fn initializeInstanceElements(self: *Object, constructor: *Object) Agent.Error!void {
     // 1. Let methods be the value of constructor.[[PrivateMethods]].
     const methods = if (constructor.is(builtins.ECMAScriptFunction)) blk: {
         break :blk constructor.as(builtins.ECMAScriptFunction).fields.private_methods;

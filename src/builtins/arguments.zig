@@ -31,7 +31,7 @@ const sameValue = types.sameValue;
 /// 10.4.4.1 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-getownproperty-p
 fn getOwnProperty(
-    object: Object,
+    object: *Object,
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!?PropertyDescriptor {
     // 1. Let desc be OrdinaryGetOwnProperty(args, P).
@@ -59,7 +59,7 @@ fn getOwnProperty(
 /// 10.4.4.2 [[DefineOwnProperty]] ( P, Desc )
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-defineownproperty-p-desc
 fn defineOwnProperty(
-    object: Object,
+    object: *Object,
     property_key: PropertyKey,
     property_descriptor: PropertyDescriptor,
 ) std.mem.Allocator.Error!bool {
@@ -99,7 +99,7 @@ fn defineOwnProperty(
         // a. If IsAccessorDescriptor(Desc) is true, then
         if (property_descriptor.isAccessorDescriptor()) {
             // i. Perform ! map.[[Delete]](P).
-            _ = map.internalMethods().delete(map, property_key) catch |err| try noexcept(err);
+            _ = map.internal_methods.delete(map, property_key) catch |err| try noexcept(err);
         }
         // b. Else,
         else {
@@ -114,7 +114,7 @@ fn defineOwnProperty(
             // ii. If Desc has a [[Writable]] field and Desc.[[Writable]] is false, then
             if (property_descriptor.writable == false) {
                 // 1. Perform ! map.[[Delete]](P).
-                _ = map.internalMethods().delete(map, property_key) catch |err| try noexcept(err);
+                _ = map.internal_methods.delete(map, property_key) catch |err| try noexcept(err);
             }
         }
     }
@@ -125,7 +125,7 @@ fn defineOwnProperty(
 
 /// 10.4.4.3 [[Get]] ( P, Receiver )
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-get-p-receiver
-fn get(object: Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value {
+fn get(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value {
     // 1. Let map be args.[[ParameterMap]].
     const map = object.as(Arguments).fields.parameter_map;
 
@@ -148,7 +148,7 @@ fn get(object: Object, property_key: PropertyKey, receiver: Value) Agent.Error!V
 /// 10.4.4.4 [[Set]] ( P, V, Receiver )
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-set-p-v-receiver
 fn set(
-    object: Object,
+    object: *Object,
     property_key: PropertyKey,
     value: Value,
     receiver: Value,
@@ -178,7 +178,7 @@ fn set(
 
 /// 10.4.4.5 [[Delete]] ( P )
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-delete-p
-fn delete(object: Object, property_key: PropertyKey) Agent.Error!bool {
+fn delete(object: *Object, property_key: PropertyKey) Agent.Error!bool {
     // 1. Let map be args.[[ParameterMap]].
     const map = object.as(Arguments).fields.parameter_map;
 
@@ -191,7 +191,7 @@ fn delete(object: Object, property_key: PropertyKey) Agent.Error!bool {
     // 4. If result is true and isMapped is true, then
     if (result and is_mapped) {
         // a. Perform ! map.[[Delete]](P).
-        _ = map.internalMethods().delete(map, property_key) catch |err| try noexcept(err);
+        _ = map.internal_methods.delete(map, property_key) catch |err| try noexcept(err);
     }
 
     // 5. Return result.
@@ -203,7 +203,7 @@ fn delete(object: Object, property_key: PropertyKey) Agent.Error!bool {
 pub fn createUnmappedArgumentsObject(
     agent: *Agent,
     arguments_list: []const Value,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. Let len be the number of elements in argumentsList.
@@ -268,11 +268,11 @@ pub fn createUnmappedArgumentsObject(
 /// https://tc39.es/ecma262/#sec-createmappedargumentsobject
 pub fn createMappedArgumentsObject(
     agent: *Agent,
-    function: Object,
+    function: *Object,
     formals: ast.FormalParameters,
     arguments_list: []const Value,
     env: Environment,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. Assert: formals does not contain a rest parameter, any binding patterns, or any
@@ -382,7 +382,7 @@ pub fn createMappedArgumentsObject(
                 // 3. Perform ! map.[[DefineOwnProperty]](! ToString(𝔽(index)), PropertyDescriptor {
                 //      [[Set]]: p, [[Get]]: g, [[Enumerable]]: false, [[Configurable]]: true
                 //    }).
-                _ = map.internalMethods().defineOwnProperty(map, PropertyKey.from(index.?), .{
+                _ = map.internal_methods.defineOwnProperty(map, PropertyKey.from(index.?), .{
                     .set = setter,
                     .get = getter,
                     .enumerable = false,
@@ -420,9 +420,13 @@ pub fn createMappedArgumentsObject(
 
 /// 10.4.4.7.1 MakeArgGetter ( name, env )
 /// https://tc39.es/ecma262/#sec-makearggetter
-fn makeArgGetter(agent: *Agent, name: String, env: Environment) std.mem.Allocator.Error!Object {
+fn makeArgGetter(
+    agent: *Agent,
+    name: *const String,
+    env: Environment,
+) std.mem.Allocator.Error!*Object {
     const Captures = struct {
-        name: String,
+        name: *const String,
         env: Environment,
     };
     const captures = try agent.gc_allocator.create(Captures);
@@ -456,9 +460,13 @@ fn makeArgGetter(agent: *Agent, name: String, env: Environment) std.mem.Allocato
 
 /// 10.4.4.7.2 MakeArgSetter ( name, env )
 /// https://tc39.es/ecma262/#sec-makeargsetter
-fn makeArgSetter(agent: *Agent, name: String, env: Environment) std.mem.Allocator.Error!Object {
+fn makeArgSetter(
+    agent: *Agent,
+    name: *const String,
+    env: Environment,
+) std.mem.Allocator.Error!*Object {
     const Captures = struct {
-        name: String,
+        name: *const String,
         env: Environment,
     };
     const captures = try agent.gc_allocator.create(Captures);
@@ -495,7 +503,7 @@ fn makeArgSetter(agent: *Agent, name: String, env: Environment) std.mem.Allocato
 pub const Arguments = MakeObject(.{
     .Fields = struct {
         /// [[ParameterMap]]
-        parameter_map: Object,
+        parameter_map: *Object,
     },
     .tag = .arguments,
 });

@@ -138,7 +138,7 @@ fn getPropertyKey(comptime name: []const u8, agent: *Agent) PropertyKey {
 }
 
 pub fn defineBuiltinAccessor(
-    object: Object,
+    object: *Object,
     comptime name: []const u8,
     getter: ?*const Behaviour.Function,
     setter: ?*const Behaviour.Function,
@@ -155,7 +155,7 @@ pub fn defineBuiltinAccessor(
 }
 
 pub fn defineBuiltinAccessorWithAttributes(
-    object: Object,
+    object: *Object,
     comptime name: []const u8,
     getter: ?*const Behaviour.Function,
     setter: ?*const Behaviour.Function,
@@ -182,18 +182,18 @@ pub fn defineBuiltinAccessorWithAttributes(
             .realm = realm,
         });
     } else null;
-    const property_key = getPropertyKey(name, object.agent());
+    const property_key = getPropertyKey(name, realm.agent);
     const property_descriptor: PropertyDescriptor = .{
         .get = getter_function,
         .set = setter_function,
         .enumerable = attributes.enumerable,
         .configurable = attributes.configurable,
     };
-    try object.propertyStorage().set(property_key, property_descriptor);
+    try object.property_storage.set(property_key, property_descriptor);
 }
 
 pub fn defineBuiltinFunction(
-    object: Object,
+    object: *Object,
     comptime name: []const u8,
     function: *const Behaviour.Function,
     length: u32,
@@ -209,7 +209,7 @@ pub fn defineBuiltinFunction(
 }
 
 pub fn defineBuiltinFunctionWithAttributes(
-    object: Object,
+    object: *Object,
     comptime name: []const u8,
     function: *const Behaviour.Function,
     length: u32,
@@ -235,12 +235,12 @@ pub fn defineBuiltinFunctionWithAttributes(
 }
 
 pub fn defineBuiltinProperty(
-    object: Object,
+    object: *Object,
     comptime name: []const u8,
     value: anytype,
 ) std.mem.Allocator.Error!void {
     const T = @TypeOf(value);
-    const property_key = getPropertyKey(name, object.agent());
+    const property_key = getPropertyKey(name, object.agent);
     const property_descriptor = if (T == Value)
         PropertyDescriptor{
             .value = value,
@@ -252,5 +252,5 @@ pub fn defineBuiltinProperty(
         value
     else
         @compileError("defineBuiltinProperty() called with incompatible type " ++ @typeName(T));
-    try object.propertyStorage().set(property_key, property_descriptor);
+    try object.property_storage.set(property_key, property_descriptor);
 }

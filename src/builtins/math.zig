@@ -22,13 +22,13 @@ const getIterator = types.getIterator;
 /// 21.3.1 Value Properties of the Math Object
 /// https://tc39.es/ecma262/#sec-value-properties-of-the-math-object
 pub const namespace = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 21.3.1.1 Math.E
         // https://tc39.es/ecma262/#sec-math.e
         try defineBuiltinProperty(object, "E", PropertyDescriptor{

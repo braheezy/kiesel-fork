@@ -45,7 +45,7 @@ const setFunctionName = builtins.setFunctionName;
 /// https://tc39.es/ecma262/#sec-initializeboundname
 pub fn initializeBoundName(
     agent: *Agent,
-    name: String,
+    name: *const String,
     value: Value,
     environment_or_strict: union(enum) {
         environment: Environment,
@@ -77,7 +77,7 @@ pub fn initializeBoundName(
 pub fn getTemplateObject(
     agent: *Agent,
     template_literal: *ast.TemplateLiteral,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     // 1. Let realm be the current Realm Record.
     const realm = agent.currentRealm();
 
@@ -254,10 +254,10 @@ pub fn getSuperConstructor(agent: *Agent) std.mem.Allocator.Error!Value {
 
     // 3. Let activeFunction be envRec.[[FunctionObject]].
     // 4. Assert: activeFunction is an ECMAScript function object.
-    const active_function = env.function_environment.function_object.object();
+    const active_function = &env.function_environment.function_object.object;
 
     // 5. Let superConstructor be ! activeFunction.[[GetPrototypeOf]]().
-    const super_constructor = active_function.internalMethods().getPrototypeOf(active_function) catch |err| try noexcept(err);
+    const super_constructor = active_function.internal_methods.getPrototypeOf(active_function) catch |err| try noexcept(err);
 
     // 6. Return superConstructor.
     return if (super_constructor) |object| Value.from(object) else .null;
@@ -468,7 +468,7 @@ pub fn instantiateOrdinaryFunctionObject(
     function_declaration: ast.FunctionDeclaration,
     env: Environment,
     private_env: ?*PrivateEnvironment,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // FunctionDeclaration : function BindingIdentifier ( FormalParameters ) { FunctionBody }
@@ -542,7 +542,7 @@ pub fn instantiateOrdinaryFunctionExpression(
     agent: *Agent,
     function_expression: ast.FunctionExpression,
     default_name: ?[]const u8,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // FunctionExpression : function BindingIdentifier ( FormalParameters ) { FunctionBody }
@@ -596,7 +596,7 @@ pub fn instantiateOrdinaryFunctionExpression(
     // FunctionExpression : function ( FormalParameters ) { FunctionBody }
     else {
         // 1. If name is not present, set name to "".
-        const name: String = if (default_name) |name|
+        const name: *const String = if (default_name) |name|
             try String.fromUtf8(agent.gc_allocator, name)
         else
             .empty;
@@ -640,11 +640,11 @@ pub fn instantiateArrowFunctionExpression(
     agent: *Agent,
     arrow_function: ast.ArrowFunction,
     default_name: ?[]const u8,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. If name is not present, set name to "".
-    const name: String = if (default_name) |name|
+    const name: *const String = if (default_name) |name|
         try String.fromUtf8(agent.gc_allocator, name)
     else
         .empty;
@@ -684,9 +684,9 @@ fn defineMethod(
     agent: *Agent,
     function_expression: ast.FunctionExpression,
     property_name: Value,
-    object: Object,
-    function_prototype: ?Object,
-) Agent.Error!struct { key: PropertyKeyOrPrivateName, closure: Object } {
+    object: *Object,
+    function_prototype: ?*Object,
+) Agent.Error!struct { key: PropertyKeyOrPrivateName, closure: *Object } {
     const realm = agent.currentRealm();
 
     // 1. Let propKey be ? Evaluation of ClassElementName.
@@ -741,7 +741,7 @@ pub fn methodDefinitionEvaluation(
         property_name: Value,
         method: ast.MethodDefinition.Method,
     },
-    object: Object,
+    object: *Object,
     enumerable: bool,
 ) Agent.Error!?PrivateMethodDefinition {
     const realm = agent.currentRealm();
@@ -1071,7 +1071,7 @@ pub fn instantiateGeneratorFunctionObject(
     generator_declaration: ast.GeneratorDeclaration,
     env: Environment,
     private_env: ?*PrivateEnvironment,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // GeneratorDeclaration : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
@@ -1167,7 +1167,7 @@ pub fn instantiateGeneratorFunctionExpression(
     agent: *Agent,
     generator_expression: ast.GeneratorExpression,
     default_name: ?[]const u8,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // GeneratorExpression : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
@@ -1234,7 +1234,7 @@ pub fn instantiateGeneratorFunctionExpression(
     // GeneratorExpression : function * ( FormalParameters ) { GeneratorBody }
     else {
         // 1. If name is not present, set name to "".
-        const name: String = if (default_name) |name|
+        const name: *const String = if (default_name) |name|
             try String.fromUtf8(agent.gc_allocator, name)
         else
             .empty;
@@ -1292,7 +1292,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
     async_generator_declaration: ast.AsyncGeneratorDeclaration,
     env: Environment,
     private_env: ?*PrivateEnvironment,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // AsyncGeneratorDeclaration : async function * BindingIdentifier ( FormalParameters ) { AsyncGeneratorBody }
@@ -1387,7 +1387,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
     agent: *Agent,
     async_generator_expression: ast.AsyncGeneratorExpression,
     default_name: ?[]const u8,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // GeneratorExpression : function * BindingIdentifier ( FormalParameters ) { GeneratorBody }
@@ -1454,7 +1454,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
     // AsyncGeneratorExpression : async function * ( FormalParameters ) { AsyncGeneratorBody }
     else {
         // 1. If name is not present, set name to "".
-        const name: String = if (default_name) |name|
+        const name: *const String = if (default_name) |name|
             try String.fromUtf8(agent.gc_allocator, name)
         else
             .empty;
@@ -1510,7 +1510,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
 fn classFieldDefinitionEvaluation(
     agent: *Agent,
     field_definition: ast.FieldDefinition,
-    home_object: Object,
+    home_object: *Object,
 ) Agent.Error!ClassFieldDefinition {
     const realm = agent.currentRealm();
 
@@ -1597,7 +1597,7 @@ fn classFieldDefinitionEvaluation(
 fn classStaticBlockDefinitionEvaluation(
     agent: *Agent,
     class_static_block: ast.ClassStaticBlock,
-    home_object: Object,
+    home_object: *Object,
 ) std.mem.Allocator.Error!ClassStaticBlockDefinition {
     const realm = agent.currentRealm();
 
@@ -1651,7 +1651,7 @@ fn classStaticBlockDefinitionEvaluation(
 fn classElementEvaluation(
     agent: *Agent,
     class_element: ast.ClassElement,
-    object: Object,
+    object: *Object,
 ) Agent.Error!?union(enum) {
     class_field_definition: ClassFieldDefinition,
     class_static_block_definition: ClassStaticBlockDefinition,
@@ -1722,9 +1722,9 @@ fn classElementEvaluation(
 pub fn classDefinitionEvaluation(
     agent: *Agent,
     class_tail: ast.ClassTail,
-    class_binding: ?String,
-    class_name: String,
-) Agent.Error!Object {
+    class_binding: ?*const String,
+    class_name: *const String,
+) Agent.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. Let env be the LexicalEnvironment of the running execution context.
@@ -1766,8 +1766,8 @@ pub fn classDefinitionEvaluation(
             // ii. Else,
             else {
                 const description = try String.fromUtf8(agent.gc_allocator, declared_name);
-                var symbol = try Symbol.init(agent.gc_allocator, description);
-                symbol.data.is_private = true;
+                const symbol = try Symbol.init(agent.gc_allocator, description);
+                symbol.is_private = true;
 
                 // 1. Let name be a new Private Name whose [[Description]] is dn.
                 const name: PrivateName = .{ .symbol = symbol };
@@ -1778,8 +1778,8 @@ pub fn classDefinitionEvaluation(
         }
     }
 
-    var prototype_parent: ?Object = undefined;
-    var constructor_parent: Object = undefined;
+    var prototype_parent: ?*Object = undefined;
+    var constructor_parent: *Object = undefined;
 
     // 7. If ClassHeritage is not present, then
     if (class_tail.class_heritage == null) {
@@ -1867,7 +1867,7 @@ pub fn classDefinitionEvaluation(
         // a. Let defaultConstructor be a new Abstract Closure with no parameters that captures
         //    nothing and performs the following steps when called:
         const default_constructor = struct {
-            fn func(agent_: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+            fn func(agent_: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
                 // i. Let args be the List of arguments that was passed to this function by [[Call]]
                 //    or [[Construct]].
                 const args = arguments.values;
@@ -1889,7 +1889,7 @@ pub fn classDefinitionEvaluation(
                     //    this function does not.
 
                     // 2. Let func be ! F.[[GetPrototypeOf]]().
-                    const prototype_function = function.internalMethods().getPrototypeOf(function) catch |err| try noexcept(err);
+                    const prototype_function = function.internal_methods.getPrototypeOf(function) catch |err| try noexcept(err);
 
                     // 3. If IsConstructor(func) is false, throw a TypeError exception.
                     if (prototype_function == null or !Value.from(prototype_function.?).isConstructor()) {
@@ -2162,7 +2162,7 @@ pub fn classDefinitionEvaluation(
             .class_static_block_definition => |class_static_block_definition| blk: {
                 // i. Assert: elementRecord is a ClassStaticBlockDefinition Record.
                 // ii. Let result be Completion(Call(elementRecord.[[BodyFunction]], F)).
-                const body_function = class_static_block_definition.body_function.object();
+                const body_function = &class_static_block_definition.body_function.object;
                 _ = Value.from(body_function).callAssumeCallableNoArgs(
                     Value.from(function),
                 ) catch |err| break :blk err;
@@ -2191,7 +2191,7 @@ pub fn classDefinitionEvaluation(
 pub fn bindingClassDeclarationEvaluation(
     agent: *Agent,
     class_declaration: ast.ClassDeclaration,
-) Agent.Error!Object {
+) Agent.Error!*Object {
     // ClassDeclaration : class BindingIdentifier ClassTail
     if (class_declaration.identifier) |identifier| {
         // 1. Let className be the StringValue of BindingIdentifier.
@@ -2253,7 +2253,7 @@ pub fn instantiateAsyncFunctionObject(
     async_function_declaration: ast.AsyncFunctionDeclaration,
     env: Environment,
     private_env: ?*PrivateEnvironment,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // AsyncFunctionDeclaration : async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
@@ -2315,7 +2315,7 @@ pub fn instantiateAsyncFunctionExpression(
     agent: *Agent,
     async_function_expression: ast.AsyncFunctionExpression,
     default_name: ?[]const u8,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // AsyncFunctionExpression : async function BindingIdentifier ( FormalParameters ) { AsyncFunctionBody }
@@ -2366,7 +2366,7 @@ pub fn instantiateAsyncFunctionExpression(
     // AsyncFunctionExpression : async function ( FormalParameters ) { AsyncFunctionBody }
     else {
         // 1. If name is not present, set name to "".
-        const name: String = if (default_name) |name|
+        const name: *const String = if (default_name) |name|
             try String.fromUtf8(agent.gc_allocator, name)
         else
             .empty;
@@ -2407,11 +2407,11 @@ pub fn instantiateAsyncArrowFunctionExpression(
     agent: *Agent,
     async_arrow_function: ast.AsyncArrowFunction,
     default_name: ?[]const u8,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. If name is not present, set name to "".
-    const name: String = if (default_name) |name|
+    const name: *const String = if (default_name) |name|
         try String.fromUtf8(agent.gc_allocator, name)
     else
         .empty;

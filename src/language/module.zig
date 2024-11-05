@@ -185,7 +185,7 @@ fn continueDynamicImport(
     const LinkAndEvaluateClosureCaptures = struct {
         module: Module,
         promise_capability: PromiseCapability,
-        on_rejected: Object,
+        on_rejected: *Object,
     };
     const link_and_evaluate_closure_captures = try agent.gc_allocator.create(LinkAndEvaluateClosureCaptures);
     link_and_evaluate_closure_captures.* = .{
@@ -305,7 +305,7 @@ fn continueDynamicImport(
 
 /// 16.2.1.7 GetImportedModule ( referrer, specifier )
 /// https://tc39.es/ecma262/#sec-GetImportedModule
-pub fn getImportedModule(referrer: *const SourceTextModule, specifier: String) Module {
+pub fn getImportedModule(referrer: *const SourceTextModule, specifier: *const String) Module {
     // 1. Assert: Exactly one element of referrer.[[LoadedModules]] is a Record whose [[Specifier]]
     //    is specifier, since LoadRequestedModules has completed successfully on referrer prior to
     //    invoking this abstract operation.
@@ -319,7 +319,7 @@ pub fn getImportedModule(referrer: *const SourceTextModule, specifier: String) M
 pub fn finishLoadingImportedModule(
     agent: *Agent,
     referrer: ImportedModuleReferrer,
-    specifier: String,
+    specifier: *const String,
     payload: ImportedModulePayload,
     result: Agent.Error!Module,
 ) std.mem.Allocator.Error!void {
@@ -365,7 +365,7 @@ pub fn finishLoadingImportedModule(
 
 /// 16.2.1.10 GetModuleNamespace ( module )
 /// https://tc39.es/ecma262/#sec-getmodulenamespace
-pub fn getModuleNamespace(agent: *Agent, module: Module) std.mem.Allocator.Error!Object {
+pub fn getModuleNamespace(agent: *Agent, module: Module) std.mem.Allocator.Error!*Object {
     // 1. Assert: If module is a Cyclic Module Record, then module.[[Status]] is not new or unlinked.
     if (module == .source_text_module) {
         std.debug.assert(switch (module.source_text_module.status) {

@@ -28,7 +28,7 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// 27.1.3.1 The Iterator Constructor
 /// https://tc39.es/ecma262/#sec-iterator-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "Iterator",
@@ -37,7 +37,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "from", from, 1, realm);
 
         // 27.1.3.2.2 Iterator.prototype
@@ -52,10 +52,10 @@ pub const constructor = struct {
 
     /// 27.1.3.1.1 Iterator ( )
     /// https://tc39.es/ecma262/#sec-iterator
-    fn impl(agent: *Agent, _: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, _: Arguments, new_target: ?*Object) Agent.Error!Value {
         // 1. If NewTarget is either undefined or the active function object, throw a TypeError
         //    exception.
-        if (new_target == null or new_target.?.sameValue(agent.activeFunctionObject())) {
+        if (new_target == null or new_target.? == agent.activeFunctionObject()) {
             return agent.throwException(
                 .type_error,
                 "Iterator must not be constructed directly",
@@ -112,13 +112,13 @@ pub const constructor = struct {
 /// 27.1.4 The %Iterator.prototype% Object
 /// https://tc39.es/ecma262/#sec-%iterator.prototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "drop", drop, 1, realm);
         try defineBuiltinFunction(object, "every", every, 1, realm);
         try defineBuiltinFunction(object, "filter", filter, 1, realm);

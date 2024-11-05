@@ -33,7 +33,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// 10.2 Properties of the Intl.Collator Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-the-intl-collator-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "Collator",
@@ -42,7 +42,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 10.2.1 Intl.Collator.prototype
         // https://tc39.es/ecma402/#sec-intl.collator.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -55,7 +55,7 @@ pub const constructor = struct {
 
     /// 10.1.1 Intl.Collator ( [ locales [ , options ] ] )
     /// https://tc39.es/ecma402/#sec-intl.collator
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const locales = arguments.get(0);
         const options_value = arguments.get(1);
 
@@ -104,7 +104,7 @@ pub const constructor = struct {
             .{ "sort", .sort },
             .{ "search", .search },
         });
-        collator.as(Collator).fields.usage = usage_map.get(usage.data.slice.ascii).?;
+        collator.as(Collator).fields.usage = usage_map.get(usage.slice.ascii).?;
 
         // TODO: 10-11.
 
@@ -165,7 +165,7 @@ pub const constructor = struct {
             .{ "false", .off },
         });
         if (maybe_case_first) |case_first| {
-            collator.as(Collator).fields.options.case_first = case_first_map.get(case_first.data.slice.ascii).?;
+            collator.as(Collator).fields.options.case_first = case_first_map.get(case_first.slice.ascii).?;
         }
 
         // 23. Let relevantExtensionKeys be %Intl.Collator%.[[RelevantExtensionKeys]].
@@ -222,7 +222,7 @@ pub const constructor = struct {
             .{ "variant", .{ .tertiary, null } },
         });
         if (maybe_sensitivity) |sensitivity| {
-            const strength, const case_level = sensitivity_map.get(sensitivity.data.slice.ascii).?;
+            const strength, const case_level = sensitivity_map.get(sensitivity.slice.ascii).?;
             collator.as(Collator).fields.options.strength = strength;
             collator.as(Collator).fields.options.case_level = case_level;
         }
@@ -251,13 +251,13 @@ pub const constructor = struct {
 /// 10.3 Properties of the Intl.Collator Prototype Object
 /// https://tc39.es/ecma402/#sec-properties-of-the-intl-collator-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "compare", compare, null, realm);
         try defineBuiltinFunction(object, "resolvedOptions", resolvedOptions, 0, realm);
 
@@ -405,8 +405,8 @@ pub const prototype = struct {
 pub fn compareStrings(
     allocator: std.mem.Allocator,
     collator_object: *const Collator,
-    x: String,
-    y: String,
+    x: *const String,
+    y: *const String,
 ) std.mem.Allocator.Error!Value {
     const data_provider = icu4zig.DataProvider.init();
     defer data_provider.deinit();
@@ -417,28 +417,28 @@ pub fn compareStrings(
     );
     defer collator.deinit();
 
-    const order = if (x.data.slice == .ascii and y.data.slice == .ascii) blk: {
+    const order = if (x.slice == .ascii and y.slice == .ascii) blk: {
         break :blk collator.compare(
-            .{ .utf8 = x.data.slice.ascii },
-            .{ .utf8 = y.data.slice.ascii },
+            .{ .utf8 = x.slice.ascii },
+            .{ .utf8 = y.slice.ascii },
         );
-    } else if (x.data.slice == .utf16 and y.data.slice == .utf16) blk: {
+    } else if (x.slice == .utf16 and y.slice == .utf16) blk: {
         break :blk collator.compare(
-            .{ .utf16 = x.data.slice.utf16 },
-            .{ .utf16 = y.data.slice.utf16 },
+            .{ .utf16 = x.slice.utf16 },
+            .{ .utf16 = y.slice.utf16 },
         );
-    } else if (x.data.slice == .ascii and y.data.slice == .utf16) blk: {
+    } else if (x.slice == .ascii and y.slice == .utf16) blk: {
         const x_utf16 = try x.toUtf16(allocator);
         defer allocator.free(x_utf16);
         break :blk collator.compare(
             .{ .utf16 = x_utf16 },
-            .{ .utf16 = y.data.slice.utf16 },
+            .{ .utf16 = y.slice.utf16 },
         );
-    } else if (x.data.slice == .utf16 and y.data.slice == .ascii) blk: {
+    } else if (x.slice == .utf16 and y.slice == .ascii) blk: {
         const y_utf16 = try y.toUtf16(allocator);
         defer allocator.free(y_utf16);
         break :blk collator.compare(
-            .{ .utf16 = x.data.slice.utf16 },
+            .{ .utf16 = x.slice.utf16 },
             .{ .utf16 = y_utf16 },
         );
     } else unreachable;
@@ -468,15 +468,15 @@ pub const Collator = MakeObject(.{
         options: icu4zig.Collator.Options,
 
         /// [[BoundCompare]]
-        bound_compare: ?Object,
+        bound_compare: ?*Object,
 
         pub const ResolvedOptions = struct {
-            usage: String,
-            sensitivity: String,
+            usage: *const String,
+            sensitivity: *const String,
             ignore_punctuation: bool,
-            collation: String,
+            collation: *const String,
             numeric: bool,
-            case_first: String,
+            case_first: *const String,
         };
 
         pub fn resolvedOptions(self: @This()) ResolvedOptions {

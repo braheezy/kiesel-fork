@@ -54,7 +54,11 @@ const ScriptOrModuleHostDefined = struct {
     base_dir: std.fs.Dir,
 };
 
-fn resolveModulePath(agent: *Agent, script_or_module: ScriptOrModule, specifier: String) Agent.Error![]const u8 {
+fn resolveModulePath(
+    agent: *Agent,
+    script_or_module: ScriptOrModule,
+    specifier: *const String,
+) Agent.Error![]const u8 {
     const base_dir: std.fs.Dir = switch (script_or_module) {
         inline else => |x| x.host_defined.cast(*ScriptOrModuleHostDefined).base_dir,
     };
@@ -72,13 +76,13 @@ fn resolveModulePath(agent: *Agent, script_or_module: ScriptOrModule, specifier:
     };
 }
 
-fn initializeGlobalObject(realm: *Realm, global_object: Object) Agent.Error!void {
+fn initializeGlobalObject(realm: *Realm, global_object: *Object) Agent.Error!void {
     try defineBuiltinProperty(global_object, "Kiesel", Value.from(try Kiesel.create(realm)));
     try kiesel_runtime.addBindings(realm, global_object);
 }
 
 const Kiesel = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         const kiesel_object = try ordinaryObjectCreate(realm.agent, try realm.intrinsics.@"%Object.prototype%"());
         try defineBuiltinFunction(kiesel_object, "createIsHTMLDDA", createIsHTMLDDA, 0, realm);
         try defineBuiltinFunction(kiesel_object, "createRealm", createRealm, 0, realm);
@@ -104,7 +108,7 @@ const Kiesel = struct {
     }
 
     fn createIsHTMLDDA(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
-        if (std.meta.fieldInfo(Object.Data, .is_htmldda).type == void) {
+        if (std.meta.fieldInfo(Object, .is_htmldda).type == void) {
             return agent.throwException(
                 .internal_error,
                 "[[IsHTMLDDA]] is not supported in this build",
@@ -130,7 +134,7 @@ const Kiesel = struct {
                         /// - SpiderMonkey: [Throws](https://searchfox.org/mozilla-central/rev/c130c69b7b863d5e28ab9524b65c27c7a9507c48/js/src/shell/js.cpp#7071-7085)
                         ///
                         /// We pick the most common one :^)
-                        fn call(_: Object, _: Value, _: Arguments) Agent.Error!Value {
+                        fn call(_: *Object, _: Value, _: Arguments) Agent.Error!Value {
                             return .null;
                         }
                     }.call,
@@ -392,11 +396,11 @@ fn run(allocator: std.mem.Allocator, realm: *Realm, source_text: []const u8, opt
                 switch (operation) {
                     .reject => stderr.print(
                         "A promise was rejected without any handlers: {pretty}\n",
-                        .{Value.from(promise.object())},
+                        .{Value.from(&promise.object)},
                     ) catch {},
                     .handle => stderr.print(
                         "A handler was added to an already rejected promise: {pretty}\n",
-                        .{Value.from(promise.object())},
+                        .{Value.from(&promise.object)},
                     ) catch {},
                 }
             }
@@ -500,8 +504,8 @@ fn printValueDebugInfo(
     try tty_config.setColor(writer, .blue);
     switch (value.type()) {
         .number => try writer.print(" (type: {s})", .{@tagName(value.asNumber())}),
-        .string => try writer.print(" (type: {s})", .{@tagName(value.asString().data.slice)}),
-        .symbol => try writer.print(" (id: {x})", .{@intFromPtr(value.asSymbol().data)}),
+        .string => try writer.print(" (type: {s})", .{@tagName(value.asString().slice)}),
+        .symbol => try writer.print(" (id: {x})", .{@intFromPtr(value.asSymbol())}),
         else => {},
     }
     try tty_config.setColor(writer, .reset);
@@ -755,7 +759,7 @@ pub fn main() !u8 {
         fn func(
             agent_: *Agent,
             referrer: ImportedModuleReferrer,
-            specifier: String,
+            specifier: *const String,
             _: SafePointer,
             payload: ImportedModulePayload,
         ) std.mem.Allocator.Error!void {

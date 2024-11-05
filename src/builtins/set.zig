@@ -33,16 +33,16 @@ const sameValue = types.sameValue;
 /// https://tc39.es/ecma262/#sec-set-records
 const SetRecord = struct {
     /// [[Set]]
-    set: Object,
+    set: *Object,
 
     /// [[Size]]
     size: usize,
 
     /// [[Has]]
-    has: Object,
+    has: *Object,
 
     /// [[Keys]]
-    keys: Object,
+    keys: *Object,
 };
 
 /// 24.2.1.2 GetSetRecord ( obj )
@@ -155,7 +155,7 @@ fn setDataSize(set_data: SetData) usize {
 /// 24.2.3 Properties of the Set Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-set-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 0,
             .name = "Set",
@@ -164,7 +164,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 24.2.3.1 Set.prototype
@@ -179,7 +179,7 @@ pub const constructor = struct {
 
     /// 24.2.2.1 Set ( [ iterable ] )
     /// https://tc39.es/ecma262/#sec-set-iterable
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const iterable = arguments.get(0);
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
@@ -238,13 +238,13 @@ pub const constructor = struct {
 /// 24.2.4 Properties of the Set Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-set-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "add", add, 1, realm);
         try defineBuiltinFunction(object, "clear", clear, 0, realm);
         try defineBuiltinFunction(object, "delete", delete, 1, realm);
@@ -271,7 +271,7 @@ pub const prototype = struct {
 
         // 24.2.4.13 Set.prototype.keys ( )
         // https://tc39.es/ecma262/#sec-set.prototype.keys
-        const @"%Set.prototype.values%" = object.propertyStorage().get(PropertyKey.from("values")).?;
+        const @"%Set.prototype.values%" = object.property_storage.get(PropertyKey.from("values")).?;
         try defineBuiltinProperty(object, "keys", @"%Set.prototype.values%");
 
         // 24.2.4.18 Set.prototype [ %Symbol.iterator% ] ( )
@@ -313,7 +313,7 @@ pub const prototype = struct {
         }
 
         // 6. Return S.
-        return Value.from(set.object());
+        return Value.from(&set.object);
     }
 
     /// 24.2.4.2 Set.prototype.clear ( )
@@ -501,7 +501,7 @@ pub const prototype = struct {
                 // i. Perform ? Call(callback, thisArg, « e, e, S »).
                 _ = try callback.callAssumeCallable(
                     this_arg,
-                    &.{ value, value, Value.from(set.object()) },
+                    &.{ value, value, Value.from(&set.object) },
                 );
 
                 // ii. NOTE: The number of elements in entries may have increased during execution

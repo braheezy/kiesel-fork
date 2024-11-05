@@ -33,10 +33,10 @@ const data_block_max_byte_length = types.data_block_max_byte_length;
 /// https://tc39.es/ecma262/#sec-allocatesharedarraybuffer
 pub fn allocateSharedArrayBuffer(
     agent: *Agent,
-    constructor_: Object,
+    constructor_: *Object,
     byte_length: u64,
     max_byte_length: ?u53,
-) Agent.Error!Object {
+) Agent.Error!*Object {
     // 1. Let slots be « [[ArrayBufferData]] ».
 
     // 2. If maxByteLength is present and maxByteLength is not empty, let allocatingGrowableBuffer
@@ -108,7 +108,7 @@ pub fn allocateSharedArrayBuffer(
 /// 25.2.4 Properties of the SharedArrayBuffer Constructor
 /// https://tc39.es/ecma262/#sec-sharedarraybuffer-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "SharedArrayBuffer",
@@ -117,7 +117,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
         // 25.2.4.1 SharedArrayBuffer.prototype
@@ -132,7 +132,7 @@ pub const constructor = struct {
 
     /// 25.2.3.1 SharedArrayBuffer ( length [ , options ] )
     /// https://tc39.es/ecma262/#sec-sharedarraybuffer-length
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const length = arguments.get(0);
         const options = arguments.get(1);
 
@@ -173,13 +173,13 @@ pub const constructor = struct {
 /// 25.2.5 Properties of the SharedArrayBuffer Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-sharedarraybuffer-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinFunction(object, "grow", grow, 1, realm);
         try defineBuiltinAccessor(object, "growable", growable, null, realm);
@@ -393,7 +393,7 @@ pub const prototype = struct {
         const new_len: u53 = @intFromFloat(@max(final_f64 - first_f64, 0));
 
         // 14. Let ctor be ? SpeciesConstructor(O, %SharedArrayBuffer%).
-        const constructor_ = try object.object().speciesConstructor(
+        const constructor_ = try object.object.speciesConstructor(
             try realm.intrinsics.@"%SharedArrayBuffer%"(),
         );
 
@@ -431,7 +431,7 @@ pub const prototype = struct {
         copyDataBlockBytes(to_buf, 0, from_buf, first, new_len);
 
         // 23. Return new.
-        return Value.from(new.object());
+        return Value.from(&new.object);
     }
 };
 

@@ -14,8 +14,8 @@ const Value = types.Value;
 
 /// 10.4.1.1 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-bound-function-exotic-objects-call-thisargument-argumentslist
-fn call(object: Object, _: Value, arguments_list: Arguments) Agent.Error!Value {
-    const agent = object.agent();
+fn call(object: *Object, _: Value, arguments_list: Arguments) Agent.Error!Value {
+    const agent = object.agent;
     const function = object.as(BoundFunction);
 
     // 1. Let target be F.[[BoundTargetFunction]].
@@ -42,11 +42,11 @@ fn call(object: Object, _: Value, arguments_list: Arguments) Agent.Error!Value {
 /// 10.4.1.2 [[Construct]] ( argumentsList, newTarget )
 /// https://tc39.es/ecma262/#sec-bound-function-exotic-objects-construct-argumentslist-newtarget
 fn construct(
-    object: Object,
+    object: *Object,
     arguments_list: Arguments,
-    new_target: Object,
-) Agent.Error!Object {
-    const agent = object.agent();
+    new_target: *Object,
+) Agent.Error!*Object {
+    const agent = object.agent;
     const function = object.as(BoundFunction);
 
     // 1. Let target be F.[[BoundTargetFunction]].
@@ -67,7 +67,7 @@ fn construct(
     defer agent.gc_allocator.free(args);
 
     // 5. If SameValue(F, newTarget) is true, set newTarget to target.
-    const new_target_ = if (object.sameValue(new_target)) target else new_target;
+    const new_target_ = if (object == new_target) target else new_target;
 
     // 6. Return ? Construct(target, args, newTarget).
     return target.construct(args, new_target_);
@@ -77,12 +77,12 @@ fn construct(
 /// https://tc39.es/ecma262/#sec-boundfunctioncreate
 pub fn boundFunctionCreate(
     agent: *Agent,
-    target_function: Object,
+    target_function: *Object,
     bound_this: Value,
     bound_args: []const Value,
-) Agent.Error!Object {
+) Agent.Error!*Object {
     // 1. Let proto be ? targetFunction.[[GetPrototypeOf]]().
-    const prototype = try target_function.internalMethods().getPrototypeOf(target_function);
+    const prototype = try target_function.internal_methods.getPrototypeOf(target_function);
 
     // 2. Let internalSlotsList be the list-concatenation of « [[Prototype]], [[Extensible]] » and
     //    the internal slots listed in Table 31.
@@ -110,7 +110,7 @@ pub fn boundFunctionCreate(
 
     // 6. If IsConstructor(targetFunction) is true, then
     if (Value.from(target_function).isConstructor()) {
-        object.data.internal_methods = &.{
+        object.internal_methods = &.{
             // NOTE: We have to duplicate step 5 to create a static vtable.
             .call = call,
             // a. Set obj.[[Construct]] as described in 10.4.1.2.
@@ -127,7 +127,7 @@ pub fn boundFunctionCreate(
 pub const BoundFunction = MakeObject(.{
     .Fields = struct {
         // [[BoundTargetFunction]]
-        bound_target_function: Object,
+        bound_target_function: *Object,
 
         /// [[BoundThis]]
         bound_this: Value,

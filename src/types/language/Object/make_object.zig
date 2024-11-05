@@ -4,7 +4,6 @@ const execution = @import("../../../execution.zig");
 const types = @import("../../../types.zig");
 
 const Agent = execution.Agent;
-const Data = @import("Data.zig");
 const InternalMethods = @import("InternalMethods.zig");
 const Object = types.Object;
 
@@ -15,27 +14,27 @@ pub fn MakeObject(
     },
 ) type {
     const has_fields = options.Fields != void;
-    const has_is_htmldda = std.meta.fieldInfo(Data, .is_htmldda).type != void;
+    const has_is_htmldda = std.meta.fieldInfo(Object, .is_htmldda).type != void;
 
     // FIXME: Can we dedupe this?
     const Args = if (has_fields and has_is_htmldda) struct {
         fields: options.Fields,
-        prototype: ?Object,
+        prototype: ?*Object,
         extensible: bool = true,
         is_htmldda: bool = false,
         internal_methods: *const InternalMethods = &.{},
     } else if (has_fields) struct {
         fields: options.Fields,
-        prototype: ?Object,
+        prototype: ?*Object,
         extensible: bool = true,
         internal_methods: *const InternalMethods = &.{},
     } else if (has_is_htmldda) struct {
-        prototype: ?Object,
+        prototype: ?*Object,
         extensible: bool = true,
         is_htmldda: bool = false,
         internal_methods: *const InternalMethods = &.{},
     } else struct {
-        prototype: ?Object,
+        prototype: ?*Object,
         extensible: bool = true,
         internal_methods: *const InternalMethods = &.{},
     };
@@ -45,13 +44,13 @@ pub fn MakeObject(
         pub const tag = options.tag;
 
         fields: Fields,
-        data: Data,
+        object: Object,
 
-        pub fn create(agent: *Agent, args: Args) std.mem.Allocator.Error!Object {
+        pub fn create(agent: *Agent, args: Args) std.mem.Allocator.Error!*Object {
             const self = try agent.gc_allocator.create(@This());
             self.* = .{
                 .fields = if (has_fields) args.fields,
-                .data = .{
+                .object = .{
                     .tag = options.tag,
                     .agent = agent,
                     .prototype = args.prototype,
@@ -62,13 +61,7 @@ pub fn MakeObject(
                     .is_htmldda = if (has_is_htmldda) args.is_htmldda,
                 },
             };
-            return self.object();
-        }
-
-        pub fn object(self: *@This()) Object {
-            return .{
-                .data = &self.data,
-            };
+            return &self.object;
         }
     };
 }

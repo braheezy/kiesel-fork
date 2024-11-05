@@ -290,7 +290,7 @@ pub const NumericLiteral = struct {
 pub fn stringValueImpl(
     allocator: std.mem.Allocator,
     text: []const u8,
-) std.mem.Allocator.Error!String {
+) std.mem.Allocator.Error!*const String {
     // NOTE: This allocates the maximum needed capacity upfront
     var result = try String.Builder.initCapacity(allocator, text.len);
     defer result.deinit();
@@ -370,7 +370,7 @@ pub const StringLiteral = struct {
     pub fn stringValue(
         self: StringLiteral,
         allocator: std.mem.Allocator,
-    ) std.mem.Allocator.Error!String {
+    ) std.mem.Allocator.Error!*const String {
         std.debug.assert(self.text.len >= 2);
         return stringValueImpl(allocator, self.text[1 .. self.text.len - 1]);
     }
@@ -429,7 +429,7 @@ pub const PropertyName = union(enum) {
                 .string_literal => |string_literal| {
                     const string = try string_literal.stringValue(allocator);
                     // TODO: This needs `String.deinit()`
-                    defer switch (string.data.slice) {
+                    defer switch (string.slice) {
                         .ascii => |ascii| allocator.free(ascii),
                         .utf16 => |utf16| allocator.free(utf16),
                     };
@@ -520,7 +520,7 @@ pub const TemplateLiteral = struct {
         pub fn templateValue(
             self: Span,
             allocator: std.mem.Allocator,
-        ) std.mem.Allocator.Error!String {
+        ) std.mem.Allocator.Error!*const String {
             std.debug.assert(self.text[0] == '`' or self.text[0] == '}');
             const text = self.templateValueChars();
             if (std.mem.indexOf(u8, text, "\r") == null) {
@@ -537,7 +537,7 @@ pub const TemplateLiteral = struct {
         pub fn templateRawValue(
             self: Span,
             allocator: std.mem.Allocator,
-        ) std.mem.Allocator.Error!String {
+        ) std.mem.Allocator.Error!*const String {
             const text = self.templateValueChars();
             if (std.mem.indexOf(u8, text, "\r") == null) {
                 return String.fromUtf8(allocator, text);
@@ -555,7 +555,7 @@ pub const TemplateLiteral = struct {
             self: Span,
             allocator: std.mem.Allocator,
             raw: bool,
-        ) std.mem.Allocator.Error!String {
+        ) std.mem.Allocator.Error!*const String {
             // 1. If raw is true, then
             const string = if (raw) blk: {
                 // a. Let string be the TRV of templateToken.
@@ -578,8 +578,8 @@ pub const TemplateLiteral = struct {
         self: TemplateLiteral,
         allocator: std.mem.Allocator,
         raw: bool,
-    ) std.mem.Allocator.Error![]const String {
-        var template_strings = std.ArrayList(String).init(allocator);
+    ) std.mem.Allocator.Error![]const *const String {
+        var template_strings = std.ArrayList(*const String).init(allocator);
         for (self.spans) |span| switch (span) {
             .text => try template_strings.append(try span.templateString(allocator, raw)),
             .expression => {},
@@ -3346,7 +3346,7 @@ pub const Module = struct {
     pub fn moduleRequests(
         self: Module,
         allocator: std.mem.Allocator,
-    ) std.mem.Allocator.Error![]const String {
+    ) std.mem.Allocator.Error![]const *const String {
         // Module : [empty]
         // 1. Return a new empty List.
         // ModuleItemList : ModuleItem
@@ -3401,7 +3401,7 @@ pub const Module = struct {
                 },
             },
         };
-        return allocator.dupe(String, module_requests.keys());
+        return allocator.dupe(*const String, module_requests.keys());
     }
 
     /// 16.2.2.2 Static Semantics: ImportEntries
@@ -3878,7 +3878,7 @@ pub const ImportClause = union(enum) {
     pub fn collectImportEntriesForModule(
         self: ImportClause,
         import_entries: *std.ArrayList(ImportEntry),
-        module: String,
+        module: *const String,
     ) std.mem.Allocator.Error!void {
         const allocator = import_entries.allocator;
         switch (self) {
@@ -4141,7 +4141,7 @@ pub const ExportFromClause = union(enum) {
     pub fn collectExportEntriesForModule(
         self: ExportFromClause,
         export_entries: *std.ArrayList(ExportEntry),
-        module: ?String,
+        module: ?*const String,
     ) std.mem.Allocator.Error!void {
         const allocator = export_entries.allocator;
         switch (self) {
@@ -4197,7 +4197,7 @@ pub const NamedExports = struct {
     pub fn collectExportEntriesForModule(
         self: NamedExports,
         export_entries: *std.ArrayList(ExportEntry),
-        module: ?String,
+        module: ?*const String,
     ) std.mem.Allocator.Error!void {
         // ExportsList : ExportsList , ExportSpecifier
         // 1. Let specs1 be the ExportEntriesForModule of ExportsList with argument module.

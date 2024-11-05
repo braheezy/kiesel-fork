@@ -26,7 +26,7 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// 20.5.2 Properties of the Error Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-error-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "Error",
@@ -35,7 +35,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 20.5.2.1 Error.prototype
         // https://tc39.es/ecma262/#sec-error.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -48,7 +48,7 @@ pub const constructor = struct {
 
     /// 20.5.1.1 Error ( message [ , options ] )
     /// https://tc39.es/ecma262/#sec-error-message
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const message = arguments.get(0);
         const options = arguments.get(1);
 
@@ -69,7 +69,7 @@ pub const constructor = struct {
         );
 
         // Non-standard
-        object.data.internal_methods = try Object.InternalMethods.create(agent.gc_allocator, object.data.internal_methods, &.{ .set = internalSet });
+        object.internal_methods = try Object.InternalMethods.create(agent.gc_allocator, object.internal_methods, &.{ .set = internalSet });
 
         // 3. If message is not undefined, then
         if (!message.isUndefined()) {
@@ -98,7 +98,7 @@ pub const constructor = struct {
 /// NOTE: Ignoring non-string values matches SpiderMonkey, V8 only remembers the original name and
 ///       message and doesn't act on property changes.
 pub fn internalSet(
-    object: Object,
+    object: *Object,
     property_key: PropertyKey,
     value: Value,
     receiver: Value,
@@ -116,13 +116,13 @@ pub fn internalSet(
 /// 20.5.3 Properties of the Error Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-error-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 20.5.3.1 Error.prototype.constructor
         // https://tc39.es/ecma262/#sec-error.prototype.constructor
         try defineBuiltinProperty(
@@ -170,7 +170,7 @@ pub const prototype = struct {
         const msg = try object.get(PropertyKey.from("message"));
 
         // 6. If msg is undefined, set msg to the empty String; otherwise set msg to ? ToString(msg).
-        const msg_string: String = if (msg.isUndefined()) .empty else try msg.toString(agent);
+        const msg_string: *const String = if (msg.isUndefined()) .empty else try msg.toString(agent);
 
         // 7. If name is the empty String, return msg.
         if (name_string.isEmpty()) return Value.from(msg_string);
@@ -196,8 +196,8 @@ pub const Error = MakeObject(.{
         // NOTE: [[ErrorData]] is undefined in the spec, we use it to store the name and message
         //       for pretty-printing purposes without property lookup.
         error_data: struct {
-            name: String,
-            message: String,
+            name: *const String,
+            message: *const String,
         },
     },
     .tag = .@"error",
@@ -255,7 +255,7 @@ pub const uri_error = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-nativeerror-constructors
 fn MakeNativeErrorConstructor(comptime name: []const u8) type {
     return struct {
-        pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+        pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
             return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
                 .length = 1,
                 .name = name,
@@ -264,7 +264,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
             });
         }
 
-        pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+        pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
             const prototypeFn = @field(Realm.Intrinsics, "%" ++ name ++ ".prototype%");
 
             // 20.5.6.2.1 NativeError.prototype
@@ -279,7 +279,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
 
         /// 20.5.6.1.1 NativeError ( message [ , options ] )
         /// https://tc39.es/ecma262/#sec-nativeerror
-        fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+        fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
             const message = arguments.get(0);
             const options = arguments.get(1);
 
@@ -312,7 +312,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
             );
 
             // Non-standard
-            object.data.internal_methods = try Object.InternalMethods.create(agent.gc_allocator, object.data.internal_methods, &.{ .set = internalSet });
+            object.internal_methods = try Object.InternalMethods.create(agent.gc_allocator, object.internal_methods, &.{ .set = internalSet });
 
             // 3. If message is not undefined, then
             if (!message.isUndefined()) {
@@ -341,13 +341,13 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
 /// https://tc39.es/ecma262/#sec-properties-of-the-nativeerror-prototype-objects
 fn MakeNativeErrorPrototype(comptime name: []const u8) type {
     return struct {
-        pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+        pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
             return builtins.Object.create(realm.agent, .{
                 .prototype = try realm.intrinsics.@"%Error.prototype%"(),
             });
         }
 
-        pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+        pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
             const constructorFn = @field(Realm.Intrinsics, "%" ++ name ++ "%");
 
             // 20.5.6.3.1 NativeError.prototype.constructor
@@ -391,7 +391,7 @@ fn MakeNativeError(comptime _: []const u8) type {
 
 /// 20.5.8.1 InstallErrorCause ( O, options )
 /// https://tc39.es/ecma262/#sec-installerrorcause
-pub fn installErrorCause(agent: *Agent, object: Object, options: Value) Agent.Error!void {
+pub fn installErrorCause(agent: *Agent, object: *Object, options: Value) Agent.Error!void {
     // 1. If options is an Object and ? HasProperty(options, "cause") is true, then
     if (options.isObject() and try options.asObject().hasProperty(PropertyKey.from("cause"))) {
         // a. Let cause be ? Get(options, "cause").

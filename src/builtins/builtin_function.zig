@@ -25,7 +25,7 @@ const setFunctionName = ecmascript_function.setFunctionName;
 
 pub const Behaviour = union(enum) {
     pub const Function = fn (*Agent, Value, Arguments) Agent.Error!Value;
-    pub const Constructor = fn (*Agent, Arguments, ?Object) Agent.Error!Value;
+    pub const Constructor = fn (*Agent, Arguments, ?*Object) Agent.Error!Value;
 
     function: *const Function,
     constructor: *const Constructor,
@@ -55,7 +55,7 @@ pub const BuiltinFunction = MakeObject(.{
         realm: *Realm,
 
         /// [[InitialName]]
-        initial_name: ?String,
+        initial_name: ?*const String,
 
         additional_fields: SafePointer,
     },
@@ -65,11 +65,11 @@ pub const BuiltinFunction = MakeObject(.{
 /// 10.3.1 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-built-in-function-objects-call-thisargument-argumentslist
 fn call(
-    object: Object,
+    object: *Object,
     this_argument: Value,
     arguments_list: Arguments,
 ) Agent.Error!Value {
-    const agent = object.agent();
+    const agent = object.agent;
     const function = object.as(BuiltinFunction);
 
     // 1. Return ? BuiltinCallOrConstruct(F, thisArgument, argumentsList, undefined).
@@ -79,11 +79,11 @@ fn call(
 /// 10.3.2 [[Construct]] ( argumentsList, newTarget )
 /// https://tc39.es/ecma262/#sec-built-in-function-objects-construct-argumentslist-newtarget
 pub fn construct(
-    object: Object,
+    object: *Object,
     arguments_list: Arguments,
-    new_target: Object,
-) Agent.Error!Object {
-    const agent = object.agent();
+    new_target: *Object,
+) Agent.Error!*Object {
+    const agent = object.agent;
     const function = object.as(BuiltinFunction);
 
     // 1. Return ? BuiltinCallOrConstruct(F, uninitialized, argumentsList, newTarget).
@@ -97,7 +97,7 @@ pub fn builtinCallOrConstruct(
     builtin_function: *BuiltinFunction,
     this_argument: ?Value,
     arguments_list: Arguments,
-    new_target: ?Object,
+    new_target: ?*Object,
 ) Agent.Error!Value {
     // 1. Let callerContext be the running execution context.
     const caller_context = agent.runningExecutionContext();
@@ -108,7 +108,7 @@ pub fn builtinCallOrConstruct(
     // 3. Let calleeContext be a new execution context.
     const callee_context: ExecutionContext = .{
         // 4. Set the Function of calleeContext to F.
-        .function = builtin_function.object(),
+        .function = &builtin_function.object,
 
         // 5. Let calleeRealm be F.[[Realm]].
         // 6. Set the Realm of calleeContext to calleeRealm.
@@ -154,11 +154,11 @@ pub fn createBuiltinFunction(
         realm: ?*Realm = null,
         // NOTE: I don't think any builtin functions are created with a null prototype,
         //       so the null state can serve as 'not present'.
-        prototype: ?Object = null,
+        prototype: ?*Object = null,
         prefix: ?[]const u8 = null,
         additional_fields: SafePointer = .null_pointer,
     },
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     // 1. If realm is not present, set realm to the current Realm Record.
     const realm = args.realm orelse agent.currentRealm();
 

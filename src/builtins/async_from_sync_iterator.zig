@@ -62,13 +62,13 @@ pub fn createAsyncFromSyncIterator(
 /// 27.1.6.2 The %AsyncFromSyncIteratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-%asyncfromsynciteratorprototype%-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%AsyncIteratorPrototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "next", next, 0, realm);
         try defineBuiltinFunction(object, "return", @"return", 0, realm);
         try defineBuiltinFunction(object, "throw", throw, 0, realm);
@@ -293,9 +293,9 @@ pub const AsyncFromSyncIterator = MakeObject(.{
 /// https://tc39.es/ecma262/#sec-asyncfromsynciteratorcontinuation
 fn asyncFromSyncIteratorContinuation(
     agent: *Agent,
-    result: Object,
+    result: *Object,
     promise_capability: PromiseCapability,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. NOTE: Because promiseCapability is derived from the intrinsic %Promise%, the calls to

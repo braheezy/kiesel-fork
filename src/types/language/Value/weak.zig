@@ -7,13 +7,13 @@ const Symbol = @import("../Symbol.zig");
 /// A value that does not prevent the underlying data from being garbage
 /// collected. Only supports object and symbol types.
 pub const Weak = union(enum) {
-    object: MaskedPtr(*allowzero Object.Data),
-    symbol: MaskedPtr(*Symbol.Data),
+    object: MaskedPtr(*Object),
+    symbol: MaskedPtr(*const Symbol),
 
     pub fn init(value: Value) Weak {
         return switch (value.type()) {
-            .object => .{ .object = .init(value.asObject().data) },
-            .symbol => .{ .symbol = .init(value.asSymbol().data) },
+            .object => .{ .object = .init(value.asObject()) },
+            .symbol => .{ .symbol = .init(value.asSymbol()) },
             else => unreachable,
         };
     }
@@ -21,8 +21,8 @@ pub const Weak = union(enum) {
     /// The returned value may have already been garbage collected.
     pub fn get(weak: Weak) Value {
         return switch (weak) {
-            .object => |object_ptr| Value.from(Object{ .data = object_ptr.get() }),
-            .symbol => |symbol_ptr| Value.from(Symbol{ .data = symbol_ptr.get() }),
+            .object => |object_ptr| Value.from(object_ptr.get()),
+            .symbol => |symbol_ptr| Value.from(symbol_ptr.get()),
         };
     }
 
@@ -30,7 +30,7 @@ pub const Weak = union(enum) {
     pub fn getPtr(weak: Weak) *anyopaque {
         return switch (weak) {
             .object => |object_ptr| object_ptr.get(),
-            .symbol => |symbol_ptr| symbol_ptr.get(),
+            .symbol => |symbol_ptr| @constCast(symbol_ptr.get()),
         };
     }
 

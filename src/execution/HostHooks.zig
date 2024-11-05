@@ -61,16 +61,16 @@ hostEnqueuePromiseJob: *const fn (
 ) std.mem.Allocator.Error!void = default_host_hooks.hostEnqueuePromiseJob,
 hostEnsureCanAddPrivateElement: *const fn (
     agent: *Agent,
-    object: Object,
+    object: *Object,
 ) Agent.Error!void = default_host_hooks.hostEnsureCanAddPrivateElement,
 hostEnsureCanCompileStrings: *const fn (
     callee_realm: *Realm,
-    parameter_strings: []const String,
-    body_string: String,
+    parameter_strings: []const *const String,
+    body_string: *const String,
     direct: bool,
 ) Agent.Error!void = default_host_hooks.hostEnsureCanCompileStrings,
 hostFinalizeImportMeta: *const fn (
-    import_meta: Object,
+    import_meta: *Object,
     module: *SourceTextModule,
 ) void = default_host_hooks.hostFinalizeImportMeta,
 hostGetImportMetaProperties: *const fn (
@@ -81,17 +81,17 @@ hostGrowSharedArrayBuffer: *const fn (
     new_byte_length: u53,
 ) Agent.Error!GrowSharedArrayBufferHandled = default_host_hooks.hostGrowSharedArrayBuffer,
 hostHasSourceTextAvailable: *const fn (
-    func: Object,
+    func: *Object,
 ) bool = default_host_hooks.hostHasSourceTextAvailable,
 hostLoadImportedModule: *const fn (
     agent: *Agent,
     referrer: ImportedModuleReferrer,
-    specifier: String,
+    specifier: *const String,
     host_defined: SafePointer,
     payload: ImportedModulePayload,
 ) std.mem.Allocator.Error!void = default_host_hooks.hostLoadImportedModule,
 hostMakeJobCallback: *const fn (
-    callback: Object,
+    callback: *Object,
 ) JobCallback = default_host_hooks.hostMakeJobCallback,
 hostPromiseRejectionTracker: *const fn (
     promise: *builtins.Promise,

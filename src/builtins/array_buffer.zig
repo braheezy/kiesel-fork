@@ -33,10 +33,10 @@ pub const ArrayBufferLike = union(enum) {
     array_buffer: *const ArrayBuffer,
     shared_array_buffer: *const builtins.SharedArrayBuffer,
 
-    pub fn object(self: ArrayBufferLike) Object {
+    pub fn object(self: ArrayBufferLike) *Object {
         return switch (self) {
-            .array_buffer => |array_buffer| @constCast(array_buffer).object(),
-            .shared_array_buffer => |shared_array_buffer| @constCast(shared_array_buffer).object(),
+            .array_buffer => |array_buffer| &@constCast(array_buffer).object,
+            .shared_array_buffer => |shared_array_buffer| &@constCast(shared_array_buffer).object,
         };
     }
 
@@ -60,10 +60,10 @@ pub const Order = enum {
 /// https://tc39.es/ecma262/#sec-allocatearraybuffer
 pub fn allocateArrayBuffer(
     agent: *Agent,
-    constructor_: Object,
+    constructor_: *Object,
     byte_length: u64,
     max_byte_length: ?u53,
-) Agent.Error!Object {
+) Agent.Error!*Object {
     // 1. Let slots be « [[ArrayBufferData]], [[ArrayBufferByteLength]], [[ArrayBufferDetachKey]] ».
 
     // 2. If maxByteLength is present and maxByteLength is not empty, let allocatingResizableBuffer
@@ -142,7 +142,7 @@ pub fn arrayBufferCopyAndDetach(
     array_buffer_value: Value,
     new_length: Value,
     preserve_resizability: enum { preserve_resizability, fixed_length },
-) Agent.Error!Object {
+) Agent.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. Perform ? RequireInternalSlot(arrayBuffer, [[ArrayBufferData]]).
@@ -270,7 +270,7 @@ pub fn cloneArrayBuffer(
     src_buffer: ArrayBufferLike,
     src_byte_offset: u53,
     src_length: u53,
-) Agent.Error!Object {
+) Agent.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. Assert: IsDetachedBuffer(srcBuffer) is false.
@@ -613,7 +613,7 @@ pub fn getModifySetValueInBuffer(
 /// 25.1.5 Properties of the ArrayBuffer Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 1,
             .name = "ArrayBuffer",
@@ -622,7 +622,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinFunction(object, "isView", isView, 1, realm);
         try defineBuiltinAccessor(object, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
@@ -638,7 +638,7 @@ pub const constructor = struct {
 
     /// 25.1.4.1 ArrayBuffer ( length [ , options ] )
     /// https://tc39.es/ecma262/#sec-arraybuffer-length
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const length = arguments.get(0);
         const options = arguments.get(1);
 
@@ -692,13 +692,13 @@ pub const constructor = struct {
 /// 25.1.6 Properties of the ArrayBuffer Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-prototype-object
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Object.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try defineBuiltinAccessor(object, "byteLength", byteLength, null, realm);
         try defineBuiltinAccessor(object, "detached", detached, null, realm);
         try defineBuiltinAccessor(object, "maxByteLength", maxByteLength, null, realm);
@@ -914,7 +914,7 @@ pub const prototype = struct {
         const new_len: u53 = @intFromFloat(@max(final_f64 - first_f64, 0));
 
         // 15. Let ctor be ? SpeciesConstructor(O, %ArrayBuffer%).
-        const constructor_ = try object.object().speciesConstructor(try realm.intrinsics.@"%ArrayBuffer%"());
+        const constructor_ = try object.object.speciesConstructor(try realm.intrinsics.@"%ArrayBuffer%"());
 
         // 16. Let new be ? Construct(ctor, « 𝔽(newLen) »).
         const new_object = try constructor_.construct(&.{Value.from(new_len)}, null);
@@ -929,7 +929,7 @@ pub const prototype = struct {
         }
 
         // 20. If SameValue(new, O) is true, throw a TypeError exception.
-        if (new.object().sameValue(object.object())) {
+        if (new == object) {
             return agent.throwException(
                 .type_error,
                 "Species constructor must return a new object",
@@ -967,7 +967,7 @@ pub const prototype = struct {
         }
 
         // 28. Return new.
-        return Value.from(new.object());
+        return Value.from(&new.object);
     }
 
     /// 25.1.6.8 ArrayBuffer.prototype.transfer ( [ newLength ] )

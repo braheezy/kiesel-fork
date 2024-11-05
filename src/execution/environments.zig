@@ -46,7 +46,7 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn hasBinding(self: Environment, name: String) Agent.Error!bool {
+    pub fn hasBinding(self: Environment, name: *const String) Agent.Error!bool {
         return switch (self) {
             .function_environment => |env| env.declarative_environment.hasBinding(name),
             inline else => |env| env.hasBinding(name),
@@ -56,7 +56,7 @@ pub const Environment = union(enum) {
     pub fn createMutableBinding(
         self: Environment,
         agent: *Agent,
-        name: String,
+        name: *const String,
         deletable: bool,
     ) Agent.Error!void {
         return switch (self) {
@@ -70,7 +70,7 @@ pub const Environment = union(enum) {
     pub fn createImmutableBinding(
         self: Environment,
         agent: *Agent,
-        name: String,
+        name: *const String,
         strict: bool,
     ) Agent.Error!void {
         return switch (self) {
@@ -84,7 +84,7 @@ pub const Environment = union(enum) {
     pub fn initializeBinding(
         self: Environment,
         agent: *Agent,
-        name: String,
+        name: *const String,
         value: Value,
     ) Agent.Error!void {
         return switch (self) {
@@ -98,7 +98,7 @@ pub const Environment = union(enum) {
     pub fn setMutableBinding(
         self: Environment,
         agent: *Agent,
-        name: String,
+        name: *const String,
         value: Value,
         strict: bool,
     ) Agent.Error!void {
@@ -113,7 +113,7 @@ pub const Environment = union(enum) {
     pub fn getBindingValue(
         self: Environment,
         agent: *Agent,
-        name: String,
+        name: *const String,
         strict: bool,
     ) Agent.Error!Value {
         return switch (self) {
@@ -122,7 +122,7 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn deleteBinding(self: Environment, name: String) Agent.Error!bool {
+    pub fn deleteBinding(self: Environment, name: *const String) Agent.Error!bool {
         return switch (self) {
             .function_environment => |env| env.declarative_environment.deleteBinding(name),
             inline else => |env| env.deleteBinding(name),
@@ -142,7 +142,7 @@ pub const Environment = union(enum) {
         };
     }
 
-    pub fn withBaseObject(self: Environment) ?Object {
+    pub fn withBaseObject(self: Environment) ?*Object {
         return switch (self) {
             inline .function_environment,
             .module_environment,
@@ -177,9 +177,9 @@ pub const Environment = union(enum) {
 
     pub fn createImportBinding(
         self: Environment,
-        name: String,
+        name: *const String,
         module: *SourceTextModule,
-        binding_name: String,
+        binding_name: *const String,
     ) std.mem.Allocator.Error!void {
         return switch (self) {
             .module_environment => |env| env.createImportBinding(name, module, binding_name),
@@ -192,7 +192,7 @@ pub const Environment = union(enum) {
 /// https://tc39.es/ecma262/#sec-getidentifierreference
 pub fn getIdentifierReference(
     start_env: Environment,
-    name: String,
+    name: *const String,
     strict: bool,
     maybe_lookup_cache_entry: ?*?Environment.LookupCacheEntry,
 ) Agent.Error!Reference {
@@ -282,7 +282,7 @@ pub fn newDeclarativeEnvironment(
 /// https://tc39.es/ecma262/#sec-newobjectenvironment
 pub fn newObjectEnvironment(
     allocator: std.mem.Allocator,
-    binding_object: Object,
+    binding_object: *Object,
     is_with_environment: bool,
     outer_env: ?Environment,
 ) std.mem.Allocator.Error!*ObjectEnvironment {
@@ -309,7 +309,7 @@ pub fn newObjectEnvironment(
 pub fn newFunctionEnvironment(
     allocator: std.mem.Allocator,
     function: *ECMAScriptFunction,
-    new_target: ?Object,
+    new_target: ?*Object,
 ) std.mem.Allocator.Error!*FunctionEnvironment {
     // 1. Let env be a new Function Environment Record containing no bindings.
     const env = try allocator.create(FunctionEnvironment);
@@ -342,8 +342,8 @@ pub fn newFunctionEnvironment(
 /// https://tc39.es/ecma262/#sec-newglobalenvironment
 pub fn newGlobalEnvironment(
     allocator: std.mem.Allocator,
-    global_object: Object,
-    this_value: Object,
+    global_object: *Object,
+    this_value: *Object,
 ) std.mem.Allocator.Error!*GlobalEnvironment {
     // 1. Let objRec be NewObjectEnvironment(G, false, null).
     const object_record = try newObjectEnvironment(allocator, global_object, false, null);

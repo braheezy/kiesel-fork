@@ -20,7 +20,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 /// https://tc39.es/ecma262/#sec-iterator-records
 pub const Iterator = struct {
     /// [[Iterator]]
-    iterator: Object,
+    iterator: *Object,
 
     /// [[NextMethod]]
     next_method: Value,
@@ -30,8 +30,8 @@ pub const Iterator = struct {
 
     /// 7.4.6 IteratorNext ( iteratorRecord [ , value ] )
     /// https://tc39.es/ecma262/#sec-iteratornext
-    pub fn next(self: *Iterator, value_: ?Value) Agent.Error!Object {
-        const agent = self.iterator.agent();
+    pub fn next(self: *Iterator, value_: ?Value) Agent.Error!*Object {
+        const agent = self.iterator.agent;
 
         // 1. If value is not present, then
         const result_completion = if (value_ == null) blk: {
@@ -69,21 +69,21 @@ pub const Iterator = struct {
 
     /// 7.4.7 IteratorComplete ( iteratorResult )
     /// https://tc39.es/ecma262/#sec-iteratorcomplete
-    pub fn complete(iterator_result: Object) Agent.Error!bool {
+    pub fn complete(iterator_result: *Object) Agent.Error!bool {
         // 1. Return ToBoolean(? Get(iteratorResult, "done")).
         return (try iterator_result.get(PropertyKey.from("done"))).toBoolean();
     }
 
     /// 7.4.8 IteratorValue ( iteratorResult )
     /// https://tc39.es/ecma262/#sec-iteratorvalue
-    pub fn value(iterator_result: Object) Agent.Error!Value {
+    pub fn value(iterator_result: *Object) Agent.Error!Value {
         // Return ? Get(iteratorResult, "value").
         return iterator_result.get(PropertyKey.from("value"));
     }
 
     /// 7.4.9 IteratorStep ( iteratorRecord )
     /// https://tc39.es/ecma262/#sec-iteratorstep
-    pub fn step(self: *Iterator) Agent.Error!?Object {
+    pub fn step(self: *Iterator) Agent.Error!?*Object {
         // 1. Let result be ? IteratorNext(iteratorRecord).
         const result = try next(self, null);
 
@@ -139,7 +139,7 @@ pub const Iterator = struct {
     /// 7.4.11 IteratorClose ( iteratorRecord, completion )
     /// https://tc39.es/ecma262/#sec-iteratorclose
     pub fn close(self: Iterator, completion: anytype) @TypeOf(completion) {
-        const agent = self.iterator.agent();
+        const agent = self.iterator.agent;
 
         const completion_exception = agent.exception;
 
@@ -184,7 +184,7 @@ pub const Iterator = struct {
     /// 7.4.16 IteratorToList ( iteratorRecord )
     /// https://tc39.es/ecma262/#sec-iteratortolist
     pub fn toList(self: *Iterator) Agent.Error![]const Value {
-        const agent = self.iterator.agent();
+        const agent = self.iterator.agent;
 
         // 1. Let values be a new empty List.
         var values = std.ArrayList(Value).init(agent.gc_allocator);
@@ -205,7 +205,7 @@ pub const Iterator = struct {
 
 /// 7.4.2 GetIteratorDirect ( obj )
 /// https://tc39.es/ecma262/#sec-getiteratordirect
-pub fn getIteratorDirect(object: Object) Agent.Error!Iterator {
+pub fn getIteratorDirect(object: *Object) Agent.Error!Iterator {
     // 1. Let nextMethod be ? Get(obj, "next").
     const next_method = try object.get(PropertyKey.from("next"));
 
@@ -222,7 +222,7 @@ pub fn getIteratorDirect(object: Object) Agent.Error!Iterator {
 
 /// 7.4.3 GetIteratorFromMethod ( obj, method )
 /// https://tc39.es/ecma262/#sec-getiteratorfrommethod
-pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: Object) Agent.Error!Iterator {
+pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: *Object) Agent.Error!Iterator {
     // 1. Let iterator be ? Call(method, obj).
     const iterator = try Value.from(method).callNoArgs(agent, object);
 
@@ -356,7 +356,7 @@ pub fn createIteratorResultObject(
     agent: *Agent,
     value: Value,
     done: bool,
-) std.mem.Allocator.Error!Object {
+) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
     // 1. Let obj be OrdinaryObjectCreate(%Object.prototype%).

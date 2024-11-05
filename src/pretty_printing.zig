@@ -17,7 +17,7 @@ const typedArrayLength = builtins.typedArrayLength;
 const weakRefDeref = builtins.weakRefDeref;
 
 const State = struct {
-    seen_objects: std.AutoHashMap(*allowzero Object.Data, usize),
+    seen_objects: std.AutoHashMap(*const Object, usize),
     print_in_progress: bool,
     tty_config: std.io.tty.Config,
 };
@@ -31,7 +31,7 @@ pub var state: State = .{
     .tty_config = undefined, // Set whenever an `Agent` is created
 };
 
-fn asciiString(ascii: []const u8) String {
+fn asciiString(ascii: []const u8) *const String {
     return String.fromAscii(arena.allocator(), ascii) catch String.fromLiteral("<OOM>");
 }
 
@@ -46,8 +46,8 @@ fn prettyPrintArray(
     array: *const builtins.Array,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const property_storage = array.data.property_storage;
-    const length = getArrayLength(@constCast(array).object());
+    const property_storage = &array.object.property_storage;
+    const length = getArrayLength(&array.object);
     const tty_config = state.tty_config;
 
     try tty_config.setColor(writer, .white);
@@ -295,7 +295,7 @@ fn prettyPrintMapIterator(
     try tty_config.setColor(writer, .reset);
     switch (map_iterator.fields) {
         .state => |state_| {
-            try writer.print("{pretty}", .{Value.from(state_.map.object())});
+            try writer.print("{pretty}", .{Value.from(&state_.map.object)});
         },
         .completed => {
             try tty_config.setColor(writer, .dim);
@@ -448,7 +448,7 @@ fn prettyPrintSetIterator(
     try tty_config.setColor(writer, .reset);
     switch (set_iterator.fields) {
         .state => |state_| {
-            try writer.print("{pretty}", .{Value.from(state_.set.object())});
+            try writer.print("{pretty}", .{Value.from(&state_.set.object)});
         },
         .completed => {
             try tty_config.setColor(writer, .dim);
@@ -519,7 +519,7 @@ fn prettyPrintStringIterator(
 }
 
 fn prettyPrintTypedArray(typed_array: *const builtins.TypedArray, writer: anytype) !void {
-    const agent = typed_array.data.agent;
+    const agent = typed_array.object.agent;
     const typed_array_name = typed_array.fields.typed_array_name;
     const viewed_array_buffer = typed_array.fields.viewed_array_buffer;
     const tty_config = state.tty_config;
@@ -644,7 +644,7 @@ fn prettyPrintIntlCollator(
     intl_collator: *const builtins.intl.Collator,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const agent = intl_collator.data.agent;
+    const agent = intl_collator.object.agent;
     const locale = intl_collator.fields.locale;
     const tty_config = state.tty_config;
 
@@ -671,7 +671,7 @@ fn prettyPrintIntlDateTimeFormat(
     intl_date_time_format: *const builtins.intl.DateTimeFormat,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const agent = intl_date_time_format.data.agent;
+    const agent = intl_date_time_format.object.agent;
     const locale = intl_date_time_format.fields.locale;
     const tty_config = state.tty_config;
 
@@ -701,7 +701,7 @@ fn prettyPrintIntlDisplayNames(
     intl_display_names: *const builtins.intl.DisplayNames,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const agent = intl_display_names.data.agent;
+    const agent = intl_display_names.object.agent;
     const locale = intl_display_names.fields.locale;
     const tty_config = state.tty_config;
 
@@ -735,7 +735,7 @@ fn prettyPrintIntlListFormat(
     intl_list_format: *const builtins.intl.ListFormat,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const agent = intl_list_format.data.agent;
+    const agent = intl_list_format.object.agent;
     const locale = intl_list_format.fields.locale;
     const tty_config = state.tty_config;
 
@@ -758,7 +758,7 @@ fn prettyPrintIntlLocale(
     intl_locale: *const builtins.intl.Locale,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const agent = intl_locale.data.agent;
+    const agent = intl_locale.object.agent;
     const locale = intl_locale.fields.locale;
     const tty_config = state.tty_config;
 
@@ -777,7 +777,7 @@ fn prettyPrintIntlPluralRules(
     intl_plural_rules: *const builtins.intl.PluralRules,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const agent = intl_plural_rules.data.agent;
+    const agent = intl_plural_rules.object.agent;
     const locale = intl_plural_rules.fields.locale;
     const tty_config = state.tty_config;
 
@@ -799,7 +799,7 @@ fn prettyPrintIntlSegmenter(
     intl_segmenter: *const builtins.intl.Segmenter,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const agent = intl_segmenter.data.agent;
+    const agent = intl_segmenter.object.agent;
     const locale = intl_segmenter.fields.locale;
     const tty_config = state.tty_config;
 
@@ -843,8 +843,8 @@ fn prettyPrintPrimitiveWrapper(
     try tty_config.setColor(writer, .reset);
 }
 
-fn prettyPrintFunction(object: Object, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
-    const name = object.propertyStorage().get(PropertyKey.from("name")).?.value.?.asString();
+fn prettyPrintFunction(object: *const Object, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
+    const name = object.property_storage.get(PropertyKey.from("name")).?.value.?.asString();
     const tty_config = state.tty_config;
 
     if (object.is(builtins.ECMAScriptFunction)) {
@@ -869,7 +869,7 @@ fn prettyPrintFunction(object: Object, writer: anytype) PrettyPrintError(@TypeOf
     }
 }
 
-fn prettyPrintObject(object: Object, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
+fn prettyPrintObject(object: *Object, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
     const property_keys = ordinaryOwnPropertyKeys(object) catch return;
     const tty_config = state.tty_config;
 
@@ -879,7 +879,7 @@ fn prettyPrintObject(object: Object, writer: anytype) PrettyPrintError(@TypeOf(w
 
     var printed_properties: usize = 0;
     for (property_keys.items) |property_key| {
-        const property_descriptor = (object.propertyStorage().getCreateIntrinsicIfNeeded(property_key) catch return).?;
+        const property_descriptor = (object.property_storage.getCreateIntrinsicIfNeeded(property_key) catch return).?;
         if (!property_descriptor.enumerable.?) continue;
 
         if (printed_properties > 0) try writer.writeAll(",");
@@ -938,13 +938,13 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
 
     if (value.isObject()) {
         const object = value.asObject();
-        if (state.seen_objects.get(object.data)) |i| {
+        if (state.seen_objects.get(object)) |i| {
             try tty_config.setColor(writer, .dim);
             try writer.print("<ref #{}>", .{i});
             try tty_config.setColor(writer, .reset);
             return;
         }
-        state.seen_objects.putNoClobber(object.data, state.seen_objects.count()) catch return;
+        state.seen_objects.putNoClobber(object, state.seen_objects.count()) catch return;
 
         inline for (.{
             .{ builtins.Array, prettyPrintArray },
@@ -991,7 +991,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             if (object.is(T)) return prettyPrintFn(object.as(T), writer);
         }
         // NOTE: This needs to go before pretty-printing functions as it has [[Call]] but no name.
-        if (build_options.enable_annex_b and object.isHTMLDDA()) {
+        if (build_options.enable_annex_b and object.is_htmldda) {
             // Keep colors in sync with undefined and null below :^)
             try tty_config.setColor(writer, .bright_black);
             try writer.writeAll("[[");
@@ -1002,7 +1002,7 @@ pub fn prettyPrintValue(value: Value, writer: anytype) PrettyPrintError(@TypeOf(
             try tty_config.setColor(writer, .reset);
             return;
         }
-        if (object.internalMethods().call != null)
+        if (object.internal_methods.call != null)
             return prettyPrintFunction(object, writer);
         return prettyPrintObject(object, writer);
     }

@@ -3,7 +3,7 @@ const String = @import("../String.zig");
 const CodeUnitIterator = @This();
 
 index: usize,
-string: String,
+string: *const String,
 
 pub fn next(self: *CodeUnitIterator) ?u16 {
     if (self.index >= self.string.length()) return null;

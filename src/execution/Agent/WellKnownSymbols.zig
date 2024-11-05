@@ -10,19 +10,19 @@ const Symbol = types.Symbol;
 
 const WellKnownSymbols = @This();
 
-@"%Symbol.asyncIterator%": Symbol,
-@"%Symbol.hasInstance%": Symbol,
-@"%Symbol.isConcatSpreadable%": Symbol,
-@"%Symbol.iterator%": Symbol,
-@"%Symbol.match%": Symbol,
-@"%Symbol.matchAll%": Symbol,
-@"%Symbol.replace%": Symbol,
-@"%Symbol.search%": Symbol,
-@"%Symbol.species%": Symbol,
-@"%Symbol.split%": Symbol,
-@"%Symbol.toPrimitive%": Symbol,
-@"%Symbol.toStringTag%": Symbol,
-@"%Symbol.unscopables%": Symbol,
+@"%Symbol.asyncIterator%": *const Symbol,
+@"%Symbol.hasInstance%": *const Symbol,
+@"%Symbol.isConcatSpreadable%": *const Symbol,
+@"%Symbol.iterator%": *const Symbol,
+@"%Symbol.match%": *const Symbol,
+@"%Symbol.matchAll%": *const Symbol,
+@"%Symbol.replace%": *const Symbol,
+@"%Symbol.search%": *const Symbol,
+@"%Symbol.species%": *const Symbol,
+@"%Symbol.split%": *const Symbol,
+@"%Symbol.toPrimitive%": *const Symbol,
+@"%Symbol.toStringTag%": *const Symbol,
+@"%Symbol.unscopables%": *const Symbol,
 
 pub fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!WellKnownSymbols {
     return .{

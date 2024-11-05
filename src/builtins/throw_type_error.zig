@@ -18,7 +18,7 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const defineBuiltinProperty = utils.defineBuiltinProperty;
 
 pub const function = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .function = impl }, .{
             .length = 0,
             .name = "",
@@ -26,9 +26,9 @@ pub const function = struct {
         });
     }
 
-    pub fn init(_: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(_: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // The value of the [[Extensible]] internal slot of this function is false.
-        object.data.extensible = false;
+        object.extensible = false;
 
         // The "length" property of this function has the attributes {
         //   [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false

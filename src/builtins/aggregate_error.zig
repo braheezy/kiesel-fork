@@ -28,7 +28,7 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 /// 20.5.7.1 The AggregateError Constructor
 /// https://tc39.es/ecma262/#sec-aggregate-error-constructor
 pub const constructor = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return createBuiltinFunction(realm.agent, .{ .constructor = impl }, .{
             .length = 2,
             .name = "AggregateError",
@@ -37,7 +37,7 @@ pub const constructor = struct {
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 20.5.7.2.1 AggregateError.prototype
         // https://tc39.es/ecma262/#sec-aggregate-error.prototype
         try defineBuiltinProperty(object, "prototype", PropertyDescriptor{
@@ -50,7 +50,7 @@ pub const constructor = struct {
 
     /// 20.5.7.1.1 AggregateError ( errors, message [ , options ] )
     /// https://tc39.es/ecma262/#sec-aggregate-error
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?Object) Agent.Error!Value {
+    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const errors = arguments.get(0);
         const message = arguments.get(1);
         const options = arguments.get(2);
@@ -72,9 +72,9 @@ pub const constructor = struct {
         );
 
         // Non-standard
-        object.data.internal_methods = try Object.InternalMethods.create(
+        object.internal_methods = try Object.InternalMethods.create(
             agent.gc_allocator,
-            object.data.internal_methods,
+            object.internal_methods,
             &.{ .set = builtins.@"error".internalSet },
         );
 
@@ -122,13 +122,13 @@ pub const constructor = struct {
 /// 20.5.7.3 Properties of the AggregateError Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-aggregate-error-prototype-objects
 pub const prototype = struct {
-    pub fn create(realm: *Realm) std.mem.Allocator.Error!Object {
+    pub fn create(realm: *Realm) std.mem.Allocator.Error!*Object {
         return builtins.Object.create(realm.agent, .{
             .prototype = try realm.intrinsics.@"%Error.prototype%"(),
         });
     }
 
-    pub fn init(realm: *Realm, object: Object) std.mem.Allocator.Error!void {
+    pub fn init(realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         // 20.5.7.3.1 AggregateError.prototype.constructor
         // https://tc39.es/ecma262/#sec-aggregate-error.prototype.constructor
         try defineBuiltinProperty(
