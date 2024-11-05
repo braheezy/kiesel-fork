@@ -322,7 +322,7 @@ fn delete(object: Object, property_key: PropertyKey) std.mem.Allocator.Error!boo
 /// https://tc39.es/ecma262/#sec-typedarray-ownpropertykeys
 fn ownPropertyKeys(object: Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
     const agent = object.agent();
-    const property_storage_hash_map = object.propertyStorage().hash_map;
+    const property_storage_hash_map = &object.propertyStorage().hash_map;
 
     // 1. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(O, seq-cst).
     const ta = makeTypedArrayWithBufferWitnessRecord(object.as(TypedArray), .seq_cst);
@@ -351,7 +351,7 @@ fn ownPropertyKeys(object: Object) std.mem.Allocator.Error!std.ArrayList(Propert
 
     // 4. For each own property key P of O such that P is a String and P is not an integer index,
     //    in ascending chronological order of property creation, do
-    for (object.propertyStorage().hash_map.keys()) |property_key| {
+    for (property_storage_hash_map.keys()) |property_key| {
         if (property_key == .string) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);
@@ -360,7 +360,7 @@ fn ownPropertyKeys(object: Object) std.mem.Allocator.Error!std.ArrayList(Propert
 
     // 5. For each own property key P of O such that P is a Symbol, in ascending chronological
     //    order of property creation, do
-    for (object.propertyStorage().hash_map.keys()) |property_key| {
+    for (property_storage_hash_map.keys()) |property_key| {
         if (property_key == .symbol) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);

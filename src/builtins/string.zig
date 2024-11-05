@@ -362,7 +362,7 @@ fn defineOwnProperty(
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-ownpropertykeys
 fn ownPropertyKeys(object: Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
     const agent = object.agent();
-    const property_storage_hash_map = object.propertyStorage().hash_map;
+    const property_storage_hash_map = &object.propertyStorage().hash_map;
 
     // 2. Let str be O.[[StringData]].
     // 3. Assert: str is a String.
@@ -385,7 +385,7 @@ fn ownPropertyKeys(object: Object) std.mem.Allocator.Error!std.ArrayList(Propert
 
     // 6. For each own property key P of O such that P is an array index and
     //    ! ToIntegerOrInfinity(P) ≥ len, in ascending numeric index order, do
-    for (object.propertyStorage().hash_map.keys()) |property_key| {
+    for (property_storage_hash_map.keys()) |property_key| {
         if (property_key.isArrayIndex() and property_key.integer_index >= len) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);
@@ -399,7 +399,7 @@ fn ownPropertyKeys(object: Object) std.mem.Allocator.Error!std.ArrayList(Propert
 
     // 7. For each own property key P of O such that P is a String and P is not an array index, in
     //    ascending chronological order of property creation, do
-    for (object.propertyStorage().hash_map.keys()) |property_key| {
+    for (property_storage_hash_map.keys()) |property_key| {
         if (property_key == .string or (property_key == .integer_index and !property_key.isArrayIndex())) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);
@@ -408,7 +408,7 @@ fn ownPropertyKeys(object: Object) std.mem.Allocator.Error!std.ArrayList(Propert
 
     // 8. For each own property key P of O such that P is a Symbol, in ascending chronological
     //    order of property creation, do
-    for (object.propertyStorage().hash_map.keys()) |property_key| {
+    for (property_storage_hash_map.keys()) |property_key| {
         if (property_key == .symbol) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);
