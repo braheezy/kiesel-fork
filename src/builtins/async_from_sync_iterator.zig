@@ -286,6 +286,7 @@ pub const AsyncFromSyncIterator = MakeObject(.{
         /// [[SyncIteratorRecord]]
         sync_iterator: Iterator,
     },
+    .tag = .async_from_sync_iterator,
 });
 
 /// 27.1.6.4 AsyncFromSyncIteratorContinuation ( result, promiseCapability )

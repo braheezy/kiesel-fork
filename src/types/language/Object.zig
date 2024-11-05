@@ -40,6 +40,7 @@ pub const Tag = enum(u32) {
     array,
     array_buffer,
     array_iterator,
+    async_from_sync_iterator,
     async_generator,
     big_int,
     boolean,
@@ -56,6 +57,7 @@ pub const Tag = enum(u32) {
     iterator_helper,
     map,
     map_iterator,
+    module_namespace,
     number,
     promise,
     proxy,
@@ -121,7 +123,7 @@ pub fn is(self: Object, comptime T: type) bool {
 }
 
 pub fn as(self: Object, comptime T: type) *T {
-    std.debug.assert(self.data.tag == T.tag);
+    std.debug.assert(self.is(T));
     // Casting alignment is safe because we allocate objects as *T
     return @alignCast(@fieldParentPtr("data", @as(*Data, @ptrCast(self.data))));
 }
