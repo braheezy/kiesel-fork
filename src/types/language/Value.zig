@@ -19,7 +19,6 @@ const Object = types.Object;
 const PrivateName = types.PrivateName;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
-const PropertyKeyArrayHashMap = Object.PropertyStorage.PropertyKeyArrayHashMap;
 const String = types.String;
 const Symbol = types.Symbol;
 const arrayCreate = builtins.arrayCreate;
@@ -1455,8 +1454,8 @@ const KeyCoercion = enum { property, collection };
 
 fn GroupByContainer(comptime key_coercion: KeyCoercion) type {
     return switch (key_coercion) {
-        .property => PropertyKeyArrayHashMap(std.ArrayList(Value)),
-        .collection => ValueArrayHashMap(std.ArrayList(Value), sameValue),
+        .property => PropertyKey.ArrayHashMap(std.ArrayList(Value)),
+        .collection => Value.ArrayHashMap(std.ArrayList(Value), sameValue),
     };
 }
 
@@ -2276,7 +2275,7 @@ pub fn getOption(
     return coerced_value;
 }
 
-pub fn ValueArrayHashMap(comptime V: type, comptime eqlFn: fn (Value, Value) bool) type {
+pub fn ArrayHashMap(comptime V: type, comptime eqlFn: fn (Value, Value) bool) type {
     return std.ArrayHashMap(Value, V, struct {
         pub fn hash(_: @This(), key: Value) u32 {
             const value_hash = switch (key.type()) {

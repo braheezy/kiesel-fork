@@ -19,7 +19,6 @@ const Object = types.Object;
 const Realm = @import("Realm.zig");
 const Reference = types.Reference;
 const String = types.String;
-const StringHashMap = types.StringHashMap;
 const Symbol = types.Symbol;
 const Value = types.Value;
 const WellKnownSymbols = @import("Agent/WellKnownSymbols.zig");
@@ -36,7 +35,7 @@ pre_allocated: struct {
 },
 exception: ?Value = null,
 well_known_symbols: WellKnownSymbols,
-global_symbol_registry: StringHashMap(*const Symbol),
+global_symbol_registry: String.HashMap(*const Symbol),
 host_hooks: HostHooks,
 execution_context_stack: std.ArrayList(ExecutionContext),
 queued_jobs: std.ArrayList(QueuedJob),

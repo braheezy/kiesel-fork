@@ -11,7 +11,6 @@ const Agent = execution.Agent;
 const Environment = environments.Environment;
 const Object = types.Object;
 const String = types.String;
-const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 
 const DeclarativeEnvironment = @This();
@@ -19,7 +18,7 @@ const DeclarativeEnvironment = @This();
 /// [[OuterEnv]]
 outer_env: ?Environment,
 
-bindings: StringHashMap(Binding),
+bindings: String.HashMap(Binding),
 
 pub const Binding = struct {
     value: ?Value,

@@ -16,14 +16,14 @@ const ImportedModuleReferrer = language.ImportedModuleReferrer;
 const Job = @import("Job.zig");
 const JobCallback = @import("JobCallback.zig");
 const Object = types.Object;
-const PropertyKeyArrayHashMap = Object.PropertyStorage.PropertyKeyArrayHashMap;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
 const SourceTextModule = language.SourceTextModule;
 const String = types.String;
 const Value = types.Value;
 
-pub const ImportMetaProperties = PropertyKeyArrayHashMap(Value);
+pub const ImportMetaProperties = PropertyKey.ArrayHashMap(Value);
 
 pub const ResizeArrayBufferHandled = enum {
     handled,

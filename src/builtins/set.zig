@@ -16,7 +16,6 @@ const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
-const ValueArrayHashMap = types.ValueArrayHashMap;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const createSetIterator = builtins.createSetIterator;
 const defineBuiltinAccessor = utils.defineBuiltinAccessor;
@@ -946,7 +945,7 @@ pub const prototype = struct {
     }
 };
 
-const SetData = ValueArrayHashMap(void, sameValue);
+const SetData = Value.ArrayHashMap(void, sameValue);
 const IterableValues = std.ArrayList(?Value);
 
 /// 24.2.5 Properties of Set Instances

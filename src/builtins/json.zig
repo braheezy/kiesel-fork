@@ -13,7 +13,6 @@ const Arguments = types.Arguments;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
-const PropertyKeyArrayHashMap = Object.PropertyStorage.PropertyKeyArrayHashMap;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
@@ -166,7 +165,7 @@ const JSONSerialization = struct {
     replacer_function: ?*Object,
 
     /// [[PropertyList]]
-    property_list: ?PropertyKeyArrayHashMap(void),
+    property_list: ?PropertyKey.ArrayHashMap(void),
 
     /// [[Gap]]
     gap: *const String,
@@ -370,7 +369,7 @@ fn serializeJSONObject(
     var keys = state.property_list orelse blk: {
         const keys = try value.enumerableOwnProperties(.key);
         defer keys.deinit();
-        var converted = PropertyKeyArrayHashMap(void).init(agent.gc_allocator);
+        var converted = PropertyKey.ArrayHashMap(void).init(agent.gc_allocator);
         try converted.ensureUnusedCapacity(keys.items.len);
         for (keys.items) |key| {
             converted.putAssumeCapacityNoClobber(key.toPropertyKey(agent) catch |err| try noexcept(err), {});
@@ -691,7 +690,7 @@ pub const namespace = struct {
         const indent: *const String = .empty;
 
         // 3. Let PropertyList be undefined.
-        var property_list: ?PropertyKeyArrayHashMap(void) = null;
+        var property_list: ?PropertyKey.ArrayHashMap(void) = null;
         defer if (property_list) |*p| p.deinit();
 
         // 4. Let ReplacerFunction be undefined.

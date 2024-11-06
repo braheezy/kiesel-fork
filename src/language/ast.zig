@@ -13,7 +13,6 @@ const ImportEntry = language.ImportEntry;
 const LreOpaque = builtins.reg_exp.LreOpaque;
 const ParsedFlags = builtins.reg_exp.ParsedFlags;
 const String = types.String;
-const StringArrayHashMap = types.StringArrayHashMap;
 const Value = types.Value;
 const containsSlice = utils.containsSlice;
 const escapeSequenceMatcher = language.tokenizer.escapeSequenceMatcher;
@@ -3358,7 +3357,7 @@ pub const Module = struct {
         // a. If moduleNames does not contain name, then
         // i. Append name to moduleNames.
         // 4. Return moduleNames.
-        var module_requests = StringArrayHashMap(void).init(allocator);
+        var module_requests = String.ArrayHashMap(void).init(allocator);
         defer module_requests.deinit();
         for (self.module_item_list.items) |module_item| switch (module_item) {
             // ModuleItem : StatementListItem

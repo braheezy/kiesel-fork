@@ -18,7 +18,6 @@ const Parser = @import("Parser.zig");
 const Realm = execution.Realm;
 const SafePointer = types.SafePointer;
 const String = types.String;
-const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
 const instantiateAsyncFunctionObject = language.instantiateAsyncFunctionObject;
@@ -35,7 +34,7 @@ realm: *Realm,
 ecmascript_code: ast.Script,
 
 /// [[LoadedModules]]
-loaded_modules: StringHashMap(Module),
+loaded_modules: String.HashMap(Module),
 
 /// [[HostDefined]]
 host_defined: SafePointer,
@@ -200,7 +199,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     defer functions_to_initialize.deinit();
 
     // 7. Let declaredFunctionNames be a new empty List.
-    var declared_function_names = StringHashMap(void).init(agent.gc_allocator);
+    var declared_function_names = String.HashMap(void).init(agent.gc_allocator);
     defer declared_function_names.deinit();
 
     // 8. For each element d of varDeclarations, in reverse List order, do
@@ -245,7 +244,7 @@ fn globalDeclarationInstantiation(agent: *Agent, script: ast.Script, env: *Globa
     }
 
     // 9. Let declaredVarNames be a new empty List.
-    var declared_var_names = StringHashMap(void).init(agent.gc_allocator);
+    var declared_var_names = String.HashMap(void).init(agent.gc_allocator);
     defer declared_var_names.deinit();
 
     var bound_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);

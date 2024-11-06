@@ -13,7 +13,6 @@ const Arguments = types.Arguments;
 const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
-const PropertyKeyArrayHashMap = Object.PropertyStorage.PropertyKeyArrayHashMap;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createIteratorResultObject = types.createIteratorResultObject;
@@ -156,7 +155,7 @@ pub const ForInIterator = MakeObject(.{
             object_was_visited: bool,
 
             /// [[VisitedKeys]]
-            visited_keys: PropertyKeyArrayHashMap(void),
+            visited_keys: PropertyKey.ArrayHashMap(void),
 
             /// [[RemainingKeys]]
             remaining_keys: std.ArrayList(PropertyKey),

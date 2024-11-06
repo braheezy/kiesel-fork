@@ -17,7 +17,6 @@ const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const SafePointer = types.SafePointer;
 const String = types.String;
-const StringHashMap = types.StringHashMap;
 const addRestrictedFunctionProperties = builtins.addRestrictedFunctionProperties;
 const globalObjectProperties = builtins.globalObjectProperties;
 const newGlobalEnvironment = environments.newGlobalEnvironment;
@@ -43,7 +42,7 @@ global_env: *GlobalEnvironment,
 template_map: std.AutoHashMap(*ast.TemplateLiteral, *Object),
 
 /// [[LoadedModules]]
-loaded_modules: StringHashMap(Module),
+loaded_modules: String.HashMap(Module),
 
 /// [[HostDefined]]
 host_defined: SafePointer,

@@ -13,7 +13,6 @@ const ObjectEnvironment = environments.ObjectEnvironment;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const String = types.String;
-const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 
 const GlobalEnvironment = @This();
@@ -28,7 +27,7 @@ global_this_value: *Object,
 declarative_record: *DeclarativeEnvironment,
 
 /// [[VarNames]]
-var_names: StringHashMap(void),
+var_names: String.HashMap(void),
 
 /// [[OuterEnv]]
 outer_env: ?Environment,

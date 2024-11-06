@@ -17,7 +17,6 @@ const ClassFieldDefinition = types.ClassFieldDefinition;
 const PreferredType = Value.PreferredType;
 const PrivateElement = types.PrivateElement;
 const PrivateName = types.PrivateName;
-const PrivateNameArrayHashMap = types.PrivateNameArrayHashMap;
 const PropertyDescriptor = spec.PropertyDescriptor;
 const Realm = execution.Realm;
 const Value = types.Value;
@@ -109,7 +108,7 @@ prototype: ?*Object,
 extensible: bool,
 
 /// [[PrivateElements]]
-private_elements: PrivateNameArrayHashMap(PrivateElement),
+private_elements: PrivateName.ArrayHashMap(PrivateElement),
 
 /// [[IsHTMLDDA]]
 is_htmldda: if (build_options.enable_annex_b) bool else void,

@@ -12,12 +12,11 @@ const Agent = execution.Agent;
 const DeclarativeEnvironment = environments.DeclarativeEnvironment;
 const SourceTextModule = language.SourceTextModule;
 const String = types.String;
-const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 
 const ModuleEnvironment = @This();
 
-indirect_bindings: StringHashMap(IndirectBinding),
+indirect_bindings: String.HashMap(IndirectBinding),
 
 // NOTE: This is how we implement the spec's inheritance of module environments.
 declarative_environment: *DeclarativeEnvironment,

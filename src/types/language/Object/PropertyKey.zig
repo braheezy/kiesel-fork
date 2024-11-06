@@ -61,19 +61,14 @@ pub const PropertyKey = union(enum) {
         return self == .integer_index and self.integer_index <= (std.math.maxInt(u32) - 1);
     }
 
-    fn eqlStringAndIntegerIndex(string: *const String, index: IntegerIndex) bool {
-        const len = comptime std.fmt.count("{d}", .{std.math.maxInt(IntegerIndex)});
-        var buf: [len]u8 = undefined;
-        const index_string: *const String = blk: {
-            const slice: String.Slice = .{
-                .ascii = std.fmt.bufPrint(&buf, "{d}", .{index}) catch unreachable,
-            };
-            break :blk &.{ .slice = slice, .hash = undefined };
+    pub fn hash(self: PropertyKey) u64 {
+        return switch (self) {
+            .string => |string| string.hash,
+            .symbol => |symbol| std.hash_map.getAutoHashFn(*const Symbol, void)({}, symbol),
+            .integer_index => |integer_index| std.hash_map.getAutoHashFn(PropertyKey.IntegerIndex, void)({}, integer_index),
         };
-        return string.eql(index_string);
     }
 
-    /// Non-standard helper to check `PropertyKey` equality without going through `sameValue()`.
     pub fn eql(a: PropertyKey, b: PropertyKey) bool {
         return switch (a) {
             .string => |a_string| switch (b) {
@@ -92,6 +87,18 @@ pub const PropertyKey = union(enum) {
                 .integer_index => |b_integer_index| a_integer_index == b_integer_index,
             },
         };
+    }
+
+    fn eqlStringAndIntegerIndex(string: *const String, index: IntegerIndex) bool {
+        const len = comptime std.fmt.count("{d}", .{std.math.maxInt(IntegerIndex)});
+        var buf: [len]u8 = undefined;
+        const index_string: *const String = blk: {
+            const slice: String.Slice = .{
+                .ascii = std.fmt.bufPrint(&buf, "{d}", .{index}) catch unreachable,
+            };
+            break :blk &.{ .slice = slice, .hash = undefined };
+        };
+        return string.eql(index_string);
     }
 
     /// Non-standard helper to convert a `PropertyKey` to a `Value` - they *are* plain (string or
@@ -129,5 +136,29 @@ pub const PropertyKey = union(enum) {
                 ),
             },
         };
+    }
+
+    pub fn HashMap(comptime V: type) type {
+        return std.HashMap(PropertyKey, V, struct {
+            pub fn hash(_: anytype, property_key: PropertyKey) u64 {
+                return property_key.hash();
+            }
+
+            pub fn eql(_: anytype, a: PropertyKey, b: PropertyKey) bool {
+                return a.eql(b);
+            }
+        }, std.hash_map.default_max_load_percentage);
+    }
+
+    pub fn ArrayHashMap(comptime V: type) type {
+        return std.ArrayHashMap(PropertyKey, V, struct {
+            pub fn hash(_: @This(), property_key: PropertyKey) u32 {
+                return @truncate(property_key.hash());
+            }
+
+            pub fn eql(_: @This(), a: PropertyKey, b: PropertyKey, _: usize) bool {
+                return a.eql(b);
+            }
+        }, true);
     }
 };

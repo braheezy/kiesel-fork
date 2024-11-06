@@ -8,17 +8,15 @@ const Instruction = instructions_.Instruction;
 const InstructionIterator = instructions_.InstructionIterator;
 const IteratorKind = types.IteratorKind;
 const String = types.String;
-const StringArrayHashMap = types.StringArrayHashMap;
 const Value = types.Value;
-const ValueArrayHashMap = types.ValueArrayHashMap;
 const sameValue = types.sameValue;
 
 const Executable = @This();
 
 allocator: std.mem.Allocator,
 instructions: std.ArrayList(u8),
-constants: ValueArrayHashMap(void, sameValue),
-identifiers: StringArrayHashMap(void),
+constants: Value.ArrayHashMap(void, sameValue),
+identifiers: String.ArrayHashMap(void),
 ast_nodes: std.ArrayList(AstNode),
 environment_lookup_cache_size: usize = 0,
 

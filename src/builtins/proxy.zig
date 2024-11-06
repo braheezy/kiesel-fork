@@ -14,7 +14,6 @@ const MakeObject = types.MakeObject;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
-const PropertyKeyArrayHashMapContext = Object.PropertyStorage.PropertyKeyArrayHashMapContext;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
@@ -771,13 +770,6 @@ fn ownPropertyKeys(object: *Object) Agent.Error!std.ArrayList(PropertyKey) {
     const agent = object.agent;
     const proxy = object.as(Proxy);
 
-    const PropertyKeySet = std.HashMap(
-        PropertyKey,
-        void,
-        PropertyKeyArrayHashMapContext,
-        std.hash_map.default_max_load_percentage,
-    );
-
     // 1. Perform ? ValidateNonRevokedProxy(O).
     try validateNonRevokedProxy(proxy);
 
@@ -810,7 +802,7 @@ fn ownPropertyKeys(object: *Object) Agent.Error!std.ArrayList(PropertyKey) {
         elements.len,
     );
 
-    var unique_property_keys = PropertyKeySet.init(agent.gc_allocator);
+    var unique_property_keys = PropertyKey.HashMap(void).init(agent.gc_allocator);
     defer unique_property_keys.deinit();
     if (elements.len > std.math.maxInt(u32)) return error.OutOfMemory;
     try unique_property_keys.ensureTotalCapacity(@intCast(elements.len));
@@ -874,7 +866,7 @@ fn ownPropertyKeys(object: *Object) Agent.Error!std.ArrayList(PropertyKey) {
     }
 
     // 18. Let uncheckedResultKeys be a List whose elements are the elements of trapResult.
-    var unchecked_result_keys = PropertyKeySet.init(agent.gc_allocator);
+    var unchecked_result_keys = PropertyKey.HashMap(void).init(agent.gc_allocator);
     defer unchecked_result_keys.deinit();
     try unchecked_result_keys.ensureTotalCapacity(@intCast(trap_result.items.len));
     for (trap_result.items) |key| {

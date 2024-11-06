@@ -14,7 +14,6 @@ const ExecutionContext = execution.ExecutionContext;
 const Parser = @import("../language/Parser.zig");
 const PrivateEnvironment = execution.PrivateEnvironment;
 const String = types.String;
-const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 const formatParseError = utils.formatParseError;
 const generateAndRunBytecode = bytecode.generateAndRunBytecode;
@@ -269,7 +268,7 @@ fn evalDeclarationInstantiation(
     defer functions_to_initialize.deinit();
 
     // 9. Let declaredFunctionNames be a new empty List.
-    var declared_function_names = StringHashMap(void).init(agent.gc_allocator);
+    var declared_function_names = String.HashMap(void).init(agent.gc_allocator);
     defer declared_function_names.deinit();
 
     // 10. For each element d of varDeclarations, in reverse List order, do
@@ -317,7 +316,7 @@ fn evalDeclarationInstantiation(
     }
 
     // 11. Let declaredVarNames be a new empty List.
-    var declared_var_names = StringHashMap(void).init(agent.gc_allocator);
+    var declared_var_names = String.HashMap(void).init(agent.gc_allocator);
     defer declared_var_names.deinit();
 
     var bound_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);

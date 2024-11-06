@@ -25,14 +25,18 @@ pub fn format(
     try writer.print("{}", .{self.symbol.description.?});
 }
 
+pub fn hash(self: PrivateName) u64 {
+    return std.hash_map.getAutoHashFn(*const Symbol, void)({}, self.symbol);
+}
+
 pub fn eql(a: PrivateName, b: PrivateName) bool {
     return a.symbol == b.symbol;
 }
 
-pub fn PrivateNameArrayHashMap(comptime V: type) type {
+pub fn ArrayHashMap(comptime V: type) type {
     return std.ArrayHashMap(PrivateName, V, struct {
-        pub fn hash(_: @This(), key: PrivateName) u32 {
-            return std.array_hash_map.getAutoHashFn(*const Symbol, void)({}, key.symbol);
+        pub fn hash(_: @This(), private_name: PrivateName) u32 {
+            return @truncate(private_name.hash());
         }
 
         pub fn eql(_: @This(), a: PrivateName, b: PrivateName, _: usize) bool {

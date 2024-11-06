@@ -32,7 +32,6 @@ const PropertyKeyOrPrivateName = types.PropertyKeyOrPrivateName;
 const Realm = execution.Realm;
 const ScriptOrModule = execution.ScriptOrModule;
 const String = types.String;
-const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 const Vm = bytecode.Vm;
 const asyncFunctionStart = builtins.asyncFunctionStart;
@@ -1039,7 +1038,7 @@ fn functionDeclarationInstantiation(
     try code.collectLexicallyDeclaredNames(&lexical_names);
 
     // 12. Let functionNames be a new empty List.
-    var function_names = StringHashMap(void).init(agent.gc_allocator);
+    var function_names = String.HashMap(void).init(agent.gc_allocator);
     defer function_names.deinit();
 
     // 13. Let functionsToInitialize be a new empty List.
@@ -1237,7 +1236,7 @@ fn functionDeclarationInstantiation(
         // a. NOTE: Only a single Environment Record is needed for the parameters and top-level vars.
 
         // b. Let instantiatedVarNames be a copy of the List parameterBindings.
-        var instantiated_var_names = StringHashMap(void).init(agent.gc_allocator);
+        var instantiated_var_names = String.HashMap(void).init(agent.gc_allocator);
         defer instantiated_var_names.deinit();
 
         if (parameter_bindings.items.len > std.math.maxInt(u32)) return error.OutOfMemory;
@@ -1284,7 +1283,7 @@ fn functionDeclarationInstantiation(
         callee_context.ecmascript_code.?.variable_environment = var_env;
 
         // d. Let instantiatedVarNames be a new empty List.
-        var instantiated_var_names = StringHashMap(void).init(agent.gc_allocator);
+        var instantiated_var_names = String.HashMap(void).init(agent.gc_allocator);
         defer instantiated_var_names.deinit();
 
         // e. For each element n of varNames, do

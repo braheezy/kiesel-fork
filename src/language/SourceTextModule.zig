@@ -27,7 +27,6 @@ const ResolvedBinding = language.ResolvedBinding;
 const ResolvedBindingOrAmbiguous = language.ResolvedBindingOrAmbiguous;
 const SafePointer = types.SafePointer;
 const String = types.String;
-const StringHashMap = types.StringHashMap;
 const Value = types.Value;
 const asyncBlockStart = builtins.asyncBlockStart;
 const containsSlice = utils.containsSlice;
@@ -95,7 +94,7 @@ dfs_ancestor_index: ?usize,
 requested_modules: std.ArrayList(*const String),
 
 /// [[LoadedModules]]
-loaded_modules: StringHashMap(Module),
+loaded_modules: String.HashMap(Module),
 
 /// [[CycleRoot]]
 cycle_root: ?*SourceTextModule,
@@ -1567,7 +1566,7 @@ pub fn initializeEnvironment(self: *SourceTextModule) Agent.Error!void {
     try code.collectVarScopedDeclarations(&var_declarations);
 
     // 20. Let declaredVarNames be a new empty List.
-    var declared_var_names = StringHashMap(void).init(agent.gc_allocator);
+    var declared_var_names = String.HashMap(void).init(agent.gc_allocator);
     defer declared_var_names.deinit();
 
     var bound_names = std.ArrayList(ast.Identifier).init(agent.gc_allocator);

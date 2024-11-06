@@ -11,7 +11,6 @@ pub const IteratorKind = iterator.IteratorKind;
 pub const PrivateElement = @import("spec/private_element.zig").PrivateElement;
 pub const PrivateMethodDefinition = @import("spec/PrivateMethodDefinition.zig");
 pub const PrivateName = @import("spec/PrivateName.zig");
-pub const PrivateNameArrayHashMap = PrivateName.PrivateNameArrayHashMap;
 pub const PropertyDescriptor = @import("spec/PropertyDescriptor.zig");
 pub const Reference = @import("spec/Reference.zig");
 pub const copyDataBlockBytes = data_block.copyDataBlockBytes;

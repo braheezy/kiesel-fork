@@ -8,8 +8,7 @@ const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
-const StringHashMap = types.StringHashMap;
-const Symbol = types.Symbol;
+const String = types.String;
 const Value = types.Value;
 
 const PropertyStorage = @This();
@@ -96,8 +95,8 @@ const LazyIntrinsic = struct {
 };
 
 // TODO: Shapes, linear storage for arrays, etc. Gotta start somewhere :^)
-hash_map: PropertyKeyArrayHashMap(Entry),
-lazy_intrinsics: StringHashMap(LazyIntrinsic),
+hash_map: PropertyKey.ArrayHashMap(Entry),
+lazy_intrinsics: String.HashMap(LazyIntrinsic),
 
 pub fn init(allocator: std.mem.Allocator) PropertyStorage {
     return .{
@@ -155,30 +154,4 @@ pub fn remove(self: *PropertyStorage, property_key: PropertyKey) void {
     if (property_key == .string) {
         _ = self.lazy_intrinsics.remove(property_key.string);
     }
-}
-
-pub const PropertyKeyArrayHashMapContext = struct {
-    pub fn hash(_: anytype, property_key: PropertyKey) u64 {
-        return switch (property_key) {
-            .string => |string| string.hash,
-            .symbol => |symbol| std.hash_map.getAutoHashFn(*const Symbol, void)({}, symbol),
-            .integer_index => |integer_index| std.hash_map.getAutoHashFn(PropertyKey.IntegerIndex, void)({}, integer_index),
-        };
-    }
-
-    pub fn eql(_: anytype, a: PropertyKey, b: PropertyKey) bool {
-        return a.eql(b);
-    }
-};
-
-pub fn PropertyKeyArrayHashMap(comptime V: type) type {
-    return std.ArrayHashMap(PropertyKey, V, struct {
-        pub fn hash(self: @This(), property_key: PropertyKey) u32 {
-            return @truncate(PropertyKeyArrayHashMapContext.hash(self, property_key));
-        }
-
-        pub fn eql(self: @This(), a: PropertyKey, b: PropertyKey, _: usize) bool {
-            return PropertyKeyArrayHashMapContext.eql(self, a, b);
-        }
-    }, true);
 }
