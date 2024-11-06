@@ -108,7 +108,7 @@ prototype: ?*Object,
 extensible: bool,
 
 /// [[PrivateElements]]
-private_elements: PrivateName.ArrayHashMap(PrivateElement),
+private_elements: PrivateName.HashMap(PrivateElement),
 
 /// [[IsHTMLDDA]]
 is_htmldda: if (build_options.enable_annex_b) bool else void,

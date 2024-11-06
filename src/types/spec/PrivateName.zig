@@ -33,14 +33,14 @@ pub fn eql(a: PrivateName, b: PrivateName) bool {
     return a.symbol == b.symbol;
 }
 
-pub fn ArrayHashMap(comptime V: type) type {
-    return std.ArrayHashMap(PrivateName, V, struct {
-        pub fn hash(_: @This(), private_name: PrivateName) u32 {
-            return @truncate(private_name.hash());
+pub fn HashMap(comptime V: type) type {
+    return std.HashMap(PrivateName, V, struct {
+        pub fn hash(_: @This(), private_name: PrivateName) u64 {
+            return private_name.hash();
         }
 
-        pub fn eql(_: @This(), a: PrivateName, b: PrivateName, _: usize) bool {
+        pub fn eql(_: @This(), a: PrivateName, b: PrivateName) bool {
             return a.eql(b);
         }
-    }, true);
+    }, std.hash_map.default_max_load_percentage);
 }
