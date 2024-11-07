@@ -11,8 +11,8 @@ const types = @import("types.zig");
 const Agent = execution.Agent;
 const Behaviour = builtins.builtin_function.Behaviour;
 const Object = types.Object;
-const PropertyKey = types.PropertyKey;
 const PropertyDescriptor = types.PropertyDescriptor;
+const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
@@ -183,13 +183,22 @@ pub fn defineBuiltinAccessorWithAttributes(
         });
     } else null;
     const property_key = getPropertyKey(name, realm.agent);
-    const property_descriptor: PropertyDescriptor = .{
-        .get = getter_function,
-        .set = setter_function,
+    const attributes_: Object.Shape.PropertyMetadata.Attributes = .{
+        .writable = false,
         .enumerable = attributes.enumerable,
         .configurable = attributes.configurable,
     };
-    try object.property_storage.set(property_key, property_descriptor);
+    object.shape = try object.shape.setPropertyWithoutTransition(
+        object.agent.gc_allocator,
+        property_key,
+        attributes_,
+    );
+    try object.property_storage.append(.{
+        .accessor = .{
+            .get = getter_function,
+            .set = setter_function,
+        },
+    });
 }
 
 pub fn defineBuiltinFunction(
@@ -237,20 +246,29 @@ pub fn defineBuiltinFunctionWithAttributes(
 pub fn defineBuiltinProperty(
     object: *Object,
     comptime name: []const u8,
-    value: anytype,
+    value_or_property_descriptor: anytype,
 ) std.mem.Allocator.Error!void {
-    const T = @TypeOf(value);
+    const T = @TypeOf(value_or_property_descriptor);
     const property_key = getPropertyKey(name, object.agent);
-    const property_descriptor = if (T == Value)
-        PropertyDescriptor{
-            .value = value,
-            .writable = true,
-            .enumerable = false,
-            .configurable = true,
-        }
-    else if (T == PropertyDescriptor)
-        value
-    else
-        @compileError("defineBuiltinProperty() called with incompatible type " ++ @typeName(T));
-    try object.property_storage.set(property_key, property_descriptor);
+    const value: Value, const attributes: Object.Shape.PropertyMetadata.Attributes = switch (T) {
+        Value => .{
+            value_or_property_descriptor,
+            .{
+                .writable = true,
+                .enumerable = false,
+                .configurable = true,
+            },
+        },
+        PropertyDescriptor => .{
+            value_or_property_descriptor.value.?,
+            Object.Shape.PropertyMetadata.Attributes.fromPropertyDescriptor(value_or_property_descriptor),
+        },
+        else => @compileError("defineBuiltinProperty() called with incompatible type " ++ @typeName(T)),
+    };
+    object.shape = try object.shape.setPropertyWithoutTransition(
+        object.agent.gc_allocator,
+        property_key,
+        attributes,
+    );
+    try object.property_storage.append(.{ .value = value });
 }

@@ -26,7 +26,8 @@ const validateNonRevokedProxy = builtins.validateNonRevokedProxy;
 
 pub const InternalMethods = @import("Object/InternalMethods.zig");
 pub const PropertyKey = @import("Object/PropertyKey.zig").PropertyKey;
-pub const PropertyStorage = @import("Object/PropertyStorage.zig");
+pub const PropertyValue = @import("Object/property_value.zig").PropertyValue;
+pub const Shape = @import("Object/Shape.zig");
 
 const Object = @This();
 
@@ -101,9 +102,6 @@ pub const PropertyKind = enum {
 
 tag: Object.Tag,
 
-/// [[Prototype]]
-prototype: ?*Object,
-
 /// [[Extensible]]
 extensible: bool,
 
@@ -115,7 +113,8 @@ is_htmldda: if (build_options.enable_annex_b) bool else void,
 
 agent: *Agent,
 internal_methods: *const InternalMethods,
-property_storage: PropertyStorage,
+property_storage: std.ArrayList(PropertyValue),
+shape: *Shape,
 
 pub fn format(
     self: *const Object,
@@ -139,6 +138,74 @@ pub fn as(self: *const Object, comptime T: type) *T {
     std.debug.assert(self.is(T));
     // Casting alignment is safe because we allocate objects as *T
     return @constCast(@alignCast(@fieldParentPtr("object", self)));
+}
+
+pub fn setPrototypeDirect(self: *Object, prototype: ?*Object) std.mem.Allocator.Error!void {
+    if (self.shape.prototype == prototype) return;
+    self.shape = try self.shape.setPrototype(self.agent.gc_allocator, prototype);
+}
+
+pub fn getPropertyValueDirect(self: *const Object, property_key: PropertyKey) Value {
+    const property_metadata = self.shape.properties.get(property_key).?;
+    const property_value = self.property_storage.items[property_metadata.index];
+    return property_value.value;
+}
+
+pub fn getPropertyDescriptorDirect(self: *const Object, property_key: PropertyKey) PropertyDescriptor {
+    const property_metadata = self.shape.properties.get(property_key).?;
+    const property_value = self.property_storage.items[property_metadata.index];
+    std.debug.assert(property_value == .value or property_value == .accessor);
+    return property_value.toPropertyDescriptor(property_metadata.attributes);
+}
+
+pub fn getPropertyCreateIntrinsicIfNeeded(
+    self: *const Object,
+    index: usize,
+) std.mem.Allocator.Error!PropertyValue {
+    const property_value = &self.property_storage.items[index];
+    if (property_value.* == .lazy_intrinsic) {
+        const object = try property_value.lazy_intrinsic.lazyIntrinsicFn(
+            &property_value.lazy_intrinsic.realm.intrinsics,
+        );
+        property_value.* = .{ .value = Value.from(object) };
+    }
+    return property_value.*;
+}
+
+pub fn setPropertyDirect(
+    self: *Object,
+    property_key: PropertyKey,
+    property_descriptor: PropertyDescriptor,
+) std.mem.Allocator.Error!void {
+    const attributes = Object.Shape.PropertyMetadata.Attributes.fromPropertyDescriptor(property_descriptor);
+    const property_value = PropertyValue.fromPropertyDescriptor(property_descriptor);
+    if (self.shape.properties.getPtr(property_key)) |property_metadata| {
+        if (!property_metadata.attributes.eql(attributes)) {
+            self.shape = try self.shape.setProperty(
+                self.agent.gc_allocator,
+                property_key,
+                attributes,
+            );
+        }
+        self.property_storage.items[property_metadata.index] = property_value;
+    } else {
+        self.shape = try self.shape.setProperty(
+            self.agent.gc_allocator,
+            property_key,
+            attributes,
+        );
+        try self.property_storage.append(property_value);
+    }
+}
+
+pub fn deletePropertyDirect(self: *Object, property_key: PropertyKey) std.mem.Allocator.Error!void {
+    const property_metadata = self.shape.properties.get(property_key).?;
+    self.shape = try self.shape.deleteProperty(self.agent.gc_allocator, property_key);
+    // By overwriting the value and keeping subsequent indices intact we can make property
+    // deletions part of the regular transition chain without making them unique and invalidating
+    // ICs. Additionally we save the cost of moving all elements after this one around, at the
+    // memory cost of wasting one element.
+    self.property_storage.items[property_metadata.index] = undefined;
 }
 
 /// 7.1.1.1 OrdinaryToPrimitive ( O, hint )
@@ -250,14 +317,11 @@ pub fn createNonEnumerableDataPropertyOrThrow(
     value: Value,
 ) Agent.Error!void {
     // 1. Assert: O is an ordinary, extensible object with no non-configurable properties.
-    std.debug.assert(self.extensible and blk: {
-        for (self.property_storage.hash_map.values()) |entry| {
-            switch (entry) {
-                inline else => |x| if (!x.attributes.configurable) break :blk false,
-            }
-        }
-        break :blk true;
-    });
+    std.debug.assert(
+        self.extensible and for (self.shape.properties.values()) |entry| {
+            if (!entry.attributes.configurable) break false;
+        } else true,
+    );
 
     // 2. Let newDesc be the PropertyDescriptor {
     //      [[Value]]: V, [[Writable]]: true, [[Enumerable]]: false, [[Configurable]]: true

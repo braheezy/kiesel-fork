@@ -132,9 +132,9 @@ fn getArgumentSpreadIndices(self: *Vm) std.mem.Allocator.Error![]const usize {
     const len = getArrayLength(array);
     var argument_spread_indices = try std.ArrayList(usize).initCapacity(self.agent.gc_allocator, len);
     for (0..len) |i| {
-        const argument_spread_index = array.property_storage.get(
+        const argument_spread_index = array.getPropertyValueDirect(
             PropertyKey.from(@as(u53, @intCast(i))),
-        ).?.value.?.asNumber().i32;
+        ).asNumber().i32;
         argument_spread_indices.appendAssumeCapacity(@intCast(argument_spread_index));
     }
     return argument_spread_indices.toOwnedSlice();

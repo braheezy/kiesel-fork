@@ -39,6 +39,7 @@ global_symbol_registry: String.HashMap(*const Symbol),
 host_hooks: HostHooks,
 execution_context_stack: std.ArrayList(ExecutionContext),
 queued_jobs: std.ArrayList(QueuedJob),
+empty_shape: *Object.Shape,
 platform: Platform,
 
 /// [[LittleEndian]]
@@ -76,6 +77,7 @@ pub fn init(gc_allocator: std.mem.Allocator, options: Options) std.mem.Allocator
         .host_hooks = .{},
         .execution_context_stack = undefined,
         .queued_jobs = undefined,
+        .empty_shape = undefined,
         .platform = platform,
     };
     self.pre_allocated = .{
@@ -86,6 +88,7 @@ pub fn init(gc_allocator: std.mem.Allocator, options: Options) std.mem.Allocator
     self.global_symbol_registry = .init(self.gc_allocator);
     self.execution_context_stack = .init(self.gc_allocator);
     self.queued_jobs = .init(self.gc_allocator);
+    self.empty_shape = try Object.Shape.init(self.gc_allocator);
     return self;
 }
 
@@ -96,6 +99,7 @@ pub fn deinit(self: *Agent) void {
     self.global_symbol_registry.deinit();
     self.execution_context_stack.deinit();
     self.queued_jobs.deinit();
+    self.empty_shape.deinit(self.gc_allocator);
     self.platform.deinit();
 }
 

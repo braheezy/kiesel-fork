@@ -504,8 +504,16 @@ fn printValueDebugInfo(
     try tty_config.setColor(writer, .blue);
     switch (value.type()) {
         .number => try writer.print(" (type: {s})", .{@tagName(value.asNumber())}),
-        .string => try writer.print(" (type: {s})", .{@tagName(value.asString().slice)}),
-        .symbol => try writer.print(" (id: {x})", .{@intFromPtr(value.asSymbol())}),
+        .string => try writer.print(" (ptr: 0x{x}, type: {s})", .{
+            @intFromPtr(value.asString()),
+            @tagName(value.asString().slice),
+        }),
+        .symbol => try writer.print(" (ptr: 0x{x})", .{@intFromPtr(value.asSymbol())}),
+        .object => try writer.print(" (ptr: 0x{x}, shape: 0x{x}, tag: {s})", .{
+            @intFromPtr(value.asObject()),
+            @intFromPtr(value.asObject().shape),
+            @tagName(value.asObject().tag),
+        }),
         else => {},
     }
     try tty_config.setColor(writer, .reset);

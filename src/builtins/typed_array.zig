@@ -322,7 +322,6 @@ fn delete(object: *Object, property_key: PropertyKey) std.mem.Allocator.Error!bo
 /// https://tc39.es/ecma262/#sec-typedarray-ownpropertykeys
 fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
     const agent = object.agent;
-    const property_storage_hash_map = &object.property_storage.hash_map;
 
     // 1. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(O, seq-cst).
     const ta = makeTypedArrayWithBufferWitnessRecord(object.as(TypedArray), .seq_cst);
@@ -330,7 +329,7 @@ fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(Proper
     // 2. Let keys be a new empty List.
     var keys = try std.ArrayList(PropertyKey).initCapacity(
         agent.gc_allocator,
-        property_storage_hash_map.count() + if (!isTypedArrayOutOfBounds(ta))
+        object.shape.properties.count() + if (!isTypedArrayOutOfBounds(ta))
             @as(usize, @intCast(typedArrayLength(ta)))
         else
             0,
@@ -351,7 +350,7 @@ fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(Proper
 
     // 4. For each own property key P of O such that P is a String and P is not an integer index,
     //    in ascending chronological order of property creation, do
-    for (property_storage_hash_map.keys()) |property_key| {
+    for (object.shape.properties.keys()) |property_key| {
         if (property_key == .string) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);
@@ -360,7 +359,7 @@ fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(Proper
 
     // 5. For each own property key P of O such that P is a Symbol, in ascending chronological
     //    order of property creation, do
-    for (property_storage_hash_map.keys()) |property_key| {
+    for (object.shape.properties.keys()) |property_key| {
         if (property_key == .symbol) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);
@@ -922,7 +921,7 @@ pub const prototype = struct {
 
         // 23.2.3.37 %TypedArray%.prototype [ %Symbol.iterator% ] ( )
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype-%symbol.iterator%
-        const @"%TypedArray.prototype.values%" = object.property_storage.get(PropertyKey.from("values")).?;
+        const @"%TypedArray.prototype.values%" = object.getPropertyDescriptorDirect(PropertyKey.from("values"));
         try defineBuiltinProperty(object, "%Symbol.iterator%", @"%TypedArray.prototype.values%");
     }
 

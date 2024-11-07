@@ -362,7 +362,6 @@ fn defineOwnProperty(
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-ownpropertykeys
 fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
     const agent = object.agent;
-    const property_storage_hash_map = &object.property_storage.hash_map;
 
     // 2. Let str be O.[[StringData]].
     // 3. Assert: str is a String.
@@ -374,7 +373,7 @@ fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(Proper
     // 1. Let keys be a new empty List.
     var keys = try std.ArrayList(PropertyKey).initCapacity(
         agent.gc_allocator,
-        property_storage_hash_map.count() + len,
+        object.shape.properties.count() + len,
     );
 
     // 5. For each integer i such that 0 ≤ i < len, in ascending order,
@@ -385,7 +384,7 @@ fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(Proper
 
     // 6. For each own property key P of O such that P is an array index and
     //    ! ToIntegerOrInfinity(P) ≥ len, in ascending numeric index order, do
-    for (property_storage_hash_map.keys()) |property_key| {
+    for (object.shape.properties.keys()) |property_key| {
         if (property_key.isArrayIndex() and property_key.integer_index >= len) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);
@@ -399,7 +398,7 @@ fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(Proper
 
     // 7. For each own property key P of O such that P is a String and P is not an array index, in
     //    ascending chronological order of property creation, do
-    for (property_storage_hash_map.keys()) |property_key| {
+    for (object.shape.properties.keys()) |property_key| {
         if (property_key == .string or (property_key == .integer_index and !property_key.isArrayIndex())) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);
@@ -408,7 +407,7 @@ fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(Proper
 
     // 8. For each own property key P of O such that P is a Symbol, in ascending chronological
     //    order of property creation, do
-    for (property_storage_hash_map.keys()) |property_key| {
+    for (object.shape.properties.keys()) |property_key| {
         if (property_key == .symbol) {
             // a. Append P to keys.
             keys.appendAssumeCapacity(property_key);
@@ -751,12 +750,12 @@ pub const prototype = struct {
 
             // B.2.2.15 String.prototype.trimLeft ( )
             // https://tc39.es/ecma262/#String.prototype.trimleft
-            const @"%String.prototype.trimStart%" = object.property_storage.get(PropertyKey.from("trimStart")).?;
+            const @"%String.prototype.trimStart%" = object.getPropertyDescriptorDirect(PropertyKey.from("trimStart"));
             try defineBuiltinProperty(object, "trimLeft", @"%String.prototype.trimStart%");
 
             // B.2.2.16 String.prototype.trimRight ( )
             // https://tc39.es/ecma262/#String.prototype.trimright
-            const @"%String.prototype.trimEnd%" = object.property_storage.get(PropertyKey.from("trimEnd")).?;
+            const @"%String.prototype.trimEnd%" = object.getPropertyDescriptorDirect(PropertyKey.from("trimEnd"));
             try defineBuiltinProperty(object, "trimRight", @"%String.prototype.trimEnd%");
         }
     }

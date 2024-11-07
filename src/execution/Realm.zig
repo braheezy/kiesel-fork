@@ -112,6 +112,7 @@ pub fn initializeHostDefinedRealm(
         agent,
         try realm.intrinsics.@"%Object.prototype%"(),
     );
+    global.shape = try global.shape.detach(agent.gc_allocator);
 
     // 14. If the host requires that the this binding in realm's global scope return an object
     //     other than the global object, then
@@ -171,9 +172,7 @@ fn setDefaultGlobalBindings(self: *Realm) Agent.Error!void {
 
     // Why export a constant when you can do reflection instead!
     const global_properties_count = @typeInfo(@typeInfo(@TypeOf(globalObjectProperties)).@"fn".return_type.?).array.len;
-    const intrinsics_count = global_properties_count - 4; // globalThis, Infinity, NaN, undefined
-    try global.property_storage.hash_map.ensureUnusedCapacity(global_properties_count);
-    try global.property_storage.lazy_intrinsics.ensureUnusedCapacity(intrinsics_count);
+    try global.property_storage.ensureUnusedCapacity(global_properties_count);
 
     // 2. For each property of the Global Object specified in clause 19, do
     for (globalObjectProperties(self)) |property| {
@@ -197,10 +196,13 @@ fn setDefaultGlobalBindings(self: *Realm) Agent.Error!void {
                     .enumerable = false,
                     .configurable = true,
                 });
-                global.property_storage.lazy_intrinsics.putAssumeCapacityNoClobber(name, .{
-                    .realm = self,
-                    .lazyIntrinsicFn = lazyIntrinsicFn,
-                });
+                const property_metadata = global.shape.properties.get(property_key).?;
+                global.property_storage.items[property_metadata.index] = .{
+                    .lazy_intrinsic = .{
+                        .realm = self,
+                        .lazyIntrinsicFn = lazyIntrinsicFn,
+                    },
+                };
             },
         }
     }

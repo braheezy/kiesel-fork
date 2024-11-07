@@ -35,8 +35,7 @@ const sameValueZero = types.sameValueZero;
 
 // Non-standard helper to get the length property of an array
 pub fn getArrayLength(array: *const Object) u32 {
-    const property_descriptor = array.property_storage.get(PropertyKey.from("length")).?;
-    const value = property_descriptor.value.?;
+    const value = array.getPropertyValueDirect(PropertyKey.from("length"));
     return @intFromFloat(value.asNumber().asFloat());
 }
 
@@ -299,7 +298,7 @@ pub fn arraySetLength(
     //       otherwise we loop through indices in reverse order and bail out if no property exists.
     var maybe_indices = if (old_len >= 1_000_000) blk: {
         var indices = std.ArrayList(u32).init(agent.gc_allocator);
-        for (array.property_storage.hash_map.keys()) |property_key| {
+        for (array.shape.properties.keys()) |property_key| {
             if (property_key.isArrayIndex() and property_key.integer_index >= new_len) {
                 try indices.append(@as(u32, @intCast(property_key.integer_index)));
             }
@@ -319,7 +318,7 @@ pub fn arraySetLength(
             std.math.sub(u32, index.?, 1) catch null;
     }) {
         const property_key = PropertyKey.from(@as(u53, index.?));
-        if (maybe_indices == null and !array.property_storage.has(property_key)) continue;
+        if (maybe_indices == null and !array.shape.properties.contains(property_key)) continue;
 
         // a. Let deleteSucceeded be ! A.[[Delete]](P).
         const delete_succeeded = array.internal_methods.delete(
@@ -767,7 +766,7 @@ pub const prototype = struct {
         // https://tc39.es/ecma262/#sec-array.prototype-%symbol.iterator%
         // NOTE: We can't use the intrinsic getter for this while creating the underlying prototype
         //       object, as it hasn't been finalized yet.
-        const @"%Array.prototype.values%" = object.property_storage.get(PropertyKey.from("values")).?;
+        const @"%Array.prototype.values%" = object.getPropertyDescriptorDirect(PropertyKey.from("values"));
         try defineBuiltinProperty(object, "%Symbol.iterator%", @"%Array.prototype.values%");
 
         // 23.1.3.41 Array.prototype [ %Symbol.unscopables% ]

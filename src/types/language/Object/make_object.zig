@@ -48,12 +48,13 @@ pub fn MakeObject(
 
         pub fn create(agent: *Agent, args: Args) std.mem.Allocator.Error!*Object {
             const self = try agent.gc_allocator.create(@This());
+            errdefer agent.gc_allocator.destroy(self);
             self.* = .{
                 .fields = if (has_fields) args.fields,
                 .object = .{
                     .tag = options.tag,
                     .agent = agent,
-                    .prototype = args.prototype,
+                    .shape = agent.empty_shape,
                     .extensible = args.extensible,
                     .private_elements = .init(agent.gc_allocator),
                     .internal_methods = args.internal_methods,
@@ -61,6 +62,7 @@ pub fn MakeObject(
                     .is_htmldda = if (has_is_htmldda) args.is_htmldda,
                 },
             };
+            try self.object.setPrototypeDirect(args.prototype);
             return &self.object;
         }
     };

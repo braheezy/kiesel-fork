@@ -207,7 +207,7 @@ pub const prototype = struct {
 
         // 24.1.3.12 Map.prototype [ %Symbol.iterator% ] ( )
         // https://tc39.es/ecma262/#sec-map.prototype-%symbol.iterator%
-        const @"%Map.prototype.entries%" = object.property_storage.get(PropertyKey.from("entries")).?;
+        const @"%Map.prototype.entries%" = object.getPropertyDescriptorDirect(PropertyKey.from("entries"));
         try defineBuiltinProperty(object, "%Symbol.iterator%", @"%Map.prototype.entries%");
 
         // 24.1.3.13 Map.prototype [ %Symbol.toStringTag% ]

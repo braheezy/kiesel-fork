@@ -964,7 +964,7 @@ pub const prototype = struct {
 
             // B.2.3.3 Date.prototype.toGMTString ( )
             // https://tc39.es/ecma262/#sec-date.prototype.togmtstring
-            const @"%Date.prototype.toUTCString%" = object.property_storage.get(PropertyKey.from("toUTCString")).?;
+            const @"%Date.prototype.toUTCString%" = object.getPropertyDescriptorDirect(PropertyKey.from("toUTCString"));
             try defineBuiltinProperty(object, "toGMTString", @"%Date.prototype.toUTCString%");
         }
     }

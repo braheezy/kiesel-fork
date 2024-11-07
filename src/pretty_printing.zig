@@ -46,7 +46,6 @@ fn prettyPrintArray(
     array: *const builtins.Array,
     writer: anytype,
 ) PrettyPrintError(@TypeOf(writer))!void {
-    const property_storage = &array.object.property_storage;
     const length = getArrayLength(&array.object);
     const tty_config = state.tty_config;
 
@@ -56,7 +55,9 @@ fn prettyPrintArray(
     if (length != 0) try writer.writeAll(" ");
     for (0..length) |i| {
         const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i)));
-        if (property_storage.get(property_key)) |property_descriptor| {
+        if (array.object.shape.properties.get(property_key)) |property_metadata| {
+            const property_value = array.object.getPropertyCreateIntrinsicIfNeeded(property_metadata.index) catch return;
+            const property_descriptor = property_value.toPropertyDescriptor(property_metadata.attributes);
             if (property_descriptor.value) |value| {
                 try writer.print("{pretty}", .{value});
             } else {
@@ -844,7 +845,7 @@ fn prettyPrintPrimitiveWrapper(
 }
 
 fn prettyPrintFunction(object: *const Object, writer: anytype) PrettyPrintError(@TypeOf(writer))!void {
-    const name = object.property_storage.get(PropertyKey.from("name")).?.value.?.asString();
+    const name = object.getPropertyValueDirect(PropertyKey.from("name")).asString();
     const tty_config = state.tty_config;
 
     if (object.is(builtins.ECMAScriptFunction)) {
@@ -879,7 +880,9 @@ fn prettyPrintObject(object: *Object, writer: anytype) PrettyPrintError(@TypeOf(
 
     var printed_properties: usize = 0;
     for (property_keys.items) |property_key| {
-        const property_descriptor = (object.property_storage.getCreateIntrinsicIfNeeded(property_key) catch return).?;
+        const property_metadata = object.shape.properties.get(property_key).?;
+        const property_value = object.getPropertyCreateIntrinsicIfNeeded(property_metadata.index) catch return;
+        const property_descriptor = property_value.toPropertyDescriptor(property_metadata.attributes);
         if (!property_descriptor.enumerable.?) continue;
 
         if (printed_properties > 0) try writer.writeAll(",");

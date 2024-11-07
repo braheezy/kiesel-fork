@@ -166,6 +166,7 @@ fn lazyIntrinsic(
     const intrinsic = &@field(self.lazy_intrinsics, name);
     if (intrinsic.* == null) {
         const object = try T.create(self.realm);
+        object.shape = try object.shape.detach(self.realm.agent.gc_allocator);
         // Sanity check to ensure there is no dependency loop - creating the object must not
         // (indirectly) rely on itself. If something within `create()` assigned the intrinsic it
         // has been created twice and overwriting it would be a mistake.
@@ -192,8 +193,7 @@ pub fn @"%Array.prototype.toString%"(self: *Intrinsics) std.mem.Allocator.Error!
     const intrinsic = &self.lazy_intrinsics.@"%Array.prototype.toString%";
     if (intrinsic.* == null) {
         const array_prototype = try @"%Array.prototype%"(self);
-        const property_descriptor = array_prototype.property_storage.get(PropertyKey.from("toString"));
-        intrinsic.* = property_descriptor.?.value.?.asObject();
+        intrinsic.* = array_prototype.getPropertyValueDirect(PropertyKey.from("toString")).asObject();
     }
     return intrinsic.*.?;
 }
@@ -201,8 +201,7 @@ pub fn @"%Array.prototype.values%"(self: *Intrinsics) std.mem.Allocator.Error!*O
     const intrinsic = &self.lazy_intrinsics.@"%Array.prototype.values%";
     if (intrinsic.* == null) {
         const array_prototype = try @"%Array.prototype%"(self);
-        const property_descriptor = array_prototype.property_storage.get(PropertyKey.from("values"));
-        intrinsic.* = property_descriptor.?.value.?.asObject();
+        intrinsic.* = array_prototype.getPropertyValueDirect(PropertyKey.from("values")).asObject();
     }
     return intrinsic.*.?;
 }
@@ -462,8 +461,7 @@ pub fn @"%Object.prototype.toString%"(self: *Intrinsics) std.mem.Allocator.Error
     const intrinsic = &self.lazy_intrinsics.@"%Object.prototype.toString%";
     if (intrinsic.* == null) {
         const object_prototype = try @"%Object.prototype%"(self);
-        const property_descriptor = object_prototype.property_storage.get(PropertyKey.from("toString"));
-        intrinsic.* = property_descriptor.?.value.?.asObject();
+        intrinsic.* = object_prototype.getPropertyValueDirect(PropertyKey.from("toString")).asObject();
     }
     return intrinsic.*.?;
 }
