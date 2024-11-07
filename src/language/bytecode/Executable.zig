@@ -9,6 +9,7 @@ const Environment = execution.Environment;
 const Instruction = instructions_.Instruction;
 const InstructionIterator = instructions_.InstructionIterator;
 const IteratorKind = types.IteratorKind;
+const Object = types.Object;
 const String = types.String;
 const Value = types.Value;
 const sameValue = types.sameValue;
@@ -21,6 +22,7 @@ constants: Value.ArrayHashMap(void, sameValue),
 identifiers: String.ArrayHashMap(void),
 ast_nodes: std.ArrayList(AstNode),
 environment_lookup_cache: std.ArrayList(?Environment.LookupCacheEntry),
+property_lookup_cache: std.ArrayList(?Object.Shape.PropertyLookupCacheEntry),
 
 pub const AstNode = union(enum) {
     arrow_function: ast.ArrowFunction,
@@ -49,6 +51,7 @@ pub fn init(allocator: std.mem.Allocator) Executable {
         .identifiers = .init(allocator),
         .ast_nodes = .init(allocator),
         .environment_lookup_cache = .init(allocator),
+        .property_lookup_cache = .init(allocator),
     };
 }
 
@@ -58,6 +61,7 @@ pub fn deinit(self: *Executable) void {
     self.identifiers.deinit();
     self.ast_nodes.deinit();
     self.environment_lookup_cache.deinit();
+    self.property_lookup_cache.deinit();
 }
 
 pub fn addInstruction(self: *Executable, instruction: Instruction) std.mem.Allocator.Error!void {
@@ -191,13 +195,14 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
                 const strict = iterator.instruction_args[0].? == 1;
                 try writer.print("(strict: {})", .{strict});
             },
-            .evaluate_property_access_with_identifier_key, .typeof_identifier => {
+            .evaluate_property_access_with_identifier_key => {
                 const identifier_index = iterator.instruction_args[0].?;
                 const strict = iterator.instruction_args[1].? == 1;
+                const property_lookup_cache_index = iterator.instruction_args[2].?;
                 const identifier = self.identifiers.unmanaged.entries.get(identifier_index).key;
                 try writer.print(
-                    "{s} [{}] (strict: {})",
-                    .{ identifier, identifier_index, strict },
+                    "{s} [{}] (strict: {}, property_lookup_cache_index: {})",
+                    .{ identifier, identifier_index, strict, property_lookup_cache_index },
                 );
             },
             .get_iterator => {
@@ -245,6 +250,15 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
                 try writer.print(
                     "{s} [{}] (strict: {}, environment_lookup_cache_index: {})",
                     .{ identifier, identifier_index, strict, environment_lookup_cache_index },
+                );
+            },
+            .typeof_identifier => {
+                const identifier_index = iterator.instruction_args[0].?;
+                const strict = iterator.instruction_args[1].? == 1;
+                const identifier = self.identifiers.unmanaged.entries.get(identifier_index).key;
+                try writer.print(
+                    "{s} [{}] (strict: {})",
+                    .{ identifier, identifier_index, strict },
                 );
             },
             .has_private_element, .make_private_reference, .resolve_private_identifier => {

@@ -87,6 +87,11 @@ pub const PropertyMetadata = struct {
     attributes: Attributes,
 };
 
+pub const PropertyLookupCacheEntry = struct {
+    shape: *const Shape,
+    index: usize,
+};
+
 const State = enum {
     default,
     detached,

@@ -13,6 +13,7 @@ const temporaryChange = utils.temporaryChange;
 pub const Context = struct {
     contained_in_strict_mode_code: bool,
     environment_lookup_cache_index: Executable.IndexType,
+    property_lookup_cache_index: Executable.IndexType,
     continue_jumps: std.ArrayList(Executable.JumpIndex),
     break_jumps: std.ArrayList(Executable.JumpIndex),
     labelled_continue_jumps: std.StringHashMap(*std.ArrayList(Executable.JumpIndex)),
@@ -23,6 +24,7 @@ pub const Context = struct {
         return .{
             .contained_in_strict_mode_code = false,
             .environment_lookup_cache_index = 0,
+            .property_lookup_cache_index = 0,
             .continue_jumps = .init(allocator),
             .break_jumps = .init(allocator),
             .labelled_continue_jumps = .init(allocator),
@@ -369,6 +371,8 @@ fn bindingInitialization(
                         try executable.addInstruction(.load);
                         try executable.addInstructionWithIdentifier(.evaluate_property_access_with_identifier_key, "slice");
                         try executable.addIndex(@intFromBool(strict));
+                        try executable.addIndex(ctx.property_lookup_cache_index);
+                        ctx.property_lookup_cache_index += 1;
                         try executable.addInstruction(.dup_reference);
                         try executable.addInstruction(.get_value);
                         try executable.addInstruction(.load);
@@ -392,6 +396,8 @@ fn bindingInitialization(
                         try executable.addInstruction(.load);
                         try executable.addInstructionWithIdentifier(.evaluate_property_access_with_identifier_key, "slice");
                         try executable.addIndex(@intFromBool(strict));
+                        try executable.addIndex(ctx.property_lookup_cache_index);
+                        ctx.property_lookup_cache_index += 1;
                         try executable.addInstruction(.dup_reference);
                         try executable.addInstruction(.get_value);
                         try executable.addInstruction(.load);
@@ -820,6 +826,8 @@ pub fn codegenMemberExpression(
                 identifier,
             );
             try executable.addIndex(@intFromBool(strict));
+            try executable.addIndex(ctx.property_lookup_cache_index);
+            ctx.property_lookup_cache_index += 1;
         },
 
         // MemberExpression : MemberExpression . PrivateIdentifier
@@ -1131,6 +1139,8 @@ pub fn codegenOptionalExpression(
                 identifier,
             );
             try executable.addIndex(@intFromBool(strict));
+            try executable.addIndex(ctx.property_lookup_cache_index);
+            ctx.property_lookup_cache_index += 1;
         },
 
         // OptionalChain : ?. PrivateIdentifier
@@ -3012,6 +3022,8 @@ fn forInOfBodyEvaluation(
         "done",
     );
     try executable.addIndex(0); // Strictness doesn't matter here
+    try executable.addIndex(ctx.property_lookup_cache_index);
+    ctx.property_lookup_cache_index += 1;
     try executable.addInstruction(.get_value);
 
     // e. If done is true, return V.
@@ -3027,6 +3039,8 @@ fn forInOfBodyEvaluation(
         "value",
     );
     try executable.addIndex(0); // Strictness doesn't matter here
+    try executable.addIndex(ctx.property_lookup_cache_index);
+    ctx.property_lookup_cache_index += 1;
     try executable.addInstruction(.get_value);
 
     // g. If lhsKind is either assignment or var-binding, then

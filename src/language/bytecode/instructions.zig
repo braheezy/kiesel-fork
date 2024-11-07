@@ -193,9 +193,10 @@ pub const Instruction = enum(u8) {
 
     pub fn argumentCount(self: Instruction) u2 {
         return switch (self) {
-            .resolve_binding => 3,
-            .evaluate_call_direct_eval,
             .evaluate_property_access_with_identifier_key,
+            .resolve_binding,
+            => 3,
+            .evaluate_call_direct_eval,
             .jump_conditional,
             .object_define_method,
             .typeof_identifier,

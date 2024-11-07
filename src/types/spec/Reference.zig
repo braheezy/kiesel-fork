@@ -8,6 +8,7 @@ const types = @import("../../types.zig");
 
 const Agent = execution.Agent;
 const Environment = execution.Environment;
+const Object = types.Object;
 const PrivateName = types.PrivateName;
 const PropertyKey = types.PropertyKey;
 const String = types.String;
@@ -33,6 +34,8 @@ strict: bool,
 
 /// [[ThisValue]]
 this_value: ?Value,
+
+maybe_lookup_cache_entry: ?*?Object.Shape.PropertyLookupCacheEntry = null,
 
 /// 6.2.5.1 IsPropertyReference ( V )
 /// https://tc39.es/ecma262/#sec-ispropertyreference
@@ -101,6 +104,26 @@ pub fn getValue(self: Reference, agent: *Agent) Agent.Error!Value {
             }
         } orelse try self.base.value.toObject(agent);
 
+        if (self.maybe_lookup_cache_entry) |lookup_cache_entry| {
+            if (lookup_cache_entry.*) |cache| {
+                if (base_object.shape == cache.shape) {
+                    switch (base_object.property_storage.items[cache.index]) {
+                        .value => |value| return value,
+                        .accessor => |accessor| {
+                            // Excerpt from ordinaryGet()
+                            const getter = accessor.get orelse return .undefined;
+                            const receiver = self.getThisValue();
+                            return Value.from(getter).callAssumeCallableNoArgs(receiver);
+                        },
+                        // If we looked at if before and got a cache, the intrinsic has been created.
+                        .lazy_intrinsic => unreachable,
+                    }
+                } else {
+                    lookup_cache_entry.* = null;
+                }
+            }
+        }
+
         // b. If IsPrivateReference(V) is true, then
         if (self.isPrivateReference()) {
             // i. Return ? PrivateGet(baseObj, V.[[ReferencedName]]).
@@ -116,11 +139,22 @@ pub fn getValue(self: Reference, agent: *Agent) Agent.Error!Value {
         };
 
         // d. Return ? baseObj.[[Get]](V.[[ReferencedName]], GetThisValue(V)).
-        return base_object.internal_methods.get(
+        const value = try base_object.internal_methods.get(
             base_object,
             property_key,
             self.getThisValue(),
         );
+
+        if (self.maybe_lookup_cache_entry) |lookup_cache_entry| {
+            if (base_object.shape.properties.get(property_key)) |property_metadata| {
+                lookup_cache_entry.* = .{
+                    .shape = base_object.shape,
+                    .index = property_metadata.index,
+                };
+            }
+        }
+
+        return value;
     }
     // 4. Else,
     else {

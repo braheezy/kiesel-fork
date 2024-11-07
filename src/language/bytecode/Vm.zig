@@ -564,6 +564,10 @@ fn executeEvaluatePropertyAccessWithIdentifierKey(self: *Vm, executable: Executa
     const property_name_string = self.fetchIdentifier(executable);
 
     const strict = self.fetchIndex(executable) == 1;
+    const property_lookup_cache_index = self.fetchIndex(executable);
+    const lookup_cache_entry = &executable.property_lookup_cache.items[
+        property_lookup_cache_index
+    ];
     const base_value = self.stack.pop();
 
     // 2. Return the Reference Record {
@@ -579,6 +583,7 @@ fn executeEvaluatePropertyAccessWithIdentifierKey(self: *Vm, executable: Executa
         },
         .strict = strict,
         .this_value = null,
+        .maybe_lookup_cache_entry = lookup_cache_entry,
     };
     try self.reference_stack.append(reference);
 }
