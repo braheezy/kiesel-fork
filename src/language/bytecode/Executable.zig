@@ -1,9 +1,11 @@
 const std = @import("std");
 
 const ast = @import("../ast.zig");
+const execution = @import("../../execution.zig");
 const instructions_ = @import("instructions.zig");
 const types = @import("../../types.zig");
 
+const Environment = execution.Environment;
 const Instruction = instructions_.Instruction;
 const InstructionIterator = instructions_.InstructionIterator;
 const IteratorKind = types.IteratorKind;
@@ -18,7 +20,7 @@ instructions: std.ArrayList(u8),
 constants: Value.ArrayHashMap(void, sameValue),
 identifiers: String.ArrayHashMap(void),
 ast_nodes: std.ArrayList(AstNode),
-environment_lookup_cache_size: usize = 0,
+environment_lookup_cache: std.ArrayList(?Environment.LookupCacheEntry),
 
 pub const AstNode = union(enum) {
     arrow_function: ast.ArrowFunction,
@@ -46,6 +48,7 @@ pub fn init(allocator: std.mem.Allocator) Executable {
         .constants = .init(allocator),
         .identifiers = .init(allocator),
         .ast_nodes = .init(allocator),
+        .environment_lookup_cache = .init(allocator),
     };
 }
 
@@ -54,6 +57,7 @@ pub fn deinit(self: *Executable) void {
     self.constants.deinit();
     self.identifiers.deinit();
     self.ast_nodes.deinit();
+    self.environment_lookup_cache.deinit();
 }
 
 pub fn addInstruction(self: *Executable, instruction: Instruction) std.mem.Allocator.Error!void {

@@ -53,7 +53,8 @@ pub fn generateBytecode(
     try executable.addInstruction(.end);
 
     // Already incremented by one by the last caller
-    executable.environment_lookup_cache_size = ctx.environment_lookup_cache_index;
+    try executable.environment_lookup_cache.resize(ctx.environment_lookup_cache_index);
+    @memset(executable.environment_lookup_cache.items, null);
 
     if (agent.options.debug.print_bytecode) {
         const stdout = agent.platform.stdout;

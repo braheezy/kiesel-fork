@@ -65,28 +65,21 @@ lexical_environment_stack: std.ArrayList(Environment),
 reference_stack: std.ArrayList(Reference),
 exception_jump_target_stack: std.ArrayList(usize),
 function_arguments: std.ArrayList(Value),
-environment_lookup_cache: std.ArrayList(?Environment.LookupCacheEntry),
 result: ?Value = null,
 exception: ?Value = null,
 
 pub fn init(agent: *Agent) std.mem.Allocator.Error!Vm {
     const stack = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 32);
-    const iterator_stack = std.ArrayList(Iterator).init(agent.gc_allocator);
-    const lexical_environment_stack = std.ArrayList(Environment).init(agent.gc_allocator);
-    const reference_stack = std.ArrayList(Reference).init(agent.gc_allocator);
-    const exception_jump_target_stack = std.ArrayList(usize).init(agent.gc_allocator);
     const function_arguments = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 8);
-    const environment_lookup_cache = std.ArrayList(?Environment.LookupCacheEntry).init(agent.gc_allocator);
     return .{
         .agent = agent,
         .ip = 0,
         .stack = stack,
-        .iterator_stack = iterator_stack,
-        .lexical_environment_stack = lexical_environment_stack,
-        .reference_stack = reference_stack,
-        .exception_jump_target_stack = exception_jump_target_stack,
+        .iterator_stack = .init(agent.gc_allocator),
+        .lexical_environment_stack = .init(agent.gc_allocator),
+        .reference_stack = .init(agent.gc_allocator),
+        .exception_jump_target_stack = .init(agent.gc_allocator),
         .function_arguments = function_arguments,
-        .environment_lookup_cache = environment_lookup_cache,
     };
 }
 
@@ -97,7 +90,6 @@ pub fn deinit(self: Vm) void {
     self.reference_stack.deinit();
     self.exception_jump_target_stack.deinit();
     self.function_arguments.deinit();
-    self.environment_lookup_cache.deinit();
 }
 
 fn fetchInstruction(self: *Vm, executable: Executable) Instruction {
@@ -1172,7 +1164,7 @@ fn executeResolveBinding(self: *Vm, executable: Executable) Agent.Error!void {
     const name = self.fetchIdentifier(executable);
     const strict = self.fetchIndex(executable) == 1;
     const environment_lookup_cache_index = self.fetchIndex(executable);
-    const lookup_cache_entry = &self.environment_lookup_cache.items[
+    const lookup_cache_entry = &executable.environment_lookup_cache.items[
         environment_lookup_cache_index
     ];
     const reference = try self.agent.resolveBinding(name, null, strict, lookup_cache_entry);
@@ -1311,8 +1303,6 @@ fn executeYield(_: *Vm, _: Executable) Agent.Error!void {
 
 pub fn run(self: *Vm, executable: Executable) Agent.Error!Completion {
     std.debug.assert(@as(Instruction, @enumFromInt(executable.instructions.getLast())) == .end);
-    try self.environment_lookup_cache.resize(executable.environment_lookup_cache_size);
-    @memset(self.environment_lookup_cache.items, null);
     main: switch (self.fetchInstruction(executable)) {
         .@"return" => return .{ .type = .@"return", .value = self.result, .target = null },
         .yield => return yield(self.agent, self.result.?),
