@@ -143,7 +143,7 @@ pub const prototype = struct {
         }
 
         // 3. NOTE: The number of elements in entries may have increased while execution of this
-        //    abstract operation was paused by Yield.
+        //    abstract operation was paused by GeneratorYield.
         // 4. Set numEntries to the number of elements in entries.
     }
 };

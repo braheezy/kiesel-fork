@@ -140,7 +140,7 @@ pub const prototype = struct {
         return Value.from(try createIteratorResultObject(agent, result, false));
 
         // 5. NOTE: The number of elements in entries may have increased while execution of this
-        //    abstract operation was paused by Yield.
+        //    abstract operation was paused by GeneratorYield.
         // 6. Set numEntries to the number of elements in entries.
     }
 };
