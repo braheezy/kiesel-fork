@@ -1302,7 +1302,7 @@ fn functionDeclarationInstantiation(
                 //     a. Let initialValue be undefined.
                 // 4. Else,
                 //     a. Let initialValue be ! env.GetBindingValue(n, false).
-                const initial_value: Value = if (!containsSlice(parameter_bindings.items, try var_name.toUtf8(agent.gc_allocator)) or
+                const initial_value: Value = if (!containsSlice(parameter_bindings.items, var_name_utf8) or
                     function_names.contains(var_name))
                     .undefined
                 else
