@@ -412,7 +412,11 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         groups,
     ) catch |err| try noexcept(err);
 
-    // 33. For each integer i such that 1 ≤ i ≤ n, in ascending order, do
+    // 33. Let matchedGroupNames be a new empty List.
+    var matched_group_names = std.StringHashMap(void).init(agent.gc_allocator);
+    defer matched_group_names.deinit();
+
+    // 34. For each integer i such that 1 ≤ i ≤ n, in ascending order, do
     var i: usize = 1;
     while (i <= n) : (i += 1) {
         var captured_value: Value = undefined;
@@ -457,17 +461,38 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
             const group_name = std.mem.span(group_name_ptr);
             group_name_ptr += group_name.len + 1;
 
-            // ii. Perform ! CreateDataPropertyOrThrow(groups, s, capturedValue).
-            const property_key = PropertyKey.from(
-                try String.fromUtf8(agent.gc_allocator, group_name),
-            );
-            groups.asObject().createDataPropertyOrThrow(
-                property_key,
-                captured_value,
-            ) catch |err| try noexcept(err);
+            // ii. If matchedGroupNames contains s, then
+            if (matched_group_names.contains(group_name)) {
+                // 1. Assert: capturedValue is undefined.
+                std.debug.assert(captured_value.isUndefined());
 
-            // iii. Append s to groupNames.
-            try group_names.append(group_name);
+                // 2. Append undefined to groupNames.
+                try group_names.append(null);
+            }
+            // iii. Else,
+            else {
+                // 1. If capturedValue is not undefined, append s to matchedGroupNames.
+                if (!captured_value.isUndefined()) {
+                    try matched_group_names.put(group_name, {});
+                }
+
+                // 2. NOTE: If there are multiple groups named s, groups may already have an s
+                //    property at this point. However, because groups is an ordinary object whose
+                //    properties are all writable data properties, the call to
+                //    CreateDataPropertyOrThrow is nevertheless guaranteed to succeed.
+
+                // 3. Perform ! CreateDataPropertyOrThrow(groups, s, capturedValue).
+                const property_key = PropertyKey.from(
+                    try String.fromUtf8(agent.gc_allocator, group_name),
+                );
+                groups.asObject().createDataPropertyOrThrow(
+                    property_key,
+                    captured_value,
+                ) catch |err| try noexcept(err);
+
+                // 4. Append s to groupNames.
+                try group_names.append(group_name);
+            }
         }
         // f. Else,
         else {
@@ -476,7 +501,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         }
     }
 
-    // 34. If hasIndices is true, then
+    // 35. If hasIndices is true, then
     if ((re_flags & libregexp.LRE_FLAG_INDICES) != 0) {
         // a. Let indicesArray be MakeMatchIndicesIndexPairArray(S, indices, groupNames, hasGroups).
         const indices_array = try makeMatchIndicesIndexPairArray(
@@ -494,7 +519,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         ) catch |err| try noexcept(err);
     }
 
-    // 35. Return A.
+    // 36. Return A.
     return array;
 }
 
@@ -625,11 +650,19 @@ fn makeMatchIndicesIndexPairArray(
             // i. Assert: groups is not undefined.
             std.debug.assert(!groups.isUndefined());
 
-            // ii. Perform ! CreateDataPropertyOrThrow(groups, groupNames[i - 1], matchIndexPair).
+            // ii. Let s be groupNames[i - 1].
+            const group_name = group_names[i - 1].?;
+
+            // iii. NOTE: If there are multiple groups named s, groups may already have an s
+            //      property at this point. However, because groups is an ordinary object whose
+            //      properties are all writable data properties, the call to
+            //      CreateDataPropertyOrThrow is nevertheless guaranteed to succeed.
+
+            // iv. Perform ! CreateDataPropertyOrThrow(groups, s, matchIndexPair).
             const property_key = PropertyKey.from(
                 try String.fromUtf8(
                     agent.gc_allocator,
-                    try agent.gc_allocator.dupe(u8, group_names[i - 1].?),
+                    try agent.gc_allocator.dupe(u8, group_name),
                 ),
             );
             groups.asObject().createDataPropertyOrThrow(
