@@ -2123,8 +2123,11 @@ pub fn createArrayFromList(
     agent: *Agent,
     elements: []const Value,
 ) std.mem.Allocator.Error!*Object {
+    // OPTIMIZATION: We set the right length upfront and set properties directly below to bypass
+    //               Array's defineOwnProperty() which does a lot of extra work.
+
     // 1. Let array be ! ArrayCreate(0).
-    const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
+    const array = arrayCreate(agent, elements.len, null) catch |err| try noexcept(err);
 
     // 2. Let n be 0.
     // 3. For each element e of elements, do
@@ -2132,7 +2135,12 @@ pub fn createArrayFromList(
         const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(n)));
 
         // a. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(n)), e).
-        array.createDataPropertyOrThrow(property_key, element) catch |err| try noexcept(err);
+        try array.setPropertyDirect(property_key, .{
+            .value = element,
+            .writable = true,
+            .enumerable = true,
+            .configurable = true,
+        });
 
         // b. Set n to n + 1.
     }
@@ -2147,8 +2155,11 @@ pub fn createArrayFromListMapToValue(
     elements: []const T,
     mapFn: fn (*Agent, T) std.mem.Allocator.Error!Value,
 ) std.mem.Allocator.Error!*Object {
+    // OPTIMIZATION: We set the right length upfront and set properties directly below to bypass
+    //               Array's defineOwnProperty() which does a lot of extra work.
+
     // 1. Let array be ! ArrayCreate(0).
-    const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
+    const array = arrayCreate(agent, elements.len, null) catch |err| try noexcept(err);
 
     // 2. Let n be 0.
     // 3. For each element e of elements, do
@@ -2156,10 +2167,12 @@ pub fn createArrayFromListMapToValue(
         const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(n)));
 
         // a. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(n)), e).
-        array.createDataPropertyOrThrow(
-            property_key,
-            try mapFn(agent, element),
-        ) catch |err| try noexcept(err);
+        try array.setPropertyDirect(property_key, .{
+            .value = try mapFn(agent, element),
+            .writable = true,
+            .enumerable = true,
+            .configurable = true,
+        });
 
         // b. Set n to n + 1.
     }
