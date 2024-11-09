@@ -159,16 +159,21 @@ pub fn asyncBlockStart(
         ) std.mem.Allocator.Error!void {
             // a. Let acAsyncContext be the running execution context.
 
-            // b. Let result be Completion(Evaluation of asyncBody).
+            // b. If asyncBody is a Parse Node, then
+            //     i. Let result be Completion(Evaluation of asyncBody).
+            // c. Else,
+            //     i. Assert: asyncBody is an Abstract Closure with no parameters.
+            //     ii. Let result be asyncBody().
+            //     NOTE: This is in the spec for Wasm JS Promise integration but we don't support it.
             const result = switch (async_body_) {
                 .ecmascript_function => |ecmascript_function| ecmascript_function.fields.evaluateBody(agent_),
                 .module => |module| generateAndRunBytecode(agent_, module, .{}),
             };
 
-            // c. Assert: If we return here, the async function either threw an exception or
+            // d. Assert: If we return here, the async function either threw an exception or
             //    performed an implicit or explicit return; all awaiting is done.
 
-            // d. Remove acAsyncContext from the execution context stack and restore the execution
+            // e. Remove acAsyncContext from the execution context stack and restore the execution
             //    context that is at the top of the execution context stack as the running execution
             //    context.
             _ = agent_.execution_context_stack.pop();
@@ -177,16 +182,16 @@ pub fn asyncBlockStart(
                 std.debug.assert(completion.type == .normal or completion.type == .@"return");
                 const value: Value = completion.value orelse .undefined;
 
-                // e. If result is a normal completion, then
+                // f. If result is a normal completion, then
                 //     i. Perform ! Call(promiseCapability.[[Resolve]], undefined, « undefined »).
-                // f. Else if result is a return completion, then
+                // g. Else if result is a return completion, then
                 //     i. Perform ! Call(promiseCapability.[[Resolve]], undefined, « result.[[Value]] »).
                 _ = Value.from(promise_capability_.resolve).callAssumeCallable(
                     .undefined,
                     &.{value},
                 ) catch |err| try noexcept(err);
             }
-            // g. Else,
+            // h. Else,
             else |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
 
@@ -202,7 +207,7 @@ pub fn asyncBlockStart(
                 },
             }
 
-            // h. Return unused.
+            // i. Return unused.
         }
     }.func;
 
