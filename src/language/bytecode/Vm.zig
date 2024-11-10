@@ -157,6 +157,26 @@ fn executeApplyStringOrNumericBinaryOperator(self: *Vm, executable: Executable) 
     const operator: ast.BinaryExpression.Operator = @enumFromInt(operator_type);
     const r_val = self.stack.pop();
     const l_val = self.stack.pop();
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (l_val.__isI32() and r_val.__isI32()) blk: {
+        const l = l_val.__asI32();
+        const r = r_val.__asI32();
+        if (switch (operator) {
+            .@"+" => std.math.add(i32, l, r),
+            .@"-" => std.math.sub(i32, l, r),
+            .@"*" => std.math.mul(i32, l, r),
+            .@"&" => l & r,
+            .@"^" => l ^ r,
+            .@"|" => l | r,
+            // Some operators are not that straightforward, use the fallback impl
+            else => break :blk,
+        }) |result| {
+            self.result = Value.from(result);
+            return;
+        } else |_| {}
+    }
+
     self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, operator, r_val);
 }
 
@@ -356,12 +376,21 @@ fn executeCreateWithEnvironment(self: *Vm, _: Executable) Agent.Error!void {
 
 fn executeDecrement(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (value.__isI32()) {
+        if (std.math.sub(i32, value.__asI32(), 1)) |result| {
+            self.result = Value.from(result);
+            return;
+        } else |_| {}
+    }
+
     self.result = switch (value.type()) {
         .number => Value.from(value.asNumber().subtract(.{ .i32 = 1 })),
         .big_int => Value.from(
             try value.asBigInt().subtract(self.agent, self.agent.pre_allocated.one),
         ),
-        else => @panic("decrement instruction must only be used with numeric value"),
+        else => unreachable,
     };
 }
 
@@ -753,6 +782,12 @@ fn executeGreaterThan(self: *Vm, _: Executable) Agent.Error!void {
     const r_val = self.stack.pop();
     const l_val = self.stack.pop();
 
+    // OPTIMIZATION: Fast path for i32 values
+    if (l_val.__isI32() and r_val.__isI32()) {
+        self.result = Value.from(l_val.__asI32() > r_val.__asI32());
+        return;
+    }
+
     // 5. Let r be ? IsLessThan(rVal, lVal, false).
     const result = try isLessThan(self.agent, r_val, l_val, .right_first);
 
@@ -763,6 +798,12 @@ fn executeGreaterThan(self: *Vm, _: Executable) Agent.Error!void {
 fn executeGreaterThanEquals(self: *Vm, _: Executable) Agent.Error!void {
     const r_val = self.stack.pop();
     const l_val = self.stack.pop();
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (l_val.__isI32() and r_val.__isI32()) {
+        self.result = Value.from(l_val.__asI32() >= r_val.__asI32());
+        return;
+    }
 
     // 5. Let r be ? IsLessThan(lVal, rVal, true).
     const result = try isLessThan(self.agent, l_val, r_val, .left_first);
@@ -818,6 +859,15 @@ fn executeHasProperty(self: *Vm, _: Executable) Agent.Error!void {
 
 fn executeIncrement(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (value.__isI32()) {
+        if (std.math.add(i32, value.__asI32(), 1)) |result| {
+            self.result = Value.from(result);
+            return;
+        } else |_| {}
+    }
+
     self.result = switch (value.type()) {
         .number => Value.from(value.asNumber().add(.{ .i32 = 1 })),
         .big_int => Value.from(
@@ -920,6 +970,12 @@ fn executeIsLooselyEqual(self: *Vm, _: Executable) Agent.Error!void {
     const r_val = self.stack.pop();
     const l_val = self.stack.pop();
 
+    // OPTIMIZATION: Fast path for i32 values
+    if (l_val.__isI32() and r_val.__isI32()) {
+        self.result = Value.from(l_val.__asI32() == r_val.__asI32());
+        return;
+    }
+
     // 5. Return IsLooselyEqual(rVal, lVal).
     self.result = Value.from(try isLooselyEqual(self.agent, r_val, l_val));
 }
@@ -927,6 +983,12 @@ fn executeIsLooselyEqual(self: *Vm, _: Executable) Agent.Error!void {
 fn executeIsStrictlyEqual(self: *Vm, _: Executable) Agent.Error!void {
     const r_val = self.stack.pop();
     const l_val = self.stack.pop();
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (l_val.__isI32() and r_val.__isI32()) {
+        self.result = Value.from(l_val.__asI32() == r_val.__asI32());
+        return;
+    }
 
     // 5. Return IsStrictlyEqual(rVal, lVal).
     self.result = Value.from(isStrictlyEqual(r_val, l_val));
@@ -947,6 +1009,12 @@ fn executeLessThan(self: *Vm, _: Executable) Agent.Error!void {
     const r_val = self.stack.pop();
     const l_val = self.stack.pop();
 
+    // OPTIMIZATION: Fast path for i32 values
+    if (l_val.__isI32() and r_val.__isI32()) {
+        self.result = Value.from(l_val.__asI32() < r_val.__asI32());
+        return;
+    }
+
     // 5. Let r be ? IsLessThan(lVal, rVal, true).
     const result = try isLessThan(self.agent, l_val, r_val, .left_first);
 
@@ -957,6 +1025,12 @@ fn executeLessThan(self: *Vm, _: Executable) Agent.Error!void {
 fn executeLessThanEquals(self: *Vm, _: Executable) Agent.Error!void {
     const r_val = self.stack.pop();
     const l_val = self.stack.pop();
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (l_val.__isI32() and r_val.__isI32()) {
+        self.result = Value.from(l_val.__asI32() <= r_val.__asI32());
+        return;
+    }
 
     // 5. Let r be ? IsLessThan(rVal, lVal, false).
     const result = try isLessThan(self.agent, r_val, l_val, .right_first);
@@ -1234,11 +1308,19 @@ fn executeThrow(self: *Vm, _: Executable) Agent.Error!void {
 
 fn executeToNumber(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
+
+    // OPTIMIZATION: If we already have a number value return early
+    if (value.isNumber()) return;
+
     self.result = Value.from(try value.toNumber(self.agent));
 }
 
 fn executeToNumeric(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
+
+    // OPTIMIZATION: If we already have a numeric value return early
+    if (value.isNumber() or value.isBigInt()) return;
+
     const numeric = try value.toNumeric(self.agent);
     self.result = switch (numeric) {
         .number => |number| Value.from(number),

@@ -463,6 +463,24 @@ pub fn asObject(self: Value) *Object {
     return self.impl.asObject();
 }
 
+/// Leaks an implementation detail, use with care.
+pub fn __isI32(self: Value) bool {
+    return switch (Impl) {
+        NanBoxingImpl => self.impl.getTag() == .number_i32,
+        TaggedUnionImpl => self.impl == .number_i32,
+        else => unreachable,
+    };
+}
+
+/// Leaks an implementation detail, use with care.
+pub fn __asI32(self: Value) i32 {
+    return switch (Impl) {
+        NanBoxingImpl => self.impl.getPayload(.number_i32, 0),
+        TaggedUnionImpl => self.impl.number_i32,
+        else => unreachable,
+    };
+}
+
 /// Return a string according to the 'typeof' operator semantics.
 pub fn typeof(self: Value) *const String {
     // Excerpt from https://tc39.es/ecma262/#sec-typeof-operator-runtime-semantics-evaluation
