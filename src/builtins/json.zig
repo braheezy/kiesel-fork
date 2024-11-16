@@ -627,10 +627,10 @@ pub const namespace = struct {
         // 5. NOTE: The early error rules defined in 13.2.5.1 have special handling for the above
         //    invocation of ParseText.
         // 6. Assert: script is a Parse Node.
-        // 7. Let completion be Completion(Evaluation of script).
+        // 7. Let unfiltered be ! Evaluation of script.
         // 8. NOTE: The PropertyDefinitionEvaluation semantics defined in 13.2.5.5 have special
         //    handling for the above evaluation.
-        const completion = std.json.parseFromSlice(
+        const parsed = std.json.parseFromSlice(
             std.json.Value,
             agent.gc_allocator,
             try json_string.toUtf8(agent.gc_allocator),
@@ -639,10 +639,8 @@ pub const namespace = struct {
             error.OutOfMemory => return error.OutOfMemory,
             else => return agent.throwException(.syntax_error, "Invalid JSON document", .{}),
         };
-        defer completion.deinit();
-
-        // 9. Let unfiltered be completion.[[Value]].
-        const unfiltered = completion.value;
+        defer parsed.deinit();
+        const unfiltered = parsed.value;
 
         // 10. Assert: unfiltered is either a String, a Number, a Boolean, an Object that is
         //     defined by either an ArrayLiteral or an ObjectLiteral, or null.
