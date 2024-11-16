@@ -233,20 +233,13 @@ pub fn createDateTimeFormat(
     defer time_zone_info.deinit();
     if (time_zone_info.setOffsetStr(time_zone_string)) |_| {
         // TODO: Normalize time zone offset string
-    } else |_| if (time_zone_id_mapper.normalizeIana(
+    } else |_| if (try time_zone_id_mapper.normalizeIana(
         agent.gc_allocator,
         time_zone_string,
     )) |normalized| {
         time_zone_string = normalized;
-    } else |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
-        error.InvalidId => {
-            return agent.throwException(
-                .range_error,
-                "Invalid time zone '{s}'",
-                .{time_zone_string},
-            );
-        },
+    } else {
+        return agent.throwException(.range_error, "Invalid time zone '{s}'", .{time_zone_string});
     }
 
     // 31. Set dateTimeFormat.[[TimeZone]] to timeZone.
@@ -794,7 +787,7 @@ fn formatDateTimeImpl(
     allocator: std.mem.Allocator,
     date_time_format: *const DateTimeFormat,
     x: f64,
-) (std.mem.Allocator.Error || icu4zig.Error || icu4zig.CalendarError)![]const u8 {
+) (std.mem.Allocator.Error || icu4zig.CalendarError || icu4zig.DateTimeFormatError)![]const u8 {
     const date = @import("../date.zig");
 
     const data_provider = icu4zig.DataProvider.init();
