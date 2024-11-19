@@ -136,10 +136,10 @@ pub fn codeUnitIterator(self: *const String) CodeUnitIterator {
 
 pub fn eql(self: *const String, other: *const String) bool {
     if (self.slice == .ascii and other.slice == .ascii) {
-        return std.mem.eql(u8, self.slice.ascii, other.slice.ascii);
+        return self.hash == other.hash and std.mem.eql(u8, self.slice.ascii, other.slice.ascii);
     }
     if (self.slice == .utf16 and other.slice == .utf16) {
-        return std.mem.eql(u16, self.slice.utf16, other.slice.utf16);
+        return self.hash == other.hash and std.mem.eql(u16, self.slice.utf16, other.slice.utf16);
     }
     if (self.isEmpty() and other.isEmpty()) return true;
     if (self.length() != other.length()) return false;
