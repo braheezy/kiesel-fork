@@ -3,7 +3,6 @@
 
 const std = @import("std");
 
-const build_options = @import("build-options");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const spec = @import("../spec.zig");
@@ -105,9 +104,6 @@ tag: Object.Tag,
 /// [[PrivateElements]]
 private_elements: PrivateName.HashMap(PrivateElement),
 
-/// [[IsHTMLDDA]]
-is_htmldda: if (build_options.enable_annex_b) bool else void,
-
 agent: *Agent,
 internal_methods: *const InternalMethods,
 property_storage: std.ArrayList(PropertyValue),
@@ -145,6 +141,11 @@ pub fn setPrototypeDirect(self: *Object, prototype: ?*Object) std.mem.Allocator.
 pub fn setNonExtensibleDirect(self: *Object) std.mem.Allocator.Error!void {
     if (!self.shape.extensible) return;
     self.shape = try self.shape.setNonExtensible(self.agent.gc_allocator);
+}
+
+pub fn setIsHTMLDDADirect(self: *Object) std.mem.Allocator.Error!void {
+    if (self.shape.is_htmldda) return;
+    self.shape = try self.shape.setIsHTMLDDA(self.agent.gc_allocator);
 }
 
 pub fn getPropertyValueDirect(self: *const Object, property_key: PropertyKey) Value {

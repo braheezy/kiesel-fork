@@ -1,5 +1,6 @@
 const std = @import("std");
 
+const build_options = @import("build-options");
 const types = @import("../../../types.zig");
 
 const Object = types.Object;
@@ -18,6 +19,7 @@ const max_transition_count = 64;
 pub const Transition = union(enum) {
     set_prototype: ?*Object,
     set_non_extensible,
+    set_is_htmldda,
     set_property: struct { PropertyKey, PropertyMetadata.Attributes },
     delete_property: PropertyKey,
 
@@ -28,7 +30,7 @@ pub const Transition = union(enum) {
             .set_prototype => |prototype| {
                 hasher.update(std.mem.asBytes(&prototype));
             },
-            .set_non_extensible => {},
+            .set_non_extensible, .set_is_htmldda => {},
             .set_property => |property_key_and_attributes| {
                 const property_key, const attributes = property_key_and_attributes;
                 hasher.update(std.mem.asBytes(&property_key.hash()));
@@ -45,7 +47,7 @@ pub const Transition = union(enum) {
         if (std.meta.activeTag(a) != std.meta.activeTag(b)) return false;
         return switch (a) {
             .set_prototype => return a.set_prototype == b.set_prototype,
-            .set_non_extensible => true,
+            .set_non_extensible, .set_is_htmldda => true,
             .set_property => a.set_property[0].eql(b.set_property[0]) and
                 a.set_property[1].eql(b.set_property[1]),
             .delete_property => a.delete_property.eql(b.delete_property),
@@ -113,6 +115,9 @@ prototype: ?*Object,
 /// [[Extensible]]
 extensible: bool,
 
+/// [[IsHTMLDDA]]
+is_htmldda: if (build_options.enable_annex_b) bool else void,
+
 pub fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!*Shape {
     const self = try allocator.create(Shape);
     self.* = .{
@@ -123,6 +128,7 @@ pub fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!*Shape {
         .properties = .init(allocator),
         .prototype = null,
         .extensible = true,
+        .is_htmldda = if (build_options.enable_annex_b) false,
     };
     return self;
 }
@@ -151,6 +157,7 @@ fn clone(self: *const Shape, allocator: std.mem.Allocator, state: State) std.mem
         .properties = try self.properties.clone(),
         .prototype = self.prototype,
         .extensible = self.extensible,
+        .is_htmldda = self.is_htmldda,
     };
     return shape;
 }
@@ -224,6 +231,25 @@ pub fn setNonExtensibleWithoutTransition(
 ) std.mem.Allocator.Error!*Shape {
     const shape = try self.getOrCreateShape(allocator, null);
     shape.extensible = false;
+    return shape;
+}
+
+pub fn setIsHTMLDDA(
+    self: *Shape,
+    allocator: std.mem.Allocator,
+) std.mem.Allocator.Error!*Shape {
+    const transition: Transition = .set_is_htmldda;
+    const shape = try self.getOrCreateShape(allocator, transition);
+    shape.is_htmldda = true;
+    return shape;
+}
+
+pub fn setIsHTMLDDAWithoutTransition(
+    self: *Shape,
+    allocator: std.mem.Allocator,
+) std.mem.Allocator.Error!*Shape {
+    const shape = try self.getOrCreateShape(allocator, null);
+    shape.is_htmldda = true;
     return shape;
 }
 

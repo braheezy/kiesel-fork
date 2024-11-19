@@ -108,7 +108,7 @@ const Kiesel = struct {
     }
 
     fn createIsHTMLDDA(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
-        if (std.meta.fieldInfo(Object, .is_htmldda).type == void) {
+        if (@FieldType(Object.Shape, "is_htmldda") == void) {
             return agent.throwException(
                 .internal_error,
                 "[[IsHTMLDDA]] is not supported in this build",
