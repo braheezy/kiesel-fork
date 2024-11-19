@@ -55,14 +55,18 @@ pub fn MakeObject(
                     .tag = options.tag,
                     .agent = agent,
                     .shape = agent.empty_shape,
-                    .extensible = args.extensible,
                     .private_elements = .init(agent.gc_allocator),
                     .internal_methods = args.internal_methods,
                     .property_storage = .init(agent.gc_allocator),
                     .is_htmldda = if (has_is_htmldda) args.is_htmldda,
                 },
             };
-            try self.object.setPrototypeDirect(args.prototype);
+            if (args.prototype != null) {
+                try self.object.setPrototypeDirect(args.prototype);
+            }
+            if (!args.extensible) {
+                try self.object.setNonExtensibleDirect();
+            }
             return &self.object;
         }
     };

@@ -102,9 +102,6 @@ pub const PropertyKind = enum {
 
 tag: Object.Tag,
 
-/// [[Extensible]]
-extensible: bool,
-
 /// [[PrivateElements]]
 private_elements: PrivateName.HashMap(PrivateElement),
 
@@ -143,6 +140,11 @@ pub fn as(self: *const Object, comptime T: type) *T {
 pub fn setPrototypeDirect(self: *Object, prototype: ?*Object) std.mem.Allocator.Error!void {
     if (self.shape.prototype == prototype) return;
     self.shape = try self.shape.setPrototype(self.agent.gc_allocator, prototype);
+}
+
+pub fn setNonExtensibleDirect(self: *Object) std.mem.Allocator.Error!void {
+    if (!self.shape.extensible) return;
+    self.shape = try self.shape.setNonExtensible(self.agent.gc_allocator);
 }
 
 pub fn getPropertyValueDirect(self: *const Object, property_key: PropertyKey) Value {
@@ -318,7 +320,7 @@ pub fn createNonEnumerableDataPropertyOrThrow(
 ) Agent.Error!void {
     // 1. Assert: O is an ordinary, extensible object with no non-configurable properties.
     std.debug.assert(
-        self.extensible and for (self.shape.properties.values()) |entry| {
+        self.shape.extensible and for (self.shape.properties.values()) |entry| {
             if (!entry.attributes.configurable) break false;
         } else true,
     );

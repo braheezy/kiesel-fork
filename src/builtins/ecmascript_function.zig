@@ -752,7 +752,7 @@ pub fn makeConstructor(
 
         // b. Assert: F is an extensible object that does not have a "prototype" own property.
         std.debug.assert(
-            function.extensible and !function.shape.properties.contains(PropertyKey.from("prototype")),
+            function.shape.extensible and !function.shape.properties.contains(PropertyKey.from("prototype")),
         );
 
         // c. Set F.[[Construct]] to the definition specified in 10.2.2.
@@ -884,7 +884,7 @@ pub fn setFunctionName(
 
     // 1. Assert: F is an extensible object that does not have a "name" own property.
     std.debug.assert(
-        function.extensible and !function.shape.properties.contains(PropertyKey.from("name")),
+        function.shape.extensible and !function.shape.properties.contains(PropertyKey.from("name")),
     );
 
     var name: *const String = switch (if (@TypeOf(key) == PropertyKey) PropertyKeyOrPrivateName{ .property_key = key } else key) {
@@ -962,7 +962,7 @@ pub fn setFunctionLength(function: *Object, length: f64) std.mem.Allocator.Error
 
     // 1. Assert: F is an extensible object that does not have a "length" own property.
     std.debug.assert(
-        function.extensible and !function.shape.properties.contains(PropertyKey.from("length")),
+        function.shape.extensible and !function.shape.properties.contains(PropertyKey.from("length")),
     );
 
     // 2. Perform ! DefinePropertyOrThrow(F, "length", PropertyDescriptor {

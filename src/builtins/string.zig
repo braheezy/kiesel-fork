@@ -340,7 +340,7 @@ fn defineOwnProperty(
     // 2. If stringDesc is not undefined, then
     if (maybe_string_property_descriptor) |string_property_descriptor| {
         // a. Let extensible be S.[[Extensible]].
-        const extensible = string.object.extensible;
+        const extensible = string.object.shape.extensible;
 
         // b. Return IsCompatiblePropertyDescriptor(extensible, Desc, stringDesc).
         return isCompatiblePropertyDescriptor(

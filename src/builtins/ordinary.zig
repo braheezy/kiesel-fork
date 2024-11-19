@@ -63,7 +63,7 @@ pub fn ordinarySetPrototypeOf(object: *Object, prototype: ?*Object) std.mem.Allo
     if (prototype == current) return true;
 
     // 3. Let extensible be O.[[Extensible]].
-    const extensible = object.extensible;
+    const extensible = object.shape.extensible;
 
     // 4. If extensible is false, return false.
     if (!extensible) return false;
@@ -110,21 +110,21 @@ fn isExtensible(object: *Object) error{}!bool {
 /// https://tc39.es/ecma262/#sec-ordinaryisextensible
 pub fn ordinaryIsExtensible(object: *Object) bool {
     // 1. Return O.[[Extensible]].
-    return object.extensible;
+    return object.shape.extensible;
 }
 
 /// 10.1.4 [[PreventExtensions]] ( )
 /// https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-preventextensions
-fn preventExtensions(object: *Object) error{}!bool {
+fn preventExtensions(object: *Object) std.mem.Allocator.Error!bool {
     // 1. Return OrdinaryPreventExtensions(O).
     return ordinaryPreventExtensions(object);
 }
 
 /// 10.1.4.1 OrdinaryPreventExtensions ( O )
 /// https://tc39.es/ecma262/#sec-ordinarypreventextensions
-pub fn ordinaryPreventExtensions(object: *Object) bool {
+pub fn ordinaryPreventExtensions(object: *Object) std.mem.Allocator.Error!bool {
     // 1. Set O.[[Extensible]] to false.
-    object.extensible = false;
+    try object.setNonExtensibleDirect();
 
     // 2. Return true.
     return true;
