@@ -73,6 +73,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .BUILD_SHARED_LIBS = false,
+        .CFLAGS_EXTRA = @as([]const u8, "-DNO_MSGBOX_ON_ERROR"),
         .enable_gcj_support = false,
         .enable_java_finalization = false,
         .enable_large_config = true,
