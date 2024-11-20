@@ -113,17 +113,84 @@ pub const ECMAScriptFunction = MakeObject(.{
 
         cached_arguments_executable: ?Executable = null,
         cached_body_executable: ?Executable = null,
+        cached_use_arguments_fast_path: ?bool = null,
 
         /// Maybe a hack, but kind of a neat one :^)
         pub fn evaluateArguments(
             self: *@This(),
             agent: *Agent,
             arguments: Arguments,
-            with_env: bool,
+            environment: ?Environment,
         ) Agent.Error!void {
-            // OPTIMIZATION: If there are no parameters we don't need to kick off codegen only to
-            //               evaluate an empty binding pattern.
+            // OPTIMIZATION: If there are no parameters we don't need to do anything.
             if (self.formal_parameters.items.len == 0) return;
+
+            // OPTIMIZATION: If there are no default arguments or binding patterns we can do this
+            //               without codegen which is quite a bit faster.
+            const use_fast_path = self.cached_use_arguments_fast_path orelse blk: {
+                const use_fast_path = for (self.formal_parameters.items) |item| {
+                    switch (item) {
+                        .formal_parameter => |formal_parameter| {
+                            switch (formal_parameter.binding_element) {
+                                .single_name_binding => |single_name_binding| {
+                                    if (single_name_binding.initializer != null) break false;
+                                },
+                                .binding_pattern_and_expression => break false,
+                            }
+                        },
+                        .function_rest_parameter => |function_rest_parameter| {
+                            switch (function_rest_parameter.binding_rest_element) {
+                                .binding_identifier => {},
+                                .binding_pattern => break false,
+                            }
+                        },
+                    }
+                } else true;
+                self.cached_use_arguments_fast_path = use_fast_path;
+                break :blk use_fast_path;
+            };
+
+            if (use_fast_path) {
+                for (self.formal_parameters.items, 0..) |item, i| {
+                    const name, const value = switch (item) {
+                        .formal_parameter => |formal_parameter| blk: {
+                            std.debug.assert(formal_parameter.binding_element == .single_name_binding);
+                            std.debug.assert(formal_parameter.binding_element.single_name_binding.initializer == null);
+                            const name = try String.fromUtf8(
+                                agent.gc_allocator,
+                                formal_parameter.binding_element.single_name_binding.binding_identifier,
+                            );
+                            const value = arguments.get(i);
+                            break :blk .{ name, value };
+                        },
+                        .function_rest_parameter => |function_rest_parameter| blk: {
+                            std.debug.assert(function_rest_parameter.binding_rest_element == .binding_identifier);
+                            const name = try String.fromUtf8(
+                                agent.gc_allocator,
+                                function_rest_parameter.binding_rest_element.binding_identifier,
+                            );
+                            const value = Value.from(
+                                try createArrayFromList(
+                                    agent,
+                                    arguments.values[@min(i, arguments.count())..],
+                                ),
+                            );
+                            break :blk .{ name, value };
+                        },
+                    };
+                    const reference = try agent.resolveBinding(
+                        name,
+                        environment,
+                        self.strict,
+                        null,
+                    );
+                    if (environment == null)
+                        try reference.putValue(agent, value)
+                    else
+                        try reference.initializeReferencedBinding(agent, value);
+                }
+                return;
+            }
 
             if (self.cached_arguments_executable == null) {
                 var elements = try std.ArrayList(ast.ArrayBindingPattern.Element).initCapacity(
@@ -148,7 +215,7 @@ pub const ECMAScriptFunction = MakeObject(.{
                 const initializer: ast.Expression = .{
                     .primary_expression = .{ .literal = .null }, // Placeholder value
                 };
-                var executable = if (with_env)
+                var executable = if (environment != null)
                     // Uses InitializeReferencedBinding
                     try generateBytecode(agent, ast.LexicalBinding{
                         .binding_pattern = .{
@@ -1229,7 +1296,7 @@ fn functionDeclarationInstantiation(
     defer if (arguments_object_needed) parameter_bindings.deinit();
 
     // 24-26.
-    try function.fields.evaluateArguments(agent, arguments_list, !has_duplicates);
+    try function.fields.evaluateArguments(agent, arguments_list, if (!has_duplicates) env else null);
 
     // 27. If hasParameterExpressions is false, then
     const var_env = if (!has_parameter_expressions) blk: {
