@@ -39,6 +39,7 @@ state: struct {
     call_expression_forbidden: bool = false,
     arguments_object_needed: bool = false,
 } = .{},
+identifier_stack: std.ArrayList(ast.Identifier),
 
 const RuleSet = ptk.RuleSet(Tokenizer.TokenType);
 const ParserCore = ptk.ParserCore(Tokenizer, .{ .whitespace, .comment });
@@ -228,7 +229,9 @@ pub fn parseNode(
         .allocator = allocator,
         .core = core,
         .diagnostics = ctx.diagnostics,
+        .identifier_stack = .init(allocator),
     };
+    defer parser.identifier_stack.deinit();
     const tmp = temporaryChange(&tokenizer_.state, .{ .tokenizer = &tokenizer });
     defer tmp.restore();
     const ast_node: ?T = acceptFn(&parser) catch |err| switch (err) {
@@ -328,6 +331,33 @@ fn unescapeIdentifier(self: *Parser, token: Tokenizer.Token) AcceptError![]const
     return string_value;
 }
 
+const IdentifierStackRange = struct {
+    parser: *Parser,
+    start: usize,
+    end: ?usize,
+
+    pub fn open(parser: *Parser) IdentifierStackRange {
+        return .{
+            .parser = parser,
+            .start = parser.identifier_stack.items.len,
+            .end = null,
+        };
+    }
+
+    pub fn close(self: *IdentifierStackRange) void {
+        self.end = self.parser.identifier_stack.items.len;
+    }
+
+    /// Must call close() before calling this.
+    pub fn slice(self: IdentifierStackRange) []ast.Identifier {
+        return self.parser.identifier_stack.items[self.start..self.end.?];
+    }
+
+    pub fn deinit(self: IdentifierStackRange) void {
+        self.parser.identifier_stack.shrinkRetainingCapacity(self.start);
+    }
+};
+
 fn ensureSimpleParameterList(
     self: *Parser,
     formal_parameters: ast.FormalParameters,
@@ -348,13 +378,14 @@ fn ensureUniqueParameterNames(
     formal_parameters: ast.FormalParameters,
     location: ptk.Location,
 ) std.mem.Allocator.Error!void {
-    var bound_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    var bound_names = IdentifierStackRange.open(self);
     defer bound_names.deinit();
-    try formal_parameters.collectBoundNames(&bound_names);
+    try formal_parameters.collectBoundNames(&self.identifier_stack);
+    bound_names.close();
     var seen_bound_names = std.StringHashMap(void).init(self.allocator);
     defer seen_bound_names.deinit();
-    try seen_bound_names.ensureTotalCapacity(@intCast(bound_names.items.len));
-    for (bound_names.items) |bound_name| {
+    try seen_bound_names.ensureTotalCapacity(@intCast(bound_names.slice().len));
+    for (bound_names.slice()) |bound_name| {
         if (try seen_bound_names.fetchPut(bound_name, {})) |_| {
             switch (kind) {
                 .strict => try self.emitErrorAt(
@@ -382,10 +413,11 @@ fn ensureAllowedParameterNames(
     formal_parameters: ast.FormalParameters,
     location: ptk.Location,
 ) AcceptError!void {
-    var bound_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    var bound_names = IdentifierStackRange.open(self);
     defer bound_names.deinit();
-    try formal_parameters.collectBoundNames(&bound_names);
-    for (bound_names.items) |bound_name| {
+    try formal_parameters.collectBoundNames(&self.identifier_stack);
+    bound_names.close();
+    for (bound_names.slice()) |bound_name| {
         try self.ensureAllowedIdentifier(.function_parameter, bound_name, location);
     }
 }
@@ -1824,21 +1856,23 @@ pub fn acceptBlock(self: *Parser) AcceptError!ast.Block {
     const block: ast.Block = .{ .statement_list = statement_list };
     _ = try self.core.accept(RuleSet.is(.@"}"));
 
-    var lexically_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    var lexically_declared_names = IdentifierStackRange.open(self);
     defer lexically_declared_names.deinit();
-    try statement_list.collectLexicallyDeclaredNames(&lexically_declared_names);
+    try statement_list.collectLexicallyDeclaredNames(&self.identifier_stack);
+    lexically_declared_names.close();
 
-    var var_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    var var_declared_names = IdentifierStackRange.open(self);
     defer var_declared_names.deinit();
-    try statement_list.collectVarDeclaredNames(&var_declared_names);
+    try statement_list.collectVarDeclaredNames(&self.identifier_stack);
+    var_declared_names.close();
 
     // - It is a Syntax Error if the LexicallyDeclaredNames of StatementList contains any duplicate
     //   entries.
     // - It is a Syntax Error if any element of the LexicallyDeclaredNames of StatementList also
     //   occurs in the VarDeclaredNames of StatementList.
     try self.ensureUniqueLexicallyDeclaredNames(
-        lexically_declared_names.items,
-        var_declared_names.items,
+        lexically_declared_names.slice(),
+        var_declared_names.slice(),
         token.location,
     );
 
@@ -2565,21 +2599,23 @@ pub fn acceptSwitchStatement(self: *Parser) AcceptError!ast.SwitchStatement {
     const case_block_location = (try self.peekToken()).location;
     const case_block = try self.acceptCaseBlock();
 
-    var lexically_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    var lexically_declared_names = IdentifierStackRange.open(self);
     defer lexically_declared_names.deinit();
-    try case_block.collectLexicallyDeclaredNames(&lexically_declared_names);
+    try case_block.collectLexicallyDeclaredNames(&self.identifier_stack);
+    lexically_declared_names.close();
 
-    var var_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    var var_declared_names = IdentifierStackRange.open(self);
     defer var_declared_names.deinit();
-    try case_block.collectVarDeclaredNames(&var_declared_names);
+    try case_block.collectVarDeclaredNames(&self.identifier_stack);
+    var_declared_names.close();
 
     // - It is a Syntax Error if the LexicallyDeclaredNames of CaseBlock contains any duplicate
     //   entries.
     // - It is a Syntax Error if any element of the LexicallyDeclaredNames of CaseBlock also occurs
     //   in the VarDeclaredNames of CaseBlock.
     try self.ensureUniqueLexicallyDeclaredNames(
-        lexically_declared_names.items,
-        var_declared_names.items,
+        lexically_declared_names.slice(),
+        var_declared_names.slice(),
         case_block_location,
     );
 
@@ -2845,21 +2881,23 @@ pub fn acceptFunctionBody(
         .arguments_object_needed = self.state.arguments_object_needed,
     };
 
-    var lexically_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    var lexically_declared_names = IdentifierStackRange.open(self);
     defer lexically_declared_names.deinit();
-    try function_body.collectLexicallyDeclaredNames(&lexically_declared_names);
+    try function_body.collectLexicallyDeclaredNames(&self.identifier_stack);
+    lexically_declared_names.close();
 
-    var var_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    var var_declared_names = IdentifierStackRange.open(self);
     defer var_declared_names.deinit();
-    try function_body.collectVarDeclaredNames(&var_declared_names);
+    try function_body.collectVarDeclaredNames(&self.identifier_stack);
+    var_declared_names.close();
 
     // - It is a Syntax Error if the LexicallyDeclaredNames of FunctionStatementList contains any
     //   duplicate entries.
     // - It is a Syntax Error if any element of the LexicallyDeclaredNames of FunctionStatementList
     //   also occurs in the VarDeclaredNames of FunctionStatementList.
     try self.ensureUniqueLexicallyDeclaredNames(
-        lexically_declared_names.items,
-        var_declared_names.items,
+        lexically_declared_names.slice(),
+        var_declared_names.slice(),
         state.location,
     );
 
@@ -3405,13 +3443,15 @@ fn acceptClassStaticBlock(self: *Parser) AcceptError!ast.ClassStaticBlock {
     const class_static_block: ast.ClassStaticBlock = .{ .statement_list = statement_list };
     _ = try self.core.accept(RuleSet.is(.@"}"));
 
-    var lexically_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    var lexically_declared_names = IdentifierStackRange.open(self);
     defer lexically_declared_names.deinit();
-    try class_static_block.collectLexicallyDeclaredNames(&lexically_declared_names);
+    try class_static_block.collectLexicallyDeclaredNames(&self.identifier_stack);
+    lexically_declared_names.close();
 
-    var var_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    var var_declared_names = IdentifierStackRange.open(self);
     defer var_declared_names.deinit();
-    try class_static_block.collectVarDeclaredNames(&var_declared_names);
+    try class_static_block.collectVarDeclaredNames(&self.identifier_stack);
+    var_declared_names.close();
 
     // - It is a Syntax Error if the LexicallyDeclaredNames of ClassStaticBlockStatementList
     //   contains any duplicate entries.
@@ -3419,8 +3459,8 @@ fn acceptClassStaticBlock(self: *Parser) AcceptError!ast.ClassStaticBlock {
     //   ClassStaticBlockStatementList also occurs in the VarDeclaredNames of
     //   ClassStaticBlockStatementList.
     try self.ensureUniqueLexicallyDeclaredNames(
-        lexically_declared_names.items,
-        var_declared_names.items,
+        lexically_declared_names.slice(),
+        var_declared_names.slice(),
         token.location,
     );
 
@@ -3678,21 +3718,23 @@ pub fn acceptScript(self: *Parser) AcceptError!ast.Script {
     const statement_list = try self.acceptStatementList(.{ .update_strict_mode = true });
     const script: ast.Script = .{ .statement_list = statement_list };
 
-    var lexically_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    var lexically_declared_names = IdentifierStackRange.open(self);
     defer lexically_declared_names.deinit();
-    try script.collectLexicallyDeclaredNames(&lexically_declared_names);
+    try script.collectLexicallyDeclaredNames(&self.identifier_stack);
+    lexically_declared_names.close();
 
-    var var_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    var var_declared_names = IdentifierStackRange.open(self);
     defer var_declared_names.deinit();
-    try script.collectVarDeclaredNames(&var_declared_names);
+    try script.collectVarDeclaredNames(&self.identifier_stack);
+    var_declared_names.close();
 
     // - It is a Syntax Error if the LexicallyDeclaredNames of ScriptBody contains any duplicate
     //   entries.
     // - It is a Syntax Error if any element of the LexicallyDeclaredNames of ScriptBody also
     //   occurs in the VarDeclaredNames of ScriptBody.
     try self.ensureUniqueLexicallyDeclaredNames(
-        lexically_declared_names.items,
-        var_declared_names.items,
+        lexically_declared_names.slice(),
+        var_declared_names.slice(),
         state.location,
     );
 
@@ -3714,21 +3756,23 @@ pub fn acceptModule(self: *Parser) AcceptError!ast.Module {
     const module_item_list = try self.acceptModuleItemList();
     const module: ast.Module = .{ .module_item_list = module_item_list };
 
-    var lexically_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    var lexically_declared_names = IdentifierStackRange.open(self);
     defer lexically_declared_names.deinit();
-    try module_item_list.collectLexicallyDeclaredNames(&lexically_declared_names);
+    try module_item_list.collectLexicallyDeclaredNames(&self.identifier_stack);
+    lexically_declared_names.close();
 
-    var var_declared_names = std.ArrayList(ast.Identifier).init(self.allocator);
+    var var_declared_names = IdentifierStackRange.open(self);
     defer var_declared_names.deinit();
-    try module_item_list.collectVarDeclaredNames(&var_declared_names);
+    try module_item_list.collectVarDeclaredNames(&self.identifier_stack);
+    var_declared_names.close();
 
     // - It is a Syntax Error if the LexicallyDeclaredNames of ModuleItemList contains any
     //   duplicate entries.
     // - It is a Syntax Error if any element of the LexicallyDeclaredNames of ModuleItemList also
     //   occurs in the VarDeclaredNames of ModuleItemList.
     try self.ensureUniqueLexicallyDeclaredNames(
-        lexically_declared_names.items,
-        var_declared_names.items,
+        lexically_declared_names.slice(),
+        var_declared_names.slice(),
         state.location,
     );
 
