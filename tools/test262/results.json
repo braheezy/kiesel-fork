@@ -10703,7 +10703,7 @@
   "test/built-ins/Object/freeze/proxy-no-ownkeys-returned-keys-order.js": "PASS",
   "test/built-ins/Object/freeze/proxy-with-defineProperty-handler.js": "PASS",
   "test/built-ins/Object/freeze/throws-when-false.js": "PASS",
-  "test/built-ins/Object/freeze/typedarray-backed-by-resizable-buffer.js": "PASS",
+  "test/built-ins/Object/freeze/typedarray-backed-by-resizable-buffer.js": "FAIL",
   "test/built-ins/Object/fromEntries/empty-iterable.js": "PASS",
   "test/built-ins/Object/fromEntries/evaluation-order.js": "PASS",
   "test/built-ins/Object/fromEntries/iterator-closed-for-null-entry.js": "PASS",

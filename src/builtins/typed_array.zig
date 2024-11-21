@@ -41,6 +41,7 @@ const ordinaryDelete = builtins.ordinaryDelete;
 const ordinaryGet = builtins.ordinaryGet;
 const ordinaryGetOwnProperty = builtins.ordinaryGetOwnProperty;
 const ordinaryHasProperty = builtins.ordinaryHasProperty;
+const ordinaryPreventExtensions = builtins.ordinaryPreventExtensions;
 const ordinarySet = builtins.ordinarySet;
 const sameValueZero = types.sameValueZero;
 const setValueInBuffer = builtins.setValueInBuffer;
@@ -160,7 +161,21 @@ pub const element_types = [_]struct { []const u8, ElementType }{
     .{ "Float64Array", .{ .T = f64 } },
 };
 
-/// 10.4.5.1 [[GetOwnProperty]] ( P )
+/// 10.4.5.1 [[PreventExtensions]] ( )
+/// https://tc39.es/ecma262/#sec-typedarray-preventextensions
+fn preventExtensions(object: *Object) std.mem.Allocator.Error!bool {
+    // 1. NOTE: The extensibility-related invariants specified in 6.1.7.3 do not allow this method
+    //    to return true when O can gain (or lose and then regain) properties, which might occur
+    //    for properties with integer index names when its underlying buffer is resized.
+
+    // 2. If IsTypedArrayFixedLength(O) is false, return false.
+    if (!isTypedArrayFixedLength(object.as(TypedArray))) return false;
+
+    // 3. Return OrdinaryPreventExtensions(O).
+    return ordinaryPreventExtensions(object);
+}
+
+/// 10.4.5.2 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-typedarray-getownproperty
 fn getOwnProperty(
     object: *Object,
@@ -192,7 +207,7 @@ fn getOwnProperty(
     return ordinaryGetOwnProperty(object, property_key);
 }
 
-/// 10.4.5.2 [[HasProperty]] ( P )
+/// 10.4.5.3 [[HasProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-typedarray-hasproperty
 fn hasProperty(object: *Object, property_key: PropertyKey) Agent.Error!bool {
     // 1. If P is a String, then
@@ -208,7 +223,7 @@ fn hasProperty(object: *Object, property_key: PropertyKey) Agent.Error!bool {
     return ordinaryHasProperty(object, property_key);
 }
 
-/// 10.4.5.3 [[DefineOwnProperty]] ( P, Desc )
+/// 10.4.5.4 [[DefineOwnProperty]] ( P, Desc )
 /// https://tc39.es/ecma262/#sec-typedarray-defineownproperty
 fn defineOwnProperty(
     object: *Object,
@@ -256,7 +271,7 @@ fn defineOwnProperty(
     ) catch |err| try noexcept(err);
 }
 
-/// 10.4.5.4 [[Get]] ( P, Receiver )
+/// 10.4.5.5 [[Get]] ( P, Receiver )
 /// https://tc39.es/ecma262/#sec-typedarray-get
 fn get(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value {
     const agent = object.agent;
@@ -273,7 +288,7 @@ fn get(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!
     return ordinaryGet(object, property_key, receiver);
 }
 
-/// 10.4.5.5 [[Set]] ( P, V, Receiver )
+/// 10.4.5.6 [[Set]] ( P, V, Receiver )
 /// https://tc39.es/ecma262/#sec-typedarray-set
 fn set(object: *Object, property_key: PropertyKey, value: Value, receiver: Value) Agent.Error!bool {
     const agent = object.agent;
@@ -301,7 +316,7 @@ fn set(object: *Object, property_key: PropertyKey, value: Value, receiver: Value
     return ordinarySet(object, property_key, value, receiver);
 }
 
-/// 10.4.5.6 [[Delete]] ( P )
+/// 10.4.5.7 [[Delete]] ( P )
 /// https://tc39.es/ecma262/#sec-typedarray-delete
 fn delete(object: *Object, property_key: PropertyKey) std.mem.Allocator.Error!bool {
     // 1. If P is a String, then
@@ -318,7 +333,7 @@ fn delete(object: *Object, property_key: PropertyKey) std.mem.Allocator.Error!bo
     return ordinaryDelete(object, property_key) catch |err| try noexcept(err);
 }
 
-/// 10.4.5.7 [[OwnPropertyKeys]] ( )
+/// 10.4.5.8 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-typedarray-ownpropertykeys
 fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(PropertyKey) {
     const agent = object.agent;
@@ -370,7 +385,7 @@ fn ownPropertyKeys(object: *Object) std.mem.Allocator.Error!std.ArrayList(Proper
     return keys;
 }
 
-/// 10.4.5.8 TypedArray With Buffer Witness Records
+/// 10.4.5.9 TypedArray With Buffer Witness Records
 /// https://tc39.es/ecma262/#sec-typedarray-with-buffer-witness-records
 pub const TypedArrayWithBufferWitness = struct {
     pub const CachedBufferByteLength = union(enum) {
@@ -385,7 +400,7 @@ pub const TypedArrayWithBufferWitness = struct {
     cached_buffer_byte_length: CachedBufferByteLength,
 };
 
-/// 10.4.5.9 MakeTypedArrayWithBufferWitnessRecord ( obj, order )
+/// 10.4.5.10 MakeTypedArrayWithBufferWitnessRecord ( obj, order )
 /// https://tc39.es/ecma262/#sec-maketypedarraywithbufferwitnessrecord
 pub fn makeTypedArrayWithBufferWitnessRecord(
     object: *const TypedArray,
@@ -411,7 +426,7 @@ pub fn makeTypedArrayWithBufferWitnessRecord(
     return .{ .object = object, .cached_buffer_byte_length = byte_length };
 }
 
-/// 10.4.5.11 TypedArrayByteLength ( taRecord )
+/// 10.4.5.12 TypedArrayByteLength ( taRecord )
 /// https://tc39.es/ecma262/#sec-typedarraybytelength
 pub fn typedArrayByteLength(ta: TypedArrayWithBufferWitness) u53 {
     // 1. If IsTypedArrayOutOfBounds(taRecord) is true, return 0.
@@ -436,7 +451,7 @@ pub fn typedArrayByteLength(ta: TypedArrayWithBufferWitness) u53 {
     return length * element_size;
 }
 
-/// 10.4.5.12 TypedArrayLength ( taRecord )
+/// 10.4.5.13 TypedArrayLength ( taRecord )
 /// https://tc39.es/ecma262/#sec-typedarraylength
 pub fn typedArrayLength(ta: TypedArrayWithBufferWitness) u53 {
     // 1. Assert: IsTypedArrayOutOfBounds(taRecord) is false.
@@ -467,7 +482,7 @@ pub fn typedArrayLength(ta: TypedArrayWithBufferWitness) u53 {
     return @divFloor(byte_length.value - byte_offset, element_size);
 }
 
-/// 10.4.5.13 IsTypedArrayOutOfBounds ( taRecord )
+/// 10.4.5.14 IsTypedArrayOutOfBounds ( taRecord )
 /// https://tc39.es/ecma262/#sec-istypedarrayoutofbounds
 pub fn isTypedArrayOutOfBounds(ta: TypedArrayWithBufferWitness) bool {
     // 1. Let O be taRecord.[[Object]].
@@ -519,7 +534,23 @@ pub fn isTypedArrayOutOfBounds(ta: TypedArrayWithBufferWitness) bool {
     return false;
 }
 
-/// 10.4.5.14 IsValidIntegerIndex ( O, index )
+/// 10.4.5.15 IsTypedArrayFixedLength ( O )
+/// https://tc39.es/ecma262/#sec-istypedarrayfixedlength
+fn isTypedArrayFixedLength(typed_array: *const TypedArray) bool {
+    // 1. If O.[[ArrayLength]] is auto, return false.
+    if (typed_array.fields.array_length == .auto) return false;
+
+    // 2. Let buffer be O.[[ViewedArrayBuffer]].
+    const buffer = typed_array.fields.viewed_array_buffer;
+
+    // 3. If IsFixedLengthArrayBuffer(buffer) is false and IsSharedArrayBuffer(buffer) is false, return false.
+    if (!isFixedLengthArrayBuffer(buffer) and buffer != .shared_array_buffer) return false;
+
+    // 4. Return true.
+    return true;
+}
+
+/// 10.4.5.16 IsValidIntegerIndex ( O, index )
 /// https://tc39.es/ecma262/#sec-isvalidintegerindex
 fn isValidIntegerIndex(typed_array: *const TypedArray, index: f64) bool {
     // 1. If IsDetachedBuffer(O.[[ViewedArrayBuffer]]) is true, return false.
@@ -549,7 +580,7 @@ fn isValidIntegerIndex(typed_array: *const TypedArray, index: f64) bool {
     return true;
 }
 
-/// 10.4.5.15 TypedArrayGetElement ( O, index )
+/// 10.4.5.17 TypedArrayGetElement ( O, index )
 /// https://tc39.es/ecma262/#sec-typedarraygetelement
 fn typedArrayGetElement(
     agent: *Agent,
@@ -591,7 +622,7 @@ fn typedArrayGetElement(
     } else unreachable;
 }
 
-/// 10.4.5.16 TypedArraySetElement ( O, index, value )
+/// 10.4.5.18 TypedArraySetElement ( O, index, value )
 /// https://tc39.es/ecma262/#sec-typedarraysetelement
 fn typedArraySetElement(agent: *Agent, typed_array: *const TypedArray, index: f64, value: Value) Agent.Error!void {
     // 1. If O.[[ContentType]] is bigint, let numValue be ? ToBigInt(value).
@@ -3252,31 +3283,34 @@ pub fn allocateTypedArray(
     // 2. Let obj be TypedArrayCreate(proto).
     // 3. Assert: obj.[[ViewedArrayBuffer]] is undefined.
     const object = try TypedArray.create(agent, .{
-        // 10.4.5.10 TypedArrayCreate ( prototype )
+        // 10.4.5.11 TypedArrayCreate ( prototype )
         // https://tc39.es/ecma262/#sec-typedarraycreate
         // 1. Let internalSlotsList be « [[Prototype]], [[Extensible]], [[ViewedArrayBuffer]],
         //    [[TypedArrayName]], [[ContentType]], [[ByteLength]], [[ByteOffset]], [[ArrayLength]] ».
         // 2. Let A be MakeBasicObject(internalSlotsList).
         .internal_methods = &.{
-            // 3. Set A.[[GetOwnProperty]] as specified in 10.4.5.1.
+            // 3. Set A.[[PreventExtensions]] as specified in 10.4.5.1.
+            .preventExtensions = preventExtensions,
+
+            // 4. Set A.[[GetOwnProperty]] as specified in 10.4.5.2.
             .getOwnProperty = getOwnProperty,
 
-            // 4. Set A.[[HasProperty]] as specified in 10.4.5.2.
+            // 5. Set A.[[HasProperty]] as specified in 10.4.5.3.
             .hasProperty = hasProperty,
 
-            // 5. Set A.[[DefineOwnProperty]] as specified in 10.4.5.3.
+            // 6. Set A.[[DefineOwnProperty]] as specified in 10.4.5.4.
             .defineOwnProperty = defineOwnProperty,
 
-            // 6. Set A.[[Get]] as specified in 10.4.5.4.
+            // 7. Set A.[[Get]] as specified in 10.4.5.5.
             .get = get,
 
-            // 7. Set A.[[Set]] as specified in 10.4.5.5.
+            // 8. Set A.[[Set]] as specified in 10.4.5.6.
             .set = set,
 
-            // 8. Set A.[[Delete]] as specified in 10.4.5.6.
+            // 9. Set A.[[Delete]] as specified in 10.4.5.7.
             .delete = delete,
 
-            // 9. Set A.[[OwnPropertyKeys]] as specified in 10.4.5.7.
+            // 10. Set A.[[OwnPropertyKeys]] as specified in 10.4.5.8.
             .ownPropertyKeys = ownPropertyKeys,
         },
 
