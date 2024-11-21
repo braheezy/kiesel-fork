@@ -203,7 +203,7 @@ jobs:
       image: ghcr.io/catthehacker/ubuntu:act-22.04
     env:
       # Re-generate `tools/test262/results.json` when updating this
-      TEST262_COMMIT: ab69bd4dd8184ce6b96a0a02c904d20ee76b10ed
+      TEST262_COMMIT: fd979d85d4e4b74ef1ed097d25c71263417d5aad
     steps:
       - name: Check out Kiesel
         uses: https://github.com/actions/checkout@v4
