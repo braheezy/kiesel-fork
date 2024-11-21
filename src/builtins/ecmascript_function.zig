@@ -306,15 +306,9 @@ fn call(object: *Object, this_argument: Value, arguments_list: Arguments) Agent.
     _ = agent.execution_context_stack.pop();
 
     // 8. If result is a return completion, return result.[[Value]].
-    if (result) |completion| {
-        if (completion.type == .@"return")
-            return completion.value.?;
-    }
-    // 9. ReturnIfAbrupt(result).
-    else |err| return err;
-
-    // 10. Return undefined.
-    return .undefined;
+    // 9. Assert: result is a throw completion.
+    // 10. Return ? result.
+    return result;
 }
 
 /// 10.2.1.1 PrepareForOrdinaryCall ( F, newTarget )
@@ -426,7 +420,7 @@ pub fn ordinaryCallEvaluateBody(
     agent: *Agent,
     function: *ECMAScriptFunction,
     arguments_list: Arguments,
-) Agent.Error!Completion {
+) Agent.Error!Value {
     // 1. Return ? EvaluateBody of F.[[ECMAScriptCode]] with arguments F and argumentsList.
     const function_body = function.fields.ecmascript_code;
 
@@ -461,13 +455,21 @@ fn evaluateFunctionBody(
     agent: *Agent,
     function: *ECMAScriptFunction,
     arguments_list: Arguments,
-) Agent.Error!Completion {
+) Agent.Error!Value {
     // FunctionBody : FunctionStatementList
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
     try functionDeclarationInstantiation(agent, function, arguments_list);
 
-    // 2. Return ? Evaluation of FunctionStatementList.
-    return function.fields.evaluateBody(agent);
+    // 2. Perform ? Evaluation of FunctionStatementList.
+    // 3. NOTE: If the previous step resulted in a normal completion, then evaluation finished by
+    //    proceeding past the end of the FunctionStatementList.
+    // 4. Return ReturnCompletion(undefined).
+    const completion = try function.fields.evaluateBody(agent);
+    return switch (completion.type) {
+        .@"return" => completion.value.?,
+        .normal => .undefined,
+        else => unreachable,
+    };
 }
 
 /// 15.5.2 Runtime Semantics: EvaluateGeneratorBody
@@ -476,7 +478,7 @@ fn evaluateGeneratorBody(
     agent: *Agent,
     function: *ECMAScriptFunction,
     arguments_list: Arguments,
-) Agent.Error!Completion {
+) Agent.Error!Value {
     // GeneratorBody : FunctionBody
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
     try functionDeclarationInstantiation(agent, function, arguments_list);
@@ -501,7 +503,7 @@ fn evaluateGeneratorBody(
     generatorStart(agent, generator.as(builtins.Generator), function);
 
     // 6. Return ReturnCompletion(G).
-    return Completion.@"return"(Value.from(generator));
+    return Value.from(generator);
 }
 
 /// 15.6.2 Runtime Semantics: EvaluateAsyncGeneratorBody
@@ -510,7 +512,7 @@ fn evaluateAsyncGeneratorBody(
     agent: *Agent,
     function: *ECMAScriptFunction,
     arguments_list: Arguments,
-) Agent.Error!Completion {
+) Agent.Error!Value {
     // AsyncGeneratorBody : FunctionBody
     // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
     try functionDeclarationInstantiation(agent, function, arguments_list);
@@ -537,7 +539,7 @@ fn evaluateAsyncGeneratorBody(
     asyncGeneratorStart(agent, generator.as(builtins.AsyncGenerator), function);
 
     // 6. Return ReturnCompletion(generator).
-    return Completion.@"return"(Value.from(generator));
+    return Value.from(generator);
 }
 
 /// 15.8.4 Runtime Semantics: EvaluateAsyncFunctionBody
@@ -546,7 +548,7 @@ fn evaluateAsyncFunctionBody(
     agent: *Agent,
     function: *ECMAScriptFunction,
     arguments_list: Arguments,
-) std.mem.Allocator.Error!Completion {
+) std.mem.Allocator.Error!Value {
     // AsyncFunctionBody : FunctionBody
     const realm = agent.currentRealm();
 
@@ -577,7 +579,7 @@ fn evaluateAsyncFunctionBody(
     try asyncFunctionStart(agent, promise_capability, function);
 
     // 5. Return ReturnCompletion(promiseCapability.[[Promise]]).
-    return Completion.@"return"(Value.from(promise_capability.promise));
+    return Value.from(promise_capability.promise);
 }
 
 /// 10.2.2 [[Construct]] ( argumentsList, newTarget )
@@ -643,38 +645,33 @@ fn construct(object: *Object, arguments_list: Arguments, new_target: *Object) Ag
     //    running execution context.
     _ = agent.execution_context_stack.pop();
 
-    // 10. If result is a return completion, then
-    if (result) |completion| {
-        if (completion.type == .@"return") {
-            // a. If result.[[Value]] is an Object, return result.[[Value]].
-            if (completion.value.?.isObject()) return completion.value.?.asObject();
+    // 10. If result is a throw completion, then
+    //     a. Return ? result.
+    // 11. Assert: result is a return completion.
+    const value = try result;
 
-            // b. If kind is base, return thisArgument.
-            if (kind == .base) return this_argument;
+    // 12. If result.[[Value]] is an Object, return result.[[Value]].
+    if (value.isObject()) return value.asObject();
 
-            // c. If result.[[Value]] is not undefined, throw a TypeError exception.
-            if (!completion.value.?.isUndefined()) {
-                return agent.throwException(
-                    .type_error,
-                    "Constructor must return an object or undefined",
-                    .{},
-                );
-            }
-        }
-    }
-    // 11. Else,
-    else |err| {
-        // a. ReturnIfAbrupt(result).
-        return err;
+    // 13. If kind is base, return thisArgument.
+    if (kind == .base) return this_argument;
+
+    // 14. If result.[[Value]] is not undefined, throw a TypeError exception.
+    if (!value.isUndefined()) {
+        return agent.throwException(
+            .type_error,
+            "Constructor must return an object or undefined",
+            .{},
+        );
     }
 
-    // 12. Let thisBinding be ? constructorEnv.GetThisBinding().
+    // 15. Let thisBinding be ? constructorEnv.GetThisBinding().
     const this_binding = try constructor_env.getThisBinding();
 
-    // 13. Assert: thisBinding is an Object.
+    // 16. Assert: thisBinding is an Object.
     std.debug.assert(this_binding.isObject());
 
-    // 14. Return thisBinding.
+    // 17. Return thisBinding.
     return this_binding.asObject();
 }
 
