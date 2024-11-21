@@ -169,6 +169,14 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
                 const operator: ast.BinaryExpression.Operator = @enumFromInt(operator_type);
                 try writer.print("(operator: {s})", .{@tagName(operator)});
             },
+            .array_create => {
+                const length = iterator.instruction_args[0].?;
+                try writer.print("(length: {})", .{length});
+            },
+            .array_set_value_direct => {
+                const index = iterator.instruction_args[0].?;
+                try writer.print("(index: {})", .{index});
+            },
             .create_catch_binding => {
                 const identifier_index = iterator.instruction_args[0].?;
                 const identifier = self.identifiers.unmanaged.entries.get(identifier_index).key;

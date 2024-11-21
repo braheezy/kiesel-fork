@@ -466,12 +466,20 @@ pub fn codegenArrayLiteral(
     executable: *Executable,
     ctx: *Context,
 ) Executable.Error!void {
+    const is_fixed_length = for (node.element_list) |element| {
+        switch (element) {
+            .spread => break false,
+            else => {},
+        }
+    } else true;
     try executable.addInstruction(.array_create);
+    try executable.addIndex(if (is_fixed_length) node.element_list.len else 0);
     try executable.addInstruction(.load);
     for (node.element_list, 0..) |element, i| {
         switch (element) {
             // Elision : ,
             .elision => {
+                if (is_fixed_length) continue;
                 try executable.addInstruction(.store);
                 try executable.addInstruction(.array_set_length);
                 try executable.addIndex(i + 1);
@@ -491,7 +499,12 @@ pub fn codegenArrayLiteral(
                 try executable.addInstruction(.load);
 
                 // 4. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(nextIndex)), initValue).
-                try executable.addInstruction(.array_push_value);
+                if (is_fixed_length) {
+                    try executable.addInstruction(.array_set_value_direct);
+                    try executable.addIndex(i);
+                } else {
+                    try executable.addInstruction(.array_push_value);
+                }
                 try executable.addInstruction(.load);
 
                 // 5. Return nextIndex + 1.
@@ -1047,13 +1060,15 @@ pub fn codegenArguments(
         try executable.addInstructionWithConstant(.load_constant, .undefined);
     } else {
         try executable.addInstruction(.array_create);
+        try executable.addIndex(spread_indices.items.len);
         try executable.addInstruction(.load);
-        for (spread_indices.items) |spread_index| {
+        for (spread_indices.items, 0..) |spread_index, i| {
             try executable.addInstructionWithConstant(
                 .load_constant,
                 Value.from(@as(u53, @intCast(spread_index))),
             );
-            try executable.addInstruction(.array_push_value);
+            try executable.addInstruction(.array_set_value_direct);
+            try executable.addIndex(i);
             try executable.addInstruction(.load);
         }
     }

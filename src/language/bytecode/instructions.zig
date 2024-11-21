@@ -12,6 +12,8 @@ pub const Instruction = enum(u8) {
     array_push_value,
     /// Set the length property of an array to the given index.
     array_set_length,
+    /// Set an array value directly.
+    array_set_value_direct,
     /// Spread value into an array.
     array_spread_value,
     /// Store Await() as the result value.
@@ -202,7 +204,9 @@ pub const Instruction = enum(u8) {
             .typeof_identifier,
             => 2,
             .apply_string_or_numeric_binary_operator,
+            .array_create,
             .array_set_length,
+            .array_set_value_direct,
             .binding_class_declaration_evaluation,
             .block_declaration_instantiation,
             .class_definition_evaluation,

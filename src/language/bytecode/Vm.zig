@@ -180,8 +180,10 @@ fn executeApplyStringOrNumericBinaryOperator(self: *Vm, executable: Executable) 
     self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, operator, r_val);
 }
 
-fn executeArrayCreate(self: *Vm, _: Executable) Agent.Error!void {
-    self.result = Value.from(try arrayCreate(self.agent, 0, null));
+fn executeArrayCreate(self: *Vm, executable: Executable) Agent.Error!void {
+    const length = self.fetchIndex(executable);
+    const array = try arrayCreate(self.agent, length, null);
+    self.result = Value.from(array);
 }
 
 fn executeArrayPushValue(self: *Vm, _: Executable) Agent.Error!void {
@@ -203,6 +205,20 @@ fn executeArraySetLength(self: *Vm, executable: Executable) Agent.Error!void {
     // From ArrayAccumulation:
     // 2. Perform ? Set(array, "length", 𝔽(len), true).
     try array.set(PropertyKey.from("length"), Value.from(length), .throw);
+}
+
+fn executeArraySetValueDirect(self: *Vm, executable: Executable) Agent.Error!void {
+    const index = self.fetchIndex(executable);
+    const value = self.stack.pop();
+    const array = self.stack.pop().asObject();
+    const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, index));
+    try array.setPropertyDirect(property_key, .{
+        .value = value,
+        .writable = true,
+        .enumerable = true,
+        .configurable = true,
+    });
+    self.result = Value.from(array);
 }
 
 fn executeArraySpreadValue(self: *Vm, _: Executable) Agent.Error!void {
@@ -1411,6 +1427,7 @@ fn executeInstruction(
         .array_create => self.executeArrayCreate(executable),
         .array_push_value => self.executeArrayPushValue(executable),
         .array_set_length => self.executeArraySetLength(executable),
+        .array_set_value_direct => self.executeArraySetValueDirect(executable),
         .array_spread_value => self.executeArraySpreadValue(executable),
         .@"await" => self.executeAwait(executable),
         .binding_class_declaration_evaluation => self.executeBindingClassDeclarationEvaluation(executable),
