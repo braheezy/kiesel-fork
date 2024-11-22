@@ -177,6 +177,22 @@ fn executeApplyStringOrNumericBinaryOperator(self: *Vm, executable: Executable) 
         } else |_| {}
     }
 
+    // OPTIMIZATION: Fast path for f64 values
+    if (l_val.__isF64() and r_val.__isF64()) blk: {
+        const l = l_val.__asF64();
+        const r = r_val.__asF64();
+        const result = switch (operator) {
+            .@"+" => l + r,
+            .@"-" => l - r,
+            .@"*" => l * r,
+            .@"/" => l / r,
+            // Some operators are not that straightforward, use the fallback impl
+            else => break :blk,
+        };
+        self.result = Value.from(result);
+        return;
+    }
+
     self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, operator, r_val);
 }
 
@@ -399,6 +415,12 @@ fn executeDecrement(self: *Vm, _: Executable) Agent.Error!void {
             self.result = Value.from(result);
             return;
         } else |_| {}
+    }
+
+    // OPTIMIZATION: Fast path for f64 values
+    if (value.__isF64()) {
+        self.result = Value.from(value.__asF64() - 1);
+        return;
     }
 
     self.result = switch (value.type()) {
@@ -804,6 +826,12 @@ fn executeGreaterThan(self: *Vm, _: Executable) Agent.Error!void {
         return;
     }
 
+    // OPTIMIZATION: Fast path for f64 values
+    if (l_val.__isF64() and r_val.__isF64()) {
+        self.result = Value.from(l_val.__asF64() > r_val.__asF64());
+        return;
+    }
+
     // 5. Let r be ? IsLessThan(rVal, lVal, false).
     const result = try isLessThan(self.agent, r_val, l_val, .right_first);
 
@@ -818,6 +846,12 @@ fn executeGreaterThanEquals(self: *Vm, _: Executable) Agent.Error!void {
     // OPTIMIZATION: Fast path for i32 values
     if (l_val.__isI32() and r_val.__isI32()) {
         self.result = Value.from(l_val.__asI32() >= r_val.__asI32());
+        return;
+    }
+
+    // OPTIMIZATION: Fast path for f64 values
+    if (l_val.__isF64() and r_val.__isF64()) {
+        self.result = Value.from(l_val.__asF64() >= r_val.__asF64());
         return;
     }
 
@@ -882,6 +916,12 @@ fn executeIncrement(self: *Vm, _: Executable) Agent.Error!void {
             self.result = Value.from(result);
             return;
         } else |_| {}
+    }
+
+    // OPTIMIZATION: Fast path for f64 values
+    if (value.__isF64()) {
+        self.result = Value.from(value.__asF64() + 1);
+        return;
     }
 
     self.result = switch (value.type()) {
@@ -992,6 +1032,12 @@ fn executeIsLooselyEqual(self: *Vm, _: Executable) Agent.Error!void {
         return;
     }
 
+    // OPTIMIZATION: Fast path for f64 values
+    if (l_val.__isF64() and r_val.__isF64()) {
+        self.result = Value.from(l_val.__asF64() == r_val.__asF64());
+        return;
+    }
+
     // 5. Return IsLooselyEqual(rVal, lVal).
     self.result = Value.from(try isLooselyEqual(self.agent, r_val, l_val));
 }
@@ -1003,6 +1049,12 @@ fn executeIsStrictlyEqual(self: *Vm, _: Executable) Agent.Error!void {
     // OPTIMIZATION: Fast path for i32 values
     if (l_val.__isI32() and r_val.__isI32()) {
         self.result = Value.from(l_val.__asI32() == r_val.__asI32());
+        return;
+    }
+
+    // OPTIMIZATION: Fast path for f64 values
+    if (l_val.__isF64() and r_val.__isF64()) {
+        self.result = Value.from(l_val.__asF64() == r_val.__asF64());
         return;
     }
 
@@ -1031,6 +1083,12 @@ fn executeLessThan(self: *Vm, _: Executable) Agent.Error!void {
         return;
     }
 
+    // OPTIMIZATION: Fast path for f64 values
+    if (l_val.__isF64() and r_val.__isF64()) {
+        self.result = Value.from(l_val.__asF64() < r_val.__asF64());
+        return;
+    }
+
     // 5. Let r be ? IsLessThan(lVal, rVal, true).
     const result = try isLessThan(self.agent, l_val, r_val, .left_first);
 
@@ -1045,6 +1103,12 @@ fn executeLessThanEquals(self: *Vm, _: Executable) Agent.Error!void {
     // OPTIMIZATION: Fast path for i32 values
     if (l_val.__isI32() and r_val.__isI32()) {
         self.result = Value.from(l_val.__asI32() <= r_val.__asI32());
+        return;
+    }
+
+    // OPTIMIZATION: Fast path for f64 values
+    if (l_val.__isF64() and r_val.__isF64()) {
+        self.result = Value.from(l_val.__asF64() <= r_val.__asF64());
         return;
     }
 
