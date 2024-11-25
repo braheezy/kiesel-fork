@@ -90,19 +90,25 @@ pub fn getValue(self: Reference, agent: *Agent) Agent.Error!Value {
         // a. Let baseObj be ? ToObject(V.[[Base]]).
         // NOTE: For property lookups on primitives we can directly go to the prototype instead
         //       of creating a wrapper object, or return the value for `"string".length`.
-        const base_object = blk: {
-            if (!self.base.value.isString() or self.referenced_name == .private_name) {
-                break :blk try self.base.value.synthesizePrototype(agent);
-            }
-            switch (self.referenced_name.value.type()) {
-                .string => if (self.referenced_name.value.asString().eql(String.fromLiteral("length")))
-                    return Value.from(@as(u53, @intCast(self.base.value.asString().length())))
-                else
-                    break :blk try self.base.value.synthesizePrototype(agent),
-                .symbol => break :blk try self.base.value.synthesizePrototype(agent),
-                else => break :blk null,
-            }
-        } orelse try self.base.value.toObject(agent);
+        const base_object = switch (self.base.value.type()) {
+            .object => self.base.value.asObject(),
+            .string => switch (self.referenced_name) {
+                .value => |value| blk: {
+                    if (value.type() == .string and value.asString().eql(String.fromLiteral("length"))) {
+                        return Value.from(@as(u53, @intCast(self.base.value.asString().length())));
+                    } else if (value.type() == .symbol) {
+                        break :blk (try self.base.value.synthesizePrototype(agent)).?;
+                    }
+                    // Might be a property handled by String's [[GetOwnProperty]], we need to make an object
+                    // TODO: This could have a fast path for numeric property lookups
+                    break :blk try self.base.value.toObject(agent);
+                },
+                .private_name => (try self.base.value.synthesizePrototype(agent)).?,
+            },
+            // Guaranteed to throw
+            .null, .undefined => try self.base.value.toObject(agent),
+            else => (try self.base.value.synthesizePrototype(agent)).?,
+        };
 
         if (self.maybe_lookup_cache_entry) |lookup_cache_entry| {
             if (lookup_cache_entry.*) |cache| {
