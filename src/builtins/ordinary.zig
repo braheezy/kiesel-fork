@@ -448,6 +448,25 @@ fn get(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!
 /// 10.1.8.1 OrdinaryGet ( O, P, Receiver )
 /// https://tc39.es/ecma262/#sec-ordinaryget
 pub fn ordinaryGet(object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value {
+    // OPTIMIZATION: Fast path bypassing property descriptors for the common case of ordinary objects
+    if (object.internal_methods.getOwnProperty == &getOwnProperty and
+        object.internal_methods.getPrototypeOf == &getPrototypeOf)
+    {
+        const property_metadata = object.shape.properties.get(property_key) orelse {
+            const parent = object.shape.prototype orelse return .undefined;
+            return parent.internal_methods.get(parent, property_key, receiver);
+        };
+        const property_value = try object.getPropertyCreateIntrinsicIfNeeded(property_metadata.index);
+        switch (property_value) {
+            .value => |value| return value,
+            .accessor => |accessor| {
+                const getter = accessor.get orelse return .undefined;
+                return Value.from(getter).callAssumeCallableNoArgs(receiver);
+            },
+            .lazy_intrinsic => unreachable,
+        }
+    }
+
     // 1. Let desc be ? O.[[GetOwnProperty]](P).
     const descriptor = try object.internal_methods.getOwnProperty(object, property_key)
 
