@@ -2769,7 +2769,7 @@ pub fn acceptFunctionDeclaration(self: *Parser) AcceptError!ast.FunctionDeclarat
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.function));
-    // We need to do this after consuming the 'function' token to skip preceeding whitespace.
+    // We need to do this after consuming the 'function' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     const binding_identifier_location = (try self.peekToken()).location;
     const binding_identifier = self.acceptBindingIdentifier() catch |err| blk: {
@@ -2813,7 +2813,7 @@ pub fn acceptFunctionExpression(self: *Parser) AcceptError!ast.FunctionExpressio
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.function));
-    // We need to do this after consuming the 'function' token to skip preceeding whitespace.
+    // We need to do this after consuming the 'function' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     const binding_identifier_location = (try self.peekToken()).location;
     const binding_identifier = self.acceptBindingIdentifier() catch null;
@@ -2912,7 +2912,7 @@ pub fn acceptArrowFunction(self: *Parser) AcceptError!ast.ArrowFunction {
     var formal_parameters: ast.FormalParameters = undefined;
     const location = (try self.peekToken()).location;
     if (self.acceptBindingIdentifier()) |binding_identifier| {
-        // We need to do this after consuming the identifier token to skip preceeding whitespace.
+        // We need to do this after consuming the identifier token to skip preceding whitespace.
         start_offset = self.core.tokenizer.offset - binding_identifier.len;
         var formal_parameters_items = try std.ArrayList(ast.FormalParameters.Item).initCapacity(
             self.allocator,
@@ -2934,7 +2934,7 @@ pub fn acceptArrowFunction(self: *Parser) AcceptError!ast.ArrowFunction {
         };
     } else |_| {
         _ = try self.core.accept(RuleSet.is(.@"("));
-        // We need to do this after consuming the '(' token to skip preceeding whitespace.
+        // We need to do this after consuming the '(' token to skip preceding whitespace.
         start_offset = self.core.tokenizer.offset - (comptime "(".len);
         formal_parameters = try self.acceptFormalParameters();
         _ = try self.core.accept(RuleSet.is(.@")"));
@@ -3090,7 +3090,7 @@ fn acceptGeneratorDeclaration(self: *Parser) AcceptError!ast.GeneratorDeclaratio
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.function));
-    // We need to do this after consuming the 'function' token to skip preceeding whitespace.
+    // We need to do this after consuming the 'function' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     _ = try self.core.accept(RuleSet.is(.@"*"));
     const binding_identifier_location = (try self.peekToken()).location;
@@ -3133,7 +3133,7 @@ pub fn acceptGeneratorExpression(self: *Parser) AcceptError!ast.GeneratorExpress
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.function));
-    // We need to do this after consuming the 'function' token to skip preceeding whitespace.
+    // We need to do this after consuming the 'function' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "function".len);
     _ = try self.core.accept(RuleSet.is(.@"*"));
     const binding_identifier_location = (try self.peekToken()).location;
@@ -3192,7 +3192,7 @@ fn acceptAsyncGeneratorDeclaration(self: *Parser) AcceptError!ast.AsyncGenerator
     errdefer self.core.restoreState(state);
 
     _ = try self.acceptKeyword("async");
-    // We need to do this after consuming the 'async' token to skip preceeding whitespace.
+    // We need to do this after consuming the 'async' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
     if (self.followedByLineTerminator()) {
         try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
@@ -3239,7 +3239,7 @@ pub fn acceptAsyncGeneratorExpression(self: *Parser) AcceptError!ast.AsyncGenera
     errdefer self.core.restoreState(state);
 
     _ = try self.acceptKeyword("async");
-    // We need to do this after consuming the 'async' token to skip preceeding whitespace.
+    // We need to do this after consuming the 'async' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
     if (self.followedByLineTerminator()) {
         try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
@@ -3286,7 +3286,7 @@ fn acceptClassDeclaration(self: *Parser) AcceptError!ast.ClassDeclaration {
     defer tmp2.restore();
 
     _ = try self.core.accept(RuleSet.is(.class));
-    // We need to do this after consuming the 'class' token to skip preceeding whitespace.
+    // We need to do this after consuming the 'class' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "class".len);
     const binding_identifier_location = (try self.peekToken()).location;
     const binding_identifier = self.acceptBindingIdentifier() catch |err| blk: {
@@ -3319,7 +3319,7 @@ fn acceptClassExpression(self: *Parser) AcceptError!ast.ClassExpression {
     defer tmp2.restore();
 
     _ = try self.core.accept(RuleSet.is(.class));
-    // We need to do this after consuming the 'class' token to skip preceeding whitespace.
+    // We need to do this after consuming the 'class' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "class".len);
     const binding_identifier_location = (try self.peekToken()).location;
     const binding_identifier = self.acceptBindingIdentifier() catch null;
@@ -3528,7 +3528,7 @@ fn acceptAsyncFunctionDeclaration(self: *Parser) AcceptError!ast.AsyncFunctionDe
     errdefer self.core.restoreState(state);
 
     _ = try self.acceptKeyword("async");
-    // We need to do this after consuming the 'async' token to skip preceeding whitespace.
+    // We need to do this after consuming the 'async' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
     if (self.followedByLineTerminator()) {
         try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
@@ -3576,7 +3576,7 @@ pub fn acceptAsyncFunctionExpression(self: *Parser) AcceptError!ast.AsyncFunctio
     errdefer self.core.restoreState(state);
 
     _ = try self.acceptKeyword("async");
-    // We need to do this after consuming the 'async' token to skip preceeding whitespace.
+    // We need to do this after consuming the 'async' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
     if (self.followedByLineTerminator()) {
         try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});
@@ -3634,7 +3634,7 @@ pub fn acceptAsyncArrowFunction(self: *Parser) AcceptError!ast.AsyncArrowFunctio
     errdefer self.core.restoreState(state);
 
     _ = try self.acceptKeyword("async");
-    // We need to do this after consuming the 'async' token to skip preceeding whitespace.
+    // We need to do this after consuming the 'async' token to skip preceding whitespace.
     const start_offset = self.core.tokenizer.offset - (comptime "async".len);
     if (self.followedByLineTerminator()) {
         try self.emitErrorAt(self.core.tokenizer.current_location, "Unexpected newline", .{});

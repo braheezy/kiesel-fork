@@ -119,7 +119,7 @@ pub fn parseNumericLiteral(
                     state = .fraction_period;
                 } else if (state == .fraction_period and i == 1) {
                     // Starting fraction period followed by another period, not actually a numeric
-                    // literal (happens in spead expressions)
+                    // literal (happens in spread expressions)
                     return error.InvalidNumericLiteral;
                 } else {
                     // Start of a member expression, terminate the literal
