@@ -67,6 +67,7 @@ exception_jump_target_stack: std.ArrayList(usize),
 function_arguments: std.ArrayList(Value),
 result: ?Value = null,
 exception: ?Value = null,
+cached_this_value: ?Value = null,
 
 pub fn init(agent: *Agent) std.mem.Allocator.Error!Vm {
     const stack = try std.ArrayList(Value).initCapacity(agent.gc_allocator, 32);
@@ -80,6 +81,9 @@ pub fn init(agent: *Agent) std.mem.Allocator.Error!Vm {
         .reference_stack = .init(agent.gc_allocator),
         .exception_jump_target_stack = .init(agent.gc_allocator),
         .function_arguments = function_arguments,
+        .result = null,
+        .exception = null,
+        .cached_this_value = null,
     };
 }
 
@@ -1351,7 +1355,12 @@ fn executeResolvePrivateIdentifier(self: *Vm, executable: Executable) Agent.Erro
 }
 
 fn executeResolveThisBinding(self: *Vm, _: Executable) Agent.Error!void {
-    self.result = try self.agent.resolveThisBinding();
+    // NOTE: Caching the this value currently relies on the fact that each function runs in its own
+    //       Vm, it'll need to be cleared between calls if that changes.
+    if (self.cached_this_value == null) {
+        self.cached_this_value = try self.agent.resolveThisBinding();
+    }
+    self.result = self.cached_this_value.?;
 }
 
 fn executeRestoreLexicalEnvironment(self: *Vm, _: Executable) Agent.Error!void {
