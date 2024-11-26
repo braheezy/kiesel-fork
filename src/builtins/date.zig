@@ -496,48 +496,39 @@ pub fn parseDateTimeString(string: *const String) f64 {
     //       using parser-toolkit.
     const old_parser = struct {
         // Copy of the functions before https://github.com/ziglang/zig/pull/18533 required them to be called at comptime.
-        pub fn until(parser: *std.fmt.Parser, ch: u8) []const u8 {
-            const start = parser.pos;
-            if (start >= parser.buf.len)
-                return &[_]u8{};
-            while (parser.pos < parser.buf.len) : (parser.pos += 1) {
-                if (parser.buf[parser.pos] == ch) break;
+        pub fn until(parser: *std.fmt.Parser, ch: u21) []const u8 {
+            const start = parser.iter.i;
+            while (parser.peek(0)) |code_point| {
+                if (code_point == ch)
+                    break;
+                _ = parser.iter.nextCodepoint();
             }
-            return parser.buf[start..parser.pos];
-        }
-        pub fn maybe(parser: *std.fmt.Parser, val: u8) bool {
-            if (parser.pos < parser.buf.len and parser.buf[parser.pos] == val) {
-                parser.pos += 1;
-                return true;
-            }
-            return false;
-        }
-        pub fn peek(parser: *std.fmt.Parser, n: usize) ?u8 {
-            return if (parser.pos + n < parser.buf.len) parser.buf[parser.pos + n] else null;
+            return parser.iter.bytes[start..parser.iter.i];
         }
     };
+    const view = std.unicode.Utf8View.initUnchecked(switch (string.slice) {
+        .ascii => |ascii| ascii,
+        .utf16 => return invalid,
+    });
     var parser: std.fmt.Parser = .{
-        .buf = switch (string.slice) {
-            .ascii => |ascii| ascii,
-            .utf16 => return invalid,
-        },
+        .iter = view.iterator(),
     };
-    const sign: ?u8 = if (old_parser.maybe(&parser, '-')) '-' else if (old_parser.maybe(&parser, '+')) '+' else null;
+    const sign: ?u8 = if (parser.maybe('-')) '-' else if (parser.maybe('+')) '+' else null;
     const year_string = old_parser.until(&parser, '-');
-    if (!old_parser.maybe(&parser, '-')) return invalid;
+    if (!parser.maybe('-')) return invalid;
     const month_string = old_parser.until(&parser, '-');
-    if (!old_parser.maybe(&parser, '-')) return invalid;
+    if (!parser.maybe('-')) return invalid;
     const date_string = old_parser.until(&parser, 'T');
-    if (!old_parser.maybe(&parser, 'T')) return invalid;
+    if (!parser.maybe('T')) return invalid;
     const hour_string = old_parser.until(&parser, ':');
-    if (!old_parser.maybe(&parser, ':')) return invalid;
+    if (!parser.maybe(':')) return invalid;
     const minute_string = old_parser.until(&parser, ':');
-    if (!old_parser.maybe(&parser, ':')) return invalid;
+    if (!parser.maybe(':')) return invalid;
     const second_string = old_parser.until(&parser, '.');
-    if (!old_parser.maybe(&parser, '.')) return invalid;
+    if (!parser.maybe('.')) return invalid;
     const millisecond_string = old_parser.until(&parser, 'Z');
-    if (!old_parser.maybe(&parser, 'Z')) return invalid;
-    if (old_parser.peek(&parser, 0) != null) return invalid;
+    if (!parser.maybe('Z')) return invalid;
+    if (parser.peek(0) != null) return invalid;
     if (year_string.len != @as(usize, if (sign != null) 6 else 4) or
         month_string.len != 2 or
         date_string.len != 2 or
