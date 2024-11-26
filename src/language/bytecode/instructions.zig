@@ -4,8 +4,6 @@ const Executable = @import("Executable.zig");
 const IndexType = Executable.IndexType;
 
 pub const Instruction = enum(u8) {
-    /// Store ApplyStringOrNumericBinaryOperator() as the result value.
-    apply_string_or_numeric_binary_operator,
     /// Store ArrayCreate(0) as the result value.
     array_create,
     /// Append value on the stack to an array.
@@ -18,6 +16,20 @@ pub const Instruction = enum(u8) {
     array_spread_value,
     /// Store Await() as the result value.
     @"await",
+    // Store ApplyStringOrNumericBinaryOperator() as the result value.
+    // These are split up to save on decoding time and avoid a switch in the fast path.
+    binary_operator_add,
+    binary_operator_sub,
+    binary_operator_mul,
+    binary_operator_div,
+    binary_operator_mod,
+    binary_operator_exp,
+    binary_operator_left_shift,
+    binary_operator_right_shift,
+    binary_operator_unsigned_right_shift,
+    binary_operator_bitwise_and,
+    binary_operator_bitwise_or,
+    binary_operator_bitwise_xor,
     /// Store BindingClassDeclarationEvaluation() as the result value.
     binding_class_declaration_evaluation,
     /// Apply bitwise NOT to the last value on the stack and store it as the result value.
@@ -203,7 +215,6 @@ pub const Instruction = enum(u8) {
             .object_define_method,
             .typeof_identifier,
             => 2,
-            .apply_string_or_numeric_binary_operator,
             .array_create,
             .array_set_length,
             .array_set_value_direct,

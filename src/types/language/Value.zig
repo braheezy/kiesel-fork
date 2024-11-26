@@ -499,6 +499,11 @@ pub fn __asF64(self: Value) f64 {
     };
 }
 
+/// Leaks an implementation detail, use with care.
+pub fn __toF64(self: Value) f64 {
+    return if (self.__isF64()) self.__asF64() else @floatFromInt(self.__asI32());
+}
+
 /// Return a string according to the 'typeof' operator semantics.
 pub fn typeof(self: Value) *const String {
     // Excerpt from https://tc39.es/ecma262/#sec-typeof-operator-runtime-semantics-evaluation

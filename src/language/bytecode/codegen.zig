@@ -786,8 +786,7 @@ pub fn codegenTemplateLiteral(
             },
         }
         if (i != 0) {
-            try executable.addInstruction(.apply_string_or_numeric_binary_operator);
-            try executable.addIndex(@intFromEnum(ast.BinaryExpression.Operator.@"+"));
+            try executable.addInstruction(.binary_operator_add);
             if (i < node.spans.len - 1) try executable.addInstruction(.load);
         }
     }
@@ -1854,25 +1853,22 @@ pub fn codegenAssignmentExpression(
         // 5. Let assignmentOpText be the source text matched by AssignmentOperator.
         // 6. Let opText be the sequence of Unicode code points associated with assignmentOpText
         //    in the following table:
-        const operator: ast.BinaryExpression.Operator = switch (node.operator) {
-            .@"*=" => .@"*",
-            .@"/=" => .@"/",
-            .@"%=" => .@"%",
-            .@"+=" => .@"+",
-            .@"-=" => .@"-",
-            .@"<<=" => .@"<<",
-            .@">>=" => .@">>",
-            .@">>>=" => .@">>>",
-            .@"&=" => .@"&",
-            .@"^=" => .@"^",
-            .@"|=" => .@"|",
-            .@"**=" => .@"**",
-            else => unreachable,
-        };
-
         // 7. Let r be ? ApplyStringOrNumericBinaryOperator(lVal, opText, rVal).
-        try executable.addInstruction(.apply_string_or_numeric_binary_operator);
-        try executable.addIndex(@intFromEnum(operator));
+        try executable.addInstruction(switch (node.operator) {
+            .@"+=" => .binary_operator_add,
+            .@"-=" => .binary_operator_sub,
+            .@"*=" => .binary_operator_mul,
+            .@"/=" => .binary_operator_div,
+            .@"%=" => .binary_operator_mod,
+            .@"**=" => .binary_operator_exp,
+            .@"<<=" => .binary_operator_left_shift,
+            .@">>=" => .binary_operator_right_shift,
+            .@">>>=" => .binary_operator_unsigned_right_shift,
+            .@"&=" => .binary_operator_bitwise_and,
+            .@"^=" => .binary_operator_bitwise_xor,
+            .@"|=" => .binary_operator_bitwise_or,
+            else => unreachable,
+        });
 
         // 8. Perform ? PutValue(lRef, r).
         // 9. Return r.
@@ -2046,8 +2042,20 @@ pub fn codegenBinaryExpression(
     try executable.addInstruction(.load);
 
     // 5. Return ? ApplyStringOrNumericBinaryOperator(lVal, opText, rVal).
-    try executable.addInstruction(.apply_string_or_numeric_binary_operator);
-    try executable.addIndex(@intFromEnum(node.operator));
+    try executable.addInstruction(switch (node.operator) {
+        .@"+" => .binary_operator_add,
+        .@"-" => .binary_operator_sub,
+        .@"*" => .binary_operator_mul,
+        .@"/" => .binary_operator_div,
+        .@"%" => .binary_operator_mod,
+        .@"**" => .binary_operator_exp,
+        .@"<<" => .binary_operator_left_shift,
+        .@">>" => .binary_operator_right_shift,
+        .@">>>" => .binary_operator_unsigned_right_shift,
+        .@"&" => .binary_operator_bitwise_and,
+        .@"^" => .binary_operator_bitwise_xor,
+        .@"|" => .binary_operator_bitwise_or,
+    });
 }
 
 /// 13.16.1 Runtime Semantics: Evaluation

@@ -156,50 +156,6 @@ fn getArguments(self: *Vm, argument_count: usize) Agent.Error![]const Value {
     return self.function_arguments.items;
 }
 
-fn executeApplyStringOrNumericBinaryOperator(self: *Vm, executable: Executable) Agent.Error!void {
-    const operator_type = self.fetchIndex(executable);
-    const operator: ast.BinaryExpression.Operator = @enumFromInt(operator_type);
-    const r_val = self.stack.pop();
-    const l_val = self.stack.pop();
-
-    // OPTIMIZATION: Fast path for i32 values
-    if (l_val.__isI32() and r_val.__isI32()) blk: {
-        const l = l_val.__asI32();
-        const r = r_val.__asI32();
-        if (switch (operator) {
-            .@"+" => std.math.add(i32, l, r),
-            .@"-" => std.math.sub(i32, l, r),
-            .@"*" => std.math.mul(i32, l, r),
-            .@"&" => l & r,
-            .@"^" => l ^ r,
-            .@"|" => l | r,
-            // Some operators are not that straightforward, use the fallback impl
-            else => break :blk,
-        }) |result| {
-            self.result = Value.from(result);
-            return;
-        } else |_| {}
-    }
-
-    // OPTIMIZATION: Fast path for f64 values
-    if (l_val.__isF64() and r_val.__isF64()) blk: {
-        const l = l_val.__asF64();
-        const r = r_val.__asF64();
-        const result = switch (operator) {
-            .@"+" => l + r,
-            .@"-" => l - r,
-            .@"*" => l * r,
-            .@"/" => l / r,
-            // Some operators are not that straightforward, use the fallback impl
-            else => break :blk,
-        };
-        self.result = Value.from(result);
-        return;
-    }
-
-    self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, operator, r_val);
-}
-
 fn executeArrayCreate(self: *Vm, executable: Executable) Agent.Error!void {
     const length = self.fetchIndex(executable);
     const array = try arrayCreate(self.agent, length, null);
@@ -269,6 +225,150 @@ fn executeAwait(self: *Vm, _: Executable) Agent.Error!void {
     self.result = try @"await"(self.agent, value);
 }
 
+fn executeBinaryOperatorAdd(self: *Vm, _: Executable) Agent.Error!void {
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
+
+    // OPTIMIZATION: Fast path for number values
+    if (l_val.isNumber() and r_val.isNumber()) {
+        if (l_val.__isI32() and r_val.__isI32()) {
+            if (std.math.add(i32, l_val.__asI32(), r_val.__asI32())) |result| {
+                self.result = Value.from(result);
+                return;
+            } else |_| {}
+        }
+        self.result = Value.from(l_val.__toF64() + r_val.__toF64());
+        return;
+    }
+
+    self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@"+", r_val);
+}
+
+fn executeBinaryOperatorSub(self: *Vm, _: Executable) Agent.Error!void {
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
+
+    // OPTIMIZATION: Fast path for number values
+    if (l_val.isNumber() and r_val.isNumber()) {
+        if (l_val.__isI32() and r_val.__isI32()) {
+            if (std.math.sub(i32, l_val.__asI32(), r_val.__asI32())) |result| {
+                self.result = Value.from(result);
+                return;
+            } else |_| {}
+        }
+        self.result = Value.from(l_val.__toF64() - r_val.__toF64());
+        return;
+    }
+
+    self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@"-", r_val);
+}
+
+fn executeBinaryOperatorMul(self: *Vm, _: Executable) Agent.Error!void {
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
+
+    // OPTIMIZATION: Fast path for number values
+    if (l_val.isNumber() and r_val.isNumber()) {
+        if (l_val.__isI32() and r_val.__isI32()) {
+            if (std.math.mul(i32, l_val.__asI32(), r_val.__asI32())) |result| {
+                self.result = Value.from(result);
+                return;
+            } else |_| {}
+        }
+        self.result = Value.from(l_val.__toF64() * r_val.__toF64());
+        return;
+    }
+
+    self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@"*", r_val);
+}
+
+fn executeBinaryOperatorDiv(self: *Vm, _: Executable) Agent.Error!void {
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
+
+    // OPTIMIZATION: Fast path for number values
+    if (l_val.isNumber() and r_val.isNumber()) {
+        self.result = Value.from(l_val.__toF64() / r_val.__toF64());
+        return;
+    }
+
+    self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@"/", r_val);
+}
+
+fn executeBinaryOperatorMod(self: *Vm, _: Executable) Agent.Error!void {
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
+
+    self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@"%", r_val);
+}
+
+fn executeBinaryOperatorExp(self: *Vm, _: Executable) Agent.Error!void {
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
+
+    self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@"**", r_val);
+}
+
+fn executeBinaryOperatorLeftShift(self: *Vm, _: Executable) Agent.Error!void {
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
+
+    self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@"<<", r_val);
+}
+
+fn executeBinaryOperatorRightShift(self: *Vm, _: Executable) Agent.Error!void {
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
+
+    self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@">>", r_val);
+}
+
+fn executeBinaryOperatorUnsignedRightShift(self: *Vm, _: Executable) Agent.Error!void {
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
+
+    self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@">>>", r_val);
+}
+
+fn executeBinaryOperatorBitwiseAnd(self: *Vm, _: Executable) Agent.Error!void {
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (l_val.__isI32() and r_val.__isI32()) {
+        self.result = Value.from(l_val.__asI32() & r_val.__asI32());
+        return;
+    }
+
+    self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@"&", r_val);
+}
+
+fn executeBinaryOperatorBitwiseOr(self: *Vm, _: Executable) Agent.Error!void {
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (l_val.__isI32() and r_val.__isI32()) {
+        self.result = Value.from(l_val.__asI32() | r_val.__asI32());
+        return;
+    }
+
+    self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@"|", r_val);
+}
+
+fn executeBinaryOperatorBitwiseXor(self: *Vm, _: Executable) Agent.Error!void {
+    const r_val = self.stack.pop();
+    const l_val = self.stack.pop();
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (l_val.__isI32() and r_val.__isI32()) {
+        self.result = Value.from(l_val.__asI32() ^ r_val.__asI32());
+        return;
+    }
+
+    self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@"^", r_val);
+}
+
 fn executeBindingClassDeclarationEvaluation(self: *Vm, executable: Executable) Agent.Error!void {
     const class_declaration = self.fetchAstNode(executable).class_declaration;
     self.result = Value.from(try bindingClassDeclarationEvaluation(self.agent, class_declaration));
@@ -276,6 +376,13 @@ fn executeBindingClassDeclarationEvaluation(self: *Vm, executable: Executable) A
 
 fn executeBitwiseNot(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
+
+    // OPTIMIZATION: Fast path for i32 values
+    if (value.__isI32()) {
+        self.result = Value.from(~value.__asI32());
+        return;
+    }
+
     self.result = switch (value.type()) {
         .number => Value.from(value.asNumber().bitwiseNOT()),
         .big_int => Value.from(try value.asBigInt().bitwiseNOT(self.agent)),
@@ -413,27 +520,19 @@ fn executeCreateWithEnvironment(self: *Vm, _: Executable) Agent.Error!void {
 fn executeDecrement(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
 
-    // OPTIMIZATION: Fast path for i32 values
-    if (value.__isI32()) {
-        if (std.math.sub(i32, value.__asI32(), 1)) |result| {
-            self.result = Value.from(result);
-            return;
-        } else |_| {}
-    }
-
-    // OPTIMIZATION: Fast path for f64 values
-    if (value.__isF64()) {
-        self.result = Value.from(value.__asF64() - 1);
+    // OPTIMIZATION: Fast path for number values
+    if (value.isNumber()) {
+        if (value.__isI32()) {
+            if (std.math.sub(i32, value.__asI32(), 1)) |result| {
+                self.result = Value.from(result);
+                return;
+            } else |_| {}
+        }
+        self.result = Value.from(value.__toF64() - 1);
         return;
     }
 
-    self.result = switch (value.type()) {
-        .number => Value.from(value.asNumber().subtract(.{ .i32 = 1 })),
-        .big_int => Value.from(
-            try value.asBigInt().subtract(self.agent, self.agent.pre_allocated.one),
-        ),
-        else => unreachable,
-    };
+    self.result = Value.from(try value.asBigInt().subtract(self.agent, self.agent.pre_allocated.one));
 }
 
 /// 13.5.1.2 Runtime Semantics: Evaluation
@@ -824,15 +923,13 @@ fn executeGreaterThan(self: *Vm, _: Executable) Agent.Error!void {
     const r_val = self.stack.pop();
     const l_val = self.stack.pop();
 
-    // OPTIMIZATION: Fast path for i32 values
-    if (l_val.__isI32() and r_val.__isI32()) {
-        self.result = Value.from(l_val.__asI32() > r_val.__asI32());
-        return;
-    }
-
-    // OPTIMIZATION: Fast path for f64 values
-    if (l_val.__isF64() and r_val.__isF64()) {
-        self.result = Value.from(l_val.__asF64() > r_val.__asF64());
+    // OPTIMIZATION: Fast path for number values
+    if (l_val.isNumber() and r_val.isNumber()) {
+        if (l_val.__isI32() and r_val.__isI32()) {
+            self.result = Value.from(l_val.__asI32() > r_val.__asI32());
+        } else {
+            self.result = Value.from(l_val.__toF64() > r_val.__toF64());
+        }
         return;
     }
 
@@ -847,15 +944,13 @@ fn executeGreaterThanEquals(self: *Vm, _: Executable) Agent.Error!void {
     const r_val = self.stack.pop();
     const l_val = self.stack.pop();
 
-    // OPTIMIZATION: Fast path for i32 values
-    if (l_val.__isI32() and r_val.__isI32()) {
-        self.result = Value.from(l_val.__asI32() >= r_val.__asI32());
-        return;
-    }
-
-    // OPTIMIZATION: Fast path for f64 values
-    if (l_val.__isF64() and r_val.__isF64()) {
-        self.result = Value.from(l_val.__asF64() >= r_val.__asF64());
+    // OPTIMIZATION: Fast path for number values
+    if (l_val.isNumber() and r_val.isNumber()) {
+        if (l_val.__isI32() and r_val.__isI32()) {
+            self.result = Value.from(l_val.__asI32() >= r_val.__asI32());
+        } else {
+            self.result = Value.from(l_val.__toF64() >= r_val.__toF64());
+        }
         return;
     }
 
@@ -914,27 +1009,19 @@ fn executeHasProperty(self: *Vm, _: Executable) Agent.Error!void {
 fn executeIncrement(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
 
-    // OPTIMIZATION: Fast path for i32 values
-    if (value.__isI32()) {
-        if (std.math.add(i32, value.__asI32(), 1)) |result| {
-            self.result = Value.from(result);
-            return;
-        } else |_| {}
-    }
-
-    // OPTIMIZATION: Fast path for f64 values
-    if (value.__isF64()) {
-        self.result = Value.from(value.__asF64() + 1);
+    // OPTIMIZATION: Fast path for number values
+    if (value.isNumber()) {
+        if (value.__isI32()) {
+            if (std.math.add(i32, value.__asI32(), 1)) |result| {
+                self.result = Value.from(result);
+                return;
+            } else |_| {}
+        }
+        self.result = Value.from(value.__toF64() + 1);
         return;
     }
 
-    self.result = switch (value.type()) {
-        .number => Value.from(value.asNumber().add(.{ .i32 = 1 })),
-        .big_int => Value.from(
-            try value.asBigInt().add(self.agent, self.agent.pre_allocated.one),
-        ),
-        else => unreachable,
-    };
+    self.result = Value.from(try value.asBigInt().add(self.agent, self.agent.pre_allocated.one));
 }
 
 fn executeInitializeDefaultExport(self: *Vm, _: Executable) Agent.Error!void {
@@ -1030,15 +1117,13 @@ fn executeIsLooselyEqual(self: *Vm, _: Executable) Agent.Error!void {
     const r_val = self.stack.pop();
     const l_val = self.stack.pop();
 
-    // OPTIMIZATION: Fast path for i32 values
-    if (l_val.__isI32() and r_val.__isI32()) {
-        self.result = Value.from(l_val.__asI32() == r_val.__asI32());
-        return;
-    }
-
-    // OPTIMIZATION: Fast path for f64 values
-    if (l_val.__isF64() and r_val.__isF64()) {
-        self.result = Value.from(l_val.__asF64() == r_val.__asF64());
+    // OPTIMIZATION: Fast path for number values
+    if (l_val.isNumber() and r_val.isNumber()) {
+        if (l_val.__isI32() and r_val.__isI32()) {
+            self.result = Value.from(l_val.__asI32() == r_val.__asI32());
+        } else {
+            self.result = Value.from(l_val.__toF64() == r_val.__toF64());
+        }
         return;
     }
 
@@ -1050,15 +1135,13 @@ fn executeIsStrictlyEqual(self: *Vm, _: Executable) Agent.Error!void {
     const r_val = self.stack.pop();
     const l_val = self.stack.pop();
 
-    // OPTIMIZATION: Fast path for i32 values
-    if (l_val.__isI32() and r_val.__isI32()) {
-        self.result = Value.from(l_val.__asI32() == r_val.__asI32());
-        return;
-    }
-
-    // OPTIMIZATION: Fast path for f64 values
-    if (l_val.__isF64() and r_val.__isF64()) {
-        self.result = Value.from(l_val.__asF64() == r_val.__asF64());
+    // OPTIMIZATION: Fast path for number values
+    if (l_val.isNumber() and r_val.isNumber()) {
+        if (l_val.__isI32() and r_val.__isI32()) {
+            self.result = Value.from(l_val.__asI32() == r_val.__asI32());
+        } else {
+            self.result = Value.from(l_val.__toF64() == r_val.__toF64());
+        }
         return;
     }
 
@@ -1081,15 +1164,13 @@ fn executeLessThan(self: *Vm, _: Executable) Agent.Error!void {
     const r_val = self.stack.pop();
     const l_val = self.stack.pop();
 
-    // OPTIMIZATION: Fast path for i32 values
-    if (l_val.__isI32() and r_val.__isI32()) {
-        self.result = Value.from(l_val.__asI32() < r_val.__asI32());
-        return;
-    }
-
-    // OPTIMIZATION: Fast path for f64 values
-    if (l_val.__isF64() and r_val.__isF64()) {
-        self.result = Value.from(l_val.__asF64() < r_val.__asF64());
+    // OPTIMIZATION: Fast path for number values
+    if (l_val.isNumber() and r_val.isNumber()) {
+        if (l_val.__isI32() and r_val.__isI32()) {
+            self.result = Value.from(l_val.__asI32() < r_val.__asI32());
+        } else {
+            self.result = Value.from(l_val.__toF64() < r_val.__toF64());
+        }
         return;
     }
 
@@ -1104,15 +1185,13 @@ fn executeLessThanEquals(self: *Vm, _: Executable) Agent.Error!void {
     const r_val = self.stack.pop();
     const l_val = self.stack.pop();
 
-    // OPTIMIZATION: Fast path for i32 values
-    if (l_val.__isI32() and r_val.__isI32()) {
-        self.result = Value.from(l_val.__asI32() <= r_val.__asI32());
-        return;
-    }
-
-    // OPTIMIZATION: Fast path for f64 values
-    if (l_val.__isF64() and r_val.__isF64()) {
-        self.result = Value.from(l_val.__asF64() <= r_val.__asF64());
+    // OPTIMIZATION: Fast path for number values
+    if (l_val.isNumber() and r_val.isNumber()) {
+        if (l_val.__isI32() and r_val.__isI32()) {
+            self.result = Value.from(l_val.__asI32() <= r_val.__asI32());
+        } else {
+            self.result = Value.from(l_val.__toF64() <= r_val.__toF64());
+        }
         return;
     }
 
@@ -1466,11 +1545,18 @@ fn executeTypeofIdentifier(self: *Vm, executable: Executable) Agent.Error!void {
 
 fn executeUnaryMinus(self: *Vm, _: Executable) Agent.Error!void {
     const value = self.result.?;
-    self.result = switch (value.type()) {
-        .number => Value.from(value.asNumber().unaryMinus()),
-        .big_int => Value.from(try value.asBigInt().unaryMinus(self.agent)),
-        else => unreachable,
-    };
+
+    // OPTIMIZATION: Fast path for number values
+    if (value.isNumber()) {
+        if (value.__isI32() and value.__asI32() != 0) {
+            self.result = Value.from(-value.__asI32());
+        } else {
+            self.result = Value.from(-value.__toF64());
+        }
+        return;
+    }
+
+    self.result = Value.from(try value.asBigInt().unaryMinus(self.agent));
 }
 
 fn executeYield(_: *Vm, _: Executable) Agent.Error!void {
@@ -1496,13 +1582,24 @@ fn executeInstruction(
     executable: Executable,
 ) Agent.Error!void {
     (switch (instruction) {
-        .apply_string_or_numeric_binary_operator => self.executeApplyStringOrNumericBinaryOperator(executable),
         .array_create => self.executeArrayCreate(executable),
         .array_push_value => self.executeArrayPushValue(executable),
         .array_set_length => self.executeArraySetLength(executable),
         .array_set_value_direct => self.executeArraySetValueDirect(executable),
         .array_spread_value => self.executeArraySpreadValue(executable),
         .@"await" => self.executeAwait(executable),
+        .binary_operator_add => self.executeBinaryOperatorAdd(executable),
+        .binary_operator_sub => self.executeBinaryOperatorSub(executable),
+        .binary_operator_mul => self.executeBinaryOperatorMul(executable),
+        .binary_operator_div => self.executeBinaryOperatorDiv(executable),
+        .binary_operator_mod => self.executeBinaryOperatorMod(executable),
+        .binary_operator_exp => self.executeBinaryOperatorExp(executable),
+        .binary_operator_left_shift => self.executeBinaryOperatorLeftShift(executable),
+        .binary_operator_right_shift => self.executeBinaryOperatorRightShift(executable),
+        .binary_operator_unsigned_right_shift => self.executeBinaryOperatorUnsignedRightShift(executable),
+        .binary_operator_bitwise_and => self.executeBinaryOperatorBitwiseAnd(executable),
+        .binary_operator_bitwise_or => self.executeBinaryOperatorBitwiseOr(executable),
+        .binary_operator_bitwise_xor => self.executeBinaryOperatorBitwiseXor(executable),
         .binding_class_declaration_evaluation => self.executeBindingClassDeclarationEvaluation(executable),
         .bitwise_not => self.executeBitwiseNot(executable),
         .block_declaration_instantiation => self.executeBlockDeclarationInstantiation(executable),

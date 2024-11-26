@@ -164,11 +164,6 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
         try tty_config.setColor(writer, .reset);
         if (instruction.argumentCount() != 0) try writer.writeAll(" ");
         switch (instruction) {
-            .apply_string_or_numeric_binary_operator => {
-                const operator_type = iterator.instruction_args[0].?;
-                const operator: ast.BinaryExpression.Operator = @enumFromInt(operator_type);
-                try writer.print("(operator: {s})", .{@tagName(operator)});
-            },
             .array_create => {
                 const length = iterator.instruction_args[0].?;
                 try writer.print("(length: {})", .{length});
