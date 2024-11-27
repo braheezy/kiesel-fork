@@ -783,11 +783,17 @@ pub fn formatDateTime(agent: *Agent, date_time_format: *const DateTimeFormat, x_
     return Value.from(try String.fromUtf8(agent.gc_allocator, result));
 }
 
+const FormatDateTimeError =
+    std.mem.Allocator.Error ||
+    icu4zig.CalendarError ||
+    icu4zig.DateTimeFormatterLoadError ||
+    icu4zig.DateTimeFormatError;
+
 fn formatDateTimeImpl(
     allocator: std.mem.Allocator,
     date_time_format: *const DateTimeFormat,
     x: f64,
-) (std.mem.Allocator.Error || icu4zig.CalendarError || icu4zig.DateTimeFormatError)![]const u8 {
+) FormatDateTimeError![]const u8 {
     const date = @import("../date.zig");
 
     const data_provider = icu4zig.DataProvider.init();
