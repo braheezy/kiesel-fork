@@ -514,6 +514,41 @@ pub fn ordinarySet(
     value: Value,
     receiver: Value,
 ) Agent.Error!bool {
+    // OPTIMIZATION: Fast path bypassing property descriptors for the common case of ordinary objects
+    if (receiver.isObject() and object == receiver.asObject() and
+        object.internal_methods.getOwnProperty == &getOwnProperty and
+        object.internal_methods.getPrototypeOf == &getPrototypeOf and
+        object.internal_methods.isExtensible == &isExtensible and
+        object.internal_methods.defineOwnProperty == &defineOwnProperty)
+    {
+        const property_metadata = object.shape.properties.get(property_key) orelse {
+            if (object.shape.prototype) |parent| {
+                return parent.internal_methods.set(parent, property_key, value, receiver);
+            }
+            if (!object.shape.extensible) return false;
+            try object.setPropertyDirect(property_key, .{
+                .value = value,
+                .writable = true,
+                .enumerable = true,
+                .configurable = true,
+            });
+            return true;
+        };
+        const property_value = try object.getPropertyCreateIntrinsicIfNeeded(property_metadata.index);
+        switch (property_value) {
+            .value => {
+                if (!property_metadata.attributes.writable) return false;
+                object.property_storage.items[property_metadata.index] = .{ .value = value };
+            },
+            .accessor => |accessor| {
+                const setter = accessor.set orelse return false;
+                _ = try Value.from(setter).callAssumeCallable(receiver, &.{value});
+            },
+            .lazy_intrinsic => unreachable,
+        }
+        return true;
+    }
+
     // 1. Let ownDesc be ? O.[[GetOwnProperty]](P).
     const own_descriptor = try object.internal_methods.getOwnProperty(object, property_key);
 
