@@ -27,14 +27,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y binutils-mingw-w64
-      # TODO: Re-enable this when https://github.com/akarpovskii/build.crab/issues/14 is fixed
-      # - name: Build kiesel.wasm
-      #   run: |
-      #     # Building with Intl almost doubles the size, let's try to keep the final blob
-      #     # reasonably small - as a result we build this twice
-      #     zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe
-      #     zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe -Denable-intl=false
-      #     # Outputs zig-out/bin/kiesel.wasm, no `mv` needed
+      - name: Build kiesel.wasm
+        run: |
+          # Building with Intl almost doubles the size, let's try to keep the final blob
+          # reasonably small - as a result we build this twice
+          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe
+          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe -Denable-intl=false
+          # Outputs zig-out/bin/kiesel.wasm, no `mv` needed
       - name: Build kiesel-linux-aarch64
         run: |
           # Verify building without NaN-boxing on aarch64.
