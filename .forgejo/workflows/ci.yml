@@ -65,7 +65,8 @@ jobs:
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-powerpc64
       - name: Build kiesel-linux-riscv64
         run: |
-          zig build -Dtarget=riscv64-linux-musl -Doptimize=ReleaseSafe
+          # TODO: Intl is disabled for now as rustc claims std can't be built for the target
+          zig build -Dtarget=riscv64-linux-musl -Doptimize=ReleaseSafe -Denable-intl=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-riscv64
       - name: Build kiesel-linux-x86
         run: |
