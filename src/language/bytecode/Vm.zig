@@ -241,6 +241,14 @@ fn executeBinaryOperatorAdd(self: *Vm, _: Executable) Agent.Error!void {
         return;
     }
 
+    // OPTIMIZATION: Fast path for string values
+    else if (l_val.isString() and r_val.isString()) {
+        self.result = Value.from(
+            try String.concat(self.agent.gc_allocator, &.{ l_val.asString(), r_val.asString() }),
+        );
+        return;
+    }
+
     self.result = try applyStringOrNumericBinaryOperator(self.agent, l_val, .@"+", r_val);
 }
 
