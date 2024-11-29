@@ -835,7 +835,7 @@ pub fn toIntegerOrInfinity(self: Value, agent: *Agent) Agent.Error!f64 {
 /// https://tc39.es/ecma262/#sec-toint32
 pub fn toInt32(self: Value, agent: *Agent) Agent.Error!i32 {
     // OPTIMIZATION: We may already have an i32 :^)
-    if (self.isNumber() and self.asNumber() == .i32) return self.asNumber().i32;
+    if (self.__isI32()) return self.__asI32();
 
     // 1. Let number be ? ToNumber(argument).
     const number = try self.toNumber(agent);
@@ -851,8 +851,8 @@ pub fn toInt32(self: Value, agent: *Agent) Agent.Error!i32 {
 /// https://tc39.es/ecma262/#sec-touint32
 pub fn toUint32(self: Value, agent: *Agent) Agent.Error!u32 {
     // OPTIMIZATION: We may already have a positive i32 :^)
-    if (self.isNumber() and self.asNumber() == .i32 and self.asNumber().i32 >= 0)
-        return @intCast(self.asNumber().i32);
+    if (self.__isI32() and self.__asI32() >= 0)
+        return @intCast(self.__asI32());
 
     // 1. Let number be ? ToNumber(argument).
     const number = try self.toNumber(agent);
