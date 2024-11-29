@@ -841,16 +841,10 @@ pub fn toInt32(self: Value, agent: *Agent) Agent.Error!i32 {
     const number = try self.toNumber(agent);
 
     // 2. If number is not finite or number is either +0𝔽 or -0𝔽, return +0𝔽.
-    if (!number.isFinite() or number.asFloat() == 0) return 0;
-
     // 3. Let int be truncate(ℝ(number)).
-    const int = number.truncate().asFloat();
-
     // 4. Let int32bit be int modulo 2**32.
-    const int32bit: u32 = @intFromFloat(@mod(int, pow_2_32));
-
     // 5. If int32bit ≥ 2**31, return 𝔽(int32bit - 2**32); otherwise return 𝔽(int32bit).
-    return @bitCast(int32bit);
+    return number.toInt32();
 }
 
 /// 7.1.7 ToUint32 ( argument )

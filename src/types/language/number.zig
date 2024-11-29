@@ -1,6 +1,7 @@
 //! 6.1.6.1 The Number Type
 //! https://tc39.es/ecma262/#sec-ecmascript-language-types-number-type
 
+const builtin = @import("builtin");
 const std = @import("std");
 
 const types = @import("../../types.zig");
@@ -151,9 +152,21 @@ pub const Number = union(enum) {
         };
     }
 
-    fn toInt32(self: Number) i32 {
+    pub fn toInt32(self: Number) i32 {
         return switch (self) {
             .f64 => |x| blk: {
+                // OPTIMIZATION: ARMv8.3-A has an instruction for this :^)
+                if (comptime builtin.target.cpu.arch.isAARCH64() and
+                    std.Target.aarch64.featureSetHas(builtin.target.cpu.features, .jsconv))
+                {
+                    return asm volatile (
+                        \\fjcvtzs w0, d1
+                        : [ret] "={w0}" (-> i32),
+                        : [number] "{d1}" (x),
+                        : "cc"
+                    );
+                }
+
                 // Excerpt from Value.toInt32()
                 if (!std.math.isFinite(x) or x == 0) break :blk 0;
                 const int = @trunc(x);
@@ -167,7 +180,7 @@ pub const Number = union(enum) {
         };
     }
 
-    fn toUint32(self: Number) u32 {
+    pub fn toUint32(self: Number) u32 {
         return switch (self) {
             .f64 => |x| blk: {
                 // Excerpt from Value.toUint32()
