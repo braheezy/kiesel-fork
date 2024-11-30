@@ -1583,9 +1583,10 @@ pub fn codegenRelationalExpression(
 
             // 4. If rVal is not an Object, throw a TypeError exception.
             // 5. Let privateEnv be the running execution context's PrivateEnvironment.
-            // 6. Let privateName be ResolvePrivateIdentifier(privateEnv, privateIdentifier).
-            // 7. If PrivateElementFind(rVal, privateName) is not empty, return true.
-            // 8. Return false.
+            // 6. Assert: privateEnv is not null.
+            // 7. Let privateName be ResolvePrivateIdentifier(privateEnv, privateIdentifier).
+            // 8. If PrivateElementFind(rVal, privateName) is not empty, return true.
+            // 9. Return false.
             try executable.addInstructionWithIdentifier(.has_private_element, private_identifier);
         },
     }

@@ -983,15 +983,16 @@ fn executeHasPrivateElement(self: *Vm, executable: Executable) Agent.Error!void 
     }
 
     // 5. Let privateEnv be the running execution context's PrivateEnvironment.
+    // 6. Assert: privateEnv is not null.
     const private_environment = self.agent.runningExecutionContext().ecmascript_code.?.private_environment.?;
 
-    // 6. Let privateName be ResolvePrivateIdentifier(privateEnv, privateIdentifier).
+    // 7. Let privateName be ResolvePrivateIdentifier(privateEnv, privateIdentifier).
     const private_name = private_environment.resolvePrivateIdentifier(
         try private_identifier.toUtf8(self.agent.gc_allocator),
     );
 
-    // 7. If PrivateElementFind(rVal, privateName) is not empty, return true.
-    // 8. Return false.
+    // 8. If PrivateElementFind(rVal, privateName) is not empty, return true.
+    // 9. Return false.
     self.result = Value.from(r_val.asObject().privateElementFind(private_name) != null);
 }
 
