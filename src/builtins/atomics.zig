@@ -452,14 +452,11 @@ pub const namespace = struct {
         const index = arguments.get(1);
         const value = arguments.get(2);
 
-        // 1. Let type be TypedArrayElementType(typedArray).
-        // 2. Let isLittleEndian be the value of the [[LittleEndian]] field of the surrounding
-        //    agent's Agent Record.
-        // 3. Let add be a new read-modify-write modification function with parameters (xBytes,
-        //    yBytes) that captures type and isLittleEndian and performs the following steps
-        //    atomically when called:
-        //     a-g.
-        // 4. Return ? AtomicReadModifyWrite(typedArray, index, value, add).
+        // 1. Let add be a new read-modify-write modification function with parameters (xBytes,
+        //    yBytes) that captures typedArray and performs the following steps atomically when
+        //    called:
+        //     a-i.
+        // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, add).
         return atomicReadModifyWrite(agent, typed_array, index, value, .Add);
     }
 
@@ -829,14 +826,11 @@ pub const namespace = struct {
         const index = arguments.get(1);
         const value = arguments.get(2);
 
-        // 1. Let type be TypedArrayElementType(typedArray).
-        // 2. Let isLittleEndian be the value of the [[LittleEndian]] field of the surrounding
-        //    agent's Agent Record.
-        // 3. Let subtract be a new read-modify-write modification function with parameters
-        //    (xBytes, yBytes) that captures type and isLittleEndian and performs the following
-        //    steps atomically when called:
-        //     a-g.
-        // 4. Return ? AtomicReadModifyWrite(typedArray, index, value, subtract).
+        // 1. Let subtract be a new read-modify-write modification function with parameters
+        //    (xBytes, yBytes) that captures typedArray and performs the following steps atomically
+        //    when called:
+        //     a-i.
+        // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, subtract).
         return atomicReadModifyWrite(agent, typed_array, index, value, .Sub);
     }
 
