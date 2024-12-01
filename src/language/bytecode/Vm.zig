@@ -468,25 +468,32 @@ fn executeClassDefinitionEvaluation(self: *Vm, executable: Executable) Agent.Err
     }
 }
 
-fn executeCreateCatchBinding(self: *Vm, executable: Executable) Agent.Error!void {
-    // TODO: This should create a new environment - for now we approximate this by creating
-    //       a new binding and ignoring the error if one already exists.
-    const name = self.fetchIdentifier(executable);
-    const thrown_value = self.exception.?;
-    self.exception = null;
-    const running_context = self.agent.runningExecutionContext();
-    const catch_env = running_context.ecmascript_code.?.lexical_environment;
-    if (!try catch_env.hasBinding(name)) {
-        try catch_env.createMutableBinding(self.agent, name, false);
-        try catch_env.initializeBinding(self.agent, name, thrown_value);
-    } else {
-        catch_env.setMutableBinding(
-            self.agent,
-            name,
-            thrown_value,
-            false,
-        ) catch unreachable;
+fn executeCreateCatchBindings(self: *Vm, executable: Executable) Agent.Error!void {
+    const catch_parameter = self.fetchAstNode(executable).catch_parameter;
+
+    // From CatchClauseEvaluation:
+    // 1. Let oldEnv be the running execution context's LexicalEnvironment.
+    const old_env = self.lexical_environment_stack.getLast();
+
+    // 2. Let catchEnv be NewDeclarativeEnvironment(oldEnv).
+    const catch_env = try newDeclarativeEnvironment(self.agent.gc_allocator, old_env);
+
+    var bound_names: std.ArrayListUnmanaged(ast.Identifier) = .empty;
+    defer bound_names.deinit(self.agent.gc_allocator);
+    try catch_parameter.collectBoundNames(self.agent.gc_allocator, &bound_names);
+
+    // 3. For each element argName of the BoundNames of CatchParameter, do
+    for (bound_names.items) |arg_name_utf8| {
+        const arg_name = try String.fromUtf8(self.agent.gc_allocator, arg_name_utf8);
+
+        // a. Perform ! catchEnv.CreateMutableBinding(argName, false).
+        catch_env.createMutableBinding(self.agent, arg_name, false) catch |err| try noexcept(err);
     }
+
+    // 4. Set the running execution context's LexicalEnvironment to catchEnv.
+    self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment = .{
+        .declarative_environment = catch_env,
+    };
 }
 
 fn executeCreateObjectPropertyIterator(self: *Vm, _: Executable) Agent.Error!void {
@@ -1036,16 +1043,13 @@ fn executeIncrement(self: *Vm, _: Executable) Agent.Error!void {
     self.result = Value.from(try value.asBigInt().add(self.agent, self.agent.pre_allocated.one));
 }
 
-fn executeInitializeDefaultExport(self: *Vm, _: Executable) Agent.Error!void {
-    const value = self.result.?;
-
-    // 3. Let env be the running execution context's LexicalEnvironment.
+fn executeInitializeBoundName(self: *Vm, executable: Executable) Agent.Error!void {
+    const name = self.fetchIdentifier(executable);
+    const value = self.stack.pop();
     const environment = self.agent.runningExecutionContext().ecmascript_code.?.lexical_environment;
-
-    // 4. Perform ? InitializeBoundName("*default*", value, env).
     try initializeBoundName(
         self.agent,
-        String.fromLiteral("*default*"),
+        name,
         value,
         .{ .environment = environment },
     );
@@ -1221,6 +1225,12 @@ fn executeLoad(self: *Vm, _: Executable) Agent.Error!void {
 
 fn executeLoadConstant(self: *Vm, executable: Executable) Agent.Error!void {
     const value = self.fetchConstant(executable);
+    try self.stack.append(self.agent.gc_allocator, value);
+}
+
+fn executeLoadAndClearException(self: *Vm, _: Executable) Agent.Error!void {
+    const value = self.exception.?;
+    self.exception = null;
     try self.stack.append(self.agent.gc_allocator, value);
 }
 
@@ -1616,7 +1626,7 @@ fn executeInstruction(
         .bitwise_not => self.executeBitwiseNot(executable),
         .block_declaration_instantiation => self.executeBlockDeclarationInstantiation(executable),
         .class_definition_evaluation => self.executeClassDefinitionEvaluation(executable),
-        .create_catch_binding => self.executeCreateCatchBinding(executable),
+        .create_catch_bindings => self.executeCreateCatchBindings(executable),
         .create_object_property_iterator => self.executeCreateObjectPropertyIterator(executable),
         .create_with_environment => self.executeCreateWithEnvironment(executable),
         .decrement => self.executeDecrement(executable),
@@ -1641,7 +1651,7 @@ fn executeInstruction(
         .has_private_element => self.executeHasPrivateElement(executable),
         .has_property => self.executeHasProperty(executable),
         .increment => self.executeIncrement(executable),
-        .initialize_default_export => self.executeInitializeDefaultExport(executable),
+        .initialize_bound_name => self.executeInitializeBoundName(executable),
         .initialize_referenced_binding => self.executeInitializeReferencedBinding(executable),
         .instanceof_operator => self.executeInstanceofOperator(executable),
         .instantiate_arrow_function_expression => self.executeInstantiateArrowFunctionExpression(executable),
@@ -1658,6 +1668,7 @@ fn executeInstruction(
         .less_than_equals => self.executeLessThanEquals(executable),
         .load => self.executeLoad(executable),
         .load_constant => self.executeLoadConstant(executable),
+        .load_and_clear_exception => self.executeLoadAndClearException(executable),
         .load_iterator_next_args => self.executeLoadIteratorNextArgs(executable),
         .load_this_value_for_evaluate_call => self.executeLoadThisValueForEvaluateCall(executable),
         .load_this_value_for_make_super_property_reference => self.executeLoadThisValueForMakeSuperPropertyReference(executable),

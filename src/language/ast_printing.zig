@@ -686,13 +686,21 @@ pub fn printTryStatement(node: ast.TryStatement, writer: anytype, indentation: u
     if (node.catch_block) |catch_block| {
         try print("catch:", writer, indentation + 1);
         if (node.catch_parameter) |catch_parameter| {
-            try print(catch_parameter, writer, indentation + 2);
+            try printCatchParameter(catch_parameter, writer, indentation + 2);
         }
         try printBlock(catch_block, writer, indentation + 2);
     }
     if (node.finally_block) |finally_block| {
         try print("finally:", writer, indentation + 1);
         try printBlock(finally_block, writer, indentation + 2);
+    }
+}
+
+pub fn printCatchParameter(node: ast.CatchParameter, writer: anytype, indentation: usize) @TypeOf(writer).Error!void {
+    try print("CatchParameter", writer, indentation);
+    switch (node) {
+        .binding_identifier => |binding_identifier| try print(binding_identifier, writer, indentation + 1),
+        .binding_pattern => |binding_pattern| try printBindingPattern(binding_pattern, writer, indentation + 1),
     }
 }
 

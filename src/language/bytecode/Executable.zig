@@ -37,6 +37,7 @@ pub const AstNode = union(enum) {
     case_block: ast.CaseBlock,
     template_literal: ast.TemplateLiteral,
     lexical_declaration: ast.LexicalDeclaration,
+    catch_parameter: ast.CatchParameter,
 };
 
 pub const IndexType = u16;
@@ -172,11 +173,6 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
                 const index = iterator.instruction_args[0].?;
                 try writer.print("(index: {})", .{index});
             },
-            .create_catch_binding => {
-                const identifier_index = iterator.instruction_args[0].?;
-                const identifier = self.identifiers.entries.get(identifier_index).key;
-                try writer.print("{s} [{}]", .{ identifier, identifier_index });
-            },
             .evaluate_call => {
                 const argument_count = iterator.instruction_args[0].?;
                 try writer.print("(argument_count: {})", .{argument_count});
@@ -216,6 +212,7 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
             .array_set_length,
             .binding_class_declaration_evaluation,
             .class_definition_evaluation,
+            .create_catch_bindings,
             .for_declaration_binding_instantiation,
             .instantiate_arrow_function_expression,
             .instantiate_async_arrow_function_expression,
@@ -264,7 +261,11 @@ pub fn print(self: Executable, writer: anytype, tty_config: std.io.tty.Config) @
                     .{ identifier, identifier_index, strict },
                 );
             },
-            .has_private_element, .make_private_reference, .resolve_private_identifier => {
+            .has_private_element,
+            .initialize_bound_name,
+            .make_private_reference,
+            .resolve_private_identifier,
+            => {
                 const identifier_index = iterator.instruction_args[0].?;
                 const identifier = self.identifiers.entries.get(identifier_index).key;
                 try writer.print("{s} [{}]", .{ identifier, identifier_index });

@@ -3603,21 +3603,59 @@ pub fn codegenTryStatement(
         // 1. Let B be Completion(Evaluation of Block).
         try executable.addInstructionWithConstant(.store_constant, .undefined);
         try codegenBlock(node.try_block, executable, ctx);
-        try executable.addInstruction(.pop_exception_jump_target);
+        try interceptContinueAndBreakJumps(executable, ctx, struct {
+            fn codegen(executable_: *Executable) Executable.Error!void {
+                try executable_.addInstruction(.pop_exception_jump_target);
+            }
+        }.codegen, .{executable});
         try executable.addInstruction(.jump);
         const end_jump = try executable.addJumpIndex();
 
         // 2. If B is a throw completion, let C be Completion(CatchClauseEvaluation of Catch with
         //    argument B.[[Value]]).
-        // TODO: Create a new lexical environment
         try exception_jump_to_catch.setTargetHere();
         try executable.addInstruction(.pop_exception_jump_target);
-        if (node.catch_parameter) |catch_parameter| try executable.addInstructionWithIdentifier(
-            .create_catch_binding,
-            catch_parameter,
-        );
+        if (node.catch_parameter) |catch_parameter| {
+            try executable.addInstruction(.push_lexical_environment);
+            try executable.addInstructionWithAstNode(.create_catch_bindings, .{
+                .catch_parameter = catch_parameter,
+            });
+            try executable.addInstruction(.load_and_clear_exception);
+            switch (catch_parameter) {
+                .binding_identifier => |binding_identifier| {
+                    try executable.addInstructionWithIdentifier(
+                        .initialize_bound_name,
+                        binding_identifier,
+                    );
+                },
+                .binding_pattern => |binding_pattern| {
+                    try bindingInitialization(
+                        binding_pattern,
+                        executable,
+                        ctx,
+                        .lexical_environment,
+                    );
+                },
+            }
+        }
+
+        // Only consider break/continue jumps from the following catch block
+        const break_jumps = try ctx.break_jumps.toOwnedSlice(executable.allocator);
+        const continue_jumps = try ctx.continue_jumps.toOwnedSlice(executable.allocator);
+
         try executable.addInstructionWithConstant(.store_constant, .undefined);
         try codegenBlock(node.catch_block.?, executable, ctx);
+        if (node.catch_parameter != null) {
+            try interceptContinueAndBreakJumps(executable, ctx, struct {
+                fn codegen(executable_: *Executable) Executable.Error!void {
+                    try executable_.addInstruction(.restore_lexical_environment);
+                    try executable_.addInstruction(.pop_lexical_environment);
+                }
+            }.codegen, .{executable});
+        }
+
+        try ctx.break_jumps.insertSlice(executable.allocator, 0, break_jumps);
+        try ctx.continue_jumps.insertSlice(executable.allocator, 0, continue_jumps);
 
         // 3. Else, let C be B.
         // 4. Return ? UpdateEmpty(C, undefined).
@@ -3655,17 +3693,51 @@ pub fn codegenTryStatement(
 
         // 2. If B is a throw completion, let C be Completion(CatchClauseEvaluation of Catch with argument B.[[Value]]).
         // 3. Else, let C be B.
-        // TODO: Create a new lexical environment
         try exception_jump_to_catch.setTargetHere();
         try executable.addInstruction(.pop_exception_jump_target);
         try executable.addInstruction(.push_exception_jump_target);
         const exception_jump_to_finally = try executable.addJumpIndex();
-        if (node.catch_parameter) |catch_parameter| try executable.addInstructionWithIdentifier(
-            .create_catch_binding,
-            catch_parameter,
-        );
+        if (node.catch_parameter) |catch_parameter| {
+            try executable.addInstruction(.push_lexical_environment);
+            try executable.addInstructionWithAstNode(.create_catch_bindings, .{
+                .catch_parameter = catch_parameter,
+            });
+            try executable.addInstruction(.load_and_clear_exception);
+            switch (catch_parameter) {
+                .binding_identifier => |binding_identifier| {
+                    try executable.addInstructionWithIdentifier(
+                        .initialize_bound_name,
+                        binding_identifier,
+                    );
+                },
+                .binding_pattern => |binding_pattern| {
+                    try bindingInitialization(
+                        binding_pattern,
+                        executable,
+                        ctx,
+                        .lexical_environment,
+                    );
+                },
+            }
+        }
+
+        // Only consider break/continue jumps from the following catch block
+        const break_jumps = try ctx.break_jumps.toOwnedSlice(executable.allocator);
+        const continue_jumps = try ctx.continue_jumps.toOwnedSlice(executable.allocator);
+
         try executable.addInstructionWithConstant(.store_constant, .undefined);
         try codegenBlock(node.catch_block.?, executable, ctx);
+        if (node.catch_parameter != null) {
+            try interceptContinueAndBreakJumps(executable, ctx, struct {
+                fn codegen(executable_: *Executable) Executable.Error!void {
+                    try executable_.addInstruction(.restore_lexical_environment);
+                    try executable_.addInstruction(.pop_lexical_environment);
+                }
+            }.codegen, .{executable});
+        }
+
+        try ctx.break_jumps.insertSlice(executable.allocator, 0, break_jumps);
+        try ctx.continue_jumps.insertSlice(executable.allocator, 0, continue_jumps);
 
         // 4. Let F be Completion(Evaluation of Finally).
         try finally_jump.setTargetHere();
@@ -4000,7 +4072,8 @@ pub fn codegenExportDeclaration(
             if (class_name == null) {
                 // a. Let env be the running execution context's LexicalEnvironment.
                 // b. Perform ? InitializeBoundName("*default*", value, env).
-                try executable.addInstruction(.initialize_default_export);
+                try executable.addInstruction(.load);
+                try executable.addInstructionWithIdentifier(.initialize_bound_name, "*default*");
             }
 
             // 4. Return empty.
@@ -4026,7 +4099,8 @@ pub fn codegenExportDeclaration(
 
             // 3. Let env be the running execution context's LexicalEnvironment.
             // 4. Perform ? InitializeBoundName("*default*", value, env).
-            try executable.addInstruction(.initialize_default_export);
+            try executable.addInstruction(.load);
+            try executable.addInstructionWithIdentifier(.initialize_bound_name, "*default*");
 
             // 5. Return empty.
             try executable.addInstruction(.store);

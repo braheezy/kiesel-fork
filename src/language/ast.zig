@@ -2565,7 +2565,7 @@ pub const ThrowStatement = struct {
 /// https://tc39.es/ecma262/#prod-TryStatement
 pub const TryStatement = struct {
     try_block: Block,
-    catch_parameter: ?Identifier, // TODO: Binding patterns
+    catch_parameter: ?CatchParameter,
     catch_block: ?Block,
     finally_block: ?Block,
 
@@ -2628,6 +2628,25 @@ pub const TryStatement = struct {
         }
         if (self.finally_block) |finally_block| {
             try finally_block.statement_list.collectVarScopedDeclarations(allocator, var_scoped_declarations);
+        }
+    }
+};
+
+/// https://tc39.es/ecma262/#prod-CatchParameter
+pub const CatchParameter = union(enum) {
+    binding_identifier: Identifier,
+    binding_pattern: BindingPattern,
+
+    /// 8.2.1 Static Semantics: BoundNames
+    /// https://tc39.es/ecma262/#sec-static-semantics-boundnames
+    pub fn collectBoundNames(
+        self: CatchParameter,
+        allocator: std.mem.Allocator,
+        bound_names: *std.ArrayListUnmanaged(Identifier),
+    ) std.mem.Allocator.Error!void {
+        switch (self) {
+            .binding_identifier => |binding_identifier| try bound_names.append(allocator, binding_identifier),
+            .binding_pattern => |binding_pattern| try binding_pattern.collectBoundNames(allocator, bound_names),
         }
     }
 };

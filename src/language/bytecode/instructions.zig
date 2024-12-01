@@ -38,8 +38,8 @@ pub const Instruction = enum(u8) {
     block_declaration_instantiation,
     /// Store ClassDefinitionEvaluation() as the result value.
     class_definition_evaluation,
-    /// Create a catch binding for the given name and populate it with the stored exception.
-    create_catch_binding,
+    /// Create bindings for the given catch parameter.
+    create_catch_bindings,
     /// Create an object property iterator for for-in loops.
     create_object_property_iterator,
     /// Create a declarative environment for a with statement.
@@ -94,8 +94,8 @@ pub const Instruction = enum(u8) {
     has_property,
     /// Increment the numeric result value by one.
     increment,
-    /// Call InitializeBoundName() with "*default*" and the result value.
-    initialize_default_export,
+    /// Call InitializeBoundName() with the given identifier.
+    initialize_bound_name,
     /// Call InitializeReferencedBinding() with the last reference on the reference stack and the result value.
     initialize_referenced_binding,
     /// Store InstanceofOperator() as the result value.
@@ -129,6 +129,8 @@ pub const Instruction = enum(u8) {
     load,
     /// Load a constant and add it to the stack.
     load_constant,
+    /// Load the exception value and add it to the stack.
+    load_and_clear_exception,
     /// Load the next method and iterator object from the top-most iterator record.
     load_iterator_next_args,
     /// Determine the this value for an upcoming evaluate_call instruction and add it to the stack.
@@ -221,7 +223,7 @@ pub const Instruction = enum(u8) {
             .binding_class_declaration_evaluation,
             .block_declaration_instantiation,
             .class_definition_evaluation,
-            .create_catch_binding,
+            .create_catch_bindings,
             .evaluate_call,
             .evaluate_new,
             .evaluate_property_access_with_expression_key,
@@ -230,6 +232,7 @@ pub const Instruction = enum(u8) {
             .get_iterator,
             .get_template_object,
             .has_private_element,
+            .initialize_bound_name,
             .instantiate_arrow_function_expression,
             .instantiate_async_arrow_function_expression,
             .instantiate_async_function_expression,
@@ -257,9 +260,9 @@ pub const Instruction = enum(u8) {
 
     pub fn hasIdentifierIndex(self: Instruction) bool {
         return switch (self) {
-            .create_catch_binding,
             .evaluate_property_access_with_identifier_key,
             .has_private_element,
+            .initialize_bound_name,
             .make_private_reference,
             .resolve_binding,
             .resolve_private_identifier,
@@ -274,6 +277,7 @@ pub const Instruction = enum(u8) {
             .binding_class_declaration_evaluation,
             .block_declaration_instantiation,
             .class_definition_evaluation,
+            .create_catch_bindings,
             .for_declaration_binding_instantiation,
             .get_template_object,
             .instantiate_arrow_function_expression,

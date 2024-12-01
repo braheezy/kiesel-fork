@@ -481,6 +481,50 @@ fn ensureUniqueLexicallyDeclaredNames(
     }
 }
 
+fn ensureUniqueCatchParameterNames(
+    self: *Parser,
+    bound_names: []const ast.Identifier,
+    lexically_declared_names: []const ast.Identifier,
+    var_declared_names: []const ast.Identifier,
+    location: ptk.Location,
+) std.mem.Allocator.Error!void {
+    var seen: std.StringHashMapUnmanaged(void) = .empty;
+    defer seen.deinit(self.allocator);
+
+    var lexical_names_set: std.StringHashMapUnmanaged(void) = .empty;
+    try lexical_names_set.ensureUnusedCapacity(self.allocator, @intCast(lexically_declared_names.len));
+    defer lexical_names_set.deinit(self.allocator);
+    for (lexically_declared_names) |name| lexical_names_set.putAssumeCapacity(name, {});
+
+    var var_names_set: std.StringHashMapUnmanaged(void) = .empty;
+    try var_names_set.ensureUnusedCapacity(self.allocator, @intCast(var_declared_names.len));
+    defer var_names_set.deinit(self.allocator);
+    for (var_declared_names) |name| var_names_set.putAssumeCapacity(name, {});
+
+    for (bound_names) |name| {
+        if (seen.contains(name)) {
+            try self.emitErrorAt(location, "Duplicate catch parameter '{s}'", .{name});
+        }
+        try seen.put(self.allocator, name, {});
+
+        if (lexical_names_set.contains(name)) {
+            try self.emitErrorAt(
+                location,
+                "Catch parameter '{s}' is also lexically declared",
+                .{name},
+            );
+        }
+
+        if (var_names_set.contains(name)) {
+            try self.emitErrorAt(
+                location,
+                "Catch parameter '{s}' is also var-declared",
+                .{name},
+            );
+        }
+    }
+}
+
 /// 5.1.5.8 [no LineTerminator here]
 /// https://tc39.es/ecma262/#sec-no-lineterminator-here
 fn followedByLineTerminator(self: *Parser) bool {
@@ -2698,10 +2742,12 @@ pub fn acceptTryStatement(self: *Parser) AcceptError!ast.TryStatement {
 
     _ = try self.core.accept(RuleSet.is(.@"try"));
     const try_block = try self.acceptBlock();
-    var catch_parameter: ?[]const u8 = null;
+    var catch_parameter: ?ast.CatchParameter = null;
+    var catch_parameter_location: ptk.Location = undefined;
     const catch_block = if (self.core.accept(RuleSet.is(.@"catch"))) |_| blk: {
         if (self.core.accept(RuleSet.is(.@"("))) |_| {
-            catch_parameter = try self.acceptBindingIdentifier();
+            catch_parameter_location = (try self.peekToken()).location;
+            catch_parameter = try self.acceptCatchParameter();
             _ = try self.core.accept(RuleSet.is(.@")"));
         } else |_| {}
         break :blk try self.acceptBlock();
@@ -2714,12 +2760,55 @@ pub fn acceptTryStatement(self: *Parser) AcceptError!ast.TryStatement {
         try self.emitError("'try' statement requires 'catch' or 'finally' block", .{});
         return error.UnexpectedToken;
     }
+
+    if (catch_parameter != null) {
+        var bound_names = IdentifierStackRange.open(self);
+        defer bound_names.deinit();
+        try catch_parameter.?.collectBoundNames(self.allocator, &self.identifier_stack);
+        bound_names.close();
+
+        var lexically_declared_names = IdentifierStackRange.open(self);
+        defer lexically_declared_names.deinit();
+        try catch_block.?.statement_list.collectLexicallyDeclaredNames(self.allocator, &self.identifier_stack);
+        lexically_declared_names.close();
+
+        var var_declared_names = IdentifierStackRange.open(self);
+        defer var_declared_names.deinit();
+        try catch_block.?.statement_list.collectVarDeclaredNames(self.allocator, &self.identifier_stack);
+        var_declared_names.close();
+
+        // - It is a Syntax Error if the BoundNames of CatchParameter contains any duplicate
+        //   elements.
+        // - It is a Syntax Error if any element of the BoundNames of CatchParameter also occurs in
+        //   the LexicallyDeclaredNames of Block.
+        // - It is a Syntax Error if any element of the BoundNames of CatchParameter also occurs in
+        //   the VarDeclaredNames of Block.
+        try self.ensureUniqueCatchParameterNames(
+            bound_names.slice(),
+            lexically_declared_names.slice(),
+            var_declared_names.slice(),
+            catch_parameter_location,
+        );
+    }
+
     return .{
         .try_block = try_block,
         .catch_parameter = catch_parameter,
         .catch_block = catch_block,
         .finally_block = finally_block,
     };
+}
+
+pub fn acceptCatchParameter(self: *Parser) AcceptError!ast.CatchParameter {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    if (self.acceptBindingIdentifier()) |binding_identifier|
+        return .{ .binding_identifier = binding_identifier }
+    else |_| if (self.acceptBindingPattern()) |binding_pattern|
+        return .{ .binding_pattern = binding_pattern }
+    else |_|
+        return error.UnexpectedToken;
 }
 
 pub fn acceptDebuggerStatement(self: *Parser) AcceptError!void {
